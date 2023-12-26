@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
@@ -39,7 +39,7 @@ use crate::{
             stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
         },
-        utils::{flatten, json},
+        utils::{flatten, json, schema_ext::SchemaExt},
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
@@ -388,9 +388,18 @@ pub async fn metrics_json_handler(
                             val_map,
                             None,
                         );
-                        let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                            schema: metric_schema_map.get(local_metric_name).unwrap().clone(),
-                            records: vec![],
+                        let hour_buf = buf.entry(hour_key).or_insert_with(|| {
+                            let schema = metric_schema_map
+                                .get(local_metric_name)
+                                .unwrap()
+                                .clone()
+                                .with_metadata(HashMap::new());
+                            let schema_key = schema.hash_key();
+                            SchemaRecords {
+                                schema_key,
+                                schema,
+                                records: vec![],
+                            }
                         });
                         hour_buf
                             .records

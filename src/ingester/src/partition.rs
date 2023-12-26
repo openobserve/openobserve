@@ -68,12 +68,12 @@ impl Partition {
 
     pub(crate) async fn persist(
         &self,
+        thread_id: usize,
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
         schema_key: &str,
     ) -> Result<Vec<PathBuf>> {
-        let thread_id = 0;
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);

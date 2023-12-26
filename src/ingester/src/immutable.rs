@@ -31,6 +31,7 @@ pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Immutable>> = Lazy::new(R
 
 #[warn(dead_code)]
 pub(crate) struct Immutable {
+    thread_id: usize,
     key: WriterKey,
     memtable: MemTable,
 }
@@ -52,15 +53,19 @@ pub async fn read_from_immutable(
 }
 
 impl Immutable {
-    pub(crate) fn new(key: WriterKey, memtable: MemTable) -> Self {
-        Self { key, memtable }
+    pub(crate) fn new(thread_id: usize, key: WriterKey, memtable: MemTable) -> Self {
+        Self {
+            thread_id,
+            key,
+            memtable,
+        }
     }
 
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<()> {
         // 1. dump memtable to disk
         let paths = self
             .memtable
-            .persist(&self.key.org_id, &self.key.stream_type)
+            .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)
             .await?;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");

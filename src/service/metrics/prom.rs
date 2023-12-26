@@ -40,7 +40,7 @@ use crate::{
             stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
         },
-        utils::{json, time::parse_i64_to_timestamp_micros},
+        utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
     },
     service::{
         db, format_stream_name,
@@ -297,9 +297,18 @@ pub async fn remote_write(
                 val_map,
                 None,
             );
-            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                schema: metric_schema_map.get(&metric_name).unwrap().clone(),
-                records: Vec::new(),
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| {
+                let schema = metric_schema_map
+                    .get(&metric_name)
+                    .unwrap()
+                    .clone()
+                    .with_metadata(HashMap::new());
+                let schema_key = schema.hash_key();
+                SchemaRecords {
+                    schema_key,
+                    schema,
+                    records: vec![],
+                }
             });
             hour_buf
                 .records

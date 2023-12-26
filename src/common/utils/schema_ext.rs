@@ -15,13 +15,20 @@
 
 use datafusion::arrow::datatypes::{Field, Schema};
 
+use super::hasher::get_fields_key_xxh3;
+
 /// SchemaExt helper...
 pub trait SchemaExt {
     fn to_cloned_fields(&self) -> Vec<Field>;
+    fn hash_key(&self) -> String;
 }
 
 impl SchemaExt for Schema {
     fn to_cloned_fields(&self) -> Vec<Field> {
         self.fields.iter().map(|x| (**x).clone()).collect()
+    }
+
+    fn hash_key(&self) -> String {
+        get_fields_key_xxh3(&self.to_cloned_fields())
     }
 }

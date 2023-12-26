@@ -53,11 +53,20 @@ impl MemTable {
         stream.read(time_range).await
     }
 
-    pub(crate) async fn persist(&self, org_id: &str, stream_type: &str) -> Result<Vec<PathBuf>> {
+    pub(crate) async fn persist(
+        &self,
+        thread_id: usize,
+        org_id: &str,
+        stream_type: &str,
+    ) -> Result<Vec<PathBuf>> {
         let mut paths = Vec::new();
         let r = self.streams.read().await;
         for (stream_name, stream) in r.iter() {
-            paths.extend(stream.persist(org_id, stream_type, stream_name).await?);
+            paths.extend(
+                stream
+                    .persist(thread_id, org_id, stream_type, stream_name)
+                    .await?,
+            );
         }
         Ok(paths)
     }

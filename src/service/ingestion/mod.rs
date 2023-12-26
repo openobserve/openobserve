@@ -330,24 +330,22 @@ pub async fn write_file(
     _partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
-    for (_key, entry) in buf {
+    for (hour_key, entry) in buf {
         if entry.records.is_empty() {
             continue;
         }
         let entry_records = entry.records.len();
 
         // -- call new ingester
-        println!("stream: {}, key: {}", stream.stream_name, _key);
         let writer =
             ingester::get_writer(thread_id, &stream.org_id, &stream.stream_type.to_string()).await;
         writer
             .write(
-                thread_id,
                 Arc::new(entry.schema),
                 ingester::Entry {
                     stream: Arc::from(stream.stream_name.as_str()),
-                    schema_key: Arc::from("default"),
-                    partition_key: Arc::from(_key.as_str()),
+                    schema_key: Arc::from(entry.schema_key.as_str()),
+                    partition_key: Arc::from(hour_key.as_str()),
                     data: entry.records,
                     data_size: 0,
                 },

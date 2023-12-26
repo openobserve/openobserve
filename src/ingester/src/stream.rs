@@ -57,6 +57,7 @@ impl Stream {
 
     pub(crate) async fn persist(
         &self,
+        thread_id: usize,
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
@@ -66,7 +67,7 @@ impl Stream {
         for (schema_key, partition) in r.iter() {
             paths.extend(
                 partition
-                    .persist(org_id, stream_type, stream_name, schema_key)
+                    .persist(thread_id, org_id, stream_type, stream_name, schema_key)
                     .await?,
             );
         }

@@ -32,7 +32,7 @@ use crate::{
             stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
         },
-        utils::{flatten, json, schema::infer_json_schema, time},
+        utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
     },
     service::{
         db, format_stream_name,
@@ -223,9 +223,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             record,
             None,
         );
-        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            schema: stream_schema_map.get(&stream_name).unwrap().clone(),
-            records: Vec::new(),
+        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| {
+            let schema = stream_schema_map
+                .get(&stream_name)
+                .unwrap()
+                .clone()
+                .with_metadata(HashMap::new());
+            let schema_key = schema.hash_key();
+            SchemaRecords {
+                schema_key,
+                schema,
+                records: Vec::new(),
+            }
         });
         hour_buf
             .records

@@ -115,22 +115,13 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     }
     for wal_file in wal_files.iter() {
         log::warn!("starting replay wal file: {:?}", wal_file);
-        let stream_type = wal_file
-            .parent()
-            .unwrap()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap();
-        let org_id = wal_file
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap();
+        let file_str = wal_file.to_string_lossy().to_string();
+        let file_columns = file_str.split('/').collect::<Vec<_>>();
+        let stream_type = file_columns[file_columns.len() - 2];
+        let org_id = file_columns[file_columns.len() - 3];
+        let thread_id: usize = file_columns[file_columns.len() - 4]
+            .parse()
+            .unwrap_or_default();
         let key = WriterKey::new(org_id, stream_type);
         let mut memtable = memtable::MemTable::new();
         let mut reader = wal::Reader::from_path(wal_file).context(WalSnafu)?;
@@ -174,7 +165,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
 
         immutable::IMMUTABLES.write().await.insert(
             wal_file.to_owned(),
-            immutable::Immutable::new(key, memtable),
+            immutable::Immutable::new(thread_id, key, memtable),
         );
     }
 

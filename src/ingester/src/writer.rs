@@ -52,6 +52,7 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 });
 
 pub struct Writer {
+    thread_id: usize,
     key: WriterKey,
     wal: Arc<Mutex<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
@@ -103,6 +104,7 @@ impl Writer {
             .join("logs")
             .join(thread_id.to_string());
         Self {
+            thread_id,
             key: key.clone(),
             wal: Arc::new(Mutex::new(
                 WalWriter::new(
@@ -120,12 +122,7 @@ impl Writer {
         }
     }
 
-    pub async fn write(
-        &self,
-        thread_id: usize,
-        schema: Arc<Schema>,
-        mut entry: Entry,
-    ) -> Result<()> {
+    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
@@ -133,7 +130,7 @@ impl Writer {
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
                 .join("logs")
-                .join(thread_id.to_string());
+                .join(self.thread_id.to_string());
             let new_wal = WalWriter::new(
                 wal_dir,
                 &self.key.org_id,
@@ -153,13 +150,14 @@ impl Writer {
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
             drop(mem);
 
+            let thread_id = self.thread_id;
             let key = self.key.clone();
             let path = old_wal.path().clone();
             tokio::task::spawn(async move {
                 IMMUTABLES
                     .write()
                     .await
-                    .insert(path, immutable::Immutable::new(key, old_mem));
+                    .insert(path, immutable::Immutable::new(thread_id, key, old_mem));
             });
         }
 

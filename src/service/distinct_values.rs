@@ -32,7 +32,7 @@ use crate::{
     common::{
         infra::errors::{Error, Result},
         meta::stream::{SchemaRecords, StreamParams},
-        utils::json,
+        utils::{json, schema_ext::SchemaExt},
     },
     service::{ingestion, stream::unwrap_partition_time_level},
 };
@@ -158,9 +158,15 @@ impl DistinctValues {
                     data,
                     None,
                 );
-                let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                    schema: schema(),
-                    records: vec![],
+
+                let hour_buf = buf.entry(hour_key).or_insert_with(|| {
+                    let schema = schema();
+                    let schema_key = schema.hash_key();
+                    SchemaRecords {
+                        schema_key,
+                        schema,
+                        records: vec![],
+                    }
                 });
                 hour_buf
                     .records
@@ -235,5 +241,18 @@ pub async fn close() -> Result<()> {
 }
 
 fn schema() -> Schema {
-    Schema::new(vec![Field::new("stream_type", DataType::Utf8, false)])
+    Schema::new(vec![
+        Field::new(
+            CONFIG.common.column_timestamp.as_str(),
+            DataType::Int64,
+            false,
+        ),
+        Field::new("count", DataType::Int64, false),
+        Field::new("stream_name", DataType::Utf8, false),
+        Field::new("stream_type", DataType::Utf8, false),
+        Field::new("field_name", DataType::Utf8, false),
+        Field::new("field_value", DataType::Utf8, true),
+        Field::new("filter_name", DataType::Utf8, true),
+        Field::new("filter_value", DataType::Utf8, true),
+    ])
 }

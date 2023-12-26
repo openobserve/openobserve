@@ -296,15 +296,12 @@ pub async fn handle_trace_request(
                 .await;
 
                 // get hour key
-                let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
-
-                // get hour key
                 let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
                     partition_time_level,
                     val_map,
-                    Some(&schema_key),
+                    None,
                 );
 
                 if trigger.is_none() && !stream_alerts_map.is_empty() {
@@ -329,11 +326,15 @@ pub async fn handle_trace_request(
                 }
                 let rec_schema = traces_schema_map.get(traces_stream_name).unwrap();
 
-                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                    schema: rec_schema
-                        .clone()
-                        .with_metadata(std::collections::HashMap::new()),
-                    records: vec![],
+                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| {
+                    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+                    SchemaRecords {
+                        schema_key,
+                        schema: rec_schema
+                            .clone()
+                            .with_metadata(std::collections::HashMap::new()),
+                        records: vec![],
+                    }
                 });
                 let loc_value: utils::json::Value =
                     utils::json::from_slice(value_str.as_bytes()).unwrap();

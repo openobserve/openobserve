@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, sync::Arc};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_multipart::Multipart;
 use actix_web::{
@@ -36,7 +36,7 @@ use crate::{
             stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
             usage::UsageType,
         },
-        utils::json,
+        utils::{json, schema_ext::SchemaExt},
     },
     service::{
         compact::retention,
@@ -172,10 +172,17 @@ pub async fn save_enrichment_data(
         );
     }
 
+    let schema = stream_schema_map
+        .get(stream_name)
+        .unwrap()
+        .clone()
+        .with_metadata(HashMap::new());
+    let schema_key = schema.hash_key();
     buf.insert(
         hour_key,
         SchemaRecords {
-            schema: stream_schema_map.get(stream_name).unwrap().clone(),
+            schema_key,
+            schema,
             records,
         },
     );

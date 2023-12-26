@@ -469,13 +469,12 @@ async fn add_valid_record_arrow(
     .await;
 
     // get hour key
-    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
         unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         local_val,
-        Some(&schema_key),
+        None,
     );
 
     let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
@@ -530,11 +529,15 @@ async fn add_valid_record_arrow(
                 // End check for alert trigger
             }
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
-            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                schema: rec_schema
-                    .clone()
-                    .with_metadata(std::collections::HashMap::new()),
-                records: vec![],
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| {
+                let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+                SchemaRecords {
+                    schema_key,
+                    schema: rec_schema
+                        .clone()
+                        .with_metadata(std::collections::HashMap::new()),
+                    records: vec![],
+                }
             });
             hour_buf.records.push(Arc::new(loc_value));
             status.successful += 1;
