@@ -138,9 +138,7 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
-import { q } from "msw/lib/SetupApi-8ab693f7";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import { emit } from "process";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
