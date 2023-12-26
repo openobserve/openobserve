@@ -62,6 +62,12 @@ export const convertLogData = (
       },
       // yaxis interval(it will show three values: 0, mid, max value)
       interval: Math.max(...y) / 2,
+      axisLabel: {
+        formatter: function (value: any) {
+          // Format the Y-axis label to show values without decimal points
+          return Math.round(value);
+        }
+      }
     },
     toolbox: {
       orient: "vertical",
