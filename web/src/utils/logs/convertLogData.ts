@@ -60,14 +60,19 @@ export const convertLogData = (
       axisLine: {
         show: true,
       },
+      axisPointer: {
+        label: {
+          precision: 0,
+        },
+      },
       // yaxis interval(it will show three values: 0, mid, max value)
       interval: Math.max(...y) / 2,
       axisLabel: {
         formatter: function (value: any) {
           // Format the Y-axis label to show values without decimal points
           return Math.round(value);
-        }
-      }
+        },
+      },
     },
     toolbox: {
       orient: "vertical",
@@ -76,10 +81,10 @@ export const convertLogData = (
       tooltip: {
         show: false,
       },
-      itemSize:0,
-      itemGap:0,
+      itemSize: 0,
+      itemGap: 0,
       // it is used to hide toolbox buttons
-      bottom:"100%",
+      bottom: "100%",
       feature: {
         dataZoom: {
           show: true,
