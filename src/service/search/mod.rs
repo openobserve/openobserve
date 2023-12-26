@@ -382,17 +382,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         None => &empty_vec,
     };
 
-    // compile vrl function & apply the same before sending the response
-    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-    let program = match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
-        Ok(program) => {
-            let registry = program.config.get_custom::<TableRegistry>().unwrap();
-            registry.finish_load();
-            Some(program)
-        }
-        Err(_) => None,
-    };
-
     if !batches_query.is_empty() {
         let schema = batches_query[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
@@ -411,6 +400,17 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 .map(json::Value::Object)
                 .collect()
         } else {
+            // compile vrl function & apply the same before returning the response
+            let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+            let program =
+                match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
+                    Ok(program) => {
+                        let registry = program.config.get_custom::<TableRegistry>().unwrap();
+                        registry.finish_load();
+                        Some(program)
+                    }
+                    Err(_) => None,
+                };
             match program {
                 Some(program) => json_rows
                     .into_iter()
