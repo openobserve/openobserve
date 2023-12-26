@@ -463,13 +463,13 @@ pub async fn merge(
     offset: usize,
     limit: usize,
     sql: &str,
-    batches: &[Vec<RecordBatch>],
+    batches: &[RecordBatch],
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
         return Ok(vec![]);
     }
-    if offset == 0 && batches.len() == 1 && batches[0].len() <= 1 {
-        return Ok(batches[0].to_owned());
+    if offset == 0 && batches.len() == 1 {
+        return Ok(batches.to_owned());
     }
 
     // let start = std::time::Instant::now();
@@ -568,28 +568,23 @@ pub async fn merge(
     Ok(batches)
 }
 
-fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>, String)> {
+fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, String)> {
     let mut i = 0;
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
     let mut schema = Schema::empty();
-    for item in batches.iter() {
-        if item.is_empty() {
+    for row in batches.iter() {
+        if row.num_rows() == 0 {
             continue;
         }
-        for row in item.iter() {
-            if row.num_rows() == 0 {
-                continue;
-            }
-            i += 1;
-            let row_schema = row.schema();
-            schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
-            let file_name = format!("{work_dir}{i}.parquet");
-            let mut buf_parquet = Vec::new();
-            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
-            writer.write(row)?;
-            writer.close()?;
-            tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
-        }
+        i += 1;
+        let row_schema = row.schema();
+        schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
+        let file_name = format!("{work_dir}{i}.parquet");
+        let mut buf_parquet = Vec::new();
+        let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
+        writer.write(row)?;
+        writer.close()?;
+        tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
     let schema = format_schema(&schema); // fix schema
     Ok((Arc::new(schema), work_dir))
@@ -1252,7 +1247,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = merge_write_recordbatch(&[vec![batch1, batch2]]).unwrap();
+        let res = merge_write_recordbatch(&[batch1, batch2]).unwrap();
         assert!(!res.0.fields().is_empty());
         assert!(!res.1.is_empty())
     }
@@ -1279,7 +1274,7 @@ mod tests {
             1,
             100,
             "select * from tbl limit 10",
-            &vec![vec![batch, batch2]],
+            &[batch, batch2],
         )
         .await
         .unwrap();

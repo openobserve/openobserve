@@ -117,22 +117,20 @@ pub async fn search(
         .instrument(storage_span),
     );
 
-    // merge data
+    // merge result
     let mut results = HashMap::new();
     let mut scan_stats = ScanStats::new();
     let tasks = try_join_all(vec![task1, task2, task3])
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     for task in tasks {
-        let (batch, stats) =
+        let (batches, stats) =
             task.map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
         scan_stats.add(&stats);
-        if !batch.is_empty() {
-            for (key, batch) in batch {
-                if !batch.is_empty() {
-                    let value = results.entry(key).or_insert_with(Vec::new);
-                    value.push(batch);
-                }
+        for (key, batch) in batches {
+            if !batch.is_empty() {
+                let value = results.entry(key).or_insert_with(Vec::new);
+                value.extend(batch);
             }
         }
     }
@@ -140,7 +138,7 @@ pub async fn search(
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
     let mut merge_results = HashMap::new();
-    for (name, batches) in results.iter() {
+    for (name, batches) in results {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
@@ -151,7 +149,7 @@ pub async fn search(
                 .clone()
         };
         let batches =
-            match super::datafusion::exec::merge(&sql.org_id, offset, limit, &merge_sql, batches)
+            match super::datafusion::exec::merge(&sql.org_id, offset, limit, &merge_sql, &batches)
                 .await
             {
                 Ok(res) => res,
@@ -162,13 +160,13 @@ pub async fn search(
             };
         merge_results.insert(name.to_string(), batches);
     }
-    drop(results);
 
     // clear session data
     datafusion::storage::file_list::clear(&session_id);
 
     // final result
     let mut hits_buf = Vec::new();
+    let mut hits_total = 0;
     let result_query = merge_results.get("query").cloned().unwrap_or_default();
     if !result_query.is_empty() && !result_query.is_empty() {
         let schema = result_query[0].schema();
@@ -179,7 +177,10 @@ pub async fn search(
         let mut writer =
             ipc::writer::FileWriter::try_new_with_options(hits_buf, &schema, ipc_options).unwrap();
         for batch in result_query {
-            writer.write(&batch).unwrap();
+            if batch.num_rows() > 0 {
+                hits_total += batch.num_rows();
+                writer.write(&batch).unwrap();
+            }
         }
         writer.finish().unwrap();
         hits_buf = writer.into_inner().unwrap();
@@ -216,7 +217,7 @@ pub async fn search(
         took: start.elapsed().as_millis() as i32,
         from: sql.meta.offset as i32,
         size: sql.meta.limit as i32,
-        total: 0,
+        total: hits_total as i64,
         hits: hits_buf,
         aggs: aggs_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
