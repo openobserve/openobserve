@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="display: flex">
     <q-tabs
-      v-model="selectedTab"
+      v-model="selectedTabIndex"
       :align="'left'"
       narrow-indicator
       dense
@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       active-color="primary"
       @click.stop
       style="max-width: calc(100% - 40px)"
+      @update:model-value="onTabChange"
     >
       <q-tab
         no-caps
@@ -36,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :name="index"
         @click.stop
         content-class="tab_content"
-        @mouseenter="() => hoveredTabIndex = index"
+        @mouseover="() => (hoveredTabIndex = index)"
         @mouseleave="hoveredTabIndex = -1"
       >
         <div class="full-width row justify-between no-wrap">
@@ -46,22 +47,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               overflow: hidden;
               text-overflow: ellipsis;
             "
-            :title="tab.name"
-            >{{ tab.name }}</span
+            :title="tab?.name"
+            >{{ tab?.name }}</span
           >
           <div v-if="hoveredTabIndex === index">
             <q-icon
               v-if="index"
               :name="outlinedEdit"
               class="q-ml-sm"
-              @click.stop="editTab(tab.tabId)"
+              @click.stop="editTab(index)"
               style="cursor: pointer; justify-self: end"
             />
             <q-icon
               v-if="index"
               :name="outlinedDelete"
               class="q-ml-sm"
-              @click.stop="showDeleteTabDialogFn(tab.tabId)"
+              @click.stop="showDeleteTabDialogFn(index)"
               style="cursor: pointer; justify-self: end"
             />
           </div>
@@ -83,10 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
       <AddTab
-        @update:tabs="updateTabList"
         :edit-mode="isTabEditMode"
-        :tab-id="selectedTabToEdit ?? 'default'"
+        :tabIndex="selectedTabIndexToEdit ?? -1"
         :tabs="tabs"
+        @update:tabs="updateTabList"
       />
     </q-dialog>
 
@@ -117,84 +118,65 @@ export default defineComponent({
     AddTab,
     ConfirmDialog,
   },
-  setup() {
+  props: {
+    tabs: {
+      required: true,
+      type: Array,
+    },
+    selectedTabIndex: {
+      required: true,
+      type: Number,
+    },
+  },
+  emits: ["update:selectedTab", "update:tabs"],
+  setup(props, { emit }) {
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
-    const selectedTabToEdit = ref(null);
-    const selectedTab = ref(0);
-    const selectedTabIdToDelete: any = ref(null);
+    const selectedTabIndexToEdit = ref(null);
+    const selectedTabIndexToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
     const hoveredTabIndex = ref(-1);
 
-    const tabs = ref([
-      {
-        tabId: "default",
-        name: "default",
-        description: "",
-      },
-      {
-        tabId: "default 2",
-        name: "default 2",
-        description: "",
-      },
-      {
-        tabId: "default 3",
-        name: "default 3",
-        description: "",
-      },
-      {
-        tabId: "default 4",
-        name: "default 4",
-        description: "",
-      },
-    ]);
-
-    const removeTab = (index: number) => {
-      tabs.value.splice(index, 1);
-    };
-
-    const updateTabList = (newFolder: any) => {
+    const updateTabList = (tabs: any) => {
+      emit("update:tabs", tabs);
       showAddTabDialog.value = false;
       isTabEditMode.value = false;
     };
 
-    const editTab = (tabId: any) => {
-      selectedTabToEdit.value = tabId;
+    const editTab = (index: any) => {
+      selectedTabIndexToEdit.value = index;
       isTabEditMode.value = true;
       showAddTabDialog.value = true;
     };
 
-    const showDeleteTabDialogFn = (tabId: any) => {
-      selectedTabIdToDelete.value = tabId;
+    const showDeleteTabDialogFn = (index: any) => {
+      selectedTabIndexToDelete.value = index;
       confirmDeleteTabDialog.value = true;
     };
 
     const deleteTab = () => {
-      tabs.value.splice(
-        tabs.value.findIndex(
-          (tab: any) => tab.tabId === selectedTabIdToDelete.value
-        ),
-        1
-      );
+      props?.tabs?.splice(selectedTabIndexToDelete.value, 1);
       confirmDeleteTabDialog.value = false;
     };
 
+    const onTabChange = (index: number) => {
+      emit("update:selectedTab", index);
+    };
+    
     return {
-      tabs,
-      selectedTab,
-      removeTab,
       showAddTabDialog,
       updateTabList,
       outlinedDelete,
       outlinedEdit,
       editTab,
-      selectedTabToEdit,
+      selectedTabIndexToEdit,
       isTabEditMode,
       showDeleteTabDialogFn,
       confirmDeleteTabDialog,
-      selectedTabIdToDelete,
+      selectedTabIndexToDelete,
       deleteTab,
       hoveredTabIndex,
+      onTabChange,
     };
   },
 });

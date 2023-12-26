@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
     />
-    <TabList class="q-mt-sm" />
+    <TabList class="q-mt-sm" v-model:tabs="tabs" v-model:selectedTabIndex="selectedTabIndex" />
     <slot name="before_panels" />
     <div class="displayDiv">
       <grid-layout
         ref="gridLayoutRef"
-        v-if="dashboardData.panels?.length > 0"
-        :layout.sync="getDashboardLayout(dashboardData)"
+        v-if="tabs[selectedTabIndex]?.panels?.length > 0"
+        :layout.sync="getDashboardLayout(tabs[selectedTabIndex])"
         :col-num="12"
         :row-height="30"
         :is-draggable="!viewOnly"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <grid-item
           class="gridBackground"
           :class="store.state.theme == 'dark' ? 'dark' : ''"
-          v-for="item in dashboardData.panels"
+          v-for="item in tabs[selectedTabIndex]?.panels || []"
           :key="item.id"
           :x="getPanelLayout(item, 'x')"
           :y="getPanelLayout(item, 'y')"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-card>
     </q-dialog>
-    <div v-if="!dashboardData.panels?.length">
+    <div v-if="!tabs[selectedTabIndex]?.panels?.length">
       <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
     </div>
@@ -112,6 +112,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
+import { watch } from "vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -144,6 +145,23 @@ export default defineComponent({
     const showViewPanel = ref(false);
     // holds the view panel id
     const viewPanelId = ref("");
+
+    // tabs array
+    const tabs = ref(props.dashboardData?.tabs || []);
+
+    // selected tab
+    // use route query tab else default
+    const defaultTabIndex = tabs.value.findIndex((tab: any) => tab.name === route?.query?.tab ?? "default");
+    const selectedTabIndex = ref(defaultTabIndex !== -1 ? defaultTabIndex : 0);
+
+    watch(
+      () => props.dashboardData?.tabs,
+      () => {
+        tabs.value = props.dashboardData?.tabs || [];
+        const defaultTabIndex = tabs?.value?.findIndex((tab: any) => tab.name === route?.query?.tab ?? "default");
+        selectedTabIndex.value = defaultTabIndex !== -1 ? defaultTabIndex : 0;
+      }
+    );
 
     // variables data
     const variablesData = reactive({});
@@ -215,9 +233,9 @@ export default defineComponent({
       saveDashboard();
     };
 
-    const getDashboardLayout = (dashboardData) => {
+    const getDashboardLayout = (tab) => {
       //map on each panels and return array of layouts
-      return dashboardData.panels?.map((item) => item.layout) || [];
+      return tab?.panels?.map((item) => item.layout) || [];
     };
 
     const getPanelLayout = (panelData, position) => {
@@ -289,6 +307,8 @@ export default defineComponent({
       layoutUpdate,
       showViewPanel,
       viewPanelId,
+      tabs,
+      selectedTabIndex,
     };
   },
   methods: {

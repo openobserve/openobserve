@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-form ref="addTabForm" @submit.stop="onSubmit.execute">
         <q-input
           v-model="tabData.name"
-          :label="t('dashboard.nameOfVariable') + '*'"
+          label="Name*"
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
@@ -42,18 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
-        />
-        <span>&nbsp;</span>
-        <q-input
-          v-model="tabData.description"
-          :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
         />
 
         <div class="flex justify-center q-mt-lg">
@@ -91,18 +79,17 @@ import { useLoading } from "@/composables/useLoading";
 
 const defaultValue = () => {
   return {
-    tabId: "",
     name: "",
-    description: "",
+    panels: [],
   };
 };
 
 export default defineComponent({
   name: "AddTab",
   props: {
-    tabId: {
-      type: String,
-      default: "default",
+    tabIndex: {
+      type: Number,
+      default: -1,
     },
     editMode: {
       type: Boolean,
@@ -110,21 +97,16 @@ export default defineComponent({
     },
     tabs: {
       type: Array,
-      default: () => [],
+      required: true,
     },
   },
   emits: ["update:tabs"],
   setup(props, { emit }) {
     const store: any = useStore();
     const addTabForm: any = ref(null);
-    const disableColor: any = ref("");
     const tabData: any = ref(
       props.editMode
-        ? JSON.parse(
-            JSON.stringify(
-              props?.tabs?.find((item: any) => item?.tabId === props.tabId)
-            )
-          )
+        ? JSON.parse(JSON.stringify(props?.tabs[props.tabIndex]))
         : defaultValue()
     );
     const isValidIdentifier: any = ref(true);
@@ -145,22 +127,24 @@ export default defineComponent({
             //   tabData.value.folderId,
             //   tabData.value
             // );
-            props.tabs[
-              props.tabs.findIndex((item: any) => item?.tabId === props.tabId)
-            ] = tabData.value;
+            // props.tabs[props.tabIndex] = tabData.value;
+            const newTab = JSON.parse(JSON.stringify(props.tabs));
+            newTab[props.tabIndex] = tabData.value;
+            emit("update:tabs", newTab);
             $q.notify({
               type: "positive",
               message: "Tab updated",
               timeout: 2000,
             });
-            emit("update:tabs", tabData.value);
           }
           //else new tab
           else {
             // const newTab: any = await createFolder(store, tabData.value);
             // const newTab = tabData.value;
-            props?.tabs?.push(tabData.value);
-            emit("update:tabs", tabData.value);
+            // props?.tabs?.push(tabData.value);
+            const newTab = JSON.parse(JSON.stringify(props.tabs))?.push(tabData.value);
+            // newTab[props.tabIndex] = tabData.value;
+            emit("update:tabs", newTab);
             $q.notify({
               type: "positive",
               message: `Tab added successfully.`,
@@ -168,6 +152,8 @@ export default defineComponent({
             });
           }
         } catch (err: any) {
+          console.log("err", err);
+          
           $q.notify({
             type: "negative",
             message: JSON.stringify(
@@ -177,9 +163,8 @@ export default defineComponent({
           });
         } finally {
           tabData.value = {
-            TabId: "",
             name: "",
-            description: "",
+            panels: [],
           };
           await addTabForm.value.resetValidation();
         }
@@ -188,9 +173,6 @@ export default defineComponent({
 
     return {
       t,
-      disableColor,
-      isPwd: ref(true),
-      status,
       tabData,
       addTabForm,
       store,
