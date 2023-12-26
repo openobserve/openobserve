@@ -52,6 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-mr-sm download-logs-btn q-px-sm"
             size="sm"
             icon="share"
+            round
+            flat
+            no-outline
             :title="t('search.shareLink')"
             @click="shareLink"
           />
