@@ -330,27 +330,7 @@ export default defineComponent({
             query_context: b64EncodeUnicode(query_context),
           })
           .then((res: any) => {
-            const values: any = new Set([]);
-
-            fieldValues.value[name]["values"] =
-              res.data.hits
-                .find((field: any) => field.field === name)
-                ?.values.map((value: any) => {
-                  values.add(value.zo_sql_key);
-                  return {
-                    key: value.zo_sql_key ? value.zo_sql_key : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
-                }) || [];
-
-            fieldValues.value[name].selectedValues.forEach((value: string) => {
-              if (values.has(value)) return;
-              else
-                fieldValues.value[name]["values"].unshift({
-                  key: value,
-                  count: "0",
-                });
-            });
+            updateSelectedValues(res.data.hits);
           })
           .catch(() => {
             $q.notify({
@@ -509,23 +489,21 @@ export default defineComponent({
           query_context: b64EncodeUnicode(query_context),
         })
         .then((res: any) => {
+          let fieldsToUpdate = [];
+
           fields.forEach((field) => {
             fieldValues.value[field]["values"] = [];
             fieldValues.value[field].size = 10;
           });
 
-          if (res.data.hits.length) {
-            res.data.hits.forEach((field: { field: string; values: any[] }) => {
-              fieldValues.value[field.field]["values"] = field.values.map(
-                (value: any) => {
-                  return {
-                    key: value.zo_sql_key ? value.zo_sql_key : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
-                }
-              );
-            });
-          }
+          fieldsToUpdate = fields.map((field) => ({
+            field,
+            values: [],
+          }));
+
+          fieldsToUpdate.push(...res.data.hits);
+
+          updateSelectedValues(fieldsToUpdate);
         })
         .catch(() => {
           $q.notify({
@@ -611,6 +589,34 @@ export default defineComponent({
           (_column) => _column !== columnName
         );
       }
+    };
+
+    //
+    const updateSelectedValues = (hits: any[]) => {
+      console.log("hits", hits);
+      hits.forEach((field: any) => {
+        const values: any = new Set([]);
+
+        fieldValues.value[field.field]["values"] =
+          field.values.map((value: any) => {
+            values.add(value.zo_sql_key);
+            return {
+              key: value.zo_sql_key ? value.zo_sql_key : "null",
+              count: formatLargeNumber(value.zo_sql_num),
+            };
+          }) || [];
+
+        fieldValues.value[field.field].selectedValues.forEach(
+          (value: string) => {
+            if (values.has(value)) return;
+            else
+              fieldValues.value[field.field]["values"].unshift({
+                key: value,
+                count: "0",
+              });
+          }
+        );
+      });
     };
 
     // const getFullQuery = () => {
