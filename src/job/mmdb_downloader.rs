@@ -48,26 +48,48 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_download_files() {
     // send request and await response
     let client = reqwest::Client::new();
-    let fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    let city_fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    let asn_fname = format!("{}{}", &CONFIG.common.mmdb_data_dir, MMDB_ASN_FILE_NAME);
 
-    let download_files = is_digest_different(&fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url)
-        .await
-        .unwrap_or_else(|e| {
-            log::error!("Error checking digest difference: {e}");
-            false
-        });
+    let download_city_files =
+        is_digest_different(&city_fname, &CONFIG.common.mmdb_geolite_citydb_sha256_url)
+            .await
+            .unwrap_or_else(|e| {
+                log::error!("Error checking digest difference: {e}");
+                false
+            });
 
-    if download_files {
-        match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &fname).await {
+    let download_asn_files =
+        is_digest_different(&asn_fname, &CONFIG.common.mmdb_geolite_asndb_sha256_url)
+            .await
+            .unwrap_or_else(|e| {
+                log::error!("Error checking digest difference: {e}");
+                false
+            });
+
+    if download_city_files {
+        match download_file(&client, &CONFIG.common.mmdb_geolite_citydb_url, &city_fname).await {
             Ok(()) => {}
             Err(e) => log::error!("failed to download the files {}", e),
         }
     }
 
-    if Lazy::get(&CLIENT_INITIALIZED).is_none() || download_files {
-        update_global_maxmind_client(&fname).await;
-        Lazy::force(&CLIENT_INITIALIZED);
+    if download_asn_files {
+        match download_file(&client, &CONFIG.common.mmdb_geolite_asndb_url, &asn_fname).await {
+            Ok(()) => {}
+            Err(e) => log::error!("failed to download the files {}", e),
+        }
     }
+
+    let client = Lazy::get(&CLIENT_INITIALIZED);
+
+    if client.is_none() || download_asn_files {
+        update_global_maxmind_client(&asn_fname).await;
+    }
+    if client.is_none() || download_city_files {
+        update_global_maxmind_client(&city_fname).await;
+    }
+    Lazy::force(&CLIENT_INITIALIZED);
 }
 
 /// Update the global maxdb client object
@@ -76,9 +98,16 @@ pub async fn update_global_maxmind_client(fname: &str) {
         Ok(maxminddb_client) => {
             let mut client = MAXMIND_DB_CLIENT.write().await;
             *client = Some(maxminddb_client);
-            let mut geoip = GEOIP_TABLE.write();
-            *geoip = Some(Geoip::new(GeoipConfig::default()).unwrap());
-            log::info!("Successfully updated MaxmindClient");
+
+            if fname.ends_with(MMDB_CITY_FILE_NAME) {
+                let mut geoip_city = GEOIP_CITY_TABLE.write();
+                *geoip_city = Some(Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap());
+            } else {
+                let mut geoip_asn = GEOIP_ASN_TABLE.write();
+                *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
+            }
+
+            log::info!("Successfully updated MaxmindClient for {}", fname);
         }
         Err(e) => log::warn!(
             "Failed to create MaxmindClient with path: {}, {}",
