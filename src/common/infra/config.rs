@@ -379,25 +379,25 @@ pub struct Common {
 
     #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_URL",
-        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.mmdb"
+        default = "https://geoip.zinclabs.dev/GeoLite2-City.mmdb"
     )]
     pub mmdb_geolite_citydb_url: String,
 
     #[env_config(
         name = "ZO_MMDB_GEOLITE_ASNDB_URL",
-        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-ASN.mmdb"
+        default = "https://geoip.zinclabs.dev/GeoLite2-ASN.mmdb"
     )]
     pub mmdb_geolite_asndb_url: String,
 
     #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
-        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-City.sha256"
+        default = "https://geoip.zinclabs.dev/GeoLite2-City.sha256"
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
 
     #[env_config(
         name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
-        default = "https://dha4druvz9fbr.cloudfront.net/GeoLite2-ASN.sha256"
+        default = "https://geoip.zinclabs.dev/GeoLite2-ASN.sha256"
     )]
     pub mmdb_geolite_asndb_sha256_url: String,
 
