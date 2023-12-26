@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isLoading="searchObj.loading"
         @searchdata="searchData"
         @onChangeTimezone="refreshTimezone"
+        @shareLink="copyTracesUrl"
       />
       <div
         id="tracesThirdLevel"
@@ -143,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:datetime="setHistogramDate"
                 @update:scroll="getMoreData"
                 @get:traceDetails="getTraceDetails"
+                @shareLink="copyTracesUrl"
               />
             </div>
           </template>
@@ -162,7 +164,7 @@ import {
   onBeforeMount,
   nextTick,
 } from "vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar, date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -556,7 +558,9 @@ export default defineComponent({
 
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
-        updateUrlQueryParams();
+        const queryParams = getUrlQueryParams();
+        console.log(queryParams);
+        router.push({ query: queryParams });
         return req;
       } catch (e) {
         searchObj.loading = false;
@@ -1191,11 +1195,44 @@ export default defineComponent({
       }
     }
 
-    function updateUrlQueryParams() {
+    const copyTracesUrl = () => {
+      const queryParams = getUrlQueryParams(true);
+
+      const queryString = Object.entries(queryParams)
+        .map(
+          ([key, value]) =>
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+        )
+        .join("&");
+
+      let shareURL = window.location.origin + window.location.pathname;
+
+      if (queryString != "") {
+        shareURL += "?" + queryString;
+      }
+
+      copyToClipboard(shareURL)
+        .then(() => {
+          $q.notify({
+            type: "positive",
+            message: "Link Copied Successfully!",
+            timeout: 5000,
+          });
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Error while copy link.",
+            timeout: 5000,
+          });
+        });
+    };
+
+    function getUrlQueryParams(getShareLink: false) {
       const date = searchObj.data.datetime;
       const query = {};
 
-      if (date.type == "relative") {
+      if (date.type == "relative" && !getShareLink) {
         query["period"] = date.relativeTimePeriod;
       } else {
         query["from"] = date.startTime;
@@ -1210,7 +1247,7 @@ export default defineComponent({
 
       query["trace_id"] = router.currentRoute.value.query.trace_id;
 
-      router.push({ query });
+      return query;
     }
 
     const onSplitterUpdate = () => {
@@ -1300,6 +1337,7 @@ export default defineComponent({
       onSplitterUpdate,
       refreshTimezone,
       indexListRef,
+      copyTracesUrl,
     };
   },
   computed: {

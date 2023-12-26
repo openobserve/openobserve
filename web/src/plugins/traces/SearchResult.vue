@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
         @hide="closeTraceDetails"
       >
-        <trace-details />
+        <trace-details @shareLink="shareLink" />
       </q-dialog>
     </div>
   </div>
@@ -97,6 +97,7 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
+    "shareLink",
   ],
   methods: {
     closeColumn(col: any) {
@@ -239,6 +240,10 @@ export default defineComponent({
       expandRowDetail(searchObj.data.queryResults.hits[data.dataIndex]);
     };
 
+    const shareLink = () => {
+      emit("shareLink");
+    };
+
     return {
       t,
       store,
@@ -258,6 +263,7 @@ export default defineComponent({
       showTraceDetails,
       closeTraceDetails,
       onChartClick,
+      shareLink,
     };
   },
 });

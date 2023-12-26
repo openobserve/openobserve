@@ -113,7 +113,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="download"
           title="Export Traces"
           @click="downloadLogs"
-        ></q-btn>
+        />
+        <q-btn
+          data-test="logs-search-bar-share-link-btn"
+          class="q-mr-sm download-logs-btn q-px-sm"
+          size="sm"
+          icon="share"
+          :title="t('search.shareLink')"
+          @click="shareLink"
+        />
       </div>
     </div>
     <div
@@ -175,7 +183,7 @@ export default defineComponent({
     AppTabs,
     ConfirmDialog,
   },
-  emits: ["searchdata"],
+  emits: ["searchdata", "shareLink"],
   props: {
     fieldValues: {
       type: Object,
@@ -384,6 +392,10 @@ export default defineComponent({
       });
     };
 
+    const shareLink = () => {
+      emit("shareLink");
+    };
+
     return {
       t,
       router,
@@ -404,6 +416,7 @@ export default defineComponent({
       showWarningDialog,
       changeToggle,
       resetFilters,
+      shareLink,
     };
   },
   computed: {
