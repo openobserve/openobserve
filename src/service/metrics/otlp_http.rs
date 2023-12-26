@@ -386,7 +386,6 @@ pub async fn metrics_json_handler(
                             &partition_keys,
                             partition_time_level,
                             val_map,
-                            None,
                         );
                         let hour_buf = buf.entry(hour_key).or_insert_with(|| {
                             let schema = metric_schema_map

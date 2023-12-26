@@ -364,7 +364,6 @@ pub async fn traces_json(
                         &partition_keys,
                         partition_time_level,
                         val_map,
-                        None,
                     );
 
                     if trigger.is_none() && !stream_alerts_map.is_empty() {

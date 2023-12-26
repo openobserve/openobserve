@@ -193,7 +193,6 @@ pub fn get_wal_time_key(
     partition_keys: &Vec<String>,
     time_level: PartitionTimeLevel,
     local_val: &Map<String, Value>,
-    suffix: Option<&str>,
 ) -> String {
     // get time file name
     let mut time_key = match time_level {
@@ -206,11 +205,6 @@ pub fn get_wal_time_key(
             .format("%Y/%m/%d/00")
             .to_string(),
     };
-    if let Some(s) = suffix {
-        time_key.push_str(&format!("/{s}"));
-    } else {
-        time_key.push_str("/default");
-    }
     for key in partition_keys {
         match local_val.get(key) {
             Some(v) => {
@@ -416,7 +410,6 @@ mod tests {
                 &vec!["country".to_string(), "sport".to_string()],
                 PartitionTimeLevel::Hourly,
                 &local_val,
-                None
             ),
             "1970/01/01/00/default/country=USA/sport=basketball"
         );
@@ -428,26 +421,14 @@ mod tests {
         local_val.insert("country".to_string(), Value::String("USA".to_string()));
         local_val.insert("sport".to_string(), Value::String("basketball".to_string()));
         assert_eq!(
-            get_wal_time_key(
-                1620000000,
-                &vec![],
-                PartitionTimeLevel::Hourly,
-                &local_val,
-                None
-            ),
+            get_wal_time_key(1620000000, &vec![], PartitionTimeLevel::Hourly, &local_val,),
             "1970/01/01/00/default"
         );
     }
     #[test]
     fn test_get_wal_time_key_no_partition_keys_no_local_val() {
         assert_eq!(
-            get_wal_time_key(
-                1620000000,
-                &vec![],
-                PartitionTimeLevel::Hourly,
-                &Map::new(),
-                None
-            ),
+            get_wal_time_key(1620000000, &vec![], PartitionTimeLevel::Hourly, &Map::new(),),
             "1970/01/01/00/default"
         );
     }

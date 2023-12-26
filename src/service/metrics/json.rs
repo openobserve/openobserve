@@ -216,13 +216,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_wal_time_key(
-            timestamp,
-            &partition_keys,
-            partition_time_level,
-            record,
-            None,
-        );
+        let hour_key = get_wal_time_key(timestamp, &partition_keys, partition_time_level, record);
         let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| {
             let schema = stream_schema_map
                 .get(&stream_name)

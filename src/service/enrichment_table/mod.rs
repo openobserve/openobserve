@@ -155,7 +155,6 @@ pub async fn save_enrichment_data(
                         &vec![],
                         PartitionTimeLevel::Unset,
                         &json_record,
-                        None,
                     );
                 }
                 records.push(Arc::new(json::Value::Object(json_record)));

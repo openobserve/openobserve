@@ -156,7 +156,6 @@ impl DistinctValues {
                     &vec![],
                     unwrap_partition_time_level(None, StreamType::Metadata),
                     data,
-                    None,
                 );
 
                 let hour_buf = buf.entry(hour_key).or_insert_with(|| {
