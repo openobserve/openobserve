@@ -29,6 +29,7 @@ pub struct Writer {
     path: PathBuf,
     f: File,
     bytes_written: usize,
+    uncompressed_bytes_written: usize,
     buffer: Vec<u8>,
 }
 
@@ -65,6 +66,7 @@ impl Writer {
             path,
             f,
             bytes_written,
+            uncompressed_bytes_written: bytes_written,
             buffer: Vec::with_capacity(8 * 1204),
         })
     }
@@ -73,8 +75,10 @@ impl Writer {
         &self.path
     }
 
-    pub fn size(&self) -> usize {
-        self.bytes_written
+    /// Return the number of bytes written (compressed, uncompressed) to the
+    /// file.
+    pub fn size(&self) -> (usize, usize) {
+        (self.bytes_written, self.uncompressed_bytes_written)
     }
 
     /// write the data to the wal file
@@ -132,6 +136,7 @@ impl Writer {
         self.f.sync_all().expect("fsync failure");
 
         self.bytes_written += bytes_written;
+        self.uncompressed_bytes_written += uncompressed_len;
         Ok(())
     }
 
