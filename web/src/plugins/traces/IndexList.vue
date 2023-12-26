@@ -336,6 +336,7 @@ export default defineComponent({
               res.data.hits
                 .find((field: any) => field.field === name)
                 ?.values.map((value: any) => {
+                  values.add(value.zo_sql_key);
                   return {
                     key: value.zo_sql_key ? value.zo_sql_key : "null",
                     count: formatLargeNumber(value.zo_sql_num),

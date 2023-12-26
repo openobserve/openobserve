@@ -732,8 +732,6 @@ export default defineComponent({
 
         const durationFilter = indexListRef.value.duration.input;
 
-        console.log(durationFilter);
-
         let filter = searchObj.data.editorValue.trim();
 
         let duration = "";
