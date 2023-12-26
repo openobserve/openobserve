@@ -64,7 +64,8 @@ impl super::FileList for PostgresFileList {
 
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
         match  sqlx::query(
             r#"
@@ -97,7 +98,8 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 
     async fn remove(&self, file: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         sqlx::query(r#"DELETE FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#)
             .bind(stream_key)
             .bind(date_key)
@@ -181,7 +183,8 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
-                let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+                let (stream_key, date_key, file_name) =
+                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
                 let ret: Option<i64> = sqlx::query_scalar(
                     r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
@@ -259,7 +262,8 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             let pool = CLIENT.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
-                let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+                let (stream_key, date_key, file_name) =
+                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
                 let ret: Option<i64> = sqlx::query_scalar(
                     r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
@@ -290,7 +294,8 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
@@ -307,7 +312,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn contains(&self, file: &str) -> Result<bool> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size

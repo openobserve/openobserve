@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::BufReader};
+use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use actix_web::{http, web};
 use ahash::AHashMap;
@@ -29,7 +29,7 @@ use crate::{
         meta::{
             ingestion::{IngestionResponse, StreamStatus},
             prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
         },
         utils::{flatten, json, schema::infer_json_schema, time},
@@ -57,7 +57,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
-    let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut stream_data_buf: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
@@ -223,8 +223,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             record,
             None,
         );
-        let hour_buf = stream_buf.entry(hour_key).or_default();
-        hour_buf.push(record_str);
+        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema: stream_schema_map.get(&stream_name).unwrap().clone(),
+            records: Vec::new(),
+        });
+        hour_buf
+            .records
+            .push(Arc::new(json::Value::Object(record.to_owned())));
 
         // update status
         let stream_status = stream_status_map
@@ -254,9 +259,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
-            &stream_data,
+            stream_data,
             thread_id,
-            &StreamParams::new(org_id, org_id, StreamType::Metrics),
+            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
@@ -33,7 +35,7 @@ use crate::{
             alerts::{self, Alert},
             http::HttpResponse as MetaHttpResponse,
             prom::*,
-            stream::{PartitioningDetails, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
         },
         utils::{flatten, json},
@@ -75,7 +77,7 @@ pub async fn handle_grpc_request(
     }
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
@@ -290,8 +292,13 @@ pub async fn handle_grpc_request(
                         val_map,
                         None,
                     );
-                    let hour_buf = buf.entry(hour_key).or_default();
-                    hour_buf.push(value_str);
+                    let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                        schema: metric_schema_map.get(local_metric_name).unwrap().clone(),
+                        records: vec![],
+                    });
+                    hour_buf
+                        .records
+                        .push(Arc::new(json::Value::Object(val_map.to_owned())));
 
                     // real time alert
                     let need_trigger = !stream_trigger_map.contains_key(local_metric_name);
@@ -351,9 +358,9 @@ pub async fn handle_grpc_request(
         };
 
         let mut req_stats = write_file(
-            &stream_data,
+            stream_data,
             thread_id,
-            &StreamParams::new(org_id, org_id, StreamType::Metrics),
+            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             &mut stream_file_name,
             time_level,
         )

@@ -162,7 +162,8 @@ impl super::FileList for SqliteFileList {
 
     async fn get(&self, file: &str) -> Result<FileMeta> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size
@@ -179,7 +180,8 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
     async fn contains(&self, file: &str) -> Result<bool> {
         let pool = CLIENT.clone();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(file)?;
+        let (stream_key, date_key, file_name) =
+            parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query(
             r#"
 SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size

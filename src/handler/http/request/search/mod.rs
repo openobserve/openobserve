@@ -23,10 +23,7 @@ use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
 
 use crate::{
     common::{
-        infra::{
-            config::{STREAM_SCHEMAS},
-            errors, metrics,
-        }, 
+        infra::{config::STREAM_SCHEMAS, errors, metrics},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
