@@ -150,11 +150,14 @@ pub async fn save_enrichment_data(
                 .await;
 
                 if records.is_empty() {
+                    let schema = stream_schema_map.get(stream_name).unwrap();
+                    let schema_key = schema.hash_key();
                     hour_key = super::ingestion::get_wal_time_key(
                         timestamp,
                         &vec![],
                         PartitionTimeLevel::Unset,
                         &json_record,
+                        Some(&schema_key),
                     );
                 }
                 records.push(Arc::new(json::Value::Object(json_record)));
@@ -181,7 +184,7 @@ pub async fn save_enrichment_data(
         hour_key,
         SchemaRecords {
             schema_key,
-            schema,
+            schema: Arc::new(schema),
             records,
         },
     );

@@ -215,20 +215,24 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
+        let schema = stream_schema_map
+            .get(&stream_name)
+            .unwrap()
+            .clone()
+            .with_metadata(HashMap::new());
+        let schema_key = schema.hash_key();
+        let hour_key = get_wal_time_key(
+            timestamp,
+            &partition_keys,
+            partition_time_level,
+            record,
+            Some(&schema_key),
+        );
         let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-        let hour_key = get_wal_time_key(timestamp, &partition_keys, partition_time_level, record);
-        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| {
-            let schema = stream_schema_map
-                .get(&stream_name)
-                .unwrap()
-                .clone()
-                .with_metadata(HashMap::new());
-            let schema_key = schema.hash_key();
-            SchemaRecords {
-                schema_key,
-                schema,
-                records: Vec::new(),
-            }
+        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema_key,
+            schema: Arc::new(schema),
+            records: vec![],
         });
         hour_buf
             .records

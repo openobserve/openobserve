@@ -39,7 +39,7 @@ pub fn generate_storage_file_name(
     stream_name: &str,
     wal_file_name: &str,
 ) -> String {
-    // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+    // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/ip=1234/7099303408192061440f3XQ2p.json
     let file_columns = wal_file_name.splitn(7, '/').collect::<Vec<&str>>();
     let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let file_date = format!(

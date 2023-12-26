@@ -276,7 +276,6 @@ pub async fn check_for_schema(
     };
 
     if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
-        // return (true, None, schema.fields().to_vec());
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,

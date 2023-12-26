@@ -72,7 +72,6 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-        schema_key: &str,
     ) -> Result<Vec<PathBuf>> {
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
@@ -86,7 +85,6 @@ impl Partition {
             let file_name = Utc::now().timestamp_nanos_opt().unwrap().to_string();
             let mut path = path.clone();
             path.push(hour.to_string());
-            path.push(schema_key);
             path.push(file_name);
             path.set_extension("par");
             create_dir_all(path.parent().unwrap())

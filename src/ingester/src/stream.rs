@@ -64,10 +64,10 @@ impl Stream {
     ) -> Result<Vec<PathBuf>> {
         let mut paths = Vec::new();
         let r = self.partitions.read().await;
-        for (schema_key, partition) in r.iter() {
+        for (_, partition) in r.iter() {
             paths.extend(
                 partition
-                    .persist(thread_id, org_id, stream_type, stream_name, schema_key)
+                    .persist(thread_id, org_id, stream_type, stream_name)
                     .await?,
             );
         }

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
@@ -367,11 +367,13 @@ async fn add_valid_record_arrow(
     .await;
 
     // get hour key
+    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
         unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         local_val,
+        Some(&schema_key),
     );
 
     let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
@@ -428,11 +430,10 @@ async fn add_valid_record_arrow(
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
             let hour_buf = buf.entry(hour_key).or_insert_with(|| {
                 let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+                let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
                 SchemaRecords {
                     schema_key,
-                    schema: rec_schema
-                        .clone()
-                        .with_metadata(std::collections::HashMap::new()),
+                    schema,
                     records: vec![],
                 }
             });

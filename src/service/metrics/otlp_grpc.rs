@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
@@ -284,25 +284,20 @@ pub async fn handle_grpc_request(
                     let buf = metric_data_map
                         .entry(local_metric_name.to_owned())
                         .or_default();
+                    let schema = metric_schema_map.get(local_metric_name).unwrap().clone();
+                    let schema_key = schema.hash_key();
                     // get hour key
                     let hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp,
                         &partition_keys,
                         partition_time_level,
                         val_map,
+                        Some(&schema_key),
                     );
-                    let hour_buf = buf.entry(hour_key).or_insert_with(|| {
-                        let schema = metric_schema_map
-                            .get(local_metric_name)
-                            .unwrap()
-                            .clone()
-                            .with_metadata(HashMap::new());
-                        let schema_key = schema.hash_key();
-                        SchemaRecords {
-                            schema_key,
-                            schema,
-                            records: vec![],
-                        }
+                    let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                        schema_key,
+                        schema: Arc::new(schema),
+                        records: vec![],
                     });
                     hour_buf
                         .records

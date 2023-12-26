@@ -377,6 +377,13 @@ pub async fn metrics_json_handler(
                         )
                         .await;
 
+                        let schema = metric_schema_map
+                            .get(local_metric_name)
+                            .unwrap()
+                            .clone()
+                            .with_metadata(HashMap::new());
+                        let schema_key = schema.hash_key();
+
                         let buf = metric_data_map
                             .entry(local_metric_name.to_owned())
                             .or_default();
@@ -386,19 +393,12 @@ pub async fn metrics_json_handler(
                             &partition_keys,
                             partition_time_level,
                             val_map,
+                            Some(&schema_key),
                         );
-                        let hour_buf = buf.entry(hour_key).or_insert_with(|| {
-                            let schema = metric_schema_map
-                                .get(local_metric_name)
-                                .unwrap()
-                                .clone()
-                                .with_metadata(HashMap::new());
-                            let schema_key = schema.hash_key();
-                            SchemaRecords {
-                                schema_key,
-                                schema,
-                                records: vec![],
-                            }
+                        let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                            schema_key,
+                            schema: Arc::new(schema),
+                            records: vec![],
                         });
                         hour_buf
                             .records

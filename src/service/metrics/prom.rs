@@ -289,25 +289,25 @@ pub async fn remote_write(
             )
             .await;
 
+            let schema = metric_schema_map
+                .get(&metric_name)
+                .unwrap()
+                .clone()
+                .with_metadata(HashMap::new());
+            let schema_key = schema.hash_key();
+
             // get hour key
             let hour_key = crate::service::ingestion::get_wal_time_key(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
                 val_map,
+                Some(&schema_key),
             );
-            let hour_buf = buf.entry(hour_key).or_insert_with(|| {
-                let schema = metric_schema_map
-                    .get(&metric_name)
-                    .unwrap()
-                    .clone()
-                    .with_metadata(HashMap::new());
-                let schema_key = schema.hash_key();
-                SchemaRecords {
-                    schema_key,
-                    schema,
-                    records: vec![],
-                }
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                schema_key,
+                schema: Arc::new(schema),
+                records: vec![],
             });
             hour_buf
                 .records

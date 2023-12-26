@@ -350,7 +350,7 @@ pub struct SchemaEvolution {
 
 pub struct SchemaRecords {
     pub schema_key: String,
-    pub schema: Schema,
+    pub schema: Arc<Schema>,
     pub records: Vec<Arc<json::Value>>,
 }
 

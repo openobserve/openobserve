@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, sync::Arc};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
@@ -91,8 +91,8 @@ pub async fn handle_trace_request(
     let traces_stream_name = &traces_stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
     let stream_schema = stream_schema_exists(
@@ -295,12 +295,14 @@ pub async fn handle_trace_request(
                 )
                 .await;
 
+                let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
                 // get hour key
                 let mut hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
                     partition_time_level,
                     val_map,
+                    Some(&schema_key),
                 );
 
                 if trigger.is_none() && !stream_alerts_map.is_empty() {
@@ -323,15 +325,16 @@ pub async fn handle_trace_request(
                     let partition_key = format!("service_name={}", service_name);
                     hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
                 }
-                let rec_schema = traces_schema_map.get(traces_stream_name).unwrap();
 
                 let hour_buf = data_buf.entry(hour_key).or_insert_with(|| {
-                    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+                    let schema = traces_schema_map
+                        .get(traces_stream_name)
+                        .unwrap()
+                        .clone()
+                        .with_metadata(HashMap::new());
                     SchemaRecords {
                         schema_key,
-                        schema: rec_schema
-                            .clone()
-                            .with_metadata(std::collections::HashMap::new()),
+                        schema: Arc::new(schema),
                         records: vec![],
                     }
                 });

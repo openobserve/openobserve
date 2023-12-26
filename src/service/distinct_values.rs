@@ -133,6 +133,8 @@ impl DistinctValues {
         // write to wal
         let timestamp = chrono::Utc::now().timestamp_micros();
         let mut stream_file_name = "".to_string();
+        let schema = schema();
+        let schema_key = schema.hash_key();
         for (org, items) in new_table {
             if items.is_empty() {
                 continue;
@@ -142,6 +144,7 @@ impl DistinctValues {
                 stream_name: STREAM_NAME.into(),
                 stream_type: StreamType::Metadata,
             };
+
             let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
@@ -156,16 +159,13 @@ impl DistinctValues {
                     &vec![],
                     unwrap_partition_time_level(None, StreamType::Metadata),
                     data,
+                    Some(&schema_key),
                 );
 
-                let hour_buf = buf.entry(hour_key).or_insert_with(|| {
-                    let schema = schema();
-                    let schema_key = schema.hash_key();
-                    SchemaRecords {
-                        schema_key,
-                        schema,
-                        records: vec![],
-                    }
+                let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                    schema_key: schema_key.clone(),
+                    schema: schema.clone(),
+                    records: vec![],
                 });
                 hour_buf
                     .records
@@ -239,8 +239,8 @@ pub async fn close() -> Result<()> {
     Ok(())
 }
 
-fn schema() -> Schema {
-    Schema::new(vec![
+fn schema() -> Arc<Schema> {
+    Arc::new(Schema::new(vec![
         Field::new(
             CONFIG.common.column_timestamp.as_str(),
             DataType::Int64,
@@ -253,5 +253,5 @@ fn schema() -> Schema {
         Field::new("field_value", DataType::Utf8, true),
         Field::new("filter_name", DataType::Utf8, true),
         Field::new("filter_value", DataType::Utf8, true),
-    ])
+    ]))
 }
