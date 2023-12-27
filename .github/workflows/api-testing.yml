@@ -31,7 +31,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2023-10-24
+          toolchain: nightly-2023-12-24
           components: rustfmt,clippy,llvm-tools
           targets: x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
