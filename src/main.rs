@@ -26,7 +26,6 @@ use std::{
 
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use chrono::{Local, Utc};
 use config::CONFIG;
 use log::LevelFilter;
 use openobserve::{
@@ -93,11 +92,7 @@ static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
 ));
 
 use tracing_subscriber::{
-    self,
-    filter::LevelFilter as TracingLevelFilter,
-    fmt::{format::Writer, time::FormatTime, Layer},
-    prelude::*,
-    EnvFilter,
+    self, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
 
 #[tokio::main]
@@ -397,18 +392,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         .run()
         .await?;
     Ok(())
-}
-
-pub struct CustomTimeFormat;
-
-impl FormatTime for CustomTimeFormat {
-    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        if CONFIG.log.local_time_format.is_empty() {
-            write!(w, "{}", Utc::now().to_rfc3339())
-        } else {
-            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
-        }
-    }
 }
 
 /// Setup the tracing related components
