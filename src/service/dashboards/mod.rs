@@ -16,6 +16,7 @@
 use std::io;
 
 use actix_web::{http, web, HttpResponse};
+use config::ider;
 
 use crate::{
     common::{
@@ -41,7 +42,7 @@ pub async fn create_dashboard(
 
     match dashboards::folders::get(org_id, folder_id).await {
         Ok(_) => {
-            let dashboard_id = crate::common::infra::ider::generate();
+            let dashboard_id = ider::generate();
             save_dashboard(org_id, &dashboard_id, folder_id, body).await
         }
         Err(_) => {
@@ -52,7 +53,7 @@ pub async fn create_dashboard(
                     description: DEFAULT_FOLDER.to_string(),
                 };
                 folders::save_folder(org_id, folder, true).await?;
-                let dashboard_id = crate::common::infra::ider::generate();
+                let dashboard_id = ider::generate();
                 save_dashboard(org_id, &dashboard_id, folder_id, body).await
             } else {
                 Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(

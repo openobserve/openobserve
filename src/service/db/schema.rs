@@ -17,16 +17,17 @@ use std::sync::Arc;
 
 use ahash::AHashSet;
 use chrono::Utc;
+use config::{is_local_disk_storage, meta::stream::StreamType, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     common::{
         infra::{
             cache,
-            config::{is_local_disk_storage, CONFIG, ENRICHMENT_TABLES, STREAM_SCHEMAS},
+            config::{ENRICHMENT_TABLES, STREAM_SCHEMAS},
             db as infra_db,
         },
-        meta::{stream::StreamSchema, StreamType},
+        meta::stream::StreamSchema,
         utils::json,
     },
     service::enrichment::StreamTable,

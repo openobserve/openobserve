@@ -18,12 +18,12 @@ use std::sync::Arc;
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::common::infra::{
     cluster,
-    config::CONFIG,
     db::{Event, EventData},
     errors::*,
 };

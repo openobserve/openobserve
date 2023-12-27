@@ -15,16 +15,15 @@
 
 use std::sync::Arc;
 
+use config::meta::stream::StreamType;
+
 use crate::common::{
     infra::{
         cluster::{is_alert_manager, LOCAL_NODE_ROLE},
         config::STREAM_ALERTS,
         db as infra_db,
     },
-    meta::{
-        alerts::{triggers::Trigger, Alert},
-        StreamType,
-    },
+    meta::alerts::{triggers::Trigger, Alert},
     utils::json,
 };
 

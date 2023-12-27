@@ -18,6 +18,7 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
+use config::CONFIG;
 use once_cell::sync::Lazy;
 use tokio::{
     net::{TcpListener, UdpSocket},
@@ -25,7 +26,7 @@ use tokio::{
 };
 
 use crate::{
-    common::infra::config::{CONFIG, SYSLOG_ENABLED},
+    common::infra::config::SYSLOG_ENABLED,
     handler::tcp_udp::{tcp_server, udp_server, STOP_SRV},
     service::db::syslog::toggle_syslog_setting,
 };

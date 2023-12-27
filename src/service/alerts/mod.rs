@@ -18,21 +18,18 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 
 use crate::{
     common::{
-        infra::config::CONFIG,
         meta::{
             alerts::{
                 destinations::{DestinationWithTemplate, HTTPType},
                 Alert, Condition, Operator, QueryCondition, QueryType,
             },
-            search, StreamType,
+            search,
         },
-        utils::{
-            json::{self, Map, Value},
-            schema_ext::SchemaExt,
-        },
+        utils::json::{self, Map, Value},
     },
     service::{db, search as SearchService},
 };

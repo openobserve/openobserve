@@ -18,15 +18,15 @@ use std::sync::Arc;
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::{
+    meta::stream::{FileKey, FileMeta},
+    CONFIG,
+};
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::common::{
-    infra::{config::CONFIG, errors::Result},
-    meta::{
-        common::{FileKey, FileMeta},
-        meta_store::MetaStore,
-        stream::StreamStats,
-    },
+    infra::errors::Result,
+    meta::{meta_store::MetaStore, stream::StreamStats},
 };
 
 pub mod dynamo;

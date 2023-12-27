@@ -13,22 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    fs::{self, File},
-    path::Path,
-};
+use std::{collections::HashMap, fs, path::Path};
 
 use actix_web::web::Query;
 use ahash::AHashMap;
+use config::meta::stream::StreamType;
 
 use crate::{
     cli::data::{cli::Cli, Context},
-    common::{
-        infra::config::CONFIG,
-        meta::{search::Request, StreamType},
-        utils::http::get_stream_type_from_request,
-    },
+    common::{meta::search::Request, utils::http::get_stream_type_from_request},
     service::search as SearchService,
 };
 
@@ -52,7 +45,7 @@ impl Context for Export {
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,
-            sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
+            sort_by: Some(format!("{} ASC", config::CONFIG.common.column_timestamp)),
             track_total_hits: false,
             query_context: None,
             uses_zo_fn: false,
@@ -75,7 +68,7 @@ impl Context for Export {
                     }
                     let path = Path::new(c.data.as_str());
                     fs::create_dir_all(path)?;
-                    let file = File::create(path.join(format!(
+                    let file = fs::File::create(path.join(format!(
                         "{}.{}",
                         chrono::Local::now().timestamp_micros(),
                         c.file_type

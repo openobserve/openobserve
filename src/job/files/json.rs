@@ -14,40 +14,37 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    io::{BufReader, Cursor},
+    fs,
+    io::{BufReader, Seek, SeekFrom},
+    path::Path,
     sync::Arc,
 };
 
-use arrow::ipc::reader::StreamReader;
-use bytes::Bytes;
-use datafusion::arrow::{datatypes::Schema, json::ReaderBuilder};
+use arrow_schema::Schema;
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    metrics,
+    utils::{
+        parquet::new_parquet_writer,
+        schema::{infer_json_schema_from_iterator, infer_json_schema_from_seekable},
+    },
+    CONFIG,
+};
+use datafusion::arrow::json::ReaderBuilder;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{CONFIG, FILE_EXT_ARROW},
-            metrics, storage, wal,
-        },
-        meta::{common::FileMeta, StreamType},
-        utils::{
-            json,
-            schema::{infer_json_schema, infer_json_schema_from_iterator},
-            stream::populate_file_meta,
-        },
+        infra::{cluster, storage, wal},
+        utils::{file::scan_files, json, stream::populate_file_meta},
     },
     service::{
-        db, schema::schema_evolution, search::datafusion::new_parquet_writer,
-        stream::get_stream_setting_bloom_filter_fields, usage::report_compression_stats,
+        db, schema::schema_evolution, stream::get_stream_setting_bloom_filter_fields,
+        usage::report_compression_stats,
     },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !CONFIG.common.wal_memory_mode_enabled {
-        return Ok(());
-    }
-
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {
@@ -56,33 +53,61 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         interval.tick().await;
         if let Err(e) = move_files_to_storage().await {
-            log::error!("Error moving memory files to remote: {}", e);
+            log::error!("Error moving disk files to remote: {}", e);
         }
     }
-    log::info!("job::files::memory is stopped");
+    log::info!("job::files::disk is stopped");
     Ok(())
 }
 
 // upload compressed files to storage & delete moved files from local
 pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
-    // need to clone here, to avoid thread boundry issues across awaits
-    let files = wal::MEMORY_FILES.list("").await;
+    let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
+        .canonicalize()
+        .unwrap();
+
+    let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
+    let files = scan_files(&pattern, "json");
+
     // use multiple threads to upload files
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
-    for (file, data) in files {
+    for file in files {
         let local_file = file.to_owned();
-        let columns = local_file.splitn(5, '/').collect::<Vec<&str>>();
+        let local_path = Path::new(&file).canonicalize().unwrap();
+        let file_path = local_path
+            .strip_prefix(&wal_dir)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace('\\', "/");
+        let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-        // 7099303408192061440f3XQ2p.json let _ = columns[0].to_string(); //
-        // files/
+        // 7099303408192061440f3XQ2p.json eg: files/default/traces/default/0/
+        // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
-        let stream_type: StreamType = StreamType::from(columns[2]);
+        let stream_type = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
-        let file_name = columns[4].to_string();
+        let mut file_name = columns[4].to_string();
 
-        log::info!("[JOB] convert memory file: {}", file);
+        // Hack: compatible for <= 0.5.1
+        if !file_name.contains('/') && file_name.contains('_') {
+            file_name = file_name.replace('_', "/");
+        }
+
+        // check the file is using for write
+        // if wal::check_in_use(
+        //     StreamParams::new(&org_id, &stream_name, stream_type),
+        //     &file_name,
+        // )
+        // .await
+        // {
+        //     // println!("file is using for write, skip, {}", file_name);
+        //     continue;
+        // }
+        log::info!("[JOB] convert disk file: {}", file);
 
         // check if we are allowed to ingest or just delete the file
         if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
@@ -93,23 +118,22 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 &stream_name,
                 file
             );
-            wal::MEMORY_FILES.remove(&file).await;
+            if let Err(e) = tokio::fs::remove_file(&local_file).await {
+                log::error!(
+                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    local_file,
+                    e
+                );
+            }
             continue;
         }
 
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<(), anyhow::Error>> = task::spawn(async move {
-            let ret = upload_file(
-                &org_id,
-                &stream_name,
-                stream_type,
-                &local_file,
-                &file_name,
-                data,
-            )
-            .await;
+            let ret =
+                upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
             if let Err(e) = ret {
-                log::error!("[JOB] Error while uploading memory file to storage {}", e);
+                log::error!("[JOB] Error while uploading disk file to storage {}", e);
                 drop(permit);
                 return Ok(());
             }
@@ -118,7 +142,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
             if let Err(e) = ret {
                 log::error!(
-                    "[JOB] Failed write memory file meta: {}, error: {}",
+                    "[JOB] Failed write disk file meta: {}, error: {}",
                     local_file,
                     e.to_string()
                 );
@@ -128,10 +152,10 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 
             // check if allowed to delete the file
             loop {
-                if wal::lock_files_exists(&local_file).await {
+                if wal::lock_files_exists(&file_path).await {
                     log::info!(
                         "[JOB] the file is still in use, waiting for a few ms: {}",
-                        local_file
+                        file_path
                     );
                     time::sleep(time::Duration::from_millis(100)).await;
                 } else {
@@ -139,8 +163,16 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 }
             }
 
-            // delete files
-            wal::MEMORY_FILES.remove(&local_file).await;
+            let ret = tokio::fs::remove_file(&local_file).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    local_file,
+                    e.to_string()
+                );
+                drop(permit);
+                return Ok(());
+            }
 
             // metrics
             let columns = key.split('/').collect::<Vec<&str>>();
@@ -159,7 +191,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 
     for task in tasks {
         if let Err(e) = task.await {
-            log::error!("[JOB] Error while uploading memory file to storage {}", e);
+            log::error!("[JOB] Error while uploading disk file to storage {}", e);
         };
     }
     Ok(())
@@ -171,12 +203,19 @@ async fn upload_file(
     stream_type: StreamType,
     path_str: &str,
     file_name: &str,
-    buf: Bytes,
 ) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
-    let file_size = buf.len() as u64;
-    log::info!("[JOB] File upload begin: memory: {}", path_str);
+    let mut file = fs::File::open(path_str).unwrap();
+    let file_meta = file.metadata().unwrap();
+    let file_size = file_meta.len();
+    log::info!("[JOB] File upload begin: disk: {}", path_str);
     if file_size == 0 {
-        wal::MEMORY_FILES.remove(path_str).await;
+        if let Err(e) = tokio::fs::remove_file(path_str).await {
+            log::error!(
+                "[JOB] Failed to remove disk file from disk: {}, {}",
+                path_str,
+                e
+            );
+        }
         return Err(anyhow::anyhow!("file is empty: {}", path_str));
     }
 
@@ -184,20 +223,18 @@ async fn upload_file(
     metrics::INGEST_WAL_READ_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
-    let is_arrow = file_name.ends_with(FILE_EXT_ARROW);
 
-    let arrow_schema;
-    let mut batches = vec![];
-    if !is_arrow {
-        let mut res_records: Vec<json::Value> = vec![];
-        let mut schema_reader = BufReader::new(buf.as_ref());
-        let inferred_schema = match infer_json_schema(&mut schema_reader, None, stream_type) {
+    let mut res_records: Vec<json::Value> = vec![];
+    let mut schema_reader = BufReader::new(&file);
+    let inferred_schema =
+        match infer_json_schema_from_seekable(&mut schema_reader, None, stream_type) {
             Ok(inferred_schema) => {
                 drop(schema_reader);
                 inferred_schema
             }
             Err(err) => {
-                // Buf has some corrupt json data....ignore such data & move rest of the records
+                // File has some corrupt json data....ignore such data & move rest of the
+                // records
                 log::error!(
                     "[JOB] Failed to infer schema from file: {}, error: {}",
                     path_str,
@@ -205,7 +242,8 @@ async fn upload_file(
                 );
 
                 drop(schema_reader);
-                let mut json_reader = BufReader::new(buf.as_ref());
+                file.seek(SeekFrom::Start(0)).unwrap();
+                let mut json_reader = BufReader::new(&file);
                 let value_reader = arrow::json::reader::ValueIter::new(&mut json_reader, None);
                 for value in value_reader {
                     match value {
@@ -218,50 +256,50 @@ async fn upload_file(
                     }
                 }
                 if res_records.is_empty() {
-                    return Err(anyhow::anyhow!("file has corrupt json data: {}", path_str));
+                    return Err(anyhow::anyhow!(
+                        "[JOB] File has corrupt json data: {}",
+                        path_str
+                    ));
                 }
                 let value_iter = res_records.iter().map(Ok);
                 infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
             }
         };
-        arrow_schema = Arc::new(inferred_schema);
+    let arrow_schema = Arc::new(inferred_schema);
 
-        if res_records.is_empty() {
-            let json_reader = BufReader::new(buf.as_ref());
-            let json = ReaderBuilder::new(arrow_schema.clone())
-                .build(json_reader)
-                .unwrap();
-            for batch in json {
-                let batch_write = batch.unwrap();
-                batches.push(batch_write);
+    let mut batches = vec![];
+    if res_records.is_empty() {
+        file.seek(SeekFrom::Start(0)).unwrap();
+        let json_reader = BufReader::new(&file);
+        let json = ReaderBuilder::new(arrow_schema.clone())
+            .build(json_reader)
+            .unwrap();
+        for batch in json {
+            match batch {
+                Ok(batch) => batches.push(batch),
+                Err(err) => {
+                    tokio::fs::remove_file(path_str).await?;
+                    return Err(anyhow::anyhow!(
+                        "[JOB] File has corrupt data: {}, err: {}",
+                        path_str,
+                        err
+                    ));
+                }
             }
-        } else {
-            let mut json = vec![];
-            let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
-            for value in res_records {
-                decoder
-                    .decode(json::to_string(&value).unwrap().as_bytes())
-                    .unwrap();
-                json.push(decoder.flush()?.unwrap());
-            }
-            for batch in json {
-                batches.push(batch);
-            }
-        };
-    } else {
-        let buf_reader = Cursor::new(buf);
-        let stream_reader = StreamReader::try_new(buf_reader, None)?;
-        for read_result in stream_reader {
-            let record_batch = read_result?;
-            batches.push(record_batch);
         }
-        let schema = if let Some(first_batch) = batches.first() {
-            first_batch.schema()
-        } else {
-            return Err(anyhow::anyhow!("No record batches found".to_string(),));
-        };
-        arrow_schema = schema
-    }
+    } else {
+        let mut json = vec![];
+        let mut decoder = ReaderBuilder::new(arrow_schema.clone()).build_decoder()?;
+        for value in res_records {
+            decoder
+                .decode(json::to_string(&value).unwrap().as_bytes())
+                .unwrap();
+            json.push(decoder.flush()?.unwrap());
+        }
+        for batch in json {
+            batches.push(batch);
+        }
+    };
 
     // write metadata
     let mut file_meta = FileMeta {
@@ -305,13 +343,15 @@ async fn upload_file(
 
     let new_file_name =
         super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
+    drop(file);
+    let file_name = new_file_name.to_owned();
     match storage::put(&new_file_name, bytes::Bytes::from(buf_parquet)).await {
-        Ok(_output) => {
-            log::info!("[JOB] memory file upload succeeded: {}", new_file_name);
-            Ok((new_file_name, file_meta, stream_type))
+        Ok(_) => {
+            log::info!("[JOB] disk file upload succeeded: {}", file_name);
+            Ok((file_name, file_meta, stream_type))
         }
         Err(err) => {
-            log::error!("[JOB] memory file upload error: {:?}", err);
+            log::error!("[JOB] disk file upload error: {:?}", err);
             Err(anyhow::anyhow!(err))
         }
     }

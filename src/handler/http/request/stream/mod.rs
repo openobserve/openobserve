@@ -17,6 +17,7 @@ use std::io::{Error, ErrorKind};
 
 use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
 use ahash::AHashMap as HashMap;
+use config::meta::stream::StreamType;
 
 use crate::{
     common::{
@@ -24,7 +25,6 @@ use crate::{
             self,
             http::HttpResponse as MetaHttpResponse,
             stream::{ListStream, StreamDeleteFields, StreamSettings},
-            StreamType,
         },
         utils::http::get_stream_type_from_request,
     },

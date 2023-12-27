@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::config::CONFIG;
+use config::CONFIG;
 
 pub mod dashboards;
 pub mod file_list;

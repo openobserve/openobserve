@@ -14,12 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::Utc;
+use config::CONFIG;
 
 use crate::common::{
-    infra::{
-        config::CONFIG,
-        db::{self, Db},
-    },
+    infra::db::{self, Db},
     utils::file::get_file_meta,
 };
 

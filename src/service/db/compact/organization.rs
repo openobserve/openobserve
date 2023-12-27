@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::RwHashMap;
 use once_cell::sync::Lazy;
 
-use crate::common::infra::{config::RwHashMap, db as infra_db};
+use crate::common::infra::db as infra_db;
 
 pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(Default::default);
 

@@ -15,6 +15,11 @@
 
 use std::sync::Arc;
 
+use config::{
+    is_local_disk_storage,
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
@@ -25,15 +30,10 @@ use tokio::sync::Semaphore;
 
 use crate::{
     common::{
-        infra::{
-            cache::file_data,
-            config::{is_local_disk_storage, CONFIG},
-        },
+        infra::cache::file_data,
         meta::{
-            common::FileKey,
             search::{SearchType, Session as SearchSession},
             stream::{PartitionTimeLevel, ScanStats, StreamParams},
-            StreamType,
         },
     },
     service::{

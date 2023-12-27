@@ -19,20 +19,20 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use config::{
+    ider, is_local_disk_storage,
+    meta::stream::{FileKey, FileMeta, StreamType},
+    CONFIG,
+};
 
 use crate::{
     common::{
         infra::{
             cache,
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-            config::{is_local_disk_storage, CONFIG},
-            dist_lock, file_list as infra_file_list, ider, storage,
+            dist_lock, file_list as infra_file_list, storage,
         },
-        meta::{
-            common::{FileKey, FileMeta},
-            stream::{PartitionTimeLevel, StreamStats},
-            StreamType,
-        },
+        meta::stream::{PartitionTimeLevel, StreamStats},
         utils::{json, time::BASE_TIME},
     },
     service::{db, file_list},

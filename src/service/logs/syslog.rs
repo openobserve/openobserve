@@ -18,30 +18,26 @@ use std::net::SocketAddr;
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS, SYSLOG_ROUTES},
-            metrics,
-        },
+        infra::{cluster, config::SYSLOG_ROUTES},
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
             ingestion::{IngestionResponse, StreamStatus},
             stream::{SchemaRecords, StreamParams},
             syslog::SyslogRoute,
-            StreamType,
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
     service::{
         db, distinct_values, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
     },
 };
 
@@ -196,8 +192,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         }
     }
 
-    let mut stream_file_name = "".to_string();
-    write_file_arrow(&buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+    write_file(buf, thread_id, &stream_params, None).await;
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;

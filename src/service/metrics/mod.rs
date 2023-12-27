@@ -13,16 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::CONFIG;
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 
 use crate::{
     common,
-    common::{
-        infra::config::CONFIG,
-        meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
-    },
+    common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
 };
 
 pub mod json;

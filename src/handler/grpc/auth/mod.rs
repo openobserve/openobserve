@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::CONFIG;
 use http_auth_basic::Credentials;
 use tonic::{Request, Status};
 
 use crate::common::{
     infra::{
         cluster::get_internal_grpc_token,
-        config::{CONFIG, ROOT_USER, USERS},
+        config::{ROOT_USER, USERS},
     },
     utils::auth::{get_hash, is_root_user},
 };
@@ -87,10 +88,11 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
+    use config::INSTANCE_ID;
     use tonic::metadata::MetadataValue;
 
     use super::*;
-    use crate::common::{infra::config::INSTANCE_ID, meta::user::User};
+    use crate::common::meta::user::User;
 
     #[actix_web::test]
     async fn test_check_no_auth() {

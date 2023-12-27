@@ -24,6 +24,7 @@ use actix_web::{
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::from_fn;
+use config::CONFIG;
 use futures::FutureExt;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -36,10 +37,7 @@ use super::{
         stream, syslog, traces, users, *,
     },
 };
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-};
+use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
 
 pub mod openapi;
 pub mod ui;

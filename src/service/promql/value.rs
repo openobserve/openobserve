@@ -16,6 +16,7 @@
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
 use ahash::HashSet;
+use config::FxIndexMap;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 use serde::{
@@ -23,7 +24,7 @@ use serde::{
     Serialize,
 };
 
-use crate::common::{infra::config::FxIndexMap, meta::prom::NAME_LABEL};
+use crate::common::meta::prom::NAME_LABEL;
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
 static RE_VALID_LABEL_NAME: Lazy<Regex> =

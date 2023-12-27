@@ -15,16 +15,17 @@
 
 use std::io::{BufRead, BufReader};
 
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::parquet::parse_file_key_columns,
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use crate::common::{
-    infra::{config::CONFIG, file_list as infra_file_list, wal},
-    meta::{
-        common::{FileKey, FileMeta},
-        stream::StreamParams,
-        StreamType,
-    },
+    infra::{file_list as infra_file_list, wal},
+    meta::stream::StreamParams,
     utils::{asynchronism::file::get_file_contents, file::scan_files, json},
 };
 
@@ -33,7 +34,7 @@ pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
     Lazy::new(|| RwLock::new(Vec::with_capacity(2048)));
 
 pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(), anyhow::Error> {
-    let (_stream_key, date_key, _file_name) = infra_file_list::parse_file_key_columns(key)?;
+    let (_stream_key, date_key, _file_name) = parse_file_key_columns(key)?;
     let file_data = FileKey::new(key, meta.clone().unwrap_or_default(), deleted);
 
     // write into file_list storage
@@ -58,7 +59,6 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
         StreamParams::new("", "", StreamType::Filelist),
         None,
         &date_key,
-        false,
     )
     .await;
     file.write(write_buf.as_ref()).await;
@@ -74,7 +74,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
 async fn get_in_wal() -> Result<Vec<FileKey>, anyhow::Error> {
     let mut result = Vec::with_capacity(1024);
     let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern);
+    let files = scan_files(&pattern, "json");
     let mut line_no = 0;
     for file in files {
         line_no += 1;

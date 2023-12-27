@@ -17,6 +17,10 @@ use std::{cmp::min, io::Cursor, sync::Arc};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -27,17 +31,13 @@ use vector_enrichment::TableRegistry;
 use crate::{
     common::{
         infra::{
-            cluster,
-            config::CONFIG,
-            dist_lock,
+            cluster, dist_lock,
             errors::{Error, ErrorCodes},
         },
         meta::{
-            common::FileKey,
             functions::VRLResultResolver,
             search,
             stream::{PartitionTimeLevel, ScanStats, StreamParams},
-            StreamType,
         },
         utils::{flatten, json, str::find},
     },
@@ -292,24 +292,31 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let mut results = Vec::new();
     for task in tasks {
-        let result = task
-            .await
-            .map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())))?;
-        match result {
-            Ok(res) => results.push(res),
-            Err(err) => {
+        match task.await {
+            Ok(res) => match res {
+                Ok(res) => results.push(res),
+                Err(err) => {
+                    // search done, release lock
+                    dist_lock::unlock(&locker).await?;
+                    return Err(err);
+                }
+            },
+            Err(e) => {
                 // search done, release lock
                 dist_lock::unlock(&locker).await?;
-                return Err(err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    e.to_string(),
+                )));
             }
         }
     }
+
     // search done, release lock
     dist_lock::unlock(&locker).await?;
 
     // merge multiple instances data
     let mut scan_stats = ScanStats::new();
-    let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();
+    let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let sql = Arc::new(meta);
     for resp in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
@@ -319,7 +326,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let buf = Cursor::new(resp.hits);
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
             let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-            value.push(batch);
+            value.extend(batch);
         }
         // handle aggs
         for agg in resp.aggs {
@@ -328,14 +335,14 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
                 let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-                value.push(batch);
+                value.extend(batch);
             }
         }
     }
 
     // merge all batches
     let mut merge_batches = HashMap::new();
-    for (name, batch) in batches.iter() {
+    for (name, batch) in batches {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
@@ -350,7 +357,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             sql.meta.offset,
             sql.meta.limit,
             &merge_sql,
-            batch,
+            &batch,
         )
         .await
         {
@@ -361,9 +368,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 )));
             }
         };
-        merge_batches.insert(name.to_string(), batch);
+        merge_batches.insert(name, batch);
     }
-    drop(batches);
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

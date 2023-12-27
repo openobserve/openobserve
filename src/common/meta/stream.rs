@@ -13,20 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashMap};
+use std::{cmp::max, collections::HashMap, sync::Arc};
 
 use arrow_schema::Field;
 use chrono::Duration;
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use utoipa::ToSchema;
 
 use super::prom::Metadata;
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{common::FileMeta, usage::Stats, StreamType},
-    utils::json,
-};
+use crate::common::{meta::usage::Stats, utils::json};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -349,8 +349,10 @@ pub struct SchemaEvolution {
 }
 
 pub struct SchemaRecords {
-    pub schema: Schema,
-    pub records: Vec<json::Value>,
+    pub schema_key: String,
+    pub schema: Arc<Schema>,
+    pub records: Vec<Arc<json::Value>>,
+    pub records_size: usize,
 }
 
 #[derive(Clone, Copy, Default)]

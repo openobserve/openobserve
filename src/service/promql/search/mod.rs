@@ -19,6 +19,7 @@ use std::{
 };
 
 use ahash::AHashMap as HashMap;
+use config::{meta::stream::StreamType, CONFIG};
 use futures::future::try_join_all;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -28,13 +29,11 @@ use crate::{
     common::{
         infra::{
             cluster,
-            config::CONFIG,
             errors::{Error, ErrorCodes, Result},
         },
         meta::{
             stream::ScanStats,
             usage::{RequestStats, UsageType},
-            StreamType,
         },
     },
     handler::grpc::cluster_rpc,

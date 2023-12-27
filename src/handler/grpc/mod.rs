@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::{FileKey, FileMeta};
 use uuid::Uuid;
 
 use crate::{
@@ -69,8 +70,8 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
     }
 }
 
-impl From<&meta::common::FileMeta> for cluster_rpc::FileMeta {
-    fn from(req: &meta::common::FileMeta) -> Self {
+impl From<&FileMeta> for cluster_rpc::FileMeta {
+    fn from(req: &FileMeta) -> Self {
         cluster_rpc::FileMeta {
             min_ts: req.min_ts,
             max_ts: req.max_ts,
@@ -81,9 +82,9 @@ impl From<&meta::common::FileMeta> for cluster_rpc::FileMeta {
     }
 }
 
-impl From<&cluster_rpc::FileMeta> for meta::common::FileMeta {
+impl From<&cluster_rpc::FileMeta> for FileMeta {
     fn from(req: &cluster_rpc::FileMeta) -> Self {
-        meta::common::FileMeta {
+        FileMeta {
             min_ts: req.min_ts,
             max_ts: req.max_ts,
             records: req.records,
@@ -93,8 +94,8 @@ impl From<&cluster_rpc::FileMeta> for meta::common::FileMeta {
     }
 }
 
-impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
-    fn from(req: &meta::common::FileKey) -> Self {
+impl From<&FileKey> for cluster_rpc::FileKey {
+    fn from(req: &FileKey) -> Self {
         cluster_rpc::FileKey {
             key: req.key.clone(),
             meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
@@ -103,11 +104,11 @@ impl From<&meta::common::FileKey> for cluster_rpc::FileKey {
     }
 }
 
-impl From<&cluster_rpc::FileKey> for meta::common::FileKey {
+impl From<&cluster_rpc::FileKey> for FileKey {
     fn from(req: &cluster_rpc::FileKey) -> Self {
-        meta::common::FileKey {
+        FileKey {
             key: req.key.clone(),
-            meta: meta::common::FileMeta::from(req.meta.as_ref().unwrap()),
+            meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
         }
     }
@@ -207,11 +208,13 @@ impl From<Vec<json::Value>> for cluster_rpc::UsageData {
 mod tests {
     use std::collections::HashMap;
 
+    use config::meta::stream::FileMeta;
+
     use super::*;
 
     #[actix_web::test]
     async fn test_get_file_meta() {
-        let file_meta = meta::common::FileMeta {
+        let file_meta = FileMeta {
             min_ts: 1667978841110,
             max_ts: 1667978845354,
             records: 300,
@@ -220,7 +223,7 @@ mod tests {
         };
 
         let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
-        let resp = meta::common::FileMeta::from(&rpc_meta);
+        let resp = FileMeta::from(&rpc_meta);
         assert_eq!(file_meta, resp);
     }
 

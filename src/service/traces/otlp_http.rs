@@ -13,22 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
+use config::{
+    meta::stream::StreamType, metrics, utils::hasher::get_fields_key_xxh3, CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
+        infra::cluster,
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
@@ -37,14 +36,13 @@ use crate::{
                 Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType,
             },
             usage::UsageType,
-            StreamType,
         },
         utils,
-        utils::{flatten, hasher::get_fields_key_xxh3, json},
+        utils::{flatten, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,
-        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
         schema::{check_for_schema, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -364,8 +362,6 @@ pub async fn traces_json(
 
                     // get hour key
                     let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
-
-                    // get hour key
                     let mut hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp.try_into().unwrap(),
                         &partition_keys,
@@ -398,28 +394,33 @@ pub async fn traces_json(
                         hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
                     }
 
-                    let rec_schema = traces_schema_map.get(traces_stream_name).unwrap();
-
-                    let hour_buf = data_buf.entry(hour_key).or_insert(SchemaRecords {
-                        schema: rec_schema
+                    let hour_buf = data_buf.entry(hour_key).or_insert_with(|| {
+                        let schema = traces_schema_map
+                            .get(traces_stream_name)
+                            .unwrap()
                             .clone()
-                            .with_metadata(std::collections::HashMap::new()),
-                        records: vec![],
+                            .with_metadata(HashMap::new());
+                        SchemaRecords {
+                            schema_key,
+                            schema: Arc::new(schema),
+                            records: vec![],
+                            records_size: 0,
+                        }
                     });
                     let loc_value: utils::json::Value =
                         utils::json::from_slice(value_str.as_bytes()).unwrap();
-                    hour_buf.records.push(loc_value);
+                    hour_buf.records.push(Arc::new(loc_value));
+                    hour_buf.records_size += value_str.len();
                 }
             }
         }
     }
 
-    let mut traces_file_name = "".to_string();
-    let mut req_stats = write_file_arrow(
-        &data_buf,
+    // write to files
+    let mut req_stats = write_file(
+        data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
-        &mut traces_file_name,
         None,
     )
     .await;

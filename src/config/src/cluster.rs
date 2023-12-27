@@ -13,15 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::arrow::datatypes::{Field, Schema};
-
-/// SchemaExt helper...
-pub trait SchemaExt {
-    fn to_cloned_fields(&self) -> Vec<Field>;
-}
-
-impl SchemaExt for Schema {
-    fn to_cloned_fields(&self) -> Vec<Field> {
-        self.fields.iter().map(|x| (**x).clone()).collect()
-    }
-}
+pub static mut LOCAL_NODE_ID: i32 = 0;

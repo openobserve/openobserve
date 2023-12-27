@@ -19,12 +19,13 @@ use std::{
 };
 
 use async_trait::async_trait;
+use config::CONFIG;
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use promql_parser::parser;
 
 use crate::{
     common::{
-        infra::{cache::tmpfs, config::CONFIG, errors::Result},
+        infra::{cache::tmpfs, errors::Result},
         meta::stream::ScanStats,
     },
     handler::grpc::cluster_rpc,

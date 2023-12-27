@@ -16,24 +16,21 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{http, http::StatusCode, HttpResponse};
+use config::{
+    is_local_disk_storage, meta::stream::StreamType, CONFIG, SIZE_IN_MB,
+    SQL_FULL_TEXT_SEARCH_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     common::{
-        infra::{
-            cache::stats,
-            config::{
-                is_local_disk_storage, CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
-                STREAM_SCHEMAS,
-            },
-        },
+        infra::{cache::stats, config::STREAM_SCHEMAS},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
             prom,
             stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
             usage::Stats,
-            StreamType,
         },
         utils::json,
     },
@@ -418,7 +415,7 @@ async fn _get_stream_stats(
         encoding: meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
-    match SearchService::search("", &CONFIG.common.usage_org, meta::StreamType::Logs, &req).await {
+    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, &req).await {
         Ok(res) => {
             let mut all_stats = HashMap::new();
             for item in res.hits {
