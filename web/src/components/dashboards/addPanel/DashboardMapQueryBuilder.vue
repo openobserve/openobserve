@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'latitude')"
         @drop="onDrop($event, 'latitude')"
-        data-test="dashboard-x-layout"
+        data-test="dashboard-latitude-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ].fields?.latitude?.column
               "
               class="q-pl-sm"
-              :data-test="`dashboard-x-item-${
+              :data-test="`dashboard-latitude-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.latitude?.column
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-x-item-${
+                :data-test="`dashboard-latitude-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].fields?.latitude?.column
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     dense
                     filled
-                    data-test="dashboard-x-item-input"
+                    data-test="dashboard-latitude-item-input"
                     :label="t('common.label')"
                     v-model="
                       dashboardPanelData.data.queries[
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-x-item-${
+              :data-test="`dashboard-latitude-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.latitude?.column
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'longitude')"
         @drop="onDrop($event, 'longitude')"
-        data-test="dashboard-y-layout"
+        data-test="dashboard-longitude-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.longitude?.column
               "
-              :data-test="`dashboard-y-item-${
+              :data-test="`dashboard-longitude-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.longitude?.column
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-y-item-${
+                :data-test="`dashboard-longitude-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].fields?.longitude?.column
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     filled
                     label="Label"
-                    data-test="dashboard-y-item-input"
+                    data-test="dashboard-longitude-item-input"
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-y-item-${
+              :data-test="`dashboard-longitude-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.longitude?.column
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'weight')"
         @drop="onDrop($event, 'weight')"
-        data-test="dashboard-y-layout"
+        data-test="dashboard-weight-layout"
       >
         <q-btn-group
           class="axis-field q-mr-sm q-my-xs"
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               size="sm"
               :label="weightLabel"
-              :data-test="`dashboard-y-item-${
+              :data-test="`dashboard-weight-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.weight?.column
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <q-menu
                 class="q-pa-md"
-                :data-test="`dashboard-y-item-${
+                :data-test="`dashboard-weight-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
                   ].fields?.weight?.column
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         emit-value
                         map-options
                         :label="t('common.aggregation')"
-                        data-test="dashboard-y-item-dropdown"
+                        data-test="dashboard-weight-item-dropdown"
                       >
                         <template v-slot:append>
                           <q-icon
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                     filled
                     :label="t('common.label')"
-                    data-test="dashboard-y-item-input"
+                    data-test="dashboard-weight-item-input"
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="height: 100%"
               size="xs"
               dense
-              :data-test="`dashboard-y-item-${
+              :data-test="`dashboard-weight-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.weight?.column
