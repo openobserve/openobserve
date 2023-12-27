@@ -166,7 +166,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             if columns[0] == "files" {
                 metrics::INGEST_WAL_USED_BYTES
                     .with_label_values(&[columns[1], columns[3], columns[2]])
-                    .sub(meta.original_size);
+                    .sub(meta.compressed_size);
                 report_compression_stats(meta.into(), &org_id, &stream_name, stream_type).await;
             }
 

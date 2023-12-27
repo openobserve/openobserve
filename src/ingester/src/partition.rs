@@ -22,8 +22,7 @@ use std::{
 
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
-use chrono::Utc;
-use config::{meta::stream::FileMeta, utils::parquet::new_parquet_writer, CONFIG};
+use config::{ider, meta::stream::FileMeta, metrics, utils::parquet::new_parquet_writer, CONFIG};
 use snafu::ResultExt;
 
 use crate::{
@@ -82,7 +81,7 @@ impl Partition {
         path.push(stream_name);
         path.push(thread_id.to_string());
         for (hour, data) in r.iter() {
-            let file_name = Utc::now().timestamp_nanos_opt().unwrap().to_string();
+            let file_name = ider::generate();
             let mut path = path.clone();
             path.push(hour.to_string());
             path.push(file_name);
@@ -118,6 +117,14 @@ impl Partition {
                 .context(CreateFileSnafu { path: path.clone() })?;
             f.write_all(&buf_parquet)
                 .context(WriteFileSnafu { path: path.clone() })?;
+
+            // update metrics
+            metrics::INGEST_WAL_USED_BYTES
+                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .add(buf_parquet.len() as i64);
+            metrics::INGEST_WAL_WRITE_BYTES
+                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .inc_by(buf_parquet.len() as u64);
 
             paths.push(path);
         }
