@@ -170,6 +170,7 @@ pub async fn search(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
+            res.set_session_id(session_id);
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
             let req_stats = RequestStats {

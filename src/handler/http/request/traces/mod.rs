@@ -399,6 +399,7 @@ pub async fn get_latest_traces(
         "hits",
         json::to_value(traces_data.values().collect::<Vec<&TraceResponseItem>>()).unwrap(),
     );
+    resp.insert("session_id", json::Value::from(session_id));
     Ok(HttpResponse::Ok().json(resp))
 }
 
