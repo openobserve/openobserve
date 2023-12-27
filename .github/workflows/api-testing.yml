@@ -33,7 +33,6 @@ jobs:
         with:
           toolchain: nightly-2023-12-24
           components: rustfmt,clippy,llvm-tools
-          targets: x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -46,18 +45,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
-      - name: Install musl-dependencies
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
-          sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
-      - name: Build static binary
+      - name: Build binary
         # run: cargo build --release --features mimalloc  --target x86_64-unknown-linux-musl
-        run: cargo build --features mimalloc  --target x86_64-unknown-linux-musl
+        run: cargo build --features mimalloc
       # - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/release/openobserve bin/openobserve
-      - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/debug/openobserve bin/openobserve
+      - run: mkdir -p bin ; cp target/debug/openobserve bin/openobserve
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
