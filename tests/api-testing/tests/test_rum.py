@@ -132,54 +132,56 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     ), f"Failed to post to rum-logs, expected={expected} got={got}, {resp_post_rum_logs.content}"
 
     retries = 3
-    try:
-        params = {
-            "type": "logs",
-        }
+    while True:
+        try:
+            params = {
+                "type": "logs",
+            }
 
-        now = datetime.now(timezone.utc)
-        end_time = int(now.timestamp() * 1000000)
-        five_min_ago = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+            now = datetime.now(timezone.utc)
+            end_time = int(now.timestamp() * 1000000)
+            five_min_ago = int((now - timedelta(minutes=5)).timestamp() * 1000000)
 
-        json_data = {
-            "query": {
-                "sql": 'select * from "_rumlog" order by _timestamp desc limit 5 ;',
-                "start_time": five_min_ago,
-                "end_time": end_time,
-                "from": 0,
-                "size": 150,
-                "sql_mode": "full",
-            },
-        }
+            json_data = {
+                "query": {
+                    "sql": 'select * from "_rumlog" order by _timestamp desc limit 5 ;',
+                    "start_time": five_min_ago,
+                    "end_time": end_time,
+                    "from": 0,
+                    "size": 150,
+                    "sql_mode": "full",
+                },
+            }
 
-        search_url = f"{base_url}api/{rum_org}/_search"
-        response_rum_data = session.post(search_url, params=params, json=json_data)
+            search_url = f"{base_url}api/{rum_org}/_search"
+            response_rum_data = session.post(search_url, params=params, json=json_data)
 
-        # First check if the response is 200.
-        got = response_rum_data.status_code
-        expected = 200
-        assert (
-            expected == got
-        ), f"Failed to retrieve rum-logs, got = {got}, expected = {expected}, {response_rum_data.content}"
+            # First check if the response is 200.
+            got = response_rum_data.status_code
+            expected = 200
+            assert (
+                expected == got
+            ), f"Failed to retrieve rum-logs, got = {got}, expected = {expected}, {response_rum_data.content}"
 
-        response_payload = response_rum_data.json()
-        assert (
-            len(response_payload["hits"]) > 0
-        ), f"No data found, {response_rum_data.content}"
+            response_payload = response_rum_data.json()
+            assert (
+                len(response_payload["hits"]) > 0
+            ), f"No data found, {response_rum_data.content}"
 
-        response_payload = response_rum_data.json()
-        assert (
-            len(response_payload["hits"]) > 0
-        ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
-        assert (
-            response_payload["hits"][0]["message"] == unique_test_identifier
-        ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
-    except Exception as e:
-        if retries > 0:
-            retries -= 1
-            time.sleep(3)
-        else:
-            raise e
+            response_payload = response_rum_data.json()
+            assert (
+                len(response_payload["hits"]) > 0
+            ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
+            assert (
+                response_payload["hits"][0]["message"] == unique_test_identifier
+            ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
+        except Exception as e:
+            if retries > 0:
+                retries -= 1
+                time.sleep(3)
+                continue
+            else:
+                raise e
 
 
 # This case would never fail, since it is a token generation.
@@ -256,50 +258,52 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
     print(resp_post_rumdata)
 
     retries = 3
-    try:
-        params = {
-            "type": "logs",
-        }
+    while True:
+        try:
+            params = {
+                "type": "logs",
+            }
 
-        now = datetime.now(timezone.utc)
-        end_time = int(now.timestamp() * 1000000)
-        five_min_ago = int((now - timedelta(minutes=5)).timestamp() * 1000000)
+            now = datetime.now(timezone.utc)
+            end_time = int(now.timestamp() * 1000000)
+            five_min_ago = int((now - timedelta(minutes=5)).timestamp() * 1000000)
 
-        json_data = {
-            "query": {
-                "sql": 'select * from "_rumdata" order by _timestamp desc limit 5 ;',
-                "start_time": five_min_ago,
-                "end_time": end_time,
-                "from": 0,
-                "size": 150,
-                "sql_mode": "full",
-            },
-        }
+            json_data = {
+                "query": {
+                    "sql": 'select * from "_rumdata" order by _timestamp desc limit 5 ;',
+                    "start_time": five_min_ago,
+                    "end_time": end_time,
+                    "from": 0,
+                    "size": 150,
+                    "sql_mode": "full",
+                },
+            }
 
-        search_url = f"{base_url}api/{rum_org}/_search"
-        response_rum_data = session.post(search_url, params=params, json=json_data)
+            search_url = f"{base_url}api/{rum_org}/_search"
+            response_rum_data = session.post(search_url, params=params, json=json_data)
 
-        # First check if the response is 200.
-        got = response_rum_data.status_code
-        expected = 200
-        assert (
-            expected == got
-        ), f"Failed to retrieve rum-data, got = {got}, expected = {expected}, {response_rum_data.content}"
+            # First check if the response is 200.
+            got = response_rum_data.status_code
+            expected = 200
+            assert (
+                expected == got
+            ), f"Failed to retrieve rum-data, got = {got}, expected = {expected}, {response_rum_data.content}"
 
-        response_payload = response_rum_data.json()
-        assert (
-            len(response_payload["hits"]) > 0
-        ), f"No data found, {response_rum_data.content}"
+            response_payload = response_rum_data.json()
+            assert (
+                len(response_payload["hits"]) > 0
+            ), f"No data found, {response_rum_data.content}"
 
-        assert unique_test_identifier in set(
-            [payload["type"] for payload in response_payload["hits"]]
-        ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
-    except Exception as e:
-        if retries > 0:
-            retries -= 1
-            time.sleep(3)
-        else:
-            raise e
+            assert unique_test_identifier in set(
+                [payload["type"] for payload in response_payload["hits"]]
+            ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
+        except Exception as e:
+            if retries > 0:
+                retries -= 1
+                time.sleep(3)
+                continue
+            else:
+                raise e
 
 
 # verify data under rum logs has geo location

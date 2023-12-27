@@ -54,7 +54,8 @@ jobs:
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
           sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
       - name: Build static binary
-        run: cargo build --release --features mimalloc  --target x86_64-unknown-linux-musl
+        # run: cargo build --release --features mimalloc  --target x86_64-unknown-linux-musl
+        run: cargo build --features mimalloc  --target x86_64-unknown-linux-musl
       - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/release/openobserve bin/openobserve
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
