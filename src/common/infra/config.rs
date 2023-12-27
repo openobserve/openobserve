@@ -343,10 +343,20 @@ pub struct Common {
         storage, we also support s3 in local mode."
     )]
     pub local_mode_storage: String,
-    #[env_config(name = "ZO_META_STORE", default = "")]
+    #[env_config(
+        name = "ZO_META_STORE",
+        default = "",
+        help = "Default is sqlite for local mode, etcd for cluster mode. 
+    and supported values are: sqlite, etcd, postgres, dynamodb, the sqlite only support for local mode."
+    )]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
-    #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
+    #[env_config(
+        name = "ZO_META_POSTGRES_DSN",
+        default = "",
+        help = "If you enable postgres as meta store, you need configure the database source address, 
+        like this: postgres://postgres:12345678@localhost:5432/openobserve"
+    )]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
@@ -394,25 +404,73 @@ pub struct Common {
         help = "metadata database local storage directory."
     )] // ./data/openobserve/db/
     pub data_db_dir: String,
-    #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
+    #[env_config(
+        name = "ZO_DATA_CACHE_DIR",
+        default = "",
+        help = "local query cache storage directory, applicable only for cluster mode."
+    )] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_BASE_URI", default = "")]
+    #[env_config(
+        name = "ZO_BASE_URI",
+        default = "",
+        help = "if you set OpenObserve with a prefix in k8s nginx ingress, you can set the prefix path."
+    )]
     pub base_uri: String,
-    #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_WAL_MEMORY_MODE_ENABLED",
+        default = false,
+        help = "For performance, we can write WAL file into memory instead of write into disk, this will increase 
+        ingestion performance, but it has dast lose risk when the system crashed."
+    )]
     pub wal_memory_mode_enabled: bool,
-    #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
+    #[env_config(
+        name = "ZO_WAL_LINE_MODE_ENABLED",
+        default = true,
+        help = "Default we write WAL file line by line, it is a bit slow but it safety, you can disable it to increase 
+        a bit performance, but it increase WAL file incorrect risk."
+    )]
     pub wal_line_mode_enabled: bool,
-    #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
+    #[env_config(
+        name = "ZO_COLUMN_TIMESTAMP",
+        default = "_timestamp",
+        help = "for each log line, if not present with this key , we add a 
+    timestamp with this key, used for queries with time range."
+    )]
     pub column_timestamp: String,
-    #[env_config(name = "ZO_WIDENING_SCHEMA_EVOLUTION", default = true)]
+    #[env_config(
+        name = "ZO_WIDENING_SCHEMA_EVOLUTION",
+        default = true,
+        help = "if set to false user can add new columns to data being ingested 
+    but changes to existing data for data type are not supported "
+    )]
     pub widening_schema_evolution: bool,
-    #[env_config(name = "ZO_SKIP_SCHEMA_VALIDATION", default = false)]
+    #[env_config(
+        name = "ZO_SKIP_SCHEMA_VALIDATION",
+        default = false,
+        help = "Default we check ingested every record for schema validation, but if your schema is fixed, you can skip it, 
+    this will increase 2x ingestion performance."
+    )]
     pub skip_schema_validation: bool,
-    #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
+    #[env_config(
+        name = "ZO_FEATURE_PER_THREAD_LOCK",
+        default = false,
+        help = "Default we check ingested every record for schema validation, but if your schema is fixed, you can skip it, 
+    this will increase 2x ingestion performance."
+    )]
     pub feature_per_thread_lock: bool,
-    #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
+    #[env_config(
+        name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS",
+        default = false,
+        help = "default full text search uses log, message, msg, content, data, events, json or selected stream fields. 
+        Enabling this option will perform full text search on each field, may hamper full text search performance"
+    )]
     pub feature_fulltext_on_all_fields: bool,
-    #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS",
+        default = "",
+        help = "default full text search uses log, message, msg, content, data, events, json as global setting, 
+        but you can add more fields as global full text search fields. eg: field1,field2"
+    )]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
@@ -420,9 +478,17 @@ pub struct Common {
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
-    #[env_config(name = "ZO_UI_ENABLED", default = true)]
+    #[env_config(
+        name = "ZO_UI_ENABLED",
+        default = true,
+        help = "default we enable embed UI, one can disable it."
+    )]
     pub ui_enabled: bool,
-    #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_UI_SQL_BASE64_ENABLED",
+        default = false,
+        help = "Enable base64 encoding for SQL in UI."
+    )]
     pub ui_sql_base64_enabled: bool,
     #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
     pub metrics_dedup_enabled: bool,
@@ -694,7 +760,12 @@ pub struct Sled {
 
 #[derive(EnvConfig)]
 pub struct Dynamo {
-    #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
+    #[env_config(
+        name = "ZO_META_DYNAMO_PREFIX",
+        default = "",
+        help = "If you enable dynamodb as meta store, you need configure DynamoDB 
+    table prefix, default use s3 bucket name."
+    )] // default set to s3 bucket name
     pub prefix: String,
     pub file_list_table: String,
     pub file_list_deleted_table: String,

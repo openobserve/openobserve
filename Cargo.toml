@@ -82,7 +82,7 @@ arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
 object_store = { version = "0.8", features = ["aws", "azure", "gcp"] }
-dotenv_config = "0.1.7"
+dotenv_config = "0.1.8"
 dotenvy = "0.15"
 env_logger = "0.10"
 etcd-client = { version = "0.12", features = ["tls"] }

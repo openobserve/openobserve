@@ -2676,9 +2676,9 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "dotenv_config"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22c42ee79502f8625682f381c05afbd2c0b65115aef83c219f49183f6c4adb1a"
+checksum = "d0125338c5beff100e677d4ffc02848574b602718435c5a47e647737bd88e62d"
 dependencies = [
  "anyhow",
  "askama",
