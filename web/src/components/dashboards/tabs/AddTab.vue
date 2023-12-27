@@ -142,7 +142,9 @@ export default defineComponent({
             // const newTab: any = await createFolder(store, tabData.value);
             // const newTab = tabData.value;
             // props?.tabs?.push(tabData.value);
-            const newTab = JSON.parse(JSON.stringify(props.tabs))?.push(tabData.value);
+            const newTab = JSON.parse(JSON.stringify(props.tabs));
+            newTab.push(tabData.value);
+            
             // newTab[props.tabIndex] = tabData.value;
             emit("update:tabs", newTab);
             $q.notify({

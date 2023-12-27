@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="display: flex">
     <q-tabs
-      v-model="selectedTabIndex"
+      v-model="selectedTab"
       :align="'left'"
       narrow-indicator
       dense
@@ -128,7 +128,7 @@ export default defineComponent({
       type: Number,
     },
   },
-  emits: ["update:selectedTab", "update:tabs"],
+  emits: ["update:selectedTabIndex", "update:tabs"],
   setup(props, { emit }) {
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
@@ -136,6 +136,7 @@ export default defineComponent({
     const selectedTabIndexToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
     const hoveredTabIndex = ref(-1);
+    const selectedTab = ref(props.selectedTabIndex);
 
     const updateTabList = (tabs: any) => {
       emit("update:tabs", tabs);
@@ -155,12 +156,12 @@ export default defineComponent({
     };
 
     const deleteTab = () => {
-      props?.tabs?.splice(selectedTabIndexToDelete.value, 1);
+      emit("update:tabs", props?.tabs?.filter((_, index) => index !== selectedTabIndexToDelete.value));
       confirmDeleteTabDialog.value = false;
     };
 
     const onTabChange = (index: number) => {
-      emit("update:selectedTab", index);
+      emit("update:selectedTabIndex", index);
     };
     
     return {
@@ -177,6 +178,7 @@ export default defineComponent({
       deleteTab,
       hoveredTabIndex,
       onTabChange,
+      selectedTab,
     };
   },
 });
