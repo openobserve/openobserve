@@ -30,7 +30,7 @@ RUN mv /app/target/aarch64-unknown-linux-gnu/release-prod/openobserve /app/targe
 
 FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools postgresql
+RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3 postgresql
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
 COPY --from=builder /lib/aarch64-linux-gnu/liblzma.so.5 /lib/aarch64-linux-gnu/liblzma.so.5

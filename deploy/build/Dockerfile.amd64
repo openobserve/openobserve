@@ -31,7 +31,7 @@ RUN mv /app/target/x86_64-unknown-linux-gnu/release/openobserve /app/target/rele
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools postgresql
+RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3 postgresql
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
