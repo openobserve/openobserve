@@ -307,10 +307,12 @@ pub async fn remote_write(
                 schema_key,
                 schema: Arc::new(schema),
                 records: vec![],
+                records_size: 0,
             });
             hour_buf
                 .records
                 .push(Arc::new(json::Value::Object(val_map.to_owned())));
+            hour_buf.records_size += value_str.len();
 
             // real time alert
             let need_trigger = !stream_trigger_map.contains_key(&metric_name);

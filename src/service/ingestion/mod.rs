@@ -345,15 +345,14 @@ pub async fn write_file(
                     schema_key: Arc::from(entry.schema_key.as_str()),
                     partition_key: Arc::from(hour_key.as_str()),
                     data: entry.records,
-                    data_size: 0,
+                    data_size: entry.records_size,
                 },
             )
             .await
             .unwrap();
         // -- end call new ingester
 
-        // TODO ingest original data size
-        req_stats.size += entry_records as f64 / SIZE_IN_MB;
+        req_stats.size += entry.records_size as f64 / SIZE_IN_MB;
         req_stats.records += entry_records as i64;
     }
     req_stats

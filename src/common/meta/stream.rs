@@ -352,6 +352,7 @@ pub struct SchemaRecords {
     pub schema_key: String,
     pub schema: Arc<Schema>,
     pub records: Vec<Arc<json::Value>>,
+    pub records_size: usize,
 }
 
 #[derive(Clone, Copy, Default)]

@@ -434,9 +434,11 @@ async fn add_valid_record_arrow(
                     schema_key,
                     schema,
                     records: vec![],
+                    records_size: 0,
                 }
             });
             hour_buf.records.push(Arc::new(loc_value));
+            hour_buf.records_size += value_str.len();
             status.successful += 1;
         };
     } else {

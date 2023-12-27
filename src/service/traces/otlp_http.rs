@@ -404,11 +404,13 @@ pub async fn traces_json(
                             schema_key,
                             schema: Arc::new(schema),
                             records: vec![],
+                            records_size: 0,
                         }
                     });
                     let loc_value: utils::json::Value =
                         utils::json::from_slice(value_str.as_bytes()).unwrap();
                     hour_buf.records.push(Arc::new(loc_value));
+                    hour_buf.records_size += value_str.len();
                 }
             }
         }

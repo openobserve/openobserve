@@ -236,10 +236,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             schema_key,
             schema: Arc::new(schema),
             records: vec![],
+            records_size: 0,
         });
         hour_buf
             .records
             .push(Arc::new(json::Value::Object(record.to_owned())));
+        hour_buf.records_size += record_str.len();
 
         // update status
         let stream_status = stream_status_map

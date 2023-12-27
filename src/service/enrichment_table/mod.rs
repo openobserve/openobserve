@@ -99,6 +99,7 @@ pub async fn save_enrichment_data(
     }
 
     let mut records = vec![];
+    let mut records_size = 0;
     let timestamp = if !append_data {
         Utc::now().timestamp_micros()
     } else {
@@ -161,6 +162,7 @@ pub async fn save_enrichment_data(
                     );
                 }
                 records.push(Arc::new(json::Value::Object(json_record)));
+                records_size += value_str.len();
             }
         }
     }
@@ -186,6 +188,7 @@ pub async fn save_enrichment_data(
             schema_key,
             schema: Arc::new(schema),
             records,
+            records_size,
         },
     );
     let mut stream_file_name = "".to_string();
