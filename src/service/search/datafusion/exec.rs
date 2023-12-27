@@ -1003,6 +1003,9 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
     if CONFIG.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
     }
+    if CONFIG.common.bloom_filter_force_disabled {
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", false);
+    }
     Ok(config)
 }
 
