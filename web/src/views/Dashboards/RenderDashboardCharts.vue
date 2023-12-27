@@ -25,13 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
     />
-    <TabList class="q-mt-sm" v-model:tabs="tabs" v-model:selectedTabIndex="selectedTabIndex" />
+    <TabList
+      class="q-mt-sm"
+      :dashboardData="dashboardData"
+      v-model:selectedTabIndex="selectedTabIndex"
+      @saveDashboard="saveDashboard"
+    />
     <slot name="before_panels" />
     <div class="displayDiv">
       <grid-layout
         ref="gridLayoutRef"
-        v-if="tabs[selectedTabIndex]?.panels?.length > 0"
-        :layout.sync="getDashboardLayout(tabs[selectedTabIndex])"
+        v-if="
+          Array.isArray(dashboardData?.tabs) &&
+          dashboardData?.tabs[selectedTabIndex]?.panels?.length > 0
+        "
+        :layout.sync="getDashboardLayout(dashboardData?.tabs[selectedTabIndex])"
         :col-num="12"
         :row-height="30"
         :is-draggable="!viewOnly"
@@ -45,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <grid-item
           class="gridBackground"
           :class="store.state.theme == 'dark' ? 'dark' : ''"
-          v-for="item in tabs[selectedTabIndex]?.panels || []"
+          v-for="item in dashboardData?.tabs[selectedTabIndex]?.panels || []"
           :key="item.id"
           :x="getPanelLayout(item, 'x')"
           :y="getPanelLayout(item, 'y')"
@@ -89,7 +97,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-card>
     </q-dialog>
-    <div v-if="!tabs[selectedTabIndex]?.panels?.length">
+    <div
+      v-if="
+        !(
+          Array.isArray(dashboardData?.tabs) &&
+          dashboardData?.tabs[selectedTabIndex]?.panels?.length
+        )
+      "
+    >
       <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
     </div>
@@ -112,7 +127,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
-import { watch } from "vue";
+import { onMounted } from "vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -146,22 +161,25 @@ export default defineComponent({
     // holds the view panel id
     const viewPanelId = ref("");
 
-    // tabs array
-    const tabs = ref(props.dashboardData?.tabs || []);
+    // selected tab index
+    const selectedTabIndex = ref(null);
 
-    // selected tab
-    // use route query tab else default
-    const defaultTabIndex = tabs.value.findIndex((tab: any) => tab.name === route?.query?.tab ?? "default");
-    const selectedTabIndex = ref(defaultTabIndex !== -1 ? defaultTabIndex : 0);
-
-    watch(
-      () => props.dashboardData?.tabs,
-      () => {
-        tabs.value = props.dashboardData?.tabs || [];
-        const defaultTabIndex = tabs?.value?.findIndex((tab: any) => tab.name === route?.query?.tab ?? "default");
-        selectedTabIndex.value = defaultTabIndex !== -1 ? defaultTabIndex : 0;
+    onMounted(() => {
+      //initial selectedTabIndex will be null
+      //if route has query and we have a tab in tab list then set selectedTabIndex to that tab index
+      // else 0 as a tab index
+      selectedTabIndex.value = null;
+      if (
+        Array.isArray(props.dashboardData?.tabs) &&
+        props.dashboardData?.tabs.findIndex(
+          (it: any) => it.name === route.query.tab
+        ) !== -1
+      ) {
+        selectedTabIndex.value = route.query.tab;
+      } else {
+        selectedTabIndex.value = 0;
       }
-    );
+    });
 
     // variables data
     const variablesData = reactive({});
@@ -220,6 +238,7 @@ export default defineComponent({
         query: {
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };
@@ -307,8 +326,8 @@ export default defineComponent({
       layoutUpdate,
       showViewPanel,
       viewPanelId,
-      tabs,
       selectedTabIndex,
+      saveDashboard,
     };
   },
   methods: {

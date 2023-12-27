@@ -95,18 +95,18 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    tabs: {
-      type: Array,
+    dashboardData: {
+      type: Object,
       required: true,
     },
   },
-  emits: ["update:tabs"],
+  emits: ["saveDashboard"],
   setup(props, { emit }) {
     const store: any = useStore();
     const addTabForm: any = ref(null);
     const tabData: any = ref(
       props.editMode
-        ? JSON.parse(JSON.stringify(props?.tabs[props.tabIndex]))
+        ? JSON.parse(JSON.stringify(props?.dashboardData?.tabs[props.tabIndex]))
         : defaultValue()
     );
     const isValidIdentifier: any = ref(true);
@@ -122,15 +122,8 @@ export default defineComponent({
         try {
           //if edit mode
           if (props.editMode) {
-            // await updateFolder(
-            //   store,
-            //   tabData.value.folderId,
-            //   tabData.value
-            // );
-            // props.tabs[props.tabIndex] = tabData.value;
-            const newTab = JSON.parse(JSON.stringify(props.tabs));
-            newTab[props.tabIndex] = tabData.value;
-            emit("update:tabs", newTab);
+            props.dashboardData.tabs[props.tabIndex] = tabData.value;
+            emit("saveDashboard");
             $q.notify({
               type: "positive",
               message: "Tab updated",
@@ -139,14 +132,8 @@ export default defineComponent({
           }
           //else new tab
           else {
-            // const newTab: any = await createFolder(store, tabData.value);
-            // const newTab = tabData.value;
-            // props?.tabs?.push(tabData.value);
-            const newTab = JSON.parse(JSON.stringify(props.tabs));
-            newTab.push(tabData.value);
-            
-            // newTab[props.tabIndex] = tabData.value;
-            emit("update:tabs", newTab);
+            props?.dashboardData?.tabs?.push(tabData.value);
+            emit("saveDashboard");
             $q.notify({
               type: "positive",
               message: `Tab added successfully.`,
@@ -155,7 +142,7 @@ export default defineComponent({
           }
         } catch (err: any) {
           console.log("err", err);
-          
+
           $q.notify({
             type: "negative",
             message: JSON.stringify(

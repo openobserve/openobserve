@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-tab
         no-caps
         :ripple="false"
-        v-for="(tab, index) in tabs"
+        v-for="(tab, index) in dashboardData?.tabs"
         :key="index"
         :name="index"
         @click.stop
@@ -86,8 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddTab
         :edit-mode="isTabEditMode"
         :tabIndex="selectedTabIndexToEdit ?? -1"
-        :tabs="tabs"
-        @update:tabs="updateTabList"
+        :dashboardData="dashboardData"
+        @saveDashboard="updateTabList"
       />
     </q-dialog>
 
@@ -119,16 +119,18 @@ export default defineComponent({
     ConfirmDialog,
   },
   props: {
-    tabs: {
+    dashboardData: {
       required: true,
-      type: Array,
+      type: Object,
     },
     selectedTabIndex: {
       required: true,
-      type: Number,
+      validator: (value) => {
+        return typeof value === "number" || value === null;
+      },
     },
   },
-  emits: ["update:selectedTabIndex", "update:tabs"],
+  emits: ["update:selectedTabIndex", "saveDashboard"],
   setup(props, { emit }) {
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
@@ -138,8 +140,8 @@ export default defineComponent({
     const hoveredTabIndex = ref(-1);
     const selectedTab = ref(props.selectedTabIndex);
 
-    const updateTabList = (tabs: any) => {
-      emit("update:tabs", tabs);
+    const updateTabList = () => {
+      emit("saveDashboard");
       showAddTabDialog.value = false;
       isTabEditMode.value = false;
     };
@@ -156,14 +158,15 @@ export default defineComponent({
     };
 
     const deleteTab = () => {
-      emit("update:tabs", props?.tabs?.filter((_, index) => index !== selectedTabIndexToDelete.value));
+      props?.dashboardData?.tabs?.splice(selectedTabIndexToDelete.value, 1);
+      emit("saveDashboard");
       confirmDeleteTabDialog.value = false;
     };
 
     const onTabChange = (index: number) => {
       emit("update:selectedTabIndex", index);
     };
-    
+
     return {
       showAddTabDialog,
       updateTabList,
