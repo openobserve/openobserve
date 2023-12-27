@@ -39,15 +39,7 @@ export default defineComponent({
             await nextTick();
             chart.resize();
         }
-        watch(() => store.state.theme, (newTheme) => {
-            const theme = newTheme === 'dark' ? 'dark' : 'light';
-            chart.dispose();
-            chart = echarts.init(chartRef.value, theme);
-            const options = props.data.options || {}
-            options.animation = false
-            chart.setOption(options, true);
-            chart.setOption({ animation: true });
-        });
+
         onMounted(async () => {
             await nextTick();
             await nextTick();
@@ -56,7 +48,7 @@ export default defineComponent({
             await nextTick();
             await nextTick();
             await nextTick();
-            // const theme = store.state.theme === 'dark' ? 'dark' : 'light';
+
             chart = echarts.init(chartRef.value);
             echarts.registerMap('world', map);
             console.log("onMounted props.data.options", props.data.options);

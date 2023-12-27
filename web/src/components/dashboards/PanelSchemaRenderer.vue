@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="
           panelData.chartType == 'maps'
             ? panelData
-            : { options: { backgroundColor: 'transparent' } }
+            : { options: {} }
         "
       ></GeoJSONMapRenderer>
         <GeoMapRenderer
