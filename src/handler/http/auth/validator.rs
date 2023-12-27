@@ -20,12 +20,12 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
+use config::CONFIG;
 
 #[cfg(not(feature = "enterprise"))]
 use crate::common::meta::user::DBUser;
 use crate::{
     common::{
-        infra::config::CONFIG,
         meta::{
             ingestion::INGESTION_EP,
             proxy::QueryParamProxyURL,

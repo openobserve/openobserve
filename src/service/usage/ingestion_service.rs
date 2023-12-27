@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::Error;
+use config::CONFIG;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::{
-    common::infra::{cluster, config::CONFIG},
+    common::infra::cluster,
     handler::grpc::cluster_rpc::{self, UsageResponse},
 };
 

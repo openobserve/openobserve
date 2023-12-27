@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_multipart::Multipart;
 use actix_web::{
@@ -23,22 +23,18 @@ use actix_web::{
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::Utc;
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 
 use crate::{
     common::{
-        infra::{
-            cache::stats,
-            cluster,
-            config::{CONFIG, STREAM_SCHEMAS},
-        },
+        infra::{cache::stats, cluster, config::STREAM_SCHEMAS},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, StreamParams},
+            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::json,
     },
@@ -62,7 +58,7 @@ pub async fn save_enrichment_data(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
-    let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let stream_name = &format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -103,6 +99,7 @@ pub async fn save_enrichment_data(
     }
 
     let mut records = vec![];
+    let mut records_size = 0;
     let timestamp = if !append_data {
         Utc::now().timestamp_micros()
     } else {
@@ -154,15 +151,18 @@ pub async fn save_enrichment_data(
                 .await;
 
                 if records.is_empty() {
+                    let schema = stream_schema_map.get(stream_name).unwrap();
+                    let schema_key = schema.hash_key();
                     hour_key = super::ingestion::get_wal_time_key(
                         timestamp,
                         &vec![],
                         PartitionTimeLevel::Unset,
                         &json_record,
-                        None,
+                        Some(&schema_key),
                     );
                 }
-                records.push(value_str);
+                records.push(Arc::new(json::Value::Object(json_record)));
+                records_size += value_str.len();
             }
         }
     }
@@ -176,13 +176,26 @@ pub async fn save_enrichment_data(
         );
     }
 
-    buf.insert(hour_key.clone(), records.clone());
-    let mut stream_file_name = "".to_string();
+    let schema = stream_schema_map
+        .get(stream_name)
+        .unwrap()
+        .clone()
+        .with_metadata(HashMap::new());
+    let schema_key = schema.hash_key();
+    buf.insert(
+        hour_key,
+        SchemaRecords {
+            schema_key,
+            schema: Arc::new(schema),
+            records,
+            records_size,
+        },
+    );
+
     let mut req_stats = write_file(
-        &buf,
+        buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::EnrichmentTables),
-        &mut stream_file_name,
         None,
     )
     .await;

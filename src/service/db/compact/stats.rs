@@ -15,7 +15,9 @@
 
 use std::sync::atomic;
 
-use crate::common::infra::{config::CONFIG, db as infra_db};
+use config::CONFIG;
+
+use crate::common::infra::db as infra_db;
 
 static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
 
@@ -43,7 +45,7 @@ pub async fn get_offset() -> (i64, String) {
 
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
     if !CONFIG.common.meta_store_external {
-        LOCAL_OFFSET.store(offset, atomic::Ordering::Relaxed);
+        LOCAL_OFFSET.store(offset, atomic::Ordering::Release);
         return Ok(());
     }
 

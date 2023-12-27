@@ -26,15 +26,12 @@ use std::{
 
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use chrono::{Local, Utc};
+use config::CONFIG;
 use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{
-            self, cluster,
-            config::{CONFIG, VERSION},
-        },
+        infra::{self, cluster, config::VERSION},
         meta, migration,
         utils::zo_logger,
     },
@@ -95,23 +92,8 @@ static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
 ));
 
 use tracing_subscriber::{
-    self,
-    filter::LevelFilter as TracingLevelFilter,
-    fmt::{format::Writer, time::FormatTime, Layer},
-    prelude::*,
-    EnvFilter,
+    self, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
-struct CustomTimeFormat;
-
-impl FormatTime for CustomTimeFormat {
-    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        if CONFIG.log.local_time_format.is_empty() {
-            write!(w, "{}", Utc::now().to_rfc3339())
-        } else {
-            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
-        }
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -127,10 +109,12 @@ async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
     let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
+    // cli mode
     if cli::cli().await? {
         return Ok(());
     }
 
+    // setup logs
     let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
         let logger = zo_logger::ZoLogger {
             sender: zo_logger::EVENT_SENDER.clone(),
@@ -157,11 +141,12 @@ async fn main() -> Result<(), anyhow::Error> {
         CONFIG.limit.disk_free / 1024 / 1024 / 1024,
     );
 
-    // init jobs
     // it must be initialized before the server starts
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
+    // init config
+    config::init().await.expect("config init failed");
     // init infra
     infra::init().await.expect("infra init failed");
 
@@ -170,6 +155,9 @@ async fn main() -> Result<(), anyhow::Error> {
     migration::check_upgrade(&old_version, VERSION).await?;
     // migrate dashboards
     migration::dashboards::run().await?;
+
+    // ingester init
+    ingester::init().await.expect("ingester init failed");
 
     // init job
     job::init().await.expect("job init failed");
@@ -326,7 +314,7 @@ fn init_router_grpc_server(
 
 async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
-    let prometheus = infra::metrics::create_prometheus_handler();
+    let prometheus = config::metrics::create_prometheus_handler();
 
     // ua parser
     let ua_parser = web::Data::new(
@@ -427,15 +415,18 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     let layer = if CONFIG.log.json_format {
         Layer::default()
             .with_writer(writer)
-            .with_timer(CustomTimeFormat)
+            .with_timer(config::meta::logger::CustomTimeFormat)
             .with_ansi(false)
             .json()
+            .with_current_span(false)
+            .with_span_list(false)
             .boxed()
     } else {
         Layer::default()
             .with_writer(writer)
-            .with_timer(CustomTimeFormat)
             .with_ansi(false)
+            .with_target(true)
+            .event_format(config::meta::logger::O2Formatter::default())
             .boxed()
     };
 

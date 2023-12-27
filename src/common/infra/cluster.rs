@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{net::IpAddr, str::FromStr, sync::Arc};
+use std::{net::IpAddr, sync::Arc};
 
+use config::{
+    cluster::LOCAL_NODE_ID,
+    meta::cluster::{Node, NodeStatus, Role},
+    RwHashMap, CONFIG, INSTANCE_ID,
+};
 use etcd_client::PutOptions;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
     common::{
         infra::{
-            config::{RwHashMap, CONFIG, INSTANCE_ID},
             db::{etcd, Event},
             errors::{Error, Result},
         },
@@ -35,76 +38,9 @@ use crate::{
 static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 
-pub static mut LOCAL_NODE_ID: i32 = 0;
 pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
 pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
 static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Node {
-    pub id: i32,
-    pub uuid: String,
-    pub name: String,
-    pub http_addr: String,
-    pub grpc_addr: String,
-    pub role: Vec<Role>,
-    pub cpu_num: u64,
-    pub status: NodeStatus,
-    #[serde(default)]
-    pub scheduled: bool,
-    #[serde(default)]
-    pub broadcasted: bool,
-    #[serde(default)]
-    pub has_sidecar: bool,
-    #[serde(default)]
-    pub is_sidecar: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum NodeStatus {
-    Prepare,
-    Online,
-    Offline,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum Role {
-    All,
-    Ingester,
-    Querier,
-    Compactor,
-    Router,
-    AlertManager,
-}
-
-impl FromStr for Role {
-    type Err = String;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let s = s.to_lowercase();
-        match s.as_str() {
-            "all" => Ok(Role::All),
-            "ingester" => Ok(Role::Ingester),
-            "querier" => Ok(Role::Querier),
-            "compactor" => Ok(Role::Compactor),
-            "router" => Ok(Role::Router),
-            "alertmanager" => Ok(Role::AlertManager),
-            _ => Err(format!("Invalid cluster role: {s}")),
-        }
-    }
-}
-
-impl std::fmt::Display for Role {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Role::All => write!(f, "all"),
-            Role::Ingester => write!(f, "ingester"),
-            Role::Querier => write!(f, "querier"),
-            Role::Compactor => write!(f, "compactor"),
-            Role::Router => write!(f, "router"),
-            Role::AlertManager => write!(f, "alertmanager"),
-        }
-    }
-}
 
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {

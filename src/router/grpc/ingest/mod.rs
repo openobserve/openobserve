@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::{
-    infra::{cluster, config::CONFIG},
-    utils::rand::get_rand_element,
-};
+use config::CONFIG;
+
+use crate::common::{infra::cluster, utils::rand::get_rand_element};
 
 pub mod logs;
 pub mod metrics;

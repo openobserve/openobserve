@@ -16,16 +16,15 @@
 use std::path::Path;
 
 use ahash::HashMap;
+use config::{
+    meta::{cluster::Role, stream::StreamType},
+    metrics, CONFIG,
+};
 use tokio::time;
 
 use crate::{
     common::{
-        infra::{
-            cache, cluster,
-            config::{CONFIG, USERS},
-            metrics,
-        },
-        meta::StreamType,
+        infra::{cache, cluster, config::USERS},
         utils::file::scan_files,
     },
     service::db,
@@ -69,7 +68,8 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Err(_) => return Ok(()),
     };
     let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern);
+    let mut files = scan_files(&pattern, "parquet");
+    files.extend(scan_files(&pattern, "json"));
     let mut sizes = HashMap::default();
     for file in files {
         let local_file = file.to_owned();
@@ -118,27 +118,27 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
             for node in nodes.unwrap() {
                 if cluster::is_ingester(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Ingester.to_string().as_str()])
+                        .with_label_values(&[Role::Ingester.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_querier(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Querier.to_string().as_str()])
+                        .with_label_values(&[Role::Querier.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_compactor(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Compactor.to_string().as_str()])
+                        .with_label_values(&[Role::Compactor.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_router(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::Router.to_string().as_str()])
+                        .with_label_values(&[Role::Router.to_string().as_str()])
                         .inc();
                 }
                 if cluster::is_alert_manager(&node.role) {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[cluster::Role::AlertManager.to_string().as_str()])
+                        .with_label_values(&[Role::AlertManager.to_string().as_str()])
                         .inc();
                 }
             }

@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use config::CONFIG;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_server::LogsService, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use tonic::{Response, Status};
-
-use crate::common::infra::config::CONFIG;
 
 #[derive(Default)]
 pub struct LogsServer;

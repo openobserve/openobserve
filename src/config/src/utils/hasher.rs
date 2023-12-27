@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::arrow::datatypes::{Field, Schema};
+use arrow_schema::{Field, Schema};
 use itertools::Itertools;
 
-use crate::common::utils::schema_ext::SchemaExt;
+use super::schema_ext::SchemaExt;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Signature(pub [u8; 32]);
@@ -57,11 +57,11 @@ pub fn get_fields_key_xxh3(fields: &[Field]) -> String {
 #[cfg(test)]
 mod tests {
 
-    use arrow_schema::{DataType, Field};
+    use arrow_schema::DataType;
 
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_ingest() {
         let mut schmea_vec = vec![
             Field::new("log", DataType::Utf8, false),

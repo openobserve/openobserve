@@ -16,15 +16,13 @@
 use std::sync::Arc;
 
 use cloudevents::{Event, EventBuilder, EventBuilderV10};
+use config::{ider, CONFIG};
 use log::{Metadata, Record};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use tokio::sync::{broadcast, RwLock};
 
-use crate::common::{
-    infra::{config::CONFIG, ider::generate},
-    utils::json,
-};
+use crate::common::utils::json;
 
 pub static EVENT_SENDER: Lazy<broadcast::Sender<Event>> = Lazy::new(|| {
     let (tx, _) = broadcast::channel(1024);
@@ -61,7 +59,7 @@ impl log::Log for ZoLogger {
             });
 
             let event = EventBuilderV10::new()
-                .id(generate())
+                .id(ider::generate())
                 .ty("debug_log")
                 .source(CONFIG.common.instance_name.clone())
                 .data("application/json", payload)

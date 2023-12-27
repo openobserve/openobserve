@@ -16,6 +16,7 @@
 use std::io;
 
 use actix_web::{http::StatusCode, HttpResponse};
+use config::ider;
 use ipnetwork::IpNetwork;
 
 use crate::{
@@ -58,7 +59,7 @@ pub async fn create_route(mut route: SyslogRoute) -> Result<HttpResponse, io::Er
         }
     }
 
-    route.id = crate::common::infra::ider::generate();
+    route.id = ider::generate();
     if let Err(e) = syslog::set(&route).await {
         return Ok(Response::InternalServerError(e).into());
     }

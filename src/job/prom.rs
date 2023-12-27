@@ -14,14 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ahash::AHashMap;
+use config::CONFIG;
 use tokio::time::{self, Duration};
 
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{CONFIG, METRIC_CLUSTER_LEADER},
-        },
+        infra::{cluster, config::METRIC_CLUSTER_LEADER},
         meta::prom::ClusterLeader,
     },
     service::db,

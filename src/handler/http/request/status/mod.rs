@@ -17,6 +17,7 @@ use std::io::Error;
 
 use actix_web::{get, HttpResponse};
 use ahash::AHashMap as HashMap;
+use config::{CONFIG, HAS_FUNCTIONS, INSTANCE_ID, SQL_FULL_TEXT_SEARCH_FIELDS};
 use datafusion::arrow::datatypes::{Field, Schema};
 use serde::Serialize;
 use utoipa::ToSchema;

@@ -19,6 +19,7 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
+use config::meta::stream::StreamType;
 
 use crate::{
     common::{
@@ -28,7 +29,6 @@ use crate::{
                 FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform,
             },
             http::HttpResponse as MetaHttpResponse,
-            StreamType,
         },
     },
     service::{db, ingestion::compile_vrl_function},

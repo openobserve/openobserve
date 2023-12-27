@@ -15,6 +15,7 @@
 
 use std::{cmp::min, path::Path};
 
+use config::{CONFIG, MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME};
 use futures::stream::StreamExt;
 use once_cell::sync::Lazy;
 use reqwest::Client;
@@ -23,10 +24,7 @@ use tokio::{fs::File, io::AsyncWriteExt, time};
 
 use crate::{
     common::{
-        infra::config::{
-            CONFIG, GEOIP_ASN_TABLE, GEOIP_CITY_TABLE, MAXMIND_DB_CLIENT, MMDB_ASN_FILE_NAME,
-            MMDB_CITY_FILE_NAME,
-        },
+        infra::config::{GEOIP_ASN_TABLE, GEOIP_CITY_TABLE, MAXMIND_DB_CLIENT},
         meta::maxmind::MaxmindClient,
     },
     service::enrichment_table::geoip::{Geoip, GeoipConfig},

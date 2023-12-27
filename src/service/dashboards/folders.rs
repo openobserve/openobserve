@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
+use config::ider;
 
 use crate::{
     common::meta::{
@@ -50,7 +51,7 @@ pub async fn save_folder(
         );
     }
     if folder.folder_id != DEFAULT_FOLDER {
-        folder.folder_id = crate::common::infra::ider::generate();
+        folder.folder_id = ider::generate();
     }
 
     match db::dashboards::folders::put(org_id, folder).await {

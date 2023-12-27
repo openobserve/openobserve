@@ -15,6 +15,14 @@
 
 use std::io::Write;
 
+use config::{
+    ider,
+    meta::{
+        cluster::Node,
+        stream::{FileKey, FileMeta, StreamType},
+    },
+    CONFIG,
+};
 use futures::future::try_join_all;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -23,15 +31,10 @@ use crate::{
     common::{
         infra::{
             cluster,
-            config::CONFIG,
             errors::{Error, ErrorCodes},
-            file_list, ider, storage,
+            file_list, storage,
         },
-        meta::{
-            common::{FileKey, FileMeta},
-            stream::{PartitionTimeLevel, ScanStats},
-            StreamType,
-        },
+        meta::stream::{PartitionTimeLevel, ScanStats},
         utils::{file::get_file_meta as util_get_file_meta, json},
     },
     handler::grpc::cluster_rpc,
@@ -134,7 +137,7 @@ pub async fn query(
         tasks.push(task);
     }
     let mut max_id: i64 = 0;
-    let mut max_id_node: Option<cluster::Node> = None;
+    let mut max_id_node: Option<Node> = None;
     let task_results = try_join_all(tasks).await?;
     for task in task_results {
         let res = task?;

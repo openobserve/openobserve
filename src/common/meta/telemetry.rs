@@ -15,6 +15,7 @@
 
 use std::collections::HashMap;
 
+use config::{CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT};
 use segment::{message::Track, Client, Message};
 use sysinfo::SystemExt;
 

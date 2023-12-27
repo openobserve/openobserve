@@ -15,6 +15,7 @@
 
 use std::collections::HashMap;
 
+use config::meta::stream::StreamType;
 use vrl::prelude::NotNan;
 
 use crate::{
@@ -27,7 +28,7 @@ use crate::{
 };
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
-    let stats = stats::get_stream_stats(org_id, name, meta::StreamType::EnrichmentTables);
+    let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
 
     let rec_num = if stats.doc_num == 0 {
         100000
@@ -48,7 +49,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         timeout: 0,
     };
     // do search
-    match SearchService::search("", org_id, meta::StreamType::EnrichmentTables, &req).await {
+    match SearchService::search("", org_id, StreamType::EnrichmentTables, &req).await {
         Ok(res) => {
             if !res.hits.is_empty() {
                 Ok(res.hits.iter().map(convert_to_vrl).collect())
