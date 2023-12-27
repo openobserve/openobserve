@@ -591,6 +591,7 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Stri
         writer.close()?;
         tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
+    filter_schema_null_fields(&mut schema); // fix schema
     Ok((Arc::new(schema), work_dir))
 }
 
@@ -1204,6 +1205,28 @@ fn apply_query_fn(
             "Error compiling VRL function: {}",
             err
         ))),
+    }
+}
+
+fn filter_schema_null_fields(schema: &mut Schema) {
+    let fields = schema.fields();
+    if fields
+        .iter()
+        .filter(|f| f.data_type() == &DataType::Null)
+        .count()
+        > 0
+    {
+        let fields = fields
+            .iter()
+            .filter_map(|f| {
+                if f.data_type() == &DataType::Null {
+                    None
+                } else {
+                    Some(f.as_ref().to_owned())
+                }
+            })
+            .collect::<Vec<_>>();
+        *schema = Schema::new(fields.to_vec());
     }
 }
 

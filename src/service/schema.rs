@@ -300,14 +300,6 @@ pub async fn check_for_schema(
             record_schema: schema,
         };
     }
-    println!(
-        "schema fields: {}",
-        schema.fields.iter().map(|f| f.name()).join(", ")
-    );
-    println!(
-        "inferred schema fields: {}",
-        inferred_schema.fields.iter().map(|f| f.name()).join(", ")
-    );
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
         // return (false, None, inferred_schema.fields().to_vec());
