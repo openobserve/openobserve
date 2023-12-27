@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-btn>
-        <q-btn-dropdown dense flat label="" no-caps v-if="!viewOnly">
+        <q-btn-dropdown :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`" dense flat label="" no-caps v-if="!viewOnly">
           <q-list dense>
             <q-item
               clickable
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('EditPanel')"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Edit Panel</q-item-label>
+                <q-item-label data-test="dashboard-edit-panel" class="q-pa-sm">Edit Panel</q-item-label>
               </q-item-section>
             </q-item>
             <q-item
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('DuplicatePanel')"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Duplicate</q-item-label>
+                <q-item-label data-test="dashboard-duplicate-panel"  class="q-pa-sm">Duplicate</q-item-label>
               </q-item-section>
             </q-item>
             <q-item
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('DeletePanel')"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
+                <q-item-label data-test="dashboard-delete-panel" class="q-pa-sm">Delete Panel</q-item-label>
               </q-item-section>
             </q-item>
             <q-item
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showViewPanel = true"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Query Inspector</q-item-label>
+                <q-item-label data-test="dashboard-query-inspector-panel" class="q-pa-sm">Query Inspector</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
