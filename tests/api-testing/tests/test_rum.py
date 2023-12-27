@@ -175,6 +175,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
             assert (
                 response_payload["hits"][0]["message"] == unique_test_identifier
             ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
+            break
         except Exception as e:
             if retries > 0:
                 retries -= 1
@@ -297,6 +298,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
             assert unique_test_identifier in set(
                 [payload["type"] for payload in response_payload["hits"]]
             ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
+            break
         except Exception as e:
             if retries > 0:
                 retries -= 1
