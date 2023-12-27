@@ -132,7 +132,6 @@ impl DistinctValues {
 
         // write to wal
         let timestamp = chrono::Utc::now().timestamp_micros();
-        let mut stream_file_name = "".to_string();
         let schema = schema();
         let schema_key = schema.hash_key();
         for (org, items) in new_table {
@@ -173,7 +172,7 @@ impl DistinctValues {
                 hour_buf.records.push(Arc::new(data));
                 hour_buf.records_size += data_size;
             }
-            _ = ingestion::write_file(buf, 0, &stream_params, &mut stream_file_name, None).await;
+            _ = ingestion::write_file(buf, 0, &stream_params, None).await;
         }
         Ok(())
     }

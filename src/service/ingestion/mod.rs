@@ -324,7 +324,6 @@ pub async fn write_file(
     buf: AHashMap<String, SchemaRecords>,
     thread_id: usize,
     stream: &StreamParams,
-    _stream_file_name: &mut str,
     _partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();

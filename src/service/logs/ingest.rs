@@ -197,16 +197,7 @@ pub async fn ingest(
     }
 
     // write to file
-    let mut stream_file_name = "".to_string();
-    let mut req_stats =
-        write_file(buf, thread_id, &stream_params, &mut stream_file_name, None).await;
-
-    if stream_file_name.is_empty() {
-        return Ok(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ));
-    }
+    let mut req_stats = write_file(buf, thread_id, &stream_params, None).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {

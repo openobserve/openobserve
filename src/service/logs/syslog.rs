@@ -192,8 +192,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         }
     }
 
-    let mut stream_file_name = "".to_string();
-    write_file(buf, thread_id, &stream_params, &mut stream_file_name, None).await;
+    write_file(buf, thread_id, &stream_params, None).await;
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;

@@ -161,6 +161,30 @@ pub static INGEST_WAL_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static INGEST_MEMTABLE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_memtable_bytes",
+            "Ingestor in memory bytes. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_MEMTABLE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_memtable_files",
+            "Ingestor in memory files. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 
 // querier memory cache stats
 pub static QUERY_MEMORY_CACHE_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -536,6 +560,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_READ_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_MEMTABLE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_MEMTABLE_FILES.clone()))
         .expect("Metric registered");
 
     // querier stats

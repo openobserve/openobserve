@@ -191,12 +191,11 @@ pub async fn save_enrichment_data(
             records_size,
         },
     );
-    let mut stream_file_name = "".to_string();
+
     let mut req_stats = write_file(
         buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::EnrichmentTables),
-        &mut stream_file_name,
         None,
     )
     .await;

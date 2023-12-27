@@ -173,22 +173,13 @@ pub async fn usage_ingest(
     }
 
     // write to file
-    let mut stream_file_name = "".to_string();
     let _ = write_file(
         buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),
-        &mut stream_file_name,
         None,
     )
     .await;
-
-    if stream_file_name.is_empty() {
-        return Ok(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ));
-    }
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;
@@ -435,12 +426,10 @@ pub async fn handle_grpc_request(
     }
 
     // write to file
-    let mut stream_file_name = "".to_string();
     let mut req_stats = write_file(
         data_buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),
-        &mut stream_file_name,
         None,
     )
     .await;

@@ -444,9 +444,6 @@ pub async fn metrics_json_handler(
             continue;
         }
 
-        // write to file
-        let mut stream_file_name = "".to_string();
-
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
             org_id,
@@ -464,11 +461,11 @@ pub async fn metrics_json_handler(
             Some(CONFIG.limit.metrics_file_retention.as_str().into())
         };
 
+        // write to file
         let mut req_stats = write_file(
             stream_data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-            &mut stream_file_name,
             time_level,
         )
         .await;

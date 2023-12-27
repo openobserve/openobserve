@@ -119,6 +119,9 @@ impl Partition {
                 .context(WriteFileSnafu { path: path.clone() })?;
 
             // update metrics
+            metrics::INGEST_MEMTABLE_BYTES
+                .with_label_values(&[])
+                .sub(file_meta.original_size);
             metrics::INGEST_WAL_USED_BYTES
                 .with_label_values(&[&org_id, &stream_name, stream_type])
                 .add(buf_parquet.len() as i64);
@@ -152,6 +155,9 @@ impl PartitionFile {
             self.data
                 .push(RecordBatchEntry::new(batch, entry.data_size));
         }
+        metrics::INGEST_MEMTABLE_BYTES
+            .with_label_values(&[])
+            .add(entry.data_size as i64);
         Ok(())
     }
 

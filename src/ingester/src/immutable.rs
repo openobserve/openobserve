@@ -16,6 +16,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
+use config::metrics;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::time;
@@ -102,6 +103,7 @@ pub(crate) async fn persist() -> Result<()> {
 
         // remove entry from IMMUTABLES
         IMMUTABLES.write().await.remove(&path);
+        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
 
         time::sleep(time::Duration::from_millis(10)).await;
     }
