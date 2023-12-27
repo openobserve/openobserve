@@ -1,0 +1,29 @@
+[project]
+name = "pytest-openobserve"
+version = "0.1.0"
+description = "Add your description here"
+dependencies = [
+    "pytest>=7.4.2",
+    "pytest-sugar>=0.9.7",
+    "pytest-pretty>=1.2.0",
+    "requests>=2.31.0",
+    "ruff>=0.1.8",
+]
+readme = "README.md"
+requires-python = ">= 3.8"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "ruff>=0.1.8",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/main"]
