@@ -501,6 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @dragenter="onDragEnter($event, 'z', null)"
           @dragend="onDragEnd()"
+          data-test="dashboard-z-layout"
         >
           <div
             class="row q-mr-sm q-my-xs"
@@ -540,9 +541,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="primary"
                   size="sm"
                   :label="zLabel[index]"
+                  :data-test="`dashboard-z-item-${itemZ?.column}`"
                   class="q-pl-sm"
                 >
-                  <q-menu class="q-pa-md">
+                  <q-menu class="q-pa-md" :data-test="`dashboard-z-item-${itemZ?.column}-menu`">
                     <div>
                       <div class="row q-mb-sm" style="align-items: center">
                         <div
@@ -566,6 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             emit-value
                             map-options
                             :label="t('common.aggregation')"
+                            data-test="dashboard-z-item-dropdown"
                           ></q-select>
                         </div>
                         <div
@@ -578,6 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <input
                             type="color"
+                            data-test="dashboard-z-item-color"
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
@@ -590,6 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dense
                         filled
                         :label="t('common.label')"
+                        data-test="dashboard-z-item-input"
                         v-model="
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
@@ -620,6 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="height: 100%"
                   size="xs"
                   dense
+                  :data-test="`dashboard-z-item-${itemZ?.column}-remove`"
                   @click="removeZAxisItem(itemZ?.column)"
                   icon="close"
                 />
