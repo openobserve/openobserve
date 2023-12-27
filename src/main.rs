@@ -157,11 +157,12 @@ async fn main() -> Result<(), anyhow::Error> {
         CONFIG.limit.disk_free / 1024 / 1024 / 1024,
     );
 
-    // init jobs
     // it must be initialized before the server starts
     cluster::register_and_keepalive()
         .await
         .expect("cluster init failed");
+    // init config
+    config::init().await.expect("config init failed");
     // init infra
     infra::init().await.expect("infra init failed");
 
@@ -329,7 +330,7 @@ fn init_router_grpc_server(
 
 async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
-    let prometheus = infra::metrics::create_prometheus_handler();
+    let prometheus = config::metrics::create_prometheus_handler();
 
     // ua parser
     let ua_parser = web::Data::new(

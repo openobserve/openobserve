@@ -17,7 +17,7 @@ use once_cell::sync::Lazy;
 use snowflake::SnowflakeIdGenerator;
 
 use super::cluster;
-use crate::common::utils::rand::generate_random_string;
+use crate::utils::rand::generate_random_string;
 
 static mut IDER: Lazy<SnowflakeIdGenerator> =
     Lazy::new(|| unsafe { SnowflakeIdGenerator::new(1, cluster::LOCAL_NODE_ID) });

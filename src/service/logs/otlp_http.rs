@@ -18,7 +18,7 @@ use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -28,7 +28,7 @@ use prost::Message;
 use super::StreamMeta;
 use crate::{
     common::{
-        infra::{cluster, metrics},
+        infra::cluster,
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,

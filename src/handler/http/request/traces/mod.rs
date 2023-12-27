@@ -17,12 +17,12 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, metrics, CONFIG};
 use serde::Serialize;
 
 use crate::{
     common::{
-        infra::{errors, metrics},
+        infra::errors,
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::json,
     },

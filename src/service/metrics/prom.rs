@@ -18,7 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, TimeZone, Utc};
-use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
+use config::{meta::stream::StreamType, metrics, FxIndexMap, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -30,7 +30,6 @@ use crate::{
             cluster::{self, LOCAL_NODE_UUID},
             config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
             errors::{Error, Result},
-            metrics,
         },
         meta::{
             alerts::{self, Alert},

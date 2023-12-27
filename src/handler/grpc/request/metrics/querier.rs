@@ -14,14 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use arrow::ipc::writer::StreamWriter;
-use config::{meta::stream::StreamType, utils::parquet::read_metadata, CONFIG};
+use config::{ider, meta::stream::StreamType, metrics, utils::parquet::read_metadata, CONFIG};
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        infra::{errors, ider, metrics, wal},
+        infra::{errors, wal},
         utils::{
             file::{get_file_contents, scan_files},
             schema_ext::SchemaExt,

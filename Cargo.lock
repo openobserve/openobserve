@@ -2047,6 +2047,7 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
+ "actix-web-prometheus",
  "ahash 0.8.6",
  "anyhow",
  "arrow-schema",
@@ -2057,11 +2058,15 @@ dependencies = [
  "dashmap",
  "dotenv_config",
  "dotenvy",
+ "getrandom",
  "indexmap 2.1.0",
  "itertools 0.12.0",
  "once_cell",
  "parquet",
+ "prometheus",
+ "rand",
  "reqwest",
+ "rs-snowflake",
  "segment",
  "serde",
  "sysinfo",

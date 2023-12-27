@@ -18,14 +18,14 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::{
     common::{
-        infra::{cluster, metrics},
+        infra::cluster,
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,

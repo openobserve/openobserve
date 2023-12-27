@@ -20,7 +20,7 @@ use std::{
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
-    is_local_disk_storage,
+    ider, is_local_disk_storage,
     meta::stream::{FileKey, FileMeta, StreamType},
     CONFIG,
 };
@@ -30,7 +30,7 @@ use crate::{
         infra::{
             cache,
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-            dist_lock, file_list as infra_file_list, ider, storage,
+            dist_lock, file_list as infra_file_list, storage,
         },
         meta::stream::{PartitionTimeLevel, StreamStats},
         utils::{json, time::BASE_TIME},

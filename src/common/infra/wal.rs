@@ -17,7 +17,7 @@ use std::{path::Path, sync::Arc};
 
 use ahash::HashMap;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
-use config::{meta::stream::StreamType, CONFIG, FILE_EXT_JSON};
+use config::{ider, meta::stream::StreamType, metrics, CONFIG, FILE_EXT_JSON};
 use once_cell::sync::Lazy;
 use tokio::{
     fs::{create_dir_all, File, OpenOptions},
@@ -26,7 +26,7 @@ use tokio::{
 };
 
 use crate::common::{
-    infra::{config::SEARCHING_FILES, ider, metrics},
+    infra::config::SEARCHING_FILES,
     meta::stream::{PartitionTimeLevel, StreamParams},
     utils::asynchronism::file::get_file_contents,
 };

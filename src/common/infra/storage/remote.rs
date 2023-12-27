@@ -17,7 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::CONFIG;
+use config::{metrics, CONFIG};
 use futures::stream::BoxStream;
 use object_store::{
     limit::LimitStore, path::Path, Error, GetOptions, GetResult, ListResult, MultipartId,
@@ -25,10 +25,7 @@ use object_store::{
 };
 use tokio::io::AsyncWrite;
 
-use crate::common::infra::{
-    metrics,
-    storage::{format_key, CONCURRENT_REQUESTS},
-};
+use crate::common::infra::storage::{format_key, CONCURRENT_REQUESTS};
 
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,

@@ -18,13 +18,13 @@ use std::path::Path;
 use ahash::HashMap;
 use config::{
     meta::{cluster::Role, stream::StreamType},
-    CONFIG,
+    metrics, CONFIG,
 };
 use tokio::time;
 
 use crate::{
     common::{
-        infra::{cache, cluster, config::USERS, metrics},
+        infra::{cache, cluster, config::USERS},
         utils::file::scan_files,
     },
     service::db,
@@ -68,7 +68,8 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Err(_) => return Ok(()),
     };
     let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern, "parquet");
+    let mut files = scan_files(&pattern, "parquet");
+    files.extend(scan_files(&pattern, "json"));
     let mut sizes = HashMap::default();
     for file in files {
         let local_file = file.to_owned();

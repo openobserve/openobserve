@@ -18,14 +18,14 @@ use std::net::SocketAddr;
 use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, CONFIG, DISTINCT_FIELDS};
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
 use crate::{
     common::{
-        infra::{cluster, config::SYSLOG_ROUTES, metrics},
+        infra::{cluster, config::SYSLOG_ROUTES},
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,

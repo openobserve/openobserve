@@ -16,6 +16,7 @@
 use std::io::Write;
 
 use config::{
+    ider,
     meta::{
         cluster::Node,
         stream::{FileKey, FileMeta, StreamType},
@@ -31,7 +32,7 @@ use crate::{
         infra::{
             cluster,
             errors::{Error, ErrorCodes},
-            file_list, ider, storage,
+            file_list, storage,
         },
         meta::stream::{PartitionTimeLevel, ScanStats},
         utils::{file::get_file_meta as util_get_file_meta, json},

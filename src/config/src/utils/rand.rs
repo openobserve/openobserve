@@ -13,7 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub(crate) mod cgroup;
-pub(crate) mod file;
-pub mod parquet;
-pub mod rand;
+use rand::distributions::{Alphanumeric, DistString};
+
+pub fn get_rand_element<T>(arr: &[T]) -> &T {
+    let mut buf = [0u8; 1];
+    getrandom::getrandom(&mut buf).unwrap();
+    &arr[buf[0] as usize % arr.len()]
+}
+
+pub fn generate_random_string(len: usize) -> String {
+    Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+}

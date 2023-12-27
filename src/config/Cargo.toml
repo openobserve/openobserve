@@ -5,8 +5,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow.workspace = true
+actix-web-prometheus.workspace = true
 ahash.workspace = true
+anyhow.workspace = true
 arrow-schema.workspace = true
 aws-sdk-dynamodb.workspace = true
 bytes.workspace = true
@@ -19,7 +20,11 @@ indexmap.workspace = true
 itertools.workspace = true
 once_cell.workspace = true
 parquet.workspace = true
+prometheus.workspace = true
 reqwest.workspace = true
+rand.workspace = true
+rs-snowflake.workspace = true
+getrandom.workspace = true
 serde.workspace = true
 segment.workspace = true
 sysinfo.workspace = true

@@ -19,7 +19,9 @@ use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusion
 use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    ider,
     meta::stream::{FileKey, FileMeta, StreamType},
+    metrics,
     utils::parquet::parse_file_key_columns,
     CONFIG, FILE_EXT_PARQUET,
 };
@@ -27,7 +29,7 @@ use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
     common::{
-        infra::{cache, file_list as infra_file_list, ider, metrics, storage},
+        infra::{cache, file_list as infra_file_list, storage},
         meta::stream::StreamStats,
         utils::json,
     },

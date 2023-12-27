@@ -19,7 +19,7 @@ use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, metrics, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -30,7 +30,7 @@ use prost::Message;
 
 use crate::{
     common::{
-        infra::{cluster, metrics},
+        infra::cluster,
         meta::{
             self,
             alerts::Alert,

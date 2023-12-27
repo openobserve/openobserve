@@ -18,14 +18,14 @@ use std::{collections::HashMap, io::BufReader, sync::Arc};
 use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, metrics, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use vrl::compiler::runtime::Runtime;
 
 use super::get_exclude_labels;
 use crate::{
     common::{
-        infra::{cluster, metrics},
+        infra::cluster,
         meta::{
             ingestion::{IngestionResponse, StreamStatus},
             prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},

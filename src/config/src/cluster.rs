@@ -13,7 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub(crate) mod cgroup;
-pub(crate) mod file;
-pub mod parquet;
-pub mod rand;
+pub static mut LOCAL_NODE_ID: i32 = 0;

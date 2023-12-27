@@ -16,6 +16,7 @@
 use std::{net::IpAddr, sync::Arc};
 
 use config::{
+    cluster::LOCAL_NODE_ID,
     meta::cluster::{Node, NodeStatus, Role},
     RwHashMap, CONFIG, INSTANCE_ID,
 };
@@ -37,7 +38,6 @@ use crate::{
 static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 
-pub static mut LOCAL_NODE_ID: i32 = 0;
 pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
 pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
 static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);

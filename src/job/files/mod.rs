@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
+use config::{ider, meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
 
-use crate::common::infra::{cluster, ider};
+use crate::common::infra::cluster;
 
 pub mod broadcast;
 pub mod json;

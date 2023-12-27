@@ -21,7 +21,7 @@ use std::{
 use ahash::AHashMap;
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
-use config::{meta::stream::FileKey, CONFIG};
+use config::{ider, meta::stream::FileKey, CONFIG};
 use tokio::sync::{RwLock, Semaphore};
 
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
         infra::{
             cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
             config::STREAM_SCHEMAS,
-            dist_lock, ider, storage,
+            dist_lock, storage,
         },
         utils::json,
     },

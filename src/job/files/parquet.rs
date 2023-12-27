@@ -17,6 +17,7 @@ use std::{fs, io::Read, path::Path};
 
 use config::{
     meta::stream::{FileMeta, StreamType},
+    metrics,
     utils::parquet::read_metadata,
     CONFIG,
 };
@@ -24,7 +25,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
-        infra::{cluster, metrics, storage, wal},
+        infra::{cluster, storage, wal},
         utils::file::scan_files,
     },
     service::{db, usage::report_compression_stats},

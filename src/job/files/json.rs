@@ -23,6 +23,7 @@ use std::{
 use arrow_schema::Schema;
 use config::{
     meta::stream::{FileMeta, StreamType},
+    metrics,
     utils::parquet::new_parquet_writer,
     CONFIG,
 };
@@ -31,7 +32,7 @@ use tokio::{sync::Semaphore, task, time};
 
 use crate::{
     common::{
-        infra::{cluster, metrics, storage, wal},
+        infra::{cluster, storage, wal},
         utils::{
             file::scan_files,
             json,

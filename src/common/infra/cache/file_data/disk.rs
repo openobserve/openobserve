@@ -19,13 +19,13 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::{is_local_disk_storage, CONFIG};
+use config::{is_local_disk_storage, metrics, CONFIG};
 use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
 use crate::common::{
-    infra::{metrics, storage},
+    infra::storage,
     utils::{asynchronism::file::*, file::scan_files},
 };
 

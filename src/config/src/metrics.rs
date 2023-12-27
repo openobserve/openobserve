@@ -16,11 +16,12 @@
 use std::collections::HashMap;
 
 use actix_web_prometheus::{PrometheusMetrics, PrometheusMetricsBuilder};
-use config::CONFIG;
 use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
 };
+
+use crate::CONFIG;
 
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
