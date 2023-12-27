@@ -180,6 +180,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
             if retries > 0:
                 retries -= 1
                 time.sleep(3)
+                print("retrying - exception was ", e)
                 continue
             else:
                 raise e
@@ -303,6 +304,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
             if retries > 0:
                 retries -= 1
                 time.sleep(3)
+                print("retrying - exception was ", e)
                 continue
             else:
                 raise e
@@ -387,15 +389,22 @@ def test_e2e_rumverifygeodata(create_session, base_url):
 
             assert len(response_payload["hits"]) > 0, "No results found in rum-logs"
             logs_exist = any(
-                [x for x in response_payload["hits"] if x["message"] == unique_test_identifier]
+                [
+                    x
+                    for x in response_payload["hits"]
+                    if x["message"] == unique_test_identifier
+                ]
             )
-            assert logs_exist, f"Failed to retrieve the rum-log, {response_rum_data.content}"
+            assert (
+                logs_exist
+            ), f"Failed to retrieve the rum-log, {response_rum_data.content}"
             assert response_payload["hits"][0].get("geo_info_country") is not None
             break
         except Exception as e:
             if retries > 0:
                 retries -= 1
                 time.sleep(3)
+                print("retrying - exception was ", e)
                 continue
             else:
                 raise e
