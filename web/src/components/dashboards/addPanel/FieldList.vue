@@ -271,6 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     padding="sm"
                     :disabled="isAddZAxisNotAllowed"
                     @click="addZAxisItem(props.row)"
+                    data-test="dashboard-add-z-data"
                   >
                     <div>+Z</div>
                   </q-btn>
@@ -305,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     padding="sm"
                     @click="addLatitude(props.row)"
-                    data-test="dashboard-add-x-data"
+                    data-test="dashboard-add-latitude-data"
                   >
                     <div>+Lat</div>
                   </q-btn>
@@ -318,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     padding="sm"
                     @click="addLongitude(props.row)"
-                    data-test="dashboard-add-y-data"
+                    data-test="dashboard-add-longitude-data"
                   >
                     <div>+Lng</div>
                   </q-btn>
@@ -330,6 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     padding="sm"
                     @click="addWeight(props.row)"
+                    data-test="dashboard-add-weight-data"
                   >
                     <div>+W</div>
                   </q-btn>
