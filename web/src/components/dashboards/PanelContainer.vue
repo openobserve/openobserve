@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-btn>
-        <q-btn-dropdown dense flat label="" no-caps v-if="!viewOnly">
+        <q-btn-dropdown :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`" dense flat label="" no-caps v-if="!viewOnly">
           <q-list dense>
             <q-item
               clickable
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('EditPanel')"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Edit Panel</q-item-label>
+                <q-item-label data-test="dashboard-edit-panel" class="q-pa-sm">Edit Panel</q-item-label>
               </q-item-section>
             </q-item>
             <q-item
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('DuplicatePanel')"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Duplicate</q-item-label>
+                <q-item-label data-test="dashboard-duplicate-panel"  class="q-pa-sm">Duplicate</q-item-label>
               </q-item-section>
             </q-item>
             <q-item
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onPanelModifyClick('DeletePanel')"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Delete Panel</q-item-label>
+                <q-item-label data-test="dashboard-delete-panel" class="q-pa-sm">Delete Panel</q-item-label>
               </q-item-section>
             </q-item>
             <q-item
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showViewPanel = true"
             >
               <q-item-section>
-                <q-item-label class="q-pa-sm">Query Inspector</q-item-label>
+                <q-item-label data-test="dashboard-query-inspector-panel" class="q-pa-sm">Query Inspector</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
@@ -119,6 +119,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
     </q-dialog>
+
+    <ConfirmDialog
+      title="Delete Panel"
+      message="Are you sure you want to delete this Panel?"
+      @update:ok="deletePanelDialog"
+      @update:cancel="confirmDeletePanelDialog = false"
+      v-model="confirmDeletePanelDialog"
+    />
   </div>
 </template>
 
@@ -130,6 +138,7 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
+import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
@@ -147,28 +156,30 @@ export default defineComponent({
   ],
   components: {
     PanelSchemaRenderer,
-    QueryInspector
+    QueryInspector,
+    ConfirmDialog,
   },
-  setup(props) {
+  setup(props, {emit}) {
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
     const $q = useQuasar();
     const metaData = ref();
     const showViewPanel = ref(false);
+    const confirmDeletePanelDialog = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
-
-      if(!metaData.value) return false
+      if (!metaData.value) return false;
 
       const adhocVariables = props.variablesData.values
         ?.filter((it: any) => it.type === "dynamic_filters")
-        ?.map((it: any) => it?.value).flat()
-        ?.filter((it: any) => it?.operator && it?.name && it?.value)
+        ?.map((it: any) => it?.value)
+        .flat()
+        ?.filter((it: any) => it?.operator && it?.name && it?.value);
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
         const vars = it?.variables?.filter(
@@ -183,7 +194,7 @@ export default defineComponent({
     const showFullScreenBtn: any = ref(false);
 
     //for edit panel
-    const onEditPanel = (data:  any) => {
+    const onEditPanel = (data: any) => {
       return router.push({
         path: "/dashboards/add_panel",
         query: {
@@ -195,7 +206,6 @@ export default defineComponent({
     };
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
-
       // Show a loading spinner notification.
       const dismiss = $q.notify({
         spinner: true,
@@ -203,25 +213,28 @@ export default defineComponent({
         timeout: 2000,
       });
 
-
       // Generate a unique panel ID.
-      const panelId = "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+      const panelId =
+        "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
       // Duplicate the panel data with the new ID.
       const panelData = JSON.parse(JSON.stringify(data));
       panelData.id = panelId;
 
-
       try {
         // Add the duplicated panel to the dashboard.
-        await addPanel(store, route.query.dashboard, panelData, route.query.folder ?? "default");
+        await addPanel(
+          store,
+          route.query.dashboard,
+          panelData,
+          route.query.folder ?? "default"
+        );
 
         // Show a success notification.
         $q.notify({
           type: "positive",
           message: `Panel Duplicated Successfully`,
         });
-
 
         // Navigate to the new panel.
         router.push({
@@ -245,10 +258,15 @@ export default defineComponent({
       // Hide the loading spinner notification.
       dismiss();
     };
+
+    const deletePanelDialog = async (data: any) => {
+        emit("onDeletePanel", props.data.id);
+    };
     return {
       props,
       onEditPanel,
       onDuplicatePanel,
+      deletePanelDialog,
       showFullScreenBtn,
       outlinedWarning,
       store,
@@ -256,16 +274,17 @@ export default defineComponent({
       metaData,
       showViewPanel,
       dependentAdHocVariable,
+      confirmDeletePanelDialog,
     };
   },
   methods: {
     onPanelModifyClick(evt: any) {
-      if  (evt == "ViewPanel") {
+      if (evt == "ViewPanel") {
         this.$emit("onViewPanel", this.props.data.id);
-      } else if (evt == "EditPanel")  {
+      } else if (evt == "EditPanel") {
         this.onEditPanel(this.props.data);
-      } else if  (evt == "DeletePanel") {
-        this.$emit("onDeletePanel", this.props.data.id);
+      } else if (evt == "DeletePanel") {
+        this.confirmDeletePanelDialog = true;
       } else if (evt == "DuplicatePanel") {
         this.onDuplicatePanel(this.props.data);
       } else {
