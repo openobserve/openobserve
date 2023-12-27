@@ -56,7 +56,8 @@ jobs:
       - name: Build static binary
         # run: cargo build --release --features mimalloc  --target x86_64-unknown-linux-musl
         run: cargo build --features mimalloc  --target x86_64-unknown-linux-musl
-      - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/release/openobserve bin/openobserve
+      # - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/release/openobserve bin/openobserve
+      - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/debug/openobserve bin/openobserve
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
