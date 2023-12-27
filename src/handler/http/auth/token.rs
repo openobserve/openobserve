@@ -30,7 +30,23 @@ pub async fn token_validator(
     req: ServiceRequest,
     token: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    use crate::{
+        common::infra::config::CONFIG,
+        service::{db, users},
+    };
+
+    let user;
     let keys = get_jwks().await;
+    let path = match req
+        .request()
+        .path()
+        .strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str())
+    {
+        Some(path) => path,
+        None => req.request().path(),
+    };
+    let path_columns = path.split('/').collect::<Vec<&str>>();
+
     match jwt::verify_decode_token(
         token.strip_prefix("Bearer").unwrap().trim(),
         &keys,
@@ -40,20 +56,49 @@ pub async fn token_validator(
     .await
     {
         Ok(res) => {
+            let user_id = &res.0.user_email;
             if res.0.is_valid {
-                // / Hack for prometheus, need support POST and check the header
-                let mut req = req;
-                if req.method().eq(&Method::POST) && !req.headers().contains_key("content-type") {
+                if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+                    let db_user = db::user::get_db_user(user_id).await;
+                    user = match db_user {
+                        Ok(user) => {
+                            let all_users = user.get_all_users();
+                            if all_users.is_empty() {
+                                None
+                            } else {
+                                all_users.first().cloned()
+                            }
+                        }
+                        Err(_) => None,
+                    }
+                } else {
+                    user = match path.find('/') {
+                        Some(index) => {
+                            let org_id = &path[0..index];
+                            users::get_user(Some(org_id), user_id).await
+                        }
+                        None => users::get_user(None, user_id).await,
+                    }
+                };
+                if user.is_some() {
+                    // / Hack for prometheus, need support POST and check the header
+                    let mut req = req;
+                    if req.method().eq(&Method::POST) && !req.headers().contains_key("content-type")
+                    {
+                        req.headers_mut().insert(
+                            header::CONTENT_TYPE,
+                            header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+                        );
+                    }
                     req.headers_mut().insert(
-                        header::CONTENT_TYPE,
-                        header::HeaderValue::from_static("application/x-www-form-urlencoded"),
+                        header::HeaderName::from_static("user_id"),
+                        header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                     );
+
+                    Ok(req)
+                } else {
+                    Err((ErrorUnauthorized("Unauthorized Access"), req))
                 }
-                req.headers_mut().insert(
-                    header::HeaderName::from_static("user_id"),
-                    header::HeaderValue::from_str(&res.0.user_email).unwrap(),
-                );
-                Ok(req)
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
             }
