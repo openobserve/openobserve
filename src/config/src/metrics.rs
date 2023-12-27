@@ -165,7 +165,7 @@ pub static INGEST_MEMTABLE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "ingest_memtable_bytes",
-            "Ingestor in memory bytes. ".to_owned() + HELP_SUFFIX,
+            "Ingestor in memory bytes.".to_owned(),
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -177,7 +177,7 @@ pub static INGEST_MEMTABLE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "ingest_memtable_files",
-            "Ingestor in memory files. ".to_owned() + HELP_SUFFIX,
+            "Ingestor in memory files.".to_owned(),
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
