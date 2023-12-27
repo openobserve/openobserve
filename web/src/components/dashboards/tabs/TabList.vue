@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       active-color="primary"
       @click.stop
       style="max-width: calc(100% - 40px)"
-      @update:model-value="onTabChange"
     >
       <q-tab
         no-caps
@@ -112,6 +111,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute, useRouter } from "vue-router";
+import { watch } from "vue";
 
 export default defineComponent({
   name: "TabList",
@@ -166,15 +166,15 @@ export default defineComponent({
       confirmDeleteTabDialog.value = false;
     };
 
-    const onTabChange = (index: number) => {
-      emit("update:selectedTabIndex", index);
+    watch(selectedTab, () => {
+      emit("update:selectedTabIndex", selectedTab.value);
       router.replace({
         query: {
           ...route.query,
-          tab: props.dashboardData?.tabs[index]?.name,
+          tab: props.dashboardData?.tabs[selectedTab.value]?.name,
         }
       })
-    };
+    });
 
     return {
       showAddTabDialog,
@@ -189,7 +189,6 @@ export default defineComponent({
       selectedTabIndexToDelete,
       deleteTab,
       hoveredTabIndex,
-      onTabChange,
       selectedTab,
     };
   },
