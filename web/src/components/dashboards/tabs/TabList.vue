@@ -111,6 +111,7 @@ import {
   outlinedEdit,
 } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { useRoute, useRouter } from "vue-router";
 
 export default defineComponent({
   name: "TabList",
@@ -132,13 +133,15 @@ export default defineComponent({
   },
   emits: ["update:selectedTabIndex", "saveDashboard"],
   setup(props, { emit }) {
+    const router = useRouter();
+    const route = useRoute();
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIndexToEdit = ref(null);
     const selectedTabIndexToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
     const hoveredTabIndex = ref(-1);
-    const selectedTab = ref(props.selectedTabIndex);
+    const selectedTab: any = ref(props.selectedTabIndex);
 
     const updateTabList = () => {
       emit("saveDashboard");
@@ -165,6 +168,12 @@ export default defineComponent({
 
     const onTabChange = (index: number) => {
       emit("update:selectedTabIndex", index);
+      router.replace({
+        query: {
+          ...route.query,
+          tab: props.dashboardData?.tabs[index]?.name,
+        }
+      })
     };
 
     return {
