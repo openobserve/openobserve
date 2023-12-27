@@ -2071,6 +2071,9 @@ dependencies = [
  "serde",
  "sysinfo",
  "tokio",
+ "tracing",
+ "tracing-log 0.2.0",
+ "tracing-subscriber",
  "utoipa",
 ]
 

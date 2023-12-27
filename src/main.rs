@@ -99,17 +99,6 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
-struct CustomTimeFormat;
-
-impl FormatTime for CustomTimeFormat {
-    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        if CONFIG.log.local_time_format.is_empty() {
-            write!(w, "{}", Utc::now().to_rfc3339())
-        } else {
-            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
-        }
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -410,6 +399,18 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub struct CustomTimeFormat;
+
+impl FormatTime for CustomTimeFormat {
+    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
+        if CONFIG.log.local_time_format.is_empty() {
+            write!(w, "{}", Utc::now().to_rfc3339())
+        } else {
+            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
+        }
+    }
+}
+
 /// Setup the tracing related components
 pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     use tracing_subscriber::fmt::writer::BoxMakeWriter;
@@ -431,15 +432,18 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
     let layer = if CONFIG.log.json_format {
         Layer::default()
             .with_writer(writer)
-            .with_timer(CustomTimeFormat)
+            .with_timer(config::meta::logger::CustomTimeFormat)
             .with_ansi(false)
             .json()
+            .with_current_span(false)
+            .with_span_list(false)
             .boxed()
     } else {
         Layer::default()
             .with_writer(writer)
-            .with_timer(CustomTimeFormat)
             .with_ansi(false)
+            .with_target(true)
+            .event_format(config::meta::logger::O2Formatter::default())
             .boxed()
     };
 
