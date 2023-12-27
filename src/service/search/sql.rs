@@ -68,6 +68,7 @@ static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
 pub struct Sql {
     pub origin_sql: String,
     pub org_id: String,
+    pub stream_type: StreamType,
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
@@ -598,6 +599,7 @@ impl Sql {
         let mut sql = Sql {
             origin_sql,
             org_id,
+            stream_type,
             stream_name,
             meta,
             fulltext,

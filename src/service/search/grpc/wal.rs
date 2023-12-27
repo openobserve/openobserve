@@ -16,6 +16,7 @@
 use std::{io::Cursor, path::Path, sync::Arc};
 
 use ahash::AHashMap as HashMap;
+use arrow::array::{new_null_array, ArrayRef};
 use config::{
     meta::stream::{FileKey, StreamType},
     utils::parquet::read_metadata,
@@ -46,7 +47,6 @@ use crate::{
     },
     service::{
         db,
-        schema::format_schema,
         search::{
             datafusion::{exec, storage::StorageType},
             sql::Sql,
@@ -121,11 +121,6 @@ pub async fn search_parquet(
         tmpfs::delete(session_id, true).unwrap();
         return Ok((HashMap::new(), scan_stats));
     }
-    log::info!(
-        "[session_id {session_id}] wal->parquet->search: load files {}, scan_size {}",
-        scan_stats.files,
-        scan_stats.original_size
-    );
 
     if CONFIG.common.memory_circuit_breaker_enable {
         super::check_memory_circuit_breaker(&scan_stats)?;
@@ -158,6 +153,13 @@ pub async fn search_parquet(
         }
     }
 
+    log::info!(
+        "[session_id {session_id}] wal->mem->search: load groups {}, files {}, scan_size {}",
+        files_group.len(),
+        scan_stats.files,
+        scan_stats.original_size
+    );
+
     let mut tasks = Vec::new();
     let is_single_group = files_group.len() == 1;
     for (ver, files) in files_group {
@@ -167,7 +169,11 @@ pub async fn search_parquet(
         let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
-        let mut inferred_schema = format_schema(arrow_reader.schema());
+        let mut inferred_schema = arrow_reader
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(std::collections::HashMap::new());
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = inferred_schema.fields();
@@ -338,7 +344,8 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[session_id {session_id}] wal->mem->search: load files {}, scan_size {}",
+        "[session_id {session_id}] wal->mem->search: load groups {}, files {}, scan_size {}",
+        batch_groups.len(),
         scan_stats.files,
         scan_stats.original_size
     );
@@ -355,7 +362,7 @@ pub async fn search_memtable(
     );
 
     let mut tasks = Vec::new();
-    for (ver, (mut schema, record_batches)) in batch_groups.into_iter().enumerate() {
+    for (ver, (mut schema, mut record_batches)) in batch_groups.into_iter().enumerate() {
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = schema.fields();
@@ -379,6 +386,10 @@ pub async fn search_memtable(
                 schema.as_ref().clone(),
                 new_schema,
             ])?);
+            // fix recordbatch
+            for batch in record_batches.iter_mut() {
+                *batch = adapt_batch(&schema, batch);
+            }
         }
 
         let sql = sql.clone();
@@ -515,4 +526,21 @@ fn get_schema_version(file: &str) -> Result<String, Error> {
         return Err(Error::Message(format!("invalid wal file name: {}", file)));
     }
     Ok(column[11].to_string())
+}
+
+pub fn adapt_batch(table_schema: &Schema, batch: &RecordBatch) -> RecordBatch {
+    let batch_schema = &*batch.schema();
+    let batch_cols = batch.columns().to_vec();
+
+    let mut cols: Vec<ArrayRef> = Vec::with_capacity(table_schema.fields().len());
+    for table_field in table_schema.fields() {
+        if let Some((batch_idx, _)) = batch_schema.column_with_name(table_field.name().as_str()) {
+            cols.push(Arc::clone(&batch_cols[batch_idx]));
+        } else {
+            cols.push(new_null_array(table_field.data_type(), batch.num_rows()))
+        }
+    }
+
+    let merged_schema = Arc::new(table_schema.clone());
+    RecordBatch::try_new(merged_schema, cols).unwrap()
 }

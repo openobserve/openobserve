@@ -220,6 +220,7 @@ dashmap = { version = "5.4", features = ["serde"] }
 datafusion = { version = "34", features = ["simd"] }
 datafusion-expr = "34"
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
+arrow-json = "49"
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
 object_store = { version = "0.8", features = ["aws", "azure", "gcp"] }

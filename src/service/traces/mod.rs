@@ -19,7 +19,9 @@ use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    meta::stream::StreamType, metrics, utils::hasher::get_fields_key_xxh3, CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -40,7 +42,7 @@ use crate::{
             traces::{Event, Span, SpanRefType},
             usage::UsageType,
         },
-        utils::{self, flatten, hasher::get_fields_key_xxh3, json},
+        utils::{self, flatten, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,

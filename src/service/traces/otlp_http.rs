@@ -18,7 +18,9 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    meta::stream::StreamType, metrics, utils::hasher::get_fields_key_xxh3, CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
@@ -36,7 +38,7 @@ use crate::{
             usage::UsageType,
         },
         utils,
-        utils::{flatten, hasher::get_fields_key_xxh3, json},
+        utils::{flatten, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,

@@ -23,7 +23,7 @@ use actix_web::{
 use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::Utc;
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 
@@ -36,7 +36,7 @@ use crate::{
             stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
             usage::UsageType,
         },
-        utils::{json, schema_ext::SchemaExt},
+        utils::json,
     },
     service::{
         compact::retention,

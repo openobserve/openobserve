@@ -17,8 +17,8 @@ use std::{str::FromStr, sync::Arc};
 
 use ahash::AHashMap as HashMap;
 use config::{
-    meta::stream::{FileKey, FileMeta},
-    utils::parquet::new_parquet_writer,
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_iterator},
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -62,7 +62,7 @@ use crate::{
         },
         utils::{flatten, json},
     },
-    service::{schema::format_schema, search::sql::Sql},
+    service::search::sql::Sql,
 };
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
@@ -320,7 +320,12 @@ async fn exec_query(
     } else if sql.query_fn.is_some() {
         let batches = df.collect().await?;
         let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-        match handle_query_fn(sql.query_fn.clone().unwrap(), &batches_ref, &sql.org_id) {
+        match handle_query_fn(
+            sql.query_fn.clone().unwrap(),
+            &batches_ref,
+            &sql.org_id,
+            sql.stream_type,
+        ) {
             Err(err) => {
                 return Err(datafusion::error::DataFusionError::Execution(format!(
                     "Error applying query function: {err} "
@@ -586,7 +591,6 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Stri
         writer.close()?;
         tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
-    let schema = format_schema(&schema); // fix schema
     Ok((Arc::new(schema), work_dir))
 }
 
@@ -1142,9 +1146,10 @@ fn handle_query_fn(
     query_fn: String,
     batches: &[&RecordBatch],
     org_id: &str,
+    stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
     match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id),
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
         Err(err) => Err(DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
             err
@@ -1156,6 +1161,7 @@ fn apply_query_fn(
     query_fn_src: String,
     in_batch: Vec<json::Map<String, json::Value>>,
     org_id: &str,
+    stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
     use vector_enrichment::TableRegistry;
 
@@ -1182,9 +1188,7 @@ fn apply_query_fn(
                 .collect();
 
             let value_iter = rows_val.iter().map(Ok);
-            let inferred_schema =
-                arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
-            let inferred_schema = format_schema(&inferred_schema);
+            let inferred_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
             let mut decoder =
                 arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 

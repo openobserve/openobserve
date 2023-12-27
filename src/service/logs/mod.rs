@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, utils::hasher::get_fields_key_xxh3, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 
 use super::ingestion::TriggerAlertData;
@@ -30,7 +30,6 @@ use crate::{
         },
         utils::{
             self,
-            hasher::get_fields_key_xxh3,
             json::{Map, Value},
         },
     },

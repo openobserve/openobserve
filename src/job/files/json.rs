@@ -24,7 +24,10 @@ use arrow_schema::Schema;
 use config::{
     meta::stream::{FileMeta, StreamType},
     metrics,
-    utils::parquet::new_parquet_writer,
+    utils::{
+        parquet::new_parquet_writer,
+        schema::{infer_json_schema_from_iterator, infer_json_schema_from_seekable},
+    },
     CONFIG,
 };
 use datafusion::arrow::json::ReaderBuilder;
@@ -33,17 +36,10 @@ use tokio::{sync::Semaphore, task, time};
 use crate::{
     common::{
         infra::{cluster, storage, wal},
-        utils::{
-            file::scan_files,
-            json,
-            schema::{infer_json_schema_from_iterator, infer_json_schema_from_seekable},
-            stream::populate_file_meta,
-        },
+        utils::{file::scan_files, json, stream::populate_file_meta},
     },
     service::{
-        db,
-        schema::{format_schema, schema_evolution},
-        stream::get_stream_setting_bloom_filter_fields,
+        db, schema::schema_evolution, stream::get_stream_setting_bloom_filter_fields,
         usage::report_compression_stats,
     },
 };
@@ -234,7 +230,7 @@ async fn upload_file(
         match infer_json_schema_from_seekable(&mut schema_reader, None, stream_type) {
             Ok(inferred_schema) => {
                 drop(schema_reader);
-                format_schema(&inferred_schema)
+                inferred_schema
             }
             Err(err) => {
                 // File has some corrupt json data....ignore such data & move rest of the

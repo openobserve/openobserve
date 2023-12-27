@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 
 use crate::{
     common::{
@@ -29,10 +29,7 @@ use crate::{
             },
             search,
         },
-        utils::{
-            json::{self, Map, Value},
-            schema_ext::SchemaExt,
-        },
+        utils::json::{self, Map, Value},
     },
     service::{db, search as SearchService},
 };

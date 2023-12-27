@@ -20,8 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use arrow::json::reader::infer_json_schema_from_iterator;
-use config::CONFIG;
+use config::{utils::schema::infer_json_schema_from_iterator, CONFIG};
 use snafu::ResultExt;
 
 use crate::{errors::*, immutable, memtable, writer::WriterKey};
@@ -152,8 +151,9 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let entry = super::Entry::from_bytes(&entry)?;
             i += 1;
             total += entry.data.len();
-            let schema = infer_json_schema_from_iterator(entry.data.iter().cloned().map(Ok))
-                .context(InferJsonSchemaSnafu)?;
+            let schema =
+                infer_json_schema_from_iterator(entry.data.iter().cloned().map(Ok), stream_type)
+                    .context(InferJsonSchemaSnafu)?;
             memtable.write(Arc::new(schema), entry).await?;
         }
         log::warn!(

@@ -21,7 +21,11 @@ use std::{
 };
 
 use ahash::AHashMap;
-use config::{meta::stream::StreamType, CONFIG};
+use config::{
+    meta::stream::StreamType,
+    utils::{schema::infer_json_schema, schema_ext::SchemaExt},
+    CONFIG,
+};
 use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
@@ -32,7 +36,7 @@ use crate::{
     common::{
         infra::{config::LOCAL_SCHEMA_LOCKER, db::etcd},
         meta::{ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution},
-        utils::{json, schema::infer_json_schema, schema_ext::SchemaExt},
+        utils::json,
     },
     service::{db, search::server_internal_error},
 };
@@ -119,7 +123,6 @@ pub async fn schema_evolution(
                         }
                         final_fields.push(field);
                     }
-                    final_fields.sort_by(|a, b| a.name().cmp(b.name()));
                     let final_schema = Schema::new(final_fields.to_vec()).with_metadata(metadata);
                     db::schema::set(
                         org_id,
@@ -205,7 +208,6 @@ fn try_merge(schemas: impl IntoIterator<Item = Schema>) -> Result<Schema, ArrowE
             }
         }
     }
-    merged_fields.sort_by(|a, b| a.name().cmp(b.name()));
     let merged = Schema::new_with_metadata(merged_fields, merged_metadata);
     Ok(merged)
 }
@@ -287,7 +289,6 @@ pub async fn check_for_schema(
 
     let mut schema_reader = BufReader::new(val_str.as_bytes());
     let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    let inferred_schema = format_schema(&inferred_schema);
 
     if schema.fields.eq(&inferred_schema.fields) {
         // return (true, None, schema.fields().to_vec());
@@ -299,6 +300,14 @@ pub async fn check_for_schema(
             record_schema: schema,
         };
     }
+    println!(
+        "schema fields: {}",
+        schema.fields.iter().map(|f| f.name()).join(", ")
+    );
+    println!(
+        "inferred schema fields: {}",
+        inferred_schema.fields.iter().map(|f| f.name()).join(", ")
+    );
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
         // return (false, None, inferred_schema.fields().to_vec());
@@ -643,22 +652,27 @@ fn get_schema_changes(
     inferred_schema: &Schema,
     _is_arrow: bool,
 ) -> (Vec<Field>, bool, Vec<Field>, Schema) {
+    let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<_> = vec![];
     let mut new_field_delta: Vec<_> = vec![];
-    let mut merged_fields: AHashMap<String, Field> = AHashMap::new();
 
-    let mut is_schema_changed = false;
-
-    for f in schema.fields.iter() {
-        merged_fields.insert(f.name().to_owned(), (**f).clone());
+    let mut merged_fields = schema
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().to_owned())
+        .collect::<Vec<_>>();
+    let mut merged_fields_chk: AHashMap<String, usize> = AHashMap::new();
+    for (i, f) in merged_fields.iter().enumerate() {
+        merged_fields_chk.insert(f.name().to_string(), i);
     }
 
     for item in inferred_schema.fields.iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
 
-        match merged_fields.get(item_name) {
-            Some(existing_field) => {
+        match merged_fields_chk.get(item_name) {
+            Some(idx) => {
+                let existing_field = &merged_fields[*idx];
                 if existing_field.data_type() != item_data_type {
                     if !CONFIG.common.widening_schema_evolution {
                         field_datatype_delta.push(existing_field.clone());
@@ -668,7 +682,7 @@ fn get_schema_changes(
                         if allowed {
                             is_schema_changed = true;
                             field_datatype_delta.push((**item).clone());
-                            merged_fields.insert(item_name.to_owned(), (**item).clone());
+                            merged_fields[*idx] = (**item).clone();
                         } else {
                             let mut meta = existing_field.metadata().clone();
                             meta.insert("zo_cast".to_owned(), true.to_string());
@@ -680,17 +694,16 @@ fn get_schema_changes(
             None => {
                 is_schema_changed = true;
                 new_field_delta.push(item);
-                merged_fields.insert(item_name.to_owned(), (**item).clone());
+                merged_fields.push((**item).clone());
+                merged_fields_chk.insert(item_name.to_string(), merged_fields.len() - 1);
             }
         }
     }
 
-    let mut final_fields: Vec<Field> = merged_fields.drain().map(|(_key, value)| value).collect();
-    final_fields.sort_by(|a, b| a.name().cmp(b.name()));
     (
         field_datatype_delta,
         is_schema_changed,
-        final_fields,
+        merged_fields,
         Schema::empty(),
     )
 }
@@ -744,7 +757,6 @@ pub async fn add_stream_schema(
     local_file.seek(SeekFrom::Start(0)).unwrap();
     let mut schema_reader = BufReader::new(local_file);
     let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    let inferred_schema = format_schema(&inferred_schema);
 
     let existing_schema = stream_schema_map.get(&stream_name.to_string());
     let mut metadata = match existing_schema {
@@ -812,22 +824,6 @@ pub async fn set_schema_metadata(
         false,
     )
     .await
-}
-
-pub fn format_schema(schema: &Schema) -> Schema {
-    let mut fields: Vec<Field> = schema
-        .fields()
-        .iter()
-        .filter_map(|f| {
-            if f.data_type() == &DataType::Null {
-                None
-            } else {
-                Some(f.as_ref().to_owned())
-            }
-        })
-        .collect();
-    fields.sort_by(|a, b| a.name().cmp(b.name()));
-    Schema::new(fields.to_vec())
 }
 
 #[cfg(test)]

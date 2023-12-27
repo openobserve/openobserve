@@ -18,7 +18,7 @@ use std::{collections::BTreeMap, io::BufReader, sync::Arc};
 use ahash::AHashMap;
 use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::StreamType, SIZE_IN_MB};
+use config::{meta::stream::StreamType, utils::schema::infer_json_schema, SIZE_IN_MB};
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -41,10 +41,9 @@ use crate::{
             flatten,
             functions::get_vrl_compiler_config,
             json::{Map, Value},
-            schema::infer_json_schema,
         },
     },
-    service::{db, format_partition_key, schema::format_schema, stream::stream_settings},
+    service::{db, format_partition_key, stream::stream_settings},
 };
 
 pub mod grpc;
@@ -303,7 +302,6 @@ pub async fn chk_schema_by_record(
 
     let mut schema_reader = BufReader::new(record_val.as_bytes());
     let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    let inferred_schema = format_schema(&inferred_schema);
     let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
     stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
     db::schema::set(

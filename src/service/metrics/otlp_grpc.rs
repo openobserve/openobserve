@@ -19,7 +19,7 @@ use actix_web::{http, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
-use config::{meta::stream::StreamType, metrics, CONFIG};
+use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -38,7 +38,7 @@ use crate::{
             stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
         },
-        utils::{flatten, json, schema_ext::SchemaExt},
+        utils::{flatten, json},
     },
     service::{
         db, format_stream_name,

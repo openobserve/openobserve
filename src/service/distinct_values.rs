@@ -20,7 +20,7 @@ use std::sync::{
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field, Schema};
-use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -32,7 +32,7 @@ use crate::{
     common::{
         infra::errors::{Error, Result},
         meta::stream::{SchemaRecords, StreamParams},
-        utils::{json, schema_ext::SchemaExt},
+        utils::json,
     },
     service::{ingestion, stream::unwrap_partition_time_level},
 };
