@@ -132,15 +132,13 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       data: mapData[index]?.map((item: any) => {
         if (query.customQuery) {
           // For custom queries
-          return [
-            item[query.fields.name.alias],
-            item[query.fields.value.alias],
-          ];
+          return {
+            name: item[query.fields.name.alias],
+            value: item[query.fields.value.alias],
+          };
         } else {
-          console.log("item", item);
-          
           // For auto queries
-          return [item.name, item.value];
+          return { name: item.name, value: item.value };
         }
       }),
       // data: mapData,
@@ -155,20 +153,18 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
     };
   });
-  const seriesData = options.series.flatMap((series: any) => series.data);
-  console.log("seriesData", seriesData);
-  
-  if (seriesData.length > 0) {
-    const minValue = Math.min(...seriesData.map((item: any) => item[1]));
-    const maxValue = Math.max(...seriesData.map((item: any) => item[1]));
-console.log("minValue", minValue, "maxValue", maxValue);
+   const seriesData = options.series.flatMap((series: any) => series.data);
 
-    options.visualMap.min = minValue;
-    options.visualMap.max = maxValue;
-  } else {
-    options.visualMap = [];
-    options.series = [];
-  }
+   if (seriesData.length > 0) {
+     const minValue = Math.min(...seriesData.map((item: any) => item.value));
+     const maxValue = Math.max(...seriesData.map((item: any) => item.value));
+
+     options.visualMap.min = minValue;
+     options.visualMap.max = maxValue;
+   } else {
+     options.visualMap = [];
+     options.series = [];
+   }
 
   return { options };
 };
