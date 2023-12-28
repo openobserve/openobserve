@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-tab
         no-caps
         :ripple="false"
-        v-for="(tab, index) in dashboardData?.tabs"
+        v-for="(tab, index) in tabs"
         :key="index"
         :name="index"
         @click.stop
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import {
@@ -143,6 +143,10 @@ export default defineComponent({
     const hoveredTabIndex = ref(-1);
     const selectedTab: any = ref(props.selectedTabIndex);
 
+    const tabs: any = computed(() => {
+      return props.dashboardData?.tabs ?? [];
+    });
+
     const updateTabList = () => {
       emit("saveDashboard");
       showAddTabDialog.value = false;
@@ -171,7 +175,7 @@ export default defineComponent({
       router.replace({
         query: {
           ...route.query,
-          tab: props.dashboardData?.tabs[selectedTab.value]?.name,
+          tab: tabs[selectedTab.value]?.name,
         }
       })
     });
@@ -190,6 +194,7 @@ export default defineComponent({
       deleteTab,
       hoveredTabIndex,
       selectedTab,
+      tabs,
     };
   },
 });

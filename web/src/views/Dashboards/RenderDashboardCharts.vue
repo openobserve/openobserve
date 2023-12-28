@@ -35,11 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="displayDiv">
       <grid-layout
         ref="gridLayoutRef"
-        v-if="
-          Array.isArray(dashboardData?.tabs) &&
-          dashboardData?.tabs[selectedTabIndex]?.panels?.length > 0
-        "
-        :layout.sync="getDashboardLayout(dashboardData?.tabs[selectedTabIndex])"
+        v-if="panels.length > 0"
+        :layout.sync="getDashboardLayout(panels)"
         :col-num="12"
         :row-height="30"
         :is-draggable="!viewOnly"
@@ -53,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <grid-item
           class="gridBackground"
           :class="store.state.theme == 'dark' ? 'dark' : ''"
-          v-for="item in dashboardData?.tabs[selectedTabIndex]?.panels || []"
+          v-for="item in panels"
           :key="item.id"
           :x="getPanelLayout(item, 'x')"
           :y="getPanelLayout(item, 'y')"
@@ -97,14 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </q-card>
     </q-dialog>
-    <div
-      v-if="
-        !(
-          Array.isArray(dashboardData?.tabs) &&
-          dashboardData?.tabs[selectedTabIndex]?.panels?.length
-        )
-      "
-    >
+    <div v-if="!panels.length">
       <!-- if data not available show nodata component -->
       <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
     </div>
@@ -113,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, provide, ref, toRaw } from "vue";
+import { computed, defineComponent, provide, ref } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -164,20 +154,28 @@ export default defineComponent({
     // selected tab index
     const selectedTabIndex = ref(null);
 
+    const panels = computed(() => {
+      return selectedTabIndex.value !== null
+        ? props.dashboardData?.tabs[selectedTabIndex.value]?.panels
+        : [];
+    });
+
     onMounted(() => {
-      //initial selectedTabIndex will be null
-      //if route has query and we have a tab in tab list then set selectedTabIndex to that tab index
-      // else 0 as a tab index
-      selectedTabIndex.value = null;
+      // use route query for default tab index
+      const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
+        (it: any) => it.name === route.query.tab ?? "default"
+      );
+
+      // if tabs array is there and default tab index is not undefined
       if (
         Array.isArray(props.dashboardData?.tabs) &&
-        props.dashboardData?.tabs.findIndex(
-          (it: any) => it.name === route.query.tab
-        ) !== -1
+        defaultTabIndex !== undefined
       ) {
-        selectedTabIndex.value = route.query.tab;
+        // set default tab
+        selectedTabIndex.value = defaultTabIndex === -1 ? 0 : defaultTabIndex;
       } else {
-        selectedTabIndex.value = 0;
+        // set default tab as null
+        selectedTabIndex.value = null;
       }
     });
 
@@ -252,9 +250,9 @@ export default defineComponent({
       saveDashboard();
     };
 
-    const getDashboardLayout = (tab) => {
+    const getDashboardLayout = (panels: any) => {
       //map on each panels and return array of layouts
-      return tab?.panels?.map((item) => item.layout) || [];
+      return panels?.map((item) => item.layout) || [];
     };
 
     const getPanelLayout = (panelData, position) => {
@@ -328,6 +326,7 @@ export default defineComponent({
       viewPanelId,
       selectedTabIndex,
       saveDashboard,
+      panels,
     };
   },
   methods: {
