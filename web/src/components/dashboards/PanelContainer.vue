@@ -255,6 +255,7 @@ export default defineComponent({
           dashboard: String(route.query.dashboard),
           panelId: data.id,
           folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };

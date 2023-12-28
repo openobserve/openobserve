@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, provide, ref } from "vue";
+import { computed, defineComponent, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -177,6 +177,18 @@ export default defineComponent({
         // set default tab as null
         selectedTabIndex.value = null;
       }
+    });
+
+    // on selected tab index change, update route
+    watch(selectedTabIndex, (value) => {
+      // update route
+      value !== null &&
+        router.push({
+          query: {
+            ...route.query,
+            tab: props.dashboardData?.tabs[value]?.name ?? "default",
+          },
+        });
     });
 
     // variables data

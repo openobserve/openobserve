@@ -360,7 +360,8 @@ export default defineComponent({
           store,
           route.query.dashboard,
           route.query.panelId,
-          route.query.folder
+          route.query.folder,
+          route.query.tab
         );
         Object.assign(
           dashboardPanelData.data,
@@ -1026,7 +1027,8 @@ export default defineComponent({
           store,
           dashId,
           dashboardPanelData.data,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
         );
         if (errorMessageOnSave instanceof Error) {
           errorData.errors.push(
@@ -1045,7 +1047,8 @@ export default defineComponent({
           store,
           dashId,
           dashboardPanelData.data,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
         );
         if (errorMessageOnSave instanceof Error) {
           errorData.errors.push(
@@ -1065,6 +1068,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: dashId,
           folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };

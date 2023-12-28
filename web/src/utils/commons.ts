@@ -160,7 +160,8 @@ export const addPanel = async (
   store: any,
   dashboardId: any,
   panelData: any,
-  folderId: any
+  folderId: any,
+  tabName: any
 ) => {
   // get the object of panel data
   // find the dashboard and add the panel data to dashboard object
@@ -173,14 +174,23 @@ export const addPanel = async (
     await getAllDashboards(store, folderId);
   }
   const currentDashboard = findDashboard(dashboardId, store, folderId);
-  if (!currentDashboard.panels) {
-    currentDashboard.panels = [];
+
+  // find tab index from tabname
+  const tabIndex = currentDashboard.tabs.findIndex(
+    (tab: any) => tab.name == tabName
+  );
+
+  if (!currentDashboard.tabs[tabIndex].panels) {
+    currentDashboard.tabs[tabIndex].panels = [];
   }
 
   let maxI = 0;
   let maxY = 0;
 
-  let lastPanel = currentDashboard.panels[currentDashboard.panels.length - 1];
+  let lastPanel =
+    currentDashboard.tabs[tabIndex].panels[
+      currentDashboard.tabs[tabIndex].panels.length - 1
+    ];
 
   currentDashboard.panels.map((it: any) => {
     maxI = Math.max(it.layout?.i || 0, maxI);
@@ -203,7 +213,7 @@ export const addPanel = async (
 
   const newLayoutObj = {
     x: 0,
-    y: currentDashboard.panels?.length > 0 ? maxY + 10 : 0,
+    y: currentDashboard.tabs[tabIndex].panels?.length > 0 ? maxY + 10 : 0,
     w: 6,
     h: 9,
     i: maxI + 1,
@@ -212,7 +222,7 @@ export const addPanel = async (
   };
 
   // check if last panel has enthough space to add new panel
-  if (currentDashboard.panels.length > 0) {
+  if (currentDashboard.tabs[tabIndex].panels.length > 0) {
     //check if new panel can be added
     if (12 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
       newLayoutObj.y = lastPanel.layout.y;
@@ -227,7 +237,7 @@ export const addPanel = async (
 
   //set layout of new panel
   panelData.layout = newLayoutObj;
-  currentDashboard.panels.push(panelData);
+  currentDashboard.tabs[tabIndex].panels.push(panelData);
 
   return await updateDashboard(
     store,
@@ -379,18 +389,23 @@ export const updatePanel = async (
   store: any,
   dashboardId: any,
   panelData: any,
-  folderId: any
+  folderId: any,
+  tabName: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  const panelIndex = currentDashboard.panels.findIndex(
+  // find tab index from tabname
+  const tabIndex = currentDashboard.tabs.findIndex(
+    (tab: any) => tab.name == tabName
+  );
+
+  const panelIndex = currentDashboard.tabs[tabIndex].panels.findIndex(
     (panel: any) => panel.id == panelData.id
   );
-  currentDashboard.panels[panelIndex] = panelData;
-  currentDashboard.panels = currentDashboard.panels;
+  currentDashboard.tabs[tabIndex].panels[panelIndex] = panelData;
 
   return await updateDashboard(
     store,
@@ -465,7 +480,8 @@ export const getPanel = async (
   store: any,
   dashboardId: any,
   panelId: any,
-  folderId: any
+  folderId: any,
+  tabName: any
 ) => {
   if (
     !store.state.organizationData.allDashboardList[folderId] ||
@@ -475,7 +491,12 @@ export const getPanel = async (
   }
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  const paneldata = currentDashboard.panels?.find(
+  // find tab index from tabname
+  const tabIndex = currentDashboard.tabs.findIndex(
+    (tab: any) => tab.name == tabName
+  );
+
+  const paneldata = currentDashboard.tabs[tabIndex].panels?.find(
     (it: any) => it.id == panelId
   );
   return paneldata;
