@@ -10,7 +10,7 @@ dependencies = [
     "ruff>=0.1.8",
 ]
 readme = "README.md"
-requires-python = ">= 3.8"
+requires-python = ">= 3.11"
 
 [build-system]
 requires = ["hatchling"]

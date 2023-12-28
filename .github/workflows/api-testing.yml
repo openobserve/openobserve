@@ -1,7 +1,16 @@
-name: Run integration tests against latest code
+name: API Integration Test
 
 on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "**.md"
   pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**.md"
 
 env:
   COLUMNS: 150
@@ -11,109 +20,58 @@ env:
 
 jobs:
   build:
-
-    runs-on: 
-      labels: ubicloud-standard-16
-    strategy:
-      matrix:
-        python-version: ["3.11"]
-
+    runs-on: ubuntu-latest
     steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.8.0
-        with:
-          cluster_name: openobserve-ci-test
-      - name: Clone the current repo
+      - name: Checkout git repo
         uses: actions/checkout@v4
-      - name: Print out the repo structure
-        run: ls -al
+
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2023-12-24
-          components: rustfmt,clippy,llvm-tools
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          cache-directories: 
-            ./target
+
       - name: Install Protoc
         uses: arduino/setup-protoc@v2
         with:
           version: "21.12"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-      - name: Build binary
-        # run: cargo build --release --features mimalloc  --target x86_64-unknown-linux-musl
+
+      - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
-      # - run: mkdir -p bin ; cp target/x86_64-unknown-linux-musl/release/openobserve bin/openobserve
-      - run: mkdir -p bin ; cp target/debug/openobserve bin/openobserve
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
-      - name: Test locations
-        run: ls -al 
-      - name: Build and push to local registry
-        uses: docker/build-push-action@v5
-        with:
-          context: "."
-          file: ./tests/api-testing/ci/Dockerfile.openobserve
-          # push: true
-          outputs: type=docker,dest=/tmp/openobserve.tar
-          # tags: localhost:5000/openobserve/openobserve:latest-amd64
-          tags: openobserve:latest-amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      # - name: Inspect
-      #   run: |
-      #     docker buildx imagetools inspect localhost:5000/openobserve/openobserve:latest-amd64
-      - name: Load built image into kind 
-        # run: kind load docker-image localhost:5000/openobserve/openobserve:latest-amd64 --name openobserve-ci-test
-        run: kind load image-archive /tmp/openobserve.tar --name openobserve-ci-test
-      - name: Deploy openobserve
-        # run: kubectl create ns openobserve && kubectl apply -f https://raw.githubusercontent.com/zinclabs/openobserve/main/deploy/k8s/statefulset.yaml
-        run: kubectl create ns openobserve && kubectl apply -f ./tests/api-testing/ci/statefulset.yaml
-      - name: Set up Python ${{ matrix.python-version }}
+
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Wait for 10s, for the deployment to complete.
-        run: sleep 10s
-        shell: bash
-      - name: Check the services - 1
-        run: kubectl get services --all-namespaces
-      - name: Check the services - 2
-        run: kubectl get pods --all-namespaces
-      - name: Check the logs
-        run: kubectl  logs openobserve-0 -n openobserve
-      - name: Port forward the 5080
-        run: kubectl -n openobserve port-forward svc/openobserve 5080:5080 &
-      # You can test your matrix by printing the current Python version
-      - name: Display Python version
-        run: python -c "import sys; print(sys.version)"
-      - name: Enable caching and define a working directory
+          python-version: "3.11"
+
+      - name: Setup rye
         uses: eifinger/setup-rye@v1
         with:
           enable-cache: true
           working-directory: 'tests/api-testing/'
           version: '0.16.0'
+
+      - name: Start OpenObserve
+        run: target/debug/openobserve &
+
+      - name: Wait for start
+        run: sleep 15
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
       - name: Run tests
-        run: cd tests/api-testing/ && rye pin cpython@3.11.6 && rye sync  && rye run pytest --force-sugar
-
-
-      # Try to test the openapi generator as well
-      # - name: openapi-generator test
-      #   uses: openapi-generators/openapitools-generator-action@v1
-      #   with:
-      #     generator: python
-      #     openapi-url: http://localhost:5080/api-doc/openapi.json
-      #     generator-tag: v7.0.1
-      #     command-args: '--package-name py-openobserve o ./py-openobserve --additional-properties=useSingleRequestParameter=true,packageVersion=2.0.0'
-          
-
-
+        run: rye run pytest --force-sugar
+        working-directory: tests/api-testing/
