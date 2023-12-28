@@ -26,11 +26,11 @@ use aws_sdk_dynamodb::{
     Client,
 };
 use bytes::Bytes;
+use config::CONFIG;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::common::infra::{
-    config::CONFIG,
     db::{Event, Stats},
     errors::*,
 };

@@ -19,6 +19,9 @@ exceptions = [
     # We should probably NOT bundle CA certs but use the OS ones.
     { name = "webpki-roots", allow = ["MPL-2.0"] },
     { name = "openobserve", allow = ["AGPL-3.0"] },
+    { name = "config", allow = ["AGPL-3.0"] },
+    { name = "ingester", allow = ["AGPL-3.0"] },
+    { name = "wal", allow = ["AGPL-3.0"] },
 ]
 
 allow = [

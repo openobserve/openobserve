@@ -21,14 +21,14 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use config::{meta::stream::FileKey, CONFIG};
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use tokio::{sync::RwLock, time};
 
 use crate::{
     common::{
-        infra::{cache::stats, config::CONFIG, file_list as infra_file_list, storage},
-        meta::common::FileKey,
+        infra::{cache::stats, file_list as infra_file_list, storage},
         utils::json,
     },
     service::db,
@@ -253,7 +253,7 @@ pub async fn cache_all() -> Result<(), anyhow::Error> {
     for prefix in prefixes {
         cache(&prefix, false).await?;
     }
-    LOADED_ALL_FILES.store(true, atomic::Ordering::Relaxed);
+    LOADED_ALL_FILES.store(true, atomic::Ordering::Release);
     Ok(())
 }
 

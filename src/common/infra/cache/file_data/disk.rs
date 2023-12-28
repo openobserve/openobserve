@@ -19,15 +19,13 @@ use std::{
 };
 
 use bytes::Bytes;
+use config::{is_local_disk_storage, metrics, CONFIG};
 use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
 use crate::common::{
-    infra::{
-        config::{is_local_disk_storage, CONFIG},
-        metrics, storage,
-    },
+    infra::storage,
     utils::{asynchronism::file::*, file::scan_files},
 };
 
@@ -62,7 +60,7 @@ impl FileData {
 
     async fn load(&mut self) -> Result<(), anyhow::Error> {
         let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
-        let files = scan_files(&self.root_dir);
+        let files = scan_files(&self.root_dir, "parquet");
         for file in files {
             let local_path = Path::new(&file).canonicalize().unwrap();
             let file_key = local_path

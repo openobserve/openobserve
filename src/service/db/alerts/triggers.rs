@@ -15,9 +15,11 @@
 
 use std::sync::Arc;
 
+use config::meta::stream::StreamType;
+
 use crate::common::{
     infra::{config::TRIGGERS, db as infra_db},
-    meta::{alerts::triggers::Trigger, StreamType},
+    meta::alerts::triggers::Trigger,
     utils::json,
 };
 

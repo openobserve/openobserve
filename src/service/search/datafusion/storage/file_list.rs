@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{TimeZone, Utc};
+use config::{meta::stream::FileKey, RwHashMap};
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
-
-use crate::common::{infra::config::RwHashMap, meta::common::FileKey};
 
 pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(Default::default);
 

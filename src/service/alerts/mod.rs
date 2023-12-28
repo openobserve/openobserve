@@ -18,21 +18,18 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 
 use crate::{
     common::{
-        infra::config::CONFIG,
         meta::{
             alerts::{
                 destinations::{DestinationWithTemplate, HTTPType},
                 Alert, Condition, Operator, QueryCondition, QueryType,
             },
-            search, StreamType,
+            search,
         },
-        utils::{
-            json::{self, Map, Value},
-            schema_ext::SchemaExt,
-        },
+        utils::json::{self, Map, Value},
     },
     service::{db, search as SearchService},
 };
@@ -220,6 +217,28 @@ pub async fn trigger(
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
+pub async fn preview(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<Vec<Map<String, Value>>, (http::StatusCode, anyhow::Error)> {
+    let alert = match db::alerts::get(org_id, stream_type, stream_name, name).await {
+        Ok(Some(alert)) => alert,
+        _ => {
+            return Err((
+                http::StatusCode::NOT_FOUND,
+                anyhow::anyhow!("Alert not found"),
+            ));
+        }
+    };
+    let data = alert
+        .preview()
+        .await
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(data.unwrap_or_default())
+}
+
 impl Alert {
     pub async fn evaluate(
         &self,
@@ -228,8 +247,12 @@ impl Alert {
         if self.is_real_time {
             self.query_condition.evaluate_realtime(row).await
         } else {
-            self.query_condition.evaluate_scheduled(self).await
+            self.query_condition.evaluate_scheduled(self, false).await
         }
+    }
+
+    pub async fn preview(&self) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        self.query_condition.evaluate_scheduled(self, true).await
     }
 
     pub async fn send_notification(
@@ -282,8 +305,9 @@ impl QueryCondition {
     pub async fn evaluate_scheduled(
         &self,
         alert: &Alert,
+        preview_mode: bool,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
-        let sql = match self.query_type {
+        let mut sql = match self.query_type {
             QueryType::Custom => {
                 if let Some(v) = self.conditions.as_ref() {
                     if self.aggregation.is_none() && v.is_empty() {
@@ -310,6 +334,28 @@ impl QueryCondition {
                 return Err(anyhow::anyhow!("PromQL is not supported yet"));
             }
         };
+
+        // handle preview mode
+        if preview_mode {
+            if sql.contains("SELECT * FROM") {
+                sql = sql["SELECT * FROM".len()..].to_string();
+                sql = format!(
+                    "SELECT histogram(_timestamp, '1 minute') AS zo_sql_key, count(*) AS alert_agg_value FROM {sql} GROUP BY zo_sql_key ORDER BY zo_sql_key"
+                )
+            } else {
+                sql = sql["SELECT ".len()..].to_string();
+                sql = sql[..sql.find(" HAVING ").unwrap()].to_string();
+                if sql.contains("GROUP BY") {
+                    sql = format!(
+                        "SELECT histogram(_timestamp, '1 minute') AS zo_sql_key, {sql} ,zo_sql_key ORDER BY zo_sql_key"
+                    )
+                } else {
+                    sql = format!(
+                        "SELECT histogram(_timestamp, '1 minute') AS zo_sql_key, {sql} GROUP BY zo_sql_key ORDER BY zo_sql_key"
+                    )
+                }
+            }
+        }
 
         // fire the query
         let now = Utc::now().timestamp_micros();
@@ -338,7 +384,7 @@ impl QueryCondition {
         let session_id = uuid::Uuid::new_v4().to_string();
         let resp =
             SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req).await?;
-        if resp.total < alert.trigger_condition.threshold as usize {
+        if !preview_mode && resp.total < alert.trigger_condition.threshold as usize {
             Ok(None)
         } else {
             Ok(Some(

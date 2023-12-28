@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::CONFIG;
 use tokio::time;
 
 use crate::{
     common::infra::{
         cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-        config::CONFIG,
         dist_lock, file_list as infra_file_list,
     },
     service::db,

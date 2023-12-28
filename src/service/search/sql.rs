@@ -20,6 +20,10 @@ use std::{
 
 use ahash::AHashMap;
 use chrono::Duration;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
+};
 use datafusion::arrow::datatypes::{DataType, Schema};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -27,15 +31,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS},
-            errors::{Error, ErrorCodes},
-        },
+        infra::errors::{Error, ErrorCodes},
         meta::{
-            common::FileKey,
             sql::{Sql as MetaSql, SqlOperator},
             stream::StreamParams,
-            StreamType,
         },
         utils::str::find,
     },
@@ -69,6 +68,7 @@ static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
 pub struct Sql {
     pub origin_sql: String,
     pub org_id: String,
+    pub stream_type: StreamType,
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
@@ -113,7 +113,7 @@ impl Sql {
         let req_query = req.query.as_ref().unwrap();
         let mut req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
-        let stream_type: StreamType = StreamType::from(req.stream_type.as_str());
+        let stream_type = StreamType::from(req.stream_type.as_str());
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
@@ -599,6 +599,7 @@ impl Sql {
         let mut sql = Sql {
             origin_sql,
             org_id,
+            stream_type,
             stream_name,
             meta,
             fulltext,
@@ -653,7 +654,7 @@ pub fn generate_filter_from_quick_text(
         if op == &SqlOperator::And
             || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
         {
-            let entry = filters.entry(k.as_str()).or_insert(vec![]);
+            let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
             entry.push(v.as_str());
         } else {
             filters.clear();

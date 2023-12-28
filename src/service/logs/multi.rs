@@ -18,26 +18,22 @@ use std::io::{BufRead, BufReader};
 use actix_web::{http, web};
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
         meta::{
             alerts::Alert,
             ingestion::{IngestionResponse, StreamStatus},
             stream::{SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
     service::{
         distinct_values, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
         logs::StreamMeta,
         usage::report_request_usage_stats,
     },
@@ -213,23 +209,7 @@ async fn ingest_inner(
     }
 
     // write to file
-    let mut stream_file_name = "".to_string();
-
-    let mut req_stats = write_file_arrow(
-        &buf,
-        thread_id,
-        &stream_params,
-        &mut stream_file_name,
-        partition_time_level,
-    )
-    .await;
-
-    if stream_file_name.is_empty() {
-        return Ok(IngestionResponse::new(
-            http::StatusCode::OK.into(),
-            vec![stream_status],
-        ));
-    }
+    let mut req_stats = write_file(buf, thread_id, &stream_params, partition_time_level).await;
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;

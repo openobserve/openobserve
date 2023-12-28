@@ -18,16 +18,13 @@ use std::io::{BufRead, BufReader};
 use actix_web::web;
 use ahash::AHashMap;
 use chrono::{Duration, Utc};
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{CONFIG, DISTINCT_FIELDS},
-            metrics,
-        },
+        infra::cluster,
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver},
@@ -37,13 +34,12 @@ use crate::{
             },
             stream::{PartitioningDetails, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
     service::{
         db, distinct_values,
-        ingestion::{evaluate_trigger, write_file_arrow, TriggerAlertData},
+        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         schema::stream_schema_exists,
         usage::report_request_usage_stats,
     },
@@ -154,7 +150,7 @@ pub async fn ingest(
 
             stream_data_map
                 .entry(stream_name.clone())
-                .or_insert(BulkStreamData {
+                .or_insert_with(|| BulkStreamData {
                     data: AHashMap::new(),
                 });
         } else {
@@ -330,13 +326,10 @@ pub async fn ingest(
             continue;
         }
         // write to file
-        let mut stream_file_name = "".to_string();
-
-        let mut req_stats = write_file_arrow(
-            &stream_data.data,
+        let mut req_stats = write_file(
+            stream_data.data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Logs),
-            &mut stream_file_name,
             None,
         )
         .await;

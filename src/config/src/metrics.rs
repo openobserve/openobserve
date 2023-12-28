@@ -21,7 +21,7 @@ use prometheus::{
     CounterVec, HistogramOpts, HistogramVec, IntCounterVec, IntGaugeVec, Opts, Registry,
 };
 
-use super::config::CONFIG;
+use crate::CONFIG;
 
 pub const NAMESPACE: &str = "zo";
 const HELP_SUFFIX: &str =
@@ -158,6 +158,30 @@ pub static INGEST_WAL_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["organization", "stream", "stream_type"],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_MEMTABLE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_memtable_bytes",
+            "Ingestor in memory bytes.".to_owned(),
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_MEMTABLE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_memtable_files",
+            "Ingestor in memory files.".to_owned(),
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
     )
     .expect("Metric created")
 });
@@ -536,6 +560,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_READ_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_MEMTABLE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_MEMTABLE_FILES.clone()))
         .expect("Metric registered");
 
     // querier stats

@@ -15,10 +15,11 @@
 
 use std::collections::HashMap;
 
+use config::{GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE};
 use vector_enrichment::{Table, TableRegistry};
 
 use crate::common::{
-    infra::config::{ENRICHMENT_TABLES, GEOIP_TABLE, GEO_IP_ENRICHMENT_TABLE},
+    infra::config::{ENRICHMENT_TABLES, GEOIP_ASN_TABLE, GEOIP_CITY_TABLE},
     meta::{functions::VRLCompilerConfig, organization::DEFAULT_ORG},
 };
 
@@ -54,10 +55,16 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
             );
         }
     }
-    if GEOIP_TABLE.read().is_some() {
+    if GEOIP_CITY_TABLE.read().is_some() {
         tables.insert(
-            GEO_IP_ENRICHMENT_TABLE.to_owned(),
-            Box::new(GEOIP_TABLE.read().as_ref().unwrap().clone()),
+            GEO_IP_CITY_ENRICHMENT_TABLE.to_owned(),
+            Box::new(GEOIP_CITY_TABLE.read().as_ref().unwrap().clone()),
+        );
+    }
+    if GEOIP_ASN_TABLE.read().is_some() {
+        tables.insert(
+            GEO_IP_ASN_ENRICHMENT_TABLE.to_owned(),
+            Box::new(GEOIP_ASN_TABLE.read().as_ref().unwrap().clone()),
         );
     }
     registry.load(tables);

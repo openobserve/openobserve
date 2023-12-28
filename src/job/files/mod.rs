@@ -13,26 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::{
-    infra::{
-        cluster,
-        config::{CONFIG, FILE_EXT_PARQUET},
-        ider,
-    },
-    meta::StreamType,
-};
+use config::{ider, meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
+
+use crate::common::infra::cluster;
 
 pub mod broadcast;
-pub mod disk;
-pub mod memory;
+pub mod json;
+pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    tokio::task::spawn(async move { disk::run().await });
-    tokio::task::spawn(async move { memory::run().await });
+    tokio::task::spawn(async move { json::run().await });
+    tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });
 
     Ok(())
@@ -44,7 +39,7 @@ pub fn generate_storage_file_name(
     stream_name: &str,
     wal_file_name: &str,
 ) -> String {
-    // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/7099303408192061440f3XQ2p.json
+    // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/ip=1234/7099303408192061440f3XQ2p.json
     let file_columns = wal_file_name.splitn(7, '/').collect::<Vec<&str>>();
     let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     let file_date = format!(

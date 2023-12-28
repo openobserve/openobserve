@@ -17,6 +17,7 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
+use config::CONFIG;
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -37,10 +38,7 @@ use promql_parser::{
 use rayon::prelude::*;
 
 use crate::{
-    common::{
-        infra::config::CONFIG,
-        meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-    },
+    common::meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     service::promql::{aggregations, binaries, functions, micros, value::*},
 };
 

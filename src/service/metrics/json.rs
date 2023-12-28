@@ -13,31 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::BufReader};
+use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use actix_web::{http, web};
 use ahash::AHashMap;
 use anyhow::{anyhow, Result};
+use config::{
+    meta::stream::StreamType,
+    metrics,
+    utils::{schema::infer_json_schema, schema_ext::SchemaExt},
+    CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
 use vrl::compiler::runtime::Runtime;
 
 use super::get_exclude_labels;
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG, metrics},
+        infra::cluster,
         meta::{
             ingestion::{IngestionResponse, StreamStatus},
             prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
-        utils::{flatten, json, schema::infer_json_schema, time},
+        utils::{flatten, json, time},
     },
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
-        schema::filter_schema_null_fields,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -57,7 +61,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
-    let mut stream_data_buf: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut stream_data_buf: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
@@ -172,9 +176,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
             if schema.fields().is_empty() {
                 let mut schema_reader = BufReader::new(record_str.as_bytes());
-                let mut inferred_schema =
+                let inferred_schema =
                     infer_json_schema(&mut schema_reader, None, StreamType::Metrics).unwrap();
-                filter_schema_null_fields(&mut inferred_schema);
                 let metadata = Metadata {
                     metric_family_name: stream_name.clone(),
                     metric_type: metrics_type.as_str().into(),
@@ -215,21 +218,35 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Metrics);
 
-        let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
+        let schema = stream_schema_map
+            .get(&stream_name)
+            .unwrap()
+            .clone()
+            .with_metadata(HashMap::new());
+        let schema_key = schema.hash_key();
         let hour_key = get_wal_time_key(
             timestamp,
             &partition_keys,
             partition_time_level,
             record,
-            None,
+            Some(&schema_key),
         );
-        let hour_buf = stream_buf.entry(hour_key).or_default();
-        hour_buf.push(record_str);
+        let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
+        let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema_key,
+            schema: Arc::new(schema),
+            records: vec![],
+            records_size: 0,
+        });
+        hour_buf
+            .records
+            .push(Arc::new(json::Value::Object(record.to_owned())));
+        hour_buf.records_size += record_str.len();
 
         // update status
         let stream_status = stream_status_map
             .entry(stream_name.clone())
-            .or_insert(StreamStatus::new(&stream_name));
+            .or_insert_with(|| StreamStatus::new(&stream_name));
         stream_status.status.successful += 1;
     }
     let time = start.elapsed().as_secs_f64();
@@ -252,12 +269,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             Some(CONFIG.limit.metrics_file_retention.as_str().into())
         };
 
-        let mut stream_file_name = "".to_string();
         let mut req_stats = write_file(
-            &stream_data,
+            stream_data,
             thread_id,
-            &StreamParams::new(org_id, org_id, StreamType::Metrics),
-            &mut stream_file_name,
+            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             time_level,
         )
         .await;

@@ -179,6 +179,9 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub response_type: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub session_id: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -203,6 +206,7 @@ impl Response {
             hits: Vec::new(),
             aggs: HashMap::new(),
             response_type: "".to_string(),
+            session_id: "".to_string(),
         }
     }
 
@@ -243,6 +247,10 @@ impl Response {
 
     pub fn set_scan_size(&mut self, val: usize) {
         self.scan_size = val;
+    }
+
+    pub fn set_session_id(&mut self, session_id: String) {
+        self.session_id = session_id;
     }
 }
 

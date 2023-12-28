@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap, sync::Arc};
+
 use actix_web::{http, web, HttpResponse};
 use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
+use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -27,15 +30,14 @@ use prost::Message;
 
 use crate::{
     common::{
-        infra::{cluster, config::CONFIG, metrics},
+        infra::cluster,
         meta::{
             self,
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
             prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords, StreamParams},
             usage::UsageType,
-            StreamType,
         },
         utils::{flatten, json},
     },
@@ -99,7 +101,7 @@ pub async fn metrics_json_handler(
 
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, Vec<String>>> = AHashMap::new();
+    let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
     let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
@@ -375,6 +377,13 @@ pub async fn metrics_json_handler(
                         )
                         .await;
 
+                        let schema = metric_schema_map
+                            .get(local_metric_name)
+                            .unwrap()
+                            .clone()
+                            .with_metadata(HashMap::new());
+                        let schema_key = schema.hash_key();
+
                         let buf = metric_data_map
                             .entry(local_metric_name.to_owned())
                             .or_default();
@@ -384,10 +393,18 @@ pub async fn metrics_json_handler(
                             &partition_keys,
                             partition_time_level,
                             val_map,
-                            None,
+                            Some(&schema_key),
                         );
-                        let hour_buf = buf.entry(hour_key).or_default();
-                        hour_buf.push(value_str);
+                        let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                            schema_key,
+                            schema: Arc::new(schema),
+                            records: vec![],
+                            records_size: 0,
+                        });
+                        hour_buf
+                            .records
+                            .push(Arc::new(json::Value::Object(val_map.to_owned())));
+                        hour_buf.records_size += value_str.len();
 
                         // real time alert
                         let need_trigger = !stream_trigger_map.contains_key(local_metric_name);
@@ -427,9 +444,6 @@ pub async fn metrics_json_handler(
             continue;
         }
 
-        // write to file
-        let mut stream_file_name = "".to_string();
-
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
             org_id,
@@ -447,11 +461,11 @@ pub async fn metrics_json_handler(
             Some(CONFIG.limit.metrics_file_retention.as_str().into())
         };
 
+        // write to file
         let mut req_stats = write_file(
-            &stream_data,
+            stream_data,
             thread_id,
-            &StreamParams::new(org_id, org_id, StreamType::Metrics),
-            &mut stream_file_name,
+            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
             time_level,
         )
         .await;

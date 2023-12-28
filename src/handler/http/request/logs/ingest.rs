@@ -16,15 +16,13 @@
 use std::io::Error;
 
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
+use config::CONFIG;
 
 use crate::{
-    common::{
-        infra::config::CONFIG,
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::{
-                GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
-            },
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::{
+            GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
         },
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},

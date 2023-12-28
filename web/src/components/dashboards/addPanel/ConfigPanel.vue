@@ -29,6 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <div class="" style="max-width: 300px">
+      <div class="q-mb-sm">{{ t("dashboard.description") }}</div>
+      <q-input outlined v-model="dashboardPanelData.data.description" filled autogrow class="showLabelOnTop"/>
+    </div>
+
+    <div class="space"></div>
+
     <q-select
       v-if="
         dashboardPanelData.data.type != 'table' &&

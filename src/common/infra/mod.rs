@@ -20,16 +20,12 @@ pub mod db;
 pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
-pub mod ider;
-pub mod metrics;
 pub mod storage;
 pub mod wal;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    ider::init()?;
     wal::init().await?;
     cache::init().await?;
-    // init db
     db::init().await?;
     db::create_table().await?;
     file_list::create_table().await?;

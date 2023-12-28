@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
+use config::CONFIG;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_client::LogsServiceClient, logs_service_server::LogsService,
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -24,10 +25,7 @@ use tonic::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::{cluster, config::CONFIG},
-    service::search::MetadataMap,
-};
+use crate::{common::infra::cluster, service::search::MetadataMap};
 
 #[derive(Default)]
 pub struct LogsServer;

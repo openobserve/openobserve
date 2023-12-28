@@ -16,6 +16,11 @@
 use std::{str::FromStr, sync::Arc};
 
 use ahash::AHashMap as HashMap;
+use config::{
+    meta::stream::{FileKey, FileMeta, StreamType},
+    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_iterator},
+    CONFIG, PARQUET_BATCH_SIZE,
+};
 use datafusion::{
     arrow::{
         datatypes::{DataType, Schema},
@@ -49,19 +54,15 @@ use super::{
 };
 use crate::{
     common::{
-        infra::{
-            cache::tmpfs,
-            config::{CONFIG, PARQUET_BATCH_SIZE},
-        },
+        infra::cache::tmpfs,
         meta::{
-            common::{FileKey, FileMeta},
             functions::VRLResultResolver,
             search::{SearchType, Session as SearchSession},
             sql,
         },
         utils::{flatten, json},
     },
-    service::{schema::filter_schema_null_fields, search::sql::Sql},
+    service::search::sql::Sql,
 };
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
@@ -87,7 +88,7 @@ pub async fn sql(
     in_records_batches: Option<Vec<RecordBatch>>,
     file_type: FileType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
-    if files.is_empty() {
+    if files.is_empty() && in_records_batches.is_none() {
         return Ok(HashMap::new());
     }
 
@@ -99,13 +100,7 @@ pub async fn sql(
         let ctx = prepare_datafusion_context(&session.search_type)?;
 
         let record_batches = in_records_batches.unwrap();
-        let schema = if let Some(first_batch) = record_batches.first() {
-            first_batch.schema()
-        } else {
-            log::error!("No record batches found");
-            return Ok(HashMap::new());
-        };
-        let mem_table = Arc::new(MemTable::try_new(schema, vec![record_batches])?);
+        let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
 
         // Register the MemTable as a table in the DataFusion context
         ctx.register_table("tbl", mem_table)?;
@@ -325,7 +320,12 @@ async fn exec_query(
     } else if sql.query_fn.is_some() {
         let batches = df.collect().await?;
         let batches_ref: Vec<&RecordBatch> = batches.iter().collect();
-        match handle_query_fn(sql.query_fn.clone().unwrap(), &batches_ref, &sql.org_id) {
+        match handle_query_fn(
+            sql.query_fn.clone().unwrap(),
+            &batches_ref,
+            &sql.org_id,
+            sql.stream_type,
+        ) {
             Err(err) => {
                 return Err(datafusion::error::DataFusionError::Execution(format!(
                     "Error applying query function: {err} "
@@ -468,13 +468,13 @@ pub async fn merge(
     offset: usize,
     limit: usize,
     sql: &str,
-    batches: &[Vec<RecordBatch>],
+    batches: &[RecordBatch],
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
         return Ok(vec![]);
     }
-    if offset == 0 && batches.len() == 1 && batches[0].len() <= 1 {
-        return Ok(batches[0].to_owned());
+    if offset == 0 && batches.len() == 1 {
+        return Ok(batches.to_owned());
     }
 
     // let start = std::time::Instant::now();
@@ -573,28 +573,23 @@ pub async fn merge(
     Ok(batches)
 }
 
-fn merge_write_recordbatch(batches: &[Vec<RecordBatch>]) -> Result<(Arc<Schema>, String)> {
+fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, String)> {
     let mut i = 0;
     let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
     let mut schema = Schema::empty();
-    for item in batches.iter() {
-        if item.is_empty() {
+    for row in batches.iter() {
+        if row.num_rows() == 0 {
             continue;
         }
-        for row in item.iter() {
-            if row.num_rows() == 0 {
-                continue;
-            }
-            i += 1;
-            let row_schema = row.schema();
-            schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
-            let file_name = format!("{work_dir}{i}.parquet");
-            let mut buf_parquet = Vec::new();
-            let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
-            writer.write(row)?;
-            writer.close()?;
-            tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
-        }
+        i += 1;
+        let row_schema = row.schema();
+        schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
+        let file_name = format!("{work_dir}{i}.parquet");
+        let mut buf_parquet = Vec::new();
+        let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
+        writer.write(row)?;
+        writer.close()?;
+        tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
     }
     filter_schema_null_fields(&mut schema); // fix schema
     Ok((Arc::new(schema), work_dir))
@@ -927,7 +922,7 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
+    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -1001,7 +996,7 @@ pub async fn merge_parquet_files(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let mut writer = super::new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
+    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
     for batch in batches {
         writer.write(&batch)?;
     }
@@ -1152,9 +1147,10 @@ fn handle_query_fn(
     query_fn: String,
     batches: &[&RecordBatch],
     org_id: &str,
+    stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
     match datafusion::arrow::json::writer::record_batches_to_json_rows(batches) {
-        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id),
+        Ok(json_rows) => apply_query_fn(query_fn, json_rows, org_id, stream_type),
         Err(err) => Err(DataFusionError::Execution(format!(
             "Error converting record batches to json rows: {}",
             err
@@ -1166,6 +1162,7 @@ fn apply_query_fn(
     query_fn_src: String,
     in_batch: Vec<json::Map<String, json::Value>>,
     org_id: &str,
+    stream_type: StreamType,
 ) -> Result<Vec<RecordBatch>> {
     use vector_enrichment::TableRegistry;
 
@@ -1192,9 +1189,7 @@ fn apply_query_fn(
                 .collect();
 
             let value_iter = rows_val.iter().map(Ok);
-            let mut inferred_schema =
-                arrow::json::reader::infer_json_schema_from_iterator(value_iter).unwrap();
-            filter_schema_null_fields(&mut inferred_schema);
+            let inferred_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
             let mut decoder =
                 arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 
@@ -1210,6 +1205,28 @@ fn apply_query_fn(
             "Error compiling VRL function: {}",
             err
         ))),
+    }
+}
+
+fn filter_schema_null_fields(schema: &mut Schema) {
+    let fields = schema.fields();
+    if fields
+        .iter()
+        .filter(|f| f.data_type() == &DataType::Null)
+        .count()
+        > 0
+    {
+        let fields = fields
+            .iter()
+            .filter_map(|f| {
+                if f.data_type() == &DataType::Null {
+                    None
+                } else {
+                    Some(f.as_ref().to_owned())
+                }
+            })
+            .collect::<Vec<_>>();
+        *schema = Schema::new(fields.to_vec());
     }
 }
 
@@ -1257,7 +1274,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = merge_write_recordbatch(&[vec![batch1, batch2]]).unwrap();
+        let res = merge_write_recordbatch(&[batch1, batch2]).unwrap();
         assert!(!res.0.fields().is_empty());
         assert!(!res.1.is_empty())
     }
@@ -1284,7 +1301,7 @@ mod tests {
             1,
             100,
             "select * from tbl limit 10",
-            &vec![vec![batch, batch2]],
+            &[batch, batch2],
         )
         .await
         .unwrap();

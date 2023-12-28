@@ -318,7 +318,7 @@ export const convertSQLData = (
             margin: 18 * (xAxisKeys.length - index - 1) + 5,
           },
           splitLine: {
-            show: false,
+            show: true,
           },
           axisTick: {
             show: xAxisKeys.length == 1 ? false : true,
@@ -371,7 +371,7 @@ export const convertSQLData = (
         },
       },
       splitLine: {
-        show: false,
+        show: true,
       },
       axisLine: {
         show: true,

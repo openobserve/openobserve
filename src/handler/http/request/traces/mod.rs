@@ -17,12 +17,13 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
+use config::{meta::stream::StreamType, metrics, CONFIG};
 use serde::Serialize;
 
 use crate::{
     common::{
-        infra::{config::CONFIG, errors, metrics},
-        meta::{self, http::HttpResponse as MetaHttpResponse, StreamType},
+        infra::errors,
+        meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::json,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
@@ -398,6 +399,7 @@ pub async fn get_latest_traces(
         "hits",
         json::to_value(traces_data.values().collect::<Vec<&TraceResponseItem>>()).unwrap(),
     );
+    resp.insert("session_id", json::Value::from(session_id));
     Ok(HttpResponse::Ok().json(resp))
 }
 

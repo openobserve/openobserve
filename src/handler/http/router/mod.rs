@@ -24,6 +24,7 @@ use actix_web::{
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::from_fn;
+use config::CONFIG;
 use futures::FutureExt;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -36,10 +37,7 @@ use super::{
         stream, syslog, traces, users, *,
     },
 };
-use crate::common::{
-    infra::config::CONFIG,
-    meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-};
+use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
 
 pub mod openapi;
 pub mod ui;
@@ -276,10 +274,11 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(alerts::save_alert)
             .service(alerts::get_alert)
             .service(alerts::list_alerts)
-            .service(alerts::trigger_alert)
             .service(alerts::list_stream_alerts)
             .service(alerts::delete_alert)
             .service(alerts::enable_alert)
+            .service(alerts::trigger_alert)
+            .service(alerts::preview_alert)
             .service(alerts::templates::save_template)
             .service(alerts::templates::get_template)
             .service(alerts::templates::delete_template)

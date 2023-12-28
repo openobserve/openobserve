@@ -19,6 +19,8 @@ use std::sync::{
 };
 
 use ahash::AHashMap;
+use arrow_schema::{DataType, Field, Schema};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -28,11 +30,8 @@ use tokio::{
 
 use crate::{
     common::{
-        infra::{
-            config::{FxIndexMap, CONFIG},
-            errors::{Error, Result},
-        },
-        meta::{stream::StreamParams, StreamType},
+        infra::errors::{Error, Result},
+        meta::stream::{SchemaRecords, StreamParams},
         utils::json,
     },
     service::{ingestion, stream::unwrap_partition_time_level},
@@ -113,7 +112,7 @@ impl DistinctValues {
     async fn write(&self, org_id: &str, data: Vec<DvItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            let count = group_items.entry(item).or_insert(0);
+            let count = group_items.entry(item).or_default();
             *count += 1;
         }
         for (item, count) in group_items {
@@ -133,7 +132,8 @@ impl DistinctValues {
 
         // write to wal
         let timestamp = chrono::Utc::now().timestamp_micros();
-        let mut stream_file_name = "".to_string();
+        let schema = schema();
+        let schema_key = schema.hash_key();
         for (org, items) in new_table {
             if items.is_empty() {
                 continue;
@@ -143,7 +143,8 @@ impl DistinctValues {
                 stream_name: STREAM_NAME.into(),
                 stream_type: StreamType::Metadata,
             };
-            let mut buf: AHashMap<String, Vec<String>> = AHashMap::new();
+
+            let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
                 let data = data.as_object_mut().unwrap();
@@ -157,13 +158,21 @@ impl DistinctValues {
                     &vec![],
                     unwrap_partition_time_level(None, StreamType::Metadata),
                     data,
-                    None,
+                    Some(&schema_key),
                 );
-                let line_str = json::to_string(&data).unwrap();
-                let hour_buf = buf.entry(hour_key).or_default();
-                hour_buf.push(line_str);
+                let data = json::Value::Object(data.to_owned());
+                let data_size = json::to_vec(&data).unwrap_or_default().len();
+
+                let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                    schema_key: schema_key.clone(),
+                    schema: schema.clone(),
+                    records: vec![],
+                    records_size: 0,
+                });
+                hour_buf.records.push(Arc::new(data));
+                hour_buf.records_size += data_size;
             }
-            _ = ingestion::write_file(&buf, 0, &stream_params, &mut stream_file_name, None).await;
+            _ = ingestion::write_file(buf, 0, &stream_params, None).await;
         }
         Ok(())
     }
@@ -198,12 +207,12 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
                 if let Err(e) = CHANNEL.flush().await {
                     log::error!("flush error: {}", e);
                 }
-                CHANNEL.shutdown.store(true, Ordering::Relaxed);
+                CHANNEL.shutdown.store(true, Ordering::Release);
                 break;
             }
             let mut mem_table = CHANNEL.mem_table.write().await;
             let entry = mem_table.entry(event.org_id).or_default();
-            let field_entry = entry.entry(event.item).or_insert(0);
+            let field_entry = entry.entry(event.item).or_default();
             *field_entry += event.count;
         }
         log::info!("[distinct_values] event loop exit");
@@ -229,4 +238,21 @@ pub async fn write(org_id: &str, data: Vec<DvItem>) -> Result<()> {
 pub async fn close() -> Result<()> {
     CHANNEL.stop().await?;
     Ok(())
+}
+
+fn schema() -> Arc<Schema> {
+    Arc::new(Schema::new(vec![
+        Field::new(
+            CONFIG.common.column_timestamp.as_str(),
+            DataType::Int64,
+            false,
+        ),
+        Field::new("count", DataType::Int64, false),
+        Field::new("stream_name", DataType::Utf8, false),
+        Field::new("stream_type", DataType::Utf8, false),
+        Field::new("field_name", DataType::Utf8, false),
+        Field::new("field_value", DataType::Utf8, true),
+        Field::new("filter_name", DataType::Utf8, true),
+        Field::new("filter_value", DataType::Utf8, true),
+    ]))
 }

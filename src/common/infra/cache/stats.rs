@@ -13,16 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::{
+    meta::stream::{FileMeta, StreamType},
+    RwHashMap,
+};
 use once_cell::sync::Lazy;
 
-use crate::common::{
-    infra::config::RwHashMap,
-    meta::{common::FileMeta, stream::StreamStats, StreamType},
-};
-
-static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
+use crate::common::meta::stream::StreamStats;
 
 const STREAM_STATS_MEM_SIZE: usize = std::mem::size_of::<StreamStats>();
+static STATS: Lazy<RwHashMap<String, StreamStats>> = Lazy::new(Default::default);
 
 #[inline]
 pub fn get_stats() -> RwHashMap<String, StreamStats> {

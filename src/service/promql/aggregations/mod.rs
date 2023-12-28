@@ -121,10 +121,12 @@ fn eval_arithmetic_processor(
     value: f64,
 ) {
     let sum_hash = sum_labels.signature();
-    let entry = score_values.entry(sum_hash).or_insert(ArithmeticItem {
-        labels: sum_labels.clone(),
-        ..Default::default()
-    });
+    let entry = score_values
+        .entry(sum_hash)
+        .or_insert_with(|| ArithmeticItem {
+            labels: sum_labels.clone(),
+            ..Default::default()
+        });
     entry.value = f_handler(entry.value, value);
     entry.num += 1;
 }
@@ -134,10 +136,12 @@ fn eval_count_values_processor(
     sum_labels: &Labels,
 ) {
     let sum_hash = sum_labels.signature();
-    let entry = score_values.entry(sum_hash).or_insert(CountValuesItem {
-        labels: sum_labels.clone(),
-        ..Default::default()
-    });
+    let entry = score_values
+        .entry(sum_hash)
+        .or_insert_with(|| CountValuesItem {
+            labels: sum_labels.clone(),
+            ..Default::default()
+        });
     entry.count += 1;
 }
 
@@ -147,10 +151,12 @@ fn eval_std_dev_var_processor(
     value: f64,
 ) {
     let sum_hash = sum_labels.signature();
-    let entry = score_values.entry(sum_hash).or_insert(StatisticItems {
-        labels: sum_labels.clone(),
-        ..Default::default()
-    });
+    let entry = score_values
+        .entry(sum_hash)
+        .or_insert_with(|| StatisticItems {
+            labels: sum_labels.clone(),
+            ..Default::default()
+        });
     entry.values.push(value);
     entry.current_count += 1;
     entry.current_sum += value;

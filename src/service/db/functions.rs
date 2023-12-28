@@ -101,7 +101,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 "{}/{}/{}",
                                 org_id, stream_fn.stream_type, stream_fn.stream
                             ))
-                            .or_insert(StreamFunctionsList { list: vec![] });
+                            .or_insert_with(|| StreamFunctionsList { list: vec![] });
                         if group.list.contains(&stream_fn) {
                             let stream_name =
                                 group.list.iter().position(|x| x.eq(&stream_fn)).unwrap();
@@ -139,7 +139,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         "{}/{}/{}",
                         org_id, stream_fn.stream_type, stream_fn.stream
                     ))
-                    .or_insert(StreamFunctionsList { list: vec![] });
+                    .or_insert_with(|| StreamFunctionsList { list: vec![] });
                 group.list.push(stream_fn);
             }
             let mut func = json_val.clone();

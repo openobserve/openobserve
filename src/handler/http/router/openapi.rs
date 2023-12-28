@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::{meta::stream::StreamType, CONFIG};
 use utoipa::{
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
     Modify, OpenApi,
 };
 
-use crate::{
-    common::{infra::config::CONFIG, meta},
-    handler::http::request,
-};
+use crate::{common::meta, handler::http::request};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -98,6 +96,7 @@ use crate::{
         request::alerts::delete_alert,
         request::alerts::enable_alert,
         request::alerts::trigger_alert,
+        request::alerts::preview_alert,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,
@@ -118,7 +117,7 @@ use crate::{
     components(
         schemas(
             meta::http::HttpResponse,
-            meta::StreamType,
+            StreamType,
             meta::stream::Stream,
             meta::stream::StreamStats,
             meta::stream::StreamProperty,

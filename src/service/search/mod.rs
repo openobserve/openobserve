@@ -17,25 +17,27 @@ use std::{cmp::min, io::Cursor, sync::Arc};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
         infra::{
-            cluster,
-            config::CONFIG,
-            dist_lock,
+            cluster, dist_lock,
             errors::{Error, ErrorCodes},
         },
         meta::{
-            common::FileKey,
+            functions::VRLResultResolver,
             search,
             stream::{PartitionTimeLevel, ScanStats, StreamParams},
-            StreamType,
         },
         utils::{flatten, json, str::find},
     },
@@ -133,7 +135,7 @@ async fn get_file_list(
     skip(req),
     fields(session_id = req.job.as_ref().unwrap().session_id, org_id = req.org_id)
 )]
-async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
+async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let session_id = req.job.as_ref().unwrap().session_id.clone();
 
@@ -184,6 +186,11 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
+    // set this value to null & use it later on results ,
+    // this being to avoid performance impact of query fn being applied during query
+    // execution
+    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
+    req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // make cluster request
     let mut tasks = Vec::new();
@@ -285,24 +292,31 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
 
     let mut results = Vec::new();
     for task in tasks {
-        let result = task
-            .await
-            .map_err(|err| Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())))?;
-        match result {
-            Ok(res) => results.push(res),
-            Err(err) => {
+        match task.await {
+            Ok(res) => match res {
+                Ok(res) => results.push(res),
+                Err(err) => {
+                    // search done, release lock
+                    dist_lock::unlock(&locker).await?;
+                    return Err(err);
+                }
+            },
+            Err(e) => {
                 // search done, release lock
                 dist_lock::unlock(&locker).await?;
-                return Err(err);
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    e.to_string(),
+                )));
             }
         }
     }
+
     // search done, release lock
     dist_lock::unlock(&locker).await?;
 
     // merge multiple instances data
     let mut scan_stats = ScanStats::new();
-    let mut batches: HashMap<String, Vec<Vec<RecordBatch>>> = HashMap::new();
+    let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let sql = Arc::new(meta);
     for resp in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
@@ -312,7 +326,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             let buf = Cursor::new(resp.hits);
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
             let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-            value.push(batch);
+            value.extend(batch);
         }
         // handle aggs
         for agg in resp.aggs {
@@ -321,14 +335,14 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 let buf = Cursor::new(agg.hits);
                 let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
                 let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
-                value.push(batch);
+                value.extend(batch);
             }
         }
     }
 
     // merge all batches
     let mut merge_batches = HashMap::new();
-    for (name, batch) in batches.iter() {
+    for (name, batch) in batches {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
@@ -343,7 +357,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
             sql.meta.offset,
             sql.meta.limit,
             &merge_sql,
-            batch,
+            &batch,
         )
         .await
         {
@@ -354,9 +368,8 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 )));
             }
         };
-        merge_batches.insert(name.to_string(), batch);
+        merge_batches.insert(name, batch);
     }
-    drop(batches);
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
@@ -368,6 +381,7 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
         Some(batches) => batches,
         None => &empty_vec,
     };
+
     if !batches_query.is_empty() {
         let schema = batches_query[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
@@ -379,12 +393,48 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
                 )));
             }
         };
-        let mut sources: Vec<json::Value> = json_rows
-            .into_iter()
-            .filter(|v| !v.is_empty())
-            .map(json::Value::Object)
-            .collect();
-
+        let mut sources: Vec<json::Value> = if query_fn.is_empty() {
+            json_rows
+                .into_iter()
+                .filter(|v| !v.is_empty())
+                .map(json::Value::Object)
+                .collect()
+        } else {
+            // compile vrl function & apply the same before returning the response
+            let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+            let program =
+                match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
+                    Ok(program) => {
+                        let registry = program.config.get_custom::<TableRegistry>().unwrap();
+                        registry.finish_load();
+                        Some(program)
+                    }
+                    Err(_) => None,
+                };
+            match program {
+                Some(program) => json_rows
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .filter_map(|hit| {
+                        let ret_val = crate::service::ingestion::apply_vrl_fn(
+                            &mut runtime,
+                            &VRLResultResolver {
+                                program: program.program.clone(),
+                                fields: program.fields.clone(),
+                            },
+                            &json::Value::Object(hit.clone()),
+                        );
+                        (!ret_val.is_null())
+                            .then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
+                    })
+                    .collect(),
+                None => json_rows
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .map(json::Value::Object)
+                    .collect(),
+            }
+        };
         // handle query type: json, metrics, table
         if query_type == "table" {
             (result.columns, sources) = handle_table_response(schema, sources);

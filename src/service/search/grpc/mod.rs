@@ -21,6 +21,11 @@ use ::datafusion::{
     error::DataFusionError,
 };
 use ahash::AHashMap as HashMap;
+use config::{
+    meta::stream::{FileKey, StreamType},
+    CONFIG,
+};
+use futures::future::try_join_all;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
@@ -28,10 +33,9 @@ use crate::{
     common::{
         infra::{
             cluster,
-            config::CONFIG,
             errors::{Error, ErrorCodes},
         },
-        meta::{common::FileKey, stream::ScanStats, StreamType},
+        meta::stream::ScanStats,
     },
     handler::grpc::cluster_rpc,
     service::db,
@@ -66,121 +70,75 @@ pub async fn search(
         ))));
     }
 
-    let mut results = HashMap::new();
-    let mut scan_stats = ScanStats::new();
-
-    // search in WAL json
+    // search in WAL parquet
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
-    let wal_span = info_span!("service:search:grpc:in_wal", session_id = ?session_id1, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let wal_parquet_span = info_span!("service:search:grpc:in_wal_parquet", session_id = ?session_id1, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search(&session_id1, sql1, stream_type, timeout).await
+                wal::search_parquet(&session_id1, sql1, stream_type, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
         }
-        .instrument(wal_span),
+        .instrument(wal_parquet_span),
+    );
+
+    // search in WAL memory
+    let session_id2 = session_id.clone();
+    let sql2 = sql.clone();
+    let wal_mem_span = info_span!("service:search:grpc:in_wal_memory", session_id = ?session_id2, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let task2 = tokio::task::spawn(
+        async move {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+                wal::search_memtable(&session_id2, sql2, stream_type, timeout).await
+            } else {
+                Ok((HashMap::new(), ScanStats::default()))
+            }
+        }
+        .instrument(wal_mem_span),
     );
 
     // search in object storage
     let req_stype = req.stype;
-    let session_id2 = session_id.clone();
-    let sql2 = sql.clone();
+    let session_id3 = session_id.clone();
+    let sql3 = sql.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-    let storage_span = info_span!("service:search:grpc:in_storage", session_id = ?session_id2, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
-    let task2 = tokio::task::spawn(
+    let storage_span = info_span!("service:search:grpc:in_storage", session_id = ?session_id3, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let task3 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
-                storage::search(&session_id2, sql2, &file_list, stream_type, timeout).await
+                storage::search(&session_id3, sql3, &file_list, stream_type, timeout).await
             }
         }
         .instrument(storage_span),
     );
 
-    // search in WAL arrow
-    let session_id3 = session_id.clone();
-    let sql3 = sql.clone();
-    let wal_span = info_span!("service:search:grpc:in_wal", org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
-    let task3 = tokio::task::spawn(
-        async move {
-            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_arrow(&session_id3, sql3, stream_type, timeout).await
-            } else {
-                Ok((HashMap::new(), ScanStats::default()))
-            }
-        }
-        .instrument(wal_span),
-    );
-
-    // merge data from local WAL
-    let (batches1, scan_stats1) = match task1.await {
-        Ok(result) => result?,
-        Err(err) => {
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                err.to_string(),
-            )));
-        }
-    };
-    if !batches1.is_empty() {
-        for (key, batch) in batches1 {
+    // merge result
+    let mut results = HashMap::new();
+    let mut scan_stats = ScanStats::new();
+    let tasks = try_join_all(vec![task1, task2, task3])
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for task in tasks {
+        let (batches, stats) =
+            task.map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+        scan_stats.add(&stats);
+        for (key, batch) in batches {
             if !batch.is_empty() {
                 let value = results.entry(key).or_insert_with(Vec::new);
-                value.push(batch);
+                value.extend(batch);
             }
         }
     }
-
-    scan_stats.add(&scan_stats1);
-
-    // merge data from object storage search
-    let (batches2, scan_stats2) = match task2.await {
-        Ok(result) => result?,
-        Err(err) => {
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                err.to_string(),
-            )));
-        }
-    };
-    if !batches2.is_empty() {
-        for (key, batch) in batches2 {
-            if !batch.is_empty() {
-                let value = results.entry(key).or_insert_with(Vec::new);
-                value.push(batch);
-            }
-        }
-    }
-
-    scan_stats.add(&scan_stats2);
-
-    // merge data from local WAL arrow
-    let (batches3, scan_stats3) = match task3.await {
-        Ok(result) => result?,
-        Err(err) => {
-            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                err.to_string(),
-            )));
-        }
-    };
-
-    if !batches3.is_empty() {
-        for (key, batch) in batches3 {
-            if !batch.is_empty() {
-                let value = results.entry(key).or_insert_with(Vec::new);
-                value.push(batch);
-            }
-        }
-    }
-
-    scan_stats.add(&scan_stats3);
 
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
     let mut merge_results = HashMap::new();
-    for (name, batches) in results.iter() {
+    for (name, batches) in results {
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
@@ -191,7 +149,7 @@ pub async fn search(
                 .clone()
         };
         let batches =
-            match super::datafusion::exec::merge(&sql.org_id, offset, limit, &merge_sql, batches)
+            match super::datafusion::exec::merge(&sql.org_id, offset, limit, &merge_sql, &batches)
                 .await
             {
                 Ok(res) => res,
@@ -202,13 +160,13 @@ pub async fn search(
             };
         merge_results.insert(name.to_string(), batches);
     }
-    drop(results);
 
     // clear session data
     datafusion::storage::file_list::clear(&session_id);
 
     // final result
     let mut hits_buf = Vec::new();
+    let mut hits_total = 0;
     let result_query = merge_results.get("query").cloned().unwrap_or_default();
     if !result_query.is_empty() && !result_query.is_empty() {
         let schema = result_query[0].schema();
@@ -219,7 +177,10 @@ pub async fn search(
         let mut writer =
             ipc::writer::FileWriter::try_new_with_options(hits_buf, &schema, ipc_options).unwrap();
         for batch in result_query {
-            writer.write(&batch).unwrap();
+            if batch.num_rows() > 0 {
+                hits_total += batch.num_rows();
+                writer.write(&batch).unwrap();
+            }
         }
         writer.finish().unwrap();
         hits_buf = writer.into_inner().unwrap();
@@ -256,7 +217,7 @@ pub async fn search(
         took: start.elapsed().as_millis() as i32,
         from: sql.meta.offset as i32,
         size: sql.meta.limit as i32,
-        total: 0,
+        total: hits_total as i64,
         hits: hits_buf,
         aggs: aggs_buf,
         scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),

@@ -39,12 +39,23 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[inline(always)]
-pub fn scan_files(root_dir: &str) -> Vec<String> {
+pub fn scan_files(root_dir: &str, ext: &str) -> Vec<String> {
     walkdir::WalkDir::new(root_dir)
         .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .map(|e| e.path().to_str().unwrap().to_string())
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_file() {
+                let path_ext = path.extension()?.to_str()?;
+                if path_ext == ext {
+                    Some(path.to_str().unwrap().to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
         .collect()
 }
 
@@ -97,7 +108,7 @@ mod tests {
         put_file_contents(file_name, content).unwrap();
         assert_eq!(get_file_contents(file_name).unwrap(), content);
         assert!(get_file_meta(file_name).unwrap().is_file());
-        assert!(!scan_files(".").is_empty());
+        assert!(!scan_files(".", "parquet").is_empty());
         std::fs::remove_file(file_name).unwrap();
     }
 }

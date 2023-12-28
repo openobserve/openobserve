@@ -19,18 +19,15 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
 use chrono::Duration;
+use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 
 use crate::{
     common::{
-        infra::{
-            config::{CONFIG, DISTINCT_FIELDS},
-            errors, metrics,
-        },
+        infra::{config::STREAM_SCHEMAS, errors},
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
             usage::{RequestStats, UsageType},
-            StreamType,
         },
         utils::{base64, functions, http::get_stream_type_from_request, json},
     },
@@ -173,6 +170,7 @@ pub async fn search(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
+            res.set_session_id(session_id);
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
             let req_stats = RequestStats {
@@ -674,7 +672,19 @@ async fn values_v1(
         timeout,
     };
 
+    // skip fields which arent part of the schema
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let schema = if let Some(schema) = STREAM_SCHEMAS.get(&key) {
+        schema.value().last().unwrap().clone()
+    } else {
+        arrow_schema::Schema::empty()
+    };
+
     for field in &fields {
+        // skip values for field which aren't part of the schema
+        if schema.field_with_name(field).is_err() {
+            continue;
+        }
         req.aggs.insert(
                 field.clone(),
                 format!(
