@@ -278,6 +278,8 @@ pub struct Common {
     pub bloom_filter_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
+    #[env_config(name = "ZO_BLOOM_FILTER_FORCE_DISABLED", default = false)]
+    pub bloom_filter_force_disabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]

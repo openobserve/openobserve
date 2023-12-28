@@ -76,8 +76,10 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "34", features = ["simd"] }
-datafusion-expr = "34"
+datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34", features = [
+  "simd",
+] }
+datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34" }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
@@ -217,8 +219,10 @@ bytes = "1.4"
 byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { version = "34", features = ["simd"] }
-datafusion-expr = "34"
+datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34", features = [
+  "simd",
+] }
+datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34" }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-json = "49"
 arrow-schema = { version = "49", features = ["serde"] }
