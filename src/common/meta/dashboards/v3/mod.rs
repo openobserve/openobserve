@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, FixedOffset, Utc};
+use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::common::meta::StreamType;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
