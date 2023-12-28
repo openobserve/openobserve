@@ -23,6 +23,7 @@ mod stream;
 mod wal;
 mod writer;
 
+use config::CONFIG;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use tokio::time;
@@ -37,8 +38,8 @@ pub async fn init() -> errors::Result<()> {
 
     // start a job to dump immutable data to disk
     tokio::task::spawn(async move {
-        // immutable persist every 10 seconds
-        let mut interval = time::interval(time::Duration::from_secs(10));
+        // immutable persist every 10 (default) seconds
+        let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.mem_persist_interval));
         interval.tick().await; // the first tick is immediate
         loop {
             if let Err(e) = immutable::persist().await {
