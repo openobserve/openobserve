@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class=""  :key="store.state.selectedOrganization.identifier">
-    <div style="position: sticky; top: 57px; z-index:50" :class="store.state.theme === 'light' ? 'bg-white' : 'dark-mode'">
+  <q-page :key="store.state.selectedOrganization.identifier">
+  <div ref="fullscreenDiv" :class="isFullscreen ? 'fullscreen' : ''">
+    <div :class="`${store.state.theme === 'light' ? 'bg-white' : 'dark-mode'} stickyHeader ${isFullscreen ? 'fullscreenHeader' : ''}`">
       <div class="flex justify-between items-center q-pa-xs" >
         <div class="flex">
           <q-btn
+            v-if="!isFullscreen"
             no-caps
             @click="goBackToDashboardList"
             padding="xs"
@@ -34,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex">
           <q-btn
+            v-if="!isFullscreen"
             outline
             padding="xs"
             no-caps
@@ -44,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tooltip>{{ t("panel.add") }}</q-tooltip>
           </q-btn>
           <q-btn
+            v-if="!isFullscreen"
             outline
             padding="xs"
             class="q-ml-sm"
@@ -78,9 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           </q-btn>
           <ExportDashboard
+            v-if="!isFullscreen"
             :dashboardId="currentDashboardData.data?.dashboardId"
           />
           <q-btn
+            v-if="!isFullscreen"
             class="q-ml-sm"
             outline
             padding="xs"
@@ -88,6 +94,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="share"
             title="share link"
             @click="shareLink"
+          ></q-btn>
+          <q-btn
+            class="q-ml-sm"
+            outline
+            padding="xs"
+            no-caps
+            :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+            :title="isFullscreen ? 'Exit Fullscreen' : 'Go Fullscreen'"
+            @click="toggleFullscreen"
           ></q-btn>
         </div>
       </div>
@@ -113,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <DashboardSettings @refresh="loadDashboard" />
     </q-dialog>
+  </div>
   </q-page>
 </template>
 
@@ -134,6 +150,8 @@ import ExportDashboard from "../../components/dashboards/ExportDashboard.vue";
 import DashboardSettings from "./DashboardSettings.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
+import { onMounted } from "vue";
+import { onUnmounted } from "vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -399,8 +417,49 @@ export default defineComponent({
         });
     };
 
+    // Fullscreen
+    const fullscreenDiv = ref(null);
+    const isFullscreen = ref(false);
+
+    const toggleFullscreen = () => {
+      if (!document.fullscreenElement) {
+        if (fullscreenDiv.value.requestFullscreen) {
+          fullscreenDiv.value.requestFullscreen();
+        }
+        isFullscreen.value = true;
+        document.body.style.overflow = 'hidden'; // Disable body scroll
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+        isFullscreen.value = false;
+        document.body.style.overflow = ''; // Enable body scroll
+      }
+    };
+
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        isFullscreen.value = false;
+      }
+    };
+
+    onMounted(() => {
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+    });
+
+    onActivated(() => {
+      isFullscreen.value = false;
+    });
+
     return {
       currentDashboardData,
+      toggleFullscreen,
+      fullscreenDiv,
+      isFullscreen,
       goBackToDashboardList,
       addPanelData,
       t,
@@ -442,5 +501,25 @@ export default defineComponent({
 
 .bg-white {
   background-color: $white;
+}
+
+.stickyHeader {
+  position: sticky; 
+  top: 57px; 
+  z-index:1001
+}
+.stickyHeader.fullscreenHeader {
+  top: 0px;
+}
+
+.fullscreen {
+    width: 100vw;
+    height: 100vh;
+    overflow-y: auto; /* Enables scrolling within the div */
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10000; /* Ensure it's on top */
+    /* Additional styling as needed */
 }
 </style>
