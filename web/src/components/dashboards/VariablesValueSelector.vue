@@ -102,7 +102,7 @@ import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vu
 
 export default defineComponent({
   name: "VariablesValueSelector",
-  props: ["selectedTimeDate", "variablesConfig", "initialVariableValues"],
+  props: ["selectedTimeDate", "variablesConfig", "initialVariableValues", "showDynamicFilters"],
   emits: ["variablesData"],
   components: {
     VariableQueryValueSelector,
@@ -149,11 +149,22 @@ export default defineComponent({
         return;
       }
 
+      const variablesConfigList = JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
+
+      if(props.showDynamicFilters) {
+        variablesConfigList.push({
+          name: "dynamic_filters",
+          label: "Dynamic Filters",
+          type: "dynamic_filters",
+          value: []
+        })
+      }
+
       // get old variable values
       let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
       if (!oldVariableValue.length) {
         const dynamicVariables =
-          props.variablesConfig?.list
+          variablesConfigList
             ?.filter((it: any) => it.type == "dynamic_filters")
             ?.map((it: any) => it.name) || [];
         oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map(
@@ -172,7 +183,7 @@ export default defineComponent({
       variablesData.values = [];
       variablesData.isVariablesLoading = false;
 
-      const promise = props.variablesConfig?.list?.map(
+      const promise = variablesConfigList?.map(
         (it: any, index: any) => {
           const obj: any = {
             name: it.name,

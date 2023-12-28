@@ -1,7 +1,7 @@
 <template>
     <div class="row items-center">
-        <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div>
-        <div class="row no-wrap items-center q-mb-sm" v-for="(item, index) in adhocVariables" :key="index">
+        <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+        <div class="row no-wrap items-center q-mb-xs" v-for="(item, index) in adhocVariables" :key="index">
             <q-select filled outlined dense :model-value="adhocVariables[index].name"
                 :display-value="adhocVariables[index].name ? adhocVariables[index].name : variableItem.isLoading ? '(No Data Found)' : ''"
                 :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label option-label="name"

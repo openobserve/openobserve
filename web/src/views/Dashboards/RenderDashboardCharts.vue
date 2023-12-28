@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
+      :showDynamicFilters="true"
       :selectedTimeDate="currentTimeObj"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
