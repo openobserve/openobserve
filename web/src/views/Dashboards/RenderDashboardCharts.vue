@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     {{ dashboardData.variables?.show_dynamic_filters }}
+    
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :show_dynamic_filters="dashboardData.variables?.show_dynamic_filters"
