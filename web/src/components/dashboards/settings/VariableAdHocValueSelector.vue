@@ -20,7 +20,7 @@
                 :options="operatorOptions" style="width: auto" class="operator" />
             <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense filled debounce="1000" style="width: 125px" class="" />
             <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" />
-            <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div>
+            <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>
         <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded icon="add" padding="xs"
             @click="addFields" />

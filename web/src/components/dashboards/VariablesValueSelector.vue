@@ -102,7 +102,12 @@ import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vu
 
 export default defineComponent({
   name: "VariablesValueSelector",
-  props: ["selectedTimeDate", "variablesConfig", "initialVariableValues", "showDynamicFilters"],
+  props: [
+    "selectedTimeDate",
+    "variablesConfig",
+    "initialVariableValues",
+    "show_dynamic_filters",
+  ],
   emits: ["variablesData"],
   components: {
     VariableQueryValueSelector,
@@ -149,15 +154,16 @@ export default defineComponent({
         return;
       }
 
-      const variablesConfigList = JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
+      const variablesConfigList =
+        JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
 
-      if(props.showDynamicFilters) {
+      if (props.show_dynamic_filters) {
         variablesConfigList.push({
           name: "dynamic_filters",
           label: "Dynamic Filters",
           type: "dynamic_filters",
-          value: []
-        })
+          value: [],
+        });
       }
 
       // get old variable values

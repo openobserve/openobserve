@@ -171,13 +171,18 @@ export default defineComponent({
             // a string.
             dashboardId: "",
             description: obj.description,
+            variables: {
+              list: [],
+              show_dynamic_filters: true,
+            },
             role: "",
             owner: store.state.userInfo.name,
             created: new Date().toISOString(),
             panels: [],
             version: 2,
           };
-
+          console.log("baseObj", baseObj);
+          
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
             baseObj,
@@ -210,7 +215,8 @@ export default defineComponent({
           });
       });
     });
-
+    console.log("dashboardData", dashboardData);
+    
     return {
       t,
       disableColor,

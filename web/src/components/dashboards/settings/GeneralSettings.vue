@@ -43,6 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
         />
+        <q-toggle
+          v-model="dashboardData.variables.show_dynamic_filters"
+          label="Show Dynamic Filters"
+        ></q-toggle>
         <div class="flex justify-center q-mt-lg">
           <q-btn
             ref="closeBtn"
@@ -98,7 +102,11 @@ export default defineComponent({
     const dashboardData = reactive({
       title: "",
       description: "",
+      variables: { show_dynamic_filters: true },
     });
+
+    console.log("dashboardData", dashboardData);
+    
 
     const getDashboardData = async () => {
       const data = await getDashboard(
@@ -106,8 +114,11 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
+      console.log("data",data);
+      
       dashboardData.title = data.title;
       dashboardData.description = data.description;
+      dashboardData.variables.show_dynamic_filters = data.variables.show_dynamic_filters;
     };
     onMounted(async () => {
       await getDashboardData();
@@ -128,6 +139,8 @@ export default defineComponent({
       // update the values
       data.title = dashboardData.title;
       data.description = dashboardData.description;
+      data.variables.show_dynamic_filters =
+        dashboardData.variables.show_dynamic_filters;
 
       // now lets save it
       await updateDashboard(
@@ -162,6 +175,7 @@ export default defineComponent({
         });
       });
     };
+console.log("dashboardData", dashboardData);
 
     return {
       t,
