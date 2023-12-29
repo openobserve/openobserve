@@ -93,6 +93,7 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
 glob = "0.3"
+hashbrown = { version = "0.14.3", features = ["serde"] }
 hashlink = "0.8.4"
 hex = "0.4"
 http-auth-basic = "0.3"
@@ -209,25 +210,17 @@ actix-web-prometheus = { version = "0.1", features = ["process"] }
 anyhow = "1.0"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
-async-recursion = "1.0"
-awc = "3.2"
 aws-config = "0.56.1"
 aws-sdk-dynamodb = "0.30.0"
 base64 = "0.21"
-blake3 = { version = "1.4", features = ["rayon"] }
 bytes = "1.4"
 byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34", features = [
-  "simd",
-] }
-datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34" }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-json = "49"
 arrow-schema = { version = "49", features = ["serde"] }
 parquet = { version = "49", features = ["arrow", "async"] }
-object_store = { version = "0.8", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1.7"
 dotenvy = "0.15"
 faststr = "0.2"
@@ -253,19 +246,9 @@ rs-snowflake = "0.6"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-simd-json = "0.13"
 sha256 = "1.4.0"
-sled = "0.34"
 snafu = "0.7.5"
 snap = "1"
-sqlparser = { version = "0.40", features = ["serde", "visitor"] }
-sqlx = { version = "0.7", features = [
-  "runtime-tokio-rustls",
-  "postgres",
-  "mysql",
-  "sqlite",
-  "chrono",
-] }
 sysinfo = "0.29"
 tempfile = "3"
 thiserror = "1.0"

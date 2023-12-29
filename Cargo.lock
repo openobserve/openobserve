@@ -4809,6 +4809,7 @@ dependencies = [
  "get_if_addrs",
  "getrandom",
  "glob",
+ "hashbrown 0.14.3",
  "hashlink",
  "hex",
  "http-auth-basic",

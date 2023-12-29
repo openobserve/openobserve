@@ -42,7 +42,7 @@ use crate::{
             traces::{Event, Span, SpanRefType},
             usage::UsageType,
         },
-        utils::{self, flatten, json},
+        utils::{flatten, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,
@@ -259,16 +259,16 @@ pub async fn handle_trace_request(
                 }
                 // End row based transform */
                 // get json object
-                let val_map = value.as_object_mut().unwrap();
+                let record_val = value.as_object_mut().unwrap();
 
-                val_map.insert(
+                record_val.insert(
                     CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {
-                    if let Some(val) = val_map.get(field) {
+                    if let Some(val) = record_val.get(field) {
                         if !val.is_null() {
                             let (filter_name, filter_value) = if field == "operation_name" {
                                 ("service_name".to_string(), service_name.clone())
@@ -287,17 +287,14 @@ pub async fn handle_trace_request(
                     }
                 }
 
-                let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
-
                 // check schema
                 let _ = check_for_schema(
                     org_id,
                     traces_stream_name,
                     StreamType::Traces,
-                    &value_str,
                     &mut traces_schema_map,
+                    &json::Value::Object(record_val.clone()),
                     timestamp.try_into().unwrap(),
-                    true,
                 )
                 .await;
 
@@ -308,7 +305,7 @@ pub async fn handle_trace_request(
                         let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
                             Vec::new();
                         for alert in alerts {
-                            if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                            if let Ok(Some(v)) = alert.evaluate(Some(record_val)).await {
                                 trigger_alerts.push((alert.clone(), v));
                             }
                         }
@@ -328,7 +325,7 @@ pub async fn handle_trace_request(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
                     partition_time_level,
-                    val_map,
+                    record_val,
                     Some(&schema_key),
                 );
 
@@ -343,10 +340,11 @@ pub async fn handle_trace_request(
                     records: vec![],
                     records_size: 0,
                 });
-                let loc_value: utils::json::Value =
-                    utils::json::from_slice(value_str.as_bytes()).unwrap();
-                hour_buf.records.push(Arc::new(loc_value));
-                hour_buf.records_size += value_str.len();
+                let record_val = record_val.to_owned();
+                let record_val = json::Value::Object(record_val);
+                let record_size = json::to_vec(&record_val).unwrap_or_default().len();
+                hour_buf.records.push(Arc::new(record_val));
+                hour_buf.records_size += record_size;
 
                 if timestamp < min_ts.try_into().unwrap() {
                     partial_success.rejected_spans += 1;
@@ -361,7 +359,6 @@ pub async fn handle_trace_request(
         data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
-        None,
     )
     .await;
     let time = start.elapsed().as_secs_f64();

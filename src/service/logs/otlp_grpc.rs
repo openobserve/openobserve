@@ -45,7 +45,7 @@ use crate::{
             grpc::{get_val, get_val_with_type_retained},
             write_file, TriggerAlertData,
         },
-        schema::stream_schema_exists,
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -77,7 +77,7 @@ pub async fn usage_ingest(
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
-    let mut min_ts =
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -122,21 +122,17 @@ pub async fn usage_ingest(
             None => Utc::now().timestamp_micros(),
         };
         // check ingestion time
-        let earlest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earlest_time.timestamp_micros() {
-            stream_status.status.failed += 1; // to old data, just discard
-            stream_status.status.error = super::get_upto_discard_error();
-            continue;
-        }
         if timestamp < min_ts {
-            min_ts = timestamp;
+            stream_status.status.failed += 1; // to old data, just discard
+            stream_status.status.error = get_upto_discard_error().to_string();
+            continue;
         }
         local_val.insert(
             CONFIG.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
 
-        let local_trigger = super::add_valid_record_arrow(
+        let local_trigger = match super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -150,7 +146,15 @@ pub async fn usage_ingest(
             local_val,
             trigger.is_none(),
         )
-        .await;
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                continue;
+            }
+        };
         if local_trigger.is_some() {
             trigger = local_trigger;
         }
@@ -177,7 +181,6 @@ pub async fn usage_ingest(
         buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),
-        None,
     )
     .await;
 
@@ -332,7 +335,7 @@ pub async fn handle_grpc_request(
 
                 if ts < earlest_time.timestamp_micros().try_into().unwrap() {
                     stream_status.status.failed += 1; // to old data, just discard
-                    stream_status.status.error = super::get_upto_discard_error();
+                    stream_status.status.error = get_upto_discard_error().to_string();
                     continue;
                 }
 
@@ -387,7 +390,7 @@ pub async fn handle_grpc_request(
                 // get json object
                 let local_val = rec.as_object_mut().unwrap();
 
-                let local_trigger = super::add_valid_record_arrow(
+                let local_trigger = match super::add_valid_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
@@ -401,7 +404,15 @@ pub async fn handle_grpc_request(
                     local_val,
                     trigger.is_none(),
                 )
-                .await;
+                .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
+                    }
+                };
                 if local_trigger.is_some() {
                     trigger = local_trigger;
                 }
@@ -430,7 +441,6 @@ pub async fn handle_grpc_request(
         data_buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),
-        None,
     )
     .await;
 

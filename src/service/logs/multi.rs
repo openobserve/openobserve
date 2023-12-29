@@ -35,6 +35,7 @@ use crate::{
         distinct_values, get_formatted_stream_name,
         ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
         logs::StreamMeta,
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };
@@ -77,7 +78,7 @@ async fn ingest_inner(
     }
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let mut min_ts =
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
@@ -157,14 +158,10 @@ async fn ingest_inner(
             None => Utc::now().timestamp_micros(),
         };
         // check ingestion time
-        let earliest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
-        if timestamp < earliest_time.timestamp_micros() {
-            stream_status.status.failed += 1; // to old data, just discard
-            stream_status.status.error = super::get_upto_discard_error();
-            continue;
-        }
         if timestamp < min_ts {
-            min_ts = timestamp;
+            stream_status.status.failed += 1; // to old data, just discard
+            stream_status.status.error = get_upto_discard_error().to_string();
+            continue;
         }
         local_val.insert(
             CONFIG.common.column_timestamp.clone(),
@@ -172,7 +169,7 @@ async fn ingest_inner(
         );
 
         // write data
-        let local_trigger = super::add_valid_record_arrow(
+        let local_trigger = match super::add_valid_record(
             &StreamMeta {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
@@ -186,7 +183,15 @@ async fn ingest_inner(
             local_val,
             trigger.is_none(),
         )
-        .await;
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                continue;
+            }
+        };
         if local_trigger.is_some() {
             trigger = local_trigger;
         }
@@ -209,7 +214,7 @@ async fn ingest_inner(
     }
 
     // write to file
-    let mut req_stats = write_file(buf, thread_id, &stream_params, partition_time_level).await;
+    let mut req_stats = write_file(buf, thread_id, &stream_params).await;
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;

@@ -45,9 +45,8 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{
-            chk_schema_by_record, evaluate_trigger,
-            otlp_json::{get_float_value, get_int_value, get_string_value, get_val_for_attr},
-            write_file, TriggerAlertData,
+            chk_schema_by_record, evaluate_trigger, get_float_value, get_int_value,
+            get_string_value, get_val_for_attr, write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
         schema::{set_schema_metadata, stream_schema_exists},
@@ -455,18 +454,11 @@ pub async fn metrics_json_handler(
             continue;
         }
 
-        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
-            details.partition_time_level
-        } else {
-            Some(CONFIG.limit.metrics_file_retention.as_str().into())
-        };
-
         // write to file
         let mut req_stats = write_file(
             stream_data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-            time_level,
         )
         .await;
 

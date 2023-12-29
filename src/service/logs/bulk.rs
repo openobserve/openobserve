@@ -40,7 +40,7 @@ use crate::{
     service::{
         db, distinct_values,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        schema::stream_schema_exists,
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -70,7 +70,7 @@ pub async fn ingest(
         items: vec![],
     };
 
-    let mut min_ts =
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -222,10 +222,9 @@ pub async fn ingest(
                 None => Utc::now().timestamp_micros(),
             };
             // check ingestion time
-            let earliest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
-            if timestamp < earliest_time.timestamp_micros() {
+            if timestamp < min_ts {
                 bulk_res.errors = true;
-                let failure_reason = Some(super::get_upto_discard_error());
+                let failure_reason = Some(get_upto_discard_error().to_string());
                 add_record_status(
                     stream_name.clone(),
                     doc_id.clone(),
@@ -236,9 +235,6 @@ pub async fn ingest(
                     failure_reason,
                 );
                 continue;
-            }
-            if timestamp < min_ts {
-                min_ts = timestamp;
             }
             local_val.insert(
                 CONFIG.common.column_timestamp.clone(),
@@ -257,7 +253,7 @@ pub async fn ingest(
             let mut status = RecordStatus::default();
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
 
-            let local_trigger = super::add_valid_record_arrow(
+            let local_trigger = match super::add_valid_record(
                 &StreamMeta {
                     org_id: org_id.to_string(),
                     stream_name: stream_name.clone(),
@@ -271,7 +267,23 @@ pub async fn ingest(
                 local_val,
                 need_trigger,
             )
-            .await;
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    bulk_res.errors = true;
+                    add_record_status(
+                        stream_name.clone(),
+                        doc_id.clone(),
+                        action.clone(),
+                        value,
+                        &mut bulk_res,
+                        Some(TS_PARSE_FAILED.to_string()),
+                        Some(e.to_string()),
+                    );
+                    continue;
+                }
+            };
             if local_trigger.is_some() {
                 stream_trigger_map.insert(stream_name.clone(), local_trigger);
             }
@@ -330,7 +342,6 @@ pub async fn ingest(
             stream_data.data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Logs),
-            None,
         )
         .await;
         req_stats.response_time += time;
