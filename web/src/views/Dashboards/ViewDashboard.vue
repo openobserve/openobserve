@@ -18,117 +18,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-  <div ref="fullscreenDiv" :class="isFullscreen ? 'fullscreen' : ''">
-    <div :class="`${store.state.theme === 'light' ? 'bg-white' : 'dark-mode'} stickyHeader ${isFullscreen ? 'fullscreenHeader' : ''}`">
-      <div class="flex justify-between items-center q-pa-xs" >
-        <div class="flex">
-          <q-btn
-            v-if="!isFullscreen"
-            no-caps
-            @click="goBackToDashboardList"
-            padding="xs"
-            outline
-            icon="arrow_back_ios_new"
-          />
-          <span class="q-table__title q-mx-md q-mt-xs">{{
-            currentDashboardData.data.title
-          }}</span>
-        </div>
-        <div class="flex">
-          <q-btn
-            v-if="!isFullscreen"
-            outline
-            padding="xs"
-            no-caps
-            icon="add"
-            @click="addPanelData"
-            data-test="dashboard-panel-add"
-          >
-            <q-tooltip>{{ t("panel.add") }}</q-tooltip>
-          </q-btn>
-          <q-btn
-            v-if="!isFullscreen"
-            outline
-            padding="xs"
-            class="q-ml-sm"
-            no-caps
-            icon="settings"
-            @click="openSettingsDialog"
-          >
-            <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
-          </q-btn>
-          <!-- <DateTimePicker 
+    <div ref="fullscreenDiv" :class="isFullscreen ? 'fullscreen' : ''">
+      <div
+        :class="`${
+          store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
+        } stickyHeader ${isFullscreen ? 'fullscreenHeader' : ''}`"
+      >
+        <div class="flex justify-between items-center q-pa-xs">
+          <div class="flex">
+            <q-btn
+              v-if="!isFullscreen"
+              no-caps
+              @click="goBackToDashboardList"
+              padding="xs"
+              outline
+              icon="arrow_back_ios_new"
+            />
+            <span class="q-table__title q-mx-md q-mt-xs">{{
+              currentDashboardData.data.title
+            }}</span>
+          </div>
+          <div class="flex">
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              padding="xs"
+              no-caps
+              icon="add"
+              @click="addPanelData"
+              data-test="dashboard-panel-add"
+            >
+              <q-tooltip>{{ t("panel.add") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              padding="xs"
+              class="q-ml-sm"
+              no-caps
+              icon="settings"
+              @click="openSettingsDialog"
+            >
+              <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
+            </q-btn>
+            <!-- <DateTimePicker 
             class="q-ml-sm"
             ref="refDateTime"
             v-model="selectedDate"
           /> -->
-          <DateTimePickerDashboard
-            ref="dateTimePicker"
-            class="q-ml-sm"
-            v-model="selectedDate"
-          />
-          <AutoRefreshInterval
-            v-model="refreshInterval"
-            trigger
-            @trigger="refreshData"
-          />
-          <q-btn
-            class="q-ml-sm"
-            outline
-            padding="xs"
-            no-caps
-            icon="refresh"
-            @click="refreshData"
-          >
-          </q-btn>
-          <ExportDashboard
-            v-if="!isFullscreen"
-            :dashboardId="currentDashboardData.data?.dashboardId"
-          />
-          <q-btn
-            v-if="!isFullscreen"
-            class="q-ml-sm"
-            outline
-            padding="xs"
-            no-caps
-            icon="share"
-            title="share link"
-            @click="shareLink"
-          ></q-btn>
-          <q-btn
-            class="q-ml-sm"
-            outline
-            padding="xs"
-            no-caps
-            :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-            :title="isFullscreen ? 'Exit Fullscreen' : 'Go Fullscreen'"
-            @click="toggleFullscreen"
-          ></q-btn>
+            <DateTimePickerDashboard
+              ref="dateTimePicker"
+              class="q-ml-sm"
+              v-model="selectedDate"
+            />
+            <AutoRefreshInterval
+              v-model="refreshInterval"
+              trigger
+              @trigger="refreshData"
+            />
+            <q-btn
+              class="q-ml-sm"
+              outline
+              padding="xs"
+              no-caps
+              icon="refresh"
+              @click="refreshData"
+            >
+            </q-btn>
+            <ExportDashboard
+              v-if="!isFullscreen"
+              :dashboardId="currentDashboardData.data?.dashboardId"
+            />
+            <q-btn
+              v-if="!isFullscreen"
+              class="q-ml-sm"
+              outline
+              padding="xs"
+              no-caps
+              icon="share"
+              title="share link"
+              @click="shareLink"
+            ></q-btn>
+            <q-btn
+              class="q-ml-sm"
+              outline
+              padding="xs"
+              no-caps
+              :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+              :title="isFullscreen ? 'Exit Fullscreen' : 'Go Fullscreen'"
+              @click="toggleFullscreen"
+            ></q-btn>
+          </div>
         </div>
+        <q-separator></q-separator>
       </div>
-      <q-separator ></q-separator>
+
+      <RenderDashboardCharts
+        @variablesData="variablesDataUpdated"
+        :initialVariableValues="initialVariableValues"
+        :viewOnly="false"
+        :dashboardData="currentDashboardData.data"
+        :currentTimeObj="currentTimeObj"
+        :selectedDateForViewPanel="selectedDate"
+        @onDeletePanel="onDeletePanel"
+        @updated:data-zoom="onDataZoom"
+      />
+
+      <q-dialog
+        v-model="showDashboardSettingsDialog"
+        position="right"
+        full-height
+        maximized
+      >
+        <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
     </div>
-
-    <RenderDashboardCharts
-      @variablesData="variablesDataUpdated"
-      :initialVariableValues="initialVariableValues"
-      :viewOnly="false"
-      :dashboardData="currentDashboardData.data"
-      :currentTimeObj="currentTimeObj"
-      :selectedDateForViewPanel="selectedDate"
-      @onDeletePanel="onDeletePanel"
-      @updated:data-zoom="onDataZoom"
-    />
-
-    <q-dialog
-      v-model="showDashboardSettingsDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <DashboardSettings @refresh="loadDashboard" />
-    </q-dialog>
-  </div>
   </q-page>
 </template>
 
@@ -427,13 +431,13 @@ export default defineComponent({
           fullscreenDiv.value.requestFullscreen();
         }
         isFullscreen.value = true;
-        document.body.style.overflow = 'hidden'; // Disable body scroll
+        document.body.style.overflow = "hidden"; // Disable body scroll
       } else {
         if (document.exitFullscreen) {
           document.exitFullscreen();
         }
         isFullscreen.value = false;
-        document.body.style.overflow = ''; // Enable body scroll
+        document.body.style.overflow = ""; // Enable body scroll
       }
     };
 
@@ -444,11 +448,11 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      document.addEventListener('fullscreenchange', onFullscreenChange);
+      document.addEventListener("fullscreenchange", onFullscreenChange);
     });
 
     onUnmounted(() => {
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
     });
 
     onActivated(() => {
@@ -504,22 +508,22 @@ export default defineComponent({
 }
 
 .stickyHeader {
-  position: sticky; 
-  top: 57px; 
-  z-index:1001
+  position: sticky;
+  top: 57px;
+  z-index: 1001;
 }
 .stickyHeader.fullscreenHeader {
   top: 0px;
 }
 
 .fullscreen {
-    width: 100vw;
-    height: 100vh;
-    overflow-y: auto; /* Enables scrolling within the div */
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 10000; /* Ensure it's on top */
-    /* Additional styling as needed */
+  width: 100vw;
+  height: 100vh;
+  overflow-y: auto; /* Enables scrolling within the div */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000; /* Ensure it's on top */
+  /* Additional styling as needed */
 }
 </style>
