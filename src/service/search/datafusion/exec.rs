@@ -126,6 +126,7 @@ pub async fn sql(
         )
         .await?,
     );
+    let mut spend_time = start.elapsed().as_secs_f64();
 
     // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
@@ -182,10 +183,13 @@ pub async fn sql(
         }
         let batches = df.collect().await?;
         result.insert(format!("agg_{name}"), batches);
+
+        let q_time = start.elapsed().as_secs_f64();
         log::info!(
             "[session_id {session_id}] Query agg:{name} took {:.3} seconds.",
-            start.elapsed().as_secs_f64()
+            q_time - spend_time
         );
+        spend_time = q_time;
     }
 
     // drop table
