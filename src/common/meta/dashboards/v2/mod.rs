@@ -35,6 +35,7 @@ pub struct Dashboard {
     pub created: DateTime<FixedOffset>,
     #[serde(default)]
     pub panels: Vec<Panel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
 }
 
