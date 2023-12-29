@@ -172,7 +172,7 @@ pub struct QueryConfig {
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
-    show_dynamic_filters: bool,
+    pub show_dynamic_filters: bool,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
