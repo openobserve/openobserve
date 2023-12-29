@@ -7,7 +7,7 @@
  * @param {string} customUnit - (optional) A custom unit of measurement.
  * @return {object} An object containing the converted value and unit.
  */
-export const getUnitValue = (value: any, unit: string, customUnit: string) => {
+export const getUnitValue = (value: any, unit: string, customUnit: string, decimals: number = 2) => {
     switch (unit) {
       case "bytes": {
         const units: any = [
@@ -22,14 +22,14 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           const unitValue: any = value ? value / unitInfo.divisor : 0;
           if (unitValue < 1024) {
             return {
-              value: `${parseFloat(unitValue).toFixed(2)}`,
+              value: `${parseFloat(unitValue).toFixed(decimals)}`,
               unit: unitInfo.unit,
             };
           }
         }
         const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(val).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(decimals)}`,
           unit: "PB",
         };
       }
@@ -55,7 +55,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           const unitValue = value / unitInfo.divisor;
           if (unitValue >= 1) {
             return {
-              value: parseFloat(unitValue.toFixed(2)),
+              value: parseFloat(unitValue.toFixed(decimals)),
               unit: unitInfo.unit,
             };
           }
@@ -63,7 +63,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
 
         // If the value is too small to fit in any unit, return in microseconds
         return {
-          value: parseFloat((value / units[0].divisor).toFixed(2)),
+          value: parseFloat((value / units[0].divisor).toFixed(decimals)),
           unit: units[0].unit,
         };
       }
@@ -84,7 +84,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           const unitValue = value / unitInfo.divisor;
           if (unitValue >= 1) {
             return {
-              value: parseFloat(unitValue.toFixed(2)),
+              value: parseFloat(unitValue.toFixed(decimals)),
               unit: unitInfo.unit,
             };
           }
@@ -92,7 +92,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
 
         // If the value is too small to fit in any unit, return in microseconds
         return {
-          value: parseFloat((value / units[0].divisor).toFixed(2)),
+          value: parseFloat((value / units[0].divisor).toFixed(decimals)),
           unit: units[0].unit,
         };
       }
@@ -113,7 +113,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           const unitValue = value / unitInfo.divisor;
           if (unitValue >= 1) {
             return {
-              value: parseFloat(unitValue.toFixed(2)),
+              value: parseFloat(unitValue.toFixed(decimals)),
               unit: unitInfo.unit,
             };
           }
@@ -121,7 +121,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
 
         // If the value is too small to fit in any unit, return in microseconds
         return {
-          value: parseFloat((value / units[0].divisor).toFixed(2)),
+          value: parseFloat((value / units[0].divisor).toFixed(decimals)),
           unit: units[0].unit,
         };
       }
@@ -130,27 +130,27 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         for (let unit of units) {
           if (value < 1024) {
             return {
-              value: `${parseFloat(value).toFixed(2)}`,
+              value: `${parseFloat(value).toFixed(decimals)}`,
               unit: `${unit}/s`,
             };
           }
           value /= 1024;
         }
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(value).toFixed(decimals)}`,
           unit: "PB/s",
         };
       }
       case "percent-1": {
         return {
-          value: `${(parseFloat(value) * 100).toFixed(2)}`,
+          value: `${(parseFloat(value) * 100).toFixed(decimals)}`,
           unit: "%",
         };
         // `${parseFloat(value) * 100}`;
       }
       case "percent": {
         return {
-          value: `${parseFloat(value).toFixed(2)}`,
+          value: `${parseFloat(value).toFixed(decimals)}`,
           unit: "%",
         };
         // ${parseFloat(value)}`;
@@ -169,14 +169,14 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           
           if (unitValue < 1024) {
             return {
-              value: `${parseFloat(unitValue).toFixed(2)}`,
+              value: `${parseFloat(unitValue).toFixed(decimals)}`,
               unit: unitInfo.unit,
             };
           }
         }
         const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(val).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(decimals)}`,
           unit: "PB",
         };
       }
@@ -193,14 +193,14 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
           const unitValue: any = value ? value / (unitInfo.divisor) : 0;
           if (unitValue < 1024) {
             return {
-              value: `${parseFloat(unitValue).toFixed(2)}`,
+              value: `${parseFloat(unitValue).toFixed(decimals)}`,
               unit: unitInfo.unit,
             };
           }
         }
         const val: any = value ? value / units[units.length - 1].divisor : 0
         return {
-          value: `${parseFloat(val).toFixed(2)}`,
+          value: `${parseFloat(val).toFixed(decimals)}`,
           unit: "PB",
         };
       }
@@ -210,7 +210,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
             ? value
             : Number.isInteger(value)
             ? value
-            : value.toFixed(2),
+            : value.toFixed(decimals),
           unit: "",
         };
       }
@@ -218,9 +218,7 @@ export const getUnitValue = (value: any, unit: string, customUnit: string) => {
         return {
           value: isNaN(value)
             ? value
-            : Number.isInteger(value)
-            ? value
-            : typeof value === "string" ? value : value.toFixed(2),
+            : typeof value === "string" ? value : value.toFixed(decimals),
           unit: "",
         };
       }

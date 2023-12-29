@@ -153,7 +153,8 @@ export const convertPromQLData = (
               getUnitValue(
                 it.data[1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )} </strong>`;
           // else normal text
@@ -162,7 +163,8 @@ export const convertPromQLData = (
               getUnitValue(
                 it.data[1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )}`;
         });
@@ -174,6 +176,7 @@ export const convertPromQLData = (
         type: "cross",
         label: {
           fontSize: 12,
+          precision: panelSchema.config?.decimals,
           show: true,
           formatter: function (name: any) {
             if (name.axisDimension == "y")
@@ -181,7 +184,8 @@ export const convertPromQLData = (
                 getUnitValue(
                   name.value,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               );
             const date = new Date(name.value);
@@ -204,7 +208,8 @@ export const convertPromQLData = (
             getUnitValue(
               name,
               panelSchema.config?.unit,
-              panelSchema.config?.unit_custom
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
             )
           );
         },
@@ -288,7 +293,7 @@ export const convertPromQLData = (
                   store.state.timezone != "UTC"
                     ? utcToZonedTime(value[0] * 1000, store.state.timezone)
                     : new Date(value[0] * 1000).toISOString().slice(0, -1),
-                  value[1],
+                  parseFloat(value[1]).toFixed(panelSchema?.config?.decimals),
                 ]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
@@ -381,13 +386,16 @@ export const convertPromQLData = (
                   panelSchema.queries[index].config.promql_legend
                 ),
                 // taking first value for gauge
-                value: parseFloat(values[0][1]).toFixed(2),
+                value: parseFloat(values[0][1]).toFixed(
+                  panelSchema.config?.decimals
+                ),
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
                       value,
                       panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals
                     );
                     return unitValue.value + unitValue.unit;
                   },
@@ -440,7 +448,8 @@ export const convertPromQLData = (
               const unitValue = getUnitValue(
                 values[values.length - 1][1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               );
               return {
                 ...getPropsByChartTypeForSeries(panelSchema.type),
@@ -449,7 +458,9 @@ export const convertPromQLData = (
                     type: "text",
                     style: {
                       text:
-                        parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
+                        parseFloat(unitValue.value).toFixed(
+                          panelSchema.config.decimals ?? 2
+                        ) + unitValue.unit,
                       fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",

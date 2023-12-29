@@ -99,12 +99,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-input
+      type="number"
       v-model.number="dashboardPanelData.data.config.decimals"
-      :value="2"
+      value="2"
+      min="0"
+      max="100"
       @update:model-value="
-        (value: any) => (dashboardPanelData.data.config.decimals = value >= 0 ? value : 2)
+        (value: any) => (dashboardPanelData.data.config.decimals = ( typeof value == 'number' && value >= 0) ? value : 2)
       "
-      label="decimals"
+      :rules="[
+        (val) =>
+          (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
+      ]"
+      label="Decimals"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
@@ -363,7 +370,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       dense
       label-slot
-      placeholder="0"
       :type="'number'"
     >
       <template v-slot:label>
