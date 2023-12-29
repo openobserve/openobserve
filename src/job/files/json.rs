@@ -36,6 +36,7 @@ use tokio::{sync::Semaphore, task, time};
 use crate::{
     common::{
         infra::{cluster, storage, wal},
+        meta::stream::StreamParams,
         utils::{file::scan_files, json, stream::populate_file_meta},
     },
     service::{
@@ -84,8 +85,9 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-        // 7099303408192061440f3XQ2p.json eg: files/default/traces/default/0/
-        // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // 7099303408192061440f3XQ2p.json
+        // eg: files/default/traces/default/0/023/09/04/05/default/
+        // service_name=ingester/7104328279989026816guOA4t.json
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type = StreamType::from(columns[2]);
@@ -98,15 +100,15 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
 
         // check the file is using for write
-        // if wal::check_in_use(
-        //     StreamParams::new(&org_id, &stream_name, stream_type),
-        //     &file_name,
-        // )
-        // .await
-        // {
-        //     // println!("file is using for write, skip, {}", file_name);
-        //     continue;
-        // }
+        if wal::check_in_use(
+            StreamParams::new(&org_id, &stream_name, stream_type),
+            &file_name,
+        )
+        .await
+        {
+            // println!("file is using for write, skip, {}", file_name);
+            continue;
+        }
         // log::info!("[JOB] convert json file: {}", file);
 
         // check if we are allowed to ingest or just delete the file

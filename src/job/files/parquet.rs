@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs, io::Read, path::Path};
+use std::{fs, io::Read, path::Path, sync::Arc};
 
 use config::{
     meta::stream::{FileMeta, StreamType},
@@ -21,6 +21,7 @@ use config::{
     utils::parquet::read_metadata,
     CONFIG,
 };
+use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
@@ -28,7 +29,7 @@ use crate::{
         infra::{cluster, storage, wal},
         utils::file::scan_files,
     },
-    service::{db, usage::report_compression_stats},
+    service::{db, schema::schema_evolution, usage::report_compression_stats},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -71,8 +72,9 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-        // 7099303408192061440f3XQ2p.json eg: files/default/traces/default/0/
-        // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // 7099303408192061440f3XQ2p.parquet
+        // eg: files/default/traces/default/0/2023/09/04/05/default/
+        // service_name=ingester/7104328279989026816guOA4t.parquet
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type = StreamType::from(columns[2]);
@@ -83,18 +85,6 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         if !file_name.contains('/') && file_name.contains('_') {
             file_name = file_name.replace('_', "/");
         }
-
-        // check the file is using for write
-        // if wal::check_in_use(
-        //     StreamParams::new(&org_id, &stream_name, stream_type),
-        //     &file_name,
-        // )
-        // .await
-        // {
-        //     // println!("file is using for write, skip, {}", file_name);
-        //     continue;
-        // }
-        // log::info!("[JOB] convert parquet file: {}", file);
 
         // check if we are allowed to ingest or just delete the file
         if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
@@ -218,15 +208,23 @@ async fn upload_file(
     let mut file_meta = read_metadata(&buf_parquet).await?;
     file_meta.compressed_size = file_size as i64;
 
-    // TODO ?
-    // schema_evolution(
-    //     org_id,
-    //     stream_name,
-    //     stream_type,
-    //     arrow_schema,
-    //     file_meta.min_ts,
-    // )
-    // .await;
+    // read schema
+    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    let inferred_schema = arrow_reader
+        .schema()
+        .as_ref()
+        .clone()
+        .with_metadata(std::collections::HashMap::new());
+
+    schema_evolution(
+        org_id,
+        stream_name,
+        stream_type,
+        Arc::new(inferred_schema),
+        file_meta.min_ts,
+    )
+    .await;
 
     let new_file_name =
         super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
