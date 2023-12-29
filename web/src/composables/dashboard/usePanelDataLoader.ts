@@ -574,13 +574,13 @@ export const usePanelDataLoader = (
 
   // [START] Variables functions
   const areDynamicVariablesStillLoading = () =>
-    variablesData.value?.values.some(
+    variablesData.value?.values?.some(
       (it: any) => it.type === "dynamic_filters" && it.isLoading
     );
 
   const areDependentVariablesStillLoadingWith = (
     newDependentVariablesData: any
-  ) => newDependentVariablesData.some((it: any) => it.isLoading);
+  ) => newDependentVariablesData?.some((it: any) => it.isLoading);
 
   const getDependentVariablesData = () =>
     variablesData.value?.values
