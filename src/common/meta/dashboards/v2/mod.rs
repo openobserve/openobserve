@@ -172,7 +172,8 @@ pub struct QueryConfig {
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
-    pub show_dynamic_filters: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub show_dynamic_filters: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
