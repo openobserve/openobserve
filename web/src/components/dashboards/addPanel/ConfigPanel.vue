@@ -31,7 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm">{{ t("dashboard.description") }}</div>
-      <q-input outlined v-model="dashboardPanelData.data.description" filled autogrow class="showLabelOnTop"/>
+      <q-input
+        outlined
+        v-model="dashboardPanelData.data.description"
+        filled
+        autogrow
+        class="showLabelOnTop"
+      />
     </div>
 
     <div class="space"></div>
@@ -83,6 +89,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.config.unit == 'custom'"
       v-model="dashboardPanelData.data.config.unit_custom"
       :label="t('dashboard.customunitLabel')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      filled
+      dense
+      label-slot
+    />
+
+    <q-input
+      v-model.number="dashboardPanelData.data.config.decimals"
+      :value="2"
+      @update:model-value="
+        (value: any) => (dashboardPanelData.data.config.decimals = value >= 0 ? value : 2)
+      "
+      label="decimals"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
