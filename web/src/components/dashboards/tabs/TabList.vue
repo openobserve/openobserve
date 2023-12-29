@@ -147,6 +147,34 @@ export default defineComponent({
       return props.dashboardData?.tabs ?? [];
     });
 
+    
+    // watch dashboardData and change selectedTabIndex
+    // watch(
+    //   () => props.dashboardData.tabs,
+    //   () => {
+
+    //     console.log("route", route.query.tab);
+        
+    //     // use route query for default tab index
+    //     const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
+    //       (it: any) => it.name === route.query.tab ?? "default"
+    //     );
+
+    //     // if tabs array is there and default tab index is not undefined
+    //     if (
+    //       Array.isArray(props.dashboardData?.tabs) &&
+    //       defaultTabIndex !== undefined
+    //     ) {
+    //       // set default tab
+    //       selectedTab.value = defaultTabIndex === -1 ? 0 : defaultTabIndex;
+    //     } else {
+    //       // set default tab as null
+    //       selectedTab.value = null;
+    //     }
+    //   }
+    // );
+
+
     const updateTabList = () => {
       emit("saveDashboard");
       showAddTabDialog.value = false;

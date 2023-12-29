@@ -318,19 +318,25 @@ export const deletePanel = async (
   store: any,
   dashboardId: any,
   panelId: any,
-  folderId: any
+  folderId: any,
+  tabName: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
+  // find tab index from tabname
+  const tabIndex = currentDashboard.tabs.findIndex(
+    (tab: any) => tab.name == tabName
+  );
+
   //remove panel from current dashboard
-  const panelIndex = currentDashboard.panels.findIndex(
+  const panelIndex = currentDashboard.tabs[tabIndex].panels.findIndex(
     (panel: any) => panel.id == panelId
   );
-  currentDashboard.panels.splice(panelIndex, 1);
-  currentDashboard.panels = currentDashboard.panels;
+  currentDashboard.tabs[tabIndex].panels.splice(panelIndex, 1);
+  // currentDashboard.panels = currentDashboard.panels;
 
   //remove layout from current dashboard
   // const layoutIndex = currentDashboard.layouts.findIndex(

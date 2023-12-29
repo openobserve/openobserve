@@ -396,7 +396,8 @@ export default defineComponent({
         store,
         route.query.dashboard,
         panelId,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
+        route.query.tab ?? "default"
       );
       await loadDashboard();
     };

@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @variablesData="variablesDataUpdated"
     />
     <TabList
+      v-if="selectedTabIndex !== null"
       class="q-mt-sm"
       :dashboardData="dashboardData"
       v-model:selectedTabIndex="selectedTabIndex"
@@ -117,7 +118,6 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
-import { onMounted } from "vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -160,24 +160,28 @@ export default defineComponent({
         : [];
     });
 
-    onMounted(() => {
-      // use route query for default tab index
-      const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
-        (it: any) => it.name === route.query.tab ?? "default"
-      );
+    watch(
+      () => props.dashboardData.tabs,
+      () => {
+        // use route query for default tab index
+        const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
+          (it: any) => it.name === route.query.tab ?? "default"
+        );
 
-      // if tabs array is there and default tab index is not undefined
-      if (
-        Array.isArray(props.dashboardData?.tabs) &&
-        defaultTabIndex !== undefined
-      ) {
-        // set default tab
-        selectedTabIndex.value = defaultTabIndex === -1 ? 0 : defaultTabIndex;
-      } else {
-        // set default tab as null
-        selectedTabIndex.value = null;
-      }
-    });
+        // if tabs array is there and default tab index is not undefined
+        if (
+          Array.isArray(props.dashboardData?.tabs) &&
+          defaultTabIndex !== undefined
+        ) {
+          // set default tab
+          selectedTabIndex.value = defaultTabIndex === -1 ? 0 : defaultTabIndex;
+        } else {
+          // set default tab as null
+          selectedTabIndex.value = null;
+        }
+      },
+      { deep: true }
+    );
 
     // on selected tab index change, update route
     watch(selectedTabIndex, (value) => {

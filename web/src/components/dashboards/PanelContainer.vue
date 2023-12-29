@@ -282,7 +282,8 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelData,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
         );
 
         // Show a success notification.
@@ -298,6 +299,7 @@ export default defineComponent({
             dashboard: String(route.query.dashboard),
             panelId: panelId,
             folder: route.query.folder ?? "default",
+            tab: route.query.tab ?? "default",
           },
         });
         return;
