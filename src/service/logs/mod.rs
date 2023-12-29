@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
-use config::{meta::stream::StreamType, utils::hasher::get_fields_key_xxh3, CONFIG};
+use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 
 use super::ingestion::TriggerAlertData;
@@ -366,7 +366,8 @@ async fn add_valid_record_arrow(
     .await;
 
     // get hour key
-    let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
+    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    let schema_key = rec_schema.hash_key();
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
@@ -374,8 +375,6 @@ async fn add_valid_record_arrow(
         local_val,
         Some(&schema_key),
     );
-
-    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
 
     if schema_evolution.schema_compatible {
         let valid_record = if schema_evolution.types_delta.is_some() {
@@ -428,8 +427,8 @@ async fn add_valid_record_arrow(
             }
             let loc_value: Value = utils::json::from_slice(value_str.as_bytes()).unwrap();
             let hour_buf = buf.entry(hour_key).or_insert_with(|| {
-                let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
                 let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
+                let schema_key = schema.hash_key();
                 SchemaRecords {
                     schema_key,
                     schema,

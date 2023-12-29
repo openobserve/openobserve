@@ -27,7 +27,19 @@ const FORMAT_KEY_ENABLED: bool = true;
 /// # Errors
 /// Will return `Err` if `to_flatten` it's not an object, or if flattening the
 /// object would result in two or more keys colliding.
-pub fn flatten(to_flatten: &Value) -> Result<Value, anyhow::Error> {
+pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
+    // quick check to see if we have an object`
+    match &to_flatten {
+        Value::Object(v) => {
+            if v.is_empty() || !v.iter().any(|(_k, v)| v.is_object() || v.is_array()) {
+                return Ok(to_flatten);
+            }
+        }
+        _ => {
+            return Err(anyhow::anyhow!("flatten value must be an object"));
+        }
+    };
+
     let mut flat = Map::<String, Value>::new();
     flatten_value(to_flatten, "".to_owned(), 0, &mut flat).map(|_x| Value::Object(flat))
 }
@@ -36,38 +48,21 @@ pub fn flatten(to_flatten: &Value) -> Result<Value, anyhow::Error> {
 /// its 0-based depth is `depth`.  The result is stored in the JSON object
 /// `flattened`.
 fn flatten_value(
-    current: &Value,
+    current: Value,
     parent_key: String,
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
-    if depth == 0 {
-        match current {
-            Value::Object(map) => {
-                if map.is_empty() {
-                    return Ok(()); // If the top level input object is empty there is nothing to do
-                }
-            }
-            _ => return Err(anyhow::anyhow!("flatten value must be an object")),
+    match current {
+        Value::Object(map) => {
+            flatten_object(map, &parent_key, depth, flattened)?;
         }
-    }
-
-    if let Some(current) = current.as_object() {
-        flatten_object(current, &parent_key, depth, flattened)?;
-    } else if let Some(current) = current.as_array() {
-        flatten_array(current, &parent_key, depth, flattened)?;
-    } else {
-        if flattened.contains_key(&parent_key) {
-            // log::error!(
-            //     "flatten will be overwritten current: {:?}, new key: {}, val:
-            // {}, ",     flattened,
-            //     parent_key,
-            //     current.clone(),
-            // );
-            // return Err(anyhow::anyhow!( "flatten will be overwritten a key
-            // {}", parent_key));
+        Value::Array(arr) => {
+            flatten_array(arr, &parent_key, depth, flattened)?;
         }
-        flattened.insert(parent_key, current.clone());
+        _ => {
+            flattened.insert(parent_key, current);
+        }
     }
     Ok(())
 }
@@ -76,17 +71,15 @@ fn flatten_value(
 /// 0-based depth is `depth`.  The result is stored in the JSON object
 /// `flattened`.
 fn flatten_object(
-    current: &Map<String, Value>,
+    current: Map<String, Value>,
     parent_key: &str,
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
-    for (k, v) in current.iter() {
-        let k = if FORMAT_KEY_ENABLED {
-            format_key(k)
-        } else {
-            k.to_string()
-        };
+    for (mut k, v) in current.into_iter() {
+        if FORMAT_KEY_ENABLED {
+            format_key(&mut k)
+        }
         let parent_key = if depth > 0 {
             format!("{}{}{}", parent_key, KEY_SEPARATOR, k)
         } else {
@@ -101,7 +94,7 @@ fn flatten_object(
 /// 0-based depth is `depth`.  The result is stored in the JSON object
 /// `flattened`.
 fn flatten_array(
-    current: &[Value],
+    current: Vec<Value>,
     parent_key: &str,
     depth: u32,
     flattened: &mut Map<String, Value>,
@@ -114,30 +107,30 @@ fn flatten_array(
     //     flatten_value(obj, parent_key, depth + 1, flattened)?;
     // }
     let v = Value::String(Value::Array(current.to_vec()).to_string());
-    flatten_value(&v, parent_key.to_string(), depth, flattened)?;
+    flatten_value(v, parent_key.to_string(), depth, flattened)?;
     Ok(())
 }
 
 /// We need every character in the key to be lowercase alphanumeric or
 /// underscore
-pub fn format_key(key: &str) -> String {
+pub fn format_key(key: &mut String) {
     if key
         .chars()
         .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
     {
-        return key.to_string();
+        return;
     }
-    key.chars()
-        .map(|c| {
-            if c.is_lowercase() || c.is_numeric() {
-                c
-            } else if c.is_uppercase() {
-                c.to_lowercase().next().unwrap()
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>()
+    let mut key_chars = key.chars().collect::<Vec<_>>();
+    for c in key_chars.iter_mut() {
+        if c.is_lowercase() || c.is_numeric() {
+            continue;
+        } else if c.is_uppercase() {
+            *c = c.to_lowercase().next().unwrap();
+        } else {
+            *c = '_';
+        }
+    }
+    *key = key_chars.into_iter().collect::<String>();
 }
 
 #[cfg(test)]
@@ -149,7 +142,7 @@ mod tests {
     #[test]
     fn object_with_plain_values() {
         let obj = json!({"int": 1, "float": 2.0, "str": "a", "bool": true, "null": null});
-        assert_eq!(obj, flatten(&obj).unwrap());
+        assert_eq!(obj, flatten(obj.clone()).unwrap());
     }
 
     /// Ensures that when using `ArrayFormatting::Plain` both arrays and objects
@@ -158,7 +151,7 @@ mod tests {
     fn array_formatting_plain() {
         let obj = json!({"s": {"a": [1, 2.0, "b", null, true]}});
         assert_eq!(
-            flatten(&obj).unwrap(),
+            flatten(obj).unwrap(),
             json!({
                 format!("s{k}a", k = KEY_SEPARATOR): "[1,2.0,\"b\",null,true]",
             })
@@ -169,7 +162,7 @@ mod tests {
     fn nested_single_key_value() {
         let obj = json!({"key": "value", "nested_key": {"key": "value"}});
         assert_eq!(
-            flatten(&obj).unwrap(),
+            flatten(obj).unwrap(),
             json!({"key": "value", "nested_key_key": "value"}),
         );
     }
@@ -178,7 +171,7 @@ mod tests {
     fn nested_multiple_key_value() {
         let obj = json!({"key": "value", "nested_key": {"key1": "value1", "key2": "value2"}});
         assert_eq!(
-            flatten(&obj).unwrap(),
+            flatten(obj).unwrap(),
             json!({"key": "value", "nested_key_key1": "value1", "nested_key_key2": "value2"}),
         );
     }
@@ -198,7 +191,7 @@ mod tests {
             ]
         });
         assert_eq!(
-            flatten(&obj).unwrap(),
+            flatten(obj).unwrap(),
             json!({"simple_key": "simple_value", "key": "[\"value1\",{\"key\":\"value2\"},{\"nested_array\":[\"nested1\",\"nested2\",[\"nested3\",\"nested4\"]]}]"}),
         );
     }
@@ -218,20 +211,20 @@ mod tests {
     #[test]
     fn empty_array() {
         let obj = json!({"key": []});
-        assert_eq!(flatten(&obj).unwrap(), json!({}));
+        assert_eq!(flatten(obj).unwrap(), json!({}));
     }
 
     /// Ensure that empty objects are not present in the result
     #[test]
     fn empty_object() {
         let obj = json!({"key": {}});
-        assert_eq!(flatten(&obj).unwrap(), json!({}));
+        assert_eq!(flatten(obj).unwrap(), json!({}));
     }
 
     #[test]
     fn empty_top_object() {
         let obj = json!({});
-        assert_eq!(flatten(&obj).unwrap(), json!({}));
+        assert_eq!(flatten(obj).unwrap(), json!({}));
     }
 
     /// Ensure that if all the end values of the JSON object are either `[]` or
@@ -240,7 +233,7 @@ mod tests {
     fn empty_complex_object() {
         let obj = json!({"key": {"key2": {}, "key3": [[], {}, {"k": {}, "q": []}]}});
         assert_eq!(
-            flatten(&obj).unwrap(),
+            flatten(obj).unwrap(),
             json!({"key_key3": "[[],{},{\"k\":{},\"q\":[]}]"})
         );
     }
@@ -248,25 +241,25 @@ mod tests {
     #[test]
     fn nested_object_with_empty_array_and_string() {
         let obj = json!({"key": {"key2": [], "key3": "a"}});
-        assert_eq!(flatten(&obj).unwrap(), json!({"key_key3": "a"}));
+        assert_eq!(flatten(obj).unwrap(), json!({"key_key3": "a"}));
     }
 
     #[test]
     fn nested_object_with_empty_object_and_string() {
         let obj = json!({"key": {"key2": {}, "key3": "a"}});
-        assert_eq!(flatten(&obj).unwrap(), json!({"key_key3": "a"}));
+        assert_eq!(flatten(obj).unwrap(), json!({"key_key3": "a"}));
     }
 
     #[test]
     fn empty_string_as_key() {
         let obj = json!({"key": {"": "a"}});
-        assert_eq!(flatten(&obj).unwrap(), json!({"key_": "a"}));
+        assert_eq!(flatten(obj).unwrap(), json!({"key_": "a"}));
     }
 
     #[test]
     fn empty_string_as_key_multiple_times() {
         let obj = json!({"key": {"": {"": {"": "a"}}}});
-        assert_eq!(flatten(&obj).unwrap(), json!({"key___": "a"}));
+        assert_eq!(flatten(obj).unwrap(), json!({"key___": "a"}));
     }
 
     /// Flattening only makes sense for objects. Passing something else must
@@ -279,7 +272,7 @@ mod tests {
         let null = json!(null);
         let array = json!([1, 2, 3]);
 
-        for j in [integer, string, boolean, null, array].iter() {
+        for j in [integer, string, boolean, null, array].into_iter() {
             let res = flatten(j);
             match res {
                 Err(_) => {} // Good
@@ -291,7 +284,7 @@ mod tests {
     #[test]
     fn complex_array() {
         let obj = json!({"a": [1, [2, [3, 4], 5], 6]});
-        assert_eq!(flatten(&obj).unwrap(), json!({"a": "[1,[2,[3,4],5],6]"}));
+        assert_eq!(flatten(obj).unwrap(), json!({"a": "[1,[2,[3,4],5],6]"}));
     }
 
     #[test]
@@ -302,16 +295,16 @@ mod tests {
                 json!({"key": "value", "nested_key_key": "value", "nested_key_foo": "bar"}),
             ),
             (
-                json!({"key+bar": "value", "@nested_key": {"key": "value", "Foo": "Bar"}}),
-                json!({"key_bar": "value", "_nested_key_key": "value", "_nested_key_foo": "Bar"}),
+                json!({"key+bar": "value", "@nested_key": {"#key": "value", "&Foo": "Bar"}}),
+                json!({"key_bar": "value", "_nested_key__key": "value", "_nested_key__foo": "Bar"}),
             ),
             (
                 json!({"a": {"A.1": [1, [3, 4], 5], "A_2": 6}}),
                 json!({"a_a_1": "[1,[3,4],5]", "a_a_2": 6}),
             ),
         ];
-        for (input, expected) in datas.iter() {
-            assert_eq!(flatten(input).unwrap(), *expected);
+        for (input, expected) in datas.into_iter() {
+            assert_eq!(flatten(input).unwrap(), expected);
         }
     }
 
@@ -350,7 +343,7 @@ mod tests {
             "phonenumbers":"[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
         });
 
-        let output = flatten(&input).unwrap();
+        let output = flatten(input).unwrap();
         assert_eq!(output, expected_output);
     }
 }

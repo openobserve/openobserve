@@ -15,7 +15,6 @@
 
 pub(crate) mod cgroup;
 pub(crate) mod file;
-pub mod hasher;
 pub mod parquet;
 pub mod rand;
 pub mod schema;

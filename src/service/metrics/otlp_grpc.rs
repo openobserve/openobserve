@@ -186,7 +186,7 @@ pub async fn handle_grpc_request(
 
                 for mut rec in records {
                     // flattening
-                    rec = flatten::flatten(&rec)?;
+                    rec = flatten::flatten(rec)?;
 
                     let local_metric_name =
                         &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
@@ -253,7 +253,7 @@ pub async fn handle_grpc_request(
                     if !local_trans.is_empty() {
                         rec = crate::service::ingestion::apply_stream_transform(
                             &local_trans,
-                            &rec,
+                            rec,
                             &stream_vrl_map,
                             local_metric_name,
                             &mut runtime,

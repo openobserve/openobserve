@@ -118,12 +118,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
 
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
-    value = flatten::flatten(&value).unwrap();
+    value = flatten::flatten(value).unwrap();
 
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_transform(
             &local_trans,
-            &value,
+            value,
             &stream_vrl_map,
             stream_name,
             &mut runtime,

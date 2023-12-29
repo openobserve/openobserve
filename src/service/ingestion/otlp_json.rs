@@ -1,4 +1,4 @@
-use crate::common::utils::{flatten::format_key, json};
+use crate::common::utils::{flatten, json};
 
 pub fn get_float_value(val: &json::Value) -> f64 {
     match val {
@@ -67,9 +67,10 @@ pub fn get_val_for_attr(attr_val: &json::Value) -> json::Value {
                     .unwrap_or(&vec![])
                     .iter()
                 {
-                    let key = item.get("key").unwrap().as_str().unwrap_or("").to_string();
+                    let mut key = item.get("key").unwrap().as_str().unwrap_or("").to_string();
+                    flatten::format_key(&mut key);
                     let value = item.get("value").unwrap().clone();
-                    vals.insert(format_key(&key), get_val_for_attr(&value));
+                    vals.insert(key, get_val_for_attr(&value));
                 }
                 return json::json!(vals);
             }

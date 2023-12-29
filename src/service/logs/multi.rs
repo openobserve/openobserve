@@ -122,13 +122,13 @@ async fn ingest_inner(
         }
 
         // JSON Flattening
-        value = flatten::flatten(&value)?;
+        value = flatten::flatten(value)?;
         // Start row based transform
 
         if !local_trans.is_empty() {
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
-                &value,
+                value,
                 &stream_vrl_map,
                 stream_name,
                 &mut runtime,

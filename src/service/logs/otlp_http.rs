@@ -262,11 +262,9 @@ pub async fn logs_json_handler(
                     let attributes = log.get("attributes").unwrap().as_array().unwrap();
                     for res_attr in attributes {
                         let local_attr = res_attr.as_object().unwrap();
-
-                        local_val.insert(
-                            flatten::format_key(local_attr.get("key").unwrap().as_str().unwrap()),
-                            get_val_for_attr(local_attr.get("value").unwrap()),
-                        );
+                        let mut key = local_attr.get("key").unwrap().as_str().unwrap().to_string();
+                        flatten::format_key(&mut key);
+                        local_val.insert(key, get_val_for_attr(local_attr.get("value").unwrap()));
                     }
                 }
                 // remove attributes after adding
@@ -323,20 +321,20 @@ pub async fn logs_json_handler(
 
                 local_val.append(&mut service_att_map.clone());
 
-                value = json::to_value(local_val).unwrap();
+                value = json::to_value(local_val)?;
 
                 // JSON Flattening
-                value = flatten::flatten(&value).unwrap();
+                value = flatten::flatten(value).unwrap();
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_transform(
                         &local_trans,
-                        &value,
+                        value,
                         &stream_vrl_map,
                         stream_name,
                         &mut runtime,
                     )
-                    .unwrap_or(value);
+                    .unwrap();
                 }
 
                 local_val = value.as_object_mut().unwrap();

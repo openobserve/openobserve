@@ -1187,7 +1187,7 @@ fn apply_query_fn(
                         },
                         &json::Value::Object(hit.clone()),
                     );
-                    (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
+                    (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                 })
                 .collect();
 

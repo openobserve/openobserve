@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use arrow_schema::{Field, Schema};
+use std::hash::{Hash, Hasher};
 
-use super::hasher::get_fields_key_xxh3;
+use arrow_schema::{Field, Schema};
 
 /// SchemaExt helper...
 pub trait SchemaExt {
@@ -29,6 +29,8 @@ impl SchemaExt for Schema {
     }
 
     fn hash_key(&self) -> String {
-        get_fields_key_xxh3(&self.to_cloned_fields())
+        let mut hasher = xxhash_rust::xxh3::Xxh3::new();
+        self.hash(&mut hasher);
+        format!("{:x}", hasher.finish())
     }
 }

@@ -469,6 +469,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 }
 
 pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
     let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
@@ -529,6 +532,9 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
 }
 
 pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
     let chunks = files.chunks(100);
     for files in chunks {
         // get ids of the files

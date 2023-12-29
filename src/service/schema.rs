@@ -281,7 +281,6 @@ pub async fn check_for_schema(
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
             record_schema: schema,
         };
@@ -295,7 +294,6 @@ pub async fn check_for_schema(
         return SchemaEvolution {
             schema_compatible: true,
             types_delta: None,
-            schema_fields: schema.to_cloned_fields(),
             is_schema_changed: false,
             record_schema: schema,
         };
@@ -306,7 +304,6 @@ pub async fn check_for_schema(
         return SchemaEvolution {
             schema_compatible: false,
             types_delta: None,
-            schema_fields: inferred_schema.to_cloned_fields(),
             is_schema_changed: false,
             record_schema: schema,
         };
@@ -328,7 +325,7 @@ pub async fn check_for_schema(
         }
     };
 
-    let (field_datatype_delta, is_schema_changed, final_fields, record_schema) =
+    let (field_datatype_delta, is_schema_changed, _, record_schema) =
         get_schema_changes(&schema, &inferred_schema, is_arrow);
 
     if is_schema_changed {
@@ -348,7 +345,6 @@ pub async fn check_for_schema(
             SchemaEvolution {
                 schema_compatible: true,
                 types_delta: Some(field_datatype_delta),
-                schema_fields: schema.to_cloned_fields(),
                 is_schema_changed: false,
                 record_schema,
             }
@@ -357,7 +353,6 @@ pub async fn check_for_schema(
         SchemaEvolution {
             schema_compatible: true,
             types_delta: Some(field_datatype_delta),
-            schema_fields: final_fields,
             is_schema_changed,
             record_schema,
         }
@@ -415,7 +410,6 @@ async fn handle_existing_schema(
         Some(SchemaEvolution {
             schema_compatible: true,
             types_delta: Some(field_datatype_delta),
-            schema_fields: final_fields,
             is_schema_changed,
             record_schema: final_schema,
         })
@@ -473,7 +467,6 @@ async fn handle_existing_schema(
             Some(SchemaEvolution {
                 schema_compatible: true,
                 types_delta: Some(field_datatype_delta),
-                schema_fields: final_fields,
                 is_schema_changed,
                 record_schema: final_schema,
             })
@@ -482,7 +475,7 @@ async fn handle_existing_schema(
             let schema = db::schema::get_from_db(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            let (field_datatype_delta, _is_schema_changed, final_fields, _) =
+            let (field_datatype_delta, _is_schema_changed, ..) =
                 get_schema_changes(&schema, inferred_schema, is_arrow);
             stream_schema_map.insert(stream_name.to_string(), schema.clone());
             log::info!("Schema exists for stream {} ", stream_name);
@@ -490,7 +483,6 @@ async fn handle_existing_schema(
             Some(SchemaEvolution {
                 schema_compatible: true,
                 types_delta: Some(field_datatype_delta),
-                schema_fields: final_fields,
                 is_schema_changed: false,
                 record_schema: schema,
             })
@@ -555,7 +547,6 @@ async fn handle_new_schema(
                 return Some(SchemaEvolution {
                     schema_compatible: true,
                     types_delta: None,
-                    schema_fields: final_schema.to_cloned_fields(),
                     is_schema_changed: true,
                     record_schema: final_schema,
                 });
@@ -610,7 +601,6 @@ async fn handle_new_schema(
                     return Some(SchemaEvolution {
                         schema_compatible: true,
                         types_delta: None,
-                        schema_fields: final_schema.to_cloned_fields(),
                         is_schema_changed: true,
                         record_schema: final_schema,
                     });

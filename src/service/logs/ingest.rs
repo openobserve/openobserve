@@ -130,7 +130,7 @@ pub async fn ingest(
         match rec {
             Ok(item) => {
                 match apply_functions(
-                    &item,
+                    item,
                     &local_trans,
                     &stream_vrl_map,
                     stream_name,
@@ -256,8 +256,8 @@ pub async fn ingest(
 }
 
 pub fn apply_functions<'a>(
-    item: &'a json::Value,
-    local_trans: &Vec<StreamTransform>,
+    item: json::Value,
+    local_trans: &[StreamTransform],
     stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
     stream_name: &'a str,
     runtime: &mut Runtime,
@@ -267,7 +267,7 @@ pub fn apply_functions<'a>(
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_transform(
             local_trans,
-            &value,
+            value,
             stream_vrl_map,
             stream_name,
             runtime,

@@ -261,7 +261,7 @@ pub async fn remote_write(
 
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
-                &value,
+                value,
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,

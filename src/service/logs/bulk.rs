@@ -164,13 +164,13 @@ pub async fn ingest(
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
             // JSON Flattening
-            let mut value = flatten::flatten(&value)?;
+            let mut value = flatten::flatten(value)?;
 
             if let Some(transforms) = stream_transform_map.get(&key) {
                 let mut ret_value = value.clone();
                 ret_value = crate::service::ingestion::apply_stream_transform(
                     transforms,
-                    &ret_value,
+                    ret_value,
                     &stream_vrl_map,
                     &stream_name,
                     &mut runtime,

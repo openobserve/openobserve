@@ -281,7 +281,7 @@ pub async fn metrics_json_handler(
 
                     for mut rec in records {
                         // flattening
-                        rec = flatten::flatten(&rec).expect("failed to flatten");
+                        rec = flatten::flatten(rec).expect("failed to flatten");
                         // get json object
 
                         let local_metric_name =
@@ -349,12 +349,12 @@ pub async fn metrics_json_handler(
                         if !local_trans.is_empty() {
                             rec = crate::service::ingestion::apply_stream_transform(
                                 &local_trans,
-                                &rec,
+                                rec,
                                 &stream_vrl_map,
                                 local_metric_name,
                                 &mut runtime,
                             )
-                            .unwrap_or(rec);
+                            .unwrap();
                         }
 
                         let val_map: &mut serde_json::Map<String, serde_json::Value> =

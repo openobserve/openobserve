@@ -102,7 +102,7 @@ pub async fn usage_ingest(
 
     let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for item in reader.iter() {
+    for item in reader.into_iter() {
         // JSON Flattening
         let mut value = flatten::flatten(item)?;
 
@@ -373,12 +373,12 @@ pub async fn handle_grpc_request(
                 };
 
                 // flattening
-                rec = flatten::flatten(&rec)?;
+                rec = flatten::flatten(rec)?;
 
                 if !local_trans.is_empty() {
                     rec = crate::service::ingestion::apply_stream_transform(
                         &local_trans,
-                        &rec,
+                        rec,
                         &stream_vrl_map,
                         stream_name,
                         &mut runtime,

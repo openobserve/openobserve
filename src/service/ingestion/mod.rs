@@ -261,14 +261,13 @@ pub fn register_stream_transforms(
     (local_trans, stream_vrl_map)
 }
 
-pub fn apply_stream_transform<'a>(
-    local_trans: &Vec<StreamTransform>,
-    value: &'a Value,
-    stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
+pub fn apply_stream_transform(
+    local_trans: &[StreamTransform],
+    mut value: Value,
+    stream_vrl_map: &AHashMap<String, VRLResultResolver>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value, anyhow::Error> {
-    let mut value = value.clone();
     for trans in local_trans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
@@ -276,7 +275,7 @@ pub fn apply_stream_transform<'a>(
             value = apply_vrl_fn(runtime, vrl_runtime, &value);
         }
     }
-    flatten::flatten(&value)
+    flatten::flatten(value)
 }
 
 pub async fn chk_schema_by_record(

@@ -20,7 +20,7 @@ use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    meta::stream::StreamType, metrics, utils::hasher::get_fields_key_xxh3, CONFIG, DISTINCT_FIELDS,
+    meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG, DISTINCT_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -241,17 +241,21 @@ pub async fn handle_trace_request(
                 let value: json::Value = json::to_value(local_val).unwrap();
 
                 // JSON Flattening
-                let mut value = flatten::flatten(&value).unwrap();
+                let mut value = flatten::flatten(value).map_err(|e| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                })?;
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_transform(
                         &local_trans,
-                        &value,
+                        value,
                         &stream_vrl_map,
                         traces_stream_name,
                         &mut runtime,
                     )
-                    .unwrap_or(value);
+                    .map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                    })?;
                 }
                 // End row based transform */
                 // get json object
@@ -286,7 +290,7 @@ pub async fn handle_trace_request(
                 let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 
                 // check schema
-                let schema_evolution = check_for_schema(
+                let _ = check_for_schema(
                     org_id,
                     traces_stream_name,
                     StreamType::Traces,
@@ -296,16 +300,6 @@ pub async fn handle_trace_request(
                     true,
                 )
                 .await;
-
-                let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
-                // get hour key
-                let mut hour_key = super::ingestion::get_wal_time_key(
-                    timestamp.try_into().unwrap(),
-                    &partition_keys,
-                    partition_time_level,
-                    val_map,
-                    Some(&schema_key),
-                );
 
                 if trigger.is_none() && !stream_alerts_map.is_empty() {
                     // Start check for alert trigger
@@ -323,23 +317,31 @@ pub async fn handle_trace_request(
                     // End check for alert trigger
                 }
 
+                // get hour key
+                let rec_schema = traces_schema_map
+                    .get(traces_stream_name)
+                    .unwrap()
+                    .clone()
+                    .with_metadata(HashMap::new());
+                let schema_key = rec_schema.hash_key();
+                let mut hour_key = super::ingestion::get_wal_time_key(
+                    timestamp.try_into().unwrap(),
+                    &partition_keys,
+                    partition_time_level,
+                    val_map,
+                    Some(&schema_key),
+                );
+
                 if partition_keys.is_empty() {
                     let partition_key = format!("service_name={}", service_name);
                     hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
                 }
 
-                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| {
-                    let schema = traces_schema_map
-                        .get(traces_stream_name)
-                        .unwrap()
-                        .clone()
-                        .with_metadata(HashMap::new());
-                    SchemaRecords {
-                        schema_key,
-                        schema: Arc::new(schema),
-                        records: vec![],
-                        records_size: 0,
-                    }
+                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                    schema_key,
+                    schema: Arc::new(rec_schema),
+                    records: vec![],
+                    records_size: 0,
                 });
                 let loc_value: utils::json::Value =
                     utils::json::from_slice(value_str.as_bytes()).unwrap();
