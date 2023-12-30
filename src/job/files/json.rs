@@ -26,7 +26,7 @@ use config::{
     metrics,
     utils::{
         parquet::new_parquet_writer,
-        schema::{infer_json_schema_from_iterator, infer_json_schema_from_seekable},
+        schema::{infer_json_schema_from_seekable, infer_json_schema_from_values},
     },
     CONFIG,
 };
@@ -263,8 +263,8 @@ async fn upload_file(
                         path_str
                     ));
                 }
-                let value_iter = res_records.iter().map(Ok);
-                infer_json_schema_from_iterator(value_iter, stream_type).unwrap()
+                let value_iter = res_records.iter();
+                infer_json_schema_from_values(value_iter, stream_type).unwrap()
             }
         };
     let arrow_schema = Arc::new(inferred_schema);

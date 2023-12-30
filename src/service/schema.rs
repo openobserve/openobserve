@@ -24,7 +24,7 @@ use ahash::AHashMap;
 use config::{
     meta::stream::StreamType,
     utils::{
-        schema::{infer_json_schema, infer_json_schema_from_iterator},
+        schema::{infer_json_schema, infer_json_schema_from_values},
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -301,8 +301,8 @@ pub async fn check_for_schema(
         });
     }
 
-    let value_iter = [record_val].into_iter().map(Ok);
-    let inferred_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
+    let value_iter = [record_val].into_iter();
+    let inferred_schema = infer_json_schema_from_values(value_iter, stream_type).unwrap();
 
     if schema.fields.eq(&inferred_schema.fields) {
         // return (true, None, schema.fields().to_vec());

@@ -46,8 +46,7 @@ use crate::{
 /// - org_id: org id to ingest data in
 /// - in_stream_name: stream to write data in
 /// - body: incoming payload
-/// - extend_json: a hashmap of string -> string values which should be extended
-///   in each json row
+/// - extend_json: a hashmap of string -> string values which should be extended in each json row
 /// - thread_id: a unique thread-id associated with this process
 pub async fn ingest_with_keys(
     org_id: &str,

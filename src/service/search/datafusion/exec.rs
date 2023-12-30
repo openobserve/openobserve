@@ -18,7 +18,7 @@ use std::{str::FromStr, sync::Arc};
 use ahash::AHashMap as HashMap;
 use config::{
     meta::stream::{FileKey, FileMeta, StreamType},
-    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_iterator},
+    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_values},
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -1195,8 +1195,8 @@ fn apply_query_fn(
                 })
                 .collect();
 
-            let value_iter = rows_val.iter().map(Ok);
-            let inferred_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
+            let value_iter = rows_val.iter();
+            let inferred_schema = infer_json_schema_from_values(value_iter, stream_type).unwrap();
             let mut decoder =
                 arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 

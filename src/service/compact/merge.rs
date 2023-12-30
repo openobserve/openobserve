@@ -98,10 +98,8 @@ pub async fn merge_by_stream(
         )
         .unwrap()
         .timestamp_micros();
-    // 1. if step_secs less than 1 hour, must wait for at least
-    //    max_file_retention_time
-    // 2. if step_secs greater than 1 hour, must wait for at least 3 *
-    //    max_file_retention_time
+    // 1. if step_secs less than 1 hour, must wait for at least max_file_retention_time
+    // 2. if step_secs greater than 1 hour, must wait for at least 3 * max_file_retention_time
     // -- first period: the last hour local file upload to storage, write file list
     // -- second period, the last hour file list upload to storage
     // -- third period, we can do the merge, so, at least 3 times of

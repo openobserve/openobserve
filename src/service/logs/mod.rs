@@ -84,7 +84,7 @@ pub fn cast_to_type(
                 }
                 value.insert(field_name, Value::String(get_string_value(val)));
             }
-            DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 => {
+            DataType::Int64 | DataType::Int32 | DataType::Int16 | DataType::Int8 => {
                 if val.is_i64() {
                     continue;
                 }
@@ -96,7 +96,7 @@ pub fn cast_to_type(
                     Err(_) => set_parsing_error(&mut parse_error, &field),
                 };
             }
-            DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {
+            DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
                 if val.is_u64() {
                     continue;
                 }
@@ -108,7 +108,7 @@ pub fn cast_to_type(
                     Err(_) => set_parsing_error(&mut parse_error, &field),
                 };
             }
-            DataType::Float16 | DataType::Float32 | DataType::Float64 => {
+            DataType::Float64 | DataType::Float32 | DataType::Float16 => {
                 if val.is_f64() {
                     continue;
                 }
