@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-input
+      v-if="dashboardPanelData.data.type != 'table'"
       type="number"
       v-model.number="dashboardPanelData.data.config.decimals"
       value="2"
