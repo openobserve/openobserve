@@ -561,8 +561,10 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
             }
         }
         // delete files by ids
-        let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
-        _ = pool.execute(sql.as_str()).await?;
+        if !ids.is_empty() {
+            let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+            _ = pool.execute(sql.as_str()).await?;
+        }
     }
     Ok(())
 }
@@ -603,6 +605,9 @@ pub async fn batch_add_deleted(
 }
 
 pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
     let chunks = files.chunks(100);
     for files in chunks {
         // get ids of the files
@@ -630,11 +635,13 @@ pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Re
             }
         }
         // delete files by ids
-        let sql = format!(
-            "DELETE FROM file_list_deleted WHERE id IN({});",
-            ids.join(",")
-        );
-        _ = pool.execute(sql.as_str()).await?;
+        if !ids.is_empty() {
+            let sql = format!(
+                "DELETE FROM file_list_deleted WHERE id IN({});",
+                ids.join(",")
+            );
+            _ = pool.execute(sql.as_str()).await?;
+        }
     }
     Ok(())
 }

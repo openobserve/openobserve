@@ -202,8 +202,10 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 }
             }
             // delete files by ids
-            let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
-            _ = pool.execute(sql.as_str()).await?;
+            if !ids.is_empty() {
+                let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+                _ = pool.execute(sql.as_str()).await?;
+            }
         }
         Ok(())
     }
@@ -277,11 +279,13 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 }
             }
             // delete files by ids
-            let sql = format!(
-                "DELETE FROM file_list_deleted WHERE id IN({});",
-                ids.join(",")
-            );
-            _ = pool.execute(sql.as_str()).await?;
+            if !ids.is_empty() {
+                let sql = format!(
+                    "DELETE FROM file_list_deleted WHERE id IN({});",
+                    ids.join(",")
+                );
+                _ = pool.execute(sql.as_str()).await?;
+            }
         }
         Ok(())
     }
