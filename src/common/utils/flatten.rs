@@ -16,7 +16,6 @@
 use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
-const FORMAT_KEY_ENABLED: bool = true;
 
 /// Flattens the provided JSON object (`current`).
 ///
@@ -29,11 +28,20 @@ const FORMAT_KEY_ENABLED: bool = true;
 /// object would result in two or more keys colliding.
 pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
     // quick check to see if we have an object`
-    match &to_flatten {
+    let to_flatten = match to_flatten {
         Value::Object(v) => {
             if v.is_empty() || !v.iter().any(|(_k, v)| v.is_object() || v.is_array()) {
-                return Ok(to_flatten);
+                if v.iter().all(|(k, _v)| check_key(k)) {
+                    return Ok(Value::Object(v));
+                }
+                let mut formatted_map = Map::<String, Value>::with_capacity(v.len());
+                for (mut k, v) in v.into_iter() {
+                    format_key(&mut k);
+                    formatted_map.insert(k, v);
+                }
+                return Ok(Value::Object(formatted_map));
             }
+            Value::Object(v)
         }
         _ => {
             return Err(anyhow::anyhow!("flatten value must be an object"));
@@ -77,9 +85,7 @@ fn flatten_object(
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
     for (mut k, v) in current.into_iter() {
-        if FORMAT_KEY_ENABLED {
-            format_key(&mut k)
-        }
+        format_key(&mut k);
         let parent_key = if depth > 0 {
             format!("{}{}{}", parent_key, KEY_SEPARATOR, k)
         } else {
@@ -114,10 +120,7 @@ fn flatten_array(
 /// We need every character in the key to be lowercase alphanumeric or
 /// underscore
 pub fn format_key(key: &mut String) {
-    if key
-        .chars()
-        .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
-    {
+    if check_key(key) {
         return;
     }
     let mut key_chars = key.chars().collect::<Vec<_>>();
@@ -133,6 +136,11 @@ pub fn format_key(key: &mut String) {
     *key = key_chars.into_iter().collect::<String>();
 }
 
+fn check_key(key: &str) -> bool {
+    key.chars()
+        .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -140,9 +148,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_check_key_lowercase() {
+        assert_eq!(check_key("hello"), true);
+    }
+
+    #[test]
+    fn test_check_key_numeric() {
+        assert_eq!(check_key("123"), true);
+    }
+
+    #[test]
+    fn test_check_key_underscore() {
+        assert_eq!(check_key("my_key"), true);
+    }
+
+    #[test]
+    fn test_check_key_mixed_case() {
+        assert_eq!(check_key("Hello_World"), false);
+    }
+
+    #[test]
+    fn test_check_key_special_characters() {
+        assert_eq!(check_key("key!"), false);
+    }
+
+    #[test]
     fn object_with_plain_values() {
         let obj = json!({"int": 1, "float": 2.0, "str": "a", "bool": true, "null": null});
         assert_eq!(obj, flatten(obj.clone()).unwrap());
+    }
+
+    #[test]
+    fn object_with_plain_values_with_format_key() {
+        let obj = json!({"int": 1, "float": 2.0, "str": "a", "bool": true, "null": null});
+        let obj2 = json!({"int": 1, "Float": 2.0, "str": "a", "bool": true, "null": null});
+        assert_eq!(obj, flatten(obj2).unwrap());
     }
 
     /// Ensures that when using `ArrayFormatting::Plain` both arrays and objects
