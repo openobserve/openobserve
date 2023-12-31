@@ -48,7 +48,7 @@ pub fn scan_files(root_dir: &str, ext: &str) -> Vec<String> {
             if path.is_file() {
                 let path_ext = path.extension()?.to_str()?;
                 if path_ext == ext {
-                    Some(path.to_str().unwrap().to_string())
+                    Some(path.display().to_string())
                 } else {
                     None
                 }
@@ -67,7 +67,7 @@ pub fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
             continue;
         }
         if entry.file_type().is_dir() {
-            dirs.push(entry.path().to_str().unwrap().to_string());
+            dirs.push(entry.path().display().to_string());
         }
     }
     dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));

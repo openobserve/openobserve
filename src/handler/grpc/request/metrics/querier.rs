@@ -144,7 +144,7 @@ impl Metrics for Querier {
         // get parquet files
         let wal_dir = match std::path::Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
             Ok(path) => {
-                let mut path = path.to_str().unwrap().to_string();
+                let mut path = path.display().to_string();
                 // Hack for windows
                 if path.starts_with("\\\\?\\") {
                     path = path[4..].to_string();
