@@ -543,14 +543,19 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
         for file in files {
             let (stream_key, date_key, file_name) =
                 parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-            let ret: Option<i64> = sqlx::query_scalar(
+            let ret: Option<i64> = match sqlx::query_scalar(
                 r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
             .fetch_one(&pool)
-            .await?;
+            .await
+            {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => continue,
+                Err(e) => return Err(e.into()),
+            };
             match ret {
                 Some(v) => ids.push(v.to_string()),
                 None => {
@@ -616,14 +621,19 @@ pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Re
         for file in files {
             let (stream_key, date_key, file_name) =
                 parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-            let ret: Option<i64> = sqlx::query_scalar(
+            let ret: Option<i64> = match sqlx::query_scalar(
                 r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
             .fetch_one(&pool)
-            .await?;
+            .await
+            {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => continue,
+                Err(e) => return Err(e.into()),
+            };
             match ret {
                 Some(v) => ids.push(v.to_string()),
                 None => {
