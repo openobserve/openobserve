@@ -20,6 +20,8 @@ use actix_web::{
     http::{header, Method},
 };
 #[cfg(feature = "enterprise")]
+use config::CONFIG;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, dex::service::auth::get_jwks};
 
 #[cfg(feature = "enterprise")]
@@ -30,10 +32,7 @@ pub async fn token_validator(
     req: ServiceRequest,
     token: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    use crate::{
-        common::infra::config::CONFIG,
-        service::{db, users},
-    };
+    use crate::service::{db, users};
 
     let user;
     let keys = get_jwks().await;
