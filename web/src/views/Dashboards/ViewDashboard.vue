@@ -42,24 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              padding="xs"
+              class="dashboard-icons q-px-sm"
+              size="sm"
               no-caps
               icon="add"
               @click="addPanelData"
               data-test="dashboard-panel-add"
             >
               <q-tooltip>{{ t("panel.add") }}</q-tooltip>
-            </q-btn>
-            <q-btn
-              v-if="!isFullscreen"
-              outline
-              padding="xs"
-              class="q-ml-sm"
-              no-caps
-              icon="settings"
-              @click="openSettingsDialog"
-            >
-              <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
             </q-btn>
             <!-- <DateTimePicker 
             class="q-ml-sm"
@@ -68,22 +58,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /> -->
             <DateTimePickerDashboard
               ref="dateTimePicker"
-              class="q-ml-sm"
+              class="dashboard-icons q-ml-sm"
+              size="sm"
               v-model="selectedDate"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
               trigger
               @trigger="refreshData"
+              class="dashboard-icons"
+              size="sm"
             />
             <q-btn
-              class="q-ml-sm"
               outline
-              padding="xs"
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
               no-caps
               icon="refresh"
               @click="refreshData"
             >
+              <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
             <ExportDashboard
               v-if="!isFullscreen"
@@ -91,23 +85,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-btn
               v-if="!isFullscreen"
-              class="q-ml-sm"
               outline
-              padding="xs"
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
               no-caps
               icon="share"
-              title="share link"
               @click="shareLink"
-            ></q-btn>
+              ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
+            >
             <q-btn
-              class="q-ml-sm"
+              v-if="!isFullscreen"
               outline
-              padding="xs"
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              icon="settings"
+              @click="openSettingsDialog"
+            >
+              <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
-              :title="isFullscreen ? 'Exit Fullscreen' : 'Go Fullscreen'"
               @click="toggleFullscreen"
-            ></q-btn>
+              ><q-tooltip>{{isFullscreen ? t("dashboard.exitFullscreen") : t("dashboard.fullscreen") }}</q-tooltip></q-btn
+            >
           </div>
         </div>
         <q-separator></q-separator>
@@ -525,5 +530,9 @@ export default defineComponent({
   left: 0;
   z-index: 10000; /* Ensure it's on top */
   /* Additional styling as needed */
+}
+
+.dashboard-icons {
+  height: 30px;
 }
 </style>
