@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-    <div ref="fullscreenDiv" :class="isFullscreen ? 'fullscreen' : ''">
+    <div ref="fullscreenDiv" :class="`${isFullscreen ? 'fullscreen' : ''}  ${store.state.theme === 'light' ? 'bg-white' : 'dark-mode'}`">
       <div
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
