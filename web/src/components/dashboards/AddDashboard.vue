@@ -181,7 +181,6 @@ export default defineComponent({
             panels: [],
             version: 2,
           };
-          console.log("baseObj", baseObj);
           
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
@@ -215,7 +214,6 @@ export default defineComponent({
           });
       });
     });
-    console.log("dashboardData", dashboardData);
 
     return {
       t,

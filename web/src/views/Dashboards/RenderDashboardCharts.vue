@@ -18,8 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    {{ dashboardData.variables?.showDynamicFilters }}
-
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -137,8 +135,6 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const gridLayoutRef = ref(null);
-    console.log("render dashboard", props);
-    console.log("render dashboard", props.dashboardData);
 
     const showViewPanel = ref(false);
     // holds the view panel id

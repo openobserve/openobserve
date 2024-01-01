@@ -156,9 +156,6 @@ export default defineComponent({
 
       const variablesConfigList =
         JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
-      console.log("variablesConfigList", variablesConfigList);
-
-      console.log("showDynamicFilters", props.showDynamicFilters);
 
       if (props.showDynamicFilters) {
         variablesConfigList.push({

@@ -221,8 +221,6 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
-      console.log("currentDashboardData", currentDashboardData.data);
-
     };
 
     const openSettingsDialog = () => {

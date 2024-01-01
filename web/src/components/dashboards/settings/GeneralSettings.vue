@@ -105,15 +105,12 @@ export default defineComponent({
       showDynamicFilters: true,
     });
 
-    console.log("dashboardData", dashboardData);
-
     const getDashboardData = async () => {
       const data = await getDashboard(
         store,
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-      console.log("data", data);
 
       dashboardData.title = data.title;
       dashboardData.description = data.description;
@@ -181,7 +178,6 @@ export default defineComponent({
         });
       });
     };
-    console.log("dashboardData", dashboardData);
 
     return {
       t,
