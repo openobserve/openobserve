@@ -417,6 +417,17 @@ export const convertPromQLData = (
             color: store.state.theme === "dark" ? "#fff" : "#000",
             fontSize: 12,
           },
+          valueFormatter: (value: any) => {
+            // unit conversion
+            return formatUnitValue(
+              getUnitValue(
+                value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
+              )
+            );
+          },
           enterable: true,
           backgroundColor:
             store.state.theme === "dark"
