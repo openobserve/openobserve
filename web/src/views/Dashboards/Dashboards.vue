@@ -535,7 +535,7 @@ export default defineComponent({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: row.identifier,
+          dashboard: row.id,
           folder: activeFolderId.value || "default",
         },
       });
