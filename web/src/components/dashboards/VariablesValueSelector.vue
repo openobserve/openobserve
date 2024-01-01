@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="variablesData.values?.length > 0"
     :key="variablesData.isVariablesLoading"
-    class="flex q-mt-sm q-ml-sm"
+    class="flex q-mt-xs q-ml-xs"
   >
     <div
       v-for="item in variablesData.values"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         item.options?.length +
         item.isLoading
       "
-      class="q-mr-lg q-mt-sm"
+      class="q-mr-lg q-mt-xs"
     >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector v-model="item.value" :variableItem="item" />

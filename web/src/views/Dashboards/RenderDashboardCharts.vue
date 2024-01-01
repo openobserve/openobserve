@@ -39,9 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :autoSize="true"
         :restore-on-drag="true"
         :use-css-transforms="false"
+        :margin="[4, 4]"
       >
         <grid-item
-          class="gridBackground"
+          class="gridBackground" :class="store.state.theme == 'dark' ? 'dark' : ''"
           v-for="item in dashboardData.panels"
           :key="item.id"
           :x="getPanelLayout(item, 'x')"
@@ -399,5 +400,9 @@ export default defineComponent({
   background: #00000000 !important;
   border-radius: 4px;
   border-color: #c2c2c27a !important;
+}
+
+.gridBackground.dark {
+  border-color: rgba(204, 204, 220, 0.12) !important;
 }
 </style>
