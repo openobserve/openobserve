@@ -159,7 +159,7 @@ export default defineComponent({
 
       if (props.showDynamicFilters) {
         variablesConfigList.push({
-          name: "dynamic_filters",
+          name: "__dynamic_filters",
           label: "Dynamic Filters",
           type: "dynamic_filters",
           value: [],
