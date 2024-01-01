@@ -118,7 +118,7 @@ export default defineComponent({
       dashboardData.title = data.title;
       dashboardData.description = data.description;
       dashboardData.variables.showDynamicFilters =
-        data.variables.showDynamicFilters ?? true;
+        data.variables?.showDynamicFilters ?? false;
     };
     onMounted(async () => {
       await getDashboardData();
