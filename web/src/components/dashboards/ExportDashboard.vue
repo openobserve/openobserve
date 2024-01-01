@@ -52,7 +52,7 @@ export default defineComponent({
       // prepare json and download via a click
       const data =
         "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard));
+        encodeURIComponent(JSON.stringify(dashboard, null, 2));
       const htmlA = document.createElement("a");
       htmlA.setAttribute("href", data);
       const fileName = dashboard.title || "dashboard";
