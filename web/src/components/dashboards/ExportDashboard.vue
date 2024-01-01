@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <q-btn
-    class="q-ml-sm"
+    class="dashboard-icons q-px-sm q-ml-sm"
+    size="sm"
     outline
-    padding="xs"
     no-caps
     icon="download"
     @click="downloadDashboard()"
   >
+    <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
   </q-btn>
 </template>
 <script lang="ts">
@@ -51,7 +52,7 @@ export default defineComponent({
       // prepare json and download via a click
       const data =
         "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard));
+        encodeURIComponent(JSON.stringify(dashboard, null, 2));
       const htmlA = document.createElement("a");
       htmlA.setAttribute("href", data);
       const fileName = dashboard.title || "dashboard";
@@ -61,7 +62,14 @@ export default defineComponent({
 
     return {
       downloadDashboard,
+      t
     };
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.dashboard-icons {
+  height: 30px;
+}
+</style>
