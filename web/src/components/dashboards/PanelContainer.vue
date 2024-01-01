@@ -36,15 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && showFullScreenBtn && props.data.description != ''"
           name="info_outline"
           style="cursor: pointer"
-          @mouseover="showText = true"
-          @mouseleave="showText = false"
         >
-          <div v-if="showText" style="border: 1px solid red; color:black; position: absolute; top: 10px; right: 0px; width: 150px; height: 200px; z-index: 999">
-            {{ props.data.description }}
-          </div>
-          <!-- <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            {{ props.data.description }}
-          </q-tooltip> -->
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            <div style="white-space: pre-wrap;">{{ props.data.description }}</div>
+          </q-tooltip>
         </q-icon>
         <q-btn
           v-if="!viewOnly && showFullScreenBtn"
