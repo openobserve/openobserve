@@ -321,11 +321,7 @@ export default defineComponent({
       {
         label: t("dashboard.custom"),
         value: "custom",
-      },
-      {
-        label: t("dashboard.ad-hoc-variable"),
-        value: "dynamic_filters",
-      },
+      }
     ]);
 
     const variableData: any = reactive({

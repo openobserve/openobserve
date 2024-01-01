@@ -171,13 +171,17 @@ export default defineComponent({
             // a string.
             dashboardId: "",
             description: obj.description,
+            variables: {
+              list: [],
+              showDynamicFilters: true,
+            },
             role: "",
             owner: store.state.userInfo.name,
             created: new Date().toISOString(),
             panels: [],
             version: 2,
           };
-
+          
           callDashboard = dashboardService.create(
             store.state.selectedOrganization.identifier,
             baseObj,
