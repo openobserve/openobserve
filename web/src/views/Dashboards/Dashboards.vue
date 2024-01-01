@@ -367,13 +367,13 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      {
-        name: "identifier",
-        field: "identifier",
-        label: t("dashboard.identifier"),
-        align: "left",
-        sortable: true,
-      },
+      // {
+      //   name: "identifier",
+      //   field: "identifier",
+      //   label: t("dashboard.identifier"),
+      //   align: "left",
+      //   sortable: true,
+      // },
       {
         name: "description",
         field: "description",
@@ -558,8 +558,11 @@ export default defineComponent({
           "#": index < 9 ? `0${index + 1}` : index + 1,
           id: board.dashboardId,
           name: board.title,
-          identifier: board.dashboardId,
-          description: board.description,
+          // identifier: board.dashboardId,
+          description:
+            board.description.length > 45
+              ? `${board.description.slice(0, 45)}...`
+              : board.description,
           owner: board.owner,
           created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
           actions: "true",
