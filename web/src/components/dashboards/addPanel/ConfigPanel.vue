@@ -99,7 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-input
-      v-if="dashboardPanelData.data.type != 'table'"
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'geomap'
+      "
       type="number"
       v-model.number="dashboardPanelData.data.config.decimals"
       value="2"
