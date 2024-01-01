@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
+      :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
@@ -118,6 +119,7 @@ export default defineComponent({
     "initialVariableValues",
     "selectedDateForViewPanel",
   ],
+
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,

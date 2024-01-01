@@ -210,7 +210,7 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-
+      
       // if variables data is null, set it to empty list
       if (
         !(
