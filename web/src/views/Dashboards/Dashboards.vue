@@ -149,6 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #no-data>
             <NoData />
           </template>
+          <template #body-cell-description="props">
+            <q-td :props="props">
+              <div :title="props.value">
+                {{ (props.value && props.value.length > 45) ? props.value.slice(0, 45) + '...' : props.value }}
+              </div>
+            </q-td>
+          </template>
           <!-- add delete icon in actions column -->
           <template #body-cell-actions="props">
             <q-td :props="props">
@@ -559,10 +566,7 @@ export default defineComponent({
           id: board.dashboardId,
           name: board.title,
           // identifier: board.dashboardId,
-          description:
-            board.description.length > 45
-              ? `${board.description.slice(0, 45)}...`
-              : board.description,
+          description: board.description,
           owner: board.owner,
           created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
           actions: "true",
