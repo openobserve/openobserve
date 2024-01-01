@@ -530,7 +530,7 @@ export const convertSQLData = (
             if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
               return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
-                  it.data[1],
+                  it.data,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals
@@ -540,7 +540,7 @@ export const convertSQLData = (
             else
               return `${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
-                  it.data[1],
+                  it.data,
                   panelSchema.config?.unit,
                   panelSchema.config?.unit_custom,
                   panelSchema.config?.decimals
@@ -548,7 +548,7 @@ export const convertSQLData = (
               )}`;
           });
 
-          return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
+          return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
         };
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
