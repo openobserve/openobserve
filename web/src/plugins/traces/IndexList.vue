@@ -591,20 +591,22 @@ export default defineComponent({
       }
     };
 
-    //
+    // Update the values of the selected fields and add the values which are not present in the selected values
+    // Also we filter out null values from the values array
     const updateSelectedValues = (hits: any[]) => {
-      console.log("hits", hits);
       hits.forEach((field: any) => {
         const values: any = new Set([]);
 
         fieldValues.value[field.field]["values"] =
-          field.values.map((value: any) => {
-            values.add(value.zo_sql_key);
-            return {
-              key: value.zo_sql_key ? value.zo_sql_key : "null",
-              count: formatLargeNumber(value.zo_sql_num),
-            };
-          }) || [];
+          field.values
+            .map((value: any) => {
+              values.add(value.zo_sql_key);
+              return {
+                key: value.zo_sql_key ? value.zo_sql_key : "null",
+                count: formatLargeNumber(value.zo_sql_num),
+              };
+            })
+            .filter((field: any) => field.key !== "null") || [];
 
         fieldValues.value[field.field].selectedValues.forEach(
           (value: string) => {

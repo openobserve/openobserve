@@ -74,6 +74,7 @@ const stream = {
     return http().get(url);
   },
 
+  // Thia API is just used for service_name and operation_name fields
   tracesFieldValues: ({
     org_identifier,
     stream_name,
