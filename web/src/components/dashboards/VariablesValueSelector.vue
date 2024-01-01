@@ -106,7 +106,7 @@ export default defineComponent({
     "selectedTimeDate",
     "variablesConfig",
     "initialVariableValues",
-    "show_dynamic_filters",
+    "showDynamicFilters",
   ],
   emits: ["variablesData"],
   components: {
@@ -156,8 +156,11 @@ export default defineComponent({
 
       const variablesConfigList =
         JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
+      console.log("variablesConfigList", variablesConfigList);
 
-      if (props.show_dynamic_filters) {
+      console.log("showDynamicFilters", props.showDynamicFilters);
+
+      if (props.showDynamicFilters) {
         variablesConfigList.push({
           name: "dynamic_filters",
           label: "Dynamic Filters",
@@ -189,201 +192,64 @@ export default defineComponent({
       variablesData.values = [];
       variablesData.isVariablesLoading = false;
 
-      const promise = variablesConfigList?.map(
-        (it: any, index: any) => {
-          const obj: any = {
-            name: it.name,
-            label: it.label,
-            type: it.type,
-            value: it.type == "dynamic_filters" ? [] : "",
-            isLoading: ["query_values", "dynamic_filters"].includes(it.type)
-              ? true
-              : false,
-          };
-          variablesData.values.push(obj);
-          variablesData.isVariablesLoading = true;
+      const promise = variablesConfigList?.map((it: any, index: any) => {
+        const obj: any = {
+          name: it.name,
+          label: it.label,
+          type: it.type,
+          value: it.type == "dynamic_filters" ? [] : "",
+          isLoading: ["query_values", "dynamic_filters"].includes(it.type)
+            ? true
+            : false,
+        };
+        variablesData.values.push(obj);
+        variablesData.isVariablesLoading = true;
 
-          switch (it.type) {
-            case "query_values": {
-              obj.isLoading = true;
-              return streamService
-                .fieldValues({
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  stream_name: it.query_data.stream,
-                  start_time: new Date(
-                    props.selectedTimeDate?.start_time?.toISOString()
-                  ).getTime(),
-                  end_time: new Date(
-                    props.selectedTimeDate?.end_time?.toISOString()
-                  ).getTime(),
-                  fields: [it.query_data.field],
-                  size: it?.query_data?.max_record_size
-                    ? it?.query_data?.max_record_size
-                    : 10,
-                  type: it.query_data.stream_type,
-                })
-                .then((res: any) => {
-                  obj.isLoading = false;
-                  if (res.data.hits.length) {
-                    //set options value from the api response
-                    obj.options = res.data.hits
-                      .find((field: any) => field.field === it.query_data.field)
-                      .values.map((value: any) =>
-                        value.zo_sql_key ? value.zo_sql_key.toString() : "null"
-                      );
-                    // find old value is exists in the dropdown
-                    let oldVariableObjectSelectedValue = oldVariableValue.find(
-                      (it2: any) => it2.name === it.name
+        switch (it.type) {
+          case "query_values": {
+            obj.isLoading = true;
+            return streamService
+              .fieldValues({
+                org_identifier: store.state.selectedOrganization.identifier,
+                stream_name: it.query_data.stream,
+                start_time: new Date(
+                  props.selectedTimeDate?.start_time?.toISOString()
+                ).getTime(),
+                end_time: new Date(
+                  props.selectedTimeDate?.end_time?.toISOString()
+                ).getTime(),
+                fields: [it.query_data.field],
+                size: it?.query_data?.max_record_size
+                  ? it?.query_data?.max_record_size
+                  : 10,
+                type: it.query_data.stream_type,
+              })
+              .then((res: any) => {
+                obj.isLoading = false;
+                if (res.data.hits.length) {
+                  //set options value from the api response
+                  obj.options = res.data.hits
+                    .find((field: any) => field.field === it.query_data.field)
+                    .values.map((value: any) =>
+                      value.zo_sql_key ? value.zo_sql_key.toString() : "null"
                     );
-
-                    // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-                    if (oldVariableObjectSelectedValue) {
-                      obj.value = obj.options.includes(
-                        oldVariableObjectSelectedValue.value
-                      )
-                        ? oldVariableObjectSelectedValue.value
-                        : obj.options.length
-                        ? obj.options[0]
-                        : "";
-                    } else {
-                      obj.value = obj.options[0] || "";
-                    }
-                    variablesData.isVariablesLoading =
-                      variablesData.values.some(
-                        (val: { isLoading: any }) => val.isLoading
-                      );
-
-                    // triggers rerendering in the current component
-                    variablesData.values[index] = obj;
-
-                    emitVariablesData();
-                    return obj;
-                  } else {
-                    variablesData.isVariablesLoading =
-                      variablesData.values.some(
-                        (val: { isLoading: any }) => val.isLoading
-                      );
-
-                    // triggers rerendering in the current component
-                    variablesData.values[index] = obj;
-
-                    emitVariablesData();
-                    return obj;
-                  }
-                })
-                .catch((err: any) => {
-                  obj.isLoading = false;
-
-                  variablesData.isVariablesLoading = variablesData.values.some(
-                    (val: { isLoading: any }) => val.isLoading
-                  );
-
-                  // triggers rerendering in the current component
-                  variablesData.values[index] = obj;
-
-                  emitVariablesData();
-                  return obj;
-                });
-            }
-            case "constant": {
-              obj.value = it.value;
-              return obj;
-            }
-            case "textbox": {
-              let oldVariableObjectSelectedValue = oldVariableValue.find(
-                (it2: any) => it2.name === it.name
-              );
-              if (oldVariableObjectSelectedValue) {
-                obj.value = oldVariableObjectSelectedValue.value;
-              } else {
-                obj.value = it.value;
-              }
-              return obj;
-            }
-            case "custom": {
-              obj["options"] = it?.options;
-              let oldVariableObjectSelectedValue = oldVariableValue.find(
-                (it2: any) => it2.name === it.name
-              );
-              // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-              if (oldVariableObjectSelectedValue) {
-                obj.value = oldVariableObjectSelectedValue.value;
-              } else {
-                obj.value = obj.options[0]?.value || "";
-              }
-              return obj;
-              // break;
-            }
-            case "dynamic_filters": {
-              obj.isLoading = true; // Set loading state
-
-              return streamService
-                .nameList(store.state.selectedOrganization.identifier, "", true)
-                .then((res) => {
-                  obj.isLoading = false; // Reset loading state
-
-                  const fieldsObj: any = {};
-
-                  res.data.list.forEach((item: any) => {
-                    const name = item.name;
-                    const stream_type = item.stream_type;
-
-                    (item.schema || []).forEach((schemaItem: any) => {
-                      const fieldName = schemaItem.name;
-
-                      if (!fieldsObj[fieldName]) {
-                        fieldsObj[fieldName] = [];
-                      }
-
-                      const existingEntry = fieldsObj[fieldName].find(
-                        (entry: any) =>
-                          entry.name === name &&
-                          entry.stream_type === stream_type
-                      );
-
-                      if (!existingEntry) {
-                        fieldsObj[fieldName].push({
-                          name: name,
-                          stream_type: stream_type,
-                        });
-                      }
-                    });
-                  });
-                  const fieldsArray = Object.entries(fieldsObj).map(
-                    ([schemaName, entries]) => ({
-                      name: schemaName,
-                      streams: entries,
-                    })
-                  );
-                  obj.options = fieldsArray;
-
-                  let old = oldVariableValue.find(
+                  // find old value is exists in the dropdown
+                  let oldVariableObjectSelectedValue = oldVariableValue.find(
                     (it2: any) => it2.name === it.name
                   );
-                  if (old) {
-                    obj.value = old.value.map((it2: any) => ({
-                      ...it2,
-                      streams: fieldsArray.find(
-                        (it3: any) => it3.name === it2.name
-                      )?.streams,
-                    }));
+
+                  // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+                  if (oldVariableObjectSelectedValue) {
+                    obj.value = obj.options.includes(
+                      oldVariableObjectSelectedValue.value
+                    )
+                      ? oldVariableObjectSelectedValue.value
+                      : obj.options.length
+                      ? obj.options[0]
+                      : "";
                   } else {
-
-                    obj.value = [];
+                    obj.value = obj.options[0] || "";
                   }
-
-                  variablesData.isVariablesLoading = variablesData.values.some(
-                    (val: { isLoading: any }) => val.isLoading
-                  );
-
-                  // triggers rerendering in the current component
-                  variablesData.values[index] = obj;
-                  emitVariablesData();
-                  return obj;
-                })
-                .catch((error) => {
-                  obj.isLoading = false; // Reset loading state
-                  // Handle error
                   variablesData.isVariablesLoading = variablesData.values.some(
                     (val: { isLoading: any }) => val.isLoading
                   );
@@ -393,14 +259,145 @@ export default defineComponent({
 
                   emitVariablesData();
                   return obj;
-                });
-            }
-            default:
-              obj.value = it.value;
-              return obj;
+                } else {
+                  variablesData.isVariablesLoading = variablesData.values.some(
+                    (val: { isLoading: any }) => val.isLoading
+                  );
+
+                  // triggers rerendering in the current component
+                  variablesData.values[index] = obj;
+
+                  emitVariablesData();
+                  return obj;
+                }
+              })
+              .catch((err: any) => {
+                obj.isLoading = false;
+
+                variablesData.isVariablesLoading = variablesData.values.some(
+                  (val: { isLoading: any }) => val.isLoading
+                );
+
+                // triggers rerendering in the current component
+                variablesData.values[index] = obj;
+
+                emitVariablesData();
+                return obj;
+              });
           }
+          case "constant": {
+            obj.value = it.value;
+            return obj;
+          }
+          case "textbox": {
+            let oldVariableObjectSelectedValue = oldVariableValue.find(
+              (it2: any) => it2.name === it.name
+            );
+            if (oldVariableObjectSelectedValue) {
+              obj.value = oldVariableObjectSelectedValue.value;
+            } else {
+              obj.value = it.value;
+            }
+            return obj;
+          }
+          case "custom": {
+            obj["options"] = it?.options;
+            let oldVariableObjectSelectedValue = oldVariableValue.find(
+              (it2: any) => it2.name === it.name
+            );
+            // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+            if (oldVariableObjectSelectedValue) {
+              obj.value = oldVariableObjectSelectedValue.value;
+            } else {
+              obj.value = obj.options[0]?.value || "";
+            }
+            return obj;
+            // break;
+          }
+          case "dynamic_filters": {
+            obj.isLoading = true; // Set loading state
+
+            return streamService
+              .nameList(store.state.selectedOrganization.identifier, "", true)
+              .then((res) => {
+                obj.isLoading = false; // Reset loading state
+
+                const fieldsObj: any = {};
+
+                res.data.list.forEach((item: any) => {
+                  const name = item.name;
+                  const stream_type = item.stream_type;
+
+                  (item.schema || []).forEach((schemaItem: any) => {
+                    const fieldName = schemaItem.name;
+
+                    if (!fieldsObj[fieldName]) {
+                      fieldsObj[fieldName] = [];
+                    }
+
+                    const existingEntry = fieldsObj[fieldName].find(
+                      (entry: any) =>
+                        entry.name === name && entry.stream_type === stream_type
+                    );
+
+                    if (!existingEntry) {
+                      fieldsObj[fieldName].push({
+                        name: name,
+                        stream_type: stream_type,
+                      });
+                    }
+                  });
+                });
+                const fieldsArray = Object.entries(fieldsObj).map(
+                  ([schemaName, entries]) => ({
+                    name: schemaName,
+                    streams: entries,
+                  })
+                );
+                obj.options = fieldsArray;
+
+                let old = oldVariableValue.find(
+                  (it2: any) => it2.name === it.name
+                );
+                if (old) {
+                  obj.value = old.value.map((it2: any) => ({
+                    ...it2,
+                    streams: fieldsArray.find(
+                      (it3: any) => it3.name === it2.name
+                    )?.streams,
+                  }));
+                } else {
+                  obj.value = [];
+                }
+
+                variablesData.isVariablesLoading = variablesData.values.some(
+                  (val: { isLoading: any }) => val.isLoading
+                );
+
+                // triggers rerendering in the current component
+                variablesData.values[index] = obj;
+                emitVariablesData();
+                return obj;
+              })
+              .catch((error) => {
+                obj.isLoading = false; // Reset loading state
+                // Handle error
+                variablesData.isVariablesLoading = variablesData.values.some(
+                  (val: { isLoading: any }) => val.isLoading
+                );
+
+                // triggers rerendering in the current component
+                variablesData.values[index] = obj;
+
+                emitVariablesData();
+                return obj;
+              });
+          }
+          default:
+            obj.value = it.value;
+            return obj;
         }
-      );
+      });
 
       variablesData.isVariablesLoading = variablesData.values.some(
         (val: { isLoading: any }) => val.isLoading

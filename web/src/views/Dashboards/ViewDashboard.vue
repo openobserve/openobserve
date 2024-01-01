@@ -210,7 +210,7 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-
+      
       // if variables data is null, set it to empty list
       if (
         !(
@@ -221,6 +221,8 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
+      console.log("currentDashboardData", currentDashboardData.data);
+
     };
 
     const openSettingsDialog = () => {

@@ -173,7 +173,7 @@ export default defineComponent({
             description: obj.description,
             variables: {
               list: [],
-              show_dynamic_filters: true,
+              showDynamicFilters: true,
             },
             role: "",
             owner: store.state.userInfo.name,
@@ -216,7 +216,7 @@ export default defineComponent({
       });
     });
     console.log("dashboardData", dashboardData);
-    
+
     return {
       t,
       disableColor,

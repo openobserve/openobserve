@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    {{ dashboardData.variables?.show_dynamic_filters }}
-    
+    {{ dashboardData.variables?.showDynamicFilters }}
+
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
-      :show_dynamic_filters="dashboardData.variables?.show_dynamic_filters"
+      :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
       :selectedTimeDate="currentTimeObj"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
@@ -122,7 +122,6 @@ export default defineComponent({
     "selectedDateForViewPanel",
   ],
 
-  
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
@@ -139,7 +138,7 @@ export default defineComponent({
     const $q = useQuasar();
     const gridLayoutRef = ref(null);
     console.log("render dashboard", props);
-  console.log("render dashboard", props.dashboardData);
+    console.log("render dashboard", props.dashboardData);
 
     const showViewPanel = ref(false);
     // holds the view panel id
