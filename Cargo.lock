@@ -3751,6 +3751,7 @@ dependencies = [
  "bytes",
  "chrono",
  "config",
+ "futures",
  "hashbrown 0.14.3",
  "indexmap 2.1.0",
  "itertools 0.12.0",

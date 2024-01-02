@@ -25,9 +25,6 @@ pub enum Error {
     WalError {
         source: wal::Error,
     },
-    Message {
-        message: String,
-    },
     OpenFileError {
         source: io::Error,
         path: PathBuf,
@@ -89,5 +86,8 @@ pub enum Error {
     },
     WriteParquetRecordBatchError {
         source: parquet::errors::ParquetError,
+    },
+    TokioJoinError {
+        source: tokio::task::JoinError,
     },
 }

@@ -16,14 +16,15 @@
 use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
-use config::metrics;
+use config::{metrics, CONFIG};
+use futures::future::try_join_all;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::time;
+use tokio::{sync::Semaphore, task};
 
 use crate::{
     entry::RecordBatchEntry,
-    errors::{DeleteFileSnafu, RenameFileSnafu, Result, WriteDataSnafu},
+    errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
@@ -91,21 +92,40 @@ impl Immutable {
 }
 
 pub(crate) async fn persist() -> Result<()> {
-    loop {
-        let r = IMMUTABLES.read().await;
-        let Some((path, immutable)) = r.first() else {
-            break;
-        };
-        let path = path.clone();
-        // persist entry to local disk
-        immutable.persist(&path).await?;
-        drop(r);
+    let r = IMMUTABLES.read().await;
+    let n = r.len();
+    drop(r);
 
-        // remove entry from IMMUTABLES
-        IMMUTABLES.write().await.remove(&path);
-        metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
-
-        time::sleep(time::Duration::from_millis(10)).await;
+    let mut tasks = Vec::new();
+    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    for _ in 0..n {
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let task: task::JoinHandle<Result<Option<PathBuf>>> = task::spawn(async move {
+            let r = IMMUTABLES.read().await;
+            let Some((path, immutable)) = r.first() else {
+                drop(permit);
+                return Ok(None);
+            };
+            // persist entry to local disk
+            let ret = immutable.persist(path).await;
+            drop(permit);
+            ret.map(|_| Some(path.clone()))
+        });
+        tasks.push(task);
     }
+
+    // remove entry from IMMUTABLES
+    let tasks = try_join_all(tasks).await.context(TokioJoinSnafu)?;
+    let mut rw = IMMUTABLES.write().await;
+    for task in tasks {
+        if let Some(v) = task? {
+            // remove entry
+            rw.remove(&v);
+            // update metrics
+            metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+        }
+    }
+    rw.shrink_to_fit();
+
     Ok(())
 }
