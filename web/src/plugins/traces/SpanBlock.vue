@@ -16,8 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center bg-white"
-    :class="defocusSpan ? 'defocus' : ''"
+    class="flex wrap justify-start items-center"
+    :class="[
+      defocusSpan ? 'defocus' : '',
+      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+    ]"
     :style="{
       zIndex: 2,
       borderBottom:
@@ -25,7 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position bg-white"
+      class="flex justify-between items-end cursor-pointer span-block relative-position"
+      :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
         width: '100%',
@@ -106,6 +110,7 @@ import { defineComponent, computed, ref } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import SpanDetails from "./SpanDetails.vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -146,6 +151,7 @@ export default defineComponent({
   emits: ["toggleCollapse"],
   components: { SpanDetails },
   setup(props, { emit }) {
+    const store = useStore();
     const { searchObj } = useTraces();
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
@@ -256,6 +262,7 @@ export default defineComponent({
       toggleSpanDetails,
       defocusSpan,
       isSpanSelected,
+      store,
     };
   },
 });
@@ -267,7 +274,6 @@ export default defineComponent({
 }
 
 .collapse-btn {
-  background-color: #ffffff;
   opacity: 0.6;
 }
 

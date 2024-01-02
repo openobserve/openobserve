@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="col-12 flex justify-start items-center q-mt-md">
+        <div class="col-12 flex justify-start items-center q-mt-xs">
           <div
             class="q-py-sm showLabelOnTop text-bold text-h7"
             data-test="add-alert-delay-title"
@@ -169,39 +169,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("alerts.silenceNotification") + " *" }}
           </div>
-          <div class="col-8 row justify-left align-center q-gutter-sm">
+          <div style="min-height: 58px">
+            <div class="col-8 row justify-left align-center q-gutter-sm">
+              <div
+                class="flex items-center"
+                style="border: 1px solid rgba(0, 0, 0, 0.05)"
+              >
+                <div
+                  style="width: 87px; margin-left: 0 !important"
+                  class="silence-notification-input"
+                >
+                  <q-input
+                    data-test="add-alert-delay-input"
+                    v-model="formData.trigger_condition.silence"
+                    type="number"
+                    dense
+                    filled
+                    min="1"
+                    style="background: none"
+                  />
+                </div>
+                <div
+                  style="
+                    min-width: 90px;
+                    margin-left: 0 !important;
+                    background: #f2f2f2;
+                    height: 40px;
+                  "
+                  class="flex justify-center items-center"
+                >
+                  {{ t("alerts.minutes") }}
+                </div>
+              </div>
+            </div>
             <div
-              class="flex items-center"
-              style="border: 1px solid rgba(0, 0, 0, 0.05)"
+              v-if="formData.trigger_condition.silence < 1"
+              class="text-red-8 q-pt-xs"
+              style="font-size: 11px; line-height: 12px"
             >
-              <div
-                style="width: 87px; margin-left: 0 !important"
-                class="silence-notification-input"
-              >
-                <q-input
-                  data-test="add-alert-delay-input"
-                  v-model="formData.trigger_condition.silence"
-                  type="number"
-                  dense
-                  filled
-                  min="1"
-                  style="background: none"
-                />
-              </div>
-              <div
-                style="
-                  min-width: 90px;
-                  margin-left: 0 !important;
-                  background: #f2f2f2;
-                  height: 40px;
-                "
-                class="flex justify-center items-center"
-                :class="
-                  store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'
-                "
-              >
-                {{ t("alerts.minutes") }}
-              </div>
+              Field is required!
             </div>
           </div>
         </div>
@@ -332,7 +338,7 @@ import ScheduledAlert from "./ScheduledAlert.vue";
 import RealTimeAlert from "./RealTimeAlert.vue";
 import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
-import { cloneDeep } from "lodash-es";
+import { clone, cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 
 const defaultValue: any = () => {
@@ -719,11 +725,6 @@ export default defineComponent({
         });
         return false;
       }
-      const dismiss = this.q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
 
       this.addAlertForm.validate().then((valid: any) => {
         if (!valid) {
@@ -767,6 +768,14 @@ export default defineComponent({
           payload.query_condition.conditions = [];
         }
 
+        if (!this.validateInputs(payload)) return;
+
+        const dismiss = this.q.notify({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000,
+        });
+
         callAlert = alertsService.create(
           this.store.state.selectedOrganization.identifier,
           payload.stream_name,
@@ -801,6 +810,71 @@ export default defineComponent({
           page: "Add/Update Alert",
         });
       });
+    },
+
+    validateInputs(input: any) {
+      if (
+        Number(input.trigger_condition.silence) < 1 ||
+        isNaN(Number(input.trigger_condition.silence))
+      ) {
+        this.q.notify({
+          type: "negative",
+          message: "Silence Notification should be greater than 0",
+          timeout: 1500,
+        });
+        return false;
+      }
+
+      if (input.is_real_time) return true;
+
+      if (
+        Number(input.trigger_condition.period) < 1 ||
+        isNaN(Number(input.trigger_condition.period))
+      ) {
+        this.q.notify({
+          type: "negative",
+          message: "Period should be greater than 0",
+          timeout: 1500,
+        });
+        return false;
+      }
+
+      if (input.query_condition.aggregation) {
+        if (
+          !input.query_condition.aggregation.having.value.toString().trim()
+            .length ||
+          !input.query_condition.aggregation.having.column ||
+          !input.query_condition.aggregation.having.operator
+        ) {
+          this.q.notify({
+            type: "negative",
+            message: "Threshold should not be empty",
+            timeout: 1500,
+          });
+          return false;
+        }
+
+        return true;
+      }
+
+      console.log(
+        input.trigger_condition.threshold.toString().trim().length,
+        input.query_condition.operator
+      );
+
+      if (
+        !input.trigger_condition.threshold.toString().trim().length ||
+        !input.trigger_condition.operator
+      ) {
+        this.q.notify({
+          type: "negative",
+          message: "Threshold should not be empty",
+          timeout: 1500,
+        });
+        return false;
+      }
+
+      return true;
     },
   },
 });
