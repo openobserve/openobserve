@@ -241,7 +241,12 @@ export default defineComponent({
     };
 
     const shareLink = () => {
-      emit("shareLink");
+      if (!searchObj.data.traceDetails.selectedTrace) return;
+      const trace = searchObj.data.traceDetails.selectedTrace as any;
+      emit("shareLink", {
+        from: trace.trace_start_time - 60000000,
+        to: trace.trace_end_time + 60000000,
+      });
     };
 
     return {

@@ -1195,8 +1195,13 @@ export default defineComponent({
       }
     }
 
-    const copyTracesUrl = () => {
+    const copyTracesUrl = (customTimeRange = null) => {
       const queryParams = getUrlQueryParams(true);
+
+      if (customTimeRange) {
+        queryParams.from = customTimeRange.from;
+        queryParams.to = customTimeRange.to;
+      }
 
       const queryString = Object.entries(queryParams)
         .map(
