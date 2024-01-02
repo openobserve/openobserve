@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <thead class="thead-sticky text-left">
             <tr>
               <th
-                v-for="(col, index) in eventColumns"
+                v-for="(col, index) in exceptionEventColumns"
                 :key="'result_' + index"
                 class="table-header"
                 :data-test="`trace-events-table-th-${col.label}`"
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="pointer"
           >
             <q-td
-              v-for="column in eventColumns"
+              v-for="column in exceptionEventColumns"
               :key="index + '-' + column.name"
               class="field_list"
               style="cursor: pointer"
@@ -261,20 +261,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>"{{ row["exception.type"] }}"</span>
                 </div>
 
-                <div>
+                <div class="q-mt-xs">
                   <span>Message: </span>
                   <span>"{{ row["exception.message"] }}"</span>
                 </div>
 
-                <div>
+                <div class="q-mt-xs">
                   <span>Escaped: </span>
                   <span>"{{ row["exception.escaped"] }}"</span>
                 </div>
 
-                <div>
+                <div class="q-mt-xs">
                   <span>Stacktrace: </span>
                   <div
-                    class="q-px-sm"
+                    class="q-px-sm q-mt-xs"
                     style="
                       background-color: #ffffff !important;
                       border: 1px solid #c1c1c1;
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <pre
                       style="font-size: 12px; text-wrap: wrap"
-                      class="log_json_content"
+                      class="q-mt-xs"
                       >{{ formatStackTrace(row["exception.stacktrace"]) }}</pre
                     >
                   </div>
@@ -365,6 +365,33 @@ export default defineComponent({
         field: (row: any) => JSON.stringify(row),
         prop: (row: any) => JSON.stringify(row),
         label: "source",
+        align: "left",
+        sortable: true,
+      },
+    ]);
+
+    const exceptionEventColumns = ref([
+      {
+        name: "@timestamp",
+        field: (row: any) =>
+          date.formatDate(
+            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
+          ),
+        prop: (row: any) =>
+          date.formatDate(
+            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
+          ),
+        label: "Timestamp",
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "type",
+        field: (row: any) => row["exception.type"],
+        prop: (row: any) => row["exception.type"],
+        label: "Type",
         align: "left",
         sortable: true,
       },
@@ -485,6 +512,7 @@ export default defineComponent({
       processes,
       formatStackTrace,
       getExceptionEvents,
+      exceptionEventColumns,
     };
   },
 });
