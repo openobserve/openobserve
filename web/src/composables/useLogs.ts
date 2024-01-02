@@ -638,6 +638,7 @@ const useLogs = () => {
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
+          queryReq.query.track_total_hits = true;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
@@ -689,7 +690,7 @@ const useLogs = () => {
               //extract fields from query response
               extractFields();
 
-              searchObj.data.histogram.chartParams.title = getHistogramTitle();
+              // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
               //update grid columns
               updateGridColumns();
@@ -734,6 +735,8 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
+        queryReq.query.size = 0;
+        queryReq.query.track_total_hits = true;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
@@ -743,7 +746,9 @@ const useLogs = () => {
           .then((res) => {
             dismiss();
             searchObj.data.queryResults.aggs = res.data.aggs;
+            searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
+            searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObj.loading = false;
             resolve(true);
