@@ -734,6 +734,7 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
+        queryReq.query.size = 0;
         searchService
           .search({
             org_identifier: searchObj.organizationIdetifier,
