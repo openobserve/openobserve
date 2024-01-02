@@ -94,22 +94,29 @@ impl Immutable {
 pub(crate) async fn persist() -> Result<()> {
     let r = IMMUTABLES.read().await;
     let n = r.len();
+    let mut paths = Vec::with_capacity(n);
+    for item in r.iter() {
+        if paths.len() >= n {
+            break;
+        }
+        paths.push(item.0.clone());
+    }
     drop(r);
 
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
-    for _ in 0..n {
+    let mut tasks = Vec::with_capacity(paths.len());
+    let semaphore = Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
+    for path in paths {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<Option<PathBuf>>> = task::spawn(async move {
             let r = IMMUTABLES.read().await;
-            let Some((path, immutable)) = r.first() else {
+            let Some(immutable) = r.get(&path) else {
                 drop(permit);
                 return Ok(None);
             };
             // persist entry to local disk
-            let ret = immutable.persist(path).await;
+            let ret = immutable.persist(&path).await;
             drop(permit);
-            ret.map(|_| Some(path.clone()))
+            ret.map(|_| Some(path))
         });
         tasks.push(task);
     }
