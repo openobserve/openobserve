@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <div class="text-center">
-        {{ getChartParamsTitle }}
+        {{ noOfRecordsTitle }}
       </div>
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
@@ -349,6 +349,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const searchListContainer = ref(null);
+    const noOfRecordsTitle = ref("");
 
     const {
       searchObj,
@@ -428,14 +429,6 @@ export default defineComponent({
       return "";
     });
 
-    const getChartParamsTitle = computed(() => {
-      if (searchObj.data.histogram.chartParams) {
-        return searchObj.data.histogram.chartParams.title;
-      } else {
-        return "";
-      }
-    });
-
     function addFieldToTable(fieldName: string) {
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
@@ -486,7 +479,7 @@ export default defineComponent({
       extractFTSFields,
       evaluateWrapContentFlag,
       useLocalWrapContent,
-      getChartParamsTitle,
+      noOfRecordsTitle,
     };
   },
   computed: {
@@ -496,6 +489,9 @@ export default defineComponent({
     findFTSFields() {
       return this.searchObj.data.stream.selectedStreamFields;
     },
+    updateTitle() {
+      return this.searchObj.data.histogram.chartParams.title;
+    }
   },
   watch: {
     toggleWrapFlag() {
@@ -505,6 +501,9 @@ export default defineComponent({
       this.extractFTSFields();
       this.evaluateWrapContentFlag();
     },
+    updateTitle() {
+      this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
+    }
   },
 });
 </script>

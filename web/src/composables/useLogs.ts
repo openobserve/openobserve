@@ -638,7 +638,6 @@ const useLogs = () => {
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
-          queryReq.query.track_total_hits = true;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
@@ -690,7 +689,11 @@ const useLogs = () => {
               //extract fields from query response
               extractFields();
 
-              // searchObj.data.histogram.chartParams.title = getHistogramTitle();
+              if (!isPagination) generateHistogramData();
+              else {
+                searchObj.data.histogram.chartParams.title =
+                  getHistogramTitle();
+              }
 
               //update grid columns
               updateGridColumns();
