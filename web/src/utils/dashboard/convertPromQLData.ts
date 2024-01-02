@@ -386,9 +386,7 @@ export const convertPromQLData = (
                   panelSchema.queries[index].config.promql_legend
                 ),
                 // taking first value for gauge
-                value: parseFloat(values[0][1]).toFixed(
-                  panelSchema.config?.decimals
-                ),
+                value: values[0][1],
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
