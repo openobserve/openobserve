@@ -212,9 +212,7 @@ export const getUnitValue = (
       return {
         value: isNaN(value)
           ? value
-          : Number.isInteger(value)
-          ? value
-          : value.toFixed(decimals),
+          : (+value).toFixed(decimals),
         unit: "",
       };
     }
@@ -222,9 +220,7 @@ export const getUnitValue = (
       return {
         value: isNaN(value)
           ? value
-          : typeof value === "string"
-          ? value
-          : value.toFixed(decimals),
+          : (+value).toFixed(decimals),
         unit: "",
       };
     }
