@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon="restart_alt"
           class="q-pr-sm q-pl-xs reset-filters q-ml-md"
-          @click="resetFilters()"
-        ></q-btn>
+          @click="resetFilters"
+        />
       </div>
       <div class="float-right col-auto">
         <div class="float-left">
@@ -113,7 +113,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="download"
           title="Export Traces"
           @click="downloadLogs"
-        ></q-btn>
+        />
+        <q-btn
+          data-test="logs-search-bar-share-link-btn"
+          class="q-mr-sm download-logs-btn q-px-sm"
+          size="sm"
+          icon="share"
+          :title="t('search.shareLink')"
+          @click="shareLink"
+        />
       </div>
     </div>
     <div
@@ -175,7 +183,7 @@ export default defineComponent({
     AppTabs,
     ConfirmDialog,
   },
-  emits: ["searchdata"],
+  emits: ["searchdata", "shareLink"],
   props: {
     fieldValues: {
       type: Object,
@@ -378,10 +386,15 @@ export default defineComponent({
 
     const resetFilters = () => {
       searchObj.data.editorValue = "";
+      searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
         field.selectedValues = [];
         field.searchKeyword = "";
       });
+    };
+
+    const shareLink = () => {
+      emit("shareLink");
     };
 
     return {
@@ -404,6 +417,7 @@ export default defineComponent({
       showWarningDialog,
       changeToggle,
       resetFilters,
+      shareLink,
     };
   },
   computed: {

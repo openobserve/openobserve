@@ -29,6 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchObj.meta.sqlMode"
           :label="t('search.sqlModeLabel')"
         />
+        <q-btn
+          label="Reset Filters"
+          no-caps
+          size="sm"
+          icon="restart_alt"
+          class="q-pr-sm q-pl-xs reset-filters q-ml-md"
+          @click="resetFilters"
+        />
         <syntax-guide
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
@@ -71,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete"
-color="grey" size="xs" />
+                    <q-icon name="delete" color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -879,7 +886,7 @@ export default defineComponent({
         fnEditorobj.layout();
         searchObj.config.fnSplitterModel = 60;
       }
-      
+
       window.addEventListener("click", () => {
         fnEditorobj.layout();
         // queryEditorRef.value.resetEditorLayout();
@@ -1495,6 +1502,11 @@ export default defineComponent({
         });
     };
 
+    const resetFilters = () => {
+      searchObj.data.query = "";
+      searchObj.data.editorValue = "";
+    };
+
     return {
       t,
       store,
@@ -1547,6 +1559,7 @@ export default defineComponent({
       saveFunctionLoader,
       shareLink,
       getImageURL,
+      resetFilters,
     };
   },
   computed: {
