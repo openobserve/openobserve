@@ -113,6 +113,13 @@ impl Writer {
         let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
             .join("logs")
             .join(thread_id.to_string());
+        log::info!(
+            "[INGESTER] create file: {}/{}/{}/{}.wal",
+            thread_id,
+            &key.org_id,
+            &key.stream_type,
+            wal_id
+        );
         Self {
             thread_id,
             key: key.clone(),
@@ -150,6 +157,13 @@ impl Writer {
             )
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
+            log::info!(
+                "[INGESTER] create file: {}/{}/{}/{}.wal",
+                self.thread_id,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id
+            );
 
             // rotation memtable
             let mut mem = self.memtable.write().await;
