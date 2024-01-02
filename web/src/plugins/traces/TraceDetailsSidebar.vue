@@ -293,6 +293,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
       </q-virtual-scroll>
+      <div
+        class="full-width text-center q-pt-lg text-bold"
+        v-if="!getExceptionEvents.length"
+      >
+        No events present for this span
+      </div>
     </q-tab-panel>
   </q-tab-panels>
 </template>
