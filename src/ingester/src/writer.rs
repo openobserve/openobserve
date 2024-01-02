@@ -115,7 +115,7 @@ impl Writer {
             .join(thread_id.to_string());
         log::info!(
             "[INGESTER] create file: {}/{}/{}/{}.wal",
-            thread_id,
+            wal_dir.display().to_string(),
             &key.org_id,
             &key.stream_type,
             wal_id
