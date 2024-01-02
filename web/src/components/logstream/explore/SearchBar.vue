@@ -104,6 +104,10 @@ export default defineComponent({
         return {};
       },
     },
+    isLoading: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     DateTime,
@@ -112,7 +116,7 @@ export default defineComponent({
   emits: ["searchdata", "update-query", "change:date-time"],
   methods: {
     searchData() {
-      if (this.searchObj.loading == false) {
+      if (!this.isLoading) {
         // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }

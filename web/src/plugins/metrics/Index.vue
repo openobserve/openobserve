@@ -424,8 +424,6 @@ export default defineComponent({
       () => searchObj.data.metrics.metricList,
       (metrics) => {
         updateMetricKeywords(metrics);
-        // on page load run query
-        runQuery();
       },
       { deep: true }
     );

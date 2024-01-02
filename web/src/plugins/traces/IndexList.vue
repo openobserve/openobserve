@@ -301,17 +301,13 @@ export default defineComponent({
     const getFieldValues = (name: string) => {
       fieldValues.value[name].size *= 2;
 
-      let query_context = "SELECT * FROM 'default'";
+      let query_context = `SELECT * FROM 'default' WHERE ${name} is not null`;
 
-      if (searchObj.data.editorValue) {
-        query_context += " WHERE " + searchObj.data.editorValue;
-      }
+      if (searchObj.data.editorValue.trim().length)
+        query_context += " AND " + searchObj.data.editorValue;
 
-      if (searchObj.data.editorValue && fieldValues.value[name].searchKeyword) {
+      if (fieldValues.value[name].searchKeyword.trim().length)
         query_context += ` AND ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
-      } else if (fieldValues.value[name].searchKeyword) {
-        query_context += ` WHERE ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
-      }
 
       fieldValues.value[name]["isLoading"] = true;
 
@@ -330,26 +326,7 @@ export default defineComponent({
             query_context: b64EncodeUnicode(query_context),
           })
           .then((res: any) => {
-            const values: any = new Set([]);
-
-            fieldValues.value[name]["values"] =
-              res.data.hits
-                .find((field: any) => field.field === name)
-                ?.values.map((value: any) => {
-                  return {
-                    key: value.zo_sql_key ? value.zo_sql_key : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
-                }) || [];
-
-            fieldValues.value[name].selectedValues.forEach((value: string) => {
-              if (values.has(value)) return;
-              else
-                fieldValues.value[name]["values"].unshift({
-                  key: value,
-                  count: "0",
-                });
-            });
+            updateSelectedValues(res.data.hits);
           })
           .catch(() => {
             $q.notify({
@@ -473,12 +450,6 @@ export default defineComponent({
     };
 
     const filterExpandedFieldValues = () => {
-      let query_context = "SELECT * FROM 'default'";
-
-      if (searchObj.data.editorValue) {
-        query_context += " WHERE " + searchObj.data.editorValue;
-      }
-
       const fields =
         [
           ...expandedFilters.value.filter(
@@ -492,6 +463,17 @@ export default defineComponent({
 
       if (expandedFilters.value.includes("service_name")) {
         getSpecialFieldsValues("service_name");
+      }
+
+      let query_context = "SELECT * FROM 'default'";
+
+      fields.forEach((field, index) => {
+        if (index) query_context += ` AND ${field} is not null `;
+        else query_context += ` WHERE ${field} is not null `;
+      });
+
+      if (searchObj.data.editorValue) {
+        query_context += " AND " + searchObj.data.editorValue;
       }
 
       if (!fields.length) return;
@@ -508,23 +490,21 @@ export default defineComponent({
           query_context: b64EncodeUnicode(query_context),
         })
         .then((res: any) => {
+          let fieldsToUpdate = [];
+
           fields.forEach((field) => {
             fieldValues.value[field]["values"] = [];
             fieldValues.value[field].size = 10;
           });
 
-          if (res.data.hits.length) {
-            res.data.hits.forEach((field: { field: string; values: any[] }) => {
-              fieldValues.value[field.field]["values"] = field.values.map(
-                (value: any) => {
-                  return {
-                    key: value.zo_sql_key ? value.zo_sql_key : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
-                }
-              );
-            });
-          }
+          fieldsToUpdate = fields.map((field) => ({
+            field,
+            values: [],
+          }));
+
+          fieldsToUpdate.push(...res.data.hits);
+
+          updateSelectedValues(fieldsToUpdate);
         })
         .catch(() => {
           $q.notify({
@@ -610,6 +590,34 @@ export default defineComponent({
           (_column) => _column !== columnName
         );
       }
+    };
+
+    // Update the values of the selected fields and add the values which are not present in the selected values
+    // Also we filter out null values from the values array
+    const updateSelectedValues = (hits: any[]) => {
+      hits.forEach((field: any) => {
+        const values: any = new Set([]);
+
+        fieldValues.value[field.field]["values"] =
+          field.values.map((value: any) => {
+            values.add(value.zo_sql_key);
+            return {
+              key: value.zo_sql_key ? value.zo_sql_key : "null",
+              count: formatLargeNumber(value.zo_sql_num),
+            };
+          }) || [];
+
+        fieldValues.value[field.field].selectedValues.forEach(
+          (value: string) => {
+            if (values.has(value)) return;
+            else
+              fieldValues.value[field.field]["values"].unshift({
+                key: value,
+                count: "0",
+              });
+          }
+        );
+      });
     };
 
     // const getFullQuery = () => {

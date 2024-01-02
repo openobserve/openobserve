@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     style="top: 0; z-index: 999; position: sticky"
     class="flex justify-start items-center header-bg bg-grey-2"
+    :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
   >
     <div
       class="flex justify-start items-center no-wrap row q-px-sm"

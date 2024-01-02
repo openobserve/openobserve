@@ -66,6 +66,7 @@
             <div class="layout-panel-container col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
+                :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
                 :selectedTimeDate="dashboardPanelData.meta.dateTime"
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
