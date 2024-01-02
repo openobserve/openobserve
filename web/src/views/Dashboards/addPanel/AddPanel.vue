@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
+                        :showDynamicFilters="currentDashboardData.data.variables?.showDynamicFilters"
                         :selectedTimeDate="dashboardPanelData.meta.dateTime"
                         @variablesData="variablesDataUpdated"
                       />
