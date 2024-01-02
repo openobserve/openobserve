@@ -293,7 +293,7 @@ export const convertPromQLData = (
                   store.state.timezone != "UTC"
                     ? utcToZonedTime(value[0] * 1000, store.state.timezone)
                     : new Date(value[0] * 1000).toISOString().slice(0, -1),
-                  parseFloat(value[1]).toFixed(panelSchema?.config?.decimals),
+                  value[1],
                 ]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
               };
