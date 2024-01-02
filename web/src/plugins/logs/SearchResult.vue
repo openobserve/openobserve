@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <div class="text-center">
-        {{ searchObj.data.histogram.chartParams.title }}
+        {{ getChartParamsTitle }}
       </div>
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
@@ -428,6 +428,14 @@ export default defineComponent({
       return "";
     });
 
+    const getChartParamsTitle = computed(() => {
+      if (searchObj.data.histogram.chartParams) {
+        return searchObj.data.histogram.chartParams.title;
+      } else {
+        return "";
+      }
+    });
+
     function addFieldToTable(fieldName: string) {
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
@@ -478,6 +486,7 @@ export default defineComponent({
       extractFTSFields,
       evaluateWrapContentFlag,
       useLocalWrapContent,
+      getChartParamsTitle,
     };
   },
   computed: {
