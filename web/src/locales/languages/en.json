@@ -82,7 +82,8 @@
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
     "savedViewDropdownLabel": "Saved Views",
-    "savedViewName": "View Name"
+    "savedViewName": "View Name",
+    "shareLink": "Share Link"
   },
   "menu": {
     "home": "Home",

@@ -46,7 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="q-pb-xs">Spans: {{ spanList.length }}</div>
         </div>
-        <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
+        <div class="flex items-center">
+          <q-btn
+            data-test="logs-search-bar-share-link-btn"
+            class="q-mr-sm download-logs-btn q-px-sm"
+            size="sm"
+            icon="share"
+            round
+            flat
+            no-outline
+            :title="t('search.shareLink')"
+            @click="shareLink"
+          />
+          <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
+        </div>
       </div>
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
@@ -195,6 +208,7 @@ import {
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { throttle } from "lodash";
 import { copyToClipboard, useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -214,8 +228,8 @@ export default defineComponent({
     ServiceMapIcon,
     ChartRenderer,
   },
-
-  setup() {
+  emits: ["shareLink"],
+  setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
     const { searchObj } = useTraces();
@@ -241,6 +255,8 @@ export default defineComponent({
       dotConnectorHeight: 6,
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
+
+    const { t } = useI18n();
 
     const $q = useQuasar();
 
@@ -696,7 +712,12 @@ export default defineComponent({
       copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
+    const shareLink = () => {
+      emit("shareLink");
+    };
+
     return {
+      t,
       traceTree,
       collapseMapping,
       traceRootSpan,
@@ -726,6 +747,7 @@ export default defineComponent({
       toggleTimeline,
       copyToClipboard,
       copyTraceId,
+      shareLink,
     };
   },
 });
