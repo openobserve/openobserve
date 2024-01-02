@@ -30,7 +30,7 @@ use tokio::{sync::Semaphore, task::JoinHandle};
 use crate::{
     common::{
         infra::{cache, file_list as infra_file_list, storage},
-        meta::stream::StreamStats,
+        meta::stream::{PartitionTimeLevel, StreamStats},
         utils::json,
     },
     service::{db, file_list, search::datafusion, stream},
@@ -84,6 +84,17 @@ pub async fn merge_by_stream(
         )
         .unwrap()
         .timestamp_micros();
+    let offset_time_day = Utc
+        .with_ymd_and_hms(
+            offset_time.year(),
+            offset_time.month(),
+            offset_time.day(),
+            0,
+            0,
+            0,
+        )
+        .unwrap()
+        .timestamp_micros();
 
     // check offset
     let time_now: DateTime<Utc> = Utc::now();
@@ -120,12 +131,19 @@ pub async fn merge_by_stream(
         return Ok(()); // the time is future, just wait
     }
 
-    // get current hour all files
-    let (partition_offset_start, partition_offset_end) = (
-        offset_time_hour,
-        offset_time_hour + Duration::hours(1).num_microseconds().unwrap()
-            - Duration::seconds(1).num_microseconds().unwrap(),
-    );
+    // get current hour(day) all files
+    let (partition_offset_start, partition_offset_end) =
+        if partition_time_level == PartitionTimeLevel::Daily {
+            (
+                offset_time_day,
+                offset_time_day + Duration::hours(24).num_microseconds().unwrap() - 1,
+            )
+        } else {
+            (
+                offset_time_hour,
+                offset_time_hour + Duration::hours(1).num_microseconds().unwrap() - 1,
+            )
+        };
     let files = file_list::query(
         org_id,
         stream_name,
