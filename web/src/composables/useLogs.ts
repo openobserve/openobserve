@@ -638,6 +638,7 @@ const useLogs = () => {
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
+          queryReq.query.track_total_hits = true;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
