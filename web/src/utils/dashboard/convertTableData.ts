@@ -46,6 +46,15 @@ export const convertTableData = (panelSchema: any, searchQueryData: any) => {
     return obj;
   });
 
+  // map on each columns, if align is right then need to use decimals config option in toFixed method
+  columns.map((col: any) => {
+    if (col.align === "right") {
+      const oldField = col["field"];
+      col["field"] = (row: any) =>
+        row[oldField].toFixed(panelSchema.config.decimals ?? 2);
+    }
+  });
+
   return {
     rows: searchQueryData[0],
     columns,
