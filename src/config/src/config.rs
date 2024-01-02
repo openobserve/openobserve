@@ -369,7 +369,8 @@ pub struct Limit {
     pub max_file_size_on_disk: usize,
     #[env_config(name = "ZO_MEM_FILE_MAX_SIZE", default = 256)] // MB, per log file size in memory
     pub mem_file_max_size: usize,
-    #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)] // MB, total file size in memory
+    #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
+    // MB, total file size in memory, default is 50% of system memory
     pub mem_table_max_size: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
     pub mem_persist_interval: u64,
