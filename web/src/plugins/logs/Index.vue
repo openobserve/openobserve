@@ -180,7 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <search-result
-                      :key="searchObj.data.queryResults.hits.length || -1"
                       ref="searchResultRef"
                       :expandedLogs="expandedLogs"
                       @update:datetime="setHistogramDate"
