@@ -301,17 +301,13 @@ export default defineComponent({
     const getFieldValues = (name: string) => {
       fieldValues.value[name].size *= 2;
 
-      let query_context = "SELECT * FROM 'default'";
+      let query_context = `SELECT * FROM 'default' WHERE ${name} is not null`;
 
-      if (searchObj.data.editorValue) {
-        query_context += " WHERE " + searchObj.data.editorValue;
-      }
+      if (searchObj.data.editorValue.trim().length)
+        query_context += " AND " + searchObj.data.editorValue;
 
-      if (searchObj.data.editorValue && fieldValues.value[name].searchKeyword) {
+      if (fieldValues.value[name].searchKeyword.trim().length)
         query_context += ` AND ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
-      } else if (fieldValues.value[name].searchKeyword) {
-        query_context += ` WHERE ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
-      }
 
       fieldValues.value[name]["isLoading"] = true;
 
@@ -454,12 +450,6 @@ export default defineComponent({
     };
 
     const filterExpandedFieldValues = () => {
-      let query_context = "SELECT * FROM 'default'";
-
-      if (searchObj.data.editorValue) {
-        query_context += " WHERE " + searchObj.data.editorValue;
-      }
-
       const fields =
         [
           ...expandedFilters.value.filter(
@@ -473,6 +463,17 @@ export default defineComponent({
 
       if (expandedFilters.value.includes("service_name")) {
         getSpecialFieldsValues("service_name");
+      }
+
+      let query_context = "SELECT * FROM 'default'";
+
+      fields.forEach((field, index) => {
+        if (index) query_context += ` AND ${field} is not null `;
+        else query_context += ` WHERE ${field} is not null `;
+      });
+
+      if (searchObj.data.editorValue) {
+        query_context += " AND " + searchObj.data.editorValue;
       }
 
       if (!fields.length) return;
@@ -598,15 +599,13 @@ export default defineComponent({
         const values: any = new Set([]);
 
         fieldValues.value[field.field]["values"] =
-          field.values
-            .map((value: any) => {
-              values.add(value.zo_sql_key);
-              return {
-                key: value.zo_sql_key ? value.zo_sql_key : "null",
-                count: formatLargeNumber(value.zo_sql_num),
-              };
-            })
-            .filter((field: any) => field.key !== "null") || [];
+          field.values.map((value: any) => {
+            values.add(value.zo_sql_key);
+            return {
+              key: value.zo_sql_key ? value.zo_sql_key : "null",
+              count: formatLargeNumber(value.zo_sql_num),
+            };
+          }) || [];
 
         fieldValues.value[field.field].selectedValues.forEach(
           (value: string) => {
