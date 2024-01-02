@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <search-result
-                      :key="searchObj.data.histogram.xData.length || -1"
+                      :key="searchObj.data.queryResults.hits.length || -1"
                       ref="searchResultRef"
                       :expandedLogs="expandedLogs"
                       @update:datetime="setHistogramDate"
@@ -542,6 +542,12 @@ export default defineComponent({
     refreshHistogram() {
       return this.searchObj.meta.histogramDirtyFlag;
     },
+    redrawHistogram() {
+      return (
+        this.searchObj.data.histogram.hasOwnProperty("xData") &&
+        this.searchObj.data.histogram.xData.length
+      );
+    },
   },
   watch: {
     showFields() {
@@ -619,9 +625,12 @@ export default defineComponent({
     refreshHistogram() {
       if (this.searchObj.meta.histogramDirtyFlag == true) {
         this.searchObj.meta.histogramDirtyFlag = false;
-        this.this.handleRunQuery();
+        this.handleRunQuery();
         this.refreshHistogramChart();
       }
+    },
+    redrawHistogram() {
+      this.refreshHistogramChart();
     },
   },
 });

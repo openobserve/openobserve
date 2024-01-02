@@ -37,6 +37,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="max-height: 100px"
         @updated:dataZoom="onChartUpdate"
       />
+      <div
+        class="q-pb-lg"
+        v-if="
+          searchObj.meta.showHistogram &&
+          !searchObj.meta.sqlMode &&
+          searchObj.data.stream.streamType !== 'enrichment_tables' &&
+          searchObj.data.histogram.xData.length === 0
+        "
+        style="top: 50px; position: absolute; left: 45%"
+      >
+        <q-spinner-hourglass
+          color="primary"
+          size="25px"
+          style="margin: 0 auto; display: block"
+        />
+      </div>
       <q-virtual-scroll
         data-test="logs-search-result-logs-table"
         id="searchGridComponent"

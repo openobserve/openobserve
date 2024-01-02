@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'ql-item-mini': mini,
       'q-router-link--active':
         router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
+      'q-link-function': title == 'Functions',
     }"
     :target="target"
     @click="external ? openWebPage(link) : ''"
@@ -153,5 +154,9 @@ export default defineComponent({
   margin: 0;
   padding: 0;
   min-width: 40px;
+}
+
+.q-item--dark.q-link-function {
+  filter: brightness(100);
 }
 </style>

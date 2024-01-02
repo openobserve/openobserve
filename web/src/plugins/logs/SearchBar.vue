@@ -120,7 +120,7 @@ color="grey" size="xs" />
             :icon-right="'img:' + getImageURL('images/common/function.svg')"
             :title="t('search.savedViewsLabel')"
             split
-            class="no-outline saved-views-dropdown no-border"
+            class="no-outline saved-views-dropdown no-border btn-function"
             @click="fnSavedFunctionDialog"
           >
             <q-list>
@@ -1863,5 +1863,11 @@ export default defineComponent({
 
 .saved-view-item {
   padding: 4px 5px !important;
+}
+
+.body--dark{
+  .btn-function {
+    filter: brightness(100);
+  }
 }
 </style>
