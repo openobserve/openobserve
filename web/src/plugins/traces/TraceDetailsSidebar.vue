@@ -68,6 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="text-transform: capitalize"
     />
     <q-tab
+      name="exceptions"
+      :label="t('common.exceptions')"
+      style="text-transform: capitalize"
+    />
+    <q-tab
       name="attributes"
       :label="t('common.attributes')"
       style="text-transform: capitalize"
@@ -192,6 +197,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         No events present for this span
       </div>
     </q-tab-panel>
+    <q-tab-panel name="exceptions">
+      <q-virtual-scroll
+        type="table"
+        ref="searchTableRef"
+        style="max-height: 100%"
+        :items="getExceptionEvents"
+      >
+        <template v-slot:before>
+          <thead class="thead-sticky text-left">
+            <tr>
+              <th
+                v-for="(col, index) in eventColumns"
+                :key="'result_' + index"
+                class="table-header"
+                :data-test="`trace-events-table-th-${col.label}`"
+              >
+                {{ col.label }}
+              </th>
+            </tr>
+          </thead>
+        </template>
+
+        <template v-slot="{ item: row, index }">
+          <q-tr
+            :data-test="`trace-event-detail-${
+              row[store.state.zoConfig.timestamp_column]
+            }`"
+            :key="'expand_' + index"
+            @click="expandEvent(index)"
+            style="cursor: pointer"
+            class="pointer"
+          >
+            <q-td
+              v-for="column in eventColumns"
+              :key="index + '-' + column.name"
+              class="field_list"
+              style="cursor: pointer"
+            >
+              <div class="flex row items-center no-wrap">
+                <q-btn
+                  v-if="column.name === '@timestamp'"
+                  :icon="
+                    expandedEvents[index.toString()]
+                      ? 'expand_more'
+                      : 'chevron_right'
+                  "
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  @click.stop="expandEvent(index)"
+                ></q-btn>
+                {{ column.prop(row) }}
+              </div>
+            </q-td>
+          </q-tr>
+          <q-tr v-if="expandedEvents[index.toString()]">
+            <td colspan="2" style="font-size: 12px; font-family: monospace">
+              <div class="q-pl-sm">
+                <div>
+                  <span>Type: </span>
+                  <span>"{{ row["exception.type"] }}"</span>
+                </div>
+
+                <div>
+                  <span>Message: </span>
+                  <span>"{{ row["exception.message"] }}"</span>
+                </div>
+
+                <div>
+                  <span>Escaped: </span>
+                  <span>"{{ row["exception.escaped"] }}"</span>
+                </div>
+
+                <div>
+                  <span>Stacktrace: </span>
+                  <div
+                    class="q-px-sm"
+                    style="
+                      background-color: #ffffff !important;
+                      border: 1px solid #c1c1c1;
+                      border-radius: 4px;
+                    "
+                  >
+                    <pre
+                      style="font-size: 12px; text-wrap: wrap"
+                      class="log_json_content"
+                      >{{ formatStackTrace(row["exception.stacktrace"]) }}</pre
+                    >
+                  </div>
+                </div>
+              </div>
+            </td>
+          </q-tr>
+        </template>
+      </q-virtual-scroll>
+    </q-tab-panel>
   </q-tab-panels>
 </template>
 
@@ -201,6 +303,7 @@ import { date, type QTableProps } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -266,6 +369,12 @@ export default defineComponent({
         sortable: true,
       },
     ]);
+
+    const getExceptionEvents = computed(() => {
+      return spanDetails.value.events.filter(
+        (event: any) => event.name === "exception"
+      );
+    });
 
     const expandEvent = (index: number) => {
       if (expandedEvents.value[index.toString()])
@@ -344,6 +453,23 @@ export default defineComponent({
         immediate: true,
       }
     );
+    function formatStackTrace(trace) {
+      // Split the trace into lines
+      const lines = trace.split("\n");
+
+      // Process each line
+      const formattedLines = lines.map((line) => {
+        // Apply formatting rules
+        // For example, indent lines that contain file paths
+        if (line.trim().startsWith("/")) {
+          return "" + line; // Indent the line
+        }
+        return line;
+      });
+
+      // Reassemble the formatted trace
+      return formattedLines.join("\n");
+    }
 
     return {
       t,
@@ -357,6 +483,8 @@ export default defineComponent({
       store,
       tags,
       processes,
+      formatStackTrace,
+      getExceptionEvents,
     };
   },
 });
