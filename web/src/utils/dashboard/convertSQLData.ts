@@ -662,6 +662,7 @@ export const convertSQLData = (
             position: "inside", // You can adjust the position of the labels
             fontSize: 10,
           },
+          percentPrecision: panelSchema.config?.decimals ?? 2,
         };
         return seriesObj;
       });
@@ -711,6 +712,7 @@ export const convertSQLData = (
             position: "inside", // You can adjust the position of the labels
             fontSize: 10,
           },
+          percentPrecision: panelSchema.config?.decimals ?? 2,
         };
         return seriesObj;
       });
