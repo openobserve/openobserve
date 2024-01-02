@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon="restart_alt"
           class="q-pr-sm q-pl-xs reset-filters q-ml-md"
-          @click="resetFilters()"
+          @click="resetFilters"
         />
       </div>
       <div class="float-right col-auto">
@@ -386,6 +386,7 @@ export default defineComponent({
 
     const resetFilters = () => {
       searchObj.data.editorValue = "";
+      searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
         field.selectedValues = [];
         field.searchKeyword = "";
