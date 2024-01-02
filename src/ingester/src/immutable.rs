@@ -64,7 +64,8 @@ impl Immutable {
         }
     }
 
-    pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<()> {
+    pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<i64> {
+        let mut persist_size = 0;
         // 1. dump memtable to disk
         let paths = self
             .memtable
@@ -74,20 +75,21 @@ impl Immutable {
         let done_path = wal_path.with_extension("lock");
         let lock_data = paths
             .iter()
-            .map(|p| p.to_string_lossy())
+            .map(|(p, _)| p.to_string_lossy())
             .collect::<Vec<_>>()
             .join("\n");
         std::fs::write(&done_path, lock_data.as_bytes()).context(WriteDataSnafu)?;
         // 3. delete wal file
         std::fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
         // 4. rename the tmp files to parquet files
-        for path in paths {
+        for (path, size) in paths {
+            persist_size += size;
             let parquet_path = path.with_extension("parquet");
             std::fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
         }
         // 5. delete the lock file
         std::fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
-        Ok(())
+        Ok(persist_size)
     }
 }
 
@@ -107,7 +109,7 @@ pub(crate) async fn persist() -> Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for path in paths {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: task::JoinHandle<Result<Option<PathBuf>>> = task::spawn(async move {
+        let task: task::JoinHandle<Result<Option<(PathBuf, i64)>>> = task::spawn(async move {
             let r = IMMUTABLES.read().await;
             let Some(immutable) = r.get(&path) else {
                 drop(permit);
@@ -116,7 +118,7 @@ pub(crate) async fn persist() -> Result<()> {
             // persist entry to local disk
             let ret = immutable.persist(&path).await;
             drop(permit);
-            ret.map(|_| Some(path))
+            ret.map(|size| Some((path, size)))
         });
         tasks.push(task);
     }
@@ -125,10 +127,13 @@ pub(crate) async fn persist() -> Result<()> {
     let tasks = try_join_all(tasks).await.context(TokioJoinSnafu)?;
     let mut rw = IMMUTABLES.write().await;
     for task in tasks {
-        if let Some(v) = task? {
+        if let Some((path, size)) = task? {
             // remove entry
-            rw.remove(&v);
+            rw.remove(&path);
             // update metrics
+            metrics::INGEST_MEMTABLE_BYTES
+                .with_label_values(&[])
+                .sub(size);
             metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
         }
     }
