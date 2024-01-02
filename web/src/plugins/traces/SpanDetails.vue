@@ -53,7 +53,7 @@
             <template v-for="(val, key) in tags" :key="key">
               <span class="text-grey-8">{{ key }}</span>
               <span class="text-grey-8">: </span>
-              <span class="text-grey-10">{{ val }}</span>
+              <span class="">{{ val }}</span>
               <span class="q-mx-xs bg-grey-5" style="padding-left: 1px"></span>
             </template>
           </div>
@@ -66,8 +66,17 @@
             <tbody>
               <template v-for="(val, key) in tags" :key="key">
                 <tr>
-                  <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
-                  <td class="q-py-xs q-px-sm text-primary">
+                  <td
+                    class="q-py-xs q-px-sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-red-5'
+                        : 'text-red-10'
+                    "
+                  >
+                    {{ key }}
+                  </td>
+                  <td class="q-py-xs q-px-sm">
                     {{ val }}
                   </td>
                 </tr>
@@ -100,7 +109,7 @@
             <template v-for="(val, key) in processes" :key="key">
               <span class="text-grey-8">{{ key }}</span>
               <span class="text-grey-8">: </span>
-              <span class="text-grey-10">{{ val }}</span>
+              <span class="">{{ val }}</span>
               <span class="q-mx-xs bg-grey-5" style="padding-left: 1px"></span>
             </template>
           </div>
@@ -110,8 +119,17 @@
             <tbody>
               <template v-for="(val, key) in processes" :key="key">
                 <tr>
-                  <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
-                  <td class="q-py-xs q-px-sm text-primary">
+                  <td
+                    class="q-py-xs q-px-sm"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'text-red-5'
+                        : 'text-red-10'
+                    "
+                  >
+                    {{ key }}
+                  </td>
+                  <td class="q-py-xs q-px-sm">
                     {{ val }}
                   </td>
                 </tr>
@@ -218,7 +236,7 @@
       </div>
       <div class="text-right flex items-center justify-end">
         <span class="text-grey-7 q-mr-xs">Span Id: </span
-        ><span class="text-grey-10">{{ span.spanId }}</span>
+        ><span class="">{{ span.spanId }}</span>
         <q-icon
           class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
           size="12px"

@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-px-sm q-pb-none ellipsis non-selectable"
       style="font-size: 14px"
     >
-      <span class="text-grey-9">Operation Name: </span>{{ span.operation_name }}
+      <span class="text-grey-7">Operation Name: </span>{{ span.operation_name }}
     </div>
     <div
       class="q-px-sm ellipsis non-selectable"
       :title="span.service_name"
       style="font-size: 14px"
     >
-      <span class="text-grey-9">Service Name: </span> {{ span.service_name }}
+      <span class="text-grey-7">Service Name: </span> {{ span.service_name }}
     </div>
   </div>
   <q-tabs
@@ -80,8 +80,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tbody>
           <template v-for="(val, key) in tags" :key="key">
             <tr>
-              <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
-              <td class="q-py-xs q-px-sm text-primary">
+              <td
+                class="q-py-xs q-px-sm"
+                :class="
+                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
+                "
+              >
+                {{ key }}
+              </td>
+              <td class="q-py-xs q-px-sm">
                 {{ val }}
               </td>
             </tr>
@@ -94,8 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tbody>
           <template v-for="(val, key) in processes" :key="key">
             <tr>
-              <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
-              <td class="q-py-xs q-px-sm text-primary">
+              <td
+                class="q-py-xs q-px-sm"
+                :class="
+                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
+                "
+              >
+                {{ key }}
+              </td>
+              <td class="q-py-xs q-px-sm">
                 {{ val }}
               </td>
             </tr>
@@ -104,18 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
-      <table class="q-my-sm">
-        <tbody>
-          <template v-for="(val, key) in spanDetails.attrs" :key="key">
-            <tr>
-              <td class="q-py-xs q-px-sm text-grey-9">{{ key }}</td>
-              <td class="q-py-xs q-px-sm text-primary">
-                {{ val }}
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
+      <pre class="attr-text">{{
+        JSON.stringify(spanDetails.attrs, null, 2)
+      }}</pre>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
