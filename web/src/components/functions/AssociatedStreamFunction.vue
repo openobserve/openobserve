@@ -64,7 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </q-tr>
         <q-tr
-          v-show="expandedRow.name == props.row.name"
+          v-show="
+            expandedRow.name == props.row.name &&
+            expandedRow.stream_type === props.row.stream_type
+          "
           :props="props"
           no-hover
           style="
@@ -75,18 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-td colspan="100%">
             <div
-              v-show="loadingFunctions == props.row.name"
+              v-show="loadingFunctions"
               class="q-pl-md q-py-xs"
               style="height: 60px"
             >
               <q-inner-loading
                 size="sm"
-                :showing="loadingFunctions == props.row.name"
+                :showing="loadingFunctions"
                 label="Fetching functions..."
                 label-style="font-size: 1.1em"
               />
             </div>
-            <div v-show="loadingFunctions != props.row.name">
+            <div v-show="!loadingFunctions">
               <q-table
                 class="border"
                 hide-bottom
