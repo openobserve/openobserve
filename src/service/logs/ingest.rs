@@ -62,6 +62,15 @@ pub async fn ingest(
         return Err(value);
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(IngestionResponse {
+            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
+            status: vec![],
+            error: Some(e.to_string()),
+        });
+    }
+
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 

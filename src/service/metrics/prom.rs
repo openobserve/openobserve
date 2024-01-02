@@ -70,6 +70,11 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Err(anyhow::Error::msg(e.to_string()));
+    }
+
     // let min_ts = (Utc::now() -
     // Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;

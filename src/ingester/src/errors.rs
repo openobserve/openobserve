@@ -90,4 +90,5 @@ pub enum Error {
     TokioJoinError {
         source: tokio::task::JoinError,
     },
+    MemoryTableOverflowError {},
 }

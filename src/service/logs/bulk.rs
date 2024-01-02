@@ -63,6 +63,11 @@ pub async fn ingest(
         return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Err(anyhow::Error::msg(e.to_string()));
+    }
+
     // let mut errors = false;
     let mut bulk_res = BulkResponse {
         took: 0,

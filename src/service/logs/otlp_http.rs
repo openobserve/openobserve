@@ -99,6 +99,16 @@ pub async fn logs_json_handler(
         )));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = match in_stream_name {

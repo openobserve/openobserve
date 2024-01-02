@@ -58,6 +58,15 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(IngestionResponse {
+            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
+            status: vec![],
+            error: Some(e.to_string()),
+        });
+    }
+
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();

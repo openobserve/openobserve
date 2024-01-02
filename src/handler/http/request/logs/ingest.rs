@@ -102,7 +102,10 @@ pub async fn multi(
         )
         .await
         {
-            Ok(v) => MetaHttpResponse::json(v),
+            Ok(v) => match v.code {
+                503 => HttpResponse::ServiceUnavailable().json(v),
+                _ => MetaHttpResponse::json(v),
+            },
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -148,7 +151,10 @@ pub async fn json(
         )
         .await
         {
-            Ok(v) => MetaHttpResponse::json(v),
+            Ok(v) => match v.code {
+                503 => HttpResponse::ServiceUnavailable().json(v),
+                _ => MetaHttpResponse::json(v),
+            },
             Err(e) => {
                 log::error!("Error processing request: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(

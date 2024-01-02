@@ -128,6 +128,7 @@ pub(crate) async fn persist() -> Result<()> {
     let mut rw = IMMUTABLES.write().await;
     for task in tasks {
         if let Some((path, size)) = task? {
+            log::info!("[INGESTER] persist file: {:?}, size: {}", &path, size);
             // remove entry
             rw.remove(&path);
             // update metrics

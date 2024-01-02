@@ -23,7 +23,7 @@ use std::{
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
-use config::CONFIG;
+use config::{metrics, CONFIG};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
@@ -58,6 +58,16 @@ pub struct Writer {
     memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
+}
+
+// check total memory size
+pub fn check_memtable_size() -> Result<()> {
+    let total_mem_size = metrics::INGEST_MEMTABLE_BYTES.with_label_values(&[]).get();
+    if total_mem_size >= CONFIG.limit.mem_table_max_size as i64 {
+        Err(Error::MemoryTableOverflowError {})
+    } else {
+        Ok(())
+    }
 }
 
 /// Get a writer for a given org_id and stream_type
@@ -112,7 +122,7 @@ impl Writer {
                     &key.org_id,
                     &key.stream_type,
                     wal_id,
-                    CONFIG.limit.max_file_size_on_disk,
+                    CONFIG.limit.max_file_size_on_disk as u64,
                 )
                 .expect("wal file create error"),
             )),
@@ -136,7 +146,7 @@ impl Writer {
                 &self.key.org_id,
                 &self.key.stream_type,
                 wal_id,
-                CONFIG.limit.max_file_size_on_disk,
+                CONFIG.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
@@ -182,8 +192,8 @@ impl Writer {
     async fn check_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
         let (compressed_size, uncompressed_size) = written_size;
         compressed_size > 0
-            && (compressed_size + data_size > CONFIG.limit.max_file_size_on_disk as usize
-                || uncompressed_size + data_size > CONFIG.compact.max_file_size as usize
+            && (compressed_size + data_size > CONFIG.limit.max_file_size_on_disk
+                || uncompressed_size + data_size > CONFIG.limit.mem_file_max_size
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                         .num_microseconds()

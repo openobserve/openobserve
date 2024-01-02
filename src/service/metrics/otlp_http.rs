@@ -98,6 +98,16 @@ pub async fn metrics_json_handler(
         )));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();

@@ -83,6 +83,17 @@ pub async fn handle_trace_request(
             "Quota exceeded for this organization".to_string(),
         )));
     }
+
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
 
     let traces_stream_name = match in_stream_name {
