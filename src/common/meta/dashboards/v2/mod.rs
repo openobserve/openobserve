@@ -35,6 +35,7 @@ pub struct Dashboard {
     pub created: DateTime<FixedOffset>,
     #[serde(default)]
     pub panels: Vec<Panel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
 }
 
@@ -146,6 +147,8 @@ pub struct PanelConfig {
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decimals: Option<f64>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
 }
@@ -169,6 +172,8 @@ pub struct QueryConfig {
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub show_dynamic_filters: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

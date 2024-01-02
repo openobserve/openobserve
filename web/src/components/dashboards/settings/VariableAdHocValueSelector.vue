@@ -1,7 +1,7 @@
 <template>
     <div class="row items-center">
-        <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div>
-        <div class="row no-wrap items-center q-mb-sm" v-for="(item, index) in adhocVariables" :key="index">
+        <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+        <div class="row no-wrap items-center q-mb-xs" v-for="(item, index) in adhocVariables" :key="index">
             <q-select filled outlined dense :model-value="adhocVariables[index].name"
                 :display-value="adhocVariables[index].name ? adhocVariables[index].name : variableItem.isLoading ? '(No Data Found)' : ''"
                 :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label option-label="name"
@@ -20,10 +20,11 @@
                 :options="operatorOptions" style="width: auto" class="operator" />
             <q-input v-model="adhocVariables[index].value" placeholder="Enter Value" dense filled debounce="1000" style="width: 125px" class="" />
             <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" />
-            <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div>
+            <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>
-        <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded icon="add" padding="xs"
-            @click="addFields" />
+        <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded icon="add" padding="xs" @click="addFields" >
+            <q-tooltip>Add Dynamic Filter</q-tooltip>
+        </q-btn>
     </div>
 </template>
 
