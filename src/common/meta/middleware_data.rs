@@ -32,6 +32,7 @@ use crate::common::infra::config::MAXMIND_DB_CLIENT;
 pub struct GeoInfoData<'a> {
     pub city: Option<&'a str>,
     pub country: Option<&'a str>,
+    pub country_iso_code: Option<&'a str>,
     pub location: Option<Location<'a>>,
 }
 
@@ -104,14 +105,17 @@ impl RumExtraData {
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
                     let country = city_info
                         .country
-                        .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
+                        .as_ref()
+                        .and_then(|c| c.names.as_ref().and_then(|map| map.get("en").copied()));
                     let city = city_info
                         .city
                         .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
+                    let country_iso_code = city_info.country.and_then(|c| c.iso_code);
 
                     GeoInfoData {
                         city,
                         country,
+                        country_iso_code,
                         location: city_info.location,
                     }
                 } else {
