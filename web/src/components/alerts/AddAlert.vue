@@ -314,6 +314,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             no-caps
           />
+
+          <q-btn
+            data-test="add-alert-preview-btn"
+            :label="t('alerts.preview')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            no-caps
+            @click="onPreview"
+          />
+        </div>
+        <div v-show="plotChart">
+          <chart-renderer
+            data-test="alert-preview-chart"
+            :data="plotChart"
+            style="max-height: 200px"
+          />
         </div>
       </q-form>
     </div>
@@ -330,7 +347,7 @@ import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { is, useQuasar } from "quasar";
+import { useQuasar } from "quasar";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser/build/mysql";
 import segment from "../../services/segment_analytics";
@@ -338,8 +355,10 @@ import ScheduledAlert from "./ScheduledAlert.vue";
 import RealTimeAlert from "./RealTimeAlert.vue";
 import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
-import { clone, cloneDeep } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
+import ChartRenderer from "../dashboards/panels/ChartRenderer.vue";
+import { getChartData } from "@/utils/alerts/alertChartData.ts";
 
 const defaultValue: any = () => {
   return {
@@ -403,6 +422,7 @@ export default defineComponent({
     ScheduledAlert,
     RealTimeAlert,
     VariablesInput,
+    ChartRenderer,
   },
   setup(props) {
     const store: any = useStore();
@@ -445,6 +465,8 @@ export default defineComponent({
 
     const router = useRouter();
     const scheduledAlertRef: any = ref(null);
+
+    const plotChart: any = ref(null);
 
     const updateCondtions = (e: any) => {
       try {
@@ -622,6 +644,29 @@ export default defineComponent({
         );
     };
 
+    const onPreview = () => {
+      alertsService
+        .preview(
+          store.state.selectedOrganization.identifier,
+          formData.value.stream_name,
+          formData.value.name
+        )
+        .then((res: any) => {
+          const xData = [] as any[];
+          const yData = [] as any[];
+          res.data.hits.forEach((hit: any) => {
+            xData.push(hit["zo_sql_key"]);
+            yData.push(hit["alert_agg_value"]);
+          });
+          const chartParams = {
+            title: "",
+            unparsed_x_data: [],
+            timezone: store.state.timezone,
+          };
+          plotChart.value = getChartData(xData, yData, chartParams);
+        });
+    };
+
     return {
       t,
       q,
@@ -662,6 +707,8 @@ export default defineComponent({
       scheduledAlertRef,
       router,
       isAggregationEnabled,
+      plotChart,
+      onPreview,
     };
   },
   created() {

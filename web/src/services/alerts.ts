@@ -69,6 +69,15 @@ const alerts = {
     const url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}/enable?value=${enable}`;
     return http().put(url);
   },
+
+  preview: (
+    org_identifier: string,
+    stream_name: string,
+    alert_name: string
+  ) => {
+    const url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}/preview`;
+    return http().get(url);
+  },
 };
 
 export default alerts;
