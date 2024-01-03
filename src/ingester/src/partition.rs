@@ -71,7 +71,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<Vec<PathBuf>> {
+    ) -> Result<Vec<(PathBuf, i64)>> {
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
@@ -119,9 +119,6 @@ impl Partition {
                 .context(WriteFileSnafu { path: path.clone() })?;
 
             // update metrics
-            metrics::INGEST_MEMTABLE_BYTES
-                .with_label_values(&[])
-                .sub(file_meta.original_size);
             metrics::INGEST_WAL_USED_BYTES
                 .with_label_values(&[&org_id, &stream_name, stream_type])
                 .add(buf_parquet.len() as i64);
@@ -129,7 +126,7 @@ impl Partition {
                 .with_label_values(&[&org_id, &stream_name, stream_type])
                 .inc_by(buf_parquet.len() as u64);
 
-            paths.push(path);
+            paths.push((path, file_meta.original_size));
         }
         Ok(paths)
     }

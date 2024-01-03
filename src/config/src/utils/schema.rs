@@ -21,8 +21,9 @@ use std::{
 
 use arrow_json::reader;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
+use serde_json::{Map, Value};
 
-use crate::meta::stream::StreamType;
+use crate::{meta::stream::StreamType, FxIndexMap};
 
 pub fn infer_json_schema<R: BufRead>(
     reader: R,
@@ -42,21 +43,118 @@ pub fn infer_json_schema_from_seekable<R: BufRead + Seek>(
     Ok(fix_schema(schema, stream_type))
 }
 
-pub fn infer_json_schema_from_iterator<I, V>(
+pub fn infer_json_schema_from_values<I, V>(
     value_iter: I,
     stream_type: impl Into<StreamType>,
 ) -> Result<Schema, ArrowError>
 where
-    I: Iterator<Item = Result<V, ArrowError>>,
-    V: Borrow<serde_json::Value>,
+    I: Iterator<Item = V>,
+    V: Borrow<Value>,
 {
-    let schema = reader::infer_json_schema_from_iterator(value_iter)?;
-    Ok(fix_schema(schema, stream_type.into()))
+    let mut fields = None;
+    for value in value_iter {
+        match value.borrow() {
+            Value::Object(v) => {
+                if fields.is_none() {
+                    fields = Some(FxIndexMap::with_capacity_and_hasher(
+                        v.len(),
+                        Default::default(),
+                    ));
+                }
+                infer_json_schema_from_object(fields.as_mut().unwrap(), v)?;
+            }
+            _ => {
+                return Err(ArrowError::SchemaError(
+                    "Cannot infer schema from non-object value".to_string(),
+                ));
+            }
+        }
+    }
+    let fields = fields.unwrap_or_default();
+    let fields = fields
+        .into_iter()
+        .map(|(_, field)| field)
+        .collect::<Vec<_>>();
+    Ok(fix_schema(Schema::new(fields), stream_type.into()))
 }
 
-/// Fix the schema to ensure that the start_time and end_time fields are always
-/// present with uint64 and that null fields are removed and sort the fields by
-/// name.
+fn infer_json_schema_from_object(
+    fields: &mut FxIndexMap<String, Field>,
+    value: &Map<String, Value>,
+) -> Result<(), ArrowError> {
+    for (key, value) in value.iter() {
+        match value {
+            Value::String(_) => {
+                convet_data_type(fields, key, DataType::Utf8)?;
+            }
+            Value::Number(v) => {
+                if v.is_i64() {
+                    convet_data_type(fields, key, DataType::Int64)?;
+                } else if v.is_u64() {
+                    convet_data_type(fields, key, DataType::UInt64)?;
+                } else if v.is_f64() {
+                    convet_data_type(fields, key, DataType::Float64)?;
+                } else {
+                    return Err(ArrowError::SchemaError(
+                        "Cannot infer schema from non-basic-number type value".to_string(),
+                    ));
+                }
+            }
+            Value::Bool(_) => {
+                convet_data_type(fields, key, DataType::Boolean)?;
+            }
+            Value::Null => {}
+            _ => {
+                return Err(ArrowError::SchemaError(
+                    "Cannot infer schema from non-basic type value".to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn convet_data_type(
+    fields: &mut FxIndexMap<String, Field>,
+    key: &str,
+    data_type: DataType,
+) -> Result<(), ArrowError> {
+    let Some(f) = fields.get(key) else {
+        fields.insert(key.to_string(), Field::new(key, data_type, true));
+        return Ok(());
+    };
+    let f_type = f.data_type();
+    if f_type == &data_type {
+        return Ok(());
+    }
+    match (f_type, &data_type) {
+        (DataType::Utf8, _) => {}
+        (DataType::Int64, DataType::UInt64)
+        | (DataType::Int64, DataType::Float64)
+        | (DataType::Int64, DataType::Utf8) => {
+            fields.insert(key.to_string(), Field::new(key, data_type, true));
+        }
+        (DataType::UInt64, DataType::Float64) | (DataType::UInt64, DataType::Utf8) => {
+            fields.insert(key.to_string(), Field::new(key, data_type, true));
+        }
+        (DataType::Float64, DataType::Utf8) => {
+            fields.insert(key.to_string(), Field::new(key, data_type, true));
+        }
+        (DataType::Boolean, _) => {
+            fields.insert(key.to_string(), Field::new(key, data_type, true));
+        }
+        _ => {
+            return Err(ArrowError::SchemaError(format!(
+                "Cannot infer schema from conflicting types: {:?} and {:?}",
+                f_type, data_type
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Fix the schema to ensure that the start_time and end_time fields are always present with uint64
+/// and that null fields are removed and sort the fields by name.
 fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
     let mut fields = if stream_type == StreamType::Traces {
         itertools::chain(
@@ -71,8 +169,8 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
                 }
             }),
             vec![
-                Arc::new(Field::new("start_time", DataType::UInt64, false)),
-                Arc::new(Field::new("end_time", DataType::UInt64, false)),
+                Arc::new(Field::new("start_time", DataType::UInt64, true)),
+                Arc::new(Field::new("end_time", DataType::UInt64, true)),
             ],
         )
         .collect::<Vec<_>>()

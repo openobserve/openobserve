@@ -17,7 +17,6 @@ use std::io::{BufRead, Read};
 
 use actix_web::http;
 use ahash::AHashMap;
-use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -43,6 +42,7 @@ use crate::{
         distinct_values, get_formatted_stream_name,
         ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
         logs::StreamMeta,
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
     },
 };
@@ -54,7 +54,7 @@ pub async fn ingest(
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-
+    // check stream
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
@@ -62,20 +62,20 @@ pub async fn ingest(
         return Err(value);
     }
 
-    let mut min_ts =
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(IngestionResponse {
+            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
+            status: vec![],
+            error: Some(e.to_string()),
+        });
+    }
+
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_status = StreamStatus::new(stream_name);
-    let mut distinct_values = Vec::with_capacity(16);
-    let mut trigger: TriggerAlertData = None;
-
-    let multi_req: &Bytes;
-    let reader: Vec<json::Value>;
-
     // Start Register Transforms for stream
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Logs,
@@ -84,6 +84,7 @@ pub async fn ingest(
     // End Register Transforms for stream
 
     // Start get stream alerts
+    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
     crate::service::ingestion::get_stream_alerts(
         org_id,
         StreamType::Logs,
@@ -91,113 +92,113 @@ pub async fn ingest(
         &mut stream_alerts_map,
     )
     .await;
-    // End get stream alert
+    // End get stream alerts
+
+    let mut stream_status = StreamStatus::new(stream_name);
+    let mut distinct_values = Vec::with_capacity(16);
+    let mut trigger: TriggerAlertData = None;
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
     let partition_keys = partition_det.partition_keys;
     let partition_time_level = partition_det.partition_time_level;
 
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut write_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
 
-    let ep: &str;
-
-    let data = match in_req {
+    let json_req: Vec<json::Value>; // to hold json request because of borrow checker
+    let (ep, data) = match in_req {
         IngestionRequest::JSON(req) => {
-            reader = json::from_slice(req).unwrap_or({
+            json_req = json::from_slice(req).unwrap_or({
                 let val: json::Value = json::from_slice(req)?;
                 vec![val]
             });
-            ep = "/api/org/ingest/logs/_json";
-            IngestionData::JSON(&reader)
+            ("/api/org/ingest/logs/_json", IngestionData::JSON(&json_req))
         }
-        IngestionRequest::GCP(req) => {
-            ep = "/api/org/ingest/logs/_gcs";
-            IngestionData::GCP(req)
-        }
-        IngestionRequest::Multi(req) => {
-            multi_req = req;
-            ep = "/api/org/ingest/logs/_multi";
-            IngestionData::Multi(multi_req)
-        }
-        IngestionRequest::KinesisFH(req) => {
-            ep = "/api/org/ingest/logs/_kinesis";
-            IngestionData::KinesisFH(req)
-        }
+        IngestionRequest::GCP(req) => ("/api/org/ingest/logs/_gcs", IngestionData::GCP(req)),
+        IngestionRequest::Multi(req) => ("/api/org/ingest/logs/_multi", IngestionData::Multi(req)),
+        IngestionRequest::KinesisFH(req) => (
+            "/api/org/ingest/logs/_kinesis",
+            IngestionData::KinesisFH(req),
+        ),
     };
 
-    for rec in data.iter() {
-        match rec {
-            Ok(item) => {
-                match apply_functions(
-                    &item,
-                    &local_trans,
-                    &stream_vrl_map,
-                    stream_name,
-                    &mut runtime,
-                ) {
-                    Ok(mut res) => {
-                        let local_val = res.as_object_mut().unwrap();
-
-                        match handle_ts(local_val, min_ts) {
-                            Ok(t) => min_ts = t,
-                            Err(e) => {
-                                stream_status.status.failed += 1;
-                                stream_status.status.error = e.to_string();
-                                continue;
-                            }
-                        }
-                        let local_trigger = super::add_valid_record_arrow(
-                            &StreamMeta {
-                                org_id: org_id.to_string(),
-                                stream_name: stream_name.to_string(),
-                                partition_keys: &partition_keys,
-                                partition_time_level: &partition_time_level,
-                                stream_alerts_map: &stream_alerts_map,
-                            },
-                            &mut stream_schema_map,
-                            &mut stream_status.status,
-                            &mut buf,
-                            local_val,
-                            trigger.is_none(),
-                        )
-                        .await;
-                        if local_trigger.is_some() {
-                            trigger = local_trigger;
-                        }
-
-                        // get distinct_value item
-                        for field in DISTINCT_FIELDS.iter() {
-                            if let Some(val) = local_val.get(field) {
-                                if !val.is_null() {
-                                    distinct_values.push(distinct_values::DvItem {
-                                        stream_type: StreamType::Logs,
-                                        stream_name: stream_name.to_string(),
-                                        field_name: field.to_string(),
-                                        field_value: val.as_str().unwrap().to_string(),
-                                        filter_name: "".to_string(),
-                                        filter_value: "".to_string(),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        stream_status.status.failed += 1;
-                        stream_status.status.error = e.to_string();
-                        continue;
-                    }
-                };
-            }
+    for ret in data.iter() {
+        let item = match ret {
+            Ok(item) => item,
             Err(e) => {
-                log::error!("Error: {:?}", e);
-                return Err(anyhow::Error::msg("Failed processing"));
+                log::error!("IngestionError: {:?}", e);
+                return Err(anyhow::anyhow!("Failed processing: {:?}", e));
+            }
+        };
+
+        let mut res = match apply_functions(
+            item,
+            &local_trans,
+            &stream_vrl_map,
+            stream_name,
+            &mut runtime,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                continue;
+            }
+        };
+
+        let local_val = res.as_object_mut().unwrap();
+        if let Err(e) = handle_timestamp(local_val, min_ts) {
+            stream_status.status.failed += 1;
+            stream_status.status.error = e.to_string();
+            continue;
+        }
+
+        let local_trigger = match super::add_valid_record(
+            &StreamMeta {
+                org_id: org_id.to_string(),
+                stream_name: stream_name.to_string(),
+                partition_keys: &partition_keys,
+                partition_time_level: &partition_time_level,
+                stream_alerts_map: &stream_alerts_map,
+            },
+            &mut stream_schema_map,
+            &mut stream_status.status,
+            &mut write_buf,
+            local_val,
+            trigger.is_none(),
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                stream_status.status.failed += 1;
+                stream_status.status.error = e.to_string();
+                continue;
+            }
+        };
+        if local_trigger.is_some() {
+            trigger = local_trigger;
+        }
+
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = local_val.get(field) {
+                if !val.is_null() {
+                    distinct_values.push(distinct_values::DvItem {
+                        stream_type: StreamType::Logs,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.as_str().unwrap().to_string(),
+                        filter_name: "".to_string(),
+                        filter_value: "".to_string(),
+                    });
+                }
             }
         }
     }
 
     // write to file
-    let mut req_stats = write_file(buf, thread_id, &stream_params, None).await;
+    let mut req_stats = write_file(write_buf, thread_id, &stream_params).await;
 
     // send distinct_values
     if !distinct_values.is_empty() {
@@ -206,7 +207,7 @@ pub async fn ingest(
         }
     }
 
-    // only one trigger per request, as it updates etcd
+    // only one trigger per request
     evaluate_trigger(trigger).await;
 
     // update ingestion metrics
@@ -229,7 +230,6 @@ pub async fn ingest(
             StreamType::Logs.to_string().as_str(),
         ])
         .inc();
-
     req_stats.response_time = start.elapsed().as_secs_f64();
 
     // report data usage
@@ -243,6 +243,7 @@ pub async fn ingest(
     )
     .await;
 
+    // drop variables
     drop(runtime);
     drop(stream_schema_map);
     drop(stream_vrl_map);
@@ -256,8 +257,8 @@ pub async fn ingest(
 }
 
 pub fn apply_functions<'a>(
-    item: &'a json::Value,
-    local_trans: &Vec<StreamTransform>,
+    item: json::Value,
+    local_trans: &[StreamTransform],
     stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
     stream_name: &'a str,
     runtime: &mut Runtime,
@@ -267,7 +268,7 @@ pub fn apply_functions<'a>(
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_transform(
             local_trans,
-            &value,
+            value,
             stream_vrl_map,
             stream_name,
             runtime,
@@ -281,10 +282,10 @@ pub fn apply_functions<'a>(
     }
 }
 
-pub fn handle_ts(
+pub fn handle_timestamp(
     local_val: &mut json::Map<String, json::Value>,
-    mut min_ts: i64,
-) -> Result<i64, anyhow::Error> {
+    min_ts: i64,
+) -> Result<(), anyhow::Error> {
     // handle timestamp
     let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
         Some(v) => match parse_timestamp_micro_from_value(v) {
@@ -294,18 +295,14 @@ pub fn handle_ts(
         None => Utc::now().timestamp_micros(),
     };
     // check ingestion time
-    let earliest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
-    if timestamp < earliest_time.timestamp_micros() {
-        return Err(anyhow::Error::msg(super::get_upto_discard_error()));
-    }
     if timestamp < min_ts {
-        min_ts = timestamp;
+        return Err(get_upto_discard_error());
     }
     local_val.insert(
         CONFIG.common.column_timestamp.clone(),
         json::Value::Number(timestamp.into()),
     );
-    Ok(min_ts)
+    Ok(())
 }
 
 impl<'a> Iterator for IngestionDataIter<'a> {

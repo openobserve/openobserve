@@ -45,9 +45,8 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{
-            chk_schema_by_record, evaluate_trigger,
-            otlp_json::{get_float_value, get_int_value, get_string_value, get_val_for_attr},
-            write_file, TriggerAlertData,
+            chk_schema_by_record, evaluate_trigger, get_float_value, get_int_value,
+            get_string_value, get_val_for_attr, write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
         schema::{set_schema_metadata, stream_schema_exists},
@@ -97,6 +96,16 @@ pub async fn metrics_json_handler(
             http::StatusCode::FORBIDDEN.into(),
             "Quota exceeded for this organization".to_string(),
         )));
+    }
+
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
     }
 
     let start = std::time::Instant::now();
@@ -281,7 +290,7 @@ pub async fn metrics_json_handler(
 
                     for mut rec in records {
                         // flattening
-                        rec = flatten::flatten(&rec).expect("failed to flatten");
+                        rec = flatten::flatten(rec).expect("failed to flatten");
                         // get json object
 
                         let local_metric_name =
@@ -349,12 +358,12 @@ pub async fn metrics_json_handler(
                         if !local_trans.is_empty() {
                             rec = crate::service::ingestion::apply_stream_transform(
                                 &local_trans,
-                                &rec,
+                                rec,
                                 &stream_vrl_map,
                                 local_metric_name,
                                 &mut runtime,
                             )
-                            .unwrap_or(rec);
+                            .unwrap();
                         }
 
                         let val_map: &mut serde_json::Map<String, serde_json::Value> =
@@ -455,18 +464,11 @@ pub async fn metrics_json_handler(
             continue;
         }
 
-        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
-            details.partition_time_level
-        } else {
-            Some(CONFIG.limit.metrics_file_retention.as_str().into())
-        };
-
         // write to file
         let mut req_stats = write_file(
             stream_data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-            time_level,
         )
         .await;
 

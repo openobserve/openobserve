@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
+use config::{meta::stream::StreamType, CONFIG};
 
 use crate::{
     common::{
@@ -80,8 +80,7 @@ pub async fn save(
 
     // before saving alert check column type to decide numeric condition
     let schema = db::schema::get(org_id, stream_name, stream_type).await?;
-    let fields = schema.to_cloned_fields();
-    if stream_name.is_empty() || fields.is_empty() {
+    if stream_name.is_empty() || schema.fields().is_empty() {
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
 

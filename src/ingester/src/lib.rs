@@ -25,8 +25,7 @@ mod writer;
 
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
-use tokio::time;
-pub use writer::{get_writer, read_from_memtable};
+pub use writer::{check_memtable_size, get_writer, read_from_memtable};
 
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
@@ -37,8 +36,10 @@ pub async fn init() -> errors::Result<()> {
 
     // start a job to dump immutable data to disk
     tokio::task::spawn(async move {
-        // immutable persist every 10 seconds
-        let mut interval = time::interval(time::Duration::from_secs(10));
+        // immutable persist every 10 (default) seconds
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            config::CONFIG.limit.mem_persist_interval,
+        ));
         interval.tick().await; // the first tick is immediate
         loop {
             if let Err(e) = immutable::persist().await {

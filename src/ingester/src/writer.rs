@@ -23,7 +23,7 @@ use std::{
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
-use config::CONFIG;
+use config::{metrics, CONFIG};
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, RwLock};
@@ -58,6 +58,16 @@ pub struct Writer {
     memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
+}
+
+// check total memory size
+pub fn check_memtable_size() -> Result<()> {
+    let total_mem_size = metrics::INGEST_MEMTABLE_BYTES.with_label_values(&[]).get();
+    if total_mem_size >= CONFIG.limit.mem_table_max_size as i64 {
+        Err(Error::MemoryTableOverflowError {})
+    } else {
+        Ok(())
+    }
 }
 
 /// Get a writer for a given org_id and stream_type
@@ -103,6 +113,13 @@ impl Writer {
         let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
             .join("logs")
             .join(thread_id.to_string());
+        log::info!(
+            "[INGESTER] create file: {}/{}/{}/{}.wal",
+            wal_dir.display().to_string(),
+            &key.org_id,
+            &key.stream_type,
+            wal_id
+        );
         Self {
             thread_id,
             key: key.clone(),
@@ -112,7 +129,7 @@ impl Writer {
                     &key.org_id,
                     &key.stream_type,
                     wal_id,
-                    CONFIG.limit.max_file_size_on_disk,
+                    CONFIG.limit.max_file_size_on_disk as u64,
                 )
                 .expect("wal file create error"),
             )),
@@ -136,10 +153,17 @@ impl Writer {
                 &self.key.org_id,
                 &self.key.stream_type,
                 wal_id,
-                CONFIG.limit.max_file_size_on_disk,
+                CONFIG.limit.max_file_size_on_disk as u64,
             )
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
+            log::info!(
+                "[INGESTER] create file: {}/{}/{}/{}.wal",
+                self.thread_id,
+                &self.key.org_id,
+                &self.key.stream_type,
+                wal_id
+            );
 
             // rotation memtable
             let mut mem = self.memtable.write().await;
@@ -180,9 +204,10 @@ impl Writer {
 
     /// Check if the wal file size is over the threshold or the file is too old
     async fn check_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
-        let (compressed_size, _uncompressed_size) = written_size;
+        let (compressed_size, uncompressed_size) = written_size;
         compressed_size > 0
-            && (compressed_size + data_size > CONFIG.limit.max_file_size_on_disk as usize
+            && (compressed_size + data_size > CONFIG.limit.max_file_size_on_disk
+                || uncompressed_size + data_size > CONFIG.limit.mem_file_max_size
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                         .num_microseconds()
