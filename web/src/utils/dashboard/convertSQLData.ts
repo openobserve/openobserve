@@ -177,7 +177,10 @@ export const convertSQLData = (
           ? 200
           : "20",
       top: "15",
-      bottom: "40",
+      bottom:
+        legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+          ? 40
+          : "20",
     },
     tooltip: {
       trigger: "axis",
@@ -304,7 +307,7 @@ export const convertSQLData = (
           name:
             index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
           nameLocation: "middle",
-          nameGap: 13 * (xAxisKeys.length - index + 1),
+          nameGap: 9 * (xAxisKeys.length - index + 1),
           nameTextStyle: {
             fontWeight: "bold",
             fontSize: 14,
@@ -403,6 +406,8 @@ export const convertSQLData = (
     },
     series: [],
   };
+  console.log("options", options.grid);
+  
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
