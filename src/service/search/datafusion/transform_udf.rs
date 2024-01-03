@@ -30,7 +30,7 @@ use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef
 
 use crate::{
     common::{infra::config::QUERY_FUNCTIONS, utils::json},
-    service::ingestion::{compile_vrl_function, get_value},
+    service::ingestion::{compile_vrl_function, get_string_value},
 };
 
 fn create_user_df(
@@ -147,13 +147,14 @@ fn get_udf_vrl(
                         for col in res.fields {
                             let field_builder = col_val_map.entry(col.to_string()).or_default();
                             if res_map.contains_key(&col) {
-                                field_builder.insert(i, get_value(res_map.get(&col).unwrap()));
+                                field_builder
+                                    .insert(i, get_string_value(res_map.get(&col).unwrap()));
                             } else {
                                 field_builder.insert(i, "".to_string());
                             }
                         }
                     } else {
-                        res_data_vec.insert(i, get_value(&result));
+                        res_data_vec.insert(i, get_string_value(&result));
                     }
                 }
             }

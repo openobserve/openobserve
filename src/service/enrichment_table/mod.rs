@@ -196,7 +196,6 @@ pub async fn save_enrichment_data(
         buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::EnrichmentTables),
-        None,
     )
     .await;
     req_stats.response_time = start.elapsed().as_secs_f64();

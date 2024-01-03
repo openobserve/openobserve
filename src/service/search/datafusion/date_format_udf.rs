@@ -56,8 +56,8 @@ pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
             )));
         }
 
-        // 1. cast both arguments to Union. These casts MUST be aligned with the
-        //    signature or this function panics!
+        // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
+        //    function panics!
         let timestamp = &args[0]
             .as_any()
             .downcast_ref::<Int64Array>()

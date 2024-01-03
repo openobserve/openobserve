@@ -20,7 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use config::{utils::schema::infer_json_schema_from_iterator, CONFIG};
+use config::{utils::schema::infer_json_schema_from_values, CONFIG};
 use snafu::ResultExt;
 
 use crate::{errors::*, immutable, memtable, writer::WriterKey};
@@ -34,17 +34,14 @@ use crate::{errors::*, immutable, memtable, writer::WriterKey};
 // 5. delete the lock file
 //
 // so, there are some cases that the process is not completed:
-// 1. the process is killed before step 2, so there are some .par files and have
-//    no lock file, need delete those files
-// 2. the process is killed before step 3, so there are some .par files and have
-//    lock file, the files actually wrote to disk completely, need to continue
-//    step 3, 4 and 5
-// 3. the process is killed before step 4, so there are some .par files and have
-//    lock file, the files actually wrote to disk completely, need to continue
-//    step 4 and 5
-// 4. the process is killed before step 5, so there are some .parquet files and
-//    have lock file, the files actually wrote to disk completely, need to
-//    continue step 5
+// 1. the process is killed before step 2, so there are some .par files and have no lock file, need
+//    delete those files
+// 2. the process is killed before step 3, so there are some .par files and have lock file, the
+//    files actually wrote to disk completely, need to continue step 3, 4 and 5
+// 3. the process is killed before step 4, so there are some .par files and have lock file, the
+//    files actually wrote to disk completely, need to continue step 4 and 5
+// 4. the process is killed before step 5, so there are some .parquet files and have lock file, the
+//    files actually wrote to disk completely, need to continue step 5
 pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     // 1. get all .lock files
     let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
@@ -54,8 +51,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     })?;
     let lock_files = scan_files(wal_dir, "lock");
 
-    // 2. check if there is a .wal file with the same name, delete it and rename the
-    //    .par file to .parquet
+    // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
     for lock_file in lock_files.iter() {
         log::warn!("found uncompleted wal file: {:?}", lock_file);
         let wal_file = lock_file.with_extension("wal");
@@ -151,9 +147,8 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let entry = super::Entry::from_bytes(&entry)?;
             i += 1;
             total += entry.data.len();
-            let schema =
-                infer_json_schema_from_iterator(entry.data.iter().cloned().map(Ok), stream_type)
-                    .context(InferJsonSchemaSnafu)?;
+            let schema = infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
+                .context(InferJsonSchemaSnafu)?;
             memtable.write(Arc::new(schema), entry).await?;
         }
         log::warn!(

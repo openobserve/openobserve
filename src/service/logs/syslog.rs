@@ -38,6 +38,7 @@ use crate::{
     service::{
         db, distinct_values, get_formatted_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
+        schema::get_upto_discard_error,
     },
 };
 
@@ -118,12 +119,12 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
 
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);
-    value = flatten::flatten(&value).unwrap();
+    value = flatten::flatten(value).unwrap();
 
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_transform(
             &local_trans,
-            &value,
+            value,
             &stream_vrl_map,
             stream_name,
             &mut runtime,
@@ -149,7 +150,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     let earlest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
     if timestamp < earlest_time.timestamp_micros() {
         stream_status.status.failed += 1; // to old data, just discard
-        stream_status.status.error = super::get_upto_discard_error();
+        stream_status.status.error = get_upto_discard_error().to_string();
     }
 
     local_val.insert(
@@ -157,7 +158,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         json::Value::Number(timestamp.into()),
     );
 
-    let local_trigger = super::add_valid_record_arrow(
+    let local_trigger = match super::add_valid_record(
         &StreamMeta {
             org_id: org_id.to_string(),
             stream_name: stream_name.to_string(),
@@ -171,7 +172,15 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         local_val,
         trigger.is_none(),
     )
-    .await;
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            stream_status.status.failed += 1;
+            stream_status.status.error = e.to_string();
+            None
+        }
+    };
     if local_trigger.is_some() {
         trigger = local_trigger;
     }
@@ -192,7 +201,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         }
     }
 
-    write_file(buf, thread_id, &stream_params, None).await;
+    write_file(buf, thread_id, &stream_params).await;
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;
