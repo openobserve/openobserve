@@ -519,6 +519,19 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
+  //check if is there any data else filter out axis or series data
+  if (
+    !options?.series?.length &&
+    !options?.xAxis?.length
+  ){
+    return {
+      options: {
+        series: [],
+        xAxis: [],
+      },
+    };
+  }
+  
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
