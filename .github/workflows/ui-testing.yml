@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - "main"
-    paths:
-      - "web/**"
+    # paths:
+    #   - "web/**"
   pull_request:
     branches:
       - "*"
-    paths:
-      - "web/**"
+    # paths:
+    #   - "web/**"
 
 env:
   COLUMNS: 150
