@@ -172,10 +172,7 @@ export const convertSQLData = (
     grid: {
       containLabel: true,
       left: "30",
-      right:
-        legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-          ? 200
-          : "20",
+      right: 20,
       top: "15",
       bottom:
         legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
@@ -406,7 +403,6 @@ export const convertSQLData = (
     },
     series: [],
   };
-  console.log("options", options.grid);
   
 
   // Now set the series values as per the chart data
@@ -1431,6 +1427,22 @@ export const convertSQLData = (
         },
       };
     }
+  }
+
+  //get max value of name
+  const maxValue = options.series
+    .map((it: any) => it.name)
+    .reduce((max: any, it: any) => (max.length < it.length ? it : max));
+
+  //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
+  //only check for vertical side only
+  if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends) {
+    options.grid.right =
+      Math.min(
+        chartPanelRef.value?.offsetWidth / 3,
+        calculateWidthText(maxValue)
+      ) + 30 ?? 20;
+    options.legend.textStyle.width = options.grid.right - 55;
   }
 
   //check if is there any data else filter out axis or series data
