@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from "uuid";
 import streamService from "@/services/stream";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import billings from "@/services/billings";
 
 const useLocalStorage = (
   key: string,
@@ -282,27 +283,47 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-        ? window.location.pathname.slice(0, pos + 5)
-        : "";
+      ? window.location.pathname.slice(0, pos + 5)
+      : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
 
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
+  const q = useQuasar();
+  if (
+    config.isCloud &&
+    store.state.selectedOrganization.subscription_type == config.freePlan
+  ) {
+    await billings
+      .list_subscription(store.state.selectedOrganization.identifier)
+      .then((res: any) => {
+        if (res.data.data.length == 0) {
+          next({ path: "/billings/plans" });
+        }
+
+        if (
+          res.data.data.CustomerBillingObj.customer_id == null ||
+          res.data.data.CustomerBillingObj.customer_id == ""
+        ) {
+          next({ path: "/billings/plans" });
+        }
+      });
+  }
+
   if (
     to.path.indexOf("/ingestion") == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data == true
   ) {
     const local_organization: any = useLocalOrganization();
-    const $q = useQuasar();
 
     await streamService
       .nameList(local_organization?.value?.identifier, "", false)
       .then((response) => {
         if (response.data.list.length == 0) {
-          $q.notify({
+          q.notify({
             type: "warning",
             message:
               "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
