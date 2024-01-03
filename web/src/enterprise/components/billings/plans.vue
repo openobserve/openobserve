@@ -82,7 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("billing.manageCards") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup="true" />
+          <q-btn icon="close"
+flat round dense v-close-popup="true" />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -107,7 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("billing.subscriptionCheckout") }}
           </div>
           <q-space />
-          <q-btn icon="close" flat round dense v-close-popup="true" />
+          <q-btn icon="close"
+flat round dense v-close-popup="true" />
         </q-card-section>
 
         <q-card-section>
@@ -151,6 +153,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-close-popup="true"
             @click="onUnsubscribe"
           />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="customerIDExist" persistent>
+      <q-card>
+        <q-card-section class="row items-center">
+          <span class="q-ml-sm"
+            ><q-avatar
+              icon="info"
+              size="sm"
+              color="secondary"
+              text-color="white"
+              class="q-mr-sm"
+            />{{ t("billing.captureCardDetail") }}</span
+          >
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn
+            color="secondary"
+            @click="
+              loadingPaymentDetail = true;
+              onLoadSubscription('Developer');
+            "
+          >
+            <div v-if="loadingPaymentDetail">
+              Loading <q-spinner-dots
+                color="white"
+                size="40px"
+                style="margin: 0 auto;"
+              />
+            </div>
+            <div v-else>
+              {{ t("billing.proceedtoPaymentDetail") }}
+            </div>
+          </q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -261,6 +299,13 @@ export default defineComponent({
         this.store.state.selectedOrganization.identifier
       )
         .then((res) => {
+          this.customerIDExist = false;
+          if (
+            res.data.data.CustomerBillingObj.customer_id == "" ||
+            res.data.data.CustomerBillingObj.customer_id == null
+          ) {
+            this.customerIDExist = true;
+          }
           if (
             res.data.data.CustomerBillingObj.subscription_type ==
             "professional-USD-Monthly"
@@ -434,6 +479,8 @@ export default defineComponent({
     const freeLoading: any = ref(false);
     const proLoading: any = ref(false);
     const confirm_downgrade_subscription: any = ref(false);
+    const customerIDExist = ref(false);
+    const loadingPaymentDetail = ref(false);
 
     const retriveHostedPage = () => {
       BillingService.retrive_hosted_page(
@@ -469,6 +516,8 @@ export default defineComponent({
       freeLoading,
       proLoading,
       confirm_downgrade_subscription,
+      customerIDExist,
+      loadingPaymentDetail,
     };
   },
 });
