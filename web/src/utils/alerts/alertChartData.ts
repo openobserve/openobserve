@@ -99,7 +99,7 @@ export const getChartData = (
           params.timezone != "UTC" ? utcToZonedTime(it, params.timezone) : it,
           y[index] || 0,
         ]),
-        type: "bar",
+        type: "line",
         emphasis: { focus: "series" },
         itemStyle: {
           color: "#7A80C2",

@@ -40,8 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
     <div
+      ref="addAlertFormRef"
       class="q-px-lg q-my-md"
-      style="max-height: calc(100vh - 138px); overflow: auto"
+      style="
+        max-height: calc(100vh - 138px);
+        overflow: auto;
+        scroll-behavior: smooth;
+      "
     >
       <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
         <div class="flex justify-start items-center q-pb-sm q-col-gutter-md">
@@ -316,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <q-btn
+            v-show="beingUpdated"
             data-test="add-alert-preview-btn"
             :label="t('alerts.preview')"
             class="q-mb-md text-bold no-border q-ml-md"
@@ -325,11 +331,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="onPreview"
           />
         </div>
-        <div v-show="plotChart">
+        <div
+          v-if="plotChart"
+          style="width: 550px; height: 200px"
+          class="q-mb-lg"
+        >
+          <div class="text-bold">Preview</div>
           <chart-renderer
             data-test="alert-preview-chart"
             :data="plotChart"
-            style="max-height: 200px"
+            style="max-height: 300px"
           />
         </div>
       </q-form>
@@ -359,6 +370,7 @@ import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import ChartRenderer from "../dashboards/panels/ChartRenderer.vue";
 import { getChartData } from "@/utils/alerts/alertChartData.ts";
+import { nextTick } from "vue";
 
 const defaultValue: any = () => {
   return {
@@ -462,6 +474,8 @@ export default defineComponent({
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
+
+    const addAlertFormRef = ref(null);
 
     const router = useRouter();
     const scheduledAlertRef: any = ref(null);
@@ -649,12 +663,13 @@ export default defineComponent({
         .preview(
           store.state.selectedOrganization.identifier,
           formData.value.stream_name,
-          formData.value.name
+          formData.value.name,
+          formData.value.stream_type
         )
         .then((res: any) => {
           const xData = [] as any[];
           const yData = [] as any[];
-          res.data.hits.forEach((hit: any) => {
+          res.data.forEach((hit: any) => {
             xData.push(hit["zo_sql_key"]);
             yData.push(hit["alert_agg_value"]);
           });
@@ -664,6 +679,12 @@ export default defineComponent({
             timezone: store.state.timezone,
           };
           plotChart.value = getChartData(xData, yData, chartParams);
+          nextTick(() => {
+            // Scroll to bottom of the page using addAlertFormRef element
+            if (addAlertFormRef.value)
+              addAlertFormRef.value.scrollTop =
+                addAlertFormRef.value.scrollHeight;
+          });
         });
     };
 
@@ -709,6 +730,7 @@ export default defineComponent({
       isAggregationEnabled,
       plotChart,
       onPreview,
+      addAlertFormRef,
     };
   },
   created() {

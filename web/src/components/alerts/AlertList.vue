@@ -575,7 +575,8 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           alert.stream_name,
           alert.name,
-          !alert?.enabled
+          !alert?.enabled,
+          alert.stream_type
         )
         .then(() => {
           alert.enabled = !alert.enabled;
