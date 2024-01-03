@@ -486,12 +486,12 @@ export default defineComponent({
         immediate: true,
       }
     );
-    function formatStackTrace(trace) {
+    function formatStackTrace(trace: any) {
       // Split the trace into lines
       const lines = trace.split("\n");
 
       // Process each line
-      const formattedLines = lines.map((line) => {
+      const formattedLines = lines.map((line: string) => {
         // Apply formatting rules
         // For example, indent lines that contain file paths
         if (line.trim().startsWith("/")) {
