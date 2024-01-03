@@ -69,8 +69,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .required(false)
                         .help("only migrate specified prefix, default is all"),
                 ),
-            clap::Command::new("migrate-file-list-from-dynamo")
-                .about("migrate file-list from dynamo to dynamo db"),
             clap::Command::new("migrate-meta").about("migrate meta"),
             clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
             clap::Command::new("delete-parquet")
@@ -184,10 +182,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::file_list::run(&prefix).await?;
             println!("Running migration file_list_deleted");
             migration::file_list::run_for_deleted().await?;
-        }
-        "migrate-file-list-from-dynamo" => {
-            println!("Running migration from DynamoDB");
-            migration::file_list::run_for_dynamo().await?
         }
         "migrate-meta" => {
             println!("Running migration");
