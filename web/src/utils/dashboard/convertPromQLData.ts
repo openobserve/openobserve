@@ -107,7 +107,8 @@ export const convertPromQLData = (
       left: "5",
       right: 20,
       top: "15",
-      bottom:  legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+      bottom:
+        legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
           ? 30
           : "0",
     },
@@ -542,23 +543,20 @@ export const convertPromQLData = (
   const maxValue = options.series
     .map((it: any) => it.name)
     .reduce((max: any, it: any) => (max.length < it.length ? it : max));
-    
+
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
   if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends) {
     options.grid.right =
       Math.min(
         chartPanelRef.value?.offsetWidth / 3,
-        calculateWidthText(maxValue)
-      ) + 30 ?? 20;
+        calculateWidthText(maxValue) + 60
+      ) ?? 20;
     options.legend.textStyle.width = options.grid.right - 55;
   }
 
   //check if is there any data else filter out axis or series data
-  if (
-    !options?.series?.length &&
-    !options?.xAxis?.length
-  ){
+  if (!options?.series?.length && !options?.xAxis?.length) {
     return {
       options: {
         series: [],
@@ -566,7 +564,7 @@ export const convertPromQLData = (
       },
     };
   }
-  
+
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 

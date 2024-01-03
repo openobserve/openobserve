@@ -403,7 +403,6 @@ export const convertSQLData = (
     },
     series: [],
   };
-  
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
@@ -1440,8 +1439,8 @@ export const convertSQLData = (
     options.grid.right =
       Math.min(
         chartPanelRef.value?.offsetWidth / 3,
-        calculateWidthText(maxValue)
-      ) + 30 ?? 20;
+        calculateWidthText(maxValue) + 60
+      ) ?? 20;
     options.legend.textStyle.width = options.grid.right - 55;
   }
 
