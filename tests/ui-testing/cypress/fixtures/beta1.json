@@ -1,0 +1,82 @@
+
+{
+  "email": "root@example.com",
+  "NewPassword": "Complexpass#123",
+  
+  "baseUrl":"http://localhost:5080",
+  "devUrl":"http://localhost:5080/web/",
+  "organizationUrl":"https://beta1.cloud.zinclabs.dev/organizations",
+  "userUrl":"http://localhost:5080/web/users",
+  "logUrl": "http://localhost:5080/web/users",
+  "streamUrl":"http://localhost:5080/web/logstreams",
+  
+  "OrganizationName":"default",
+  "streamName":"Alpha1-Logs",
+ 
+  "role":"Member",
+ 
+  "moduleUser":"User",
+  "moduleOrganization":"Organization",
+  "moduleLogs":"Logs",
+  "moduleStream":"Streams",
+  
+  "searchUser":"ashish",
+    "keywordSearchUser":"ashi",
+    "searchInvalidUser":"pqrs",
+    "userRole":"admin",
+    "updatedUserRole":"member",
+    
+    "searchOrganizationByValid":"Nitin's Organization",
+    "searchOrganizationByInvalid":"pqrstsx",
+    "searchOrganizationByKey":"ash",
+    
+    "addOrganization":"abcd",
+    "sendEmail1":"trupti.potdar06@gmail.com",
+    "sendEmail2":"dipti.dixit23@gmail.com",
+
+      
+    "rQuery":"Query",
+    "rFields":"Fields",
+    "rHistogram":"Histogram",
+    "rSqlMode":"SQL Mode",
+    "bSyntaxGuide":"Syntax Guide",
+    "bSearch":"search",
+      
+    "rTime":"2",
+  
+    "validStream":"default",
+    "invalidStream":"pqr",
+    "invalidField":"abcd",
+    "keywordStream":"def",
+    
+    "fieldName":"stream",
+    "keySearchField":"cod",
+    "keyFieldValue":"code",
+    "fieldValue":"stderr",
+
+    "columnName":"stream",
+    "columnValue":"stdout",
+
+    "validOrg":"SampleOrg",
+
+    "sqlcolumnadd1":"stream",
+    "sqlcolumnvalue1":"stderr",
+    "sqlcolumnadd2":"took",
+    "sqlcolumnvalue2":"57",
+    "sqlcolumn2Value1":"33",
+    "sqlcolumn2Value2":"42",
+    "columnForOr":"kubernetes.container_name",
+    "columnForOrValue1":"zinc-cp",
+    "columnForOrValue2":"ziox"
+   
+
+
+ 
+
+
+
+  
+  
+   
+
+}
