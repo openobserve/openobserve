@@ -343,9 +343,7 @@ impl StreamParams {
 pub struct SchemaEvolution {
     pub schema_compatible: bool,
     pub types_delta: Option<Vec<Field>>,
-    pub schema_fields: Vec<Field>,
     pub is_schema_changed: bool,
-    pub record_schema: Schema,
 }
 
 pub struct SchemaRecords {

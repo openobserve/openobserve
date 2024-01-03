@@ -12,6 +12,7 @@ arrow-schema.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
+futures.workspace = true
 hashbrown.workspace = true
 indexmap.workspace = true
 itertools.workspace = true

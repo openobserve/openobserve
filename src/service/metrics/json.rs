@@ -58,6 +58,15 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(IngestionResponse {
+            code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
+            status: vec![],
+            error: Some(e.to_string()),
+        });
+    }
+
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
@@ -65,7 +74,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for record in reader.iter() {
+    for record in reader.into_iter() {
         // JSON Flattening
         let mut record = flatten::flatten(record)?;
         // check data type
@@ -117,8 +126,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         }
 
         // apply functions
-        let mut record = json::Value::Object(record.to_owned());
-        apply_func(&mut runtime, org_id, &stream_name, &mut record)?;
+        let record = json::Value::Object(record.to_owned());
+        let mut record = apply_func(&mut runtime, org_id, &stream_name, record)?;
 
         let record = record.as_object_mut().unwrap();
 
@@ -263,17 +272,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             continue;
         }
 
-        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
-            details.partition_time_level
-        } else {
-            Some(CONFIG.limit.metrics_file_retention.as_str().into())
-        };
-
         let mut req_stats = write_file(
             stream_data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-            time_level,
         )
         .await;
         req_stats.response_time = time;
@@ -319,21 +321,19 @@ fn apply_func(
     runtime: &mut Runtime,
     org_id: &str,
     metric_name: &str,
-    value: &mut json::Value,
-) -> Result<()> {
+    value: json::Value,
+) -> Result<json::Value> {
     let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
         StreamType::Metrics,
         metric_name,
     );
 
-    *value = crate::service::ingestion::apply_stream_transform(
+    crate::service::ingestion::apply_stream_transform(
         &local_tans,
         value,
         &stream_vrl_map,
         metric_name,
         runtime,
-    )?;
-
-    Ok(())
+    )
 }

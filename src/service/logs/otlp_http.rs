@@ -42,11 +42,9 @@ use crate::{
     service::{
         db, distinct_values, get_formatted_stream_name,
         ingestion::{
-            evaluate_trigger,
-            otlp_json::{get_int_value, get_val_for_attr},
-            write_file, TriggerAlertData,
+            evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
         },
-        schema::stream_schema_exists,
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -101,6 +99,16 @@ pub async fn logs_json_handler(
         )));
     }
 
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
     let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
     let stream_name = match in_stream_name {
@@ -127,7 +135,7 @@ pub async fn logs_json_handler(
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: TriggerAlertData = None;
 
-    let mut min_ts =
+    let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
     let partition_det =
@@ -262,11 +270,9 @@ pub async fn logs_json_handler(
                     let attributes = log.get("attributes").unwrap().as_array().unwrap();
                     for res_attr in attributes {
                         let local_attr = res_attr.as_object().unwrap();
-
-                        local_val.insert(
-                            flatten::format_key(local_attr.get("key").unwrap().as_str().unwrap()),
-                            get_val_for_attr(local_attr.get("value").unwrap()),
-                        );
+                        let mut key = local_attr.get("key").unwrap().as_str().unwrap().to_string();
+                        flatten::format_key(&mut key);
+                        local_val.insert(key, get_val_for_attr(local_attr.get("value").unwrap()));
                     }
                 }
                 // remove attributes after adding
@@ -306,14 +312,10 @@ pub async fn logs_json_handler(
                 }
 
                 // check ingestion time
-                let earliest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
-                if timestamp < earliest_time.timestamp_micros() {
-                    stream_status.status.failed += 1; // to old data, just discard
-                    stream_status.status.error = super::get_upto_discard_error();
-                    continue;
-                }
                 if timestamp < min_ts {
-                    min_ts = timestamp;
+                    stream_status.status.failed += 1; // to old data, just discard
+                    stream_status.status.error = get_upto_discard_error().to_string();
+                    continue;
                 }
 
                 local_val.insert(
@@ -323,25 +325,25 @@ pub async fn logs_json_handler(
 
                 local_val.append(&mut service_att_map.clone());
 
-                value = json::to_value(local_val).unwrap();
+                value = json::to_value(local_val)?;
 
                 // JSON Flattening
-                value = flatten::flatten(&value).unwrap();
+                value = flatten::flatten(value).unwrap();
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_transform(
                         &local_trans,
-                        &value,
+                        value,
                         &stream_vrl_map,
                         stream_name,
                         &mut runtime,
                     )
-                    .unwrap_or(value);
+                    .unwrap();
                 }
 
                 local_val = value.as_object_mut().unwrap();
 
-                let local_trigger = super::add_valid_record_arrow(
+                let local_trigger = match super::add_valid_record(
                     &StreamMeta {
                         org_id: org_id.to_string(),
                         stream_name: stream_name.to_string(),
@@ -355,8 +357,15 @@ pub async fn logs_json_handler(
                     local_val,
                     trigger.is_none(),
                 )
-                .await;
-
+                .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        stream_status.status.failed += 1;
+                        stream_status.status.error = e.to_string();
+                        continue;
+                    }
+                };
                 if local_trigger.is_some() {
                     trigger = local_trigger;
                 }
@@ -385,7 +394,6 @@ pub async fn logs_json_handler(
         buf,
         thread_id,
         &StreamParams::new(org_id, stream_name, StreamType::Logs),
-        None,
     )
     .await;
 

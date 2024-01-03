@@ -160,7 +160,7 @@ impl DistinctValues {
                     data,
                     Some(&schema_key),
                 );
-                let data = json::Value::Object(data.to_owned());
+                let data = json::Value::Object(data.clone());
                 let data_size = json::to_vec(&data).unwrap_or_default().len();
 
                 let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
@@ -172,7 +172,7 @@ impl DistinctValues {
                 hour_buf.records.push(Arc::new(data));
                 hour_buf.records_size += data_size;
             }
-            _ = ingestion::write_file(buf, 0, &stream_params, None).await;
+            _ = ingestion::write_file(buf, 0, &stream_params).await;
         }
         Ok(())
     }

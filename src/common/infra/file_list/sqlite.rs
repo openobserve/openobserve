@@ -469,6 +469,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
 }
 
 pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
     let chunks = files.chunks(100);
     for files in chunks {
         let mut tx = client.begin().await?;
@@ -529,6 +532,9 @@ pub async fn batch_add(client: &Pool<Sqlite>, files: &[FileKey]) -> Result<()> {
 }
 
 pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
     let chunks = files.chunks(100);
     for files in chunks {
         // get ids of the files
@@ -537,14 +543,19 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
         for file in files {
             let (stream_key, date_key, file_name) =
                 parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-            let ret: Option<i64> = sqlx::query_scalar(
+            let ret: Option<i64> = match sqlx::query_scalar(
                 r#"SELECT id FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
             .fetch_one(&pool)
-            .await?;
+            .await
+            {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => continue,
+                Err(e) => return Err(e.into()),
+            };
             match ret {
                 Some(v) => ids.push(v.to_string()),
                 None => {
@@ -555,8 +566,10 @@ pub async fn batch_remove(client: &Pool<Sqlite>, files: &[String]) -> Result<()>
             }
         }
         // delete files by ids
-        let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
-        _ = pool.execute(sql.as_str()).await?;
+        if !ids.is_empty() {
+            let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+            _ = pool.execute(sql.as_str()).await?;
+        }
     }
     Ok(())
 }
@@ -597,6 +610,9 @@ pub async fn batch_add_deleted(
 }
 
 pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
     let chunks = files.chunks(100);
     for files in chunks {
         // get ids of the files
@@ -605,14 +621,19 @@ pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Re
         for file in files {
             let (stream_key, date_key, file_name) =
                 parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-            let ret: Option<i64> = sqlx::query_scalar(
+            let ret: Option<i64> = match sqlx::query_scalar(
                 r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
             )
             .bind(stream_key)
             .bind(date_key)
             .bind(file_name)
             .fetch_one(&pool)
-            .await?;
+            .await
+            {
+                Ok(v) => v,
+                Err(sqlx::Error::RowNotFound) => continue,
+                Err(e) => return Err(e.into()),
+            };
             match ret {
                 Some(v) => ids.push(v.to_string()),
                 None => {
@@ -624,11 +645,13 @@ pub async fn batch_remove_deleted(client: &Pool<Sqlite>, files: &[String]) -> Re
             }
         }
         // delete files by ids
-        let sql = format!(
-            "DELETE FROM file_list_deleted WHERE id IN({});",
-            ids.join(",")
-        );
-        _ = pool.execute(sql.as_str()).await?;
+        if !ids.is_empty() {
+            let sql = format!(
+                "DELETE FROM file_list_deleted WHERE id IN({});",
+                ids.join(",")
+            );
+            _ = pool.execute(sql.as_str()).await?;
+        }
     }
     Ok(())
 }

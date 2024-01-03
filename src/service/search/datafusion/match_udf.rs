@@ -65,8 +65,8 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
             )));
         }
 
-        // 1. cast both arguments to string. These casts MUST be aligned with the
-        //    signature or this function panics!
+        // 1. cast both arguments to string. These casts MUST be aligned with the signature or this
+        //    function panics!
         let haystack = &args[0]
             .as_any()
             .downcast_ref::<StringArray>()
