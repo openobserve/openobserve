@@ -57,6 +57,7 @@ fn get_cors() -> Rc<Cors> {
     Rc::new(cors)
 }
 
+/// #[cfg(not(feature = "enterprise"))]
 #[cfg(not(feature = "enterprise"))]
 fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
