@@ -1435,7 +1435,7 @@ export const convertSQLData = (
     //get max value of name
     const maxValue = options.series
       .map((it: any) => it.name)
-      .reduce((max: any, it: any) => (max.length < it.length ? it : max));
+      .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
     options.grid.right =
       Math.min(
         chartPanelRef.value?.offsetWidth / 3,
