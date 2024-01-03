@@ -1428,14 +1428,14 @@ export const convertSQLData = (
     }
   }
 
-  //get max value of name
-  const maxValue = options.series
-    .map((it: any) => it.name)
-    .reduce((max: any, it: any) => (max.length < it.length ? it : max));
-
+  
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
-  if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends) {
+  if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends && panelSchema.type != "gauge") {
+    //get max value of name
+    const maxValue = options.series
+      .map((it: any) => it.name)
+      .reduce((max: any, it: any) => (max.length < it.length ? it : max));
     options.grid.right =
       Math.min(
         chartPanelRef.value?.offsetWidth / 3,
