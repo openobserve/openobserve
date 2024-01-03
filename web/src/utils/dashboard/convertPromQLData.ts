@@ -104,13 +104,15 @@ export const convertPromQLData = (
     legend: legendConfig,
     grid: {
       containLabel: true,
-      left: "30",
+      left: "5",
       right:
         legendConfig.orient === "vertical" && panelSchema.config?.show_legends
           ? 220
           : "40",
       top: "15",
-      bottom: "30",
+      bottom:  legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+          ? 30
+          : "0",
     },
     tooltip: {
       show: true,
