@@ -44,7 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -128,10 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -282,6 +286,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
 import streamService from "@/services/stream";
+import billings from "@/services/billings";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import {
@@ -569,10 +574,36 @@ export default defineComponent({
       useLocalOrganization(selectedOrg.value);
       // store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
 
+      if (
+        config.isCloud &&
+        selectedOrg.value.subscription_type == config.freePlan
+      ) {
+        await billings
+          .list_subscription(selectedOrg.value.identifier)
+          .then(async (res: any) => {
+            if (res.data.data.length == 0) {
+              router.push({ name: "plans" });
+            } else if (
+              res.data.data.CustomerBillingObj.customer_id == null ||
+              res.data.data.CustomerBillingObj.customer_id == ""
+            ) {
+              router.push({ name: "plans" });
+            } else {
+              await verifyStreamExist(selectedOrg.value);
+            }
+          });
+      } else {
+        await verifyStreamExist(selectedOrg.value);
+      }
+    };
+
+    const verifyStreamExist = async (selectedOrgData: any) => {
       await streamService
-        .nameList(selectedOrg.value?.identifier, "", false)
+        .nameList(selectedOrgData?.identifier, "", false)
         .then((response) => {
-          store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+          store.dispatch("setSelectedOrganization", {
+            ...selectedOrgData,
+          });
           if (response.data.list.length == 0) {
             $q.notify({
               type: "warning",

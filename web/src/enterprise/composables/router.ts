@@ -92,33 +92,21 @@ const useEnvRoutes = () => {
       meta: {
         keepAlive: false,
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
       children: [
         {
           path: "usage",
           name: "usage",
           component: Usage,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
         },
         {
           path: "plans",
           name: "plans",
           component: Plans,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
         },
         {
           path: "invoice_history",
           name: "invoice_history",
           component: InvoiceHistory,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
         },
       ],
     },
