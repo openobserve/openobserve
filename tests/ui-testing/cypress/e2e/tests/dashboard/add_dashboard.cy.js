@@ -1,5 +1,6 @@
 ///<reference types="cypress" />
 import { fieldType } from "../../../support/commons";
+import logsdata from "../../../data/logs_data.json"
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
 });
@@ -26,6 +27,31 @@ describe("Create a new dashboard", () => {
           });
       
         cy.login();
+           // ("ingests logs via API", () => {
+    const orgId = Cypress.env("ORGNAME");
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = btoa(`${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`);
+
+    
+    // Making a POST request using cy.request()
+    cy.request({
+      method: "POST",
+      url: `http://localhost:5080/api/${orgId}/${streamName}/_json`,
+      body: logsdata,
+      headers: {
+        Authorization: `Basic ${basicAuthCredentials}`,
+        "Content-Type": "application/json",
+      },
+    }).then((response) => {
+      // Logging response content to the Cypress console
+      cy.log(response.body);
+
+      // Assertion: Ensure the response status is 200 OK
+      expect(response.status).to.eq(
+        200,
+        `Expected status code 200, but got ${response.status}`
+      );
+    });
         cy.intercept('GET', '**/api/default/organizations**').as('allorgs');
         cy.intercept('GET', '/api/default/settings').as('settings')
         cy.intercept('GET', '/api/default/folders').as('folders')
@@ -41,8 +67,6 @@ describe("Create a new dashboard", () => {
 
     it("Add dashboard", () => {
         // Create dynamic dashboard name
-        cy.wait("@allorgs")
-        cy.wait('@settings')
         cy.wait('@folders')
         dashboardName = `${dashboardData.DashboardName}_${randomNumber}`;
         console.log("==dashboardName==", dashboardName);
@@ -56,16 +80,14 @@ describe("Create a new dashboard", () => {
 
     
     it("Delete dashboard", () => {
-        cy.wait("@allorgs")
-        cy.wait('@settings')
-        cy.wait('@folders')
+
         dashboardName = `${dashboardData.DashboardName}_${randomNumber}`;
         console.log("==dashboardName==", dashboardName);
         cy.wait('@dashboards')
         cy.contains("New Dashboard").click()
         cy.wait(1000)
         cy.get('[data-test="dashboard-name"]').type(dashboardName);
-        cy.get('[data-test="dashboard-add-submit"]').click();
+        cy.get('[data-test="dashboard-add-submit"]').click({force:true});
         cy.url().should("include", dashboardData.ViewDashboardUrl);
         cy.get('.q-pa-sm > :nth-child(1) > .q-btn > .q-btn__content > .q-icon').click({force:true})
         
@@ -95,7 +117,7 @@ describe("Create a new dashboard", () => {
         cy.get('[data-test="dashboard-delete"]:first').click({force:true})
         cy.get('[data-test="dashboard-confirm-dialog"]').should("be.visible"); // check that the dialog is visible
         cy.wait(2000); // wait for 2ms for the dialogues
-        cy.get('[data-test="confirm-button"]').click(); // click on the confirm button
+        cy.get('[data-test="confirm-button"]').click({force:true}); // click on the confirm button
         cy.wait(1000)
         cy.reload(); // reload the window
         // cy.get('[data-test="dashboard-table"] td').should(
@@ -105,13 +127,30 @@ describe("Create a new dashboard", () => {
     });
 
 
+    it("Delete All", () => {
+        cy.get('[data-test="dashboard-table"]')
+          .find("td")
+          .filter((index, element) =>
+            Cypress.$(element).text().includes(dashboardData.DashboardName)
+          )
+          .each((item) => {
+            console.log("==", item);
+            // cy.wrap(item).contains(dashboardData.DashboardName).then(($el)=>{
+            cy.wrap(item)
+              .siblings()
+              .wait(2000)
+              .find('[data-test="dashboard-delete"]') // finds the delete button and clicks on it
+              .click({ force: true });
+            cy.get('[data-test="confirm-button"]').click();
+            // })
+          });
+      });
+
     it("should display save button disabled if dashboard name is blank", () => {
-        cy.wait("@allorgs")
-        cy.wait('@settings')
-        cy.wait('@folders')
+    
         cy.wait('@dashboards')
-        cy.contains("New Dashboard").click()
-        cy.wait(1000)
+        cy.contains("New Dashboard").click({force:true})
+        cy.wait(2000)
         cy.get('[data-test="dashboard-name"]').type('     ');
         cy.get('[data-test="dashboard-add-submit"]').should('be.disabled');
     });
