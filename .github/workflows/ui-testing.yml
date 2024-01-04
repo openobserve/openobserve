@@ -59,9 +59,32 @@ jobs:
       - name: Build frontend code
         run: cd web && npm install && npm run build
       
-      - name: Build and run binary
+      - name: Build binary
         run: cargo build --features mimalloc
-        
+      
+      - uses: actions/upload-artifact@master
+        with:
+          name: binary-and-web
+          path: |
+            target/debug/openobserve
+            web
+           
+            
+  run-logs-test:
+    runs-on: 
+      labels: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chrome]
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-and-web
+          path: ./
+      - run: ls -alR
       - name: Start OpenObserve
         run: target/debug/openobserve &
 
