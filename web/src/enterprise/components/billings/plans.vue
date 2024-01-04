@@ -242,7 +242,7 @@ export default defineComponent({
       )
         .then((res) => {
           this.loadSubscription();
-          this.$router.go(this.$router.currentRoute);
+          this.$router.go(0);
         })
         .catch((e) => {
           this.freeLoading = false;
