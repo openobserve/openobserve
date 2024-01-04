@@ -39,7 +39,7 @@ Cypress.Commands.add("addFieldToAxis", (type, streamType, stream, field) => {
 Cypress.Commands.add("selectStream", (stream,streamType) => {
   cy.wait(2000);
   cy.get('[data-test="index-dropdown-stream_type"]').click();
-  cy.get("div.q-item").contains(`${streamType}`).click();
+  cy.get("div.q-item").contains(`${streamType}`).click({force:true});
   cy.get('[data-test="index-dropdown-stream"]').click();
   cy.get("div.q-item").contains(`${stream}`).click();
 });
