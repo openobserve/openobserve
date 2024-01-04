@@ -41,7 +41,7 @@ jobs:
 
       
       - name: Simulate building frontend code
-        run: touch web/dist/index.html
+        run: mkdir -p web/dist && touch web/dist/index.html
       
       - name: Setup cargo config
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
