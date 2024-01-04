@@ -83,12 +83,22 @@ async fn run_download_files() {
 
     let client = Lazy::get(&CLIENT_INITIALIZED);
 
-    if client.is_none() || download_asn_files {
+    if client.is_none() {
         update_global_maxmind_client(&asn_fname).await;
-    }
-    if client.is_none() || download_city_files {
         update_global_maxmind_client(&city_fname).await;
+        log::info!("Maxmind client initialized");
+    } else {
+        if download_asn_files {
+            log::info!("New asn file found, updating client");
+            update_global_maxmind_client(&asn_fname).await;
+        }
+
+        if download_city_files {
+            log::info!("New city file found, updating client");
+            update_global_maxmind_client(&city_fname).await;
+        }
     }
+
     Lazy::force(&CLIENT_INITIALIZED);
 }
 
@@ -106,8 +116,6 @@ pub async fn update_global_maxmind_client(fname: &str) {
                 let mut geoip_asn = GEOIP_ASN_TABLE.write();
                 *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
             }
-
-            log::info!("Successfully updated MaxmindClient for {}", fname);
         }
         Err(e) => log::warn!(
             "Failed to create MaxmindClient with path: {}, {}",
