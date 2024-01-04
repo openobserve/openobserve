@@ -150,9 +150,9 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     decimals: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    axisWidth: Option<f64>,
+    axis_width: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    axisBorderShow: Option<bool>,
+    axis_border_show: Option<bool>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
 }
