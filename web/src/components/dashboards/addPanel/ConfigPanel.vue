@@ -425,6 +425,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">Gauge Max Value</div>
       </template>
     </q-input>
+    <q-input
+      v-model.number="
+        dashboardPanelData.data.config.axisWidth
+      "
+      :label="t('common.axisWidth')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      :type="'number'"
+      placeholder="Auto"
+      @update:model-value="
+      (value) =>
+        (dashboardPanelData.data.config.axisWidth = value !== '' ? value : null)
+    "
+    >
+    </q-input>
   </div>
 </template>
 
