@@ -107,6 +107,7 @@ export const convertPromQLData = (
         panelSchema.config?.axisWidth == null
           ? true
           : false,
+      //based on config width set grid
       left: panelSchema.config?.axisWidth ?? 5,
       right: 20,
       top: "15",
