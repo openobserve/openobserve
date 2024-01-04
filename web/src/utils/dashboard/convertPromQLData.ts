@@ -32,7 +32,6 @@ import { calculateGridPositions } from "./calculateGridForSubPlot";
 //   '#e83e8c', '#b82d66', '#8c1f49', '#631433', '#3f0a1d'
 // ];
 
-const colorArray = 
 // [
 //   "#99cadd",
 //   "#a9bdd5",
@@ -99,7 +98,7 @@ const colorArray =
 //   "#DEDAF7"  // Pale Lavender
 // ]
 
-[
+const colorArrayBySeries = [
   "#5470c6",
   "#91cc75",
   "#fac858",
@@ -116,10 +115,18 @@ const colorArray =
   "rgba(161,225,200,0.48)",
   "#ec8ceb",
   "#99e9f1",
-  "#eec59c"
+  "#eec59c",
 ];
 
-function getIndexForName(name: any) {
+const colorArrayByValue = [
+  "#0ac670",
+  "#08b968",
+  "#08aa60",
+  "#079f59",
+  "#069a55",
+];
+
+function getIndexForName(name: any, colorArray: any) {
   let index = 0;
   for (let i = 0; i < 15; i++) {
     const charCode = name.charCodeAt(i) || 0;
@@ -128,8 +135,8 @@ function getIndexForName(name: any) {
   return index % colorArray.length;
 }
 
-function nameToColor(name: any) {
-  const index = getIndexForName(name);
+function nameToColor(name: any, colorArray: any) {
+  const index = getIndexForName(name, colorArray);
   return colorArray[index];
 }
 
@@ -213,6 +220,7 @@ export const convertPromQLData = (
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
+    // color: colorArrayByValue,
     grid: {
       containLabel: panelSchema.config?.axis_width == null ? true : false,
       //based on config width set grid
@@ -420,9 +428,11 @@ export const convertPromQLData = (
                     getPromqlLegendName(
                       metric.metric,
                       panelSchema.queries[index].config.promql_legend
-                    )
+                    ),
+                    colorArrayBySeries
                   ),
                 },
+                // colorBy: "data",
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
