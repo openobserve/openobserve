@@ -103,8 +103,11 @@ export const convertPromQLData = (
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: true,
-      left: "5",
+      containLabel:
+        panelSchema.config?.axisWidth == null
+          ? true
+          : false,
+      left: panelSchema.config?.axisWidth ?? 5,
       right: 20,
       top: "15",
       bottom:

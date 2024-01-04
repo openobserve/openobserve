@@ -170,8 +170,8 @@ export const convertSQLData = (
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: true,
-      left: "30",
+      containLabel: panelSchema.config?.axisWidth == null ? true : false,
+      left: panelSchema.config?.axisWidth ?? 30,
       right: 20,
       top: "15",
       bottom:
