@@ -84,7 +84,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: binary-and-web
-          path: ./
+          path: ./artifacts
       - run: ls -alR
       - name: Start OpenObserve
         run: target/debug/openobserve &
