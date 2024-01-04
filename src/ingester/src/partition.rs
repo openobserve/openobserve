@@ -20,7 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use arrow::json::ReaderBuilder;
+use arrow::{json::ReaderBuilder, record_batch::RecordBatch};
 use arrow_schema::Schema;
 use config::{
     ider,
@@ -114,10 +114,10 @@ impl Partition {
             let mut buf_parquet = Vec::new();
             let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
             for batch in data.data.iter() {
-                arrow_size += batch.data.size();
-                writer
-                    .write(&batch.data)
-                    .context(WriteParquetRecordBatchSnafu)?;
+                arrow_size += batch.data_arrow_size;
+                // writer
+                //     .write(&batch.data)
+                //     .context(WriteParquetRecordBatchSnafu)?;
             }
             writer.close().context(WriteParquetRecordBatchSnafu)?;
             // write into local file
@@ -163,8 +163,12 @@ impl PartitionFile {
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
                 .add(batch.size() as i64);
-            self.data
-                .push(RecordBatchEntry::new(batch, entry.data_size));
+            // TODO: here we droped the RecordBatch
+            self.data.push(RecordBatchEntry::new(
+                RecordBatch::new_empty(Arc::new(Schema::empty())),
+                entry.data_size,
+                batch.size(),
+            ));
         }
         metrics::INGEST_MEMTABLE_BYTES
             .with_label_values(&[])
