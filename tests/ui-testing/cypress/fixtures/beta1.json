@@ -1,17 +1,5 @@
 
 {
-  "email": "root@example.com",
-  "NewPassword": "Complexpass#123",
-  
-  "baseUrl":"http://localhost:5080",
-  "devUrl":"http://localhost:5080/web/",
-  "organizationUrl":"https://beta1.cloud.zinclabs.dev/organizations",
-  "userUrl":"http://localhost:5080/web/users",
-  "logUrl": "http://localhost:5080/web/users",
-  "streamUrl":"http://localhost:5080/web/logstreams",
-  
-  "OrganizationName":"default",
-  "streamName":"Alpha1-Logs",
  
   "role":"Member",
  
@@ -25,15 +13,6 @@
     "searchInvalidUser":"pqrs",
     "userRole":"admin",
     "updatedUserRole":"member",
-    
-    "searchOrganizationByValid":"Nitin's Organization",
-    "searchOrganizationByInvalid":"pqrstsx",
-    "searchOrganizationByKey":"ash",
-    
-    "addOrganization":"abcd",
-    "sendEmail1":"trupti.potdar06@gmail.com",
-    "sendEmail2":"dipti.dixit23@gmail.com",
-
       
     "rQuery":"Query",
     "rFields":"Fields",

@@ -1,52 +1,6 @@
 
 {
   
-  "email": "nitin.dixit14@gmail.com",
-  "NewPassword": "Test@2023",
- 
-  "baseUrl":"https://zinccpcloud.auth.us-west-2.amazoncognito.com/login?client_id=31ds0mr4psua0p58353l3t6j61&response_type=CODE&scope=&redirect_uri=https://alpha1-api.dev.zinclabs.dev/api/auth/callback",
-  "devUrl":"https://alpha1.cloud.zinclabs.dev/",
-  "DashboardUrl":"https://alpha1.cloud.zinclabs.dev/dashboards",
-  "organizationUrl":"https://alpha1.cloud.zinclabs.dev/organizations",
-  "userUrl":"https://alpha1.cloud.zinclabs.dev/users",
-  "logUrl": "https://alpha1.cloud.zinclabs.dev/logs",
-  "streamUrl":"https://alpha1.cloud.zinclabs.dev/logstream",
-  "functionUrl":"https://alpha1.cloud.zinclabs.dev/functions",
-  "ingestionCurlUrl":"https://alpha1.cloud.zinclabs.dev/ingestion/curl",
-  "ingestionFluentBitUrl":"https://alpha1.cloud.zinclabs.dev/ingestion/fluentbit",
-  "ingestionFluentDUrl":"https://alpha1.cloud.zinclabs.dev/ingestion/fluentd",
-  "ingestionVectorUrl":"https://alpha1.cloud.zinclabs.dev/ingestion/vector",
-  "alertsUrl":"https://alpha1.cloud.zinclabs.dev/alerts",
- 
-  "OrganizationName":"zinc production",
-  "streamName":"default",
-
-  "role":"Member",
-
-  "moduleUser":"User",
-  "moduleOrganization":"Organizations",
-  "moduleLogs":"Logs",
-  "moduleStream":"Streams",
-  "moduleFunction":"Functions",
-  "moduleIngestion":"Ingestion",
- 
-  "searchUser":"ashish",
-  "keywordSearchUser":"ashi",
-  "searchInvalidUser":"pqrs",
-  "userRole":"admin",
-  "updatedUserRole":"member",
-  
-  "searchOrganizationByValid":"Nitin's Organization",
-  "searchOrganizationByInvalid":"pqrstsx",
-  "searchOrganizationByKey":"Nitin's",
-  
-  "addOrganizationBtn":"Add Organization",
-  "addOrganization":"abcd",
-  "sendEmail1":"trupti.potdar06@gmail.com",
-  "sendEmail2":"dipti.dixit23@gmail.com",
-  "sendEmail3":"dip.com",
-
-    
   "rQuery":"Query",
   "rFields":"Fields",
   "rHistogram":"Histogram",
