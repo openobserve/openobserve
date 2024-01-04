@@ -86,7 +86,17 @@ pub async fn process_token(
     ),
 ) {
     let dec_token = res.1.unwrap();
-    let groups = dec_token.claims.get("groups").unwrap().as_array().unwrap();
+
+    let groups = match dec_token.claims.get("groups") {
+        None => vec![],
+        Some(groups) => {
+            if !groups.is_array() {
+                vec![]
+            } else {
+                groups.as_array().unwrap().to_vec()
+            }
+        }
+    };
     let name = dec_token.claims.get("name").unwrap().as_str().unwrap();
     let user_email = res.0.user_email.to_owned();
     let mut source_orgs: Vec<UserOrg> = vec![];
