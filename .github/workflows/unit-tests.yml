@@ -1,0 +1,51 @@
+name: Unit tests
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**.md" 
+
+env:
+  COLUMNS: 150
+
+jobs:
+  build:
+
+    runs-on: 
+      labels: ubuntu-latest
+
+    steps:
+
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2023-12-24
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          version: "21.12"
+
+      
+      - name: Simulate building frontend code
+        run: touch web/dist/index.html
+      
+      - name: Setup cargo config
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+
+      - name: Run unit tests
+        run: ./coverage.sh
+       
