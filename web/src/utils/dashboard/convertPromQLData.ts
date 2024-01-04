@@ -554,7 +554,7 @@ export const convertPromQLData = (
   
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
-  if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends && panelSchema.type != "gauge") {
+  if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends && panelSchema.type != "gauge" && panelSchema.type != "metric") {
     //get max value of name
     const maxValue = options.series
       .map((it: any) => it.name)

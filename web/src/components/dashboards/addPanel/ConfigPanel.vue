@@ -426,6 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-input>
     <q-input
+      v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap'&& dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'"
       v-model.number="
         dashboardPanelData.data.config.axisWidth
       "
@@ -450,6 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="space"></div>
 
     <q-toggle
+    v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'" 
       v-model="dashboardPanelData.data.config.axisBorderShow"
       :label="t('dashboard.showBorder')"
     />
