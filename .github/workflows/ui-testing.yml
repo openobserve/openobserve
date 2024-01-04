@@ -71,6 +71,7 @@ jobs:
            
             
   run-logs-test:
+    needs: build
     runs-on: 
       labels: ubuntu-latest
     strategy:
