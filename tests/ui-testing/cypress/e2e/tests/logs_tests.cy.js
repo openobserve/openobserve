@@ -87,8 +87,7 @@ describe("Logs testcases", () => {
     // cy.get('[data-test="menu-link-/logs-item"]')
     //   .contains(logData.moduleLog)
     //   .click();
-    // // Ensure the logs table is visible with a timeout of 3 seconds
-    // cy.get("table.q-table", { timeout: 3000 }).should("be.visible");
+  
   });
 
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
