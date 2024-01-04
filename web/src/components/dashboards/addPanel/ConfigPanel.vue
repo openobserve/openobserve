@@ -446,6 +446,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     >
     </q-input>
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-model="dashboardPanelData.data.config.axisBorderShow"
+      :label="t('dashboard.showBorder')"
+    />
+
   </div>
 </template>
 

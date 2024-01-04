@@ -461,6 +461,7 @@
     "oneFieldConfigMessage": "Add 1 field or Configure it from the Config",
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
+    "showBorder": "Show Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
     "basemapLabel": "Base Map",

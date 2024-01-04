@@ -325,6 +325,9 @@ export const convertSQLData = (
           splitLine: {
             show: true,
           },
+          axisLine: {
+            show: panelSchema.config?.axisBorderShow,
+          },
           axisTick: {
             show: xAxisKeys.length == 1 ? false : true,
             align: "left",
@@ -381,7 +384,7 @@ export const convertSQLData = (
         show: true,
       },
       axisLine: {
-        show: true,
+        show: panelSchema.config?.axisBorderShow,
       },
     },
     toolbox: {
