@@ -71,7 +71,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<Vec<(PathBuf, i64)>> {
+    ) -> Result<Vec<(PathBuf, i64, usize)>> {
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
@@ -100,10 +100,12 @@ impl Partition {
                     file_meta.max_ts = r.max_ts;
                 }
             });
+            let mut arrow_size = 0;
             // write into parquet buf
             let mut buf_parquet = Vec::new();
             let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
             for batch in data.data.iter() {
+                arrow_size += batch.data.get_array_memory_size();
                 writer
                     .write(&batch.data)
                     .context(WriteParquetRecordBatchSnafu)?;
@@ -126,7 +128,7 @@ impl Partition {
                 .with_label_values(&[&org_id, &stream_name, stream_type])
                 .inc_by(buf_parquet.len() as u64);
 
-            paths.push((path, file_meta.original_size));
+            paths.push((path, file_meta.original_size, arrow_size));
         }
         Ok(paths)
     }
@@ -149,6 +151,9 @@ impl PartitionFile {
         let _ = decoder.serialize(&entry.data);
         let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
         if let Some(batch) = batch {
+            metrics::INGEST_MEMTABLE_ARROW_BYTES
+                .with_label_values(&[])
+                .add(batch.get_array_memory_size() as i64);
             self.data
                 .push(RecordBatchEntry::new(batch, entry.data_size));
         }

@@ -173,6 +173,18 @@ pub static INGEST_MEMTABLE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static INGEST_MEMTABLE_ARROW_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_memtable_arrow_bytes",
+            "Ingestor arrow format in memory bytes.".to_owned(),
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
 pub static INGEST_MEMTABLE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -563,6 +575,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_MEMTABLE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_MEMTABLE_ARROW_BYTES.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_MEMTABLE_FILES.clone()))

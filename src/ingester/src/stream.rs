@@ -61,7 +61,7 @@ impl Stream {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<Vec<(PathBuf, i64)>> {
+    ) -> Result<Vec<(PathBuf, i64, usize)>> {
         let mut paths = Vec::new();
         let r = self.partitions.read().await;
         for (_, partition) in r.iter() {

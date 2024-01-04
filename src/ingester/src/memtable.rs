@@ -60,7 +60,7 @@ impl MemTable {
         thread_id: usize,
         org_id: &str,
         stream_type: &str,
-    ) -> Result<Vec<(PathBuf, i64)>> {
+    ) -> Result<Vec<(PathBuf, i64, usize)>> {
         let mut paths = Vec::new();
         let r = self.streams.read().await;
         for (stream_name, stream) in r.iter() {
