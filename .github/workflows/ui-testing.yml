@@ -87,7 +87,7 @@ jobs:
           path: ./artifacts
       - run: ls -alR
       - name: Start OpenObserve
-        run: cd artifacts && target/debug/openobserve &
+        run: cd artifacts && chmod +x target/debug/openobserve && target/debug/openobserve &
 
       - name: Wait for start
         run: sleep 10
