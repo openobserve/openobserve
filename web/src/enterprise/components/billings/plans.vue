@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isPaidPlan="planType"
         :freeLoading="freeLoading"
         :proLoading="proLoading"
-        @update:freeSubscription="confirm_downgrade_subscription = true"
+        @update:freeSubscription="subscribeFreePlan"
         @update:proSubscription="onLoadSubscription('pro')"
         @update:businessSubscription="onLoadSubscription('business')"
       ></plan-card>
@@ -83,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-space />
           <q-btn icon="close"
-flat round dense v-close-popup="true" />
+flat round
+dense v-close-popup="true" />
         </q-card-section>
         <q-card-section>
           <iframe
@@ -109,7 +110,8 @@ flat round dense v-close-popup="true" />
           </div>
           <q-space />
           <q-btn icon="close"
-flat round dense v-close-popup="true" />
+flat round
+dense v-close-popup="true" />
         </q-card-section>
 
         <q-card-section>
@@ -156,42 +158,6 @@ flat round dense v-close-popup="true" />
         </q-card-actions>
       </q-card>
     </q-dialog>
-
-    <q-dialog v-model="customerIDExist" persistent>
-      <q-card>
-        <q-card-section class="row items-center">
-          <span class="q-ml-sm"
-            ><q-avatar
-              icon="info"
-              size="sm"
-              color="secondary"
-              text-color="white"
-              class="q-mr-sm"
-            />{{ t("billing.captureCardDetail") }}</span
-          >
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn
-            color="secondary"
-            @click="
-              loadingPaymentDetail = true;
-              onLoadSubscription('Developer');
-            "
-          >
-            <div v-if="loadingPaymentDetail">
-              Loading <q-spinner-dots
-                color="white"
-                size="40px"
-                style="margin: 0 auto;"
-              />
-            </div>
-            <div v-else>
-              {{ t("billing.proceedtoPaymentDetail") }}
-            </div>
-          </q-btn>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
     <!-- </div> -->
   </q-page>
 </template>
@@ -218,6 +184,16 @@ export default defineComponent({
     this.loadSubscription();
   },
   methods: {
+    subscribeFreePlan() {
+      if (
+        this.currentPlanDetail.CustomerBillingObj.subscription_type ==
+        config.freePlan
+      ) {
+        this.onLoadSubscription("Developer");
+      } else {
+        this.confirm_downgrade_subscription = true;
+      }
+    },
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
@@ -266,6 +242,7 @@ export default defineComponent({
       )
         .then((res) => {
           this.loadSubscription();
+          this.$router.go(this.$router.currentRoute);
         })
         .catch((e) => {
           this.freeLoading = false;
@@ -299,42 +276,48 @@ export default defineComponent({
         this.store.state.selectedOrganization.identifier
       )
         .then((res) => {
-          this.customerIDExist = false;
+          this.currentPlanDetail = res.data.data;
+
           if (
-            res.data.data.CustomerBillingObj.customer_id == "" ||
-            res.data.data.CustomerBillingObj.customer_id == null
+            res.data.data.CustomerBillingObj.customer_id !== "" &&
+            res.data.data.CustomerBillingObj.customer_id !== null
           ) {
-            this.customerIDExist = true;
-          }
-          if (
-            res.data.data.CustomerBillingObj.subscription_type ==
-            "professional-USD-Monthly"
-          ) {
-            this.planType = "pro";
-            const localOrg: any = useLocalOrganization();
-            localOrg.value.subscription_type = "professional-USD-Monthly";
-            useLocalOrganization(localOrg.value);
-            this.store.dispatch("setSelectedOrganization", localOrg.value);
-            this.store.dispatch("setQuotaThresholdMsg", "");
-          } else if (
-            res.data.data.CustomerBillingObj.subscription_type ==
-            config.freePlan
-          ) {
-            this.planType = "basic";
-            const localOrg: any = useLocalOrganization();
-            localOrg.value.subscription_type = config.freePlan;
-            useLocalOrganization(localOrg.value);
-            this.store.dispatch("setSelectedOrganization", localOrg.value);
-          } else if (
-            res.data.data.CustomerBillingObj.subscription_type ==
-            "business-USD-Monthly"
-          ) {
-            this.planType = "business";
-            const localOrg: any = useLocalOrganization();
-            localOrg.value.subscription_type = "professional-USD-Monthly";
-            useLocalOrganization(localOrg.value);
-            this.store.dispatch("setSelectedOrganization", localOrg.value);
-            this.store.dispatch("setQuotaThresholdMsg", "");
+            if (
+              res.data.data.CustomerBillingObj.subscription_type ==
+              "professional-USD-Monthly"
+            ) {
+              this.planType = "pro";
+              const localOrg: any = useLocalOrganization();
+              localOrg.value.subscription_type = "professional-USD-Monthly";
+              useLocalOrganization(localOrg.value);
+              this.store.dispatch("setSelectedOrganization", localOrg.value);
+              this.store.dispatch("setQuotaThresholdMsg", "");
+            } else if (
+              res.data.data.CustomerBillingObj.subscription_type ==
+              config.freePlan
+            ) {
+              this.planType = "basic";
+              const localOrg: any = useLocalOrganization();
+              localOrg.value.subscription_type = config.freePlan;
+              useLocalOrganization(localOrg.value);
+              this.store.dispatch("setSelectedOrganization", localOrg.value);
+            } else if (
+              res.data.data.CustomerBillingObj.subscription_type ==
+              "business-USD-Monthly"
+            ) {
+              this.planType = "business";
+              const localOrg: any = useLocalOrganization();
+              localOrg.value.subscription_type = "professional-USD-Monthly";
+              useLocalOrganization(localOrg.value);
+              this.store.dispatch("setSelectedOrganization", localOrg.value);
+              this.store.dispatch("setQuotaThresholdMsg", "");
+            }
+          } else {
+            this.$q.notify({
+              type: "warning",
+              message: "Please subscribe to one of the plan.",
+              timeout: 5000,
+            });
           }
           // this.listSubscriptionResponse = res.data.data;
           // this.listSubscriptionResponse.subscription.current_term_end =
@@ -466,7 +449,7 @@ export default defineComponent({
     const expiry_month = ref("12");
     const expiry_year = ref("2025");
     const frmPayment = ref();
-    const planType = ref("basic");
+    const planType = ref("");
     const isActiveSubscription = ref(false);
     const loading = ref(false);
     const hostedResponse: any = ref();
@@ -479,8 +462,7 @@ export default defineComponent({
     const freeLoading: any = ref(false);
     const proLoading: any = ref(false);
     const confirm_downgrade_subscription: any = ref(false);
-    const customerIDExist = ref(false);
-    const loadingPaymentDetail = ref(false);
+    const currentPlanDetail = ref();
 
     const retriveHostedPage = () => {
       BillingService.retrive_hosted_page(
@@ -516,8 +498,7 @@ export default defineComponent({
       freeLoading,
       proLoading,
       confirm_downgrade_subscription,
-      customerIDExist,
-      loadingPaymentDetail,
+      currentPlanDetail,
     };
   },
 });

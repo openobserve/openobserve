@@ -600,7 +600,7 @@
     "plansLabel": "Plans",
     "invoiceHistoryLabel": "Invoice History",
     "downgradeMessage": "You are downgrading the subscription plan. Are you sure you want to proceed with this action?",
-    "captureCardDetail": "To proceed, please provide your credit card details. Rest assured, you will not be charged at this stage. Click the button below to proceed to enter your card details. Charges will only apply when you choose to subscribe to a paid plan.",
+    "captureCardDetail": "To proceed, please provide your credit card details. Rest assured, you will not be charged at this stage. Charges will only apply when you choose to subscribe to a paid plan. Click the button below to proceed to enter your card details.",
     "proceedtoPaymentDetail": "Proceed to Payment Details"
   },
   "message": {
