@@ -846,7 +846,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.skip("should only display results for selected date time ", () => {
+  it("should only display results for selected date time ", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-absolute-tab"]').click({ force: true });
@@ -885,21 +885,21 @@ describe("Logs testcases", () => {
     endDate.setMinutes(0);
     endDate.setSeconds(0);
 
+ 
     const startDateStr =
       startDate.getFullYear() +
-      "-" +
-      (startDate.getMonth() + 1) +
-      "-" +
-      startDate.getDate() +
-      " 00:00:00";
+      '-' +
+      String(startDate.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(startDate.getDate()).padStart(2, '0') +
+      ' 00:00:00';
     const endDateStr =
       endDate.getFullYear() +
-      "-" +
-      (endDate.getMonth() + 1) +
-      "-" +
-      endDate.getDate() +
-      " 23:59:59";
-
+      '-' +
+      String(endDate.getMonth() + 1).padStart(2, '0') +
+      '-' +
+      String(endDate.getDate()).padStart(2, '0') +
+      ' 23:59:59';
     cy.get('[data-test="logs-search-result-logs-table"]')
       .find("tbody")
       .eq(1)
