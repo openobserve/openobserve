@@ -47,7 +47,7 @@ const getDefaultDashboardPanelData: any = () => ({
       unit_custom: null,
       decimals: 2,
       axisWidth: null,
-      axisBorderShow: true,
+      axisBorderShow: false,
       base_map: {
         type: "osm",
       },
