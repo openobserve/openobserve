@@ -68,10 +68,11 @@ impl Immutable {
         let mut persist_json_size = 0;
         let mut persist_arrow_size = 0;
         // 1. dump memtable to disk
-        let paths = self
+        let (schema_size, paths) = self
             .memtable
             .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)
             .await?;
+        persist_arrow_size += schema_size;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");
         let lock_data = paths

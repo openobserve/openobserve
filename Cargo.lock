@@ -2050,6 +2050,7 @@ dependencies = [
  "actix-web-prometheus",
  "ahash 0.8.6",
  "anyhow",
+ "arrow",
  "arrow-json",
  "arrow-schema",
  "aws-sdk-dynamodb",

@@ -22,7 +22,13 @@ use std::{
 
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
-use config::{ider, meta::stream::FileMeta, metrics, utils::parquet::new_parquet_writer, CONFIG};
+use config::{
+    ider,
+    meta::stream::FileMeta,
+    metrics,
+    utils::{parquet::new_parquet_writer, record_batch_ext::RecordBatchExt, schema_ext::SchemaExt},
+    CONFIG,
+};
 use snafu::ResultExt;
 
 use crate::{
@@ -38,6 +44,9 @@ pub(crate) struct Partition {
 
 impl Partition {
     pub(crate) fn new(schema: Arc<Schema>) -> Self {
+        metrics::INGEST_MEMTABLE_ARROW_BYTES
+            .with_label_values(&[])
+            .add(schema.size() as i64);
         Self {
             schema,
             files: RwMap::default(),
@@ -71,7 +80,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<Vec<(PathBuf, i64, usize)>> {
+    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
@@ -105,7 +114,7 @@ impl Partition {
             let mut buf_parquet = Vec::new();
             let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
             for batch in data.data.iter() {
-                arrow_size += batch.data.get_array_memory_size();
+                arrow_size += batch.data.size();
                 writer
                     .write(&batch.data)
                     .context(WriteParquetRecordBatchSnafu)?;
@@ -130,7 +139,7 @@ impl Partition {
 
             paths.push((path, file_meta.original_size, arrow_size));
         }
-        Ok(paths)
+        Ok((self.schema.size(), paths))
     }
 }
 
@@ -153,7 +162,7 @@ impl PartitionFile {
         if let Some(batch) = batch {
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
-                .add(batch.get_array_memory_size() as i64);
+                .add(batch.size() as i64);
             self.data
                 .push(RecordBatchEntry::new(batch, entry.data_size));
         }
