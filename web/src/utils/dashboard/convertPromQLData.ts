@@ -196,8 +196,14 @@ export const convertPromQLData = (
     },
     xAxis: {
       type: "time",
+      axisLine: {
+        show: false,
+      },
       splitLine: {
         show: true,
+        lineStyle: {
+          opacity: 0.5,
+        },
       },
     },
     yAxis: {
@@ -215,10 +221,13 @@ export const convertPromQLData = (
         },
       },
       axisLine: {
-        show: true,
+        show: false,
       },
       splitLine: {
         show: true,
+        lineStyle: {
+          opacity: 0.5,
+        },
       },
     },
     toolbox: {
