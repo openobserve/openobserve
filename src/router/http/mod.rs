@@ -137,6 +137,7 @@ async fn dispatch(
                 .limit(0),
         )
         .timeout(Duration::from_secs(CONFIG.route.timeout))
+        .disable_redirects()
         .finish();
 
     // send query
