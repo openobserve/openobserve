@@ -96,16 +96,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="q-mt-lg q-mb-xl">
         <div class="q-mt-sm" v-for="rule in planData.included">
-          <q-icon name="check_circle" size="20px" :color="cardColor" />
+          <q-icon name="check_circle" size="20px"
+:color="cardColor" />
           <span class="q-ml-sm text-body1 text-weight-redular">{{ rule }}</span>
         </div>
       </div>
       <q-btn
-        v-if="
-          isPaidPlan !== planData.type ||
-          isPaidPlan !== planData.type ||
-          isPaidPlan !== planData.type
-        "
+        v-if="isPaidPlan !== planData.type"
         class="full-width card-btn"
         type="button"
         :color="cardColor"
@@ -124,13 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ planData.getStarted }}
         </div>
       </q-btn>
-
       <div
-        v-if="
-          isPaidPlan == planData.type ||
-          isPaidPlan == planData.type ||
-          isPaidPlan == planData.type
-        "
+        v-if="isPaidPlan == planData.type"
         class="row justify-center items-center card-btn"
         :class="cardColor"
       >
