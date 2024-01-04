@@ -122,6 +122,8 @@ pub(crate) async fn persist() -> Result<()> {
                 // persist entry to local disk
                 let ret = immutable.persist(&path).await;
                 drop(permit);
+                drop(r);
+                task::yield_now().await;
                 ret.map(|size| Some((path, size.0, size.1)))
             });
         tasks.push(task);

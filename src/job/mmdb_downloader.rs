@@ -20,7 +20,7 @@ use futures::stream::StreamExt;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use sha256::try_digest;
-use tokio::{fs::File, io::AsyncWriteExt};
+use tokio::{fs::File, io::AsyncWriteExt, time};
 
 use crate::{
     common::{
@@ -35,15 +35,14 @@ static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
 pub async fn run() -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&CONFIG.common.mmdb_data_dir)?;
     // should run it every 24 hours
-    // let mut interval = time::interval(time::Duration::from_secs(
-    //     CONFIG.common.mmdb_update_duration,
-    // ));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.common.mmdb_update_duration,
+    ));
 
-    // loop {
-    //     interval.tick().await;
-    //     run_download_files().await;
-    // }
-    Ok(())
+    loop {
+        interval.tick().await;
+        run_download_files().await;
+    }
 }
 
 async fn run_download_files() {
