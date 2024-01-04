@@ -446,7 +446,7 @@ export const convertSQLData = (
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
-          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+          new Set(getAxisDataFromKey(xAxisKeys[0]))
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
 
