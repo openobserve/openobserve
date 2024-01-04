@@ -60,6 +60,7 @@
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 130px"
+            @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
         <div class="q-ml-none flex items-end">
@@ -77,6 +78,7 @@
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
             style="min-width: 250px"
+            @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
         <div
@@ -147,7 +149,7 @@ var triggerOperators: any = ref([
   "Contains",
   "NotContains",
 ]);
-const emits = defineEmits(["add", "remove"]);
+const emits = defineEmits(["add", "remove", "input:update"]);
 
 const filteredFields = ref(props.streamFields);
 
@@ -157,6 +159,7 @@ const { t } = useI18n();
 
 const deleteApiHeader = (field: any) => {
   emits("remove", field);
+  emits("input:update", "conditions", field);
 };
 
 const addApiHeader = () => {

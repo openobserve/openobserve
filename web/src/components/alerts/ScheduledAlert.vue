@@ -21,6 +21,7 @@
         :fields="conditions"
         @add="addField"
         @remove="removeField"
+        @input:update="(name, field) => emits('input:update', name, field)"
       />
     </template>
     <template v-else>
@@ -353,6 +354,7 @@ const emits = defineEmits([
   "update:sql",
   "update:aggregation",
   "update:isAggregationEnabled",
+  "input:update",
 ]);
 
 const { t } = useI18n();
@@ -406,15 +408,18 @@ const removeField = (field: any) => {
 const updateQueryValue = (value: string) => {
   query.value = value;
   emits("update:sql", value);
+  emits("input:update", "sql", value);
 };
 
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
+  emits("input:update", "period", triggerData.value);
 };
 
 const updateTab = () => {
   _isAggregationEnabled.value = false;
   emits("update:query_type", tab.value);
+  emits("input:update", "query_type", tab.value);
 };
 
 defineExpose({
@@ -425,12 +430,14 @@ const addGroupByColumn = () => {
   const aggregationDataCopy = { ...aggregationData.value };
   aggregationDataCopy.group_by.push("");
   emits("update:aggregation", aggregationDataCopy);
+  emits("input:update", "aggregation", aggregationDataCopy);
 };
 
 const deleteGroupByColumn = (index: number) => {
   const aggregationDataCopy = { ...aggregationData.value };
   aggregationDataCopy.group_by.splice(index, 1);
   emits("update:aggregation", aggregationDataCopy);
+  emits("input:update", "aggregation", aggregationDataCopy);
 };
 
 const updateAggregation = () => {
@@ -447,6 +454,7 @@ const updateAggregation = () => {
   }
   emits("update:aggregation", aggregationData.value);
   emits("update:isAggregationEnabled", _isAggregationEnabled.value);
+  emits("input:update", "aggregation", aggregationData.value);
 };
 
 const filterColumns = (val: string, update: Function) => {
