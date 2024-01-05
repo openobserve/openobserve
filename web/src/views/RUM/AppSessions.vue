@@ -226,6 +226,7 @@ const userDataSet = new Set([
   "oo_evp_origin_version",
   "source",
   "api",
+  "usr_email",
 ]);
 
 const columns = ref([
@@ -322,6 +323,14 @@ const getStreamFields = () => {
           "usr_name",
         ]);
         streamFields.value = [];
+
+        streamFields.value.push({
+          name: "usr_email",
+          type: "UTF8",
+          stream_name: "_rumdata",
+          showValues: true,
+        });
+
         res.data.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
             schemaMapping.value[field.name] = field;
