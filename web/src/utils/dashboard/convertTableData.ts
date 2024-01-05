@@ -36,23 +36,19 @@ export const convertTableData = (panelSchema: any, searchQueryData: any) => {
 
   const columns = columnData.map((it: any) => {
     let obj: any = {};
+    const isNumber = isSampleValuesNumbers(searchQueryData[0], it.alias, 20);
     obj["name"] = it.label;
     obj["field"] = it.alias;
     obj["label"] = it.label;
-    obj["align"] = !isSampleValuesNumbers(searchQueryData[0], it.alias, 20)
-      ? "left"
-      : "right";
+    obj["align"] = !isNumber ? "left" : "right";
     obj["sortable"] = true;
-    return obj;
-  });
-
-  // map on each columns, if align is right then need to use decimals config option in toFixed method
-  columns.map((col: any) => {
-    if (col.align === "right") {
-      const oldField = col["field"];
-      col["field"] = (row: any) =>
-        +row[oldField].toFixed(panelSchema.config.decimals ?? 2);
+    // if number then sort by number and use decimal point config option in format
+    if (isNumber) {
+      obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+      obj["format"] = (val: any) =>
+        val ? val?.toFixed(panelSchema?.config?.decimals ?? 2) ?? 0 : val;
     }
+    return obj;
   });
 
   return {

@@ -26,20 +26,20 @@ export const getUnitValue = (
         const unitValue: any = value ? value / unitInfo.divisor : 0;
         if (unitValue < 1024) {
           return {
-            value: `${parseFloat(unitValue).toFixed(decimals)}`,
+            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
             unit: unitInfo.unit,
           };
         }
       }
       const val: any = value ? value / units[units.length - 1].divisor : 0;
       return {
-        value: `${parseFloat(val).toFixed(decimals)}`,
+        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
         unit: "PB",
       };
     }
     case "custom": {
       return {
-        value: `${parseFloat(value).toFixed(decimals)}`,
+        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: `${customUnit ?? ""}`,
       };
     }
@@ -59,7 +59,7 @@ export const getUnitValue = (
         const unitValue = value / unitInfo.divisor;
         if (unitValue >= 1) {
           return {
-            value: parseFloat(unitValue.toFixed(decimals)),
+            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
             unit: unitInfo.unit,
           };
         }
@@ -67,7 +67,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor).toFixed(decimals)),
+        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
         unit: units[0].unit,
       };
     }
@@ -88,7 +88,7 @@ export const getUnitValue = (
         const unitValue = value / unitInfo.divisor;
         if (unitValue >= 1) {
           return {
-            value: parseFloat(unitValue.toFixed(decimals)),
+            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
             unit: unitInfo.unit,
           };
         }
@@ -96,7 +96,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor).toFixed(decimals)),
+        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
         unit: units[0].unit,
       };
     }
@@ -117,7 +117,7 @@ export const getUnitValue = (
         const unitValue = value / unitInfo.divisor;
         if (unitValue >= 1) {
           return {
-            value: parseFloat(unitValue.toFixed(decimals)),
+            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
             unit: unitInfo.unit,
           };
         }
@@ -125,7 +125,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor).toFixed(decimals)),
+        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
         unit: units[0].unit,
       };
     }
@@ -134,27 +134,27 @@ export const getUnitValue = (
       for (let unit of units) {
         if (value < 1024) {
           return {
-            value: `${parseFloat(value).toFixed(decimals)}`,
+            value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
             unit: `${unit}/s`,
           };
         }
         value /= 1024;
       }
       return {
-        value: `${parseFloat(value).toFixed(decimals)}`,
+        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: "PB/s",
       };
     }
     case "percent-1": {
       return {
-        value: `${(parseFloat(value) * 100).toFixed(decimals)}`,
+        value: `${(parseFloat(value) * 100)?.toFixed(decimals) ?? 0}`,
         unit: "%",
       };
       // `${parseFloat(value) * 100}`;
     }
     case "percent": {
       return {
-        value: `${parseFloat(value).toFixed(decimals)}`,
+        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: "%",
       };
       // ${parseFloat(value)}`;
@@ -173,14 +173,14 @@ export const getUnitValue = (
 
         if (unitValue < 1024) {
           return {
-            value: `${parseFloat(unitValue).toFixed(decimals)}`,
+            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
             unit: unitInfo.unit,
           };
         }
       }
       const val: any = value ? value / units[units.length - 1].divisor : 0;
       return {
-        value: `${parseFloat(val).toFixed(decimals)}`,
+        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
         unit: "PB",
       };
     }
@@ -197,14 +197,14 @@ export const getUnitValue = (
         const unitValue: any = value ? value / unitInfo.divisor : 0;
         if (unitValue < 1024) {
           return {
-            value: `${parseFloat(unitValue).toFixed(decimals)}`,
+            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
             unit: unitInfo.unit,
           };
         }
       }
       const val: any = value ? value / units[units.length - 1].divisor : 0;
       return {
-        value: `${parseFloat(val).toFixed(decimals)}`,
+        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
         unit: "PB",
       };
     }
@@ -212,7 +212,7 @@ export const getUnitValue = (
       return {
         value: isNaN(value)
           ? value
-          : (+value).toFixed(decimals),
+          : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
@@ -220,7 +220,7 @@ export const getUnitValue = (
       return {
         value: isNaN(value)
           ? value
-          : (+value).toFixed(decimals),
+          : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
