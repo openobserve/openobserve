@@ -51,7 +51,13 @@ export const convertTableData = (panelSchema: any, searchQueryData: any) => {
     if (col.align === "right") {
       const oldField = col["field"];
       col["field"] = (row: any) =>
-        +row[oldField].toFixed(panelSchema.config.decimals ?? 2);
+        // if the value is null or undefined
+        // return empty string
+        row[oldField]
+          ? parseFloat(
+              row[oldField]?.toFixed(panelSchema?.config?.decimals ?? 2) ?? 0
+            )
+          : "";
     }
   });
 
