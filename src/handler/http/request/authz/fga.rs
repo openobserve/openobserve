@@ -5,6 +5,9 @@ use actix_web::{get, post, web, HttpResponse};
 use o2_enterprise::enterprise::dex::meta::auth::O2EntityAuthorization;
 
 #[cfg(feature = "enterprise")]
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use o2_enterprise::enterprise::dex::meta::auth::O2EntityAuthorization;
+
 #[post("/{org_id}/roles")]
 pub async fn create_role(
     org_id: web::Path<String>,
