@@ -335,7 +335,7 @@ pub async fn search_memtable(
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
     for (schema, batch) in batches {
         let entry = batch_groups.entry(schema).or_default();
-        scan_stats.original_size += batch.iter().map(|r| r.data_size).sum::<usize>() as i64;
+        scan_stats.original_size += batch.iter().map(|r| r.data_json_size).sum::<usize>() as i64;
         entry.extend(batch.into_iter().map(|r| r.data.clone()));
     }
 

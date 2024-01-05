@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::{create_dir_all, OpenOptions},
+    io::Write,
+    path::PathBuf,
+    sync::Arc,
+};
 
 use arrow::{json::ReaderBuilder, record_batch::RecordBatch};
 use arrow_schema::Schema;
@@ -21,7 +26,7 @@ use config::{
     ider,
     meta::stream::FileMeta,
     metrics,
-    utils::{record_batch_ext::RecordBatchExt, schema_ext::SchemaExt},
+    utils::{parquet::new_parquet_writer, record_batch_ext::RecordBatchExt, schema_ext::SchemaExt},
     CONFIG,
 };
 use snafu::ResultExt;
@@ -95,7 +100,7 @@ impl Partition {
 
             let mut file_meta = FileMeta::default();
             data.data.iter().for_each(|r| {
-                file_meta.original_size += r.data_size as i64;
+                file_meta.original_size += r.data_json_size as i64;
                 file_meta.records += r.data.num_rows() as i64;
                 if file_meta.min_ts == 0 || file_meta.min_ts > r.min_ts {
                     file_meta.min_ts = r.min_ts;
@@ -106,31 +111,31 @@ impl Partition {
             });
             let mut arrow_size = 0;
             // write into parquet buf
-            // let mut buf_parquet = Vec::new();
-            // let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
+            let mut buf_parquet = Vec::new();
+            let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
             for batch in data.data.iter() {
                 arrow_size += batch.data_arrow_size;
-                // writer
-                //     .write(&batch.data)
-                //     .context(WriteParquetRecordBatchSnafu)?;
+                writer
+                    .write(&batch.data)
+                    .context(WriteParquetRecordBatchSnafu)?;
             }
-            // writer.close().context(WriteParquetRecordBatchSnafu)?;
+            writer.close().context(WriteParquetRecordBatchSnafu)?;
             // write into local file
-            // let mut f = OpenOptions::new()
-            //     .create(true)
-            //     .write(true)
-            //     .open(&path)
-            //     .context(CreateFileSnafu { path: path.clone() })?;
-            // f.write_all(&buf_parquet)
-            //     .context(WriteFileSnafu { path: path.clone() })?;
+            let mut f = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&path)
+                .context(CreateFileSnafu { path: path.clone() })?;
+            f.write_all(&buf_parquet)
+                .context(WriteFileSnafu { path: path.clone() })?;
 
             // update metrics
-            // metrics::INGEST_WAL_USED_BYTES
-            //     .with_label_values(&[&org_id, &stream_name, stream_type])
-            //     .add(buf_parquet.len() as i64);
-            // metrics::INGEST_WAL_WRITE_BYTES
-            //     .with_label_values(&[&org_id, &stream_name, stream_type])
-            //     .inc_by(buf_parquet.len() as u64);
+            metrics::INGEST_WAL_USED_BYTES
+                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .add(buf_parquet.len() as i64);
+            metrics::INGEST_WAL_WRITE_BYTES
+                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .inc_by(buf_parquet.len() as u64);
 
             paths.push((path, file_meta.original_size, arrow_size));
         }

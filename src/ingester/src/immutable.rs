@@ -24,7 +24,7 @@ use tokio::{sync::Semaphore, task};
 
 use crate::{
     entry::RecordBatchEntry,
-    errors::{Result, TokioJoinSnafu, WriteDataSnafu},
+    errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
     writer::WriterKey,
@@ -82,16 +82,16 @@ impl Immutable {
             .join("\n");
         std::fs::write(&done_path, lock_data.as_bytes()).context(WriteDataSnafu)?;
         // 3. delete wal file
-        _ = std::fs::remove_file(wal_path);
+        std::fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
         // 4. rename the tmp files to parquet files
         for (path, json_size, arrow_size) in paths {
             persist_json_size += json_size;
             persist_arrow_size += arrow_size;
             let parquet_path = path.with_extension("parquet");
-            _ = std::fs::rename(&path, &parquet_path);
+            std::fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
         }
         // 5. delete the lock file
-        _ = std::fs::remove_file(&done_path);
+        std::fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
         Ok((persist_json_size, persist_arrow_size))
     }
 }
@@ -122,8 +122,6 @@ pub(crate) async fn persist() -> Result<()> {
                 // persist entry to local disk
                 let ret = immutable.persist(&path).await;
                 drop(permit);
-                drop(r);
-                task::yield_now().await;
                 ret.map(|size| Some((path, size.0, size.1)))
             });
         tasks.push(task);
