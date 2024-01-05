@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             text-color="black"
             class="q-mr-sm"
+            data-test="dashboard-panel-error-bar-icon"
           />
         </div>
         <q-space />
@@ -48,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outside-arrows
             mobile-arrows
             @click.stop
+            data-test="dashboard-panel-query-tab"
           >
             <q-tab
               no-caps
@@ -57,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="index"
               :label="'Query ' + (index + 1)"
               @click.stop
+              :data-test="`dashboard-panel-query-tab-${index}`"
             >
               <q-icon
                 v-if="
@@ -67,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-sm"
                 @click.stop="removeTab(index)"
                 style="cursor: pointer"
+                :data-test="`dashboard-panel-query-tab-remove-${index}`"
               />
             </q-tab>
           </q-tabs>
@@ -91,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="addTab"
           icon="add"
           style="margin-right: 10px"
+          data-test="`dashboard-panel-query-tab-add`"
         ></q-btn>
       </div>
       <div>

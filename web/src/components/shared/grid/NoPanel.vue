@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="insert_drive_file"
         class=""
         @click="$emit('update:Panel')"
+        data-test="dashboard-if-no-panel-add-panel-btn"
       >
       </q-btn>
     </div>

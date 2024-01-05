@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         item.isLoading
       "
       class="q-mr-lg q-mt-xs"
+      :data-test="`dashboard-variable-${item}-selector`"
     >
       <div v-if="item.type == 'query_values'">
         <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
@@ -41,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           outlined
           readonly
+          data-test="dashboard-variable-constant-selector"
         ></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
@@ -51,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="item.label || item.name"
           dense
           outlined
+          data-test="dashboard-variable-textbox-selector"
         ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
@@ -75,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           option-value="value"
           option-label="label"
           emit-value
+          data-test="dashboard-variable-custom-selector"
         >
           <template v-slot:no-option>
             <q-item>
