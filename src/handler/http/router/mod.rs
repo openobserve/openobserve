@@ -29,8 +29,10 @@ use futures::FutureExt;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+#[cfg(feature = "enterprise")]
+use super::auth::validator::{validator_aws, validator_gcp};
 use super::{
-    auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
+    auth::validator::{validator_proxy_url, validator_rum},
     request::{
         dashboards::{folders::*, *},
         enrichment_table, functions, kv, logs, metrics, organization, prom, rum, search, status,
@@ -313,23 +315,24 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(move_dashboard)
             .service(traces::get_latest_traces)
             .service(logs::ingest::multi)
-            .service(logs::ingest::json)
-            .service(logs::ingest::handle_kinesis_request)
-            .service(logs::ingest::handle_gcp_request),
+            .service(logs::ingest::json),
     );
 }
 
 pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
+    #[cfg(feature = "enterprise")]
     let amz_auth = HttpAuthentication::with_fn(validator_aws);
+    #[cfg(feature = "enterprise")]
     cfg.service(
         web::scope("/aws")
             .wrap(cors.clone())
             .wrap(amz_auth)
             .service(logs::ingest::handle_kinesis_request),
     );
-
+    #[cfg(feature = "enterprise")]
     let gcp_auth = HttpAuthentication::with_fn(validator_gcp);
+    #[cfg(feature = "enterprise")]
     cfg.service(
         web::scope("/gcp")
             .wrap(cors.clone())

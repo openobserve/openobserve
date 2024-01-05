@@ -18,13 +18,12 @@ use std::io::Error;
 use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use config::CONFIG;
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::ingestion::{
+    GCPIngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
+};
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{
-            GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
-        },
-    },
+    common::meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestionRequest},
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{
         logs,
@@ -184,6 +183,7 @@ pub async fn json(
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse, example = json!({ "requestId": "ed4acda5-034f-9f42-bba1-f29aea6d7d8f", "timestamp": 1578090903599_i64, "errorMessage": "error processing request"})),
     )
 )]
+#[cfg(feature = "enterprise")]
 #[post("/{org_id}/{stream_name}/_kinesis_firehose")]
 pub async fn handle_kinesis_request(
     path: web::Path<(String, String)>,
@@ -221,6 +221,7 @@ pub async fn handle_kinesis_request(
     )
 }
 
+#[cfg(feature = "enterprise")]
 #[post("/{org_id}/{stream_name}/_sub")]
 pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
