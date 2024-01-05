@@ -21,124 +21,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
-
-// const colorArray = [
-//   '#0056b3', '#003e80', '#00294d', '#001326',
-//   '#28a745', '#1f8e3e', '#156331', '#0e3f24', '#072717',
-//   '#dc3545', '#a52a35', '#751e26', '#4e141a', '#27090d',
-//   '#fd7e14', '#d46a11', '#a9560e', '#803f0a', '#551f06',
-//   '#ffc107', '#d9a106', '#b28605', '#8b6a04', '#634d03',
-//   '#6f42c1', '#57348f', '#412663', '#2a1940', '#160c20',
-//   '#e83e8c', '#b82d66', '#8c1f49', '#631433', '#3f0a1d'
-// ];
-
-// [
-//   "#99cadd",
-//   "#a9bdd5",
-//   "#d6a9bc",
-//   "#c691a4",
-//   "#b87c94",
-//   "#ffcb20",
-//   "#ff3b3b",
-//   "#ff8d0c",
-//   "#42a6ff",
-//   "#ffb3ba",
-//   "#ffdfba",
-//   "#ffffba",
-//   "#baffc9",
-//   "#bae1ff",
-//   "#a8e6cf",
-//   "#dcedc1",
-//   "#ffd3b6",
-//   "#ffaaa5",
-//   "#ff8b94",
-//   "#ffbf00",
-//   "#ffcf40",
-//   "#ffdc73",
-//   "#b88c8c",
-//   "#ddadad",
-//   "#d6c7c7",
-//   "#9fb9bf",
-//   "#aec8ce",
-// ];
-
-// [
-//   "#E24D42", // Red
-//   "#1F78C1", // Blue
-//   "#BA43A9", // Purple
-//   "#705DA0", // Violet
-//   "#466803", // Green
-//   "#508642", // Dark Green
-//   "#447EBC", // Dark Blue
-//   "#C15C17", // Brown
-//   "#890F02", // Dark Red
-//   "#757575", // Grey
-//   "#70DBED", // Light Blue
-//   "#6ED0E0", // Turquoise
-//   "#B9D7D9", // Light Grey
-//   "#D683CE", // Light Purple
-//   "#E5AC0E", // Orange
-//   "#AEA2E0", // Lavender
-//   "#5195CE", // Bright Blue
-//   "#D9BF77", // Beige
-//   "#FADE2A", // Yellow
-//   "#2F575E", // Dark Turquoise
-//   "#99440A", // Dark Brown
-//   "#58140C", // Maroon
-//   "#052B51", // Navy
-//   "#511749", // Dark Violet
-//   "#3F2B5B", // Dark Indigo
-//   "#E0F9D7", // Light Green
-//   "#FCEACA", // Light Yellow
-//   "#CFFAFF", // Sky Blue
-//   "#F9E2D2", // Light Pink
-//   "#FCE2DE", // Pink
-//   "#BADFF4", // Light Bright Blue
-//   "#F9D9F9", // Light Lavender
-//   "#DEDAF7"  // Pale Lavender
-// ]
-
-const colorArrayBySeries = [
-  "#5470c6",
-  "#91cc75",
-  "#fac858",
-  "#ee6666",
-  "#73c0de",
-  "#3ba272",
-  "#fc8452",
-  "#9a60b4",
-  "#dc1e1e",
-  "#9086e9",
-  "#27e162",
-  "#e08de6",
-  "#de6086",
-  "rgba(161,225,200,0.48)",
-  "#ec8ceb",
-  "#99e9f1",
-  "#eec59c",
-];
-
-const colorArrayByValue = [
-  "#0ac670",
-  "#08b968",
-  "#08aa60",
-  "#079f59",
-  "#069a55",
-];
-
-function getIndexForName(name: any, colorArray: any) {
-  let index = 0;
-  for (let i = 0; i < 15; i++) {
-    const charCode = name.charCodeAt(i) || 0;
-    index += charCode * (i + 1);
-  }
-  return index % colorArray.length;
-}
-
-function nameToColor(name: any, colorArray: any) {
-  const index = getIndexForName(name, colorArray);
-  return colorArray[index];
-}
+import { getColor } from "./colorPalette";
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -329,6 +212,9 @@ export const convertPromQLData = (
           opacity: 0.5,
         },
       },
+      axisLine: {
+        show: false,
+      },
       axisLabel: {
         // hide axis label if overlaps
         hideOverlap: true,
@@ -405,6 +291,25 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
+  // need min and max value for color
+  let min = Infinity;
+  let max = -Infinity;
+  searchQueryData.forEach((metric: any) => {
+    if (metric.result && Array.isArray(metric.result)) {
+      metric?.result?.forEach((valuesArr: any) => {
+        if (valuesArr.values && Array.isArray(valuesArr.values)) {
+          valuesArr.values.forEach((val: any) => {
+            // val[1] should not NaN
+            if (!isNaN(val[1])) {
+              min = Math.min(min, val[1]);
+              max = Math.max(max, val[1]);
+            }
+          });
+        }
+      });
+    }
+  });
+
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -418,19 +323,24 @@ export const convertPromQLData = (
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
+              // get min value based on 2nd value of values
+              let seriesMin = values[0][1];
+              let seriesMax = values[0][1];
+              values.forEach((value: any) => {
+                // value[1] should not NaN
+                if (!isNaN(value[1])) {
+                  seriesMin = Math.min(value[1], seriesMin);
+                  seriesMax = Math.max(value[1], seriesMax);
+                }
+              });
               return {
                 name: getPromqlLegendName(
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
                 itemStyle: {
-                  color: nameToColor(
-                    getPromqlLegendName(
-                      metric.metric,
-                      panelSchema.queries[index].config.promql_legend
-                    ),
-                    colorArrayBySeries
-                  ),
+                  color: getColor(panelSchema, seriesMax, min, max),
+                  // color: getColor(panelSchema, getPromqlLegendName(metric.metric, panelSchema.queries[index].config.promql_legend)),
                 },
                 // colorBy: "data",
                 // if utc then simply return the values by removing z from string
@@ -504,6 +414,9 @@ export const convertPromQLData = (
                   ) / 6
                 }`,
               },
+            },
+            itemStyle: {
+              color: getColor(panelSchema, values[0][1], min, max),
             },
             title: {
               fontSize: 10,
