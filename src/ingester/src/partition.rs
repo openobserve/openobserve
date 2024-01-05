@@ -160,14 +160,15 @@ impl PartitionFile {
         let _ = decoder.serialize(&entry.data);
         let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
         if let Some(batch) = batch {
+            let arrow_size = batch.size();
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
-                .add(batch.size() as i64);
+                .add(arrow_size as i64);
             // TODO: here we droped the RecordBatch
             self.data.push(RecordBatchEntry::new(
                 RecordBatch::new_empty(Arc::new(Schema::empty())),
                 entry.data_size,
-                batch.size(),
+                arrow_size,
             ));
         }
         metrics::INGEST_MEMTABLE_BYTES

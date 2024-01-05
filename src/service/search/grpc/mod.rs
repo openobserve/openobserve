@@ -73,7 +73,13 @@ pub async fn search(
     // search in WAL parquet
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
-    let wal_parquet_span = info_span!("service:search:grpc:in_wal_parquet", session_id = ?session_id1, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let wal_parquet_span = info_span!(
+        "service:search:grpc:in_wal_parquet",
+        session_id = session_id1.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -88,7 +94,13 @@ pub async fn search(
     // search in WAL memory
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
-    let wal_mem_span = info_span!("service:search:grpc:in_wal_memory", session_id = ?session_id2, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let wal_mem_span = info_span!(
+        "service:search:grpc:in_wal_memory",
+        session_id = session_id2.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
     let task2 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -105,7 +117,13 @@ pub async fn search(
     let session_id3 = session_id.clone();
     let sql3 = sql.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-    let storage_span = info_span!("service:search:grpc:in_storage", session_id = ?session_id3, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let storage_span = info_span!(
+        "service:search:grpc:in_storage",
+        session_id = session_id3.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
     let task3 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {

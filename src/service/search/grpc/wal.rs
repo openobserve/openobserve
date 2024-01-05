@@ -56,7 +56,7 @@ use crate::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
     session_id: &str,
     sql: Arc<Sql>,
@@ -235,7 +235,7 @@ pub async fn search_parquet(
             "service:search:grpc:wal:parquet:datafusion",
             org_id = sql.org_id,
             stream_name = sql.stream_name,
-            stream_type = ?stream_type
+            stream_type = stream_type.to_string(),
         );
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
@@ -403,7 +403,7 @@ pub async fn search_memtable(
             "service:search:grpc:wal:mem:datafusion",
             org_id = sql.org_id,
             stream_name = sql.stream_name,
-            stream_type = ?stream_type
+            stream_type = stream_type.to_string(),
         );
 
         let task = tokio::time::timeout(
