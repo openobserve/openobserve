@@ -121,6 +121,7 @@ pub(crate) async fn persist() -> Result<()> {
                 };
                 // persist entry to local disk
                 let ret = immutable.persist(&path).await;
+                drop(r);
                 drop(permit);
                 ret.map(|size| Some((path, size.0, size.1)))
             });
