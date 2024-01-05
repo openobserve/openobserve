@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model.number="
         dashboardPanelData.data.config.axis_width
       "
-      :label="t('common.axis_width')"
+      :label="t('common.axisWidth')"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
