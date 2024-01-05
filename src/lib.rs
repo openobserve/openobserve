@@ -19,3 +19,8 @@ pub mod handler;
 pub mod job;
 pub mod router;
 pub mod service;
+
+pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/ua_regex/regexes.yaml"
+));
