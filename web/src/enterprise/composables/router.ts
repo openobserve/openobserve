@@ -21,6 +21,7 @@ import {
   useLocalCurrentUser,
   getLoginURL,
   getLogoutURL,
+  invlidateLoginData,
 } from "@/utils/zincutils";
 
 import authService from "@/services/auth";
@@ -59,11 +60,15 @@ const useEnvRoutes = () => {
     },
     {
       path: "/logout",
-      beforeEnter(to: any, from: any, next: any) {
+      beforeEnter: async (to: any, from: any, next: any) => {
         useLocalToken("", true);
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
-        window.location.href = getLogoutURL();
+        if (config.isEnterprise == "true") {
+          invlidateLoginData();
+        } else {
+          window.location.href = getLogoutURL();
+        }
       },
     },
     {

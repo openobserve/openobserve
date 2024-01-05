@@ -206,7 +206,7 @@ pub async fn validate_user(
     _user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
     use actix_web::error::ErrorNotFound;
-
+    log::warn!("Not supported in enterprise version");
     Err(ErrorNotFound("Not supported in enterprise version"))
 }
 
