@@ -201,7 +201,7 @@ export const convertPromQLData = (
     xAxis: {
       type: "time",
       axisLine: {
-        show: panelSchema.config?.axis_border_show,
+        show: panelSchema.config?.axis_border_show || false,
       },
       splitLine: {
         show: true,
@@ -225,7 +225,7 @@ export const convertPromQLData = (
         },
       },
       axisLine: {
-        show: panelSchema.config?.axis_border_show,
+        show: panelSchema.config?.axis_border_show || false,
       },
       splitLine: {
         show: true,
