@@ -7,6 +7,7 @@
     behavior="menu"
     filled
     borderless
+    data-test="histogram-interval-dropdown"
     dense
     @update:model-value="$emit('update:modelValue', $event)"
     :display-value="`${
