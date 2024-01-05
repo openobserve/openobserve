@@ -166,7 +166,6 @@ describe("Functions testcases", () => {
     // cy.contains('Create new function').click({ force: true })
     cy.get('[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label').click({ force: true })
     cy.contains('Add Enrichment Table').click({ force: true })
-    cy.log('    --Uploading enrichment table--')
     
     cy.fixture('enrichment_info.csv').then((fileContent) => {
        
@@ -176,7 +175,6 @@ describe("Functions testcases", () => {
           mimeType: 'text/csv', 
         });
         cy.wait(5000);
-        cy.log('    --Uploading enrichment table complete--')
         cy.get('.q-input > .q-field__inner > .q-field__control').type('enrichment_test')
         cy.contains('Save').click({ force: true })
         cy.wait(200)
