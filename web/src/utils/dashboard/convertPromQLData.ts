@@ -561,7 +561,7 @@ export const convertPromQLData = (
       .map((it: any) => it.name)
       .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
       
-    options.grid.right =
+    options.grid.right = panelSchema.config?.legend_width ??
       Math.min(
         chartPanelRef.value?.offsetWidth / 3,
         calculateWidthText(maxValue) + 60

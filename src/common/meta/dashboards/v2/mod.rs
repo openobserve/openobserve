@@ -153,6 +153,8 @@ pub struct PanelConfig {
     axis_width: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_border_show: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legend_width: Option<f64>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
 }

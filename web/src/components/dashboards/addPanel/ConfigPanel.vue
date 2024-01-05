@@ -426,6 +426,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-input>
     <q-input
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge'
+      "
+      v-model.number="
+        dashboardPanelData.data.config.legend_width
+      "
+      :label="t('common.legendWidth')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      :type="'number'"
+      placeholder="Auto"
+      @update:model-value="
+      (value) =>
+        (dashboardPanelData.data.config.legend_width = value !== '' ? value : null)
+    "
+    >
+    </q-input>
+
+    <div class="space"></div>
+    
+    <q-input
       v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap'&& dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'"
       v-model.number="
         dashboardPanelData.data.config.axis_width
