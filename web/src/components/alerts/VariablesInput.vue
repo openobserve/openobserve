@@ -27,7 +27,6 @@
             v-model="variable.key"
             color="input-border"
             bg-color="input-bg"
-            class="showLabelOnTop"
             stack-label
             outlined
             filled
@@ -44,7 +43,6 @@
             :placeholder="t('common.value')"
             color="input-border"
             bg-color="input-bg"
-            class="showLabelOnTop"
             stack-label
             outlined
             filled

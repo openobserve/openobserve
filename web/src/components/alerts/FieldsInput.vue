@@ -23,16 +23,15 @@
         :key="field.uuid"
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
       >
-        <div class="q-ml-none">
+        <div class="q-ml-none o2-input">
           <q-select
             v-model="field.column"
             :options="filteredFields"
             :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-py-sm"
             filled
-            borderless
             emit-value
             dense
             use-input
@@ -43,27 +42,27 @@
             @filter="filterColumns"
             behavior="menu"
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 250px"
+            style="min-width: 220px"
           />
         </div>
-        <div class="q-ml-none">
+        <div class="q-ml-none o2-input">
           <q-select
             v-model="field.operator"
             :options="triggerOperators"
             :popup-content-style="{ textTransform: 'capitalize' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-py-sm"
             stack-label
             outlined
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 130px"
+            style="min-width: 120px"
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
-        <div class="q-ml-none flex items-end">
+        <div class="q-ml-none flex items-end o2-input">
           <q-input
             v-model="field.value"
             :options="streamFields"
@@ -71,13 +70,13 @@
             :placeholder="t('common.value')"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-py-sm"
             stack-label
             outlined
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 250px"
+            style="min-width: 150px"
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>

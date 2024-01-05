@@ -41,21 +41,257 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div
       ref="addAlertFormRef"
-      class="q-px-lg q-my-md row justify-center items-center"
+      class="q-px-lg q-my-md"
       style="
         max-height: calc(100vh - 138px);
         overflow: auto;
         scroll-behavior: smooth;
       "
     >
-      <div style="width: calc(100% - 200px)">
-        <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
-          <div class="flex justify-start items-center q-pb-sm q-col-gutter-md">
-            <div class="alert-name-input" style="padding-top: 12px">
+      <div class="row justify-start items-start" style="width: 1024px">
+        <div style="width: calc(100% - 401px)">
+          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+            <div
+              class="flex justify-start items-center q-pb-sm q-col-gutter-md"
+            >
+              <div class="alert-name-input o2-input" style="padding-top: 12px">
+                <q-input
+                  data-test="add-alert-name-input"
+                  v-model="formData.name"
+                  :label="t('alerts.name') + ' *'"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                  tabindex="0"
+                  style="min-width: 220px"
+                />
+              </div>
+              <div class="alert-stream-type o2-input" style="padding-top: 0">
+                <q-select
+                  v-model="formData.stream_type"
+                  :options="streamTypes"
+                  :label="t('alerts.streamType') + ' *'"
+                  :popup-content-style="{ textTransform: 'lowercase' }"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="q-py-sm showLabelOnTop no-case"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  @update:model-value="updateStreams()"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="min-width: 120px"
+                />
+              </div>
+              <div class="o2-input" style="padding-top: 0">
+                <q-select
+                  data-test="add-alert-stream-select"
+                  v-model="formData.stream_name"
+                  :options="filteredStreams"
+                  :label="t('alerts.stream_name') + ' *'"
+                  :loading="isFetchingStreams"
+                  :popup-content-style="{ textTransform: 'lowercase' }"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="q-py-sm showLabelOnTop no-case"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  :input-debounce="400"
+                  @filter="filterStreams"
+                  @update:model-value="updateStreamFields(formData.stream_name)"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="min-width: 220px"
+                />
+              </div>
+            </div>
+            <div class="q-gutter-sm">
+              <q-radio
+                data-test="add-alert-scheduled-alert-radio"
+                v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated"
+                v-model="formData.is_real_time"
+                :checked="formData.is_real_time"
+                val="false"
+                :label="t('alerts.scheduled')"
+                class="q-ml-none"
+              />
+              <q-radio
+                data-test="add-alert-realtime-alert-radio"
+                v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated"
+                v-model="formData.is_real_time"
+                :checked="!formData.is_real_time"
+                val="true"
+                :label="t('alerts.realTime')"
+                class="q-ml-none"
+              />
+            </div>
+            <div
+              v-if="formData.is_real_time === 'true'"
+              class="q-py-sm showLabelOnTop text-bold text-h7"
+              data-test="add-alert-query-input-title"
+            >
+              <real-time-alert
+                :columns="filteredColumns"
+                :conditions="formData.query_condition.conditions"
+                @field:add="addField"
+                @field:remove="removeField"
+                @input:update="onInputUpdate"
+              />
+            </div>
+            <div v-else>
+              <scheduled-alert
+                ref="scheduledAlertRef"
+                :columns="filteredColumns"
+                :conditions="formData.query_condition.conditions"
+                v-model:trigger="formData.trigger_condition"
+                v-model:sql="formData.query_condition.sql"
+                v-model:query_type="formData.query_condition.type"
+                v-model:aggregation="formData.query_condition.aggregation"
+                v-model:isAggregationEnabled="isAggregationEnabled"
+                @field:add="addField"
+                @field:remove="removeField"
+                @input:update="onInputUpdate"
+                class="q-mt-sm"
+              />
+            </div>
+
+            <div class="col-12 flex justify-start items-center q-mt-xs">
+              <div
+                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md"
+                data-test="add-alert-delay-title"
+                style="width: 180px"
+              >
+                {{ t("alerts.silenceNotification") + " *" }}
+              </div>
+              <div style="min-height: 58px">
+                <div class="col-8 row justify-left align-center q-gutter-sm">
+                  <div
+                    class="flex items-center"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05)"
+                  >
+                    <div
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        data-test="add-alert-delay-input"
+                        v-model="formData.trigger_condition.silence"
+                        type="number"
+                        dense
+                        filled
+                        min="1"
+                        style="background: none"
+                      />
+                    </div>
+                    <div
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        background: #f2f2f2;
+                        height: 40px;
+                      "
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  v-if="formData.trigger_condition.silence < 1"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+            </div>
+
+            <div class="o2-input flex justify-start items-center">
+              <div class="text-bold q-pb-sm" style="width: 180px">
+                {{ t("alerts.destination") + " *" }}
+              </div>
+              <q-select
+                data-test="add-alert-destination-select"
+                v-model="formData.destinations"
+                :options="getFormattedDestinations"
+                color="input-border"
+                bg-color="input-bg q-mt-sm"
+                class="no-case"
+                stack-label
+                outlined
+                filled
+                dense
+                multiple
+                :rules="[(val: any) => !!val || 'Field is required!']"
+                style="width: 250px"
+              >
+                <template v-slot:option="option">
+                  <q-list dense>
+                    <q-item tag="label">
+                      <q-item-section avatar>
+                        <q-checkbox
+                          size="xs"
+                          dense
+                          v-model="formData.destinations"
+                          :val="option.opt"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="ellipsis"
+                          >{{ option.opt }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </template>
+              </q-select>
+            </div>
+
+            <div class="q-mt-md">
+              <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
+              <variables-input
+                class="o2-input"
+                :variables="formData.context_attributes"
+                @add:variable="addVariable"
+                @remove:variable="removeVariable"
+              />
+            </div>
+
+            <div class="o2-input">
               <q-input
-                data-test="add-alert-name-input"
-                v-model="formData.name"
-                :label="t('alerts.name') + ' *'"
+                data-test="add-alert-description-input"
+                v-model="formData.description"
+                :label="t('alerts.description')"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop q-mb-sm"
+                stack-label
+                outlined
+                filled
+                dense
+                tabindex="0"
+                style="width: 550px"
+              />
+
+              <q-input
+                data-test="add-alert-row-input"
+                v-model="formData.row_template"
+                :label="t('alerts.row')"
                 color="input-border"
                 bg-color="input-bg"
                 class="showLabelOnTop"
@@ -63,279 +299,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 outlined
                 filled
                 dense
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                 tabindex="0"
-                style="min-width: 250px"
+                style="width: 550px"
               />
             </div>
-            <div class="alert-stream-type" style="padding-top: 0">
-              <q-select
-                v-model="formData.stream_type"
-                :options="streamTypes"
-                :label="t('alerts.streamType') + ' *'"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm showLabelOnTop no-case"
-                stack-label
-                outlined
-                filled
-                dense
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                @update:model-value="updateStreams()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                style="min-width: 150px"
+
+            <div class="flex justify-start q-mt-lg">
+              <q-btn
+                data-test="add-alert-cancel-btn"
+                v-close-popup="true"
+                class="q-mb-md text-bold"
+                :label="t('alerts.cancel')"
+                text-color="light-text"
+                padding="sm md"
+                no-caps
+                @click="$emit('cancel:hideform')"
+              />
+              <q-btn
+                data-test="add-alert-submit-btn"
+                :label="t('alerts.save')"
+                class="q-mb-md text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                type="submit"
+                no-caps
               />
             </div>
-            <div style="padding-top: 0">
-              <q-select
-                data-test="add-alert-stream-select"
-                v-model="formData.stream_name"
-                :options="filteredStreams"
-                :label="t('alerts.stream_name') + ' *'"
-                :loading="isFetchingStreams"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm showLabelOnTop no-case"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                filled
-                borderless
-                dense
-                use-input
-                hide-selected
-                fill-input
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                :input-debounce="400"
-                @filter="filterStreams"
-                @update:model-value="updateStreamFields(formData.stream_name)"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                style="min-width: 250px"
-              />
-            </div>
-          </div>
-          <div class="q-gutter-sm">
-            <q-radio
-              data-test="add-alert-scheduled-alert-radio"
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              v-model="formData.is_real_time"
-              :checked="formData.is_real_time"
-              val="false"
-              :label="t('alerts.scheduled')"
-              class="q-ml-none"
-            />
-            <q-radio
-              data-test="add-alert-realtime-alert-radio"
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              v-model="formData.is_real_time"
-              :checked="!formData.is_real_time"
-              val="true"
-              :label="t('alerts.realTime')"
-              class="q-ml-none"
-            />
-          </div>
-          <div
-            v-if="formData.is_real_time === 'true'"
-            class="q-py-sm showLabelOnTop text-bold text-h7"
-            data-test="add-alert-query-input-title"
-          >
-            <real-time-alert
-              :columns="filteredColumns"
-              :conditions="formData.query_condition.conditions"
-              @field:add="addField"
-              @field:remove="removeField"
-              @input:update="onInputUpdate"
-            />
-          </div>
-          <div v-else>
-            <scheduled-alert
-              ref="scheduledAlertRef"
-              :columns="filteredColumns"
-              :conditions="formData.query_condition.conditions"
-              v-model:trigger="formData.trigger_condition"
-              v-model:sql="formData.query_condition.sql"
-              v-model:query_type="formData.query_condition.type"
-              v-model:aggregation="formData.query_condition.aggregation"
-              v-model:isAggregationEnabled="isAggregationEnabled"
-              @field:add="addField"
-              @field:remove="removeField"
-              @input:update="onInputUpdate"
-              class="q-mt-sm"
-            />
-          </div>
-
-          <div class="col-12 flex justify-start items-center q-mt-xs">
-            <div
-              class="q-py-sm showLabelOnTop text-bold text-h7"
-              data-test="add-alert-delay-title"
-              style="width: 180px"
-            >
-              {{ t("alerts.silenceNotification") + " *" }}
-            </div>
-            <div style="min-height: 58px">
-              <div class="col-8 row justify-left align-center q-gutter-sm">
-                <div
-                  class="flex items-center"
-                  style="border: 1px solid rgba(0, 0, 0, 0.05)"
-                >
-                  <div
-                    style="width: 87px; margin-left: 0 !important"
-                    class="silence-notification-input"
-                  >
-                    <q-input
-                      data-test="add-alert-delay-input"
-                      v-model="formData.trigger_condition.silence"
-                      type="number"
-                      dense
-                      filled
-                      min="1"
-                      style="background: none"
-                    />
-                  </div>
-                  <div
-                    style="
-                      min-width: 90px;
-                      margin-left: 0 !important;
-                      background: #f2f2f2;
-                      height: 40px;
-                    "
-                    class="flex justify-center items-center"
-                  >
-                    {{ t("alerts.minutes") }}
-                  </div>
-                </div>
-              </div>
-              <div
-                v-if="formData.trigger_condition.silence < 1"
-                class="text-red-8 q-pt-xs"
-                style="font-size: 11px; line-height: 12px"
-              >
-                Field is required!
-              </div>
-            </div>
-          </div>
-
-          <div class="q-mt-lg">
-            <div class="text-bold">{{ t("alerts.destination") + " *" }}</div>
-            <q-select
-              data-test="add-alert-destination-select"
-              v-model="formData.destinations"
-              :options="getFormattedDestinations"
-              color="input-border"
-              bg-color="input-bg q-mt-sm"
-              class="no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              multiple
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 250px"
-            >
-              <template v-slot:option="option">
-                <q-list dense>
-                  <q-item tag="label">
-                    <q-item-section avatar>
-                      <q-checkbox
-                        size="xs"
-                        dense
-                        v-model="formData.destinations"
-                        :val="option.opt"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="ellipsis"
-                        >{{ option.opt }}
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </template>
-            </q-select>
-          </div>
-
-          <div>
-            <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
-            <variables-input
-              :variables="formData.context_attributes"
-              @add:variable="addVariable"
-              @remove:variable="removeVariable"
-            />
-          </div>
-
-          <div>
-            <q-input
-              data-test="add-alert-description-input"
-              v-model="formData.description"
-              :label="t('alerts.description')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              tabindex="0"
-              style="width: 550px"
-            />
-          </div>
-
-          <div>
-            <q-input
-              data-test="add-alert-row-input"
-              v-model="formData.row_template"
-              :label="t('alerts.row')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              tabindex="0"
-              style="width: 550px"
-            />
-          </div>
-
-          <div class="flex justify-start q-mt-lg">
-            <q-btn
-              data-test="add-alert-cancel-btn"
-              v-close-popup="true"
-              class="q-mb-md text-bold"
-              :label="t('alerts.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              no-caps
-              @click="$emit('cancel:hideform')"
-            />
-            <q-btn
-              data-test="add-alert-submit-btn"
-              :label="t('alerts.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
-              type="submit"
-              no-caps
-            />
-          </div>
-        </q-form>
-      </div>
-      <div v-show="showPreview" style="width: 200px">
+          </q-form>
+        </div>
         <div
-          v-if="plotChart"
-          style="width: 550px; height: 200px"
-          class="q-mb-lg"
+          style="width: 400px; height: 200px; position: sticky; top: 0"
+          class="q-mb-lg q-px-md"
         >
-          <div class="text-bold">Preview</div>
-          <chart-renderer
-            data-test="alert-preview-chart"
-            :data="plotChart"
-            style="max-height: 300px"
+          <div class="text-bold q-pb-xs text-grey-9">Preview</div>
+          <preview-alert
+            style="border: 1px solid #ececec"
+            ref="previewAlertRef"
+            :formData="formData"
+            :query="previewQuery"
+            :aggregationEnabled="isAggregationEnabled"
           />
         </div>
       </div>
@@ -351,6 +353,7 @@ import {
   watch,
   type Ref,
   computed,
+  nextTick,
 } from "vue";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
@@ -360,7 +363,7 @@ import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { useQuasar, debounce } from "quasar";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser/build/mysql";
 import segment from "../../services/segment_analytics";
@@ -370,10 +373,7 @@ import VariablesInput from "./VariablesInput.vue";
 import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
-import ChartRenderer from "../dashboards/panels/ChartRenderer.vue";
-import { getChartData } from "@/utils/alerts/alertChartData.ts";
-import { nextTick } from "vue";
-import { on } from "events";
+import PreviewAlert from "./PreviewAlert.vue";
 
 const defaultValue: any = () => {
   return {
@@ -438,7 +438,7 @@ export default defineComponent({
     ScheduledAlert,
     RealTimeAlert,
     VariablesInput,
-    ChartRenderer,
+    PreviewAlert,
   },
   setup(props) {
     const store: any = useStore();
@@ -479,12 +479,16 @@ export default defineComponent({
       formData.value.sql = e.target.value;
     };
 
+    const previewQuery = ref("");
+
     const addAlertFormRef = ref(null);
 
     const router = useRouter();
     const scheduledAlertRef: any = ref(null);
 
     const plotChart: any = ref(null);
+
+    const previewAlertRef: any = ref(null);
 
     const streamFieldsMap = computed(() => {
       const map: any = {};
@@ -502,48 +506,6 @@ export default defineComponent({
         areConditionsValid
       );
     });
-
-    // const alertHash = computed(() => {
-    //   if (!showPreview.value) return "";
-
-    //   const inputGroup1 =
-    //     formData.value.name +
-    //     formData.value.stream_type +
-    //     formData.value.stream_name +
-    //     formData.value.query_condition.conditions
-    //       .map((condition: any) => {
-    //         condition.column.trim() +
-    //           condition.operator.trim() +
-    //           condition.value.trim();
-    //       })
-    //       .join("");
-
-    //   if (formData.value.query_condition.aggregation) {
-    //     return (
-    //       inputGroup1 +
-    //       formData.value.trigger_condition.aggregation.group_by +
-    //       formData.value.trigger_condition.aggregation +
-    //       formData.value.trigger_condition.aggregation +
-    //       formData.value.query_condition.aggregation.having.value
-    //     );
-    //   }
-
-    //   return (
-    //     formData.value.name +
-    //     formData.value.stream_type +
-    //     formData.value.stream_name +
-    //     formData.value.query_condition.conditions
-    //       .map((condition: any) => {
-    //         condition.column.trim() +
-    //           condition.operator.trim() +
-    //           condition.value.trim();
-    //       })
-    //       .join("") +
-    //     formData.value.trigger_condition.threshold +
-    //     formData.value.trigger_condition.period +
-    //     formData.value.trigger_condition.operator
-    //   );
-    // });
 
     const areConditionsValid = computed(() => {
       return formData.value.query_condition.conditions.every(
@@ -733,57 +695,34 @@ export default defineComponent({
         );
     };
 
-    const previewAlert = () => {
-      alertsService
-        .preview(
-          store.state.selectedOrganization.identifier,
-          formData.value.stream_name,
-          formData.value.name,
-          formData.value.stream_type
-        )
-        .then((res: any) => {
-          const xData = [] as any[];
-          const yData = [] as any[];
-          res.data.forEach((hit: any) => {
-            xData.push(hit["zo_sql_key"]);
-            yData.push(hit["alert_agg_value"]);
-          });
-          const chartParams = {
-            title: "",
-            unparsed_x_data: [],
-            timezone: store.state.timezone,
-          };
-          plotChart.value = getChartData(xData, yData, chartParams);
-          nextTick(() => {
-            // Scroll to bottom of the page using addAlertFormRef element
-            if (addAlertFormRef.value)
-              addAlertFormRef.value.scrollTop =
-                addAlertFormRef.value.scrollHeight;
-          });
-        });
+    const previewAlert = async () => {
+      previewQuery.value = generateSqlQuery();
+      await nextTick();
+      previewAlertRef.value.refreshData();
     };
 
     const generateSqlQuery = () => {
       // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
       // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val, geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
-      let query = "SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key,";
+      let query = "SELECT histogram(_timestamp) AS zo_sql_key,";
 
       let whereClause = formData.value.query_condition.conditions
         .map((condition: any) => {
           if (condition.column && condition.operator && condition.value) {
+            console.log(condition.column, condition.value);
             const value =
               streamFieldsMap.value[condition.column].type === "Int64"
                 ? condition.value
                 : `'${condition.value}'`;
-            return `'${condition.column}' ${condition.operator} ${value}`;
+            return `${condition.column}${condition.operator}${value}`;
           }
         })
         .join(" AND ");
 
       whereClause = whereClause?.trim().length ? " WHERE " + whereClause : "";
 
-      if (!formData.value.query_condition.aggregation) {
+      if (!isAggregationEnabled.value) {
         query +=
           ` COUNT(*) as zo_sql_val FROM ${formData.value.stream_name} ` +
           whereClause +
@@ -791,13 +730,14 @@ export default defineComponent({
       } else {
         const aggFn = formData.value.query_condition.aggregation.function;
         const column = formData.value.query_condition.aggregation.having.column;
-        let groupBy = formData.value.query_condition.aggregation.group_by
-          .map((column: any) => {
-            return `'${column}'`;
-          })
-          .join(",");
+        let groupBy = "";
+        formData.value.query_condition.aggregation.group_by.forEach(
+          (column: any) => {
+            if (column.trim().length) groupBy += `,${column}`;
+          }
+        );
 
-        groupBy = groupBy?.trim().length ? "," + groupBy : "";
+        console.log("groupBy", groupBy, groupBy?.trim().length);
 
         query +=
           ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
@@ -808,11 +748,12 @@ export default defineComponent({
       return query;
     };
 
-    const onInputUpdate = (name: string, value: any) => {
+    const debouncedPreviewAlert = debounce(previewAlert, 500);
+
+    const onInputUpdate = async (name: string, value: any) => {
+      console.log(name, cloneDeep(formData.value.query_condition.conditions));
       if (showPreview.value && validateInputs(getAlertPayload(), false)) {
-        console.log("onInputUpdate :", name, value);
-        const query = generateSqlQuery();
-        previewAlert();
+        debouncedPreviewAlert();
       }
     };
 
@@ -969,6 +910,8 @@ export default defineComponent({
       onInputUpdate,
       showPreview,
       streamFieldsMap,
+      previewQuery,
+      previewAlertRef,
     };
   },
 
@@ -1083,66 +1026,6 @@ export default defineComponent({
         });
       });
     },
-
-    validateInputs(input: any) {
-      if (
-        Number(input.trigger_condition.silence) < 1 ||
-        isNaN(Number(input.trigger_condition.silence))
-      ) {
-        this.q.notify({
-          type: "negative",
-          message: "Silence Notification should be greater than 0",
-          timeout: 1500,
-        });
-        return false;
-      }
-
-      if (input.is_real_time) return true;
-
-      if (
-        Number(input.trigger_condition.period) < 1 ||
-        isNaN(Number(input.trigger_condition.period))
-      ) {
-        this.q.notify({
-          type: "negative",
-          message: "Period should be greater than 0",
-          timeout: 1500,
-        });
-        return false;
-      }
-
-      if (input.query_condition.aggregation) {
-        if (
-          !input.query_condition.aggregation.having.value.toString().trim()
-            .length ||
-          !input.query_condition.aggregation.having.column ||
-          !input.query_condition.aggregation.having.operator
-        ) {
-          this.q.notify({
-            type: "negative",
-            message: "Threshold should not be empty",
-            timeout: 1500,
-          });
-          return false;
-        }
-
-        return true;
-      }
-
-      if (
-        !input.trigger_condition.threshold.toString().trim().length ||
-        !input.trigger_condition.operator
-      ) {
-        this.q.notify({
-          type: "negative",
-          message: "Threshold should not be empty",
-          timeout: 1500,
-        });
-        return false;
-      }
-
-      return true;
-    },
   },
 });
 </script>
@@ -1174,7 +1057,6 @@ export default defineComponent({
 }
 .add-alert-form {
   .q-field--dense .q-field__control {
-    height: 40px !important;
     .q-field__native span {
       overflow: hidden;
     }
