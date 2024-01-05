@@ -6,15 +6,18 @@
       @click="updateSortOption(null)"
       icon="block"
       size="sm"
+      data-test="dashboard-sort-by-item-clear"
     />
     <q-btn
       :class="fieldObj.sortBy === 'ASC' ? 'selected' : ''"
       @click="updateSortOption('ASC')"
+      data-test="dashboard-sort-by-item-asc"
       ><AscSort
     /></q-btn>
     <q-btn
       :class="fieldObj.sortBy === 'DESC' ? 'selected' : ''"
       @click="updateSortOption('DESC')"
+      data-test="dashboard-sort-by-item-desc"
       ><DescSort
     /></q-btn>
   </q-btn-group>
