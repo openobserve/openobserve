@@ -467,9 +467,9 @@ export const convertPromQLData = (
                     type: "text",
                     style: {
                       text:
-                        parseFloat(unitValue.value).toFixed(
+                        (parseFloat(unitValue?.value)?.toFixed(
                           panelSchema.config.decimals ?? 2
-                        ) + unitValue.unit,
+                        ) ?? 0) + unitValue.unit,
                       fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
