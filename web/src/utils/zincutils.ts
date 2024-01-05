@@ -99,9 +99,11 @@ export const getUserInfo = (loginString: string) => {
         useLocalUserInfo(encodedSessionData);
         useLocalToken(propArr[1]);
       }
-      // if (propArr[0] == "access_token") {
-      //   useLocalToken(propArr[1]);
-      // }
+      else if (propArr[0] == "access_token") {
+        useLocalStorage("access_token", propArr[1], false, false);
+      } if (propArr[0] == "refresh_token") {
+        useLocalStorage("refresh_token", propArr[1], false, false);
+      }
     }
 
     return decToken;
@@ -109,6 +111,13 @@ export const getUserInfo = (loginString: string) => {
     console.log(`Error in getUserInfo util with loginString: ${loginString}`);
   }
 };
+
+export const invlidateLoginData = () => {
+  useLocalStorage("refresh_token", "", true, false);
+  useLocalStorage("access_token", "", true, false);
+  useLocalStorage("token", "", true, false);
+}
+
 
 export const getLoginURL = () => {
   return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
@@ -283,8 +292,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-      ? window.location.pathname.slice(0, pos + 5)
-      : "";
+        ? window.location.pathname.slice(0, pos + 5)
+        : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };

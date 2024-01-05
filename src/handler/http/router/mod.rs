@@ -57,6 +57,7 @@ fn get_cors() -> Rc<Cors> {
     Rc::new(cors)
 }
 
+/// #[cfg(not(feature = "enterprise"))]
 #[cfg(not(feature = "enterprise"))]
 fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
@@ -171,11 +172,15 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
 pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    #[cfg(not(feature = "enterprise"))]
     cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
-    #[cfg(feature = "enterprise")]
+}
+
+#[cfg(feature = "enterprise")]
+pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
+    let cors = get_cors();
     cfg.service(
         web::scope("/config")
             .wrap(cors)

@@ -351,6 +351,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
                 web::scope(&CONFIG.common.base_uri)
                     .service(router::http::config)
+                    .service(router::http::config_paths)
                     .service(router::http::api)
                     .service(router::http::aws)
                     .service(router::http::gcp)
