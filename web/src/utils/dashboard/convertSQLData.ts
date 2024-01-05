@@ -170,8 +170,8 @@ export const convertSQLData = (
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: panelSchema.config?.axisWidth == null ? true : false,
-      left: panelSchema.config?.axisWidth ?? 30,
+      containLabel: panelSchema.config?.axis_width == null ? true : false,
+      left: panelSchema.config?.axis_width ?? 30,
       right: 20,
       top: "15",
       bottom:
@@ -326,7 +326,7 @@ export const convertSQLData = (
             show: true,
           },
           axisLine: {
-            show: panelSchema.config?.axisBorderShow,
+            show: panelSchema.config?.axis_border_show,
           },
           axisTick: {
             show: xAxisKeys.length == 1 ? false : true,
@@ -384,7 +384,7 @@ export const convertSQLData = (
         show: true,
       },
       axisLine: {
-        show: panelSchema.config?.axisBorderShow,
+        show: panelSchema.config?.axis_border_show,
       },
     },
     toolbox: {

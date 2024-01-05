@@ -428,9 +428,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-input
       v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap'&& dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'"
       v-model.number="
-        dashboardPanelData.data.config.axisWidth
+        dashboardPanelData.data.config.axis_width
       "
-      :label="t('common.axisWidth')"
+      :label="t('common.axis_width')"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       placeholder="Auto"
       @update:model-value="
       (value) =>
-        (dashboardPanelData.data.config.axisWidth = value !== '' ? value : null)
+        (dashboardPanelData.data.config.axis_width = value !== '' ? value : null)
     "
     >
     </q-input>
@@ -452,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-toggle
     v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'" 
-      v-model="dashboardPanelData.data.config.axisBorderShow"
+      v-model="dashboardPanelData.data.config.axis_border_show"
       :label="t('dashboard.showBorder')"
     />
 

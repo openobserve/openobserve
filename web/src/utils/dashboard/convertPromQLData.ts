@@ -104,11 +104,11 @@ export const convertPromQLData = (
     legend: legendConfig,
     grid: {
       containLabel:
-        panelSchema.config?.axisWidth == null
+        panelSchema.config?.axis_width == null
           ? true
           : false,
       //based on config width set grid
-      left: panelSchema.config?.axisWidth ?? 5,
+      left: panelSchema.config?.axis_width ?? 5,
       right: 20,
       top: "15",
       bottom:
@@ -201,7 +201,7 @@ export const convertPromQLData = (
     xAxis: {
       type: "time",
       axisLine: {
-        show: panelSchema.config?.axisBorderShow,
+        show: panelSchema.config?.axis_border_show,
       },
       splitLine: {
         show: true,
@@ -225,7 +225,7 @@ export const convertPromQLData = (
         },
       },
       axisLine: {
-        show: panelSchema.config?.axisBorderShow,
+        show: panelSchema.config?.axis_border_show,
       },
       splitLine: {
         show: true,

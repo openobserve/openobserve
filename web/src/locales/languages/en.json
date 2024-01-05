@@ -42,7 +42,7 @@
     "details": "Details",
     "tags": "Tags",
     "process": "Process",
-    "axisWidth": "Width",
+    "axis_width": "Width",
     "exceptions": "Exceptions"
   },
   "search": {
