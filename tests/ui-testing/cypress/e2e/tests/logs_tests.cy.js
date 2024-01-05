@@ -76,33 +76,7 @@ describe("Logs testcases", () => {
     // cy.intercept('GET', '**/api/default/_search**').as('allsearch')
   });
 
-  // it("ingests logs via API", () => {
-  //   const orgId = "default";
-  //   const streamName = "e2e_automate";
-  //   const basicAuthCredentials =
-  //     "ZTJlLnRlc3RpbmdAZXhhbXBsZS5jb206NnJCWGlWNmQxMmJ4SGdHdQ==";
-
-  //   // Making a POST request using cy.request()
-  //   cy.request({
-  //     method: "POST",
-  //     url: `https://alpha1.dev.zinclabs.dev/api/${orgId}/${streamName}/_json`,
-  //     body: logsdata,
-  //     headers: {
-  //       Authorization: `Basic ${basicAuthCredentials}`,
-  //       "Content-Type": "application/json",
-  //     },
-  //   }).then((response) => {
-  //     // Logging response content to the Cypress console
-  //     cy.log(response.body);
-
-  //     // Assertion: Ensure the response status is 200 OK
-  //     expect(response.status).to.eq(
-  //       200,
-  //       `Expected status code 200, but got ${response.status}`
-  //     );
-  //   });
-  // });
-
+  
   // This is a test case to navigate to the logs page
   it("Navigate to the logs page", () => {
     // Visit the base URL
@@ -113,8 +87,7 @@ describe("Logs testcases", () => {
     // cy.get('[data-test="menu-link-/logs-item"]')
     //   .contains(logData.moduleLog)
     //   .click();
-    // // Ensure the logs table is visible with a timeout of 3 seconds
-    // cy.get("table.q-table", { timeout: 3000 }).should("be.visible");
+  
   });
 
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.

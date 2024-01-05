@@ -3,11 +3,6 @@ Cypress.on('uncaught:exception', (err, runnable) => {
     return false;
 });
 let details;
-before(function () {
-    cy.fixture('alpha1').then(function (data) {
-        details = data;
-    })
-})
 Cypress.Commands.add('signin', () => {
     Cypress.on('uncaught:exception', (err, runnable) => { return false; })
    // Alpha login
