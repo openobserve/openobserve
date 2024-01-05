@@ -47,6 +47,7 @@
           no-caps
           icon="refresh"
           @click="refreshData"
+          data-test="dashboard-refresh-data-btn"
         />
         <q-btn
           no-caps
@@ -55,6 +56,7 @@
           class="q-ml-md"
           flat
           icon="close"
+          data-test="dashboard-viewpanel-close-btn"
         />
       </div>
     </div>

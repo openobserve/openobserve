@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       emit-value
       class="textbox col no-case"
       :loading="variableItem.isLoading"
+      data-test="dashboard-variable-query-value-selector"
     >
       <template v-slot:no-option>
         <q-item>

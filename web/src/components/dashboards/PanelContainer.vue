@@ -26,8 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         class="q-px-xs"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
+        data-test="dashboard-panel-bar"
       >
-        <q-icon v-if="!viewOnly" name="drag_indicator" />
+        <q-icon v-if="!viewOnly" name="drag_indicator" data-test="dashboard-panel-drag"/>
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
@@ -36,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!viewOnly && showFullScreenBtn && props.data.description != ''"
           name="info_outline"
           style="cursor: pointer"
+          data-test="dashboard-panel-description-info"
         >
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
             <div style="white-space: pre-wrap;">{{ props.data.description }}</div>
@@ -49,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="1px"
           @click="onPanelModifyClick('ViewPanel')"
           title="Full screen"
+          data-test="dashboard-panel-fullscreen-btn"
         />
         <q-btn
           v-if="dependentAdHocVariable"
@@ -57,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           padding="2px"
           @click="showViewPanel = true"
+          data-test="dashboard-panel-dependent-adhoc-variable-btn"
         >
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
             Some dynamic variables are not applied because the field is not
