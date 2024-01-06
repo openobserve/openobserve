@@ -24,14 +24,14 @@ COPY . /app
 COPY --from=webBuilder /web/dist web/dist
 RUN mkdir -p /app/target/release/
 
-RUN --mount=type=cache,target=/root/.cache/sccache cargo build --profile release-profiling --target x86_64-unknown-linux-gnu \
+RUN --mount=type=cache,target=/root/.cache/sccache cargo build --profile release-profiling --features profiling --target x86_64-unknown-linux-gnu \
   && sccache --show-stats
 RUN mv /app/target/x86_64-unknown-linux-gnu/release-profiling/openobserve /app/target/release/openobserve
 
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools linux-perf sqlite3
+RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3
 RUN update-ca-certificates
 COPY --from=builder /app/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
