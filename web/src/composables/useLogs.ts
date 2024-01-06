@@ -636,6 +636,8 @@ const useLogs = () => {
           }
 
           searchObj.data.errorCode = 0;
+          const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
+          delete queryReq.aggs;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
@@ -696,6 +698,9 @@ const useLogs = () => {
               //update grid columns
               updateGridColumns();
               searchObj.loading = false;
+              if (histogramQueryReq.hasOwnProperty("aggs")) {
+                getHistogramQueryData(histogramQueryReq);
+              }
               resolve(true);
             })
             .catch((err) => {
@@ -724,6 +729,54 @@ const useLogs = () => {
         dismiss();
         searchObj.loading = false;
         showErrorNotification("Error while fetching data");
+        reject(false);
+      }
+    });
+  };
+
+  const getHistogramQueryData = (queryReq: any) => {
+    return new Promise((resolve, reject) => {
+      const dismiss = () => {};
+      try {
+        queryReq.query.size = 0;
+        queryReq.query.track_total_hits = true;
+        searchService
+          .search({
+            org_identifier: searchObj.organizationIdetifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+          })
+          .then((res) => {
+            dismiss();
+            searchObj.data.queryResults.aggs = res.data.aggs;
+            searchObj.data.queryResults.total = res.data.total;
+            generateHistogramData();
+            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+
+            searchObj.loading = false;
+            resolve(true);
+          })
+          .catch((err) => {
+            searchObj.loading = false;
+            if (err.response != undefined) {
+              searchObj.data.errorMsg = err.response.data.error;
+            } else {
+              searchObj.data.errorMsg = err.message;
+            }
+
+            const customMessage = logsErrorMessage(err?.response?.data.code);
+            searchObj.data.errorCode = err?.response?.data.code;
+
+            if (customMessage != "") {
+              searchObj.data.errorMsg = t(customMessage);
+            }
+
+            reject(false);
+          });
+      } catch (e: any) {
+        dismiss();
+        searchObj.loading = false;
+        showErrorNotification("Error while fetching histogram data");
         reject(false);
       }
     });

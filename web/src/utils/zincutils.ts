@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from "uuid";
 import streamService from "@/services/stream";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import billings from "@/services/billings";
 
 const useLocalStorage = (
   key: string,
@@ -98,9 +99,11 @@ export const getUserInfo = (loginString: string) => {
         useLocalUserInfo(encodedSessionData);
         useLocalToken(propArr[1]);
       }
-      // if (propArr[0] == "access_token") {
-      //   useLocalToken(propArr[1]);
-      // }
+      else if (propArr[0] == "access_token") {
+        useLocalStorage("access_token", propArr[1], false, false);
+      } if (propArr[0] == "refresh_token") {
+        useLocalStorage("refresh_token", propArr[1], false, false);
+      }
     }
 
     return decToken;
@@ -108,6 +111,13 @@ export const getUserInfo = (loginString: string) => {
     console.log(`Error in getUserInfo util with loginString: ${loginString}`);
   }
 };
+
+export const invlidateLoginData = () => {
+  useLocalStorage("refresh_token", "", true, false);
+  useLocalStorage("access_token", "", true, false);
+  useLocalStorage("token", "", true, false);
+}
+
 
 export const getLoginURL = () => {
   return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
@@ -290,19 +300,39 @@ export const getPath = () => {
 
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
+  const q = useQuasar();
+  if (
+    config.isCloud &&
+    store.state.selectedOrganization.subscription_type == config.freePlan
+  ) {
+    await billings
+      .list_subscription(store.state.selectedOrganization.identifier)
+      .then((res: any) => {
+        if (res.data.data.length == 0) {
+          next({ path: "/billings/plans" });
+        }
+
+        if (
+          res.data.data.CustomerBillingObj.customer_id == null ||
+          res.data.data.CustomerBillingObj.customer_id == ""
+        ) {
+          next({ path: "/billings/plans" });
+        }
+      });
+  }
+
   if (
     to.path.indexOf("/ingestion") == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data == true
   ) {
     const local_organization: any = useLocalOrganization();
-    const $q = useQuasar();
 
     await streamService
       .nameList(local_organization?.value?.identifier, "", false)
       .then((response) => {
         if (response.data.list.length == 0) {
-          $q.notify({
+          q.notify({
             type: "warning",
             message:
               "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
@@ -560,6 +590,9 @@ export function getUUID() {
 }
 
 export const maskText = (text: string) => {
+  return text;
+
+  // Disabled masking as it was not great usefull
   const visibleChars = 4; // Number of characters to keep visible at the beginning and end
   const maskedChars = text.length - visibleChars * 2;
 

@@ -424,8 +424,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                             },
                             &json::Value::Object(hit.clone()),
                         );
-                        (!ret_val.is_null())
-                            .then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
+                        (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                     })
                     .collect(),
                 None => json_rows
@@ -444,7 +443,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         if sql.uses_zo_fn {
             for source in sources {
-                result.add_hit(&flatten::flatten(&source).unwrap());
+                result
+                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
             }
         } else {
             for source in sources {

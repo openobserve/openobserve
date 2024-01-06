@@ -24,8 +24,8 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::jwt::{process_token, verify_decode_token},
-    crate::handler::http::auth::validator::{ACCESS_TOKEN, PKCE_STATE_ORG, REFRESH_TOKEN},
-    actix_web::{cookie::Cookie, http::header, web, HttpRequest},
+    crate::handler::http::auth::validator::PKCE_STATE_ORG,
+    actix_web::{http::header, web, HttpRequest},
     o2_enterprise::enterprise::{
         common::infra::config::O2_CONFIG,
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
@@ -224,23 +224,8 @@ pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
                 Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
-
-            let mut access_token_cookie = Cookie::new(ACCESS_TOKEN, token);
-            access_token_cookie.set_http_only(true);
-            access_token_cookie.set_secure(true);
-            access_token_cookie.set_path("/");
-            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
-
-            let mut refresh_token_cookie = Cookie::new(REFRESH_TOKEN, login_data.refresh_token);
-            refresh_token_cookie.set_http_only(true);
-            refresh_token_cookie.set_secure(true);
-            refresh_token_cookie.set_path("/");
-            refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
-
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
-                .cookie(access_token_cookie)
-                .cookie(refresh_token_cookie)
                 .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
@@ -262,32 +247,20 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
-    let token = if let Some(cookie) = req.cookie("refresh_token") {
-        cookie.value().to_string()
+    let token = if req.headers().contains_key(header::AUTHORIZATION) {
+        req.headers()
+            .get(header::AUTHORIZATION)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
     } else {
         return HttpResponse::Unauthorized().finish();
     };
 
     // Exchange the refresh token for a new access token
-
     match refresh_token(&token).await {
-        Ok(token_response) => {
-            // Set the new access token in the cookie
-            let mut access_token_cookie = Cookie::new(ACCESS_TOKEN, token_response);
-            access_token_cookie.set_http_only(true);
-            access_token_cookie.set_secure(true);
-            access_token_cookie.set_path("/");
-            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
-
-            HttpResponse::Ok().cookie(access_token_cookie).finish()
-        }
-        Err(_) => {
-            let access_cookie = Cookie::new(ACCESS_TOKEN, "");
-            let refresh_cookie = Cookie::new(REFRESH_TOKEN, "");
-            let mut response = HttpResponse::Unauthorized().finish();
-            response.add_removal_cookie(&access_cookie).unwrap();
-            response.add_removal_cookie(&refresh_cookie).unwrap();
-            response
-        }
+        Ok(token_response) => HttpResponse::Ok().json(token_response),
+        Err(_) => HttpResponse::Unauthorized().finish(),
     }
 }

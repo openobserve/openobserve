@@ -223,23 +223,31 @@ pub async fn search(
     Ok(result)
 }
 
-fn check_memory_circuit_breaker(scan_stats: &ScanStats) -> Result<(), Error> {
+fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Result<(), Error> {
     let scan_size = if scan_stats.compressed_size > 0 {
         scan_stats.compressed_size
     } else {
         scan_stats.original_size
     };
     if let Some(cur_memory) = memory_stats::memory_stats() {
-        if cur_memory.physical_mem as i64 + scan_size
-            > (CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100) as i64
+        // left memory < datafusion * breaker_ratio and scan_size >=  left memory
+        let left_mem = CONFIG.limit.mem_total - cur_memory.physical_mem;
+        if (left_mem
+            < (CONFIG.memory_cache.datafusion_max_size
+                * CONFIG.common.memory_circuit_breaker_ratio
+                / 100))
+            && (scan_size >= left_mem as i64)
         {
             let err = format!(
-                "fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, larger than limit of [{} bytes] ",
+                "fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, left memory more than limit of [{} bytes] or scan_size more than left memory , please submit a new query with a short time range",
                 scan_size,
                 cur_memory.physical_mem,
-                CONFIG.limit.mem_total * CONFIG.common.memory_circuit_breaker_ratio / 100
+                left_mem,
+                CONFIG.memory_cache.datafusion_max_size
+                    * CONFIG.common.memory_circuit_breaker_ratio
+                    / 100
             );
-            log::warn!("{}", err);
+            log::warn!("[{session_id}] {}", err);
             return Err(Error::Message(err.to_string()));
         }
     }

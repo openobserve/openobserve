@@ -82,7 +82,8 @@
     "savedViewsNotFound": "Saved view not found!",
     "savedViewAction": "Create/Update Saved View",
     "savedViewDropdownLabel": "Saved Views",
-    "savedViewName": "View Name"
+    "savedViewName": "View Name",
+    "shareLink": "Share Link"
   },
   "menu": {
     "home": "Home",
@@ -413,6 +414,11 @@
     "goBackToDashboard": "Go back to dashboard",
     "import": "Import",
     "setting": "Dashboard Settings",
+    "refresh": "Refresh",
+    "export": "Export Dashboard",
+    "share": "Share",
+    "fullscreen": "Go Fullscreen",
+    "exitFullscreen": "Exit Fullscreen",
     "generalSettings": "General settings",
     "variableSettings": "Variable settings",
     "newVariable": "Add Variable",
@@ -593,7 +599,9 @@
     "usageLabel": "Usage",
     "plansLabel": "Plans",
     "invoiceHistoryLabel": "Invoice History",
-    "downgradeMessage": "You are downgrading the subscription plan. Are you sure you want to proceed with this action?"
+    "downgradeMessage": "You are downgrading the subscription plan. Are you sure you want to proceed with this action?",
+    "captureCardDetail": "To proceed, please provide your credit card details. Rest assured, you will not be charged at this stage. Charges will only apply when you choose to subscribe to a paid plan. Click the button below to proceed to enter your card details.",
+    "proceedtoPaymentDetail": "Proceed to Payment Details"
   },
   "message": {
     "ServerInternalError": "Error: Something went wrong. Internal server error.",

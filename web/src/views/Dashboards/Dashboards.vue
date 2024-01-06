@@ -149,6 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #no-data>
             <NoData />
           </template>
+          <template #body-cell-description="props">
+            <q-td :props="props">
+              <div :title="props.value">
+                {{ (props.value && props.value.length > 45) ? props.value.slice(0, 45) + '...' : props.value }}
+              </div>
+            </q-td>
+          </template>
           <!-- add delete icon in actions column -->
           <template #body-cell-actions="props">
             <q-td :props="props">
@@ -367,13 +374,13 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      {
-        name: "identifier",
-        field: "identifier",
-        label: t("dashboard.identifier"),
-        align: "left",
-        sortable: true,
-      },
+      // {
+      //   name: "identifier",
+      //   field: "identifier",
+      //   label: t("dashboard.identifier"),
+      //   align: "left",
+      //   sortable: true,
+      // },
       {
         name: "description",
         field: "description",
@@ -535,7 +542,7 @@ export default defineComponent({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: row.identifier,
+          dashboard: row.id,
           folder: activeFolderId.value || "default",
         },
       });
@@ -558,7 +565,7 @@ export default defineComponent({
           "#": index < 9 ? `0${index + 1}` : index + 1,
           id: board.dashboardId,
           name: board.title,
-          identifier: board.dashboardId,
+          // identifier: board.dashboardId,
           description: board.description,
           owner: board.owner,
           created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),

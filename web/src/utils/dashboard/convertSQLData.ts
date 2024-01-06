@@ -194,6 +194,7 @@ export const convertSQLData = (
         label: {
           show: true,
           fontsize: 12,
+          precision: panelSchema.config?.decimals,
           formatter: function (params: any) {
             let lineBreaks = "";
             if (
@@ -205,7 +206,8 @@ export const convertSQLData = (
                   getUnitValue(
                     params.value,
                     panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
                   )
                 );
 
@@ -227,7 +229,8 @@ export const convertSQLData = (
                 getUnitValue(
                   params.value,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               );
             for (let i = 0; i < xAxisKeys.length - params.axisIndex - 1; i++) {
@@ -266,7 +269,8 @@ export const convertSQLData = (
               getUnitValue(
                 it.value,
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )} </strong>`;
           // else normal text
@@ -275,7 +279,8 @@ export const convertSQLData = (
               getUnitValue(
                 it.value,
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )}`;
         });
@@ -351,7 +356,8 @@ export const convertSQLData = (
                 getUnitValue(
                   largestLabel(getAxisDataFromKey(yAxisKeys[0])),
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               )
         ) + 8,
@@ -365,7 +371,8 @@ export const convertSQLData = (
             getUnitValue(
               value,
               panelSchema.config?.unit,
-              panelSchema.config?.unit_custom
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
             )
           );
         },
@@ -418,6 +425,7 @@ export const convertSQLData = (
           show: true,
           label: {
             fontsize: 12,
+            precision: panelSchema.config?.decimals,
           },
           formatter: function (params: any) {
             if (params.axisDimension == "y")
@@ -425,7 +433,8 @@ export const convertSQLData = (
                 getUnitValue(
                   params.value,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               );
             return params.value.toString();
@@ -437,7 +446,7 @@ export const convertSQLData = (
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
-          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+          new Set(getAxisDataFromKey(xAxisKeys[0]))
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
 
@@ -521,23 +530,25 @@ export const convertSQLData = (
             if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
               return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
-                  it.data[1],
+                  it.data,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               )} </strong>`;
             // else normal text
             else
               return `${it.marker} ${it.seriesName} : ${formatUnitValue(
                 getUnitValue(
-                  it.data[1],
+                  it.data,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               )}`;
           });
 
-          return `${name[0].data[0]} <br/> ${hoverText.join("<br/>")}`;
+          return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
         };
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
@@ -632,7 +643,8 @@ export const convertSQLData = (
             getUnitValue(
               name.value,
               panelSchema.config?.unit,
-              panelSchema.config?.unit_custom
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
             )
           )}</b>`;
         },
@@ -650,6 +662,7 @@ export const convertSQLData = (
             position: "inside", // You can adjust the position of the labels
             fontSize: 10,
           },
+          percentPrecision: panelSchema.config?.decimals ?? 2,
         };
         return seriesObj;
       });
@@ -680,7 +693,8 @@ export const convertSQLData = (
             getUnitValue(
               name.value,
               panelSchema.config?.unit,
-              panelSchema.config?.unit_custom
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
             )
           )}<b/>`;
         },
@@ -698,6 +712,7 @@ export const convertSQLData = (
             position: "inside", // You can adjust the position of the labels
             fontSize: 10,
           },
+          percentPrecision: panelSchema.config?.decimals ?? 2,
         };
         return seriesObj;
       });
@@ -715,6 +730,7 @@ export const convertSQLData = (
         show: true,
         label: {
           fontsize: 12,
+          precision: panelSchema.config?.decimals,
         },
         formatter: function (params: any) {
           if (params.axisDimension == "y")
@@ -722,7 +738,8 @@ export const convertSQLData = (
               getUnitValue(
                 params.value,
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             );
           return params.value.toString();
@@ -817,7 +834,8 @@ export const convertSQLData = (
                     getUnitValue(
                       params.value[2],
                       panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals
                     )
                   ) || params.value[2]
                 );
@@ -852,7 +870,8 @@ export const convertSQLData = (
               getUnitValue(
                 params?.value[2],
                 panelSchema?.config?.unit,
-                panelSchema?.config?.unit_custom
+                panelSchema?.config?.unit_custom,
+                panelSchema?.config?.decimals
               )
             ) || params.value[2]
           }`;
@@ -862,6 +881,7 @@ export const convertSQLData = (
           type: "cross",
           label: {
             fontsize: 12,
+            precision: panelSchema.config?.decimals,
           },
         });
       // if auto sql
@@ -969,7 +989,8 @@ export const convertSQLData = (
       const unitValue = getUnitValue(
         yAxisValue.length > 0 ? yAxisValue[0] : 0,
         panelSchema.config?.unit,
-        panelSchema.config?.unit_custom
+        panelSchema.config?.unit_custom,
+        panelSchema.config?.decimals
       );
       options.dataset = { source: [[]] };
       options.tooltip = {
@@ -991,7 +1012,10 @@ export const convertSQLData = (
             return {
               type: "text",
               style: {
-                text: parseFloat(unitValue.value).toFixed(2) + unitValue.unit,
+                text:
+                  (parseFloat(unitValue?.value)?.toFixed(
+                    panelSchema?.config?.decimals ?? 2
+                  ) ?? 0) + unitValue?.unit,
                 fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
                 align: "center",
@@ -1026,6 +1050,17 @@ export const convertSQLData = (
         textStyle: {
           color: store.state.theme === "dark" ? "#fff" : "#000",
           fontSize: 12,
+        },
+        valueFormatter: (value: any) => {
+          // unit conversion
+          return formatUnitValue(
+            getUnitValue(
+              value,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
+            )
+          );
         },
         enterable: true,
         backgroundColor:
@@ -1111,7 +1146,8 @@ export const convertSQLData = (
                   const unitValue = getUnitValue(
                     value,
                     panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
                   );
                   return unitValue.value + unitValue.unit;
                 },
@@ -1224,7 +1260,8 @@ export const convertSQLData = (
               getUnitValue(
                 it.data[1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )} </strong>`;
           // else normal text
@@ -1233,7 +1270,8 @@ export const convertSQLData = (
               getUnitValue(
                 it.data[1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )}`;
         });
@@ -1244,13 +1282,15 @@ export const convertSQLData = (
         type: "cross",
         label: {
           fontsize: 12,
+          precision: panelSchema.config?.decimals,
           formatter: function (params: any) {
             if (params.axisDimension == "y")
               return formatUnitValue(
                 getUnitValue(
                   params.value,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               );
             return Number.isInteger(params.value)
@@ -1344,7 +1384,8 @@ export const convertSQLData = (
               getUnitValue(
                 it.data[1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )} </strong>`;
           // else normal text
@@ -1353,7 +1394,8 @@ export const convertSQLData = (
               getUnitValue(
                 it.data[1],
                 panelSchema.config?.unit,
-                panelSchema.config?.unit_custom
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals
               )
             )}`;
         });
@@ -1364,13 +1406,15 @@ export const convertSQLData = (
         type: "cross",
         label: {
           fontsize: 12,
+          precision: panelSchema.config?.decimals,
           formatter: function (params: any) {
             if (params.axisDimension == "y")
               return formatUnitValue(
                 getUnitValue(
                   params.value,
                   panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals
                 )
               );
             return formatDate(new Date(params?.value)).toString();

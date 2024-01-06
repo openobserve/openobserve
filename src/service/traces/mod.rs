@@ -20,7 +20,7 @@ use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    meta::stream::StreamType, metrics, utils::hasher::get_fields_key_xxh3, CONFIG, DISTINCT_FIELDS,
+    meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG, DISTINCT_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -42,7 +42,7 @@ use crate::{
             traces::{Event, Span, SpanRefType},
             usage::UsageType,
         },
-        utils::{self, flatten, json},
+        utils::{flatten, json},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,
@@ -83,6 +83,17 @@ pub async fn handle_trace_request(
             "Quota exceeded for this organization".to_string(),
         )));
     }
+
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
 
     let traces_stream_name = match in_stream_name {
@@ -241,30 +252,34 @@ pub async fn handle_trace_request(
                 let value: json::Value = json::to_value(local_val).unwrap();
 
                 // JSON Flattening
-                let mut value = flatten::flatten(&value).unwrap();
+                let mut value = flatten::flatten(value).map_err(|e| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                })?;
 
                 if !local_trans.is_empty() {
                     value = crate::service::ingestion::apply_stream_transform(
                         &local_trans,
-                        &value,
+                        value,
                         &stream_vrl_map,
                         traces_stream_name,
                         &mut runtime,
                     )
-                    .unwrap_or(value);
+                    .map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
+                    })?;
                 }
                 // End row based transform */
                 // get json object
-                let val_map = value.as_object_mut().unwrap();
+                let record_val = value.as_object_mut().unwrap();
 
-                val_map.insert(
+                record_val.insert(
                     CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
 
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {
-                    if let Some(val) = val_map.get(field) {
+                    if let Some(val) = record_val.get(field) {
                         if !val.is_null() {
                             let (filter_name, filter_value) = if field == "operation_name" {
                                 ("service_name".to_string(), service_name.clone())
@@ -283,29 +298,16 @@ pub async fn handle_trace_request(
                     }
                 }
 
-                let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
-
                 // check schema
-                let schema_evolution = check_for_schema(
+                let _ = check_for_schema(
                     org_id,
                     traces_stream_name,
                     StreamType::Traces,
-                    &value_str,
                     &mut traces_schema_map,
+                    &json::Value::Object(record_val.clone()),
                     timestamp.try_into().unwrap(),
-                    true,
                 )
                 .await;
-
-                let schema_key = get_fields_key_xxh3(&schema_evolution.schema_fields);
-                // get hour key
-                let mut hour_key = super::ingestion::get_wal_time_key(
-                    timestamp.try_into().unwrap(),
-                    &partition_keys,
-                    partition_time_level,
-                    val_map,
-                    Some(&schema_key),
-                );
 
                 if trigger.is_none() && !stream_alerts_map.is_empty() {
                     // Start check for alert trigger
@@ -314,7 +316,7 @@ pub async fn handle_trace_request(
                         let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
                             Vec::new();
                         for alert in alerts {
-                            if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
+                            if let Ok(Some(v)) = alert.evaluate(Some(record_val)).await {
                                 trigger_alerts.push((alert.clone(), v));
                             }
                         }
@@ -323,28 +325,37 @@ pub async fn handle_trace_request(
                     // End check for alert trigger
                 }
 
+                // get hour key
+                let rec_schema = traces_schema_map
+                    .get(traces_stream_name)
+                    .unwrap()
+                    .clone()
+                    .with_metadata(HashMap::new());
+                let schema_key = rec_schema.hash_key();
+                let mut hour_key = super::ingestion::get_wal_time_key(
+                    timestamp.try_into().unwrap(),
+                    &partition_keys,
+                    partition_time_level,
+                    record_val,
+                    Some(&schema_key),
+                );
+
                 if partition_keys.is_empty() {
                     let partition_key = format!("service_name={}", service_name);
                     hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
                 }
 
-                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| {
-                    let schema = traces_schema_map
-                        .get(traces_stream_name)
-                        .unwrap()
-                        .clone()
-                        .with_metadata(HashMap::new());
-                    SchemaRecords {
-                        schema_key,
-                        schema: Arc::new(schema),
-                        records: vec![],
-                        records_size: 0,
-                    }
+                let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                    schema_key,
+                    schema: Arc::new(rec_schema),
+                    records: vec![],
+                    records_size: 0,
                 });
-                let loc_value: utils::json::Value =
-                    utils::json::from_slice(value_str.as_bytes()).unwrap();
-                hour_buf.records.push(Arc::new(loc_value));
-                hour_buf.records_size += value_str.len();
+                let record_val = record_val.to_owned();
+                let record_val = json::Value::Object(record_val);
+                let record_size = json::to_vec(&record_val).unwrap_or_default().len();
+                hour_buf.records.push(Arc::new(record_val));
+                hour_buf.records_size += record_size;
 
                 if timestamp < min_ts.try_into().unwrap() {
                     partial_success.rejected_spans += 1;
@@ -359,7 +370,6 @@ pub async fn handle_trace_request(
         data_buf,
         thread_id,
         &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
-        None,
     )
     .await;
     let time = start.elapsed().as_secs_f64();

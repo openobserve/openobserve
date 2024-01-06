@@ -47,6 +47,7 @@
           no-caps
           icon="refresh"
           @click="refreshData"
+          data-test="dashboard-refresh-data-btn"
         />
         <q-btn
           no-caps
@@ -55,6 +56,7 @@
           class="q-ml-md"
           flat
           icon="close"
+          data-test="dashboard-viewpanel-close-btn"
         />
       </div>
     </div>
@@ -66,6 +68,7 @@
             <div class="layout-panel-container col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
+                :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
                 :selectedTimeDate="dashboardPanelData.meta.dateTime"
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"

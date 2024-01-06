@@ -278,6 +278,8 @@ pub struct Common {
     pub bloom_filter_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
+    #[env_config(name = "ZO_BLOOM_FILTER_FORCE_DISABLED", default = false)]
+    pub bloom_filter_force_disabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
@@ -361,10 +363,17 @@ pub struct Limit {
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 32)] // MB
-    pub max_file_size_on_disk: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 64)] // MB, per log file size on disk
+    pub max_file_size_on_disk: usize,
+    #[env_config(name = "ZO_MEM_FILE_MAX_SIZE", default = 256)] // MB, per log file size in memory
+    pub mem_file_max_size: usize,
+    #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
+    // MB, total file size in memory, default is 50% of system memory
+    pub mem_table_max_size: usize,
+    #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
+    pub mem_persist_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
@@ -607,9 +616,9 @@ pub fn init() -> Config {
     if cfg.limit.query_thread_num == 0 {
         cfg.limit.query_thread_num = cpu_num * 4;
     }
-    // HACK for move_file_thread_num equal to CPU core
+    // HACK for move_file_thread_num equal to CPU core * 2
     if cfg.limit.file_move_thread_num == 0 {
-        cfg.limit.file_move_thread_num = cpu_num;
+        cfg.limit.file_move_thread_num = cpu_num * 2;
     }
 
     // check common config
@@ -623,7 +632,7 @@ pub fn init() -> Config {
     }
 
     // check memeory cache
-    if let Err(e) = check_memory_cache_config(&mut cfg) {
+    if let Err(e) = check_memory_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
 
@@ -840,7 +849,7 @@ fn check_sled_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let mem_total = cgroup::get_memory_limit();
     cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
@@ -866,6 +875,14 @@ fn check_memory_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
+    }
+
+    // for memtable limit check
+    cfg.limit.mem_file_max_size *= 1024 * 1024;
+    if cfg.limit.mem_table_max_size == 0 {
+        cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+    } else {
+        cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
     Ok(())
 }
@@ -1000,7 +1017,7 @@ mod tests {
 
         cfg.memory_cache.max_size = 1024;
         cfg.memory_cache.release_size = 1024;
-        check_memory_cache_config(&mut cfg).unwrap();
+        check_memory_config(&mut cfg).unwrap();
         assert_eq!(cfg.memory_cache.max_size, 1024 * 1024 * 1024);
         assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);
 

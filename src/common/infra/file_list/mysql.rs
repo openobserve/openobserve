@@ -184,14 +184,19 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             for file in files {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-                let ret: Option<i64> = sqlx::query_scalar(
+                let ret: Option<i64> = match sqlx::query_scalar(
                     r#"SELECT id FROM file_list WHERE stream = ? AND date = ? AND file = ?"#,
                 )
                 .bind(stream_key)
                 .bind(date_key)
                 .bind(file_name)
                 .fetch_one(&pool)
-                .await?;
+                .await
+                {
+                    Ok(v) => v,
+                    Err(sqlx::Error::RowNotFound) => continue,
+                    Err(e) => return Err(e.into()),
+                };
                 match ret {
                     Some(v) => ids.push(v.to_string()),
                     None => {
@@ -202,8 +207,10 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 }
             }
             // delete files by ids
-            let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
-            _ = pool.execute(sql.as_str()).await?;
+            if !ids.is_empty() {
+                let sql = format!("DELETE FROM file_list WHERE id IN({});", ids.join(","));
+                _ = pool.execute(sql.as_str()).await?;
+            }
         }
         Ok(())
     }
@@ -259,13 +266,19 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
             for file in files {
                 let (stream_key, date_key, file_name) =
                     parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
-                let ret: Option<i64> = sqlx::query_scalar(
+                let ret: Option<i64> = match sqlx::query_scalar(
                     r#"SELECT id FROM file_list_deleted WHERE stream = ? AND date = ? AND file = ?"#,
                 )
                 .bind(stream_key)
                 .bind(date_key)
                 .bind(file_name)
-                .fetch_one(&pool).await?;
+                .fetch_one(&pool)
+                .await
+                {
+                    Ok(v) => v,
+                    Err(sqlx::Error::RowNotFound) => continue,
+                    Err(e) => return Err(e.into()),
+                };
                 match ret {
                     Some(v) => ids.push(v.to_string()),
                     None => {
@@ -277,11 +290,13 @@ INSERT IGNORE INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, 
                 }
             }
             // delete files by ids
-            let sql = format!(
-                "DELETE FROM file_list_deleted WHERE id IN({});",
-                ids.join(",")
-            );
-            _ = pool.execute(sql.as_str()).await?;
+            if !ids.is_empty() {
+                let sql = format!(
+                    "DELETE FROM file_list_deleted WHERE id IN({});",
+                    ids.join(",")
+                );
+                _ = pool.execute(sql.as_str()).await?;
+            }
         }
         Ok(())
     }

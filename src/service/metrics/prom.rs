@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use actix_web::web;
 use ahash::AHashMap;
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use promql_parser::{label::MatchOp, parser};
@@ -70,8 +70,13 @@ pub async fn remote_write(
         return Err(anyhow::anyhow!("Quota exceeded for this organization"));
     }
 
-    let mut min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Err(anyhow::Error::msg(e.to_string()));
+    }
+
+    // let min_ts = (Utc::now() -
+    // Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -169,9 +174,6 @@ pub async fn remote_write(
             };
 
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
-            if timestamp < min_ts {
-                min_ts = timestamp;
-            }
 
             if first_line && dedup_enabled && !cluster_name.is_empty() {
                 let lock = METRIC_CLUSTER_LEADER.read().await;
@@ -261,7 +263,7 @@ pub async fn remote_write(
 
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
-                &value,
+                value,
                 &stream_vrl_map,
                 &metric_name,
                 &mut runtime,
@@ -357,18 +359,11 @@ pub async fn remote_write(
             continue;
         }
 
-        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
-            details.partition_time_level
-        } else {
-            Some(CONFIG.limit.metrics_file_retention.as_str().into())
-        };
-
         // write to file
         let mut req_stats = write_file(
             stream_data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-            time_level,
         )
         .await;
 

@@ -19,6 +19,7 @@ import axios from "axios";
 import config from "../aws-exports";
 
 const http = ({ headers } = {} as any) => {
+
   let instance: AxiosInstance;
   if (config.isEnterprise == "false") {
     headers = {
@@ -34,6 +35,10 @@ const http = ({ headers } = {} as any) => {
       headers,
     });
   } else {
+    headers = {
+      Authorization: "Bearer " + localStorage.getItem("access_token"),
+      ...headers,
+    };
     instance = axios.create({
       // timeout: 10000,
       baseURL: store.state.API_ENDPOINT,
@@ -41,6 +46,7 @@ const http = ({ headers } = {} as any) => {
       headers,
     });
   }
+
 
   instance.interceptors.response.use(
     function (response) {
@@ -69,7 +75,14 @@ const http = ({ headers } = {} as any) => {
             // Check if the failing request is not the login or refresh token request
             else if ((config.isEnterprise == "true") && !error.config.url.includes('/config/dex_login') && !error.config.url.includes('/config/dex_refresh')) {
               // Call refresh token API
-              return instance.get('/config/dex_refresh').then(() => {
+              const refreshToken = localStorage.getItem('refresh_token');
+
+              // Modify the request to include the refresh token
+              return instance.get('/config/dex_refresh', {
+                headers: { 'Authorization': `${refreshToken}` }
+              }).then(res => {
+                localStorage.setItem('access_token', res.data);
+                error.config.headers['Authorization'] = 'Bearer ' + res.data;
                 return instance(error.config);
               }).catch(refreshError => {
                 store.dispatch('logout');

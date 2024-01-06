@@ -264,8 +264,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 }
 
 /// compactor delete files run steps:
-/// 1. get pending deleted files from file_list_deleted table, created_at > 2
-///    hours
+/// 1. get pending deleted files from file_list_deleted table, created_at > 2 hours
 /// 2. delete files from storage
 pub async fn run_delete_files() -> Result<(), anyhow::Error> {
     let now = Utc::now();

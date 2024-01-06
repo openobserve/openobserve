@@ -75,6 +75,17 @@ pub async fn handle_grpc_request(
             "Quota exceeded for this organisation".to_string(),
         )));
     }
+
+    // check memtable
+    if let Err(e) = ingester::check_memtable_size() {
+        return Ok(
+            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                http::StatusCode::SERVICE_UNAVAILABLE.into(),
+                e.to_string(),
+            )),
+        );
+    }
+
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
@@ -186,7 +197,7 @@ pub async fn handle_grpc_request(
 
                 for mut rec in records {
                     // flattening
-                    rec = flatten::flatten(&rec)?;
+                    rec = flatten::flatten(rec)?;
 
                     let local_metric_name =
                         &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
@@ -253,7 +264,7 @@ pub async fn handle_grpc_request(
                     if !local_trans.is_empty() {
                         rec = crate::service::ingestion::apply_stream_transform(
                             &local_trans,
-                            &rec,
+                            rec,
                             &stream_vrl_map,
                             local_metric_name,
                             &mut runtime,
@@ -353,18 +364,11 @@ pub async fn handle_grpc_request(
             continue;
         }
 
-        let time_level = if let Some(details) = stream_partitioning_map.get(&stream_name) {
-            details.partition_time_level
-        } else {
-            Some(CONFIG.limit.metrics_file_retention.as_str().into())
-        };
-
         // write to file
         let mut req_stats = write_file(
             stream_data,
             thread_id,
             &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-            time_level,
         )
         .await;
 

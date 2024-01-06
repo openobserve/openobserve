@@ -18,7 +18,7 @@ use std::{str::FromStr, sync::Arc};
 use ahash::AHashMap as HashMap;
 use config::{
     meta::stream::{FileKey, FileMeta, StreamType},
-    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_iterator},
+    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_values},
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -126,6 +126,7 @@ pub async fn sql(
         )
         .await?,
     );
+    let mut spend_time = start.elapsed().as_secs_f64();
 
     // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
@@ -182,10 +183,13 @@ pub async fn sql(
         }
         let batches = df.collect().await?;
         result.insert(format!("agg_{name}"), batches);
+
+        let q_time = start.elapsed().as_secs_f64();
         log::info!(
             "[session_id {session_id}] Query agg:{name} took {:.3} seconds.",
-            start.elapsed().as_secs_f64()
+            q_time - spend_time
         );
+        spend_time = q_time;
     }
 
     // drop table
@@ -1023,6 +1027,9 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
     if CONFIG.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
     }
+    if CONFIG.common.bloom_filter_force_disabled {
+        config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", false);
+    }
     Ok(config)
 }
 
@@ -1184,12 +1191,12 @@ fn apply_query_fn(
                         },
                         &json::Value::Object(hit.clone()),
                     );
-                    (!ret_val.is_null()).then_some(flatten::flatten(&ret_val).unwrap_or(ret_val))
+                    (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                 })
                 .collect();
 
-            let value_iter = rows_val.iter().map(Ok);
-            let inferred_schema = infer_json_schema_from_iterator(value_iter, stream_type).unwrap();
+            let value_iter = rows_val.iter();
+            let inferred_schema = infer_json_schema_from_values(value_iter, stream_type).unwrap();
             let mut decoder =
                 arrow::json::ReaderBuilder::new(Arc::new(inferred_schema)).build_decoder()?;
 

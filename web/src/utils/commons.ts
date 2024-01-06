@@ -238,6 +238,7 @@ export const addVariable = async (
   const currentDashboard = findDashboard(dashboardId, store, folderId);
   if (!currentDashboard.variables) {
     currentDashboard.variables = {};
+    currentDashboard.variables.showDynamicFilters = false;
     currentDashboard.variables.list = [];
   }
 

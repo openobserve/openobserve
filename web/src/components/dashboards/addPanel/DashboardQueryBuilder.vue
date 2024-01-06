@@ -878,6 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             size="xs"
             dense
+            :data-test="`dashboard-filter-item-${filteredItem.column}-remove`"
             @click="removeFilterItem(filteredItem.column)"
             icon="close"
           />

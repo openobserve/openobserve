@@ -122,10 +122,6 @@ pub async fn search_parquet(
         return Ok((HashMap::new(), scan_stats));
     }
 
-    if CONFIG.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&scan_stats)?;
-    }
-
     // fetch all schema versions, get latest schema
     let schema_latest = Arc::new(
         schema_latest
@@ -351,7 +347,7 @@ pub async fn search_memtable(
     );
 
     if CONFIG.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(&scan_stats)?;
+        super::check_memory_circuit_breaker(session_id, &scan_stats)?;
     }
 
     // fetch all schema versions, get latest schema

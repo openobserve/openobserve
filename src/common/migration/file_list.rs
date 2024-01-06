@@ -13,17 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    meta::stream::{FileKey, StreamType},
-    CONFIG,
-};
+use config::CONFIG;
 
 use crate::{
-    common::{
-        infra::file_list as infra_file_list,
-        meta::stream::PartitionTimeLevel,
-        utils::{file::get_file_meta, time::BASE_TIME},
-    },
+    common::{infra::file_list as infra_file_list, utils::file::get_file_meta},
     job::{file_list, files},
     service::{compact::stats::update_stats_from_file_list, db},
 };
@@ -60,51 +53,6 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
     update_stats_from_file_list()
         .await
         .expect("file list migration stats failed");
-    Ok(())
-}
-
-/// Run the file list migration for DynamoDB to add new fields `created_at` and
-/// `org`.
-pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
-    // load stream list
-    db::schema::cache().await?;
-    // load file list from DynamoDB
-    let stream_types = [
-        StreamType::Logs,
-        StreamType::Metrics,
-        StreamType::Traces,
-        StreamType::Metadata,
-    ];
-    let start_time = BASE_TIME.timestamp_micros();
-    let end_time = chrono::Utc::now().timestamp_micros();
-    let orgs = db::schema::list_organizations_from_cache();
-    for org_id in orgs.iter() {
-        for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(org_id, stream_type);
-            for stream_name in streams.iter() {
-                let files = infra_file_list::query(
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    PartitionTimeLevel::Unset,
-                    (start_time, end_time),
-                )
-                .await
-                .expect("file list get failed");
-                let put_items = files
-                    .into_iter()
-                    .map(|(file_key, file_meta)| FileKey::new(&file_key, file_meta, false))
-                    .collect::<Vec<_>>();
-                infra_file_list::batch_add(&put_items)
-                    .await
-                    .expect("file list put failed");
-            }
-        }
-    }
-    // create secondary index
-    infra_file_list::dynamo::create_table_file_list_org_crated_at_index()
-        .await
-        .expect("file list migration create index failed");
     Ok(())
 }
 

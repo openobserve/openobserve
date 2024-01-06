@@ -45,6 +45,7 @@ const getDefaultDashboardPanelData: any = () => ({
       legends_position: null,
       unit: null,
       unit_custom: null,
+      decimals: 2,
       base_map: {
         type: "osm",
       },

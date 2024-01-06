@@ -13,26 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::net::IpAddr;
+use std::{net::IpAddr, sync::Arc};
 
 use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
-    web, Error as ActixErr, FromRequest, HttpMessage,
+    web, Error as ActixErr, HttpMessage,
 };
 use actix_web_lab::middleware::Next;
 use ahash::AHashMap;
 use maxminddb::geoip2::city::Location;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
-use crate::common::infra::config::MAXMIND_DB_CLIENT;
+use crate::{common::infra::config::MAXMIND_DB_CLIENT, USER_AGENT_REGEX_FILE};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GeoInfoData<'a> {
     pub city: Option<&'a str>,
     pub country: Option<&'a str>,
+    pub country_iso_code: Option<&'a str>,
     pub location: Option<Location<'a>>,
+}
+
+/// This is a global cache for user agent parser. This is lazily initialized only when
+/// the first request comes in.
+static UA_PARSER: Lazy<Arc<UserAgentParser>> = Lazy::new(|| Arc::new(initialize_ua_parser()));
+
+pub fn initialize_ua_parser() -> UserAgentParser {
+    UserAgentParser::builder()
+        .build_from_bytes(USER_AGENT_REGEX_FILE)
+        .expect("User Agent Parser creation failed")
 }
 
 /// This is the custom data which is provided by `browser-sdk`
@@ -104,14 +116,17 @@ impl RumExtraData {
                 if let Ok(city_info) = client.city_reader.lookup::<maxminddb::geoip2::City>(ip) {
                     let country = city_info
                         .country
-                        .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
+                        .as_ref()
+                        .and_then(|c| c.names.as_ref().and_then(|map| map.get("en").copied()));
                     let city = city_info
                         .city
                         .and_then(|c| c.names.and_then(|map| map.get("en").copied()));
+                    let country_iso_code = city_info.country.and_then(|c| c.iso_code);
 
                     GeoInfoData {
                         city,
                         country,
+                        country_iso_code,
                         location: city_info.location,
                     }
                 } else {
@@ -135,9 +150,7 @@ impl RumExtraData {
                 .map(|v| v.to_str().unwrap_or(""))
                 .unwrap_or_default();
 
-            let ua_parser = web::Data::<UserAgentParser>::extract(req.request())
-                .await
-                .unwrap();
+            let ua_parser = UA_PARSER.clone();
             let parsed_user_agent = ua_parser.parse(user_agent);
 
             user_agent_hashmap.insert(

@@ -22,7 +22,6 @@ use std::{
 use byteorder::{BigEndian, ReadBytesExt};
 use crc32fast::Hasher;
 use snafu::{ensure, ResultExt};
-use snap::read::FrameDecoder;
 
 use crate::errors::*;
 
@@ -84,7 +83,7 @@ where
 
         let compressed_read = self.f.by_ref().take(expected_len);
         let hashing_read = CrcReader::new(compressed_read);
-        let mut decompressing_read = FrameDecoder::new(hashing_read);
+        let mut decompressing_read = snap::read::FrameDecoder::new(hashing_read);
 
         let mut data = Vec::with_capacity(100);
         decompressing_read

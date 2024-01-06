@@ -40,14 +40,13 @@ use crate::{
         utils::{
             flatten,
             functions::get_vrl_compiler_config,
-            json::{Map, Value},
+            json::{self, Map, Value},
         },
     },
     service::{db, format_partition_key, stream::stream_settings},
 };
 
 pub mod grpc;
-pub mod otlp_json;
 
 pub type TriggerAlertData = Option<Vec<(Alert, Vec<Map<String, Value>>)>>;
 
@@ -261,14 +260,13 @@ pub fn register_stream_transforms(
     (local_trans, stream_vrl_map)
 }
 
-pub fn apply_stream_transform<'a>(
-    local_trans: &Vec<StreamTransform>,
-    value: &'a Value,
-    stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
+pub fn apply_stream_transform(
+    local_trans: &[StreamTransform],
+    mut value: Value,
+    stream_vrl_map: &AHashMap<String, VRLResultResolver>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value, anyhow::Error> {
-    let mut value = value.clone();
     for trans in local_trans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
@@ -276,7 +274,7 @@ pub fn apply_stream_transform<'a>(
             value = apply_vrl_fn(runtime, vrl_runtime, &value);
         }
     }
-    flatten::flatten(&value)
+    flatten::flatten(value)
 }
 
 pub async fn chk_schema_by_record(
@@ -324,7 +322,6 @@ pub async fn write_file(
     buf: AHashMap<String, SchemaRecords>,
     thread_id: usize,
     stream: &StreamParams,
-    _partition_time_level: Option<PartitionTimeLevel>,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
     for (hour_key, entry) in buf {
@@ -332,8 +329,6 @@ pub async fn write_file(
             continue;
         }
         let entry_records = entry.records.len();
-
-        // -- call new ingester
         let writer =
             ingester::get_writer(thread_id, &stream.org_id, &stream.stream_type.to_string()).await;
         writer
@@ -349,28 +344,11 @@ pub async fn write_file(
             )
             .await
             .unwrap();
-        // -- end call new ingester
 
         req_stats.size += entry.records_size as f64 / SIZE_IN_MB;
         req_stats.records += entry_records as i64;
     }
     req_stats
-}
-
-pub fn get_value(value: &Value) -> String {
-    if value.is_boolean() {
-        value.as_bool().unwrap().to_string()
-    } else if value.is_f64() {
-        value.as_f64().unwrap().to_string()
-    } else if value.is_i64() {
-        value.as_i64().unwrap().to_string()
-    } else if value.is_u64() {
-        value.as_u64().unwrap().to_string()
-    } else if value.is_string() {
-        value.as_str().unwrap().to_string()
-    } else {
-        value.to_string()
-    }
 }
 
 pub fn is_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Option<anyhow::Error> {
@@ -389,6 +367,119 @@ pub fn is_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Option<a
     };
 
     None
+}
+
+pub fn get_float_value(val: &Value) -> f64 {
+    match val {
+        Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
+        Value::Number(v) => v.as_f64().unwrap_or(0.0),
+        _ => 0.0,
+    }
+}
+
+pub fn get_int_value(val: &Value) -> i64 {
+    match val {
+        Value::String(v) => v.parse::<i64>().unwrap_or(0),
+        Value::Number(v) => v.as_i64().unwrap_or(0),
+        _ => 0,
+    }
+}
+
+pub fn get_string_value(value: &Value) -> String {
+    if value.is_boolean() {
+        value.as_bool().unwrap_or_default().to_string()
+    } else if value.is_i64() {
+        value.as_i64().unwrap_or_default().to_string()
+    } else if value.is_u64() {
+        value.as_u64().unwrap_or_default().to_string()
+    } else if value.is_f64() {
+        value.as_f64().unwrap_or_default().to_string()
+    } else if value.is_string() {
+        value.as_str().unwrap_or_default().to_string()
+    } else {
+        value.to_string()
+    }
+}
+
+pub fn get_val_for_attr(attr_val: &Value) -> Value {
+    let local_val = attr_val.as_object().unwrap();
+    if let Some((key, value)) = local_val.into_iter().next() {
+        match key.as_str() {
+            "stringValue" | "string_value" => {
+                return json::json!(get_string_value(value));
+            }
+            "boolValue" | "bool_value" => {
+                return json::json!(value.as_bool().unwrap_or(false).to_string());
+            }
+            "intValue" | "int_value" => {
+                return json::json!(get_int_value(value).to_string());
+            }
+            "doubleValue" | "double_value" => {
+                return json::json!(get_float_value(value).to_string());
+            }
+
+            "bytesValue" | "bytes_value" => {
+                return json::json!(value.as_str().unwrap_or("").to_string());
+            }
+
+            "arrayValue" | "array_value" => {
+                let mut vals = vec![];
+                for item in value
+                    .get("values")
+                    .unwrap()
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                {
+                    vals.push(get_val_for_attr(item));
+                }
+                return json::json!(vals);
+            }
+
+            "kvlistValue" | "kvlist_value" => {
+                let mut vals = json::Map::new();
+                for item in value
+                    .get("values")
+                    .unwrap()
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                {
+                    let mut key = item.get("key").unwrap().as_str().unwrap_or("").to_string();
+                    flatten::format_key(&mut key);
+                    let value = item.get("value").unwrap().clone();
+                    vals.insert(key, get_val_for_attr(&value));
+                }
+                return json::json!(vals);
+            }
+
+            _ => {
+                return json::json!(get_string_value(value));
+            }
+        }
+    };
+    attr_val.clone()
+}
+
+pub fn get_val_with_type_retained(val: &Value) -> Value {
+    match val {
+        Value::String(val) => {
+            json::json!(val)
+        }
+        Value::Bool(val) => {
+            json::json!(val)
+        }
+        Value::Number(val) => {
+            json::json!(val)
+        }
+        Value::Array(val) => {
+            json::json!(val)
+        }
+        Value::Object(val) => {
+            json::json!(val)
+        }
+        Value::Null => Value::Null,
+    }
 }
 
 #[cfg(test)]

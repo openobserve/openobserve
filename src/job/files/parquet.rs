@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs, io::Read, path::Path};
+use std::{fs, io::Read, path::Path, sync::Arc};
 
 use config::{
     meta::stream::{FileMeta, StreamType},
@@ -21,6 +21,7 @@ use config::{
     utils::parquet::read_metadata,
     CONFIG,
 };
+use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
@@ -28,7 +29,7 @@ use crate::{
         infra::{cluster, storage, wal},
         utils::file::scan_files,
     },
-    service::{db, usage::report_compression_stats},
+    service::{db, schema::schema_evolution, usage::report_compression_stats},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -40,10 +41,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
         interval.tick().await;
         if let Err(e) = move_files_to_storage().await {
-            log::error!("Error moving disk files to remote: {}", e);
+            log::error!("Error moving parquet files to remote: {}", e);
         }
     }
-    log::info!("job::files::disk is stopped");
+    log::info!("job::files::parquet is stopped");
     Ok(())
 }
 
@@ -71,8 +72,9 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let columns = file_path.splitn(5, '/').collect::<Vec<&str>>();
 
         // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-        // 7099303408192061440f3XQ2p.json eg: files/default/traces/default/0/
-        // 2023/09/04/05/default/service_name=ingester/7104328279989026816guOA4t.json
+        // 7099303408192061440f3XQ2p.parquet
+        // eg: files/default/traces/default/0/2023/09/04/05/default/
+        // service_name=ingester/7104328279989026816guOA4t.parquet
         // let _ = columns[0].to_string(); // files/
         let org_id = columns[1].to_string();
         let stream_type = StreamType::from(columns[2]);
@@ -84,21 +86,9 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             file_name = file_name.replace('_', "/");
         }
 
-        // check the file is using for write
-        // if wal::check_in_use(
-        //     StreamParams::new(&org_id, &stream_name, stream_type),
-        //     &file_name,
-        // )
-        // .await
-        // {
-        //     // println!("file is using for write, skip, {}", file_name);
-        //     continue;
-        // }
-        log::info!("[JOB] convert disk file: {}", file);
-
         // check if we are allowed to ingest or just delete the file
         if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
-            log::info!(
+            log::warn!(
                 "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
                 &org_id,
                 stream_type,
@@ -107,7 +97,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             );
             if let Err(e) = tokio::fs::remove_file(&local_file).await {
                 log::error!(
-                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    "[JOB] Failed to remove parquet file from disk: {}, {}",
                     local_file,
                     e
                 );
@@ -120,7 +110,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             let ret =
                 upload_file(&org_id, &stream_name, stream_type, &local_file, &file_name).await;
             if let Err(e) = ret {
-                log::error!("[JOB] Error while uploading disk file to storage {}", e);
+                log::error!("[JOB] Error while uploading parquet file to storage {}", e);
                 drop(permit);
                 return Ok(());
             }
@@ -129,7 +119,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             let ret = db::file_list::local::set(&key, Some(meta.clone()), false).await;
             if let Err(e) = ret {
                 log::error!(
-                    "[JOB] Failed write disk file meta: {}, error: {}",
+                    "[JOB] Failed write parquet file meta: {}, error: {}",
                     local_file,
                     e.to_string()
                 );
@@ -140,7 +130,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             // check if allowed to delete the file
             loop {
                 if wal::lock_files_exists(&file_path).await {
-                    log::info!(
+                    log::warn!(
                         "[JOB] the file is still in use, waiting for a few ms: {}",
                         file_path
                     );
@@ -153,7 +143,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             let ret = tokio::fs::remove_file(&local_file).await;
             if let Err(e) = ret {
                 log::error!(
-                    "[JOB] Failed to remove disk file from disk: {}, {}",
+                    "[JOB] Failed to remove parquet file from disk: {}, {}",
                     local_file,
                     e.to_string()
                 );
@@ -178,7 +168,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 
     for task in tasks {
         if let Err(e) = task.await {
-            log::error!("[JOB] Error while uploading disk file to storage {}", e);
+            log::error!("[JOB] Error while uploading parquet file to storage {}", e);
         };
     }
     Ok(())
@@ -194,11 +184,11 @@ async fn upload_file(
     let mut file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
-    log::info!("[JOB] File upload begin: disk: {}", path_str);
+    log::info!("[JOB] File upload begin: {}", path_str);
     if file_size == 0 {
         if let Err(e) = tokio::fs::remove_file(path_str).await {
             log::error!(
-                "[JOB] Failed to remove disk file from disk: {}, {}",
+                "[JOB] Failed to remove parquet file from disk: {}, {}",
                 path_str,
                 e
             );
@@ -218,15 +208,23 @@ async fn upload_file(
     let mut file_meta = read_metadata(&buf_parquet).await?;
     file_meta.compressed_size = file_size as i64;
 
-    // TODO ?
-    // schema_evolution(
-    //     org_id,
-    //     stream_name,
-    //     stream_type,
-    //     arrow_schema,
-    //     file_meta.min_ts,
-    // )
-    // .await;
+    // read schema
+    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    let inferred_schema = arrow_reader
+        .schema()
+        .as_ref()
+        .clone()
+        .with_metadata(std::collections::HashMap::new());
+
+    schema_evolution(
+        org_id,
+        stream_name,
+        stream_type,
+        Arc::new(inferred_schema),
+        file_meta.min_ts,
+    )
+    .await;
 
     let new_file_name =
         super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
@@ -234,11 +232,11 @@ async fn upload_file(
     let file_name = new_file_name.to_owned();
     match storage::put(&new_file_name, buf_parquet).await {
         Ok(_) => {
-            log::info!("[JOB] disk file upload succeeded: {}", file_name);
+            log::info!("[JOB] File upload succeeded: {}", file_name);
             Ok((file_name, file_meta, stream_type))
         }
         Err(err) => {
-            log::error!("[JOB] disk file upload error: {:?}", err);
+            log::error!("[JOB] File upload error: {:?}", err);
             Err(anyhow::anyhow!(err))
         }
     }

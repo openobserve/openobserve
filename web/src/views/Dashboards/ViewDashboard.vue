@@ -17,99 +17,127 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-md" :key="store.state.selectedOrganization.identifier">
-    <div class="flex justify-between items-center q-pa-sm">
-      <div class="flex">
-        <q-btn
-          no-caps
-          @click="goBackToDashboardList"
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-        />
-        <span class="q-table__title q-mx-md q-mt-xs">{{
-          currentDashboardData.data.title
-        }}</span>
+  <q-page :key="store.state.selectedOrganization.identifier">
+    <div ref="fullscreenDiv" :class="`${isFullscreen ? 'fullscreen' : ''}  ${store.state.theme === 'light' ? 'bg-white' : 'dark-mode'}`">
+      <div
+        :class="`${
+          store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
+        } stickyHeader ${isFullscreen ? 'fullscreenHeader' : ''}`"
+      >
+        <div class="flex justify-between items-center q-pa-xs">
+          <div class="flex">
+            <q-btn
+              v-if="!isFullscreen"
+              no-caps
+              @click="goBackToDashboardList"
+              padding="xs"
+              outline
+              icon="arrow_back_ios_new"
+            />
+            <span class="q-table__title q-mx-md q-mt-xs">{{
+              currentDashboardData.data.title
+            }}</span>
+          </div>
+          <div class="flex">
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              class="dashboard-icons q-px-sm"
+              size="sm"
+              no-caps
+              icon="add"
+              @click="addPanelData"
+              data-test="dashboard-panel-add"
+            >
+              <q-tooltip>{{ t("panel.add") }}</q-tooltip>
+            </q-btn>
+            <!-- <DateTimePicker 
+            class="q-ml-sm"
+            ref="refDateTime"
+            v-model="selectedDate"
+          /> -->
+            <DateTimePickerDashboard
+              ref="dateTimePicker"
+              class="dashboard-icons q-ml-sm"
+              size="sm"
+              v-model="selectedDate"
+            />
+            <AutoRefreshInterval
+              v-model="refreshInterval"
+              trigger
+              @trigger="refreshData"
+              class="dashboard-icons"
+              size="sm"
+            />
+            <q-btn
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              icon="refresh"
+              @click="refreshData"
+            >
+              <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
+            </q-btn>
+            <ExportDashboard
+              v-if="!isFullscreen"
+              :dashboardId="currentDashboardData.data?.dashboardId"
+            />
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              icon="share"
+              @click="shareLink"
+              ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
+            >
+            <q-btn
+              v-if="!isFullscreen"
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              icon="settings"
+              @click="openSettingsDialog"
+            >
+              <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+              @click="toggleFullscreen"
+              ><q-tooltip>{{isFullscreen ? t("dashboard.exitFullscreen") : t("dashboard.fullscreen") }}</q-tooltip></q-btn
+            >
+          </div>
+        </div>
+        <q-separator></q-separator>
       </div>
-      <div class="flex">
-        <q-btn
-          outline
-          padding="xs"
-          no-caps
-          icon="add"
-          @click="addPanelData"
-          data-test="dashboard-panel-add"
-        >
-          <q-tooltip>{{ t("panel.add") }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          outline
-          padding="xs"
-          class="q-ml-sm"
-          no-caps
-          icon="settings"
-          @click="openSettingsDialog"
-        >
-          <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
-        </q-btn>
-        <!-- <DateTimePicker 
-          class="q-ml-sm"
-          ref="refDateTime"
-          v-model="selectedDate"
-        /> -->
-        <DateTimePickerDashboard
-          ref="dateTimePicker"
-          class="q-ml-sm"
-          v-model="selectedDate"
-        />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          trigger
-          @trigger="refreshData"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="refresh"
-          @click="refreshData"
-        >
-        </q-btn>
-        <ExportDashboard
-          :dashboardId="currentDashboardData.data?.dashboardId"
-        />
-        <q-btn
-          class="q-ml-sm"
-          outline
-          padding="xs"
-          no-caps
-          icon="share"
-          title="share link"
-          @click="shareLink"
-        ></q-btn>
-      </div>
-    </div>
-    <q-separator></q-separator>
-    <RenderDashboardCharts
-      @variablesData="variablesDataUpdated"
-      :initialVariableValues="initialVariableValues"
-      :viewOnly="false"
-      :dashboardData="currentDashboardData.data"
-      :currentTimeObj="currentTimeObj"
-      :selectedDateForViewPanel="selectedDate"
-      @onDeletePanel="onDeletePanel"
-      @updated:data-zoom="onDataZoom"
-    />
 
-    <q-dialog
-      v-model="showDashboardSettingsDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <DashboardSettings @refresh="loadDashboard" />
-    </q-dialog>
+      <RenderDashboardCharts
+        @variablesData="variablesDataUpdated"
+        :initialVariableValues="initialVariableValues"
+        :viewOnly="false"
+        :dashboardData="currentDashboardData.data"
+        :currentTimeObj="currentTimeObj"
+        :selectedDateForViewPanel="selectedDate"
+        @onDeletePanel="onDeletePanel"
+        @updated:data-zoom="onDataZoom"
+      />
+
+      <q-dialog
+        v-model="showDashboardSettingsDialog"
+        position="right"
+        full-height
+        maximized
+      >
+        <DashboardSettings @refresh="loadDashboard" />
+      </q-dialog>
+    </div>
   </q-page>
 </template>
 
@@ -131,6 +159,8 @@ import ExportDashboard from "../../components/dashboards/ExportDashboard.vue";
 import DashboardSettings from "./DashboardSettings.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
+import { onMounted } from "vue";
+import { onUnmounted } from "vue";
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -210,7 +240,7 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-
+      
       // if variables data is null, set it to empty list
       if (
         !(
@@ -396,8 +426,49 @@ export default defineComponent({
         });
     };
 
+    // Fullscreen
+    const fullscreenDiv = ref(null);
+    const isFullscreen = ref(false);
+
+    const toggleFullscreen = () => {
+      if (!document.fullscreenElement) {
+        if (fullscreenDiv.value.requestFullscreen) {
+          fullscreenDiv.value.requestFullscreen();
+        }
+        isFullscreen.value = true;
+        document.body.style.overflow = "hidden"; // Disable body scroll
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+        isFullscreen.value = false;
+        document.body.style.overflow = ""; // Enable body scroll
+      }
+    };
+
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        isFullscreen.value = false;
+      }
+    };
+
+    onMounted(() => {
+      document.addEventListener("fullscreenchange", onFullscreenChange);
+    });
+
+    onUnmounted(() => {
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    });
+
+    onActivated(() => {
+      isFullscreen.value = false;
+    });
+
     return {
       currentDashboardData,
+      toggleFullscreen,
+      fullscreenDiv,
+      isFullscreen,
       goBackToDashboardList,
       addPanelData,
       t,
@@ -431,5 +502,37 @@ export default defineComponent({
     border-bottom: 1px solid $border-color;
     justify-content: flex-end;
   }
+}
+
+.dark-mode {
+  background-color: $dark-page;
+}
+
+.bg-white {
+  background-color: $white;
+}
+
+.stickyHeader {
+  position: sticky;
+  top: 57px;
+  z-index: 1001;
+}
+.stickyHeader.fullscreenHeader {
+  top: 0px;
+}
+
+.fullscreen {
+  width: 100vw;
+  height: 100vh;
+  overflow-y: auto; /* Enables scrolling within the div */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000; /* Ensure it's on top */
+  /* Additional styling as needed */
+}
+
+.dashboard-icons {
+  height: 30px;
 }
 </style>

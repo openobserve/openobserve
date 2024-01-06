@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           icon="info_outline"
           @click="showViewPanel = true"
+          data-test="dashboard-panel-data-view-query-inspector-btn"
         >
           <q-tooltip anchor="center left" self="center right"
             >Query Inspector
@@ -58,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           :label="t('panel.discard')"
           @click="goBackToDashboardList"
+          data-test="dashboard-panel-discard"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -154,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
+                        :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
                         :selectedTimeDate="dashboardPanelData.meta.dateTime"
                         @variablesData="variablesDataUpdated"
                       />

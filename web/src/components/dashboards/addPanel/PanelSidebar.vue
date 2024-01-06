@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sidebar" :class="{ open: isOpen }">
     <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
       <!-- <div class="collapsed-icon">+</div> -->
-      <q-icon name="expand_all" class="collapsed-icon rotate-90" />
+      <q-icon name="expand_all" class="collapsed-icon rotate-90" data-test="dashboard-sidebar"/>
       <div class="collapsed-title">{{ title }}</div>
     </div>
     <div v-else class="sidebar-header-expanded">
@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="unfold_less"
         class="collapse-button rotate-90"
         @click="toggleSidebar"
+        data-test="dashboard-sidebar-collapse-btn"
       />
     </div>
     <q-separator style="margin-top: -1px" />
