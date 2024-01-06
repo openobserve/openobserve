@@ -2075,6 +2075,7 @@ dependencies = [
  "segment",
  "serde",
  "serde_json",
+ "simd-json",
  "sysinfo",
  "tokio",
  "tracing",
