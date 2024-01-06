@@ -280,7 +280,7 @@ pub async fn search_parquet(
                     err
                 );
                 tmpfs::delete(session_id, true).unwrap();
-                return Err(super::handle_datafusion_error(err));
+                return Err(err.into());
             }
         };
     }
@@ -445,7 +445,7 @@ pub async fn search_memtable(
             }
             Err(err) => {
                 log::error!("datafusion execute error: {}", err);
-                return Err(super::handle_datafusion_error(err));
+                return Err(err.into());
             }
         };
     }
