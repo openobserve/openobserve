@@ -91,6 +91,11 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // cli mode
+    if cli::cli().await? {
+        return Ok(());
+    }
+
     #[cfg(feature = "profiling")]
     console_subscriber::init();
     // #[cfg(feature = "profiling")]
@@ -104,11 +109,6 @@ async fn main() -> Result<(), anyhow::Error> {
     // .expect("Failed to setup pyroscope agent");
     // #[cfg(feature = "profiling")]
     // let agent_running = agent.start().expect("Failed to start pyroscope agent");
-
-    // cli mode
-    if cli::cli().await? {
-        return Ok(());
-    }
 
     // setup logs
     let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
