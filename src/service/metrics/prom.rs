@@ -116,10 +116,19 @@ pub async fn remote_write(
             .unwrap();
     }
 
+    // TODO: delete for debug
+    let mut streams = std::collections::HashSet::new();
+    for series in request.timeseries.iter() {
+        let metric_name = match series.labels.iter().find(|label| label.name == NAME_LABEL) {
+            Some(v) => v.value.clone(),
+            None => continue,
+        };
+        streams.insert(metric_name);
+    }
     log::info!(
         "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
         req_metadata_len,
-        request.timeseries.len(),
+        streams.len(),
         request
             .timeseries
             .iter()
