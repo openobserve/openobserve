@@ -249,7 +249,7 @@ pub async fn search(
                     "[session_id {session_id}] datafusion execute error: {}",
                     err
                 );
-                return Err(super::handle_datafusion_error(err));
+                return Err(err.into());
             }
         };
     }
