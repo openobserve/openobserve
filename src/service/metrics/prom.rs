@@ -97,6 +97,7 @@ pub async fn remote_write(
         .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
 
     // parse metadata
+    let req_metadata_len = request.metadata.len();
     for item in request.metadata {
         let metric_name = format_stream_name(&item.metric_family_name.clone());
         let metadata = Metadata {
@@ -117,6 +118,25 @@ pub async fn remote_write(
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
+        let time = start.elapsed().as_secs_f64();
+        metrics::HTTP_RESPONSE_TIME
+            .with_label_values(&[
+                "/prometheus/api/v1/write",
+                "200",
+                org_id,
+                "",
+                &StreamType::Metrics.to_string(),
+            ])
+            .observe(time);
+        metrics::HTTP_INCOMING_REQUESTS
+            .with_label_values(&[
+                "/prometheus/api/v1/write",
+                "200",
+                org_id,
+                "",
+                &StreamType::Metrics.to_string(),
+            ])
+            .inc();
         return Ok(());
     }
 
@@ -151,6 +171,12 @@ pub async fn remote_write(
             Some(v) => v.to_owned(),
             None => continue,
         };
+        log::info!(
+            "/prometheus/api/v1/write: metadata {}, stream: {}, samples: {}",
+            req_metadata_len,
+            metric_name,
+            event.samples.len()
+        );
 
         let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
@@ -206,6 +232,25 @@ pub async fn remote_write(
             }
             if !accept_record {
                 // do not accept any entries for request
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/prometheus/api/v1/write",
+                        "200",
+                        org_id,
+                        "",
+                        &StreamType::Metrics.to_string(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/prometheus/api/v1/write",
+                        "200",
+                        org_id,
+                        "",
+                        &StreamType::Metrics.to_string(),
+                    ])
+                    .inc();
                 return Ok(());
             }
 
@@ -260,7 +305,6 @@ pub async fn remote_write(
             let mut value: json::Value = json::to_value(&metric).unwrap();
 
             // Start row based transform
-
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
                 value,
