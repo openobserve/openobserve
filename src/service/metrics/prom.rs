@@ -116,6 +116,17 @@ pub async fn remote_write(
             .unwrap();
     }
 
+    log::info!(
+        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
+        req_metadata_len,
+        request.timeseries.len(),
+        request
+            .timeseries
+            .iter()
+            .map(|ts| ts.samples.len())
+            .sum::<usize>(),
+    );
+
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
         let time = start.elapsed().as_secs_f64();
@@ -171,12 +182,6 @@ pub async fn remote_write(
             Some(v) => v.to_owned(),
             None => continue,
         };
-        log::info!(
-            "/prometheus/api/v1/write: metadata {}, stream: {}, samples: {}",
-            req_metadata_len,
-            metric_name,
-            event.samples.len()
-        );
 
         let buf = metric_data_map.entry(metric_name.to_owned()).or_default();
 
