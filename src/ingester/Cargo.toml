@@ -21,6 +21,7 @@ once_cell.workspace = true
 parquet.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+simd-json.workspace = true
 snafu.workspace = true
 tokio.workspace = true
 uuid.workspace = true
