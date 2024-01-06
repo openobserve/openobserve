@@ -407,6 +407,15 @@ pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor)
     true
 }
 
+pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
+    o2_enterprise::enterprise::openfga::authorizer::is_allowed(
+        user_id,
+        &auth_info.method,
+        &auth_info.o2_type,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

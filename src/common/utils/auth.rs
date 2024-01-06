@@ -206,6 +206,36 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        let mut method = req.method().to_string();
+        let local_path = req.path().to_string();
+        let path =
+            match local_path.strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str()) {
+                Some(path) => path,
+                None => &local_path,
+            };
+
+        let path_columns = path.split('/').collect::<Vec<&str>>();
+        let url_len = path_columns.len();
+        let org_id = path_columns[0].to_string();
+
+        let object_type = if url_len == 1 {
+            // this is es ep??
+            "es".to_string()
+        } else if url_len == 2 {
+            path_columns[url_len - 1].to_string()
+        } else if crate::common::meta::types::END_POINTS.contains(&path_columns[url_len - 1]) {
+            if method.eq("GET") {
+                method = "LIST".to_string();
+            }
+            format!("{}:{}_all", path_columns[url_len - 1].to_string(), org_id)
+        } else {
+            format!(
+                "{}:{}",
+                path_columns[url_len - 2],
+                path_columns[url_len - 1]
+            )
+        };
+
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 return ready(Ok(AuthExtractor {
