@@ -186,7 +186,7 @@ impl Writer {
         }
 
         // write into wal
-        wal.write(&entry_bytes).context(WalSnafu)?;
+        // wal.write(&entry_bytes).context(WalSnafu)?;
 
         // write into memtable
         // self.memtable.write().await.write(schema, entry).await?;

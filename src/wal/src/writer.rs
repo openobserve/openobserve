@@ -133,7 +133,7 @@ impl Writer {
         self.f.write_all(buf).context(WriteDataSnafu)?;
 
         // fsync the fd
-        // self.f.sync_all().expect("fsync failure");
+        self.f.sync_all().expect("fsync failure");
 
         self.bytes_written += bytes_written;
         self.uncompressed_bytes_written += uncompressed_len;
