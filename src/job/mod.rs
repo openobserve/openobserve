@@ -98,7 +98,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // telemetry run
-    if CONFIG.common.telemetry_enabled {
+    if CONFIG.common.telemetry_enabled && cluster::is_querier(&cluster::LOCAL_NODE_ROLE) {
         tokio::task::spawn(async move { telemetry::run().await });
     }
 
