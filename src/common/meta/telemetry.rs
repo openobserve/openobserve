@@ -167,6 +167,20 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
+                data.insert(
+                    "querier_nodes".to_string(),
+                    crate::common::infra::cluster::get_cached_online_querier_nodes()
+                        .unwrap_or(vec![])
+                        .len()
+                        .into(),
+                );
+                data.insert(
+                    "ingester_nodes".to_string(),
+                    crate::common::infra::cluster::get_cached_online_ingester_nodes()
+                        .unwrap_or(vec![])
+                        .len()
+                        .into(),
+                );
             }
             None => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(false));
