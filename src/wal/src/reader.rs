@@ -85,7 +85,7 @@ where
         let hashing_read = CrcReader::new(compressed_read);
         let mut decompressing_read = snap::read::FrameDecoder::new(hashing_read);
 
-        let mut data = Vec::with_capacity(100);
+        let mut data = Vec::with_capacity(1024);
         decompressing_read
             .read_to_end(&mut data)
             .context(UnableToReadDataSnafu)?;
