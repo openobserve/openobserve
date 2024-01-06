@@ -4,7 +4,8 @@ RUN rustup toolchain install nightly-2023-12-24
 RUN rustup default nightly-2023-12-24
 RUN rustup target add x86_64-unknown-linux-gnu
 RUN rustup component add rustfmt clippy llvm-tools
-RUN cargo install sccache --locked
+RUN cargo install --locked sccache
+RUN cargo install --locked tokio-console
 ENV SCCACHE_IDLE_TIMEOUT=1800
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
 

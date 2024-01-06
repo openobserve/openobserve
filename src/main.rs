@@ -98,16 +98,18 @@ use tracing_subscriber::{
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
-    let agent = PyroscopeAgent::builder(
-        &CONFIG.profiling.pyroscope_server_url,
-        &CONFIG.profiling.pyroscope_project_name,
-    )
-    .tags([("Host", "Rust")].to_vec())
-    .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-    .build()
-    .expect("Failed to setup pyroscope agent");
-    #[cfg(feature = "profiling")]
-    let agent_running = agent.start().expect("Failed to start pyroscope agent");
+    console_subscriber::init();
+    // #[cfg(feature = "profiling")]
+    // let agent = PyroscopeAgent::builder(
+    //     &CONFIG.profiling.pyroscope_server_url,
+    //     &CONFIG.profiling.pyroscope_project_name,
+    // )
+    // .tags([("Host", "Rust")].to_vec())
+    // .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+    // .build()
+    // .expect("Failed to setup pyroscope agent");
+    // #[cfg(feature = "profiling")]
+    // let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
     // cli mode
     if cli::cli().await? {
@@ -129,7 +131,11 @@ async fn main() -> Result<(), anyhow::Error> {
         enable_tracing()?;
         None
     } else {
-        Some(setup_logs())
+        #[cfg(feature = "profiling")]
+        let ret = None;
+        #[cfg(not(feature = "profiling"))]
+        let ret = Some(setup_logs());
+        ret
     };
 
     log::info!("Starting OpenObserve {}", VERSION);
@@ -212,10 +218,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     log::info!("server stopped");
 
-    #[cfg(feature = "profiling")]
-    let agent_ready = agent_running.stop().unwrap();
-    #[cfg(feature = "profiling")]
-    agent_ready.shutdown();
+    // #[cfg(feature = "profiling")]
+    // let agent_ready = agent_running.stop().unwrap();
+    // #[cfg(feature = "profiling")]
+    // agent_ready.shutdown();
 
     Ok(())
 }

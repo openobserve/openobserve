@@ -24,7 +24,7 @@ publish = false
 [features]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
-profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
+profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs", "dep:console-subscriber"]
 
 [profile.release]
 debug = false
@@ -127,6 +127,7 @@ promql-parser = "0.2"
 prost = "0.11"
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
+console-subscriber = { version = "0.2.0", optional = true }
 rand = "0.8"
 getrandom = "0.2.11"
 rayon = "1.7.0"
