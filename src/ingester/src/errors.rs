@@ -60,6 +60,9 @@ pub enum Error {
         source: io::Error,
     },
     JSONSerialization {
+        #[cfg(target_arch = "x86_64")]
+        source: simd_json::Error,
+        #[cfg(not(target_arch = "x86_64"))]
         source: serde_json::Error,
     },
     FromUtf8Error {
