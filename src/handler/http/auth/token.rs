@@ -26,13 +26,17 @@ use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, dex::service::
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::jwt;
+use crate::{
+    common::utils::auth::AuthExtractor,
+    service::{db, users},
+};
 
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
     req: ServiceRequest,
-    token: &str,
+    auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    use crate::service::{db, users};
+    use super::validator::check_permissions;
 
     let user;
     let keys = get_jwks().await;
@@ -47,7 +51,7 @@ pub async fn token_validator(
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     match jwt::verify_decode_token(
-        token.strip_prefix("Bearer").unwrap().trim(),
+        &auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &O2_CONFIG.dex.client_id,
         false,
@@ -94,7 +98,11 @@ pub async fn token_validator(
                         header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                     );
 
-                    Ok(req)
+                    if check_permissions(user_id, auth_info).await {
+                        return Ok(req);
+                    } else {
+                        return Err((ErrorUnauthorized("Unauthorized Access"), req));
+                    }
                 } else {
                     Err((ErrorUnauthorized("Unauthorized Access"), req))
                 }

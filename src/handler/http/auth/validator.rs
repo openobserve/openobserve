@@ -47,6 +47,7 @@ pub async fn validator(
     req: ServiceRequest,
     user_id: &str,
     password: &str,
+    auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = match req
         .request()
@@ -72,7 +73,11 @@ pub async fn validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                Ok(req)
+                if check_permissions(user_id, auth_info).await {
+                    return Ok(req);
+                } else {
+                    return Err((ErrorUnauthorized("Unauthorized Access"), req));
+                }
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
             }
@@ -363,10 +368,11 @@ pub async fn validator_rum(
 
 pub async fn oo_validator(
     req: ServiceRequest,
-    auth_header: AuthExtractor,
+    auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if auth_header.auth.starts_with("Basic") {
-        let decoded = base64::decode(auth_header.auth.strip_prefix("Basic").unwrap().trim())
+    println!("auth_info: {:?}", auth_info);
+    if auth_info.auth.starts_with("Basic") {
+        let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
             .expect("Failed to decode base64 string");
         let credentials = String::from_utf8(decoded.into())
             .map_err(|_| ())
@@ -378,12 +384,21 @@ pub async fn oo_validator(
         let (username, password) = (parts[0], parts[1]);
         let username = username.to_owned();
         let password = password.to_owned();
-        validator(req, &username, &password).await
-    } else if auth_header.auth.starts_with("Bearer") {
-        super::token::token_validator(req, &auth_header.auth).await
+        validator(req, &username, &password, auth_info).await
+    } else if auth_info.auth.starts_with("Bearer") {
+        super::token::token_validator(req, auth_info).await
     } else {
         Err((ErrorUnauthorized("Unauthorized Access"), req))
     }
+}
+
+pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
+    o2_enterprise::enterprise::openfga::authorizer::is_allowed(
+        user_id,
+        &auth_info.method,
+        &auth_info.o2_type,
+    )
+    .await
 }
 
 #[cfg(test)]
