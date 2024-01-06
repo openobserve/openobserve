@@ -76,7 +76,6 @@ use tokio::sync::oneshot;
 use tonic::codec::CompressionEncoding;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::Registry;
-use uaparser::UserAgentParser;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -85,11 +84,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/ua_regex/regexes.yaml"
-));
 
 use tracing_subscriber::{
     self, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
@@ -322,13 +316,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
-    // ua parser
-    let ua_parser = web::Data::new(
-        UserAgentParser::builder()
-            .build_from_bytes(USER_AGENT_REGEX_FILE)
-            .expect("User Agent Parser creation failed"),
-    );
-
     let thread_id = Arc::new(AtomicU16::new(0));
     let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
         format!("[::]:{}", CONFIG.http.port).parse()?
@@ -357,6 +344,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
                 web::scope(&CONFIG.common.base_uri)
                     .service(router::http::config)
+                    .service(router::http::config_paths)
                     .service(router::http::api)
                     .service(router::http::aws)
                     .service(router::http::gcp)
@@ -377,7 +365,6 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
             .app_data(web::Data::new(local_id))
-            .app_data(ua_parser.clone())
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
