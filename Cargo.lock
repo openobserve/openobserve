@@ -3762,6 +3762,7 @@ dependencies = [
  "parquet",
  "serde",
  "serde_json",
+ "simd-json",
  "snafu 0.7.5",
  "tokio",
  "uuid",

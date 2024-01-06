@@ -15,7 +15,6 @@
 
 pub(crate) mod cgroup;
 pub(crate) mod file;
-pub mod json;
 pub mod parquet;
 pub mod rand;
 pub mod record_batch_ext;

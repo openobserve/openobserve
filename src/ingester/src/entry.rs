@@ -20,7 +20,7 @@ use std::{
 
 use arrow::{array::Int64Array, record_batch::RecordBatch};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::{utils::json, CONFIG};
+use config::CONFIG;
 use snafu::ResultExt;
 
 use crate::errors::*;
@@ -29,7 +29,7 @@ pub struct Entry {
     pub stream: Arc<str>,
     pub schema_key: Arc<str>,
     pub partition_key: Arc<str>, // 2023/12/18/00/country=US/state=CA
-    pub data: Vec<Arc<json::Value>>,
+    pub data: Vec<Arc<serde_json::Value>>,
     pub data_size: usize,
 }
 
@@ -39,7 +39,7 @@ impl Entry {
         let stream = self.stream.as_bytes();
         let schema_key = self.schema_key.as_bytes();
         let partition_key = self.partition_key.as_bytes();
-        let data = json::to_vec(&self.data).context(JSONSerializationSnafu)?;
+        let data = serde_json::to_vec(&self.data).context(JSONSerializationSnafu)?;
         let data_size = data.len();
         self.data_size = data_size; // reset data size
         buf.write_u16::<BigEndian>(stream.len() as u16)
@@ -76,7 +76,7 @@ impl Entry {
         let data_len = cursor.read_u32::<BigEndian>().context(ReadDataSnafu)?;
         let mut data = vec![0; data_len as usize];
         cursor.read_exact(&mut data).context(ReadDataSnafu)?;
-        let data = json::from_slice(&data).context(JSONSerializationSnafu)?;
+        let data = serde_json::from_slice(&data).context(JSONSerializationSnafu)?;
         Ok(Self {
             stream: stream.into(),
             schema_key: schema_key.into(),
