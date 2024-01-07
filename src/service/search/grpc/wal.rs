@@ -56,7 +56,7 @@ use crate::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
     session_id: &str,
     sql: Arc<Sql>,
@@ -235,7 +235,7 @@ pub async fn search_parquet(
             "service:search:grpc:wal:parquet:datafusion",
             org_id = sql.org_id,
             stream_name = sql.stream_name,
-            stream_type = ?stream_type
+            stream_type = stream_type.to_string(),
         );
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
@@ -335,7 +335,7 @@ pub async fn search_memtable(
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
     for (schema, batch) in batches {
         let entry = batch_groups.entry(schema).or_default();
-        scan_stats.original_size += batch.iter().map(|r| r.data_size).sum::<usize>() as i64;
+        scan_stats.original_size += batch.iter().map(|r| r.data_json_size).sum::<usize>() as i64;
         entry.extend(batch.into_iter().map(|r| r.data.clone()));
     }
 
@@ -403,7 +403,7 @@ pub async fn search_memtable(
             "service:search:grpc:wal:mem:datafusion",
             org_id = sql.org_id,
             stream_name = sql.stream_name,
-            stream_type = ?stream_type
+            stream_type = stream_type.to_string(),
         );
 
         let task = tokio::time::timeout(

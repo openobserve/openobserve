@@ -34,7 +34,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords, StreamParams},
+            stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords},
             usage::RequestStats,
         },
         utils::{
@@ -319,9 +319,9 @@ pub fn init_functions_runtime() -> Runtime {
 }
 
 pub async fn write_file(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
     buf: AHashMap<String, SchemaRecords>,
-    thread_id: usize,
-    stream: &StreamParams,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
     for (hour_key, entry) in buf {
@@ -329,13 +329,11 @@ pub async fn write_file(
             continue;
         }
         let entry_records = entry.records.len();
-        let writer =
-            ingester::get_writer(thread_id, &stream.org_id, &stream.stream_type.to_string()).await;
-        writer
+        if let Err(e) = writer
             .write(
                 entry.schema,
                 ingester::Entry {
-                    stream: Arc::from(stream.stream_name.as_str()),
+                    stream: Arc::from(stream_name),
                     schema_key: Arc::from(entry.schema_key.as_str()),
                     partition_key: Arc::from(hour_key.as_str()),
                     data: entry.records,
@@ -343,7 +341,9 @@ pub async fn write_file(
                 },
             )
             .await
-            .unwrap();
+        {
+            log::error!("ingestion write file error: {}", e);
+        }
 
         req_stats.size += entry.records_size as f64 / SIZE_IN_MB;
         req_stats.records += entry_records as i64;

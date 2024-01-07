@@ -77,10 +77,10 @@ impl FileData {
             let columns = file_key.split('/').collect::<Vec<&str>>();
             if columns[0] == "files" {
                 metrics::QUERY_DISK_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                    .with_label_values(&[columns[1], columns[2]])
                     .dec();
                 metrics::QUERY_DISK_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[3], columns[2]])
+                    .with_label_values(&[columns[1], columns[2]])
                     .sub(data_size as i64);
             }
         }
@@ -127,10 +127,10 @@ impl FileData {
                 let columns = key.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {
                     metrics::QUERY_DISK_CACHE_FILES
-                        .with_label_values(&[columns[1], columns[3], columns[2]])
+                        .with_label_values(&[columns[1], columns[2]])
                         .dec();
                     metrics::QUERY_DISK_CACHE_USED_BYTES
-                        .with_label_values(&[columns[1], columns[3], columns[2]])
+                        .with_label_values(&[columns[1], columns[2]])
                         .sub(data_size as i64);
                 }
                 release_size += data_size;
@@ -151,10 +151,10 @@ impl FileData {
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .with_label_values(&[columns[1], columns[2]])
                 .inc();
             metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[3], columns[2]])
+                .with_label_values(&[columns[1], columns[2]])
                 .add(data_size as i64);
         }
         Ok(())

@@ -197,8 +197,12 @@ pub async fn ingest(
         }
     }
 
-    // write to file
-    let mut req_stats = write_file(write_buf, thread_id, &stream_params).await;
+    // write data to wal
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let mut req_stats = write_file(&writer, stream_name, write_buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
 
     // send distinct_values
     if !distinct_values.is_empty() {

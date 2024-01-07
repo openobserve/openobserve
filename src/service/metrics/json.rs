@@ -34,7 +34,7 @@ use crate::{
         meta::{
             ingestion::{IngestionResponse, StreamStatus},
             prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, SchemaRecords, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords},
             usage::UsageType,
         },
         utils::{flatten, json, time},
@@ -258,8 +258,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             .or_insert_with(|| StreamStatus::new(&stream_name));
         stream_status.status.successful += 1;
     }
-    let time = start.elapsed().as_secs_f64();
 
+    // write data to wal
+    let time = start.elapsed().as_secs_f64();
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in stream_data_buf {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
@@ -272,14 +274,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             continue;
         }
 
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-        )
-        .await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
         req_stats.response_time = time;
-
         report_request_usage_stats(
             req_stats,
             org_id,
@@ -289,6 +285,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             0,
         )
         .await;
+    }
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     metrics::HTTP_RESPONSE_TIME

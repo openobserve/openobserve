@@ -38,7 +38,7 @@ use crate::{
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
+            stream::{PartitionTimeLevel, SchemaRecords},
             traces::{Event, Span, SpanRefType},
             usage::UsageType,
         },
@@ -362,13 +362,13 @@ pub async fn handle_trace_request(
         }
     }
 
-    // write to file
-    let mut req_stats = write_file(
-        data_buf,
-        thread_id,
-        &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
-    )
-    .await;
+    // write data to wal
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
+    let mut req_stats = write_file(&writer, traces_stream_name, data_buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
+
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
@@ -380,9 +380,9 @@ pub async fn handle_trace_request(
     }
 
     let ep = if is_grpc {
-        "grpc/export/traces"
+        "/grpc/export/traces"
     } else {
-        "http-proto/api/org/traces/"
+        "/api/org/v1/traces"
     };
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
