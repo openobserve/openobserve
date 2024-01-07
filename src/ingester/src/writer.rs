@@ -139,7 +139,7 @@ impl Writer {
         }
     }
 
-    pub async fn write(&self, _schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
+    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
@@ -191,7 +191,7 @@ impl Writer {
         wal.write(&entry_bytes, false).context(WalSnafu)?;
 
         // write into memtable
-        // self.memtable.write().await.write(schema, entry).await?;
+        self.memtable.write().await.write(schema, entry).await?;
         Ok(())
     }
 
