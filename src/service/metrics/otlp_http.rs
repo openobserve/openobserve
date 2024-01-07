@@ -144,6 +144,41 @@ pub async fn metrics_json_handler(
         }
     };
 
+    // TODO: delete for debug
+    let mut streams = std::collections::HashSet::new();
+    let mut records_num = 0;
+    for metric in res_metrics.iter() {
+        if let Some(metrics) = metric.get("scopeMetrics") {
+            if let Some(metrics) = metrics.as_array() {
+                for metric in metrics.iter() {
+                    if let Some(metrics) = metric.get("metrics") {
+                        if let Some(metrics) = metrics.as_array() {
+                            for metric in metrics.iter() {
+                                let name = metric.get("name").unwrap().as_str().unwrap();
+                                streams.insert(name);
+                                for key in ["sum", "gauge", "histogram", "summary"].iter() {
+                                    if let Some(data) = metric.get(key) {
+                                        if let Some(data) = data.get("dataPoints") {
+                                            if let Some(data_points) = data.as_array() {
+                                                records_num += data_points.len();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    log::info!(
+        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
+        0,
+        streams.len(),
+        records_num,
+    );
+
     for res_metric in res_metrics.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
         if res_metric.get("resource").is_some() {

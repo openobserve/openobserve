@@ -94,6 +94,41 @@ pub async fn handle_grpc_request(
     let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
 
+    // TODO: delete for debug
+    let mut streams = std::collections::HashSet::new();
+    let mut records_num = 0;
+    for metric in request.resource_metrics.iter() {
+        for metric in metric.scope_metrics.iter() {
+            for metric in metric.metrics.iter() {
+                streams.insert(metric.name.clone());
+                match metric.data {
+                    Some(Data::Gauge(ref gauge)) => {
+                        records_num += gauge.data_points.len();
+                    }
+                    Some(Data::Sum(ref sum)) => {
+                        records_num += sum.data_points.len();
+                    }
+                    Some(Data::Histogram(ref hist)) => {
+                        records_num += hist.data_points.len();
+                    }
+                    Some(Data::ExponentialHistogram(ref exp_hist)) => {
+                        records_num += exp_hist.data_points.len();
+                    }
+                    Some(Data::Summary(ref summary)) => {
+                        records_num += summary.data_points.len();
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
+    log::info!(
+        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
+        0,
+        streams.len(),
+        records_num,
+    );
+
     for resource_metric in &request.resource_metrics {
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
