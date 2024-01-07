@@ -212,8 +212,12 @@ async fn ingest_inner(
         }
     }
 
-    // write to file
-    let mut req_stats = write_file(buf, thread_id, &stream_params).await;
+    // write data to wal
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
+    let mut req_stats = write_file(&writer, stream_name, buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
 
     // only one trigger per request, as it updates etcd
     evaluate_trigger(trigger).await;

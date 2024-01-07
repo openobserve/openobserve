@@ -36,7 +36,7 @@ use crate::{
             functions::StreamTransform,
             prom::*,
             search,
-            stream::{PartitioningDetails, SchemaRecords, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords},
             usage::UsageType,
         },
         utils::{json, time::parse_i64_to_timestamp_micros},
@@ -399,7 +399,9 @@ pub async fn remote_write(
         }
     }
 
+    // write data to wal
     let time = start.elapsed().as_secs_f64();
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -418,12 +420,7 @@ pub async fn remote_write(
         }
 
         // write to file
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-        )
-        .await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         req_stats.response_time += time;
@@ -436,6 +433,9 @@ pub async fn remote_write(
             fns_length as u16,
         )
         .await;
+    }
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd

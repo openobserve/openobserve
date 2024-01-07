@@ -31,7 +31,7 @@ use tokio::{
 use crate::{
     common::{
         infra::errors::{Error, Result},
-        meta::stream::{SchemaRecords, StreamParams},
+        meta::stream::SchemaRecords,
         utils::json,
     },
     service::{ingestion, stream::unwrap_partition_time_level},
@@ -134,15 +134,10 @@ impl DistinctValues {
         let timestamp = chrono::Utc::now().timestamp_micros();
         let schema = schema();
         let schema_key = schema.hash_key();
-        for (org, items) in new_table {
+        for (org_id, items) in new_table {
             if items.is_empty() {
                 continue;
             }
-            let stream_params = StreamParams {
-                org_id: org.into(),
-                stream_name: STREAM_NAME.into(),
-                stream_type: StreamType::Metadata,
-            };
 
             let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
             for (item, count) in items {
@@ -172,7 +167,12 @@ impl DistinctValues {
                 hour_buf.records.push(Arc::new(data));
                 hour_buf.records_size += data_size;
             }
-            _ = ingestion::write_file(buf, 0, &stream_params).await;
+
+            let writer = ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string()).await;
+            _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
+            if let Err(e) = writer.sync().await {
+                log::error!("ingestion error while syncing writer: {}", e);
+            }
         }
         Ok(())
     }

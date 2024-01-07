@@ -32,7 +32,7 @@ use crate::{
                 BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
                 StreamSchemaChk,
             },
-            stream::{PartitioningDetails, StreamParams},
+            stream::PartitioningDetails,
             usage::UsageType,
         },
         utils::{flatten, json, time::parse_timestamp_micro_from_value},
@@ -334,7 +334,9 @@ pub async fn ingest(
         }
     }
 
+    // write data to wal
     let time = start.elapsed().as_secs_f64();
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
     for (stream_name, stream_data) in stream_data_map {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
@@ -343,12 +345,7 @@ pub async fn ingest(
             continue;
         }
         // write to file
-        let mut req_stats = write_file(
-            stream_data.data,
-            thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Logs),
-        )
-        .await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data.data).await;
         req_stats.response_time += time;
         // metric + data usage
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
@@ -361,6 +358,9 @@ pub async fn ingest(
             fns_length as u16,
         )
         .await;
+    }
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd
