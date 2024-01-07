@@ -140,9 +140,8 @@ fn get_udf_vrl(
                 registry.finish_load();
                 let result = apply_vrl_fn(&mut runtime, res.program);
                 if result != json::Value::Null {
-                    if result.is_object() {
+                    if let Some(res_map) = result.as_object() {
                         is_multi_value = true;
-                        let res_map = result.as_object().unwrap();
                         res.fields.sort();
                         for col in res.fields {
                             let field_builder = col_val_map.entry(col.to_string()).or_default();
