@@ -61,16 +61,17 @@ impl Stream {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<Vec<(PathBuf, i64)>> {
+    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
+        let mut schema_size = 0;
         let mut paths = Vec::new();
         let r = self.partitions.read().await;
         for (_, partition) in r.iter() {
-            paths.extend(
-                partition
-                    .persist(thread_id, org_id, stream_type, stream_name)
-                    .await?,
-            );
+            let (part_schema_size, partitions) = partition
+                .persist(thread_id, org_id, stream_type, stream_name)
+                .await?;
+            schema_size += part_schema_size;
+            paths.extend(partitions);
         }
-        Ok(paths)
+        Ok((schema_size, paths))
     }
 }

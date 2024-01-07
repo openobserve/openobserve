@@ -260,18 +260,10 @@ impl RwFile {
     pub async fn write(&self, data: &[u8]) {
         // metrics
         metrics::INGEST_WAL_USED_BYTES
-            .with_label_values(&[
-                &self.org_id,
-                &self.stream_name,
-                self.stream_type.to_string().as_str(),
-            ])
+            .with_label_values(&[&self.org_id, self.stream_type.to_string().as_str()])
             .add(data.len() as i64);
         metrics::INGEST_WAL_WRITE_BYTES
-            .with_label_values(&[
-                &self.org_id,
-                &self.stream_name,
-                self.stream_type.to_string().as_str(),
-            ])
+            .with_label_values(&[&self.org_id, self.stream_type.to_string().as_str()])
             .inc_by(data.len() as u64);
 
         self.file

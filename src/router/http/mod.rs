@@ -56,6 +56,20 @@ pub async fn config(
 }
 
 #[route(
+    "/config/{path:.*}",
+    method = "GET",
+    method = "POST",
+    method = "PUT",
+    method = "DELETE"
+)]
+pub async fn config_paths(
+    req: HttpRequest,
+    payload: web::Payload,
+) -> actix_web::Result<HttpResponse, Error> {
+    dispatch(req, payload).await
+}
+
+#[route(
     "/api/{path:.*}",
     method = "GET",
     method = "POST",
@@ -123,6 +137,7 @@ async fn dispatch(
                 .limit(0),
         )
         .timeout(Duration::from_secs(CONFIG.route.timeout))
+        .disable_redirects()
         .finish();
 
     // send query

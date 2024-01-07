@@ -19,97 +19,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-header :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'">
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
-          <img
-            class="appLogo"
-            :src="
-              store?.state?.theme == 'dark'
-                ? getImageURL('images/common/open_observe_logo_2.svg')
-                : getImageURL('images/common/open_observe_logo.svg')
-            "
-            @click="goToHome"
-          />
-          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
-            >Beta</span
-          >
+          <img class="appLogo" :src="store?.state?.theme == 'dark'
+            ? getImageURL('images/common/open_observe_logo_2.svg')
+            : getImageURL('images/common/open_observe_logo.svg')
+            " @click="goToHome" />
+          <span v-if="config.isCloud == 'true'" class="absolute beta-text">Beta</span>
         </div>
 
         <q-toolbar-title></q-toolbar-title>
-        <div
-          class="headerMenu float-left"
-          v-if="store.state.organizationData.quotaThresholdMsg"
-        >
-          <div
-            type="warning"
-            icon="cloud"
-            class="warning-msg"
-            style="display: inline"
-          >
+        <div class="headerMenu float-left" v-if="store.state.organizationData.quotaThresholdMsg">
+          <div type="warning" icon="cloud" class="warning-msg" style="display: inline">
             <q-icon name="warning" size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
-          <q-btn
-            color="secondary"
-            size="sm"
-            style="display: inline; padding: 5px 10px"
-            rounded
-            borderless
-            dense
-            class="q-ma-xs"
-            @click="router.replace('/billings/plans')"
-            >Upgrade to PRO Plan</q-btn
-          >
+          <q-btn color="secondary" size="sm" style="display: inline; padding: 5px 10px" rounded borderless dense
+            class="q-ma-xs" @click="router.replace('/billings/plans')">Upgrade to PRO Plan</q-btn>
         </div>
         <ThemeSwitcher></ThemeSwitcher>
         <template v-if="config.isCloud !== 'true'">
-          <q-btn
-            class="q-ml-xs no-border"
-            size="13px"
-            no-caps
-            :label="t(`menu.openapi`)"
-            @click="navigateToOpenAPI(zoBackendUrl)"
-          />
+          <q-btn class="q-ml-xs no-border" size="13px" no-caps :label="t(`menu.openapi`)"
+            @click="navigateToOpenAPI(zoBackendUrl)" />
         </template>
-        <q-btn
-          class="q-ml-xs no-border"
-          size="13px"
-          no-caps
-          :label="t(`menu.docs`)"
-          @click="navigateToDocs()"
-        />
+        <q-btn class="q-ml-xs no-border" size="13px" no-caps :label="t(`menu.docs`)" @click="navigateToDocs()" />
         <div class="languageWrapper">
-          <q-btn-dropdown
-            data-test="language-dropdown"
-            unelevated
-            no-caps
-            flat
-            class="languageDdl"
-            :icon="selectedLanguage.icon"
-          >
+          <q-btn-dropdown data-test="language-dropdown" unelevated no-caps flat class="languageDdl"
+            :icon="selectedLanguage.icon">
             <template #label>
               <div class="row no-wrap">
                 {{ selectedLanguage.label }}
               </div>
             </template>
             <q-list class="languagelist">
-              <q-item
-                data-test="language-dropdown-item"
-                v-for="lang in langList"
-                :key="lang.code"
-                v-ripple="true"
-                v-close-popup="true"
-                clickable
-                v-bind="lang"
-                active-class="activeLang"
-                @click="changeLanguage(lang)"
-              >
+              <q-item data-test="language-dropdown-item" v-for="lang in langList" :key="lang.code" v-ripple="true"
+                v-close-popup="true" clickable v-bind="lang" active-class="activeLang" @click="changeLanguage(lang)">
                 <q-item-section avatar>
                   <q-icon :name="lang.icon" class="flagIcon" />
                 </q-item-section>
 
-                <q-item-section
-                  :data-test="`language-dropdown-item-${lang.code}`"
-                >
+                <q-item-section :data-test="`language-dropdown-item-${lang.code}`">
                   <q-item-label>{{ lang.label }}</q-item-label>
                 </q-item-section>
               </q-item>
@@ -118,13 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mx-sm current-organization">
-          <q-select
-            v-model="selectedOrg"
-            borderless
-            :options="orgOptions"
-            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
-            @update:model-value="updateOrganization()"
-          />
+          <q-select v-model="selectedOrg" borderless :options="orgOptions"
+            class="q-px-none q-py-none q-mx-none q-my-none organizationlist" @update:model-value="updateOrganization()" />
         </div>
 
         <div class="q-mr-xs">
@@ -132,20 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md" color="grey" text-color="white">
-                  <img
-                    :src="
-                      user.picture
-                        ? user.picture
-                        : getImageURL('images/common/profile.svg')
-                    "
-                  />
+                  <img :src="user.picture
+                    ? user.picture
+                    : getImageURL('images/common/profile.svg')
+                    " />
                 </q-avatar>
                 <div class="userInfo">
                   <div class="userName">
                     {{
                       user.given_name
-                        ? user.given_name + " " + user.family_name
-                        : user.email
+                      ? user.given_name + " " + user.family_name
+                      : user.email
                     }}
                   </div>
                 </div>
@@ -154,38 +94,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-list>
               <q-item-label header>{{ t("menu.account") }}</q-item-label>
 
-              <q-item
-                v-if="config.isCloud == 'true'"
-                v-ripple="true"
-                v-close-popup="true"
-                clickable
-                :to="{ path: '/settings' }"
-              >
+              <q-item v-if="config.isCloud == 'true'" v-ripple="true" v-close-popup="true" clickable
+                :to="{ path: '/settings' }">
                 <q-item-section avatar>
-                  <q-avatar
-                    size="md"
-                    icon="settings"
-                    color="red"
-                    text-color="white"
-                  />
+                  <q-avatar size="md" icon="settings" color="red" text-color="white" />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>{{ t("menu.settings") }}</q-item-label>
                 </q-item-section>
               </q-item>
-              <q-item
-                v-ripple="true"
-                v-close-popup="true"
-                clickable
-                @click="signout"
-              >
+              <q-item v-ripple="true" v-close-popup="true" clickable @click="signout">
                 <q-item-section avatar>
-                  <q-avatar
-                    size="md"
-                    icon="exit_to_app"
-                    color="red"
-                    text-color="white"
-                  />
+                  <q-avatar size="md" icon="exit_to_app" color="red" text-color="white" />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -197,26 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-toolbar>
     </q-header>
 
-    <q-drawer
-      :mini="miniMode"
-      bordered
-      show-if-above
-      @mouseover="miniMode = false"
-      @mouseout="miniMode = true"
-      mini-to-overlay
-    >
+    <q-drawer :mini="miniMode" bordered show-if-above @mouseover="miniMode = false" @mouseout="miniMode = true"
+      mini-to-overlay>
       <q-list class="leftNavList">
-        <menu-link
-          v-for="nav in linksList"
-          :key="nav.title"
-          v-bind="{ ...nav, mini: miniMode }"
-        />
+        <menu-link v-for="nav in linksList" :key="nav.title" v-bind="{ ...nav, mini: miniMode }" />
       </q-list>
     </q-drawer>
-    <q-page-container
-      :key="store.state.selectedOrganization?.identifier"
-      v-if="isLoading"
-    >
+    <q-page-container :key="store.state.selectedOrganization?.identifier" v-if="isLoading">
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive>
@@ -259,6 +166,7 @@ import {
   useLocalUserInfo,
   useLocalToken,
   getImageURL,
+  invlidateLoginData,
 } from "../utils/zincutils";
 
 import {
@@ -282,6 +190,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
 import streamService from "@/services/stream";
+import billings from "@/services/billings";
 import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import {
@@ -341,6 +250,9 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
+      if (config.isEnterprise == "true") {
+        invlidateLoginData();
+      }
       this.store.dispatch("logout");
       useLocalToken("", true);
       useLocalCurrentUser("", true);
@@ -533,7 +445,7 @@ export default defineComponent({
       if (
         mainLayoutMixin.setup().customOrganization != undefined &&
         mainLayoutMixin.setup().customOrganization !=
-          store.state.selectedOrganization?.identifier
+        store.state.selectedOrganization?.identifier
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
@@ -569,10 +481,36 @@ export default defineComponent({
       useLocalOrganization(selectedOrg.value);
       // store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
 
+      if (
+        config.isCloud &&
+        selectedOrg.value.subscription_type == config.freePlan
+      ) {
+        await billings
+          .list_subscription(selectedOrg.value.identifier)
+          .then(async (res: any) => {
+            if (res.data.data.length == 0) {
+              router.push({ name: "plans" });
+            } else if (
+              res.data.data.CustomerBillingObj.customer_id == null ||
+              res.data.data.CustomerBillingObj.customer_id == ""
+            ) {
+              router.push({ name: "plans" });
+            } else {
+              await verifyStreamExist(selectedOrg.value);
+            }
+          });
+      } else {
+        await verifyStreamExist(selectedOrg.value);
+      }
+    };
+
+    const verifyStreamExist = async (selectedOrgData: any) => {
       await streamService
-        .nameList(selectedOrg.value?.identifier, "", false)
+        .nameList(selectedOrgData?.identifier, "", false)
         .then((response) => {
-          store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+          store.dispatch("setSelectedOrganization", {
+            ...selectedOrgData,
+          });
           if (response.data.list.length == 0) {
             $q.notify({
               type: "warning",
@@ -698,7 +636,7 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           scrape_interval: orgSettings?.data?.data?.scrape_interval ?? 15,
         });
-      } catch (error) {}
+      } catch (error) { }
       return;
     };
 
@@ -990,7 +928,7 @@ export default defineComponent({
 
   &.q-btn {
     .q-icon {
-      & + .row {
+      &+.row {
         margin-left: 0.875rem;
         margin-right: 0.5rem;
       }

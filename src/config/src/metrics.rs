@@ -133,7 +133,7 @@ pub static INGEST_WAL_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -145,7 +145,7 @@ pub static INGEST_WAL_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -157,7 +157,7 @@ pub static INGEST_WAL_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -166,6 +166,18 @@ pub static INGEST_MEMTABLE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new(
             "ingest_memtable_bytes",
             "Ingestor in memory bytes.".to_owned(),
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static INGEST_MEMTABLE_ARROW_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_memtable_arrow_bytes",
+            "Ingestor arrow format in memory bytes.".to_owned(),
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -207,7 +219,7 @@ pub static QUERY_MEMORY_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -219,7 +231,7 @@ pub static QUERY_MEMORY_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -245,7 +257,7 @@ pub static QUERY_DISK_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -257,7 +269,7 @@ pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -271,7 +283,7 @@ pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -283,7 +295,7 @@ pub static COMPACT_MERGED_FILES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -295,7 +307,7 @@ pub static COMPACT_MERGED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -367,7 +379,7 @@ pub static STORAGE_WRITE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -379,7 +391,7 @@ pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -391,7 +403,7 @@ pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -403,7 +415,7 @@ pub static STORAGE_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type"],
+        &["organization", "stream_type"],
     )
     .expect("Metric created")
 });
@@ -415,7 +427,7 @@ pub static STORAGE_TIME: Lazy<CounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream", "stream_type", "method_type"],
+        &["organization", "stream_type", "method_type"],
     )
     .expect("Metric created")
 });
@@ -563,6 +575,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_MEMTABLE_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_MEMTABLE_ARROW_BYTES.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_MEMTABLE_FILES.clone()))

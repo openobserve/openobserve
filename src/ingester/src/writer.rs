@@ -143,6 +143,8 @@ impl Writer {
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
         if self.check_threshold(wal.size(), entry_bytes.len()).await {
+            // sync wal before rotation
+            wal.sync().context(WalSnafu)?;
             // rotation wal
             let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
             let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir)
@@ -186,11 +188,16 @@ impl Writer {
         }
 
         // write into wal
-        wal.write(&entry_bytes).context(WalSnafu)?;
+        wal.write(&entry_bytes, false).context(WalSnafu)?;
 
         // write into memtable
         self.memtable.write().await.write(schema, entry).await?;
         Ok(())
+    }
+
+    pub async fn sync(&self) -> Result<()> {
+        let wal = self.wal.lock().await;
+        wal.sync().context(WalSnafu)
     }
 
     pub async fn read(

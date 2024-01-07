@@ -446,7 +446,7 @@ export const convertSQLData = (
 
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
-          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+          new Set(getAxisDataFromKey(xAxisKeys[0]))
         );
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
 
@@ -1013,9 +1013,9 @@ export const convertSQLData = (
               type: "text",
               style: {
                 text:
-                  parseFloat(unitValue.value).toFixed(
-                    panelSchema.config.decimals ?? 2
-                  ) + unitValue.unit,
+                  (parseFloat(unitValue?.value)?.toFixed(
+                    panelSchema?.config?.decimals ?? 2
+                  ) ?? 0) + unitValue?.unit,
                 fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
                 fontWeight: 500,
                 align: "center",

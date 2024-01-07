@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
+      data-test="dashboard-config-show-legend"
     />
 
     <div class="space"></div>
@@ -37,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filled
         autogrow
         class="showLabelOnTop"
+        data-test="dashboard-config-description"
       />
     </div>
 
@@ -60,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :display-value="`${
         dashboardPanelData.data.config.legends_position ?? 'Auto'
       }`"
+      data-test="dashboard-config-legend-position"
     >
     </q-select>
 
@@ -82,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )?.label
           : 'Default'
       }`"
+      data-test="dashboard-config-unit"
     >
     </q-select>
     <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
@@ -96,6 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       dense
       label-slot
+      data-test="dashboard-config-custom-unit"
     />
 
     <q-input
@@ -120,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       dense
       label-slot
+      data-test="dashboard-config-decimals"
     />
 
     <div class="space"></div>
@@ -135,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stack-label
       emit-value
       :display-value="'OpenStreetMap'"
+      data-test="dashboard-config-basemap"
     >
     </q-select>
 
@@ -154,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           label-slot
           :type="'number'"
+          data-test="dashboard-config-lattitude"
         >
         </q-input>
         <q-input
@@ -168,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           label-slot
           :type="'number'"
+          data-test="dashboard-config-longitude"
         >
         </q-input>
       </div>
@@ -183,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         label-slot
         :type="'number'"
+        data-test="dashboard-config-zoom"
       >
       </q-input>
     </div>
@@ -203,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         inline-label
         outside-arrows
         mobile-arrows
+        data-test="dashboard-config-query-tab"
       >
         <q-tab
           no-caps
@@ -210,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           :name="index"
           :label="'Query ' + (index + 1)"
+          :data-test="`dashboard-config-query-tab-${index}`"
         >
         </q-tab>
       </q-tabs>
@@ -250,12 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label-slot
       placeholder="0"
       :type="'number'"
+      data-test="dashboard-config-limit"
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
           Query Limit
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px" name="info" data-test="dashboard-config-limit-info"/>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -284,12 +297,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       dense
       label-slot
+      data-test="dashboard-config-promql-legend"
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">
           {{ t("dashboard.legendLabel") }}
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" />
+            <q-icon class="q-ml-xs" size="20px" name="info" data-test="dashboard-config-promql-legend-info"/>
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -323,6 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.layout.currentQueryIndex
         ].config.layer_type
       }`"
+      data-test="dashboard-config-layer-type"
     >
     </q-select>
 
@@ -345,6 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       label-slot
       :type="'number'"
+      data-test="dashboard-config-weight"
     >
     </q-input>
 
@@ -372,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       label-slot
       :type="'number'"
+      data-test="dashboard-config-gauge-min"
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">Gauge Min Value</div>
@@ -402,6 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label-slot
       placeholder="100"
       :type="'number'"
+      data-test="dashboard-config-gauge-max"
     >
       <template v-slot:label>
         <div class="row items-center all-pointer-events">Gauge Max Value</div>

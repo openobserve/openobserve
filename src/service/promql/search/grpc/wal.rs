@@ -219,8 +219,7 @@ async fn get_file_list(
             start_time: time_range.0,
             end_time: time_range.1,
         };
-        let grpc_span =
-            info_span!("promql:search:grpc:wal:grpc_wal_file", session_id = ?session_id);
+        let grpc_span = info_span!("promql:search:grpc:wal:grpc_wal_file", session_id);
         let task: tokio::task::JoinHandle<
             std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
         > = tokio::task::spawn(
