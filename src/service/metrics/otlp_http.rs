@@ -173,7 +173,7 @@ pub async fn metrics_json_handler(
         }
     }
     log::info!(
-        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
+        "/prometheus/otlp/http/v1/write: metadatas: {}, streams: {}, samples: {}",
         0,
         streams.len(),
         records_num,

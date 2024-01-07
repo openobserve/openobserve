@@ -123,7 +123,7 @@ pub async fn handle_grpc_request(
         }
     }
     log::info!(
-        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
+        "/prometheus/otlp/grpc/v1/write: metadatas: {}, streams: {}, samples: {}",
         0,
         streams.len(),
         records_num,
