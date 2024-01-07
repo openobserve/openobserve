@@ -20,7 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{json::ReaderBuilder, record_batch::RecordBatch};
+use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use config::{
     ider,
@@ -164,12 +164,8 @@ impl PartitionFile {
             metrics::INGEST_MEMTABLE_ARROW_BYTES
                 .with_label_values(&[])
                 .add(arrow_size as i64);
-            // TODO: here we droped the RecordBatch
-            self.data.push(RecordBatchEntry::new(
-                RecordBatch::new_empty(Arc::new(Schema::empty())),
-                entry.data_size,
-                arrow_size,
-            ));
+            self.data
+                .push(RecordBatchEntry::new(batch, entry.data_size, arrow_size));
         }
         metrics::INGEST_MEMTABLE_BYTES
             .with_label_values(&[])
