@@ -277,7 +277,7 @@ pub async fn handle_trace_request(
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {
                     if let Some(val) = record_val.get(field) {
-                        if !val.is_null() {
+                        if let Some(val) = val.as_str() {
                             let (filter_name, filter_value) = if field == "operation_name" {
                                 ("service_name".to_string(), service_name.clone())
                             } else {
@@ -287,7 +287,7 @@ pub async fn handle_trace_request(
                                 stream_type: StreamType::Traces,
                                 stream_name: traces_stream_name.to_string(),
                                 field_name: field.to_string(),
-                                field_value: val.as_str().unwrap().to_string(),
+                                field_value: val.to_string(),
                                 filter_name,
                                 filter_value,
                             });
