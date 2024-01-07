@@ -131,10 +131,10 @@ impl Partition {
 
             // update metrics
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .with_label_values(&[&org_id, stream_type])
                 .add(buf_parquet.len() as i64);
             metrics::INGEST_WAL_WRITE_BYTES
-                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .with_label_values(&[&org_id, stream_type])
                 .inc_by(buf_parquet.len() as u64);
 
             paths.push((path, file_meta.original_size, arrow_size));

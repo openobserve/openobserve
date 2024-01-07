@@ -91,9 +91,9 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
             Err(_) => 0,
         };
     }
-    for ((org_id, stream_name, stream_type), size) in sizes {
+    for ((org_id, _stream_name, stream_type), size) in sizes {
         metrics::INGEST_WAL_USED_BYTES
-            .with_label_values(&[&org_id, &stream_name, &stream_type])
+            .with_label_values(&[&org_id, &stream_type])
             .set(size as i64);
     }
     Ok(())
