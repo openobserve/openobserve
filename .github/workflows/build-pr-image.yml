@@ -2,11 +2,6 @@
 name: Build PR Docker Image
 
 on:
-  push:
-    branches:
-      - "main"
-    paths-ignore:
-      - "**.md"
   pull_request:
     branches:
       - "*"
@@ -21,8 +16,8 @@ jobs:
       permissions:
         id-token: write
         contents: read
-      runs-on: ubicloud-standard-16
-      # runs-on: ubuntu-latest
+      # runs-on: ubicloud-standard-16
+      runs-on: ubuntu-latest
       steps:
         - name: Remove unused tools
           run: |
@@ -93,5 +88,5 @@ jobs:
             tags: |
               public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
             push: true
-            cache-from: type=local,src=/tmp/.buildx-cache
-            cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+            cache-from: type=gha
+            cache-to: type=gha,mode=max
