@@ -416,7 +416,7 @@ pub async fn handle_grpc_request(
         .await;
 
         let ep = if is_grpc {
-            "grpc/export/metrics"
+            "/grpc/export/metrics"
         } else {
             "/api/org/v1/metrics"
         };

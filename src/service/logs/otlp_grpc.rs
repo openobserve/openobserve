@@ -464,7 +464,7 @@ pub async fn handle_grpc_request(
     }
 
     let ep = if is_grpc {
-        "grpc/export/logs"
+        "/grpc/export/logs"
     } else {
         "/api/org/v1/logs"
     };

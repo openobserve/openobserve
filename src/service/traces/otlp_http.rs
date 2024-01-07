@@ -444,7 +444,7 @@ pub async fn traces_json(
 
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "http-json/api/org/traces",
+            "/api/org/v1/traces",
             "200",
             org_id,
             traces_stream_name,
@@ -453,7 +453,7 @@ pub async fn traces_json(
         .observe(time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "http-json/api/org/traces",
+            "/api/org/v1/traces",
             "200",
             org_id,
             traces_stream_name,

@@ -383,9 +383,9 @@ pub async fn handle_trace_request(
     }
 
     let ep = if is_grpc {
-        "grpc/export/traces"
+        "/grpc/export/traces"
     } else {
-        "http-proto/api/org/traces/"
+        "/api/org/v1/traces"
     };
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
