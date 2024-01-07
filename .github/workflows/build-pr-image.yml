@@ -16,8 +16,7 @@ jobs:
       permissions:
         id-token: write
         contents: read
-      # runs-on: ubicloud-standard-16
-      runs-on: ubuntu-latest
+      runs-on: ubicloud-standard-8
       steps:
         - name: Remove unused tools
           run: |
