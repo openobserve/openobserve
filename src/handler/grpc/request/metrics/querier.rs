@@ -125,7 +125,7 @@ impl Metrics for Querier {
             let mut body = Vec::new();
             let mut writer = StreamWriter::try_new(&mut body, &schema).unwrap();
             for batch in batches {
-                size += batch.data_size;
+                size += batch.data_json_size;
                 writer.write(&batch.data).unwrap();
             }
             writer.finish().unwrap();

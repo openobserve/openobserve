@@ -298,7 +298,7 @@ pub async fn merge_by_stream(
     // metrics
     let time = start.elapsed().as_secs_f64();
     metrics::COMPACT_USED_TIME
-        .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+        .with_label_values(&[org_id, stream_type.to_string().as_str()])
         .inc_by(time);
     metrics::COMPACT_DELAY_HOURS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
@@ -333,10 +333,10 @@ async fn merge_files(
         log::info!("[COMPACT] merge small file: {}", &file.key);
         // metrics
         metrics::COMPACT_MERGED_FILES
-            .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+            .with_label_values(&[org_id, stream_type.to_string().as_str()])
             .inc();
         metrics::COMPACT_MERGED_BYTES
-            .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
+            .with_label_values(&[org_id, stream_type.to_string().as_str()])
             .inc_by(file.meta.original_size as u64);
     }
     // no files need to merge

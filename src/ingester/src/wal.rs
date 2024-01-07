@@ -144,7 +144,16 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let Some(entry) = entry else {
                 break;
             };
-            let entry = super::Entry::from_bytes(&entry)?;
+            let entry = match super::Entry::from_bytes(&entry) {
+                Ok(v) => v,
+                Err(Error::ReadDataError { source }) => {
+                    log::error!("Unable to read entry from: {}, skip the entry", source);
+                    continue;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            };
             i += 1;
             total += entry.data.len();
             let schema = infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)

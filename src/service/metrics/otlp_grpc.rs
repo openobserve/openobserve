@@ -35,7 +35,7 @@ use crate::{
             alerts::{self, Alert},
             http::HttpResponse as MetaHttpResponse,
             prom::*,
-            stream::{PartitioningDetails, SchemaRecords, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords},
             usage::UsageType,
         },
         utils::{flatten, json},
@@ -93,6 +93,41 @@ pub async fn handle_grpc_request(
     let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
     let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
     let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
+
+    // TODO: delete for debug
+    let mut streams = std::collections::HashSet::new();
+    let mut records_num = 0;
+    for metric in request.resource_metrics.iter() {
+        for metric in metric.scope_metrics.iter() {
+            for metric in metric.metrics.iter() {
+                streams.insert(metric.name.clone());
+                match metric.data {
+                    Some(Data::Gauge(ref gauge)) => {
+                        records_num += gauge.data_points.len();
+                    }
+                    Some(Data::Sum(ref sum)) => {
+                        records_num += sum.data_points.len();
+                    }
+                    Some(Data::Histogram(ref hist)) => {
+                        records_num += hist.data_points.len();
+                    }
+                    Some(Data::ExponentialHistogram(ref exp_hist)) => {
+                        records_num += exp_hist.data_points.len();
+                    }
+                    Some(Data::Summary(ref summary)) => {
+                        records_num += summary.data_points.len();
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
+    log::info!(
+        "/prometheus/otlp/grpc/v1/write: metadatas: {}, streams: {}, samples: {}",
+        0,
+        streams.len(),
+        records_num,
+    );
 
     for resource_metric in &request.resource_metrics {
         for scope_metric in &resource_metric.scope_metrics {
@@ -346,7 +381,9 @@ pub async fn handle_grpc_request(
         }
     }
 
+    // write data to wal
     let time = start.elapsed().as_secs_f64();
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -365,12 +402,7 @@ pub async fn handle_grpc_request(
         }
 
         // write to file
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-        )
-        .await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         req_stats.response_time += time;
         report_request_usage_stats(
@@ -384,7 +416,7 @@ pub async fn handle_grpc_request(
         .await;
 
         let ep = if is_grpc {
-            "grpc/export/metrics"
+            "/grpc/export/metrics"
         } else {
             "/api/org/v1/metrics"
         };
@@ -408,6 +440,9 @@ pub async fn handle_grpc_request(
                 StreamType::Metrics.to_string().as_str(),
             ])
             .inc();
+    }
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd

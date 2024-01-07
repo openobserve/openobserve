@@ -36,7 +36,7 @@ use crate::{
             functions::StreamTransform,
             prom::*,
             search,
-            stream::{PartitioningDetails, SchemaRecords, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords},
             usage::UsageType,
         },
         utils::{json, time::parse_i64_to_timestamp_micros},
@@ -97,6 +97,7 @@ pub async fn remote_write(
         .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
 
     // parse metadata
+    let req_metadata_len = request.metadata.len();
     for item in request.metadata {
         let metric_name = format_stream_name(&item.metric_family_name.clone());
         let metadata = Metadata {
@@ -115,8 +116,47 @@ pub async fn remote_write(
             .unwrap();
     }
 
+    // TODO: delete for debug
+    let mut streams = std::collections::HashSet::new();
+    for series in request.timeseries.iter() {
+        let metric_name = match series.labels.iter().find(|label| label.name == NAME_LABEL) {
+            Some(v) => v.value.clone(),
+            None => continue,
+        };
+        streams.insert(metric_name);
+    }
+    log::info!(
+        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
+        req_metadata_len,
+        streams.len(),
+        request
+            .timeseries
+            .iter()
+            .map(|ts| ts.samples.len())
+            .sum::<usize>(),
+    );
+
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
+        let time = start.elapsed().as_secs_f64();
+        metrics::HTTP_RESPONSE_TIME
+            .with_label_values(&[
+                "/prometheus/api/v1/write",
+                "200",
+                org_id,
+                "",
+                &StreamType::Metrics.to_string(),
+            ])
+            .observe(time);
+        metrics::HTTP_INCOMING_REQUESTS
+            .with_label_values(&[
+                "/prometheus/api/v1/write",
+                "200",
+                org_id,
+                "",
+                &StreamType::Metrics.to_string(),
+            ])
+            .inc();
         return Ok(());
     }
 
@@ -206,6 +246,25 @@ pub async fn remote_write(
             }
             if !accept_record {
                 // do not accept any entries for request
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/prometheus/api/v1/write",
+                        "200",
+                        org_id,
+                        "",
+                        &StreamType::Metrics.to_string(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/prometheus/api/v1/write",
+                        "200",
+                        org_id,
+                        "",
+                        &StreamType::Metrics.to_string(),
+                    ])
+                    .inc();
                 return Ok(());
             }
 
@@ -260,7 +319,6 @@ pub async fn remote_write(
             let mut value: json::Value = json::to_value(&metric).unwrap();
 
             // Start row based transform
-
             value = crate::service::ingestion::apply_stream_transform(
                 &local_trans,
                 value,
@@ -341,7 +399,9 @@ pub async fn remote_write(
         }
     }
 
+    // write data to wal
     let time = start.elapsed().as_secs_f64();
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -360,12 +420,7 @@ pub async fn remote_write(
         }
 
         // write to file
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-        )
-        .await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         req_stats.response_time += time;
@@ -378,6 +433,9 @@ pub async fn remote_write(
             fns_length as u16,
         )
         .await;
+    }
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd
