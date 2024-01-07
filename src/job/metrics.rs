@@ -84,14 +84,13 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         let _ = columns[0].to_string();
         let org_id = columns[1].to_string();
         let stream_type = columns[2].to_string();
-        let stream_name = columns[3].to_string();
-        let entry = sizes.entry((org_id, stream_name, stream_type)).or_insert(0);
+        let entry = sizes.entry((org_id, stream_type)).or_insert(0);
         *entry += match std::fs::metadata(local_file) {
             Ok(metadata) => metadata.len(),
             Err(_) => 0,
         };
     }
-    for ((org_id, _stream_name, stream_type), size) in sizes {
+    for ((org_id, stream_type), size) in sizes {
         metrics::INGEST_WAL_USED_BYTES
             .with_label_values(&[&org_id, &stream_type])
             .set(size as i64);
