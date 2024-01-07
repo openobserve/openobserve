@@ -165,8 +165,8 @@ pub async fn handle_trace_request(
         for res_attr in resource.attributes {
             if res_attr.key.eq(SERVICE_NAME) {
                 let loc_service_name = get_val(&res_attr.value.as_ref());
-                if !loc_service_name.eq(&json::Value::Null) {
-                    service_name = loc_service_name.as_str().unwrap().to_string();
+                if let Some(name) = loc_service_name.as_str() {
+                    service_name = name.to_string();
                     service_att_map.insert(res_attr.key, loc_service_name);
                 }
             } else {
@@ -182,14 +182,12 @@ pub async fn handle_trace_request(
             for span in spans {
                 let span_id: String = SpanId::from_bytes(
                     span.span_id
-                        .as_slice()
                         .try_into()
                         .expect("slice with incorrect length"),
                 )
                 .to_string();
                 let trace_id: String = TraceId::from_bytes(
                     span.trace_id
-                        .as_slice()
                         .try_into()
                         .expect("slice with incorrect length"),
                 )
@@ -201,7 +199,6 @@ pub async fn handle_trace_request(
                         PARENT_SPAN_ID.to_string(),
                         SpanId::from_bytes(
                             span.parent_span_id
-                                .as_slice()
                                 .try_into()
                                 .expect("slice with incorrect length"),
                         )
@@ -280,7 +277,7 @@ pub async fn handle_trace_request(
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {
                     if let Some(val) = record_val.get(field) {
-                        if !val.is_null() {
+                        if let Some(val) = val.as_str() {
                             let (filter_name, filter_value) = if field == "operation_name" {
                                 ("service_name".to_string(), service_name.clone())
                             } else {
@@ -290,7 +287,7 @@ pub async fn handle_trace_request(
                                 stream_type: StreamType::Traces,
                                 stream_name: traces_stream_name.to_string(),
                                 field_name: field.to_string(),
-                                field_value: val.as_str().unwrap().to_string(),
+                                field_value: val.to_string(),
                                 filter_name,
                                 filter_value,
                             });
