@@ -22,7 +22,13 @@ use std::{
 
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
-use config::{ider, meta::stream::FileMeta, metrics, utils::parquet::new_parquet_writer, CONFIG};
+use config::{
+    ider,
+    meta::stream::FileMeta,
+    metrics,
+    utils::{parquet::new_parquet_writer, record_batch_ext::RecordBatchExt, schema_ext::SchemaExt},
+    CONFIG,
+};
 use snafu::ResultExt;
 
 use crate::{
@@ -38,6 +44,9 @@ pub(crate) struct Partition {
 
 impl Partition {
     pub(crate) fn new(schema: Arc<Schema>) -> Self {
+        metrics::INGEST_MEMTABLE_ARROW_BYTES
+            .with_label_values(&[])
+            .add(schema.size() as i64);
         Self {
             schema,
             files: RwMap::default(),
@@ -71,7 +80,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<Vec<(PathBuf, i64)>> {
+    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
@@ -91,7 +100,7 @@ impl Partition {
 
             let mut file_meta = FileMeta::default();
             data.data.iter().for_each(|r| {
-                file_meta.original_size += r.data_size as i64;
+                file_meta.original_size += r.data_json_size as i64;
                 file_meta.records += r.data.num_rows() as i64;
                 if file_meta.min_ts == 0 || file_meta.min_ts > r.min_ts {
                     file_meta.min_ts = r.min_ts;
@@ -100,10 +109,12 @@ impl Partition {
                     file_meta.max_ts = r.max_ts;
                 }
             });
+            let mut arrow_size = 0;
             // write into parquet buf
             let mut buf_parquet = Vec::new();
             let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
             for batch in data.data.iter() {
+                arrow_size += batch.data_arrow_size;
                 writer
                     .write(&batch.data)
                     .context(WriteParquetRecordBatchSnafu)?;
@@ -120,15 +131,15 @@ impl Partition {
 
             // update metrics
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .with_label_values(&[&org_id, stream_type])
                 .add(buf_parquet.len() as i64);
             metrics::INGEST_WAL_WRITE_BYTES
-                .with_label_values(&[&org_id, &stream_name, stream_type])
+                .with_label_values(&[&org_id, stream_type])
                 .inc_by(buf_parquet.len() as u64);
 
-            paths.push((path, file_meta.original_size));
+            paths.push((path, file_meta.original_size, arrow_size));
         }
-        Ok(paths)
+        Ok((self.schema.size(), paths))
     }
 }
 
@@ -149,8 +160,12 @@ impl PartitionFile {
         let _ = decoder.serialize(&entry.data);
         let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
         if let Some(batch) = batch {
+            let arrow_size = batch.size();
+            metrics::INGEST_MEMTABLE_ARROW_BYTES
+                .with_label_values(&[])
+                .add(arrow_size as i64);
             self.data
-                .push(RecordBatchEntry::new(batch, entry.data_size));
+                .push(RecordBatchEntry::new(batch, entry.data_size, arrow_size));
         }
         metrics::INGEST_MEMTABLE_BYTES
             .with_label_values(&[])

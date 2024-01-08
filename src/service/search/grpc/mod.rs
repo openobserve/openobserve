@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod errors;
+
 use std::sync::Arc;
 
-use ::datafusion::{
-    arrow::{ipc, record_batch::RecordBatch},
-    common::SchemaError,
-    error::DataFusionError,
-};
+use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
 use config::{
     meta::stream::{FileKey, StreamType},
@@ -73,7 +71,13 @@ pub async fn search(
     // search in WAL parquet
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
-    let wal_parquet_span = info_span!("service:search:grpc:in_wal_parquet", session_id = ?session_id1, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let wal_parquet_span = info_span!(
+        "service:search:grpc:in_wal_parquet",
+        session_id = session_id1.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -88,7 +92,13 @@ pub async fn search(
     // search in WAL memory
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
-    let wal_mem_span = info_span!("service:search:grpc:in_wal_memory", session_id = ?session_id2, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let wal_mem_span = info_span!(
+        "service:search:grpc:in_wal_memory",
+        session_id = session_id2.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
     let task2 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -105,7 +115,13 @@ pub async fn search(
     let session_id3 = session_id.clone();
     let sql3 = sql.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-    let storage_span = info_span!("service:search:grpc:in_storage", session_id = ?session_id3, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+    let storage_span = info_span!(
+        "service:search:grpc:in_storage",
+        session_id = session_id3.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
     let task3 = tokio::task::spawn(
         async move {
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
@@ -155,7 +171,7 @@ pub async fn search(
                 Ok(res) => res,
                 Err(err) => {
                     log::error!("[session_id {session_id}] datafusion merge error: {}", err);
-                    return Err(handle_datafusion_error(err));
+                    return Err(err.into());
                 }
             };
         merge_results.insert(name.to_string(), batches);
@@ -224,60 +240,6 @@ pub async fn search(
     };
 
     Ok(result)
-}
-
-pub fn handle_datafusion_error(err: DataFusionError) -> Error {
-    if let DataFusionError::SchemaError(SchemaError::FieldNotFound {
-        field,
-        valid_fields: _,
-    }) = err
-    {
-        return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field.name));
-    }
-
-    let err = err.to_string();
-    if err.contains("Schema error: No field named") {
-        let pos = err.find("Schema error: No field named").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
-    }
-    if err.contains("parquet not found") {
-        return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
-    }
-    if err.contains("Invalid function ") {
-        let pos = err.find("Invalid function ").unwrap();
-        return match get_key_from_error(&err, pos) {
-            Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
-            None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-        };
-    }
-    if err.contains("Incompatible data types") {
-        let pos = err.find("for field").unwrap();
-        let pos_start = err[pos..].find(' ').unwrap();
-        let pos_end = err[pos + pos_start + 1..].find('.').unwrap();
-        let field = err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string();
-        return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
-    }
-    Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
-}
-
-fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for punctuation in ['\'', '"'] {
-        let pos_start = err[pos..].find(punctuation);
-        if pos_start.is_none() {
-            continue;
-        }
-        let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(punctuation);
-        if pos_end.is_none() {
-            continue;
-        }
-        let pos_end = pos_end.unwrap();
-        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
-    }
-    None
 }
 
 fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Result<(), Error> {

@@ -60,16 +60,17 @@ impl MemTable {
         thread_id: usize,
         org_id: &str,
         stream_type: &str,
-    ) -> Result<Vec<(PathBuf, i64)>> {
+    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
+        let mut schema_size = 0;
         let mut paths = Vec::new();
         let r = self.streams.read().await;
         for (stream_name, stream) in r.iter() {
-            paths.extend(
-                stream
-                    .persist(thread_id, org_id, stream_type, stream_name)
-                    .await?,
-            );
+            let (part_schema_size, partitions) = stream
+                .persist(thread_id, org_id, stream_type, stream_name)
+                .await?;
+            schema_size += part_schema_size;
+            paths.extend(partitions);
         }
-        Ok(paths)
+        Ok((schema_size, paths))
     }
 }

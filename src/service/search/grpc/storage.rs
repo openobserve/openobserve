@@ -49,7 +49,7 @@ use crate::{
 };
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
     session_id: &str,
     sql: Arc<Sql>,
@@ -206,7 +206,13 @@ pub async fn search(
                 }
             }
         }
-        let datafusion_span = info_span!("service:search:grpc:storage:datafusion", session_id, org_id = sql.org_id,stream_name = sql.stream_name, stream_type = ?stream_type);
+        let datafusion_span = info_span!(
+            "service:search:grpc:storage:datafusion",
+            session_id,
+            org_id = sql.org_id,
+            stream_name = sql.stream_name,
+            stream_type = stream_type.to_string(),
+        );
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
@@ -249,7 +255,7 @@ pub async fn search(
                     "[session_id {session_id}] datafusion execute error: {}",
                     err
                 );
-                return Err(super::handle_datafusion_error(err));
+                return Err(err.into());
             }
         };
     }
@@ -257,7 +263,7 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(session_id = ?session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
     session_id: &str,
     sql: &Sql,
@@ -298,7 +304,7 @@ async fn get_file_list(
 #[tracing::instrument(
     name = "service:search:grpc:storage:cache_parquet_files",
     skip_all,
-    fields(session_id = ?session_id)
+    fields(session_id)
 )]
 async fn cache_parquet_files(
     session_id: &str,

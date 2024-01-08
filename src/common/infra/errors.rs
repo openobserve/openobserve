@@ -31,12 +31,8 @@ pub enum Error {
     SledError(#[from] sled::Error),
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
-    #[error("SimdJsonError# {0}")]
-    SimdJsonError(#[from] simd_json::Error),
     #[error("ArrowError# {0}")]
     ArrowError(#[from] datafusion::arrow::error::ArrowError),
-    #[error("DataFusionError# {0}")]
-    DataFusionError(#[from] datafusion::error::DataFusionError),
     #[error("WatchError# watcher is exists {0}")]
     WatcherExists(String),
     #[error("StringUTF8Error# {0}")]

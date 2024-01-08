@@ -38,7 +38,7 @@ use crate::{
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, SchemaRecords, StreamParams},
+            stream::{PartitionTimeLevel, SchemaRecords},
             traces::{Event, Span, SpanRefType},
             usage::UsageType,
         },
@@ -165,8 +165,8 @@ pub async fn handle_trace_request(
         for res_attr in resource.attributes {
             if res_attr.key.eq(SERVICE_NAME) {
                 let loc_service_name = get_val(&res_attr.value.as_ref());
-                if !loc_service_name.eq(&json::Value::Null) {
-                    service_name = loc_service_name.as_str().unwrap().to_string();
+                if let Some(name) = loc_service_name.as_str() {
+                    service_name = name.to_string();
                     service_att_map.insert(res_attr.key, loc_service_name);
                 }
             } else {
@@ -182,14 +182,12 @@ pub async fn handle_trace_request(
             for span in spans {
                 let span_id: String = SpanId::from_bytes(
                     span.span_id
-                        .as_slice()
                         .try_into()
                         .expect("slice with incorrect length"),
                 )
                 .to_string();
                 let trace_id: String = TraceId::from_bytes(
                     span.trace_id
-                        .as_slice()
                         .try_into()
                         .expect("slice with incorrect length"),
                 )
@@ -201,7 +199,6 @@ pub async fn handle_trace_request(
                         PARENT_SPAN_ID.to_string(),
                         SpanId::from_bytes(
                             span.parent_span_id
-                                .as_slice()
                                 .try_into()
                                 .expect("slice with incorrect length"),
                         )
@@ -280,7 +277,7 @@ pub async fn handle_trace_request(
                 // get distinct_value item
                 for field in DISTINCT_FIELDS.iter() {
                     if let Some(val) = record_val.get(field) {
-                        if !val.is_null() {
+                        if let Some(val) = val.as_str() {
                             let (filter_name, filter_value) = if field == "operation_name" {
                                 ("service_name".to_string(), service_name.clone())
                             } else {
@@ -290,7 +287,7 @@ pub async fn handle_trace_request(
                                 stream_type: StreamType::Traces,
                                 stream_name: traces_stream_name.to_string(),
                                 field_name: field.to_string(),
-                                field_value: val.as_str().unwrap().to_string(),
+                                field_value: val.to_string(),
                                 filter_name,
                                 filter_value,
                             });
@@ -365,13 +362,13 @@ pub async fn handle_trace_request(
         }
     }
 
-    // write to file
-    let mut req_stats = write_file(
-        data_buf,
-        thread_id,
-        &StreamParams::new(org_id, traces_stream_name, StreamType::Traces),
-    )
-    .await;
+    // write data to wal
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
+    let mut req_stats = write_file(&writer, traces_stream_name, data_buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
+
     let time = start.elapsed().as_secs_f64();
     req_stats.response_time = time;
 
@@ -383,9 +380,9 @@ pub async fn handle_trace_request(
     }
 
     let ep = if is_grpc {
-        "grpc/export/traces"
+        "/grpc/export/traces"
     } else {
-        "http-proto/api/org/traces/"
+        "/api/org/v1/traces"
     };
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[

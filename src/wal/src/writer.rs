@@ -82,7 +82,7 @@ impl Writer {
     }
 
     /// write the data to the wal file
-    pub fn write(&mut self, data: &[u8]) -> Result<()> {
+    pub fn write(&mut self, data: &[u8], sync: bool) -> Result<()> {
         // Ensure the write buffer is always empty before using it.
         self.buffer.clear();
         // And shrink the buffer below the maximum permitted size should the odd
@@ -133,18 +133,25 @@ impl Writer {
         self.f.write_all(buf).context(WriteDataSnafu)?;
 
         // fsync the fd
-        self.f.sync_all().expect("fsync failure");
+        if sync {
+            self.sync()?;
+        }
 
         self.bytes_written += bytes_written;
         self.uncompressed_bytes_written += uncompressed_len;
+
+        Ok(())
+    }
+
+    pub fn sync(&self) -> Result<()> {
+        self.f.sync_all().context(FileSyncSnafu {
+            path: self.path.clone(),
+        })?;
         Ok(())
     }
 
     pub fn close(&self) -> Result<()> {
-        self.f.sync_all().context(FileWriteSnafu {
-            path: self.path.clone(),
-        })?;
-        Ok(())
+        self.sync()
     }
 }
 

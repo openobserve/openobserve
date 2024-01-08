@@ -36,7 +36,7 @@ use crate::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
             prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, SchemaRecords, StreamParams},
+            stream::{PartitioningDetails, SchemaRecords},
             usage::UsageType,
         },
         utils::{flatten, json},
@@ -143,6 +143,41 @@ pub async fn metrics_json_handler(
             )));
         }
     };
+
+    // TODO: delete for debug
+    let mut streams = std::collections::HashSet::new();
+    let mut records_num = 0;
+    for metric in res_metrics.iter() {
+        if let Some(metrics) = metric.get("scopeMetrics") {
+            if let Some(metrics) = metrics.as_array() {
+                for metric in metrics.iter() {
+                    if let Some(metrics) = metric.get("metrics") {
+                        if let Some(metrics) = metrics.as_array() {
+                            for metric in metrics.iter() {
+                                let name = metric.get("name").unwrap().as_str().unwrap();
+                                streams.insert(name);
+                                for key in ["sum", "gauge", "histogram", "summary"].iter() {
+                                    if let Some(data) = metric.get(key) {
+                                        if let Some(data) = data.get("dataPoints") {
+                                            if let Some(data_points) = data.as_array() {
+                                                records_num += data_points.len();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    log::info!(
+        "/prometheus/otlp/http/v1/write: metadatas: {}, streams: {}, samples: {}",
+        0,
+        streams.len(),
+        records_num,
+    );
 
     for res_metric in res_metrics.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
@@ -446,7 +481,9 @@ pub async fn metrics_json_handler(
         }
     }
 
+    // write data to wal
     let time = start.elapsed().as_secs_f64();
+    let writer = ingester::get_writer(thread_id, org_id, &StreamType::Metrics.to_string()).await;
     for (stream_name, stream_data) in metric_data_map {
         // stream_data could be empty if metric value is nan, check it
         if stream_data.is_empty() {
@@ -465,12 +502,7 @@ pub async fn metrics_json_handler(
         }
 
         // write to file
-        let mut req_stats = write_file(
-            stream_data,
-            thread_id,
-            &StreamParams::new(org_id, &stream_name, StreamType::Metrics),
-        )
-        .await;
+        let mut req_stats = write_file(&writer, &stream_name, stream_data).await;
 
         req_stats.response_time += time;
         report_request_usage_stats(
@@ -502,6 +534,9 @@ pub async fn metrics_json_handler(
                 StreamType::Metrics.to_string().as_str(),
             ])
             .inc();
+    }
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
     }
 
     // only one trigger per request, as it updates etcd

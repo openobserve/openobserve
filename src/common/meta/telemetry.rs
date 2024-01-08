@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use config::{CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT};
+use hashbrown::HashSet;
 use segment::{message::Track, Client, Message};
 use sysinfo::SystemExt;
 
@@ -119,9 +120,12 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
     let mut num_streams = 0;
     let mut logs_streams = 0;
     let mut metrics_streams = 0;
+    let mut orgs = HashSet::new();
     for item in iter {
         num_streams += item.value().len();
+
         let stream_type = item.key().split('/').collect::<Vec<&str>>();
+        orgs.insert(stream_type[0].to_string());
         if stream_type.len() < 2 {
             continue;
         }
@@ -131,7 +135,8 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             _ => (),
         }
     }
-    data.insert("num_org".to_string(), STREAM_SCHEMAS.len().into());
+
+    data.insert("num_org".to_string(), orgs.len().into());
     data.insert("num_streams".to_string(), num_streams.into());
     data.insert("num_logs_streams".to_string(), logs_streams.into());
     data.insert("num_metrics_streams".to_string(), metrics_streams.into());
@@ -162,6 +167,20 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
+                data.insert(
+                    "querier_nodes".to_string(),
+                    crate::common::infra::cluster::get_cached_online_querier_nodes()
+                        .unwrap_or_default()
+                        .len()
+                        .into(),
+                );
+                data.insert(
+                    "ingester_nodes".to_string(),
+                    crate::common::infra::cluster::get_cached_online_ingester_nodes()
+                        .unwrap_or_default()
+                        .len()
+                        .into(),
+                );
             }
             None => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(false));

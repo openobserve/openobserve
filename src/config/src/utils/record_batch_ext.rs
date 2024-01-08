@@ -13,34 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-};
+use arrow::record_batch::RecordBatch;
 
-use arrow_schema::{Field, Schema};
+use super::schema_ext::SchemaExt;
 
-const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
+const USIZE_SIZE: usize = std::mem::size_of::<usize>();
 
-/// SchemaExt helper...
-pub trait SchemaExt {
-    fn to_cloned_fields(&self) -> Vec<Field>;
-    fn hash_key(&self) -> String;
+/// RecordBatchExt helper...
+pub trait RecordBatchExt {
     fn size(&self) -> usize;
 }
 
-impl SchemaExt for Schema {
-    fn to_cloned_fields(&self) -> Vec<Field> {
-        self.fields.iter().map(|x| (**x).clone()).collect()
-    }
-
-    fn hash_key(&self) -> String {
-        let mut hasher = xxhash_rust::xxh3::Xxh3::new();
-        self.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
-    }
-
+impl RecordBatchExt for RecordBatch {
     fn size(&self) -> usize {
-        self.fields.iter().fold(0, |acc, field| acc + field.size()) + HASH_MAP_SIZE
+        self.schema().size() + self.get_array_memory_size() + USIZE_SIZE
     }
 }

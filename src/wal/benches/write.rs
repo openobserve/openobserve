@@ -25,7 +25,7 @@ pub fn write_benchmark(c: &mut Criterion) {
         let mut writer = Writer::new(dir, "org", "stream", entry_size as u64, 1024_1024).unwrap();
         let data = vec![42u8; entry_size];
         group.bench_function(BenchmarkId::from_parameter(entry_size), |b| {
-            b.iter(|| writer.write(black_box(&data)));
+            b.iter(|| writer.write(black_box(&data), true));
         });
     }
     group.finish();

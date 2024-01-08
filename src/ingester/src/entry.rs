@@ -89,13 +89,18 @@ impl Entry {
 
 pub struct RecordBatchEntry {
     pub data: RecordBatch,
-    pub data_size: usize,
+    pub data_json_size: usize,
+    pub data_arrow_size: usize,
     pub min_ts: i64,
     pub max_ts: i64,
 }
 
 impl RecordBatchEntry {
-    pub fn new(data: RecordBatch, data_size: usize) -> Arc<RecordBatchEntry> {
+    pub fn new(
+        data: RecordBatch,
+        data_json_size: usize,
+        data_arrow_size: usize,
+    ) -> Arc<RecordBatchEntry> {
         let (min_ts, max_ts) = match data.column_by_name(&CONFIG.common.column_timestamp) {
             None => (0, 0),
             Some(v) => {
@@ -115,7 +120,8 @@ impl RecordBatchEntry {
         };
         Arc::new(Self {
             data,
-            data_size,
+            data_json_size,
+            data_arrow_size,
             min_ts,
             max_ts,
         })

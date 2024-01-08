@@ -35,6 +35,10 @@ pub enum Error {
         source: io::Error,
         path: PathBuf,
     },
+    FileSync {
+        source: io::Error,
+        path: PathBuf,
+    },
     WriteFileType {
         source: io::Error,
     },

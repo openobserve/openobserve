@@ -71,6 +71,8 @@ export default defineComponent({
     };
     const content = `remote_write:
   - url: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/prometheus/api/v1/write
+    queue_config:
+      max_samples_per_send: 10000
     basic_auth:
       username: [EMAIL]
       password: [PASSCODE]`;
