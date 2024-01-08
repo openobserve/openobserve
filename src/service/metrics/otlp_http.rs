@@ -44,11 +44,11 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{
-            chk_schema_by_record, evaluate_trigger, get_float_value, get_int_value,
-            get_string_value, get_val_for_attr, write_file, TriggerAlertData,
+            evaluate_trigger, get_float_value, get_int_value, get_string_value, get_val_for_attr,
+            write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
-        schema::{set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -410,13 +410,16 @@ pub async fn metrics_json_handler(
                             .unwrap_or(Utc::now().timestamp_micros());
 
                         let value_str = json::to_string(&val_map).unwrap();
-                        chk_schema_by_record(
-                            &mut metric_schema_map,
+
+                        // check for schema evolution
+                        let record_val = json::Value::Object(val_map.to_owned());
+                        let _ = check_for_schema(
                             org_id,
+                            &local_metric_name,
                             StreamType::Metrics,
-                            local_metric_name,
+                            &mut metric_schema_map,
+                            &record_val,
                             timestamp,
-                            &value_str,
                         )
                         .await;
 

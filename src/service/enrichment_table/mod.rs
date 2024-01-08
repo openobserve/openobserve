@@ -40,8 +40,8 @@ use crate::{
     service::{
         compact::retention,
         db, format_stream_name,
-        ingestion::{chk_schema_by_record, write_file},
-        schema::stream_schema_exists,
+        ingestion::write_file,
+        schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -139,13 +139,16 @@ pub async fn save_enrichment_data(
                     json::Value::Number(timestamp.into()),
                 );
                 let value_str = json::to_string(&json_record).unwrap();
-                chk_schema_by_record(
-                    &mut stream_schema_map,
+
+                // check for schema evolution
+                let record_val = json::Value::Object(json_record.to_owned());
+                let _ = check_for_schema(
                     org_id,
+                    &stream_name,
                     StreamType::EnrichmentTables,
-                    stream_name,
+                    &mut stream_schema_map,
+                    &record_val,
                     timestamp,
-                    &value_str,
                 )
                 .await;
 

@@ -42,12 +42,12 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{
-            chk_schema_by_record, evaluate_trigger,
+            evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels},
-        schema::{set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -316,13 +316,16 @@ pub async fn handle_grpc_request(
                         .unwrap_or(Utc::now().timestamp_micros());
 
                     let value_str = json::to_string(&val_map).unwrap();
-                    chk_schema_by_record(
-                        &mut metric_schema_map,
+
+                    // check for schema evolution
+                    let record_val = json::Value::Object(val_map.to_owned());
+                    let _ = check_for_schema(
                         org_id,
+                        &local_metric_name,
                         StreamType::Metrics,
-                        local_metric_name,
+                        &mut metric_schema_map,
+                        &record_val,
                         timestamp,
-                        &value_str,
                     )
                     .await;
 

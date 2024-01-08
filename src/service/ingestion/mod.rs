@@ -15,13 +15,12 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    io::BufReader,
     sync::Arc,
 };
 
 use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::StreamType, utils::schema::infer_json_schema, SIZE_IN_MB};
+use config::{meta::stream::StreamType, SIZE_IN_MB};
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -278,43 +277,6 @@ pub fn apply_stream_transform(
         }
     }
     flatten::flatten(value)
-}
-
-pub async fn chk_schema_by_record(
-    stream_schema_map: &mut HashMap<String, Schema>,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    record_ts: i64,
-    record_val: &str,
-) {
-    let schema = if stream_schema_map.contains_key(stream_name) {
-        stream_schema_map.get(stream_name).unwrap().clone()
-    } else {
-        let schema = db::schema::get(org_id, stream_name, stream_type)
-            .await
-            .unwrap();
-        stream_schema_map.insert(stream_name.to_string(), schema.clone());
-        schema
-    };
-    if !schema.fields().is_empty() {
-        return;
-    }
-
-    let mut schema_reader = BufReader::new(record_val.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
-    stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
-    db::schema::set(
-        org_id,
-        stream_name,
-        stream_type,
-        &inferred_schema,
-        Some(record_ts),
-        true,
-    )
-    .await
-    .unwrap();
 }
 
 pub fn init_functions_runtime() -> Runtime {

@@ -41,6 +41,7 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
+        schema::check_for_schema,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -210,6 +211,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             }
             stream_schema_map.insert(stream_name.clone(), schema);
         }
+
+        // check for schema evolution
+        let record_val = json::Value::Object(record.to_owned());
+        let _ = check_for_schema(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            &mut stream_schema_map,
+            &record_val,
+            timestamp,
+        )
+        .await;
 
         // write into buffer
         if !stream_partitioning_map.contains_key(&stream_name) {
