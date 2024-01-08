@@ -18,7 +18,7 @@ use std::{cmp::min, io::Cursor, sync::Arc};
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
 use config::{
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, NodeQueryAllocationStrategy, StreamType},
     CONFIG,
 };
 use once_cell::sync::Lazy;
@@ -176,12 +176,23 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let file_list = get_file_list(&session_id, &meta, stream_type, partition_time_level).await;
-    let file_num = file_list.len();
-    let offset = if querier_num >= file_num {
-        1
-    } else {
-        (file_num / querier_num) + 1
-    };
+    let mut avg_files = None;
+    let mut file_num = file_list.len();
+    let offset =
+        match NodeQueryAllocationStrategy::from(&CONFIG.common.node_query_allocation_strategy) {
+            NodeQueryAllocationStrategy::FileSize => {
+                if querier_num >= file_num {
+                    1
+                } else {
+                    (file_num / querier_num) + 1
+                }
+            }
+            NodeQueryAllocationStrategy::ByteSize => {
+                avg_files = Some(avg_file_by_byte(&file_list, querier_num));
+                file_num = avg_files.as_ref().unwrap().len();
+                1
+            }
+        };
     log::info!(
         "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
@@ -206,12 +217,30 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as i32;
-                req.file_list = file_list[offset_start..min(offset_start + offset, file_num)]
-                    .to_vec()
-                    .iter()
-                    .map(cluster_rpc::FileKey::from)
-                    .collect();
-                offset_start += offset;
+                match NodeQueryAllocationStrategy::from(
+                    &CONFIG.common.node_query_allocation_strategy,
+                ) {
+                    NodeQueryAllocationStrategy::FileSize => {
+                        req.file_list = file_list
+                            [offset_start..min(offset_start + offset, file_num)]
+                            .to_vec()
+                            .iter()
+                            .map(cluster_rpc::FileKey::from)
+                            .collect();
+                        offset_start += offset;
+                    }
+                    NodeQueryAllocationStrategy::ByteSize => {
+                        if let Some(ref temp_files) = avg_files {
+                            req.file_list = temp_files
+                                .get(offset_start)
+                                .unwrap()
+                                .iter()
+                                .map(cluster_rpc::FileKey::from)
+                                .collect();
+                            offset_start += 1;
+                        }
+                    }
+                };
             } else if !cluster::is_ingester(&node.role) {
                 continue; // no need more querier
             }
@@ -500,6 +529,22 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     );
 
     Ok(result)
+}
+
+fn avg_file_by_byte(file_keys: &Vec<FileKey>, num_nodes: usize) -> Vec<Vec<FileKey>> {
+    let mut partitions: Vec<Vec<FileKey>> = vec![Vec::new(); num_nodes];
+    let mut file_keys = file_keys.clone();
+    file_keys.sort_by_key(|x| x.meta.original_size);
+    while let Some(fk) = file_keys.pop() {
+        let current_node = partitions
+            .iter_mut()
+            .enumerate()
+            .min_by_key(|(_, node)| node.iter().map(|k| k.meta.original_size).sum::<i64>())
+            .unwrap()
+            .0;
+        partitions[current_node].push(fk.clone());
+    }
+    partitions
 }
 
 fn handle_table_response(
@@ -817,6 +862,158 @@ mod tests {
             let meta = sql::Sql::new(tsql).unwrap();
             let filter = super::sql::generate_filter_from_quick_text(&meta.quick_text);
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
+        }
+    }
+
+    #[test]
+    fn test_avg_file_by_byte() {
+        use config::meta::stream::FileMeta;
+
+        let mut vec = Vec::new();
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 10,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 100,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 30,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 5,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 1,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 3,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 40,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 30,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 90,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 300,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 5,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 6,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        let expected: Vec<Vec<i64>> = vec![
+            vec![300],
+            vec![100, 30, 30],
+            vec![90, 40, 10, 6, 5, 5, 3, 1],
+        ];
+        let byte = avg_file_by_byte(&vec, 3);
+        for value in byte
+            .iter()
+            .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
+            .enumerate()
+        {
+            assert_eq!(value.1, expected.get(value.0).unwrap().clone());
         }
     }
 }
