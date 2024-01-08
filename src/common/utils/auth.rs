@@ -219,8 +219,15 @@ impl FromRequest for AuthExtractor {
         let org_id = path_columns[0].to_string();
 
         let object_type = if url_len == 1 {
-            // this is es ep??
-            "es".to_string()
+            if (method.eq("POST") || method.eq("GET")) && path_columns[0].eq("organizations") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                };
+
+                format!("org:o2_ALL")
+            } else {
+                path_columns[0].to_string()
+            }
         } else if url_len == 2 {
             path_columns[url_len - 1].to_string()
         } else if crate::common::meta::types::END_POINTS.contains(&path_columns[url_len - 1]) {
