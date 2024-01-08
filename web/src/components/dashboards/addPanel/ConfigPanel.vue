@@ -75,11 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'metric' &&
           dashboardPanelData.data.type != 'gauge'
         "
-        v-model="legendWidthValue"
+        v-model.number="legendWidthValue"
         :label="t('common.legendWidth')"
         color="input-border"
         bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
+        class="q-py-md showLabelOnTop q-mr-sm"
         stack-label
         outlined
         filled
@@ -88,8 +88,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :type="'number'"
         placeholder="Auto"
       ></q-input>
-      <button @click="setUnit('px')">px</button>
-      <button @click="setUnit('%')">%</button>
+      <div class="unit-container">
+        <button
+          @click="setUnit('px')"
+          :class="{
+            active:
+              dashboardPanelData.data.config.legend_width.unit === null ||
+              dashboardPanelData.data.config.legend_width.unit === 'px',
+          }"
+          style="height: 100%; width: 100%; font-size: 14px"
+        >
+          px
+        </button>
+        <button
+          @click="setUnit('%')"
+          :class="{
+            active: dashboardPanelData.data.config.legend_width.unit === '%',
+          }"
+          style="height: 100%; width: 100%; font-size: 14px"
+        >
+          %
+        </button>
+      </div>
     </div>
 
     <div class="space"></div>
@@ -560,7 +580,7 @@ export default defineComponent({
           unit: null,
         };
       }
-
+      
       // Set the unit
       dashboardPanelData.data.config.legend_width.unit = unit;
     };
@@ -674,8 +694,39 @@ export default defineComponent({
   align-items: center;
 }
 
+.input-container button-group {
+  border: 1px solid gray !important;
+  border-radius: 9px;
+}
+
 .input-container button {
-  margin-left: 5px;
-  margin-top: 10px;
+  display: block;
+  cursor: pointer;
+  background-color: #f0eaea;
+  border: none;
+  font-size: 16px;
+  padding: 3px 10px;
+}
+
+.input-container button-left {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.input-container button-right {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.input-container button.active {
+  background-color: var(--q-primary) !important;
+  font-weight: bold;
+  color: white;
+}
+.unit-container {
+  display: flex;
+  height: 40px;
+  margin-top: 15px;
+  width: 100px;
 }
 </style>
