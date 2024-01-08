@@ -281,7 +281,10 @@ export default defineComponent({
       return filtered;
     };
 
-    const openFilterCreator = (event: any, { name, ftsKey }: any) => {
+    const openFilterCreator = (
+      event: any,
+      { name, ftsKey, stream_name }: any
+    ) => {
       if (ftsKey) {
         event.stopPropagation();
         event.preventDefault();
@@ -295,7 +298,7 @@ export default defineComponent({
       streamService
         .fieldValues({
           org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: props.streamName,
+          stream_name: stream_name ? stream_name : props.streamName,
           start_time: props.timeStamp.startTime,
           end_time: props.timeStamp.endTime,
           fields: [name],
