@@ -188,7 +188,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 }
             }
             NodeQueryAllocationStrategy::ByteSize => {
-                avg_files = Some(avg_file_by_byte(&file_list, querier_num));
+                avg_files = Some(avg_file_by_byte(&file_list[..], querier_num));
                 file_num = avg_files.as_ref().unwrap().len();
                 1
             }
@@ -531,9 +531,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     Ok(result)
 }
 
-fn avg_file_by_byte(file_keys: &Vec<FileKey>, num_nodes: usize) -> Vec<Vec<FileKey>> {
+fn avg_file_by_byte(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<FileKey>> {
     let mut partitions: Vec<Vec<FileKey>> = vec![Vec::new(); num_nodes];
-    let mut file_keys = file_keys.clone();
+    let mut file_keys = file_keys.to_owned();
     file_keys.sort_by_key(|x| x.meta.original_size);
     while let Some(fk) = file_keys.pop() {
         let current_node = partitions
@@ -1007,7 +1007,7 @@ mod tests {
             vec![100, 30, 30],
             vec![90, 40, 10, 6, 5, 5, 3, 1],
         ];
-        let byte = avg_file_by_byte(&vec, 3);
+        let byte = avg_file_by_byte(&vec[..], 3);
         for value in byte
             .iter()
             .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
