@@ -43,9 +43,10 @@ describe("Logs testcases", () => {
     // ("ingests logs via API", () => {
     const orgId = Cypress.env("ORGNAME");
     const streamName = "e2e_automate";
-    const basicAuthCredentials = btoa(`${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`);
+    const basicAuthCredentials = btoa(
+      `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
+    );
 
-    
     // Making a POST request using cy.request()
     cy.request({
       method: "POST",
@@ -76,7 +77,6 @@ describe("Logs testcases", () => {
     // cy.intercept('GET', '**/api/default/_search**').as('allsearch')
   });
 
-  
   // This is a test case to navigate to the logs page
   it("Navigate to the logs page", () => {
     // Visit the base URL
@@ -87,7 +87,6 @@ describe("Logs testcases", () => {
     // cy.get('[data-test="menu-link-/logs-item"]')
     //   .contains(logData.moduleLog)
     //   .click();
-  
   });
 
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
@@ -628,7 +627,7 @@ describe("Logs testcases", () => {
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
     });
-    applyQueryButton()
+    applyQueryButton();
     cy.get(
       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
     ).type(".a=2");
@@ -636,7 +635,7 @@ describe("Logs testcases", () => {
     cy.get(' [data-test="table-row-expand-menu"]')
       .first()
       .click({ force: true });
-    cy.contains('a:2').should("be.visible");
+    cy.contains("a:2").should("be.visible");
     cy.get('[data-test="logs-search-result-logs-table"]').should("be.visible");
   });
 
@@ -722,7 +721,9 @@ describe("Logs testcases", () => {
         ).click({ force: true });
       });
 
-      cy.get('[data-test="confirm-button"] > .q-btn__content').click({ force: true });
+    cy.get('[data-test="confirm-button"] > .q-btn__content').click({
+      force: true,
+    });
   });
 
   // TODO: Need to change the locators for Saved views once added
@@ -854,21 +855,20 @@ describe("Logs testcases", () => {
     endDate.setMinutes(0);
     endDate.setSeconds(0);
 
- 
     const startDateStr =
       startDate.getFullYear() +
-      '-' +
-      String(startDate.getMonth() + 1).padStart(2, '0') +
-      '-' +
-      String(startDate.getDate()).padStart(2, '0') +
-      ' 00:00:00';
+      "-" +
+      String(startDate.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(startDate.getDate()).padStart(2, "0") +
+      " 00:00:00";
     const endDateStr =
       endDate.getFullYear() +
-      '-' +
-      String(endDate.getMonth() + 1).padStart(2, '0') +
-      '-' +
-      String(endDate.getDate()).padStart(2, '0') +
-      ' 23:59:59';
+      "-" +
+      String(endDate.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(endDate.getDate()).padStart(2, "0") +
+      " 23:59:59";
     cy.get('[data-test="logs-search-result-logs-table"]')
       .find("tbody")
       .eq(1)
@@ -947,8 +947,23 @@ describe("Logs testcases", () => {
       .should("be.visible");
   });
 
- 
-  
+  // TODO: change the last line to '.should('be.visible')' when bug is resolved
+  it("should display added function on switching between tabs and again navigate to logs", () => {
+    // cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[data-cy="date-time-button"]').click({ force: true });
+    cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
+      force: true,
+    });
+    applyQueryButton();
+    cy.get(
+      "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
+    ).type(".a=2");
+    applyQueryButton();
+    cy.get('[data-test="menu-link-/metrics-item"]').click({ force: true });
+    cy.wait(100);
+    cy.get('[data-test="menu-link-/logs-item"]').click({ force: true });
+    cy.contains(".a=2").should("not.be.visible");
+  });
 
   // it.only("should enter function, edit and then delete the function", () => {
   //   cy.intercept("GET", logData.ValueQuery).as("value");
