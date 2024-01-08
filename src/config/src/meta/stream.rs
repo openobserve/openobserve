@@ -228,7 +228,7 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
             }
         }
         meta
-  }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -246,4 +246,3 @@ impl From<&String> for NodeQueryAllocationStrategy {
         }
     }
 }
-

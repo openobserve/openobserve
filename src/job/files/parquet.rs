@@ -271,7 +271,7 @@ async fn merge_files(
     files_with_size: &[FileKey],
     force_upload: bool,
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
-    if files_with_size.len() <= 1 {
+    if files_with_size.is_empty() {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
 

@@ -176,7 +176,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let file_list = get_file_list(&session_id, &meta, stream_type, partition_time_level).await;
-    let mut avg_files = None;
+    let mut partition_files = None;
     let mut file_num = file_list.len();
     let offset =
         match NodeQueryAllocationStrategy::from(&CONFIG.common.node_query_allocation_strategy) {
@@ -188,8 +188,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 }
             }
             NodeQueryAllocationStrategy::ByteSize => {
-                avg_files = Some(avg_file_by_byte(&file_list, querier_num));
-                file_num = avg_files.as_ref().unwrap().len();
+                let files = partition_file_by_bytes(&file_list, querier_num);
+                file_num = files.len();
+                partition_files = Some(files);
                 1
             }
         };
@@ -197,6 +198,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
+
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
@@ -230,15 +232,15 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                         offset_start += offset;
                     }
                     NodeQueryAllocationStrategy::ByteSize => {
-                        if let Some(ref temp_files) = avg_files {
-                            req.file_list = temp_files
-                                .get(offset_start)
-                                .unwrap()
-                                .iter()
-                                .map(|fk| cluster_rpc::FileKey::from(*fk))
-                                .collect();
-                            offset_start += offset;
-                        }
+                        req.file_list = partition_files
+                            .as_ref()
+                            .unwrap()
+                            .get(offset_start)
+                            .unwrap()
+                            .iter()
+                            .map(|fk| cluster_rpc::FileKey::from(*fk))
+                            .collect();
+                        offset_start += offset;
                     }
                 };
             } else if !cluster::is_ingester(&node.role) {
@@ -531,25 +533,24 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     Ok(result)
 }
 
-fn avg_file_by_byte(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<&FileKey>> {
+fn partition_file_by_bytes(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<&FileKey>> {
     let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); num_nodes];
     let sum_original_size = file_keys
         .iter()
         .map(|fk| fk.meta.original_size)
         .sum::<i64>();
     let avg_size = sum_original_size / num_nodes as i64;
-    let mut temp_size = 0;
-    let mut num = 0;
+    let mut node_size = 0;
+    let mut node_k = 0;
     for fk in file_keys {
-        let temp_value = temp_size + fk.meta.original_size;
-        if temp_value > avg_size && num != num_nodes - 1 && !partitions[num].is_empty() {
-            temp_size = fk.meta.original_size;
-            num += 1;
-            partitions[num].push(fk);
+        node_size += fk.meta.original_size;
+        if node_size >= avg_size && node_k != num_nodes - 1 && !partitions[node_k].is_empty() {
+            node_size = fk.meta.original_size;
+            node_k += 1;
+            partitions[node_k].push(fk);
             continue;
         }
-        temp_size = temp_value;
-        partitions[num].push(fk);
+        partitions[node_k].push(fk);
     }
     partitions
 }
@@ -873,7 +874,7 @@ mod tests {
     }
 
     #[test]
-    fn test_avg_file_by_byte() {
+    fn test_partition_file_by_bytes() {
         use config::meta::stream::FileMeta;
 
         let mut vec = Vec::new();
@@ -1014,7 +1015,7 @@ mod tests {
             vec![256, 1, 256],
             vec![200, 30, 90, 256, 5, 150],
         ];
-        let byte = avg_file_by_byte(&vec, 3);
+        let byte = partition_file_by_bytes(&vec, 3);
         for value in byte
             .iter()
             .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
