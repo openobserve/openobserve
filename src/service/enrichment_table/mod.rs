@@ -144,7 +144,7 @@ pub async fn save_enrichment_data(
                 let record_val = json::Value::Object(json_record.to_owned());
                 let _ = check_for_schema(
                     org_id,
-                    &stream_name,
+                    stream_name,
                     StreamType::EnrichmentTables,
                     &mut stream_schema_map,
                     &record_val,

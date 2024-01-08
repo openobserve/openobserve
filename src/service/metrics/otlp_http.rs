@@ -415,7 +415,7 @@ pub async fn metrics_json_handler(
                         let record_val = json::Value::Object(val_map.to_owned());
                         let _ = check_for_schema(
                             org_id,
-                            &local_metric_name,
+                            local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
                             &record_val,
