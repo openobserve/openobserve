@@ -41,7 +41,8 @@
     "add": "Add",
     "details": "Details",
     "tags": "Tags",
-    "process": "Process"
+    "process": "Process",
+    "exceptions": "Exceptions"
   },
   "search": {
     "selectIndex": "Select Stream First",

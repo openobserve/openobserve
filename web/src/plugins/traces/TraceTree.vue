@@ -203,7 +203,6 @@ export default defineComponent({
 .collapse-btn {
   width: 14px;
   height: auto;
-  background-color: #ffffff;
   opacity: 0.6;
 }
 </style>
