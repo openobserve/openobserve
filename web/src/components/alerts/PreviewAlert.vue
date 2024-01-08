@@ -153,7 +153,6 @@ const refreshData = () => {
 
   const xAxis = [
     {
-      aggregationFunction: "histogram",
       alias: "zo_sql_key",
       color: null,
       column: "_timestamp",
