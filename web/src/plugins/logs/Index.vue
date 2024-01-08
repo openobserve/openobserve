@@ -355,6 +355,18 @@ export default defineComponent({
     });
 
     onActivated(async () => {
+      const queryParams: any = router.currentRoute.value.query;
+
+      const isStreamChanged =
+        queryParams.stream_type !== searchObj.data.stream.streamType ||
+        queryParams.stream !== searchObj.data.stream.selectedStream.value;
+
+      if (isStreamChanged) {
+        restoreUrlQueryParams();
+        loadLogsData();
+        return;
+      }
+
       if (
         searchObj.organizationIdetifier !=
         store.state.selectedOrganization.identifier

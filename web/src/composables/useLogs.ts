@@ -243,13 +243,15 @@ const useLogs = () => {
 
   function resetStreamData() {
     store.dispatch("resetStreams", {});
+    console.log("reset stream ", router.currentRoute.value.query.stream_type);
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
     searchObj.data.stream.filterField = "";
     searchObj.data.stream.addToFilter = "";
     searchObj.data.stream.functions = [];
-    searchObj.data.stream.streamType = "logs";
+    searchObj.data.stream.streamType =
+      (router.currentRoute.value.query.stream_type as string) || "logs";
     searchObj.data.stream.streamLists = [];
     resetQueryData();
     resetSearchAroundData();
@@ -335,6 +337,10 @@ const useLogs = () => {
 
     if (searchObj.data.stream.selectedStream.label) {
       query["stream"] = searchObj.data.stream.selectedStream.label;
+    }
+
+    if (searchObj.data.stream.streamType !== "logs") {
+      query["stream_type"] = searchObj.data.stream.streamType;
     }
 
     if (date.type == "relative") {
@@ -1219,6 +1225,12 @@ const useLogs = () => {
         b64DecodeUnicode(queryParams.functionContent) || "";
       searchObj.meta.functionEditorPlaceholderFlag = false;
       searchObj.meta.toggleFunction = true;
+    }
+
+    if (queryParams.stream_type) {
+      searchObj.data.stream.streamType = queryParams.type;
+    } else {
+      searchObj.data.stream.streamType = "logs";
     }
 
     router.push({
