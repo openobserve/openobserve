@@ -30,6 +30,8 @@ use crate::common::{
 // DBKey to set settings for an org
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
+pub const ORG_KEY_PREFIX: &str = "/organization/org";
+
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let db = infra_db::get_db().await;
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
@@ -101,4 +103,55 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 .insert(item_key, json_val);
         }
     }
+}
+
+pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    let key = format!("{ORG_KEY_PREFIX}/{org_id}");
+    match db
+        .put(
+            &key,
+            json::to_vec(js_func).unwrap().into(),
+            infra_db::NEED_WATCH,
+        )
+        .await
+    {
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("Error saving function: {}", e);
+            return Err(anyhow::anyhow!("Error saving function: {}", e));
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
+    let db = infra_db::get_db().await;
+    let val = db.get(&format!("/function/{org_id}/{name}")).await?;
+    Ok(json::from_slice(&val).unwrap())
+}
+
+pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    let key = format!("/function/{org_id}/{name}");
+    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("Error deleting function: {}", e);
+            return Err(anyhow::anyhow!("Error deleting function: {}", e));
+        }
+    }
+    Ok(())
+}
+
+pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
+    let db = infra_db::get_db().await;
+
+    Ok(db
+        .list(&format!("/function/{org_id}/"))
+        .await?
+        .values()
+        .map(|val| json::from_slice(val).unwrap())
+        .collect())
 }
