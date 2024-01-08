@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
         :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="300"
-        :virtual-scroll-slice-ratio-before="10"
+        :virtual-scroll-slice-size="3000"
+        :virtual-scroll-slice-ratio-before="1000"
         :items="searchObj.data.queryResults.hits"
         @virtual-scroll="onScroll"
         :wrap-cells="
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           height:
             !searchObj.meta.showHistogram || searchObj.meta.sqlMode
               ? 'calc(100% - 0px)'
-              : 'calc(100% - 100px)',
+              : 'calc(100% - 120px)',
         }"
       >
         <template v-slot:before>
@@ -108,6 +108,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </th>
             </tr>
           </thead>
+          <tbody class="tbody-sticky">
+            <tr
+              v-if="
+                scrollPosition <= 10 &&
+                searchObj.data.resultGrid.currentPage > 0
+              "
+            >
+              <th :colspan="searchObj.data.resultGrid.columns.length">
+                <q-btn
+                  size="xs"
+                  class="q-text-bold"
+                  color="primary"
+                  @click="onLoadLessData"
+                  >Load less data...</q-btn
+                >
+              </th>
+            </tr>
+          </tbody>
         </template>
         <template v-slot="{ item: row, index }">
           <q-tr
@@ -146,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="table-row-expand-menu"
                   @click.stop="expandLog(row, index)"
                 ></q-btn>
-                <high-light
+                <!-- <high-light
                   :content="
                     column.name == 'source'
                       ? column.prop(row)
@@ -169,7 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? column.prop(row, column.name)
                       : ''
                   "
-                ></high-light>
+                ></high-light> -->
+                {{ column.prop(row, column.name) }}
               </div>
               <div
                 v-if="column.closable && row[column.name]"
@@ -231,6 +250,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </td>
           </q-tr>
+        </template>
+        <template v-slot:after>
+          <tbody class="tfoot-sticky">
+            <tr v-if="scrollPosition >= searchObj.config.recordsPerPage - 10">
+              <th :colspan="searchObj.data.resultGrid.columns.length">
+                <q-btn
+                  size="xs"
+                  class="q-text-bold"
+                  color="primary"
+                  @click="onLoadMoreData"
+                  >Load more data...</q-btn
+                >
+              </th>
+            </tr>
+          </tbody>
         </template>
       </q-virtual-scroll>
       <q-dialog
@@ -294,6 +328,7 @@ export default defineComponent({
   },
   emits: [
     "update:scroll",
+    "update:scroll-up",
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
@@ -325,15 +360,36 @@ export default defineComponent({
     },
     onScroll(info: any) {
       this.searchObj.meta.scrollInfo = info;
-      if (
-        info.ref.items.length / info.index <= 1.3 &&
-        this.searchObj.loading == false &&
-        this.searchObj.data.resultGrid.currentPage <=
-          this.searchObj.data.queryResults.hits.length /
-            this.searchObj.meta.resultGrid.rowsPerPage
-      ) {
-        this.$emit("update:scroll");
-      }
+      // console.log(info.ref.items.length , info.index)
+      // if (
+      //   info.ref.items.length / info.index <= 1.3 &&
+      //   this.searchObj.loading == false &&
+      //   this.searchObj.data.resultGrid.currentPage <=
+      //     this.searchObj.data.queryResults.hits.length /
+      //       this.searchObj.meta.resultGrid.rowsPerPage
+      // ) {
+      //   this.$emit("update:scroll");
+      // }
+      this.scrollPosition = info.index;
+      // if (info.index >= info.ref.items.length - 1) {
+      //   // this.searchTableRef.ResetScroll();
+      //   this.$emit("update:scroll");
+      //   this.searchTableRef.scrollTo(0);
+      // }
+
+      // if (info.index === 1) {
+      //   this.$emit("update:scroll-up");
+      //   this.searchTableRef.scrollTo(100);
+      //   // this.searchTableRef.value.$el.scrollBottom = 0;
+      // }
+    },
+    onLoadMoreData() {
+      this.$emit("update:scroll");
+      this.searchTableRef.scrollTo(0);
+    },
+    onLoadLessData() {
+      this.$emit("update:scroll-up");
+      this.searchTableRef.scrollTo(this.searchObj.config.recordsPerPage);
     },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
@@ -350,6 +406,7 @@ export default defineComponent({
     const $q = useQuasar();
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
+    const scrollPosition = ref(0);
 
     const {
       searchObj,
@@ -480,6 +537,7 @@ export default defineComponent({
       evaluateWrapContentFlag,
       useLocalWrapContent,
       noOfRecordsTitle,
+      scrollPosition,
     };
   },
   computed: {
@@ -491,7 +549,7 @@ export default defineComponent({
     },
     updateTitle() {
       return this.searchObj.data.histogram.chartParams.title;
-    }
+    },
   },
   watch: {
     toggleWrapFlag() {
@@ -503,7 +561,7 @@ export default defineComponent({
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
-    }
+    },
   },
 });
 </script>

@@ -53,6 +53,7 @@ const defaultObject = {
   runQuery: false,
   loading: true,
   config: {
+    recordsPerPage: 250,
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
@@ -394,11 +395,10 @@ const useLogs = () => {
           sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
-          from: searchObj.data.queryResults?.hits?.length || 0,
-          size: parseInt(
-            (searchObj.data.queryResults?.hits?.length || 0) + 150,
-            10
-          ),
+          from:
+            searchObj.config.recordsPerPage *
+              searchObj.data.resultGrid.currentPage || 0,
+          size: searchObj.config.recordsPerPage,
         },
         aggs: {
           histogram:
@@ -660,7 +660,8 @@ const useLogs = () => {
                 searchObj.data.queryResults.from = res.data.from;
                 searchObj.data.queryResults.scan_size += res.data.scan_size;
                 searchObj.data.queryResults.took += res.data.took;
-                searchObj.data.queryResults.hits.push(...res.data.hits);
+                // searchObj.data.queryResults.hits.push(...res.data.hits);
+                searchObj.data.queryResults.hits = res.data.hits;
               } else {
                 resetFieldValues();
                 if (
@@ -971,7 +972,10 @@ const useLogs = () => {
   function getHistogramTitle() {
     const title =
       "Showing " +
-      searchObj.data.queryResults.hits.length.toLocaleString() +
+      searchObj.data.resultGrid.currentPage * searchObj.config.recordsPerPage +
+      " to " +
+      (searchObj.data.resultGrid.currentPage * searchObj.config.recordsPerPage +
+        searchObj.config.recordsPerPage) +
       " out of " +
       searchObj.data.queryResults.total.toLocaleString() +
       " hits in " +
