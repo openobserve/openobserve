@@ -235,7 +235,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                                 .get(offset_start)
                                 .unwrap()
                                 .iter()
-                                .map(cluster_rpc::FileKey::from)
+                                .map(|fk| cluster_rpc::FileKey::from(*fk))
                                 .collect();
                             offset_start += offset;
                         }
@@ -531,25 +531,25 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     Ok(result)
 }
 
-fn avg_file_by_byte(file_keys: &Vec<FileKey>, num_nodes: usize) -> Vec<Vec<FileKey>> {
-    let mut partitions: Vec<Vec<FileKey>> = vec![Vec::new(); num_nodes];
-    let mut file_keys = file_keys.clone();
-    file_keys.reverse();
+fn avg_file_by_byte(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<&FileKey>> {
+    let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); num_nodes];
     let sum_original_size = file_keys
         .iter()
         .map(|fk| fk.meta.original_size)
         .sum::<i64>();
     let avg_size = sum_original_size / num_nodes as i64;
-    for num in 0..num_nodes {
-        let mut temp_size = 0;
-        while let Some(fk) = file_keys.pop() {
-            temp_size += fk.meta.original_size;
-            if temp_size > avg_size && num != num_nodes - 1 && !partitions[num].is_empty() {
-                file_keys.push(fk);
-                break;
-            }
+    let mut temp_size = 0;
+    let mut num = 0;
+    for fk in file_keys {
+        let temp_value = temp_size + fk.meta.original_size;
+        if temp_value > avg_size && num != num_nodes - 1 && !partitions[num].is_empty() {
+            temp_size = fk.meta.original_size;
+            num += 1;
             partitions[num].push(fk);
+            continue;
         }
+        temp_size = temp_value;
+        partitions[num].push(fk);
     }
     partitions
 }
