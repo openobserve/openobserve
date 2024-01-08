@@ -544,7 +544,7 @@ fn avg_file_by_byte(file_keys: &Vec<FileKey>, num_nodes: usize) -> Vec<Vec<FileK
         let mut temp_size = 0;
         while let Some(fk) = file_keys.pop() {
             temp_size += fk.meta.original_size;
-            if temp_size > avg_size && num != num_nodes - 1 && partitions[num].len() > 0 {
+            if temp_size > avg_size && num != num_nodes - 1 && !partitions[num].is_empty() {
                 file_keys.push(fk);
                 break;
             }
