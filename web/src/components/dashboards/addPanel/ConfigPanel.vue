@@ -16,20 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <q-toggle
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
-      "
-      v-model="dashboardPanelData.data.config.show_legends"
-      :label="t('dashboard.showLegendsLabel')"
-      data-test="dashboard-config-show-legend"
-    />
-
-    <div class="space"></div>
-
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm">{{ t("dashboard.description") }}</div>
       <q-input
@@ -41,6 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-description"
       />
     </div>
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge'
+      "
+      v-model="dashboardPanelData.data.config.show_legends"
+      :label="t('dashboard.showLegendsLabel')"
+      data-test="dashboard-config-show-legend"
+    />
 
     <div class="space"></div>
 
@@ -65,6 +65,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-legend-position"
     >
     </q-select>
+
+    <div class="space"></div>
+    <div class="input-container">
+      <q-input
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge'
+        "
+        v-model="legendWidthValue"
+        :label="t('common.legendWidth')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        :type="'number'"
+        placeholder="Auto"
+      ></q-input>
+      <button @click="setUnit('px')">px</button>
+      <button @click="setUnit('%')">%</button>
+    </div>
 
     <div class="space"></div>
 
@@ -268,7 +294,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">
           Query Limit
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" data-test="dashboard-config-limit-info"/>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-limit-info"
+            />
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -303,7 +334,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">
           {{ t("dashboard.legendLabel") }}
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" data-test="dashboard-config-promql-legend-info"/>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-promql-legend-info"
+            />
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -425,41 +461,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">Gauge Max Value</div>
       </template>
     </q-input>
+
     <q-input
       v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'gauge' &&
         dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
+        dashboardPanelData.data.type != 'geomap' &&
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'pie' &&
+        dashboardPanelData.data.type != 'donut'
       "
-      v-model.number="
-        dashboardPanelData.data.config.legend_width
-      "
-      :label="t('common.legendWidth')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      :type="'number'"
-      placeholder="Auto"
-      @update:model-value="
-      (value) =>
-        (dashboardPanelData.data.config.legend_width = value !== '' ? value : null)
-    "
-    >
-    </q-input>
-
-    <div class="space"></div>
-    
-    <q-input
-      v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap'&& dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'"
-      v-model.number="
-        dashboardPanelData.data.config.axis_width
-      "
+      v-model.number="dashboardPanelData.data.config.axis_width"
       :label="t('common.axisWidth')"
       color="input-border"
       bg-color="input-bg"
@@ -472,20 +484,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :type="'number'"
       placeholder="Auto"
       @update:model-value="
-      (value) =>
-        (dashboardPanelData.data.config.axis_width = value !== '' ? value : null)
-    "
+        (value) =>
+          (dashboardPanelData.data.config.axis_width =
+            value !== '' ? value : null)
+      "
     >
     </q-input>
 
     <div class="space"></div>
 
     <q-toggle
-    v-if="dashboardPanelData.data.type != 'gauge' && dashboardPanelData.data.type != 'metric' && dashboardPanelData.data.type != 'geomap' && dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'pie' && dashboardPanelData.data.type != 'donut'" 
+      v-if="
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'geomap' &&
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'pie' &&
+        dashboardPanelData.data.type != 'donut'
+      "
       v-model="dashboardPanelData.data.config.axis_border_show"
       :label="t('dashboard.showBorder')"
     />
-
   </div>
 </template>
 
@@ -505,6 +524,46 @@ export default defineComponent({
         value: "osm",
       },
     ];
+
+    const legendWidthValue = computed({
+      get() {
+        console.log(
+          "legendWidthValue",
+          dashboardPanelData.data.config?.legend_width?.value
+        );
+        return dashboardPanelData.data.config?.legend_width?.value;
+      },
+      set(value) {
+        console.log("legendWidthValue set", value);
+
+        // Ensure that the nested structure is initialized
+        if (!dashboardPanelData.data.config.legend_width) {
+          dashboardPanelData.data.config.legend_width = {
+            value: null,
+            unit: null,
+          };
+        }
+
+        // Set the value
+        dashboardPanelData.data.config.legend_width.value =
+          value !== "" ? value : null;
+      },
+    });
+
+    const setUnit = (unit: any) => {
+      console.log("set unit", unit);
+
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.legend_width) {
+        dashboardPanelData.data.config.legend_width = {
+          value: null,
+          unit: null,
+        };
+      }
+
+      // Set the unit
+      dashboardPanelData.data.config.legend_width.unit = unit;
+    };
 
     const layerTypeOptions = [
       {
@@ -593,6 +652,8 @@ export default defineComponent({
       legendsPositionOptions,
       unitOptions,
       isWeightFieldPresent,
+      setUnit,
+      legendWidthValue,
     };
   },
 });
@@ -606,5 +667,15 @@ export default defineComponent({
 .space {
   margin-top: 10px;
   margin-bottom: 10px;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+}
+
+.input-container button {
+  margin-left: 5px;
+  margin-top: 10px;
 }
 </style>
