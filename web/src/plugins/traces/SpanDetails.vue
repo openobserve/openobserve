@@ -151,7 +151,6 @@
           />
           <div class="cursor-pointer text-bold">Events</div>
           <div
-            v-show="!areEventsExpananded"
             class="q-ml-sm text-grey-9"
             style="
               white-space: nowrap;
@@ -163,7 +162,7 @@
             {{ events.length }}
           </div>
         </div>
-        <div v-show="areEventsExpananded" class="q-px-md q-mt-sm">
+        <div v-show="areEventsExpananded" class="q-px-md q-my-sm">
           <q-virtual-scroll
             type="table"
             ref="searchTableRef"
@@ -229,6 +228,130 @@
           <div
             class="full-width text-center q-pt-lg text-bold"
             v-if="!events.length"
+          >
+            No events present for this span
+          </div>
+        </div>
+      </div>
+      <div v-if="getExceptionEvents.length">
+        <div
+          class="flex items-center no-wrap cursor-pointer"
+          @click="toggleExceptions"
+        >
+          <q-icon
+            name="expand_more"
+            :class="!isExceptionExpanded ? 'rotate-270' : ''"
+            size="14px"
+            class="cursor-pointer text-grey-7"
+          />
+          <div class="cursor-pointer text-bold">Exceptions</div>
+          <div
+            class="q-ml-sm text-grey-9"
+            style="
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              font-size: 12px;
+            "
+          >
+            {{ getExceptionEvents.length }}
+          </div>
+        </div>
+        <div v-show="isExceptionExpanded" class="q-px-md q-my-sm">
+          <q-virtual-scroll
+            type="table"
+            ref="searchTableRef"
+            style="max-height: 100%"
+            :items="getExceptionEvents"
+          >
+            <template v-slot:before>
+              <thead class="thead-sticky text-left">
+                <tr>
+                  <th
+                    v-for="(col, index) in exceptionEventColumns"
+                    :key="'result_' + index"
+                    class="table-header"
+                    :data-test="`trace-events-table-th-${col.label}`"
+                  >
+                    {{ col.label }}
+                  </th>
+                </tr>
+              </thead>
+            </template>
+
+            <template v-slot="{ item: row, index }">
+              <q-tr
+                :data-test="`trace-event-detail-${
+                  row[store.state.zoConfig.timestamp_column]
+                }`"
+                :key="'expand_' + index"
+                @click="expandEvent(index)"
+                style="cursor: pointer"
+                class="pointer"
+              >
+                <q-td
+                  v-for="column in exceptionEventColumns"
+                  :key="index + '-' + column.name"
+                  class="field_list"
+                  style="cursor: pointer"
+                >
+                  <div class="flex row items-center no-wrap">
+                    <q-btn
+                      v-if="column.name === '@timestamp'"
+                      :icon="
+                        expandedEvents[index.toString()]
+                          ? 'expand_more'
+                          : 'chevron_right'
+                      "
+                      dense
+                      size="xs"
+                      flat
+                      class="q-mr-xs"
+                      @click.stop="expandEvent(index)"
+                    ></q-btn>
+                    {{ column.prop(row) }}
+                  </div>
+                </q-td>
+              </q-tr>
+              <q-tr v-if="expandedEvents[index.toString()]">
+                <td colspan="2" style="font-size: 12px; font-family: monospace">
+                  <div class="q-pl-sm">
+                    <div>
+                      <span>Type: </span>
+                      <span>"{{ row["exception.type"] }}"</span>
+                    </div>
+
+                    <div class="q-mt-xs">
+                      <span>Message: </span>
+                      <span>"{{ row["exception.message"] }}"</span>
+                    </div>
+
+                    <div class="q-mt-xs">
+                      <span>Escaped: </span>
+                      <span>"{{ row["exception.escaped"] }}"</span>
+                    </div>
+
+                    <div class="q-mt-xs">
+                      <span>Stacktrace: </span>
+                      <div
+                        class="q-px-sm q-mt-xs"
+                        style="border: 1px solid #c1c1c1; border-radius: 4px"
+                      >
+                        <pre
+                          style="font-size: 12px; text-wrap: wrap"
+                          class="q-mt-xs"
+                          >{{ row["exception.stacktrace"] }}</pre
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </q-tr>
+            </template>
+          </q-virtual-scroll>
+          <div
+            class="full-width text-center q-pt-lg text-bold"
+            v-if="!getExceptionEvents.length"
           >
             No events present for this span
           </div>
@@ -329,11 +452,42 @@ const eventColumns = ref([
   },
 ]);
 
+const exceptionEventColumns = ref([
+  {
+    name: "@timestamp",
+    field: (row: any) =>
+      date.formatDate(
+        Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z"
+      ),
+    prop: (row: any) =>
+      date.formatDate(
+        Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
+        "MMM DD, YYYY HH:mm:ss.SSS Z"
+      ),
+    label: "Timestamp",
+    align: "left",
+    sortable: true,
+  },
+  {
+    name: "type",
+    field: (row: any) => row["exception.type"],
+    prop: (row: any) => row["exception.type"],
+    label: "Type",
+    align: "left",
+    sortable: true,
+  },
+]);
+
 const setSpanEvents = () => {
   if (events.value) events.value = [];
 
   events.value = JSON.parse(props.spanData.events).map((event: any) => event);
 };
+
+const getExceptionEvents = computed(() => {
+  return events.value.filter((event: any) => event.name === "exception");
+});
 
 watch(
   () => props.spanData,
@@ -366,6 +520,8 @@ const areProcessExpananded = ref(false);
 
 const areEventsExpananded = ref(false);
 
+const isExceptionExpanded = ref(false);
+
 const toggleProcess = () => {
   areProcessExpananded.value = !areProcessExpananded.value;
 };
@@ -376,6 +532,10 @@ const toggleTags = () => {
 
 const toggleEvents = () => {
   areEventsExpananded.value = !areEventsExpananded.value;
+};
+
+const toggleExceptions = () => {
+  isExceptionExpanded.value = !isExceptionExpanded.value;
 };
 
 const expandEvent = (index: number) => {

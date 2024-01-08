@@ -350,6 +350,8 @@ pub struct Common {
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,
+    #[env_config(name = "ZO_NODE_QUERY_ALLOCATION_STRATEGY", default = "file_size")]
+    pub node_query_allocation_strategy: String,
 }
 
 #[derive(EnvConfig)]
