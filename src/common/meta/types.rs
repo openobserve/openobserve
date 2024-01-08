@@ -30,10 +30,3 @@ pub const END_POINTS: [&str; 15] = [
     "streams",
     "syslog-routes",
 ];
-
-
-get /org_id/functions
-get /org_id/functions/abcd
-post /org_id/functions
-put /org_id/functions/abcd
-delete /org_id/functions/abcd
