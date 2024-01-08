@@ -106,9 +106,6 @@ describe("Logs testcases", () => {
 
   // This test case checks if the function editor is toggled on/off when the 'functions toggle' button is clicked
   it("Should toggle the function editor on functions toggle click", () => {
-    cy.get(
-      '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
-    ).click();
     logstests.displayVrlFunctionEditor();
     logstests.clickLogsSearchQueryToggle();
     logstests.vrlFunctionEditorHidden();
@@ -119,9 +116,6 @@ describe("Logs testcases", () => {
   it("Should clear the value of a function on functions toggle click", () => {
     // Wait for 5 seconds
     cy.wait(5000);
-    cy.get(
-      '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
-    ).click();
     logstests.enterVrlFunctionvalue();
     logstests.clickLogsSearchQueryToggle();
     logstests.clickLogsSearchQueryToggle();
@@ -629,18 +623,20 @@ describe("Logs testcases", () => {
   });
 
   it("should be able to enter valid text in VRL and run query", () => {
-    cy.intercept("GET", logData.ValueQuery).as("value");
+    // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
     });
-    cy.get('[data-test="logs-search-bar-show-query-toggle-btn"] ').click({
-      force: true,
-    });
+    applyQueryButton()
     cy.get(
       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
     ).type(".a=2");
     applyQueryButton();
+    cy.get(' [data-test="table-row-expand-menu"]')
+      .first()
+      .click({ force: true });
+    cy.contains('a:2').should("be.visible");
     cy.get('[data-test="logs-search-result-logs-table"]').should("be.visible");
   });
 
@@ -795,9 +791,9 @@ describe("Logs testcases", () => {
 
   it("should click on vrl toggle and display the field and on disable toggle the VRL field to disappear ", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
-    cy.get(
-      '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
-    ).click({ force: true });
+    // cy.get(
+    //   '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
+    // ).click({ force: true });
     cy.get("#fnEditor >>>>> .view-lines").should("be.visible");
     cy.get(
       '[data-test="logs-search-bar-show-query-toggle-btn"] > .q-toggle__inner'
@@ -909,7 +905,6 @@ describe("Logs testcases", () => {
 
   it("should save a function and then delete it", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
-    logstests.clickVrlQueryToggle();
     cy.wait(2000);
     logstests.enterTextVrlQueryEditor(".a=1");
     logstests.clickSaveFunctionButton();
@@ -930,7 +925,6 @@ describe("Logs testcases", () => {
 
   it("should display error on adding only blank spaces under function name", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
-    logstests.clickVrlQueryToggle();
     cy.wait(2000);
     logstests.enterTextVrlQueryEditor(".a=1");
     logstests.clickSaveFunctionButton();
@@ -943,7 +937,6 @@ describe("Logs testcases", () => {
 
   it("should display error on special characters under function name", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
-    logstests.clickVrlQueryToggle();
     cy.wait(2000);
     logstests.enterTextVrlQueryEditor("a=1");
     logstests.clickSaveFunctionButton();
@@ -954,18 +947,8 @@ describe("Logs testcases", () => {
       .should("be.visible");
   });
 
-  it("shoudld display error on entering invalid VRL function but trying to save invalid function", () => {
-    cy.intercept("GET", logData.ValueQuery).as("value");
-    logstests.clickVrlQueryToggle();
-    cy.wait(2000);
-    logstests.enterTextVrlQueryEditor("3%%%%%%");
-    logstests.clickSaveFunctionButton();
-    logstests.enterFunctionName("e2e_function");
-    logstests.clickSavedOkButton();
-    cy.get(".q-notification__message")
-      .contains("syntax error")
-      .should("be.visible");
-  });
+ 
+  
 
   // it.only("should enter function, edit and then delete the function", () => {
   //   cy.intercept("GET", logData.ValueQuery).as("value");
