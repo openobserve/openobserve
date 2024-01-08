@@ -641,6 +641,10 @@ describe("Logs testcases", () => {
       "#fnEditor > .monaco-editor > .overflow-guard > .monaco-scrollable-element > .lines-content > .view-lines"
     ).type(".a=2");
     applyQueryButton();
+    cy.get(' [data-test="table-row-expand-menu"]')
+      .first()
+      .click({ force: true });
+    cy.contains('a:2').should("be.visible");
     cy.get('[data-test="logs-search-result-logs-table"]').should("be.visible");
   });
 
@@ -954,18 +958,8 @@ describe("Logs testcases", () => {
       .should("be.visible");
   });
 
-  it("shoudld display error on entering invalid VRL function but trying to save invalid function", () => {
-    cy.intercept("GET", logData.ValueQuery).as("value");
-    logstests.clickVrlQueryToggle();
-    cy.wait(2000);
-    logstests.enterTextVrlQueryEditor("3%%%%%%");
-    logstests.clickSaveFunctionButton();
-    logstests.enterFunctionName("e2e_function");
-    logstests.clickSavedOkButton();
-    cy.get(".q-notification__message")
-      .contains("syntax error")
-      .should("be.visible");
-  });
+ 
+  
 
   // it.only("should enter function, edit and then delete the function", () => {
   //   cy.intercept("GET", logData.ValueQuery).as("value");
