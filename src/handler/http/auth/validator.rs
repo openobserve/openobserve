@@ -76,7 +76,7 @@ pub async fn validator(
                 if check_permissions(user_id, auth_info).await {
                     return Ok(req);
                 } else {
-                    return Err((ErrorUnauthorized("Unauthorized Access"), req));
+                    return Err((ErrorForbidden("Unauthorized Access"), req));
                 }
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))

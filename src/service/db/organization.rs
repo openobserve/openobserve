@@ -23,7 +23,7 @@ use crate::common::{
         db as infra_db,
         errors::{self, Error},
     },
-    meta::organization::OrganizationSetting,
+    meta::organization::{Organization, OrganizationSetting},
     utils::json,
 };
 
@@ -107,11 +107,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("{ORG_KEY_PREFIX}/{org_id}");
+    let key = format!("{ORG_KEY_PREFIX}/{}", org.identifier);
     match db
         .put(
             &key,
-            json::to_vec(js_func).unwrap().into(),
+            json::to_vec(org).unwrap().into(),
             infra_db::NEED_WATCH,
         )
         .await
@@ -126,15 +126,15 @@ pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
+pub async fn get(org_id: &str) -> Result<Organization, anyhow::Error> {
     let db = infra_db::get_db().await;
-    let val = db.get(&format!("/function/{org_id}/{name}")).await?;
+    let val = db.get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
+pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/function/{org_id}/{name}");
+    let key = format!("{ORG_KEY_PREFIX}/{}", org_id);
     match db.delete(&key, false, infra_db::NEED_WATCH).await {
         Ok(_) => {}
         Err(e) => {
@@ -143,15 +143,4 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
-}
-
-pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
-    let db = infra_db::get_db().await;
-
-    Ok(db
-        .list(&format!("/function/{org_id}/"))
-        .await?
-        .values()
-        .map(|val| json::from_slice(val).unwrap())
-        .collect())
 }

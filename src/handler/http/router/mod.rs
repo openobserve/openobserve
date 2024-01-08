@@ -207,15 +207,15 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(users::delete)
             .service(users::update)
             .service(users::add_user_to_org)
-            .service(organization::organizations)
+            .service(organization::org::organizations)
             .service(organization::settings::get)
             .service(organization::settings::create)
-            .service(organization::org_summary)
-            .service(organization::get_user_passcode)
-            .service(organization::update_user_passcode)
-            .service(organization::create_user_rumtoken)
-            .service(organization::get_user_rumtoken)
-            .service(organization::update_user_rumtoken)
+            .service(organization::org::org_summary)
+            .service(organization::org::get_user_passcode)
+            .service(organization::org::update_user_passcode)
+            .service(organization::org::create_user_rumtoken)
+            .service(organization::org::get_user_rumtoken)
+            .service(organization::org::update_user_rumtoken)
             .service(organization::es::org_index)
             .service(organization::es::org_license)
             .service(organization::es::org_xpack)
@@ -319,7 +319,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(fga::create_role)
             .service(fga::get_all_role_permissions)
             .service(fga::add_role_permissions)
-            .service(fga::get_roles),
+            .service(fga::get_roles)
+            .service(organization::org::create_org),
     );
 }
 

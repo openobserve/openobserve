@@ -36,6 +36,8 @@ pub async fn token_validator(
     req: ServiceRequest,
     auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    use actix_web::error::ErrorForbidden;
+
     use super::validator::check_permissions;
 
     let user;
@@ -101,7 +103,7 @@ pub async fn token_validator(
                     if check_permissions(user_id, auth_info).await {
                         return Ok(req);
                     } else {
-                        return Err((ErrorUnauthorized("Unauthorized Access"), req));
+                        return Err((ErrorForbidden("Unauthorized Access"), req));
                     }
                 } else {
                     Err((ErrorUnauthorized("Unauthorized Access"), req))
