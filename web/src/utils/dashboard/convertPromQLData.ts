@@ -103,10 +103,7 @@ export const convertPromQLData = (
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel:
-        panelSchema.config?.axis_width == null
-          ? true
-          : false,
+      containLabel: panelSchema.config?.axis_width == null ? true : false,
       //based on config width set grid
       left: panelSchema.config?.axis_width ?? 5,
       right: 20,
@@ -552,21 +549,59 @@ export const convertPromQLData = (
     return width;
   };
 
-  
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
-  if (legendConfig.orient == "vertical" && panelSchema.config?.show_legends && panelSchema.type != "gauge" && panelSchema.type != "metric") {
-    //get max value of name
+  if (
+    legendConfig.orient == "vertical" &&
+    panelSchema.config?.show_legends &&
+    panelSchema.type != "gauge" &&
+    panelSchema.type != "metric"
+  ) {
     const maxValue = options.series
       .map((it: any) => it.name)
       .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
-      
-    options.grid.right = panelSchema.config?.legend_width ??
-      Math.min(
-        chartPanelRef.value?.offsetWidth / 3,
-        calculateWidthText(maxValue) + 60
-      ) ?? 20;
-    options.legend.textStyle.width = options.grid.right - 55;
+
+    console.log("maxValue", maxValue);
+
+    let legendWidth;
+
+    if (
+      panelSchema.config.legend_width &&
+      !isNaN(parseFloat(panelSchema.config.legend_width.value)) &&
+      ["px", "%"].includes(panelSchema.config.legend_width.unit)
+    ) {
+      console.log("legend_width.value", panelSchema.config.legend_width.value);
+      console.log("legend_width.unit", panelSchema.config.legend_width.unit);
+
+      if (panelSchema.config.legend_width.unit === "%") {
+        console.log("inside %");
+        
+        // If in percentage, calculate percentage of the chartPanelRef width
+        const percentage = panelSchema.config.legend_width.value / 100;
+        legendWidth = chartPanelRef.value?.offsetWidth * percentage;
+      } else {
+        console.log("inside px");
+        
+        // If in pixels, use the provided value
+        legendWidth = panelSchema.config.legend_width.value;
+      }
+    } else {
+      console.log(
+        "Conditions not met. legend_width not provided or invalid format."
+      );
+
+      // If legend_width is not provided or has invalid format, calculate it based on other criteria
+      legendWidth =
+        Math.min(
+          chartPanelRef.value?.offsetWidth / 3,
+          calculateWidthText(maxValue) + 60
+        ) ?? 20;
+    }
+
+    console.log("legendWidth", legendWidth);
+
+    options.grid.right = legendWidth;
+    options.legend.textStyle.width = legendWidth - 55;
   }
 
   //check if is there any data else filter out axis or series data
