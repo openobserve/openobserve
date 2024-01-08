@@ -1450,9 +1450,10 @@ export const convertSQLData = (
 
     if (
       panelSchema.config.legend_width &&
-      !isNaN(parseFloat(panelSchema.config.legend_width.value)) &&
-      ["px", "%"].includes(panelSchema.config.legend_width.unit)
+      !isNaN(parseFloat(panelSchema.config.legend_width.value))
+      // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
+      
       console.log("legend_width.value", panelSchema.config.legend_width.value);
       console.log("legend_width.unit", panelSchema.config.legend_width.unit);
 
