@@ -1,5 +1,9 @@
 const { defineConfig } = require("cypress");
-const  cypressjson  = require("./cypress.env.json");
+let cypressjson = {};
+
+try {
+  cypressjson = require("./cypress.env.json");
+} catch (err) {}
 
 module.exports = defineConfig({
   projectId: 'fmd3am',
@@ -10,7 +14,8 @@ module.exports = defineConfig({
     },
 
     //"excludeSpecPattern": "**/cypress/e2e/**",
-    "baseUrl":cypressjson.BASEURL,
+    baseUrl: cypressjson?.BASEURL || "http://localhost:5080",
+    "ingestionUrl":cypressjson.INGESTION_URL || "http://localhost:5080",
     "experimentalOriginDependencies":true,
     "testIsolation": true,
     "experimentalRunAllSpecs": true,
