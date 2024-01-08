@@ -56,7 +56,7 @@ const defaultObject = {
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
-    fnSplitterModel: 99.5,
+    fnSplitterModel: 60,
     fnLastSplitterPosition: 0,
     fnSplitterLimit: [40, 100],
     refreshTimes: [
@@ -88,7 +88,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
-    toggleFunction: false,
+    toggleFunction: true,
     toggleSourceWrap: useLocalWrapContent()
       ? JSON.parse(useLocalWrapContent())
       : false,
@@ -814,15 +814,20 @@ const useLogs = () => {
     try {
       searchObj.data.stream.selectedStreamFields = [];
       if (searchObj.data.streamResults.list.length > 0) {
-        const queryResult: { name: string; type: string }[] = [];
+        const queryResult: {
+          name: string;
+          type: string;
+        }[] = [];
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
         let ftsKeys: Set<any>;
+        let schemaFields: Set<any>;
 
         searchObj.data.streamResults.list.forEach((stream: any) => {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
             queryResult.push(...stream.schema);
             ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+            schemaFields = new Set([...stream.schema.map((e: any) => e.name)]);
           }
         });
 
@@ -850,7 +855,10 @@ const useLogs = () => {
 
           Object.keys(recordwithMaxAttribute).forEach((key) => {
             if (!tempFieldsName.includes(key)) {
-              queryResult.push({ name: key, type: "Utf8" });
+              queryResult.push({
+                name: key,
+                type: "Utf8",
+              });
             }
           });
         }
@@ -864,6 +872,7 @@ const useLogs = () => {
             searchObj.data.stream.selectedStreamFields.push({
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
+              isSchemaField: schemaFields.has(row.name),
             });
           }
           // }
