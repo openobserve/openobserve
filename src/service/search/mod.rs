@@ -188,7 +188,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 }
             }
             NodeQueryAllocationStrategy::ByteSize => {
-                avg_files = Some(avg_file_by_byte(&file_list[..], querier_num));
+                avg_files = Some(avg_file_by_byte(&file_list, querier_num));
                 file_num = avg_files.as_ref().unwrap().len();
                 1
             }
@@ -237,7 +237,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                                 .iter()
                                 .map(cluster_rpc::FileKey::from)
                                 .collect();
-                            offset_start += 1;
+                            offset_start += offset;
                         }
                     }
                 };
@@ -531,18 +531,25 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     Ok(result)
 }
 
-fn avg_file_by_byte(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<FileKey>> {
+fn avg_file_by_byte(file_keys: &Vec<FileKey>, num_nodes: usize) -> Vec<Vec<FileKey>> {
     let mut partitions: Vec<Vec<FileKey>> = vec![Vec::new(); num_nodes];
-    let mut file_keys = file_keys.to_owned();
-    file_keys.sort_by_key(|x| x.meta.original_size);
-    while let Some(fk) = file_keys.pop() {
-        let current_node = partitions
-            .iter_mut()
-            .enumerate()
-            .min_by_key(|(_, node)| node.iter().map(|k| k.meta.original_size).sum::<i64>())
-            .unwrap()
-            .0;
-        partitions[current_node].push(fk.clone());
+    let mut file_keys = file_keys.clone();
+    file_keys.reverse();
+    let sum_original_size = file_keys
+        .iter()
+        .map(|fk| fk.meta.original_size)
+        .sum::<i64>();
+    let avg_size = sum_original_size / num_nodes as i64;
+    for num in 0..num_nodes {
+        let mut temp_size = 0;
+        while let Some(fk) = file_keys.pop() {
+            temp_size += fk.meta.original_size;
+            if temp_size > avg_size && num != num_nodes - 1 && partitions[num].len() > 0 {
+                file_keys.push(fk);
+                break;
+            }
+            partitions[num].push(fk);
+        }
     }
     partitions
 }
@@ -876,7 +883,18 @@ mod tests {
                 min_ts: -1,
                 max_ts: -1,
                 records: -1,
-                original_size: 10,
+                original_size: 256,
+                compressed_size: -1,
+            },
+            false,
+        ));
+        vec.push(FileKey::new(
+            "",
+            FileMeta {
+                min_ts: -1,
+                max_ts: -1,
+                records: -1,
+                original_size: 256,
                 compressed_size: -1,
             },
             false,
@@ -898,18 +916,7 @@ mod tests {
                 min_ts: -1,
                 max_ts: -1,
                 records: -1,
-                original_size: 30,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 5,
+                original_size: 256,
                 compressed_size: -1,
             },
             false,
@@ -931,7 +938,7 @@ mod tests {
                 min_ts: -1,
                 max_ts: -1,
                 records: -1,
-                original_size: 3,
+                original_size: 256,
                 compressed_size: -1,
             },
             false,
@@ -942,7 +949,7 @@ mod tests {
                 min_ts: -1,
                 max_ts: -1,
                 records: -1,
-                original_size: 40,
+                original_size: 200,
                 compressed_size: -1,
             },
             false,
@@ -975,7 +982,7 @@ mod tests {
                 min_ts: -1,
                 max_ts: -1,
                 records: -1,
-                original_size: 300,
+                original_size: 256,
                 compressed_size: -1,
             },
             false,
@@ -997,17 +1004,17 @@ mod tests {
                 min_ts: -1,
                 max_ts: -1,
                 records: -1,
-                original_size: 6,
+                original_size: 150,
                 compressed_size: -1,
             },
             false,
         ));
         let expected: Vec<Vec<i64>> = vec![
-            vec![300],
-            vec![100, 30, 30],
-            vec![90, 40, 10, 6, 5, 5, 3, 1],
+            vec![256, 256, 100],
+            vec![256, 1, 256],
+            vec![200, 30, 90, 256, 5, 150],
         ];
-        let byte = avg_file_by_byte(&vec[..], 3);
+        let byte = avg_file_by_byte(&vec, 3);
         for value in byte
             .iter()
             .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
