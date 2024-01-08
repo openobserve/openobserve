@@ -1,4 +1,5 @@
 const { defineConfig } = require("cypress");
+const  cypressjson  = require("./cypress.env.json");
 
 module.exports = defineConfig({
   projectId: 'fmd3am',
@@ -9,7 +10,7 @@ module.exports = defineConfig({
     },
 
     //"excludeSpecPattern": "**/cypress/e2e/**",
-    "baseUrl":"http://localhost:5080",
+    "baseUrl":cypressjson.BASEURL,
     "experimentalOriginDependencies":true,
     "testIsolation": true,
     "experimentalRunAllSpecs": true,
