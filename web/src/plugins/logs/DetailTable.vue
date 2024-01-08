@@ -40,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div class="row justify-between">
       <div class="col-10">
-        <q-tabs v-model="tab" shrink align="left">
+        <q-tabs v-model="tab" shrink
+align="left">
           <q-tab
             data-test="log-detail-json-tab"
             name="json"
@@ -142,7 +143,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="'img:' + getImageURL('images/common/add_icon.svg')"
                   >
                     <q-list data-test="field-list-modal">
-                      <q-item clickable v-close-popup="true">
+                      <q-item
+                        clickable
+                        v-close-popup="true"
+                        v-if="searchObj.data.stream.selectedStreamFields.some(
+                                (item: any) =>
+                                  item.name === value
+                                    ? item.isSchemaField
+                                    : ''
+                              )
+                            "
+                      >
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
@@ -163,7 +174,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item-section>
                       </q-item>
 
-                      <q-item clickable v-close-popup="true">
+                      <q-item
+                        clickable
+                        v-close-popup="true"
+                        v-if="searchObj.data.stream.selectedStreamFields.some(
+                                (item: any) =>
+                                  item.name === value
+                                    ? item.isSchemaField
+                                    : ''
+                              )
+                            "
+                      >
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
@@ -210,7 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </q-item-section>
                       </q-item>
-                      <q-item v-else clickable v-close-popup="true">
+                      <q-item v-else clickable
+v-close-popup="true">
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
