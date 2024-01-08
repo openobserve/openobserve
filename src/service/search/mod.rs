@@ -18,7 +18,7 @@ use std::{cmp::min, io::Cursor, sync::Arc};
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
 use config::{
-    meta::stream::{FileKey, NodeQueryAllocationStrategy, StreamType},
+    meta::stream::{FileKey, QueryPartitionStrategy, StreamType},
     CONFIG,
 };
 use once_cell::sync::Lazy;
@@ -178,22 +178,22 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let file_list = get_file_list(&session_id, &meta, stream_type, partition_time_level).await;
     let mut partition_files = None;
     let mut file_num = file_list.len();
-    let offset =
-        match NodeQueryAllocationStrategy::from(&CONFIG.common.node_query_allocation_strategy) {
-            NodeQueryAllocationStrategy::FileSize => {
-                if querier_num >= file_num {
-                    1
-                } else {
-                    (file_num / querier_num) + 1
-                }
-            }
-            NodeQueryAllocationStrategy::ByteSize => {
-                let files = partition_file_by_bytes(&file_list, querier_num);
-                file_num = files.len();
-                partition_files = Some(files);
+    let offset = match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
+    {
+        QueryPartitionStrategy::FileNum => {
+            if querier_num >= file_num {
                 1
+            } else {
+                (file_num / querier_num) + 1
             }
-        };
+        }
+        QueryPartitionStrategy::FileSize => {
+            let files = partition_file_by_bytes(&file_list, querier_num);
+            file_num = files.len();
+            partition_files = Some(files);
+            1
+        }
+    };
     log::info!(
         "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
@@ -219,10 +219,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as i32;
-                match NodeQueryAllocationStrategy::from(
-                    &CONFIG.common.node_query_allocation_strategy,
-                ) {
-                    NodeQueryAllocationStrategy::FileSize => {
+                match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
+                {
+                    QueryPartitionStrategy::FileNum => {
                         req.file_list = file_list
                             [offset_start..min(offset_start + offset, file_num)]
                             .to_vec()
@@ -231,7 +230,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                             .collect();
                         offset_start += offset;
                     }
-                    NodeQueryAllocationStrategy::ByteSize => {
+                    QueryPartitionStrategy::FileSize => {
                         req.file_list = partition_files
                             .as_ref()
                             .unwrap()

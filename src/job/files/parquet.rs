@@ -13,16 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    io::{Cursor, Read},
+    path::Path,
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    ider,
     meta::stream::{FileKey, FileMeta, StreamType},
     metrics,
-    utils::parquet::read_metadata_from_file,
-    CONFIG, FILE_EXT_PARQUET,
+    utils::parquet::{read_metadata_from_bytes, read_metadata_from_file},
+    CONFIG,
 };
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task::JoinHandle, time};
@@ -35,7 +40,9 @@ use crate::{
             file::scan_files,
         },
     },
-    service::{db, search::datafusion::exec::merge_parquet_files, stream},
+    service::{
+        db, schema::schema_evolution, search::datafusion::exec::merge_parquet_files, stream,
+    },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -166,22 +173,17 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 // yield to other tasks
                 tokio::task::yield_now().await;
                 // merge file and get the big file key
-                let (new_file_name, new_file_meta, new_file_list) = match merge_files(
-                    &latest_schema,
-                    &wal_dir,
-                    &prefix,
-                    &files_with_size,
-                    force_upload,
-                )
-                .await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[INGESTER:JOB] merge files failed: {}", e);
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
+                let (new_file_name, new_file_meta, new_file_list) =
+                    match merge_files(&latest_schema, &wal_dir, &files_with_size, force_upload)
+                        .await
+                    {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!("[INGESTER:JOB] merge files failed: {}", e);
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                            continue;
+                        }
+                    };
                 if new_file_name.is_empty() {
                     if new_file_list.is_empty() {
                         // no file need to merge
@@ -267,7 +269,6 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 async fn merge_files(
     latest_schema: &Schema,
     wal_dir: &Path,
-    prefix: &str,
     files_with_size: &[FileKey],
     force_upload: bool,
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
@@ -285,10 +286,6 @@ async fn merge_files(
         new_file_size += file.meta.original_size;
         new_file_list.push(file.clone());
         log::info!("[INGESTER:JOB] merge small file: {}", &file.key);
-    }
-    // no files need to merge
-    if new_file_list.is_empty() {
-        return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
     // these files are too small, just skip upload and wait for next round
     if !force_upload && new_file_size < CONFIG.limit.max_file_size_on_disk as i64 {
@@ -334,10 +331,34 @@ async fn merge_files(
         return Ok((String::from(""), FileMeta::default(), retain_file_list));
     }
 
-    // convert the file to the latest version of schema
+    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+    // 7099303408192061440f3XQ2p.parquet
+    // eg: files/default/traces/default/0/023/09/04/05/default/
+    // service_name=ingester/7104328279989026816guOA4t.parquet
+    // let _ = columns[0].to_string(); // files/
+    let file = new_file_list.first().unwrap();
+    let columns = file.key.splitn(5, '/').collect::<Vec<&str>>();
+    let org_id = columns[1].to_string();
+    let stream_type = StreamType::from(columns[2]);
+    let stream_name = columns[3].to_string();
+    let file_name = columns[4].to_string();
+
+    if new_file_list.len() == 1 {
+        let (new_file_name, file_meta) = upload_file(
+            &org_id,
+            &stream_name,
+            stream_type,
+            wal_dir,
+            &file.key,
+            &file_name,
+        )
+        .await?;
+        return Ok((new_file_name, file_meta, files_with_size.to_vec()));
+    }
+
+    // merge files
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
-
     let mut buf = Vec::new();
     let mut new_file_meta = merge_parquet_files(
         tmp_dir.name(),
@@ -353,8 +374,8 @@ async fn merge_files(
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }
 
-    let id = ider::generate();
-    let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+    let new_file_key =
+        super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
         "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
         retain_file_list.len(),
@@ -367,5 +388,70 @@ async fn merge_files(
     match storage::put(&new_file_key, buf.into()).await {
         Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
         Err(e) => Err(e),
+    }
+}
+
+async fn upload_file(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    wal_dir: &Path,
+    path_str: &str,
+    file_name: &str,
+) -> Result<(String, FileMeta), anyhow::Error> {
+    let file_path = wal_dir.join(path_str);
+    let mut file = std::fs::File::open(&file_path).unwrap();
+    let file_meta = file.metadata().unwrap();
+    let file_size = file_meta.len();
+    log::info!("[INGESTER:JOB] File upload begin: {}", path_str);
+    if file_size == 0 {
+        if let Err(e) = tokio::fs::remove_file(file_path).await {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                path_str,
+                e
+            );
+        }
+        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+    }
+
+    // write metadata
+    let mut buf_parquet: Vec<u8> = Vec::new();
+    file.read_to_end(&mut buf_parquet)?;
+    let buf_parquet = bytes::Bytes::from(buf_parquet);
+    let mut file_meta = read_metadata_from_bytes(&buf_parquet).await?;
+    file_meta.compressed_size = file_size as i64;
+
+    // read schema
+    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    let inferred_schema = arrow_reader
+        .schema()
+        .as_ref()
+        .clone()
+        .with_metadata(std::collections::HashMap::new());
+
+    schema_evolution(
+        org_id,
+        stream_name,
+        stream_type,
+        Arc::new(inferred_schema),
+        file_meta.min_ts,
+    )
+    .await;
+
+    let new_file_name =
+        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
+    drop(file);
+    let file_name = new_file_name.to_owned();
+    match storage::put(&new_file_name, buf_parquet).await {
+        Ok(_) => {
+            log::info!("[INGESTER:JOB] File upload succeeded: {}", file_name);
+            Ok((file_name, file_meta))
+        }
+        Err(err) => {
+            log::error!("[INGESTER:JOB] File upload error: {:?}", err);
+            Err(anyhow::anyhow!(err))
+        }
     }
 }

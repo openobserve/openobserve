@@ -232,17 +232,17 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum NodeQueryAllocationStrategy {
+pub enum QueryPartitionStrategy {
+    FileNum,
     FileSize,
-    ByteSize,
 }
 
-impl From<&String> for NodeQueryAllocationStrategy {
+impl From<&String> for QueryPartitionStrategy {
     fn from(s: &String) -> Self {
         match s.to_lowercase().as_str() {
-            "file_size" => NodeQueryAllocationStrategy::FileSize,
-            "byte_size" => NodeQueryAllocationStrategy::ByteSize,
-            _ => NodeQueryAllocationStrategy::FileSize,
+            "file_num" => QueryPartitionStrategy::FileNum,
+            "file_size" => QueryPartitionStrategy::FileSize,
+            _ => QueryPartitionStrategy::FileNum,
         }
     }
 }
