@@ -1,0 +1,43 @@
+
+name: test permissions
+
+on:
+  pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**.md"
+env:
+    AWS_REGION: us-east-1
+
+jobs:
+    build:
+      name: build
+      permissions:
+        id-token: write
+        contents: read
+      runs-on: ubuntu-latest
+      steps:
+        - name: Remove unused tools
+          run: |
+            sudo rm -rf /usr/share/dotnet
+            sudo rm -rf /opt/ghc
+            sudo rm -rf "/usr/local/share/boost"
+            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+  
+        - name: Clone the current repo
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+ 
+        - name: Configure AWS Credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          with:
+            aws-region: ${{ env.AWS_REGION }}
+            role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
+            role-session-name: GithubActionsSession
+  
+        - name: Test permissions
+          run: aws s3 ls
+  
+ 
