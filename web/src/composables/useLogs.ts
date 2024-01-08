@@ -243,7 +243,6 @@ const useLogs = () => {
 
   function resetStreamData() {
     store.dispatch("resetStreams", {});
-    console.log("reset stream ", router.currentRoute.value.query.stream_type);
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
