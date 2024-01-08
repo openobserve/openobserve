@@ -211,3 +211,22 @@ impl TryFrom<&[u8]> for FileMeta {
         })
     }
 }
+
+impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
+    fn from(values: &[parquet::file::metadata::KeyValue]) -> Self {
+        let mut meta = FileMeta::default();
+        for kv in values {
+            match kv.key.as_str() {
+                "min_ts" => meta.min_ts = kv.value.as_ref().unwrap().parse().unwrap(),
+                "max_ts" => meta.max_ts = kv.value.as_ref().unwrap().parse().unwrap(),
+                "records" => meta.records = kv.value.as_ref().unwrap().parse().unwrap(),
+                "original_size" => meta.original_size = kv.value.as_ref().unwrap().parse().unwrap(),
+                "compressed_size" => {
+                    meta.compressed_size = kv.value.as_ref().unwrap().parse().unwrap()
+                }
+                _ => {}
+            }
+        }
+        meta
+    }
+}

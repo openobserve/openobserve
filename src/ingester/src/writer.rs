@@ -114,7 +114,7 @@ impl Writer {
             .join("logs")
             .join(thread_id.to_string());
         log::info!(
-            "[INGESTER] create file: {}/{}/{}/{}.wal",
+            "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
             wal_dir.display().to_string(),
             &key.org_id,
             &key.stream_type,
@@ -160,7 +160,7 @@ impl Writer {
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
             log::info!(
-                "[INGESTER] create file: {}/{}/{}/{}.wal",
+                "[INGESTER:WAL] create file: {}/{}/{}/{}.wal",
                 self.thread_id,
                 &self.key.org_id,
                 &self.key.stream_type,

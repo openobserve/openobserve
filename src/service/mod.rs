@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap;
+use std::collections::HashMap;
+
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
@@ -64,7 +65,7 @@ pub fn format_partition_key(input: &str) -> String {
 // format stream name
 pub async fn get_formatted_stream_name(
     params: &mut StreamParams,
-    schema_map: &mut AHashMap<String, Schema>,
+    schema_map: &mut HashMap<String, Schema>,
 ) -> String {
     let mut stream_name = params.stream_name.to_string();
 

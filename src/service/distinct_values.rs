@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
-use ahash::AHashMap;
 use arrow_schema::{DataType, Field, Schema};
 use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
 use once_cell::sync::Lazy;
@@ -132,14 +134,14 @@ impl DistinctValues {
 
         // write to wal
         let timestamp = chrono::Utc::now().timestamp_micros();
-        let schema = schema();
+        let schema = generate_schema();
         let schema_key = schema.hash_key();
         for (org_id, items) in new_table {
             if items.is_empty() {
                 continue;
             }
 
-            let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+            let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
                 let data = data.as_object_mut().unwrap();
@@ -168,10 +170,30 @@ impl DistinctValues {
                 hour_buf.records_size += data_size;
             }
 
+            // check schema
+            let db_schema = super::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+                .await
+                .unwrap();
+            if db_schema.fields().is_empty() {
+                let schema = schema.as_ref().clone();
+                if let Err(e) = super::db::schema::set(
+                    &org_id,
+                    STREAM_NAME,
+                    StreamType::Metadata,
+                    &schema,
+                    None,
+                    false,
+                )
+                .await
+                {
+                    log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
+                }
+            }
+
             let writer = ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string()).await;
             _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
             if let Err(e) = writer.sync().await {
-                log::error!("ingestion error while syncing writer: {}", e);
+                log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);
             }
         }
         Ok(())
@@ -199,13 +221,13 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
             let event = match rx.recv().await {
                 Some(v) => v,
                 None => {
-                    log::info!("[distinct_values] event channel closed");
+                    log::info!("[DISTINCT_VALUES] event channel closed");
                     break;
                 }
             };
             if let DvEventType::Shutudown = event.ev_type {
                 if let Err(e) = CHANNEL.flush().await {
-                    log::error!("flush error: {}", e);
+                    log::error!("[DISTINCT_VALUES] flush error: {}", e);
                 }
                 CHANNEL.shutdown.store(true, Ordering::Release);
                 break;
@@ -215,7 +237,7 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
             let field_entry = entry.entry(event.item).or_default();
             *field_entry += event.count;
         }
-        log::info!("[distinct_values] event loop exit");
+        log::info!("[DISTINCT_VALUES] event loop exit");
     });
     Arc::new(tx)
 }
@@ -226,7 +248,7 @@ async fn run_flush() {
     loop {
         interval.tick().await;
         if let Err(e) = CHANNEL.flush().await {
-            log::error!("[distinct_values] errot flush data to wal: {}", e);
+            log::error!("[DISTINCT_VALUES] errot flush data to wal: {}", e);
         }
     }
 }
@@ -240,7 +262,7 @@ pub async fn close() -> Result<()> {
     Ok(())
 }
 
-fn schema() -> Arc<Schema> {
+fn generate_schema() -> Arc<Schema> {
     Arc::new(Schema::new(vec![
         Field::new(
             CONFIG.common.column_timestamp.as_str(),

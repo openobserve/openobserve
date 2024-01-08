@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, sync::Arc};
+use std::{io::Cursor, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use parquet::{
-    arrow::{ArrowWriter, ParquetRecordBatchStreamBuilder},
+    arrow::{arrow_reader::ArrowReaderMetadata, ArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
@@ -116,20 +116,22 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
-pub async fn read_metadata(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
+pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
     let mut meta = FileMeta::default();
     let schema_reader = Cursor::new(data.clone());
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
     if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
-        for kv in metadata {
-            match kv.key.as_str() {
-                "min_ts" => meta.min_ts = kv.value.as_ref().unwrap().parse().unwrap(),
-                "max_ts" => meta.max_ts = kv.value.as_ref().unwrap().parse().unwrap(),
-                "records" => meta.records = kv.value.as_ref().unwrap().parse().unwrap(),
-                "original_size" => meta.original_size = kv.value.as_ref().unwrap().parse().unwrap(),
-                _ => {}
-            }
-        }
+        meta = metadata.as_slice().into();
+    }
+    Ok(meta)
+}
+
+pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow::Error> {
+    let mut meta = FileMeta::default();
+    let mut file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+    if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
+        meta = metadata.as_slice().into();
     }
     Ok(meta)
 }

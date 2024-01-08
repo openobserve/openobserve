@@ -16,7 +16,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use actix_web::web;
-use ahash::AHashMap;
 use chrono::{TimeZone, Utc};
 use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
 use datafusion::arrow::datatypes::Schema;
@@ -83,12 +82,12 @@ pub async fn remote_write(
     let mut has_entry = false;
     let mut accept_record: bool;
     let mut cluster_name = String::new();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
-    let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
-    let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
-    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
+    let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -106,7 +105,7 @@ pub async fn remote_write(
             help: item.help.clone(),
             unit: item.unit.clone(),
         };
-        let mut extra_metadata: AHashMap<String, String> = AHashMap::new();
+        let mut extra_metadata: HashMap<String, String> = HashMap::new();
         extra_metadata.insert(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),

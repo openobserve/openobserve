@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use actix_web::{http, web, HttpResponse};
-use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
@@ -57,7 +58,7 @@ pub async fn usage_ingest(
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let stream_name = &get_formatted_stream_name(
         &mut StreamParams::new(org_id, in_stream_name, StreamType::Logs),
@@ -80,7 +81,7 @@ pub async fn usage_ingest(
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
 
     let mut trigger: TriggerAlertData = None;
@@ -100,7 +101,7 @@ pub async fn usage_ingest(
     .await;
     // End get stream alert
 
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for item in reader.into_iter() {
         // JSON Flattening
@@ -253,7 +254,7 @@ pub async fn handle_grpc_request(
     }
 
     let start = std::time::Instant::now();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
@@ -273,7 +274,7 @@ pub async fn handle_grpc_request(
     let stream_name = &stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut distinct_values = Vec::with_capacity(16);
 
@@ -302,7 +303,7 @@ pub async fn handle_grpc_request(
 
     let mut trigger: TriggerAlertData = None;
 
-    let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     for resource_log in &request.resource_logs {
         for instrumentation_logs in &resource_log.scope_logs {

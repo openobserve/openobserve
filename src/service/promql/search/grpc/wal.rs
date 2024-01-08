@@ -93,7 +93,7 @@ pub(crate) async fn create_context(
             num_arrow_files += 1;
             let record_batch_meta = record_batches_meta
                 .entry(file.schema_key)
-                .or_insert_with(|| (Schema::empty().with_metadata(metadata.clone()), Vec::new()));
+                .or_insert_with(|| (Schema::empty(), Vec::new()));
 
             let buf_reader = Cursor::new(file.body.clone());
             let stream_reader = StreamReader::try_new(buf_reader, None)?;

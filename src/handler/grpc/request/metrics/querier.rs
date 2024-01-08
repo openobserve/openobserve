@@ -18,7 +18,7 @@ use config::{
     ider,
     meta::stream::StreamType,
     metrics,
-    utils::{parquet::read_metadata, schema_ext::SchemaExt},
+    utils::{parquet::read_metadata_from_bytes, schema_ext::SchemaExt},
     CONFIG,
 };
 use opentelemetry::global;
@@ -184,7 +184,7 @@ impl Metrics for Querier {
                 continue;
             };
             let body = bytes::Bytes::from(body);
-            let parquet_meta = read_metadata(&body).await.unwrap_or_default();
+            let parquet_meta = read_metadata_from_bytes(&body).await.unwrap_or_default();
             if (start_time > 0 && parquet_meta.max_ts < start_time)
                 || (end_time > 0 && parquet_meta.min_ts > end_time)
             {

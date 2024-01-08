@@ -20,7 +20,6 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::Utc;
 use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
@@ -58,7 +57,7 @@ pub async fn save_enrichment_data(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let stream_name = &format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -85,7 +84,7 @@ pub async fn save_enrichment_data(
         );
     }
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,

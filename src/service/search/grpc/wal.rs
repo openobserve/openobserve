@@ -19,7 +19,7 @@ use ahash::AHashMap as HashMap;
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
     meta::stream::{FileKey, StreamType},
-    utils::parquet::read_metadata,
+    utils::parquet::read_metadata_from_bytes,
     CONFIG,
 };
 use datafusion::{
@@ -93,7 +93,9 @@ pub async fn search_parquet(
             }
             Ok(file_data) => {
                 let file_data = file_data.into();
-                let parquet_meta = read_metadata(&file_data).await.unwrap_or_default();
+                let parquet_meta = read_metadata_from_bytes(&file_data)
+                    .await
+                    .unwrap_or_default();
                 scan_stats.original_size += parquet_meta.original_size;
                 if let Some((min_ts, max_ts)) = sql.meta.time_range {
                     if parquet_meta.min_ts <= max_ts && parquet_meta.max_ts >= min_ts {

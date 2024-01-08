@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use actix_web::{http, HttpResponse};
-use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG};
@@ -88,11 +87,11 @@ pub async fn handle_grpc_request(
 
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
-    let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
-    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
+    let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
     // TODO: delete for debug
     let mut streams = std::collections::HashSet::new();
@@ -206,7 +205,7 @@ pub async fn handle_grpc_request(
                     help: metric.description.to_owned(),
                     unit: metric.unit.to_owned(),
                 };
-                let mut prom_meta: AHashMap<String, String> = AHashMap::new();
+                let mut prom_meta: HashMap<String, String> = HashMap::new();
 
                 let records = match &metric.data {
                     Some(data) => match data {
@@ -466,7 +465,7 @@ fn process_gauge(
     rec: &mut json::Value,
     gauge: &Gauge,
     metadata: &mut Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     let mut records = vec![];
 
@@ -491,7 +490,7 @@ fn process_sum(
     rec: &mut json::Value,
     sum: &Sum,
     metadata: &mut Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Counter;
@@ -518,7 +517,7 @@ fn process_histogram(
     rec: &mut json::Value,
     hist: &Histogram,
     metadata: &mut Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Histogram;
@@ -545,7 +544,7 @@ fn process_exponential_histogram(
     rec: &mut json::Value,
     hist: &ExponentialHistogram,
     metadata: &mut Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::ExponentialHistogram;
@@ -571,7 +570,7 @@ fn process_summary(
     rec: &json::Value,
     summary: &Summary,
     metadata: &mut Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Summary;

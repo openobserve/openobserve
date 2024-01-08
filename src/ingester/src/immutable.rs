@@ -135,7 +135,7 @@ pub(crate) async fn persist() -> Result<()> {
     for task in tasks {
         if let Some((path, json_size, arrow_size)) = task? {
             log::info!(
-                "[INGESTER] persist file: {:?}, json_size: {}, arrow_size: {}",
+                "[INGESTER:WAL] persist file: {:?}, json_size: {}, arrow_size: {}",
                 &path,
                 json_size,
                 arrow_size

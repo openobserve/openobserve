@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{BufRead, BufReader};
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader},
+};
 
 use actix_web::{http, web};
-use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -52,7 +54,7 @@ pub async fn ingest_with_keys(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
-    extend_json: &AHashMap<String, serde_json::Value>,
+    extend_json: &HashMap<String, serde_json::Value>,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     ingest_inner(org_id, in_stream_name, body, extend_json, thread_id).await
@@ -62,12 +64,12 @@ async fn ingest_inner(
     org_id: &str,
     in_stream_name: &str,
     body: web::Bytes,
-    extend_json: &AHashMap<String, serde_json::Value>,
+    extend_json: &HashMap<String, serde_json::Value>,
     thread_id: usize,
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
@@ -80,7 +82,7 @@ async fn ingest_inner(
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: TriggerAlertData = None;
 
@@ -107,7 +109,7 @@ async fn ingest_inner(
     .await;
     // End get stream alert
 
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
         let line = line?;
