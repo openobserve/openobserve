@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expandedLogs="expandedLogs"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
+                      @update:scroll-up="getLessData"
                       @expandlog="toggleExpandLog"
                     />
                   </div>
