@@ -144,6 +144,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </th>
             </tr>
           </thead>
+          <tbody class="tbody-sticky">
+            <tr
+              v-if="
+                scrollPosition <= 10 &&
+                searchObj.data.resultGrid.currentPage > 0
+              "
+            >
+              <th :colspan="searchObj.data.resultGrid.columns.length">
+                <q-btn
+                  size="xs"
+                  class="q-text-bold"
+                  color="primary"
+                  @click="onLoadLessData"
+                  >Load less data...</q-btn
+                >
+              </th>
+            </tr>
+          </tbody>
         </template>
         <template v-slot="{ item: row, index }">
           <q-tr
@@ -269,6 +287,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </q-tr>
         </template>
+        <template v-slot:after>
+          <tbody class="tfoot-sticky">
+            <tr v-if="scrollPosition >= searchObj.config.recordsPerPage - 10">
+              <th :colspan="searchObj.data.resultGrid.columns.length">
+                <q-btn
+                  size="xs"
+                  class="q-text-bold"
+                  color="primary"
+                  @click="onLoadMoreData"
+                  >Load more data...</q-btn
+                >
+              </th>
+            </tr>
+          </tbody>
+        </template>
       </q-virtual-scroll>
       <q-dialog
         data-test="logs-search-result-detail-dialog"
@@ -331,6 +364,7 @@ export default defineComponent({
   },
   emits: [
     "update:scroll",
+    "update:scroll-up",
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
