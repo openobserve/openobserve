@@ -72,10 +72,8 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // should run it every 10 minutes
-    let mut interval = time::interval(time::Duration::from_secs(
-        CONFIG.limit.calculate_stats_interval,
-    ));
+    // should run it every minute
+    let mut interval = time::interval(time::Duration::from_secs(60));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
