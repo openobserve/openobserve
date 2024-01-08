@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- TODO OK : Repeated code make seperate component to display field  -->
               <div
-                v-if="props.row.ftsKey"
+                v-if="props.row.ftsKey || !props.row.isSchemaField"
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >
@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="field_overlay">
                   <q-btn
+                    v-if="props.row.isSchemaField"
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
@@ -153,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="field_overlay">
                       <q-btn
+                        v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
@@ -425,7 +427,7 @@ export default defineComponent({
       updatedLocalLogFilterField();
     }
 
-    const openFilterCreator = (event: any, { name, ftsKey }: any) => {
+    const openFilterCreator = (event: any, { name, ftsKey, isSchemaField }: any) => {
       if (ftsKey) {
         event.stopPropagation();
         event.preventDefault();

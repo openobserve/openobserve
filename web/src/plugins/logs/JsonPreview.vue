@@ -28,7 +28,17 @@
         :name="'img:' + getImageURL('images/common/add_icon.svg')"
       >
         <q-list>
-          <q-item clickable v-close-popup>
+          <q-item
+            clickable
+            v-close-popup
+            v-if="searchObj.data.stream.selectedStreamFields.some(
+                                (item: any) =>
+                                  item.name === key
+                                    ? item.isSchemaField
+                                    : ''
+                              )
+                            "
+          >
             <q-item-section>
               <q-item-label
                 data-test="log-details-include-field-btn"
@@ -47,8 +57,18 @@
               >
             </q-item-section>
           </q-item>
-
-          <q-item clickable v-close-popup>
+          
+          <q-item
+            clickable
+            v-close-popup
+            v-if="searchObj.data.stream.selectedStreamFields.some(
+                                (item: any) =>
+                                  item.name === key
+                                    ? item.isSchemaField
+                                    : ''
+                              )
+                            "
+          >
             <q-item-section>
               <q-item-label
                 data-test="log-details-exclude-field-btn"
@@ -111,6 +131,7 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
+import useLogs from "../../composables/useLogs";
 
 export default {
   name: "JsonPreview",
@@ -139,6 +160,7 @@ export default {
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);
     };
+    const { searchObj } = useLogs();
     return {
       t,
       copyLogToClipboard,
@@ -146,6 +168,7 @@ export default {
       addSearchTerm,
       addFieldToTable,
       store,
+      searchObj,
     };
   },
 };
