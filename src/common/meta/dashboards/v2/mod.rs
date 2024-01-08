@@ -225,6 +225,6 @@ pub struct MapView {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct LegendWidth {
-    pub value: f64,
-    pub unit: String,
+    pub value: Option<f64>,
+    pub unit: Option<String>,
 }
