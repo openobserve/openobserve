@@ -152,7 +152,7 @@ export const convertPromQLData = (
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        let hoverText = name.map((it: any) => {
+        const hoverText = name.map((it: any) => {
           // check if the series is the current series being hovered
           // if have than bold it
           if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
@@ -291,25 +291,6 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
-  // need min and max value for color
-  let min = Infinity;
-  let max = -Infinity;
-  searchQueryData.forEach((metric: any) => {
-    if (metric.result && Array.isArray(metric.result)) {
-      metric?.result?.forEach((valuesArr: any) => {
-        if (valuesArr.values && Array.isArray(valuesArr.values)) {
-          valuesArr.values.forEach((val: any) => {
-            // val[1] should not NaN
-            if (!isNaN(val[1])) {
-              min = Math.min(min, val[1]);
-              max = Math.max(max, val[1]);
-            }
-          });
-        }
-      });
-    }
-  });
-
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -323,24 +304,21 @@ export const convertPromQLData = (
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0]
               );
-              // get min value based on 2nd value of values
-              let seriesMin = values[0][1];
-              let seriesMax = values[0][1];
-              values.forEach((value: any) => {
-                // value[1] should not NaN
-                if (!isNaN(value[1])) {
-                  seriesMin = Math.min(value[1], seriesMin);
-                  seriesMax = Math.max(value[1], seriesMax);
-                }
-              });
               return {
                 name: getPromqlLegendName(
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
                 itemStyle: {
-                  color: getColor(panelSchema, seriesMax, min, max),
-                  // color: getColor(panelSchema, getPromqlLegendName(metric.metric, panelSchema.queries[index].config.promql_legend)),
+                  color: getColor(
+                    panelSchema,
+                    searchQueryData,
+                    getPromqlLegendName(
+                      metric.metric,
+                      panelSchema.queries[index].config.promql_legend
+                    ),
+                    values
+                  ),
                 },
                 // colorBy: "data",
                 // if utc then simply return the values by removing z from string
@@ -372,6 +350,7 @@ export const convertPromQLData = (
             return traces;
           }
         }
+        break;
       }
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
@@ -416,7 +395,15 @@ export const convertPromQLData = (
               },
             },
             itemStyle: {
-              color: getColor(panelSchema, values[0][1], min, max),
+              color: getColor(
+                panelSchema,
+                searchQueryData,
+                getPromqlLegendName(
+                  metric.metric,
+                  panelSchema.queries[index].config.promql_legend
+                ),
+                values
+              ),
             },
             title: {
               fontSize: 10,
@@ -445,8 +432,8 @@ export const convertPromQLData = (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
-                // taking first value for gauge
-                value: values[0][1],
+                // taking last value for gauge
+                value: values[values?.length - 1][1],
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(

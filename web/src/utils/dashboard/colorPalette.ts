@@ -131,9 +131,9 @@ const nameToColor = (name: any, colorArray: any) => {
   return colorArray[index];
 };
 
-const scaleValue = (value: any, min: any, max: any) => {
-  return ((value - min) * 100) / (max - min);
-};
+// const scaleValue = (value: any, min: any, max: any) => {
+//   return ((value - min) * 100) / (max - min);
+// };
 
 // const scaleValue = (value: any, min: any, max: any) => {
 //   return ((value - min) * 50) / (max - min);
@@ -143,39 +143,109 @@ const scaleValue = (value: any, min: any, max: any) => {
 //   return ((value - min) * 20) / (max - min) - 10;
 // };
 
-const shadeColor = (color: any, value: any, min: any, max: any) => {
-  let percent: any = scaleValue(value, min, max);
-  let R: any = parseInt(color.substring(1, 3), 16);
-  let G: any = parseInt(color.substring(3, 5), 16);
-  let B: any = parseInt(color.substring(5, 7), 16);
+// const shadeColor = (color: any, value: any, min: any, max: any) => {
+//   const percent: any = scaleValue(value, min, max);
+//   let R: any = parseInt(color.substring(1, 3), 16);
+//   let G: any = parseInt(color.substring(3, 5), 16);
+//   let B: any = parseInt(color.substring(5, 7), 16);
 
-  R = parseInt(((R * (100 + percent)) / 255).toString());
-  G = parseInt(((G * (100 + percent)) / 255).toString());
-  B = parseInt(((B * (100 + percent)) / 255).toString());
+//   R = parseInt(((R * (100 + percent)) / 255).toString());
+//   G = parseInt(((G * (100 + percent)) / 255).toString());
+//   B = parseInt(((B * (100 + percent)) / 255).toString());
 
-  let RR = R.toString(16).length == 1 ? "0" + R.toString(16) : R.toString(16);
-  let GG = G.toString(16).length == 1 ? "0" + G.toString(16) : G.toString(16);
-  let BB = B.toString(16).length == 1 ? "0" + B.toString(16) : B.toString(16);
+//   const RR = R.toString(16).length == 1 ? "0" + R.toString(16) : R.toString(16);
+//   const GG = G.toString(16).length == 1 ? "0" + G.toString(16) : G.toString(16);
+//   const BB = B.toString(16).length == 1 ? "0" + B.toString(16) : B.toString(16);
 
-  return "#" + RR + GG + BB;
+//   return "#" + RR + GG + BB;
+// };
+
+function shadeColor(color: any, value: any, min: any, max: any) {
+  let percent = (value - min) / (max - min);
+  let num = parseInt(color.replace("#", ""), 16),
+    amt = Math.round(0.5 * percent * 100),
+    R = (num >> 16) + amt,
+    B = ((num >> 8) & 0x00ff) + amt,
+    G = (num & 0x0000ff) + amt;
+
+  let newColor = (
+    0x1000000 +
+    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+    (B < 255 ? (B < 1 ? 0 : B) : 255) * 0x100 +
+    (G < 255 ? (G < 1 ? 0 : G) : 255)
+  )
+    .toString(16)
+    .slice(1);
+  return "#" + newColor;
+}
+
+const getMinMaxValue = (searchQueryData: any) => {
+  // need min and max value for color
+  let min = Infinity;
+  let max = -Infinity;
+  searchQueryData.forEach((metric: any) => {
+    if (metric.result && Array.isArray(metric.result)) {
+      metric?.result?.forEach((valuesArr: any) => {
+        if (valuesArr.values && Array.isArray(valuesArr.values)) {
+          valuesArr.values.forEach((val: any) => {
+            // val[1] should not NaN
+            if (!isNaN(val[1])) {
+              min = Math.min(min, val[1]);
+              max = Math.max(max, val[1]);
+            }
+          });
+        }
+      });
+    }
+  });
+  return {
+    min,
+    max,
+  };
+};
+
+const getSeriesValueFromArray = (panelSchema: any, values: any) => {
+  // if color is based on value then need to find seriesmin or seriesmax or last value
+  let seriesvalue = values[values.length - 1][1];
+  if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
+    if (panelSchema?.config?.color?.seriesBy == "min") {
+      values.forEach((value: any) => {
+        // value[1] should not NaN
+        if (!isNaN(value[1])) {
+          seriesvalue = Math.min(value[1], seriesvalue);
+        }
+      });
+    } else if (panelSchema?.config?.color?.seriesBy == "max") {
+      values.forEach((value: any) => {
+        // value[1] should not NaN
+        if (!isNaN(value[1])) {
+          seriesvalue = Math.max(value[1], seriesvalue);
+        }
+      });
+    }
+  }
+
+  return seriesvalue;
 };
 
 export const getColor = (
   panelSchema: any,
-  value?: any,
-  min?: any,
-  max?: any
+  searchQueryData: any,
+  seriesName: any,
+  valuesArr?: any
 ) => {
   // switch case based on panelSchema.color type
-  switch (panelSchema?.color?.mode) {
+  switch (panelSchema?.config?.color?.mode) {
     case "fixed": {
-      return panelSchema?.color?.fixedColor ?? "#5b8ff9";
+      return panelSchema?.config?.color?.fixedColor ?? "#5b8ff9";
     }
     case "shades": {
+      // getMinMaxValue
+      const { min, max } = getMinMaxValue(searchQueryData);
       // based on selected color pass different shades of same color
       return shadeColor(
-        panelSchema?.color?.fixedColor ?? "#5b8ff9",
-        value ?? 50,
+        panelSchema?.config?.color?.fixedColor ?? "#5b8ff9",
+        getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
         min ?? 0,
         max ?? 100
       );
@@ -184,14 +254,16 @@ export const getColor = (
     case "palette-classic": {
       // return color using colorArrayBySeries
       // NOTE: value will be series name
-      return nameToColor(value, colorArrayBySeries);
+      return nameToColor(seriesName, colorArrayBySeries);
     }
 
     case "continuous": {
+      const { min, max } = getMinMaxValue(searchQueryData);
+
       // based on selected color and value pass different shades of same color
       return shadeColor(
-        panelSchema?.color?.fixedColor ?? "#5b8ff9",
-        value ?? 50,
+        panelSchema?.config?.color?.fixedColor ?? "#5b8ff9",
+        getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
         min ?? 0,
         max ?? 100
       );
@@ -203,14 +275,7 @@ export const getColor = (
 
     default: {
       // return color using colorArrayBySeries
-      // NOTE: value will be series name
-      // return nameToColor(value, colorArrayBySeries);
-      return shadeColor(
-        panelSchema?.color?.fixedColor ?? "#73bf5f",
-        value ?? 50,
-        min ?? 0,
-        max ?? 100
-      );
+      return nameToColor(seriesName, colorArrayBySeries);
     }
   }
 };

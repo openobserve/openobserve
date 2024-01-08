@@ -563,6 +563,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-axis-border"
       />
     </div>
+
+    <div style="display: flex; align-items: center;">
+      <q-select
+        v-model="dashboardPanelData.data.config.color.mode"
+        :options="colorOptions"
+        outlined
+        dense
+        label="Color palette"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.color.mode ?? 'palette-classic'
+        }`"
+        style="width: 100%"
+      >
+      </q-select>
+      <div
+        class="color-input-wrapper"
+        v-if="['fixed','shades'].includes(dashboardPanelData.data.config.color.mode)"
+        style="margin-top: 30px; margin-left: 5px;"
+      >
+        <input
+          type="color"
+          v-model="dashboardPanelData.data.config.color.fixedColor"
+        />
+      </div>
+    </div>
+
+    <div class="space"></div>
   </div>
 </template>
 
@@ -575,6 +605,15 @@ export default defineComponent({
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
+
+    // on before mount need to check whether color object is there or not else use palette-classic as a default
+    onBeforeMount(() => {
+      if (!dashboardPanelData?.data?.config?.color) {
+        dashboardPanelData.data.config.color = {
+          mode: "palette-classic",
+        };
+      }
+    });
 
     const basemapTypeOptions = [
       {
@@ -654,6 +693,26 @@ export default defineComponent({
         value: "bottom",
       },
     ];
+
+    const colorOptions = [
+      {
+        label: "fixed",
+        value: "fixed",
+      },
+      {
+        label: "shades",
+        value: "shades",
+      },
+      {
+        label: "palette-classic",
+        value: "palette-classic",
+      },
+      {
+        label: "continuous",
+        value: "continuous",
+      },
+    ];
+
     const unitOptions = [
       {
         label: t("dashboard.default"),
@@ -718,6 +777,7 @@ export default defineComponent({
       isWeightFieldPresent,
       setUnit,
       legendWidthValue,
+      colorOptions,
     };
   },
 });
@@ -772,5 +832,26 @@ export default defineComponent({
   height: 36px;
   margin-top: 9px;
   width: 100px;
+}
+.color-input-wrapper {
+  height: 25px;
+  width: 25px;
+  overflow: hidden;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+.color-input-wrapper input[type="color"] {
+  position: absolute;
+  height: 4em;
+  width: 4em;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  border: none;
+  margin: 0;
+  padding: 0;
 }
 </style>
