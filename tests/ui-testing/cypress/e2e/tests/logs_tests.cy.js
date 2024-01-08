@@ -50,7 +50,7 @@ describe("Logs testcases", () => {
     // Making a POST request using cy.request()
     cy.request({
       method: "POST",
-      url: `${Cypress.config().baseUrl}/api/${orgId}/${streamName}/_json`,
+      url: `${Cypress.config().ingestionUrl}/api/${orgId}/${streamName}/_json`,
       body: logsdata,
       headers: {
         Authorization: `Basic ${basicAuthCredentials}`,
