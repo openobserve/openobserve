@@ -36,7 +36,7 @@ describe("Create a new dashboard", () => {
     // Making a POST request using cy.request()
     cy.request({
       method: "POST",
-      url: `http://localhost:5080/api/${orgId}/${streamName}/_json`,
+      url: `${Cypress.config().baseUrl}/api/${orgId}/${streamName}/_json`,
       body: logsdata,
       headers: {
         Authorization: `Basic ${basicAuthCredentials}`,
