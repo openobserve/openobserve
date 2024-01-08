@@ -335,12 +335,12 @@ const useLogs = () => {
 
     const query: any = {};
 
-    if (searchObj.data.stream.selectedStream.label) {
-      query["stream"] = searchObj.data.stream.selectedStream.label;
+    if (searchObj.data.stream.streamType) {
+      query["stream_type"] = searchObj.data.stream.streamType;
     }
 
-    if (searchObj.data.stream.streamType !== "logs") {
-      query["stream_type"] = searchObj.data.stream.streamType;
+    if (searchObj.data.stream.selectedStream.label) {
+      query["stream"] = searchObj.data.stream.selectedStream.label;
     }
 
     if (date.type == "relative") {

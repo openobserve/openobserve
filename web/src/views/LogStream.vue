@@ -480,11 +480,11 @@ export default defineComponent({
       router.push({
         name: "logs",
         query: {
+          stream_type: props.row.stream_type,
+          stream: props.row.name,
           period: "15m",
           refresh: "0",
           query: "",
-          stream_name: props.row.name,
-          stream_type: props.row.stream_type,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
