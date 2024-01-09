@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-right="archive"
         label="Export to csv"
         no-caps
-        style="height: 5px"
+        style="padding: 5px; font-size: small"
         @click="exportTable"
       />
     </template>
