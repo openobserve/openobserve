@@ -140,7 +140,6 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     - Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                         .num_microseconds()
                         .unwrap();
-                let mut partition_files_created = HashMap::with_capacity(files_with_size.len());
                 for file in files_with_size.iter() {
                     let Ok(file_meta) = get_file_meta(&wal_dir.join(&file.key)).await else {
                         continue;
@@ -151,18 +150,15 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                         .duration_since(UNIX_EPOCH)
                         .unwrap()
                         .as_micros() as i64;
-                    partition_files_created.insert(file.key.clone(), file_created);
+                    if file_created <= min_ts {
+                        force_upload = true;
+                        break;
+                    }
                 }
-                files_with_size = files_with_size
-                    .into_iter()
-                    .filter(|r| partition_files_created.get(&r.key).unwrap_or(&0) <= &min_ts)
-                    .collect::<Vec<_>>();
-                if files_with_size.is_empty() {
+                if !force_upload {
                     drop(permit);
                     return Ok(());
                 }
-                // the files are too old, force to upload
-                force_upload = true;
             }
 
             // get latest schema
