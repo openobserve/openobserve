@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type != 'table' &&
         dashboardPanelData.data.type != 'heatmap' &&
         dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'geomap'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
@@ -49,7 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type != 'table' &&
         dashboardPanelData.data.type != 'heatmap' &&
         dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'geomap'
       "
       outlined
       v-model="dashboardPanelData.data.config.legends_position"
@@ -67,13 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <div class="space"></div>
+    
     <div class="input-container">
       <q-input
         v-if="
           dashboardPanelData.data.type != 'table' &&
           dashboardPanelData.data.type != 'heatmap' &&
           dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge'
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap'
         "
         v-model.number="legendWidthValue"
         :label="t('common.legendWidth')"
@@ -89,7 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Auto"
         data-test="dashboard-config-legend-width"
       ></q-input>
-      <div class="unit-container">
+      <div
+        class="unit-container"
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap'
+        "
+      >
         <button
           @click="setUnit('px')"
           :class="{
@@ -98,7 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData?.data?.config?.legend_width?.unit === 'px',
           }"
           style="height: 100%; width: 100%; font-size: 14px"
-          :data-test="`dashboard-config-legend-width-unit-${dashboardPanelData?.data?.config?.legend_width?.unit === 'px' ? 'active' : 'inactive'}`"
+          :data-test="`dashboard-config-legend-width-unit-${
+            dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
+              ? 'active'
+              : 'inactive'
+          }`"
         >
           px
         </button>
@@ -109,7 +126,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData?.data?.config?.legend_width?.unit === '%',
           }"
           style="height: 100%; width: 100%; font-size: 14px"
-          :data-test="`dashboard-config-legend-width-unit-${dashboardPanelData?.data?.config?.legend_width?.unit === '%' ? 'active' : 'inactive'}`"
+          :data-test="`dashboard-config-legend-width-unit-${
+            dashboardPanelData?.data?.config?.legend_width?.unit === '%'
+              ? 'active'
+              : 'inactive'
+          }`"
         >
           %
         </button>
@@ -120,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-select
       outlined
-      v-if="dashboardPanelData.data.type != 'table'"
+      v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'geomap'"
       v-model="dashboardPanelData.data.config.unit"
       :options="unitOptions"
       dense
