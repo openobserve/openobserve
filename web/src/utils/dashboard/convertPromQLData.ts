@@ -623,6 +623,9 @@ export const convertPromQLData = (
     options.legend.textStyle.width = legendWidth - 55;
   }
 
+  console.log("options", JSON.parse(JSON.stringify(options)));
+  
+
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {
     return {

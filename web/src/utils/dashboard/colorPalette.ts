@@ -233,7 +233,138 @@ const colorBasedOnValue = (colors: any, min: any, max: any, value: any) => {
   let step = range / colors.length;
   let index = Math.min(Math.floor((value - min) / step), colors.length - 1);
   return colors[index];
+};
+
+// function getColorFn(value: any, min: any, max: any, colors: any) {
+//   // Ensure the value is between min and max
+//   if (value < min) value = min;
+//   if (value > max) value = max;
+
+//   // Convert colors from hex to RGB
+//   colors = colors.map((color: any) => {
+//       let r = parseInt(color.slice(1, 3), 16);
+//       let g = parseInt(color.slice(3, 5), 16);
+//       let b = parseInt(color.slice(5, 7), 16);
+//       return { r, g, b };
+//   });
+
+//   // Assign each color a maximum value
+//   let step = (max - min) / (colors.length - 1);
+//   colors = colors.map((color: any, i: any) => ({ ...color, max: min + step * i }));
+
+//   // Find which colors to interpolate between
+//   let color1, color2;
+//   for (let i = 0; i < colors.length; i++) {
+//       if (value <= colors[i].max) {
+//           color1 = colors[i - 1];
+//           color2 = colors[i];
+//           break;
+//       }
+//   }
+
+//   // Interpolate between the two colors
+//   let ratio = (value - color1.max) / (color2.max - color1.max);
+//   let r = Math.round(color1.r + ratio * (color2.r - color1.r));
+//   let g = Math.round(color1.g + ratio * (color2.g - color1.g));
+//   let b = Math.round(color1.b + ratio * (color2.b - color1.b));
+
+//   // Return the color as a CSS string
+//   return `rgb(${r}, ${g}, ${b})`;
+// }
+
+// function interpolateColor(color1: any, color2: any, factor: any) {
+//   let result = color1.slice();
+//   for (let i = 0; i < 3; i++) {
+//       result[i] = Math.round(result[i] + factor * (color2[i] - color1[i]));
+//   }
+//   return result;
+// };
+
+function rgbToHsl(r, g, b) {
+  r /= 255, g /= 255, b /= 255;
+  let max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) {
+      h = s = 0; // achromatic
+  } else {
+      let diff = max - min;
+      s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
+      switch (max) {
+          case r: h = (g - b) / diff + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / diff + 2; break;
+          case b: h = (r - g) / diff + 4; break;
+      }
+      h /= 6;
+  }
+  return [h, s, l];
 }
+
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) {
+      r = g = b = l; // achromatic
+  } else {
+      let hue2rgb = function hue2rgb(p, q, t) {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+      };
+      let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      let p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1 / 3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function lightenColor(color, percent) {
+  // Parse the color string to r, g, b
+  let [r, g, b] = color.match(/\d+/g).map(Number);
+  // Convert to HSL
+  let [h, s, l] = rgbToHsl(r, g, b);
+  // Adjust the lightness
+  l += ((0.7 - l) - (0.3 * (percent / 100)));
+  // Convert back to RGB
+  [r, g, b] = hslToRgb(h, s, l);
+  // Return the color as a string
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getColorPalette(colors) {
+  return function(value, min, max) {
+      const index = Math.floor(((value - min) / (max - min)) * colors.length);
+      const baseColor = colors[Math.min(index, colors.length - 1)];
+      const lightness = (1 - ((value - min) / (max - min))) * 100;
+      return lightenColor(baseColor, lightness);
+  };
+}
+// function getColorForPercentage(value: any, min: any, max: any, colors: any) {
+//   let ratio = (colors.length - 1) / 100;
+//   // let index = Math.floor(percentage * ratio);
+//   let range = max - min;
+//   let step = range / colors.length;
+//   let index = Math.min(Math.floor((value - min) / step), colors.length - 2);
+//   let percentage = ((value - min) * 100) / (max-min);
+//   let factor = (percentage * ratio) - index;
+
+  
+//   console.log(percentage, index, factor, colors[index], colors[index + 1]);
+  
+//   let color1 = colors[index];
+//   let color2 = colors[index + 1];
+  
+//   let result = interpolateColor(color1, color2, factor);
+
+//   return "#" + result.map((x: any) => x.toString(16).padStart(2, '0')).join('');
+// }
+
+// let colors = [[0, 128, 0], [255, 255, 0], [255, 0, 0]];  // green, yellow, red in RGB
+// console.log(getColorForPercentage(colors, 36));  // Output: "#b8ff00"
+
 
 export const getColor = (
   panelSchema: any,
@@ -264,17 +395,40 @@ export const getColor = (
       return nameToColor(seriesName, colorArrayBySeries);
     }
 
-    case "continuous": {
+    case "green-yellow-red": {
       const { min, max } = getMinMaxValue(searchQueryData);
 
       const value = getSeriesValueFromArray(panelSchema, valuesArr);
       // based on selected color and value pass different shades of same color
-      return shadeColor(
-        colorBasedOnValue(["#42f566", '#c3cc41', "#f5424b"], min, max, value ?? 50),
-        value ?? 50,
-        min ?? 0,
-        max ?? 100
-      );
+      // return shadeColor(
+      //   colorBasedOnValue(["#42f566", '#c3cc41', "#f5424b"], min, max, value ?? 50),
+      //   value ?? 50,
+      //   min ?? 0,
+      //   max ?? 100
+      // );
+
+      // return  getColorFn(value ?? 50, min ?? 0, max ?? 100, ["#42f566", '#c3cc41', "#f5424b"]);
+      // return  getColorForPercentage(value ?? 50, min ?? 0, max ?? 100, [[0, 128, 0], [255, 255, 0], [255, 0, 0]]);
+      const colorArrayBySeriesConst = getColorPalette(["rgb(0, 128, 0)", "rgb(255, 255, 0)", "rgb(255, 0, 0)"]);
+      return  colorArrayBySeriesConst(value ?? 50, min ?? 0, max ?? 100);
+    }
+
+    case "red-yellow-green": {
+      const { min, max } = getMinMaxValue(searchQueryData);
+
+      const value = getSeriesValueFromArray(panelSchema, valuesArr);
+      // based on selected color and value pass different shades of same color
+      // return shadeColor(
+      //   colorBasedOnValue(["#42f566", '#c3cc41', "#f5424b"], min, max, value ?? 50),
+      //   value ?? 50,
+      //   min ?? 0,
+      //   max ?? 100
+      // );
+
+      // return  getColorFn(value ?? 50, min ?? 0, max ?? 100, ["#42f566", '#c3cc41', "#f5424b"]);
+      // return  getColorForPercentage(value ?? 50, min ?? 0, max ?? 100, [[0, 128, 0], [255, 255, 0], [255, 0, 0]]);
+      const colorArrayBySeriesConst = getColorPalette(["rgb(255, 0, 0)", "rgb(255, 255, 0)","rgb(0, 128, 0)"]);
+      return  colorArrayBySeriesConst(value ?? 50, min ?? 0, max ?? 100);
     }
 
     // case "scheme":

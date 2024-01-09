@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <input
         type="color"
         v-model="dashboardPanelData.data.config.color.fixedColor"
+        format-model="rgb"
       />
     </div>
   </div>
@@ -79,8 +80,12 @@ export default defineComponent({
         value: "palette-classic",
       },
       {
-        label: "continuous",
-        value: "continuous",
+        label: "green-yellow-red",
+        value: "green-yellow-red",
+      },
+      {
+        label: "red-yellow-green",
+        value: "red-yellow-green",
       },
     ];
 
