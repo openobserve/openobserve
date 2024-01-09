@@ -545,10 +545,6 @@ export default defineComponent({
         value: "osm",
       },
     ];
-    console.log(
-      "dashboardPanelData",
-      dashboardPanelData?.data?.config?.legend_width
-    );
 
     onBeforeMount(() => {
       // Ensure that the nested structure is initialized
@@ -562,15 +558,9 @@ export default defineComponent({
 
     const legendWidthValue = computed({
       get() {
-        console.log(
-          "legendWidthValue",
-          dashboardPanelData.data.config?.legend_width?.value
-        );
         return dashboardPanelData.data.config?.legend_width?.value;
       },
       set(value) {
-        console.log("legendWidthValue set", value);
-
         // Ensure that the nested structure is initialized
         if (!dashboardPanelData.data.config.legend_width) {
           dashboardPanelData.data.config.legend_width = {
@@ -586,8 +576,6 @@ export default defineComponent({
     });
 
     const setUnit = (unit: any) => {
-      console.log("set unit", unit);
-
       // Ensure that the nested structure is initialized
       if (!dashboardPanelData.data.config.legend_width) {
         dashboardPanelData.data.config.legend_width = {

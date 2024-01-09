@@ -110,8 +110,12 @@ export const convertPromQLData = (
       top: "15",
       bottom:
         legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? panelSchema.config?.axis_width == null ? 30 : 50
-          : panelSchema.config?.axis_width == null ? 5 : "25",
+          ? panelSchema.config?.axis_width == null
+            ? 30
+            : 50
+          : panelSchema.config?.axis_width == null
+          ? 5
+          : "25",
     },
     tooltip: {
       show: true,
@@ -561,35 +565,22 @@ export const convertPromQLData = (
       .map((it: any) => it.name)
       .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
 
-    console.log("maxValue", maxValue);
-
     let legendWidth;
 
     if (
       panelSchema.config.legend_width &&
-      !isNaN(parseFloat(panelSchema.config.legend_width.value)) 
+      !isNaN(parseFloat(panelSchema.config.legend_width.value))
       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
-      console.log("legend_width.value", panelSchema.config.legend_width.value);
-      console.log("legend_width.unit", panelSchema.config.legend_width.unit);
-
       if (panelSchema.config.legend_width.unit === "%") {
-        console.log("inside %");
-        
         // If in percentage, calculate percentage of the chartPanelRef width
         const percentage = panelSchema.config.legend_width.value / 100;
         legendWidth = chartPanelRef.value?.offsetWidth * percentage;
       } else {
-        console.log("inside px");
-        
         // If in pixels, use the provided value
         legendWidth = panelSchema.config.legend_width.value;
       }
     } else {
-      console.log(
-        "Conditions not met. legend_width not provided or invalid format."
-      );
-
       // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
         Math.min(
@@ -597,8 +588,6 @@ export const convertPromQLData = (
           calculateWidthText(maxValue) + 60
         ) ?? 20;
     }
-
-    console.log("legendWidth", legendWidth);
 
     options.grid.right = legendWidth;
     options.legend.textStyle.width = legendWidth - 55;

@@ -176,8 +176,12 @@ export const convertSQLData = (
       top: "15",
       bottom:
         legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? panelSchema.config?.axis_width == null ? 40 : 60
-          : panelSchema.config?.axis_width == null ? 20 : "40",
+          ? panelSchema.config?.axis_width == null
+            ? 40
+            : 60
+          : panelSchema.config?.axis_width == null
+          ? 20
+          : "40",
     },
     tooltip: {
       trigger: "axis",
@@ -1431,7 +1435,6 @@ export const convertSQLData = (
     }
   }
 
-  
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
   if (
@@ -1444,8 +1447,6 @@ export const convertSQLData = (
       .map((it: any) => it.name)
       .reduce((max: any, it: any) => (max.length < it.length ? it : max));
 
-    console.log("maxValue", maxValue);
-
     let legendWidth;
 
     if (
@@ -1453,27 +1454,15 @@ export const convertSQLData = (
       !isNaN(parseFloat(panelSchema.config.legend_width.value))
       // ["px", "%"].includes(panelSchema.config.legend_width.unit)
     ) {
-      
-      console.log("legend_width.value", panelSchema.config.legend_width.value);
-      console.log("legend_width.unit", panelSchema.config.legend_width.unit);
-
       if (panelSchema.config.legend_width.unit === "%") {
-        console.log("inside %");
-
         // If in percentage, calculate percentage of the chartPanelRef width
         const percentage = panelSchema.config.legend_width.value / 100;
         legendWidth = chartPanelRef.value?.offsetWidth * percentage;
       } else {
-        console.log("inside px");
-
         // If in pixels, use the provided value
         legendWidth = panelSchema.config.legend_width.value;
       }
     } else {
-      console.log(
-        "Conditions not met. legend_width not provided or invalid format."
-      );
-
       // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
         Math.min(
@@ -1481,8 +1470,6 @@ export const convertSQLData = (
           calculateWidthText(maxValue) + 60
         ) ?? 20;
     }
-
-    console.log("legendWidth", legendWidth);
 
     options.grid.right = legendWidth;
     options.legend.textStyle.width = legendWidth - 55;
