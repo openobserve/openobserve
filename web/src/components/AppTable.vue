@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in props.cols"
               :key="col.name"
               :props="props"
+              :class="col.class || ''"
               @click="handleDataClick(col.name, props.row)"
             >
               <template v-if="col.slot">
