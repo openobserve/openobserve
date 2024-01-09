@@ -176,8 +176,8 @@ export const convertSQLData = (
       top: "15",
       bottom:
         legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? 40
-          : "20",
+          ? panelSchema.config?.axis_width == null ? 40 : 60
+          : panelSchema.config?.axis_width == null ? 20 : "40",
     },
     tooltip: {
       trigger: "axis",

@@ -110,8 +110,8 @@ export const convertPromQLData = (
       top: "15",
       bottom:
         legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-          ? 30
-          : "5",
+          ? panelSchema.config?.axis_width == null ? 30 : 50
+          : panelSchema.config?.axis_width == null ? 5 : "25",
     },
     tooltip: {
       show: true,
