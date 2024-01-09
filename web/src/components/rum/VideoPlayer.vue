@@ -231,8 +231,8 @@ const playerState = ref({
   time: "00.00",
   duration: "00.00", // in ms
   speed: {
-    label: "1x",
-    value: 1,
+    label: "4x",
+    value: 4,
   },
   progressWidth: 0,
   playBackEvents: {
