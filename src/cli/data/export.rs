@@ -16,7 +16,6 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use actix_web::web::Query;
-use ahash::AHashMap;
 use config::meta::stream::StreamType;
 
 use crate::{
@@ -29,7 +28,7 @@ pub struct Export {}
 
 impl Context for Export {
     fn operator(c: Cli) -> Result<bool, anyhow::Error> {
-        let map = AHashMap::from([("type".to_string(), c.stream_type)]);
+        let map = HashMap::from([("type".to_string(), c.stream_type)]);
 
         let stream_type = match get_stream_type_from_request(&Query(map.clone())) {
             Ok(v) => v.unwrap_or(StreamType::Logs),

@@ -17,7 +17,6 @@ pub mod saved_view;
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
-use ahash::AHashMap;
 use chrono::Duration;
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 
@@ -109,7 +108,7 @@ pub async fn search(
     let session_id = uuid::Uuid::new_v4().to_string();
 
     let org_id = org_id.into_inner();
-    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
@@ -279,7 +278,7 @@ pub async fn around(
 
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
@@ -527,7 +526,7 @@ pub async fn values(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
@@ -580,7 +579,7 @@ async fn values_v1(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    query: &web::Query<AHashMap<String, String>>,
+    query: &web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = uuid::Uuid::new_v4().to_string();
@@ -788,7 +787,7 @@ async fn values_v2(
     stream_name: &str,
     field: &str,
     filter: Option<(&str, &str)>,
-    query: &web::Query<AHashMap<String, String>>,
+    query: &web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = uuid::Uuid::new_v4().to_string();

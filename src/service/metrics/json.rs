@@ -16,7 +16,6 @@
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use actix_web::{http, web};
-use ahash::AHashMap;
 use anyhow::{anyhow, Result};
 use config::{
     meta::stream::StreamType,
@@ -42,6 +41,7 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
+        schema::check_for_schema,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -68,10 +68,10 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_status_map: AHashMap<String, StreamStatus> = AHashMap::new();
-    let mut stream_data_buf: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
-    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
+    let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
@@ -211,6 +211,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             }
             stream_schema_map.insert(stream_name.clone(), schema);
         }
+
+        // check for schema evolution
+        let record_val = json::Value::Object(record.to_owned());
+        let _ = check_for_schema(
+            org_id,
+            &stream_name,
+            StreamType::Metrics,
+            &mut stream_schema_map,
+            &record_val,
+            timestamp,
+        )
+        .await;
 
         // write into buffer
         if !stream_partitioning_map.contains_key(&stream_name) {

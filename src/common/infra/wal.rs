@@ -107,7 +107,10 @@ impl Manager {
             "{}/{}/{}/{key}",
             stream.org_id, stream.stream_type, stream.stream_name
         );
-        let manager = self.data.get(thread_id).unwrap().read().await;
+        let Some(locker) = self.data.get(thread_id) else {
+            return None;
+        };
+        let manager = locker.read().await;
         let file = match manager.get(&full_key) {
             Some(file) => file.clone(),
             None => {
@@ -120,7 +123,7 @@ impl Manager {
         if file.size().await >= (CONFIG.limit.max_file_size_on_disk as i64)
             || file.expired() <= Utc::now().timestamp()
         {
-            let mut manager = self.data.get(thread_id).unwrap().write().await;
+            let mut manager = locker.write().await;
             manager.remove(&full_key);
             manager.shrink_to_fit();
             file.sync().await;

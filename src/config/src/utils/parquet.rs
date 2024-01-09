@@ -13,18 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, sync::Arc};
+use std::{io::Cursor, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use parquet::{
-    arrow::{ArrowWriter, ParquetRecordBatchStreamBuilder},
+    arrow::{arrow_reader::ArrowReaderMetadata, ArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
     schema::types::ColumnPath,
 };
 
-use crate::{config::*, meta::stream::FileMeta};
+use crate::{config::*, ider, meta::stream::FileMeta};
 
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
@@ -116,20 +116,45 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
-pub async fn read_metadata(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
+pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
     let mut meta = FileMeta::default();
     let schema_reader = Cursor::new(data.clone());
     let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
     if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
-        for kv in metadata {
-            match kv.key.as_str() {
-                "min_ts" => meta.min_ts = kv.value.as_ref().unwrap().parse().unwrap(),
-                "max_ts" => meta.max_ts = kv.value.as_ref().unwrap().parse().unwrap(),
-                "records" => meta.records = kv.value.as_ref().unwrap().parse().unwrap(),
-                "original_size" => meta.original_size = kv.value.as_ref().unwrap().parse().unwrap(),
-                _ => {}
-            }
-        }
+        meta = metadata.as_slice().into();
     }
     Ok(meta)
+}
+
+pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow::Error> {
+    let mut meta = FileMeta::default();
+    let mut file = tokio::fs::File::open(path).await?;
+    let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
+    if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
+        meta = metadata.as_slice().into();
+    }
+    Ok(meta)
+}
+
+pub fn generate_filename_with_time_range(min_ts: i64, max_ts: i64) -> String {
+    format!(
+        "{}.{}.{}{}",
+        min_ts,
+        max_ts,
+        ider::generate(),
+        FILE_EXT_PARQUET
+    )
+}
+
+pub fn parse_time_range_from_filename(mut name: &str) -> (i64, i64) {
+    if let Some(v) = name.rfind('/') {
+        name = &name[v + 1..];
+    }
+    let columns = name.split('.').collect::<Vec<&str>>();
+    if columns.len() < 4 {
+        return (0, 0);
+    }
+    let min_ts = columns[0].parse::<i64>().unwrap_or(0);
+    let max_ts = columns[1].parse::<i64>().unwrap_or(0);
+    (min_ts, max_ts)
 }

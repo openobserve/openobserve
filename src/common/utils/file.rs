@@ -16,6 +16,7 @@
 use std::{
     fs::{File, Metadata},
     io::{Read, Write},
+    path::Path,
 };
 
 #[inline(always)]
@@ -39,8 +40,8 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[inline(always)]
-pub fn scan_files(root_dir: &str, ext: &str) -> Vec<String> {
-    walkdir::WalkDir::new(root_dir)
+pub fn scan_files<P: AsRef<Path>>(root: P, ext: &str) -> Vec<String> {
+    walkdir::WalkDir::new(root)
         .into_iter()
         .filter_map(|entry| {
             let entry = entry.ok()?;

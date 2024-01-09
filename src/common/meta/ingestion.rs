@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io;
+use std::{
+    collections::HashMap,
+    io::{BufReader, Lines},
+};
 
 use actix_web::web;
-use ahash::AHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -321,7 +323,7 @@ impl From<std::io::Error> for IngestionError {
 
 pub enum IngestionDataIter<'a> {
     JSONIter(std::slice::Iter<'a, json::Value>),
-    MultiIter(io::Lines<std::io::BufReader<&'a [u8]>>),
+    MultiIter(Lines<BufReader<&'a [u8]>>),
     GCP(
         std::vec::IntoIter<json::Value>,
         Option<GCPIngestionResponse>,

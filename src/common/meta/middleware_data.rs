@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{net::IpAddr, sync::Arc};
+use std::{collections::HashMap, net::IpAddr, sync::Arc};
 
 use actix_web::{
     body::MessageBody,
@@ -21,7 +21,6 @@ use actix_web::{
     web, Error as ActixErr, HttpMessage,
 };
 use actix_web_lab::middleware::Next;
-use ahash::AHashMap;
 use maxminddb::geoip2::city::Location;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -52,18 +51,18 @@ pub fn initialize_ua_parser() -> UserAgentParser {
 /// NOTE: the only condition is that the prefix of such params is `oo`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RumExtraData {
-    pub data: AHashMap<String, serde_json::Value>,
+    pub data: HashMap<String, serde_json::Value>,
 }
 
 impl RumExtraData {
-    fn filter_api_keys(data: &mut AHashMap<String, String>) {
+    fn filter_api_keys(data: &mut HashMap<String, String>) {
         data.retain(|k, _| {
             (k.starts_with("oo") || k.starts_with("o2") || k.starts_with("batch_time"))
                 && !(k.eq("oo-api-key") || k.eq("o2-api-key"))
         })
     }
 
-    fn filter_tags(data: &AHashMap<String, String>) -> AHashMap<String, serde_json::Value> {
+    fn filter_tags(data: &HashMap<String, String>) -> HashMap<String, serde_json::Value> {
         match data.get("ootags").or_else(|| data.get("o2tags")) {
             Some(tags) => tags
                 .split(',')
@@ -73,7 +72,7 @@ impl RumExtraData {
                 })
                 .collect(),
 
-            None => AHashMap::default(),
+            None => HashMap::default(),
         }
     }
 
@@ -83,13 +82,13 @@ impl RumExtraData {
     ) -> Result<ServiceResponse<impl MessageBody>, ActixErr> {
         let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
         let mut data =
-            web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+            web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         Self::filter_api_keys(&mut data);
 
         // These are the tags which come in `ootags` or `o2tags`
-        let tags: AHashMap<String, serde_json::Value> = Self::filter_tags(&data);
+        let tags: HashMap<String, serde_json::Value> = Self::filter_tags(&data);
 
-        let mut user_agent_hashmap: AHashMap<String, serde_json::Value> = data
+        let mut user_agent_hashmap: HashMap<String, serde_json::Value> = data
             .into_inner()
             .into_iter()
             .map(|(key, val)| (key, val.into()))
@@ -184,7 +183,7 @@ mod tests {
 
         // Call the from_query function
         let mut data =
-            web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+            web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         RumExtraData::filter_api_keys(&mut data);
 
         // Assert that the data is filtered correctly
@@ -208,7 +207,7 @@ mod tests {
 
             // Call the from_query function
             let query_data =
-                web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+                web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
             let data = RumExtraData::filter_tags(&query_data);
 
             // Assert that the tags are filtered correctly

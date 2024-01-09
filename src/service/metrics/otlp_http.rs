@@ -16,7 +16,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use actix_web::{http, web, HttpResponse};
-use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG};
@@ -45,11 +44,11 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{
-            chk_schema_by_record, evaluate_trigger, get_float_value, get_int_value,
-            get_string_value, get_val_for_attr, write_file, TriggerAlertData,
+            evaluate_trigger, get_float_value, get_int_value, get_string_value, get_val_for_attr,
+            write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
-        schema::{set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -110,11 +109,12 @@ pub async fn metrics_json_handler(
 
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
-    let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
-    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
+    let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,
@@ -143,41 +143,6 @@ pub async fn metrics_json_handler(
             )));
         }
     };
-
-    // TODO: delete for debug
-    let mut streams = std::collections::HashSet::new();
-    let mut records_num = 0;
-    for metric in res_metrics.iter() {
-        if let Some(metrics) = metric.get("scopeMetrics") {
-            if let Some(metrics) = metrics.as_array() {
-                for metric in metrics.iter() {
-                    if let Some(metrics) = metric.get("metrics") {
-                        if let Some(metrics) = metrics.as_array() {
-                            for metric in metrics.iter() {
-                                let name = metric.get("name").unwrap().as_str().unwrap();
-                                streams.insert(name);
-                                for key in ["sum", "gauge", "histogram", "summary"].iter() {
-                                    if let Some(data) = metric.get(key) {
-                                        if let Some(data) = data.get("dataPoints") {
-                                            if let Some(data_points) = data.as_array() {
-                                                records_num += data_points.len();
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    log::info!(
-        "/prometheus/otlp/http/v1/write: metadatas: {}, streams: {}, samples: {}",
-        0,
-        streams.len(),
-        records_num,
-    );
 
     for res_metric in res_metrics.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
@@ -288,7 +253,7 @@ pub async fn metrics_json_handler(
                             .to_owned(),
                         unit: metric.get("unit").unwrap().as_str().unwrap().to_owned(),
                     };
-                    let mut prom_meta: AHashMap<String, String> = AHashMap::new();
+                    let mut prom_meta: HashMap<String, String> = HashMap::new();
 
                     let records = if metric.get("sum").is_some() {
                         let sum = metric.get("sum").unwrap().as_object().unwrap();
@@ -411,15 +376,24 @@ pub async fn metrics_json_handler(
                             .unwrap_or(Utc::now().timestamp_micros());
 
                         let value_str = json::to_string(&val_map).unwrap();
-                        chk_schema_by_record(
-                            &mut metric_schema_map,
-                            org_id,
-                            StreamType::Metrics,
-                            local_metric_name,
-                            timestamp,
-                            &value_str,
-                        )
-                        .await;
+
+                        // check for schema evolution
+                        if schema_evoluted.get(local_metric_name).is_none() {
+                            let record_val = json::Value::Object(val_map.to_owned());
+                            if check_for_schema(
+                                org_id,
+                                local_metric_name,
+                                StreamType::Metrics,
+                                &mut metric_schema_map,
+                                &record_val,
+                                timestamp,
+                            )
+                            .await
+                            .is_ok()
+                            {
+                                schema_evoluted.insert(local_metric_name.to_owned(), true);
+                            }
+                        }
 
                         let schema = metric_schema_map
                             .get(local_metric_name)
@@ -560,7 +534,7 @@ fn process_sum(
     rec: &mut json::Value,
     sum: &json::Map<String, json::Value>,
     metadata: &mut prom::Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Counter;
@@ -610,7 +584,7 @@ fn process_histogram(
     rec: &mut json::Value,
     hist: &json::Map<String, json::Value>,
     metadata: &mut prom::Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Histogram;
@@ -647,7 +621,7 @@ fn process_summary(
     rec: &json::Value,
     summary: &json::Map<String, json::Value>,
     metadata: &mut prom::Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::Summary;
@@ -677,7 +651,7 @@ fn process_gauge(
     rec: &mut json::Value,
     gauge: &json::Map<String, json::Value>,
     metadata: &mut prom::Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     let mut records = vec![];
 
@@ -705,7 +679,7 @@ fn process_exponential_histogram(
     rec: &mut json::Value,
     hist: &json::Map<String, json::Value>,
     metadata: &mut prom::Metadata,
-    prom_meta: &mut AHashMap<String, String>,
+    prom_meta: &mut HashMap<String, String>,
 ) -> Vec<serde_json::Value> {
     // set metadata
     metadata.metric_type = MetricType::ExponentialHistogram;

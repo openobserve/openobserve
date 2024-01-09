@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::BTreeMap, io::BufReader, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
-use ahash::AHashMap;
 use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::StreamType, utils::schema::infer_json_schema, SIZE_IN_MB};
+use config::{meta::stream::StreamType, SIZE_IN_MB};
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -111,8 +113,8 @@ pub async fn get_stream_transforms<'a>(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    stream_transform_map: &mut AHashMap<String, Vec<StreamTransform>>,
-    stream_vrl_map: &mut AHashMap<String, VRLResultResolver>,
+    stream_transform_map: &mut HashMap<String, Vec<StreamTransform>>,
+    stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
 ) {
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
     if stream_transform_map.contains_key(&key) {
@@ -126,7 +128,7 @@ pub async fn get_stream_transforms<'a>(
 
 pub async fn get_stream_partition_keys(
     stream_name: &str,
-    stream_schema_map: &AHashMap<String, Schema>,
+    stream_schema_map: &HashMap<String, Schema>,
 ) -> PartitioningDetails {
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema,
@@ -144,7 +146,7 @@ pub async fn get_stream_alerts(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    stream_alerts_map: &mut AHashMap<String, Vec<Alert>>,
+    stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
 ) {
     let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     if stream_alerts_map.contains_key(&key) {
@@ -229,9 +231,9 @@ pub fn register_stream_transforms(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-) -> (Vec<StreamTransform>, AHashMap<String, VRLResultResolver>) {
+) -> (Vec<StreamTransform>, HashMap<String, VRLResultResolver>) {
     let mut local_trans = vec![];
-    let mut stream_vrl_map: AHashMap<String, VRLResultResolver> = AHashMap::new();
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
     let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
@@ -263,7 +265,7 @@ pub fn register_stream_transforms(
 pub fn apply_stream_transform(
     local_trans: &[StreamTransform],
     mut value: Value,
-    stream_vrl_map: &AHashMap<String, VRLResultResolver>,
+    stream_vrl_map: &HashMap<String, VRLResultResolver>,
     stream_name: &str,
     runtime: &mut Runtime,
 ) -> Result<Value, anyhow::Error> {
@@ -277,43 +279,6 @@ pub fn apply_stream_transform(
     flatten::flatten(value)
 }
 
-pub async fn chk_schema_by_record(
-    stream_schema_map: &mut AHashMap<String, Schema>,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    record_ts: i64,
-    record_val: &str,
-) {
-    let schema = if stream_schema_map.contains_key(stream_name) {
-        stream_schema_map.get(stream_name).unwrap().clone()
-    } else {
-        let schema = db::schema::get(org_id, stream_name, stream_type)
-            .await
-            .unwrap();
-        stream_schema_map.insert(stream_name.to_string(), schema.clone());
-        schema
-    };
-    if !schema.fields().is_empty() {
-        return;
-    }
-
-    let mut schema_reader = BufReader::new(record_val.as_bytes());
-    let inferred_schema = infer_json_schema(&mut schema_reader, None, stream_type).unwrap();
-    let inferred_schema = inferred_schema.with_metadata(schema.metadata().clone());
-    stream_schema_map.insert(stream_name.to_string(), inferred_schema.clone());
-    db::schema::set(
-        org_id,
-        stream_name,
-        stream_type,
-        &inferred_schema,
-        Some(record_ts),
-        true,
-    )
-    .await
-    .unwrap();
-}
-
 pub fn init_functions_runtime() -> Runtime {
     crate::common::utils::functions::init_vrl_runtime()
 }
@@ -321,7 +286,7 @@ pub fn init_functions_runtime() -> Runtime {
 pub async fn write_file(
     writer: &Arc<ingester::Writer>,
     stream_name: &str,
-    buf: AHashMap<String, SchemaRecords>,
+    buf: HashMap<String, SchemaRecords>,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
     for (hour_key, entry) in buf {
@@ -540,7 +505,7 @@ mod tests {
     }
     #[actix_web::test]
     async fn test_get_stream_partition_keys() {
-        let mut stream_schema_map = AHashMap::new();
+        let mut stream_schema_map = HashMap::new();
         let mut meta = HashMap::new();
         meta.insert(
             "settings".to_string(),

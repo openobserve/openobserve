@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{prelude::*, Error};
+use std::{
+    collections::HashMap,
+    io::{prelude::*, Error},
+};
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{post, web, HttpResponse};
-use ahash::AHashMap;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 
@@ -203,7 +205,7 @@ async fn ingest_multi_json(
     org_id: &str,
     stream_name: &str,
     body: web::Bytes,
-    extend_json: &AHashMap<String, serde_json::Value>,
+    extend_json: &HashMap<String, serde_json::Value>,
     thread_id: usize,
 ) -> Result<HttpResponse, Error> {
     Ok(

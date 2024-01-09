@@ -15,7 +15,6 @@
 
 use std::collections::HashMap;
 
-use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -34,14 +33,14 @@ pub struct Span {
     pub duration: u64,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub reference: AHashMap<String, String>,
+    pub reference: HashMap<String, String>,
     pub service_name: String,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub attributes: AHashMap<String, json::Value>,
+    pub attributes: HashMap<String, json::Value>,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub service: AHashMap<String, json::Value>,
+    pub service: HashMap<String, json::Value>,
     pub events: String,
 }
 
@@ -60,7 +59,7 @@ pub struct Event {
     pub _timestamp: u64,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub attributes: AHashMap<String, json::Value>,
+    pub attributes: HashMap<String, json::Value>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
