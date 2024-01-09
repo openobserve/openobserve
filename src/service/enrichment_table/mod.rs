@@ -84,6 +84,7 @@ pub async fn save_enrichment_data(
         );
     }
 
+    let mut schema_evoluted = false;
     let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
@@ -141,16 +142,22 @@ pub async fn save_enrichment_data(
                 let value_str = json::to_string(&json_record).unwrap();
 
                 // check for schema evolution
-                let record_val = json::Value::Object(json_record.to_owned());
-                let _ = check_for_schema(
-                    org_id,
-                    stream_name,
-                    StreamType::EnrichmentTables,
-                    &mut stream_schema_map,
-                    &record_val,
-                    timestamp,
-                )
-                .await;
+                if !schema_evoluted {
+                    let record_val = json::Value::Object(json_record.to_owned());
+                    if check_for_schema(
+                        org_id,
+                        stream_name,
+                        StreamType::EnrichmentTables,
+                        &mut stream_schema_map,
+                        &record_val,
+                        timestamp,
+                    )
+                    .await
+                    .is_ok()
+                    {
+                        schema_evoluted = true;
+                    }
+                }
 
                 if records.is_empty() {
                     let schema = stream_schema_map.get(stream_name).unwrap();

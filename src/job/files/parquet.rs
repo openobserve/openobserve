@@ -353,7 +353,7 @@ async fn merge_files(
             &file_name,
         )
         .await?;
-        return Ok((new_file_name, file_meta, files_with_size.to_vec()));
+        return Ok((new_file_name, file_meta, retain_file_list));
     }
 
     // merge files

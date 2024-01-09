@@ -89,44 +89,10 @@ pub async fn handle_grpc_request(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
-
-    // TODO: delete for debug
-    let mut streams = std::collections::HashSet::new();
-    let mut records_num = 0;
-    for metric in request.resource_metrics.iter() {
-        for metric in metric.scope_metrics.iter() {
-            for metric in metric.metrics.iter() {
-                streams.insert(metric.name.clone());
-                match metric.data {
-                    Some(Data::Gauge(ref gauge)) => {
-                        records_num += gauge.data_points.len();
-                    }
-                    Some(Data::Sum(ref sum)) => {
-                        records_num += sum.data_points.len();
-                    }
-                    Some(Data::Histogram(ref hist)) => {
-                        records_num += hist.data_points.len();
-                    }
-                    Some(Data::ExponentialHistogram(ref exp_hist)) => {
-                        records_num += exp_hist.data_points.len();
-                    }
-                    Some(Data::Summary(ref summary)) => {
-                        records_num += summary.data_points.len();
-                    }
-                    None => {}
-                }
-            }
-        }
-    }
-    log::info!(
-        "/prometheus/otlp/grpc/v1/write: metadatas: {}, streams: {}, samples: {}",
-        0,
-        streams.len(),
-        records_num,
-    );
 
     for resource_metric in &request.resource_metrics {
         for scope_metric in &resource_metric.scope_metrics {
@@ -318,16 +284,22 @@ pub async fn handle_grpc_request(
                     let value_str = json::to_string(&val_map).unwrap();
 
                     // check for schema evolution
-                    let record_val = json::Value::Object(val_map.to_owned());
-                    let _ = check_for_schema(
-                        org_id,
-                        local_metric_name,
-                        StreamType::Metrics,
-                        &mut metric_schema_map,
-                        &record_val,
-                        timestamp,
-                    )
-                    .await;
+                    if schema_evoluted.get(local_metric_name).is_none() {
+                        let record_val = json::Value::Object(val_map.to_owned());
+                        if check_for_schema(
+                            org_id,
+                            local_metric_name,
+                            StreamType::Metrics,
+                            &mut metric_schema_map,
+                            &record_val,
+                            timestamp,
+                        )
+                        .await
+                        .is_ok()
+                        {
+                            schema_evoluted.insert(local_metric_name.to_owned(), true);
+                        }
+                    }
 
                     let buf = metric_data_map
                         .entry(local_metric_name.to_owned())

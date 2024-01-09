@@ -141,6 +141,26 @@ impl DistinctValues {
                 continue;
             }
 
+            // check for schema
+            let db_schema = super::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+                .await
+                .unwrap();
+            if db_schema.fields().is_empty() {
+                let schema = schema.as_ref().clone();
+                if let Err(e) = super::db::schema::set(
+                    &org_id,
+                    STREAM_NAME,
+                    StreamType::Metadata,
+                    &schema,
+                    None,
+                    false,
+                )
+                .await
+                {
+                    log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
+                }
+            }
+
             let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
@@ -168,26 +188,6 @@ impl DistinctValues {
                 });
                 hour_buf.records.push(Arc::new(data));
                 hour_buf.records_size += data_size;
-            }
-
-            // check schema
-            let db_schema = super::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
-                .await
-                .unwrap();
-            if db_schema.fields().is_empty() {
-                let schema = schema.as_ref().clone();
-                if let Err(e) = super::db::schema::set(
-                    &org_id,
-                    STREAM_NAME,
-                    StreamType::Metadata,
-                    &schema,
-                    None,
-                    false,
-                )
-                .await
-                {
-                    log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
-                }
             }
 
             let writer = ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string()).await;

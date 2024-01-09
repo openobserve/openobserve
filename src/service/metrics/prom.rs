@@ -84,6 +84,7 @@ pub async fn remote_write(
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
     let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
@@ -339,16 +340,22 @@ pub async fn remote_write(
             let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
-            let record_val = json::Value::Object(val_map.to_owned());
-            let _ = check_for_schema(
-                org_id,
-                &metric_name,
-                StreamType::Metrics,
-                &mut metric_schema_map,
-                &record_val,
-                timestamp,
-            )
-            .await;
+            if schema_evoluted.get(&metric_name).is_none() {
+                let record_val = json::Value::Object(val_map.to_owned());
+                if check_for_schema(
+                    org_id,
+                    &metric_name,
+                    StreamType::Metrics,
+                    &mut metric_schema_map,
+                    &record_val,
+                    timestamp,
+                )
+                .await
+                .is_ok()
+                {
+                    schema_evoluted.insert(metric_name.to_owned(), true);
+                }
+            }
 
             let schema = metric_schema_map
                 .get(&metric_name)

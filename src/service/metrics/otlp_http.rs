@@ -111,6 +111,7 @@ pub async fn metrics_json_handler(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
@@ -142,41 +143,6 @@ pub async fn metrics_json_handler(
             )));
         }
     };
-
-    // TODO: delete for debug
-    let mut streams = std::collections::HashSet::new();
-    let mut records_num = 0;
-    for metric in res_metrics.iter() {
-        if let Some(metrics) = metric.get("scopeMetrics") {
-            if let Some(metrics) = metrics.as_array() {
-                for metric in metrics.iter() {
-                    if let Some(metrics) = metric.get("metrics") {
-                        if let Some(metrics) = metrics.as_array() {
-                            for metric in metrics.iter() {
-                                let name = metric.get("name").unwrap().as_str().unwrap();
-                                streams.insert(name);
-                                for key in ["sum", "gauge", "histogram", "summary"].iter() {
-                                    if let Some(data) = metric.get(key) {
-                                        if let Some(data) = data.get("dataPoints") {
-                                            if let Some(data_points) = data.as_array() {
-                                                records_num += data_points.len();
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    log::info!(
-        "/prometheus/otlp/http/v1/write: metadatas: {}, streams: {}, samples: {}",
-        0,
-        streams.len(),
-        records_num,
-    );
 
     for res_metric in res_metrics.iter() {
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
@@ -412,16 +378,22 @@ pub async fn metrics_json_handler(
                         let value_str = json::to_string(&val_map).unwrap();
 
                         // check for schema evolution
-                        let record_val = json::Value::Object(val_map.to_owned());
-                        let _ = check_for_schema(
-                            org_id,
-                            local_metric_name,
-                            StreamType::Metrics,
-                            &mut metric_schema_map,
-                            &record_val,
-                            timestamp,
-                        )
-                        .await;
+                        if schema_evoluted.get(local_metric_name).is_none() {
+                            let record_val = json::Value::Object(val_map.to_owned());
+                            if check_for_schema(
+                                org_id,
+                                local_metric_name,
+                                StreamType::Metrics,
+                                &mut metric_schema_map,
+                                &record_val,
+                                timestamp,
+                            )
+                            .await
+                            .is_ok()
+                            {
+                                schema_evoluted.insert(local_metric_name.to_owned(), true);
+                            }
+                        }
 
                         let schema = metric_schema_map
                             .get(local_metric_name)
