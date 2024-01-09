@@ -19,7 +19,7 @@ use ahash::AHashMap as HashMap;
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
     meta::stream::{FileKey, StreamType},
-    utils::parquet::read_metadata_from_bytes,
+    utils::parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
     CONFIG,
 };
 use datafusion::{
@@ -459,7 +459,7 @@ pub async fn search_memtable(
 /// searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
-    _session_id: &str,
+    session_id: &str,
     sql: &Sql,
     stream_type: StreamType,
     _partition_time_level: &PartitionTimeLevel,
@@ -492,7 +492,6 @@ async fn get_file_list(
     // lock theses files
     let files = files
         .iter()
-        .filter(|f| f.ends_with(".parquet"))
         .map(|f| {
             f.strip_prefix(&wal_dir)
                 .unwrap()
@@ -505,8 +504,24 @@ async fn get_file_list(
     wal::lock_files(&files).await;
 
     let mut result = Vec::with_capacity(files.len());
+    let (min_ts, max_ts) = sql.meta.time_range.unwrap_or((0, 0));
     for file in files.iter() {
         let file_key = FileKey::from_file_name(file);
+        if (min_ts, max_ts) != (0, 0) {
+            let (file_min_ts, file_max_ts) = parse_time_range_from_filename(file);
+            if (file_min_ts > 0 && file_max_ts > 0)
+                && ((max_ts > 0 && file_min_ts > max_ts) || (min_ts > 0 && file_max_ts < min_ts))
+            {
+                log::debug!(
+                    "[session_id {session_id}] skip wal parquet file: {} time_range: [{},{}]",
+                    &file,
+                    file_min_ts,
+                    file_max_ts
+                );
+                wal::release_files(&[file.clone()]).await;
+                continue;
+            }
+        }
         if sql.match_source(&file_key, false, true, stream_type).await {
             result.push(file_key);
         } else {

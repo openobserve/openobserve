@@ -189,7 +189,7 @@ impl Metrics for Querier {
                 || (end_time > 0 && parquet_meta.min_ts > end_time)
             {
                 log::debug!(
-                    "skip wal file: {} time_range: [{},{}]",
+                    "skip wal parquet file: {} time_range: [{},{}]",
                     file,
                     parquet_meta.min_ts,
                     parquet_meta.max_ts
