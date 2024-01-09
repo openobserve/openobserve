@@ -54,7 +54,6 @@ const defaultObject = {
   runQuery: false,
   loading: true,
   config: {
-    recordsPerPage: 250,
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
