@@ -765,7 +765,6 @@ export const usePanelDataLoader = (
     ) {
       // 1. Regular variables  = 0 and Dynamic variables  = 0
       // go ahead and bravly load the data
-      lo;
       !newDependentVariablesData?.length && !newDynamicVariablesData?.length;
 
       log(
