@@ -41,6 +41,7 @@
     "d3-selection": "^3.0.0",
     "date-fns-tz": "^2.0.0",
     "echarts": "^5.4.3",
+    "flag-icons": "^7.1.0",
     "jest-canvas-mock": "^2.5.0",
     "js-cookie": "^3.0.1",
     "jwt-decode": "^3.1.2",

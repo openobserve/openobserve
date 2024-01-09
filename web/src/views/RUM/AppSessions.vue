@@ -359,6 +359,7 @@ const getRumDataFields = () => {
         const fieldsToVerify = new Set([
           "geo_info_city",
           "geo_info_country",
+          "geo_info_country_iso_code",
           "usr_email",
           "usr_id",
           "usr_name",
@@ -446,6 +447,10 @@ const getSessionLogs = (req: any) => {
     geoFields += "min(geo_info_country) as country,";
   }
 
+  if (schemaMapping.value["geo_info_country_iso_code"]) {
+    geoFields += "min(geo_info_country_iso_code) as country_iso_code,";
+  }
+
   if (schemaMapping.value["usr_email"]) {
     geoFields += "min(usr_email) as user_email,";
   }
@@ -472,6 +477,8 @@ const getSessionLogs = (req: any) => {
             hit.user_email;
           sessionState.data.sessions[hit.session_id].country = hit.country;
           sessionState.data.sessions[hit.session_id].city = hit.city;
+          sessionState.data.sessions[hit.session_id].country_iso_code =
+            hit.country_iso_code.toLowerCase();
         }
       });
       rows.value = Object.values(sessionState.data.sessions);
