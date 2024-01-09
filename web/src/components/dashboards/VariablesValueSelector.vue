@@ -150,6 +150,13 @@ export default defineComponent({
     };
 
     const getVariablesData = async () => {
+      if (
+        !JSON.parse(JSON.stringify(props.selectedTimeDate.start_time ?? {})) ||
+        !JSON.parse(JSON.stringify(props.selectedTimeDate.end_time ?? {}))
+      ) {
+        return;
+      }
+
       // do we have variables & date?
       if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
         variablesData.values = [];
