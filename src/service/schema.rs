@@ -20,7 +20,6 @@ use std::{
     sync::Arc,
 };
 
-use ahash::AHashMap;
 use config::{
     meta::stream::StreamType,
     utils::{
@@ -279,7 +278,7 @@ pub async fn check_for_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    stream_schema_map: &mut AHashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, Schema>,
     record_val: &json::Value,
     record_ts: i64,
 ) -> Result<SchemaEvolution, anyhow::Error> {
@@ -370,7 +369,7 @@ async fn handle_existing_schema(
     stream_type: StreamType,
     inferred_schema: &Schema,
     record_ts: i64,
-    stream_schema_map: &mut AHashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
     if !CONFIG.common.local_mode {
         let mut lock = etcd::Locker::new(&format!("schema/{org_id}/{stream_type}/{stream_name}"));
@@ -493,7 +492,7 @@ async fn handle_existing_schema(
 async fn handle_new_schema(
     schema: &mut Schema,
     inferred_schema: &Schema,
-    stream_schema_map: &mut AHashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, Schema>,
     stream_name: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -677,7 +676,7 @@ pub async fn stream_schema_exists(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    stream_schema_map: &mut AHashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, Schema>,
 ) -> StreamSchemaChk {
     let mut schema_chk = StreamSchemaChk {
         conforms: true,
@@ -715,7 +714,7 @@ pub async fn add_stream_schema(
     stream_name: &str,
     stream_type: StreamType,
     file: &File,
-    stream_schema_map: &mut AHashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, Schema>,
     min_ts: i64,
 ) {
     let mut local_file = file;
@@ -759,7 +758,7 @@ pub async fn set_schema_metadata(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    extra_metadata: &AHashMap<String, String>,
+    extra_metadata: &HashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
     let schema = db::schema::get(org_id, stream_name, stream_type).await?;
     let mut metadata = schema.metadata().clone();
@@ -793,7 +792,6 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
-    use ahash::AHashMap;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use super::*;
@@ -840,7 +838,7 @@ mod tests {
             Field::new("City", DataType::Utf8, false),
             Field::new("_timestamp", DataType::Int64, false),
         ]);
-        let mut map: AHashMap<String, Schema> = AHashMap::new();
+        let mut map: HashMap<String, Schema> = HashMap::new();
         map.insert(stream_name.to_string(), schema);
         let result = check_for_schema(
             org_name,

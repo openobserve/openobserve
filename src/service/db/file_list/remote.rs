@@ -48,7 +48,8 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let mut stats = ProcessStats::default();
 
-    let files = storage::list(&prefix).await?;
+    let mut files = storage::list(&prefix).await?;
+    files.reverse(); // reverse order let deleted files be the first
     let files_num = files.len();
     log::info!("Load file_list [{prefix}] gets {} files", files_num);
     if files.is_empty() {
@@ -191,6 +192,9 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
             }
         }
         // check deleted files
+        if super::DELETED_FILES.contains_key(&item.key) {
+            continue;
+        }
         if item.deleted {
             super::DELETED_FILES.insert(item.key, item.meta.to_owned());
             continue;

@@ -16,7 +16,6 @@
 use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{http, HttpResponse};
-use ahash::AHashMap;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -104,8 +103,8 @@ pub async fn handle_trace_request(
     let traces_stream_name = &traces_stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut traces_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
     let stream_schema = stream_schema_exists(
@@ -154,12 +153,12 @@ pub async fn handle_trace_request(
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
 
-    let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
     for res_span in res_spans {
-        let mut service_att_map: AHashMap<String, json::Value> = AHashMap::new();
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let resource = res_span.resource.unwrap();
 
         for res_attr in resource.attributes {
@@ -192,7 +191,7 @@ pub async fn handle_trace_request(
                         .expect("slice with incorrect length"),
                 )
                 .to_string();
-                let mut span_ref = AHashMap::new();
+                let mut span_ref = HashMap::new();
                 if !span.parent_span_id.is_empty() {
                     span_ref.insert(PARENT_TRACE_ID.to_string(), trace_id.clone());
                     span_ref.insert(
@@ -208,13 +207,13 @@ pub async fn handle_trace_request(
                 }
                 let start_time: u64 = span.start_time_unix_nano;
                 let end_time: u64 = span.end_time_unix_nano;
-                let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
+                let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                 for span_att in span.attributes {
                     span_att_map.insert(span_att.key, get_val(&span_att.value.as_ref()));
                 }
 
                 let mut events = vec![];
-                let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
+                let mut event_att_map: HashMap<String, json::Value> = HashMap::new();
                 for event in span.events {
                     for event_att in event.attributes {
                         event_att_map.insert(event_att.key, get_val(&event_att.value.as_ref()));

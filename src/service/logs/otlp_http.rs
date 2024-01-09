@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use actix_web::{http, web, HttpResponse};
-use ahash::AHashMap;
 use arrow_schema::Schema;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
@@ -110,7 +111,7 @@ pub async fn logs_json_handler(
     }
 
     let start = std::time::Instant::now();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
@@ -130,7 +131,7 @@ pub async fn logs_json_handler(
     let stream_name = &stream_name;
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: TriggerAlertData = None;
@@ -161,7 +162,7 @@ pub async fn logs_json_handler(
     );
     // End Register Transforms for stream
 
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let body: json::Value = match json::from_slice(body.as_ref()) {
         Ok(v) => v,

@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use actix_web::{http, HttpResponse};
-use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -64,7 +63,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     let org_id = &route.org_id;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -86,7 +85,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         );
     }
 
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
     let mut distinct_values = Vec::with_capacity(16);
 
@@ -115,7 +114,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     );
     // End Register Transforms for stream
 
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let parsed_msg = syslog_loose::parse_message(msg);
     let mut value = message_to_value(parsed_msg);

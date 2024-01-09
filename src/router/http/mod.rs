@@ -36,9 +36,16 @@ const QUERIER_ROUTES: [&str; 13] = [
     "/prometheus/api/v1/label/",
 ];
 
+const FIXED_QUERIER_ROUTES: [&str; 4] = ["/summary", "/schema", "/streams", "/api/cache/status"];
+
 #[inline]
 fn check_querier_route(path: &str) -> bool {
     QUERIER_ROUTES.iter().any(|x| path.contains(x))
+}
+
+#[inline]
+fn is_fixed_querier_route(path: &str) -> bool {
+    FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
 }
 
 #[route(
@@ -183,7 +190,12 @@ fn get_url(path: &str) -> URLDetails {
 
     let nodes = if is_querier_path {
         node_type = Role::Querier;
-        cluster::get_cached_online_querier_nodes()
+        let nodes = cluster::get_cached_online_querier_nodes();
+        if is_fixed_querier_route(path) && nodes.is_some() && !nodes.as_ref().unwrap().is_empty() {
+            nodes.map(|v| v.into_iter().take(1).collect())
+        } else {
+            nodes
+        }
     } else {
         node_type = Role::Ingester;
         cluster::get_cached_online_ingester_nodes()

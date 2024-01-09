@@ -15,7 +15,6 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use ahash::AHashMap;
 use arrow_schema::{DataType, Field};
 use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
 use datafusion::arrow::datatypes::Schema;
@@ -147,9 +146,9 @@ pub fn cast_to_type(
 
 async fn add_valid_record(
     stream_meta: &StreamMeta<'_>,
-    stream_schema_map: &mut AHashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, Schema>,
     status: &mut RecordStatus,
-    write_buf: &mut AHashMap<String, SchemaRecords>,
+    write_buf: &mut HashMap<String, SchemaRecords>,
     record_val: &mut Map<String, Value>,
     need_trigger: bool,
 ) -> Result<TriggerAlertData, anyhow::Error> {
@@ -269,7 +268,7 @@ struct StreamMeta<'a> {
     stream_name: String,
     partition_keys: &'a Vec<String>,
     partition_time_level: &'a Option<PartitionTimeLevel>,
-    stream_alerts_map: &'a AHashMap<String, Vec<Alert>>,
+    stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
 
 #[cfg(test)]

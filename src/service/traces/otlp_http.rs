@@ -16,7 +16,6 @@
 use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{http, web, HttpResponse};
-use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use config::{
     meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG, DISTINCT_FIELDS,
@@ -104,14 +103,14 @@ pub async fn traces_json(
     let traces_stream_name = &traces_stream_name;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut traces_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut traces_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
-    let mut data_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let stream_schema = stream_schema_exists(
         org_id,
@@ -185,7 +184,7 @@ pub async fn traces_json(
         }
     };
     for res_span in spans.iter() {
-        let mut service_att_map: AHashMap<String, json::Value> = AHashMap::new();
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         if res_span.get("resource").is_some() {
             let resource = res_span.get("resource").unwrap().as_object().unwrap();
             if resource.get("attributes").is_some() {
@@ -236,7 +235,7 @@ pub async fn traces_json(
                     let trace_id: String =
                         span.get("traceId").unwrap().as_str().unwrap().to_string();
 
-                    let mut span_ref = AHashMap::new();
+                    let mut span_ref = HashMap::new();
                     if span.get("parentSpanId").is_some() {
                         span_ref.insert(
                             PARENT_SPAN_ID.to_string(),
@@ -253,7 +252,7 @@ pub async fn traces_json(
 
                     let start_time: u64 = span.get("startTimeUnixNano").unwrap().as_u64().unwrap();
                     let end_time: u64 = span.get("endTimeUnixNano").unwrap().as_u64().unwrap();
-                    let mut span_att_map: AHashMap<String, json::Value> = AHashMap::new();
+                    let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                     let attributes = span.get("attributes").unwrap().as_array().unwrap();
                     for span_att in attributes {
                         span_att_map.insert(
@@ -263,7 +262,7 @@ pub async fn traces_json(
                     }
 
                     let mut events = vec![];
-                    let mut event_att_map: AHashMap<String, json::Value> = AHashMap::new();
+                    let mut event_att_map: HashMap<String, json::Value> = HashMap::new();
 
                     let empty_vec = Vec::new();
                     let span_events = match span.get("events") {

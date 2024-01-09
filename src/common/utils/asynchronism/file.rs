@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fs::Metadata;
+use std::{fs::Metadata, path::Path};
 
 use tokio::{
     fs::File,
@@ -21,21 +21,24 @@ use tokio::{
 };
 
 #[inline(always)]
-pub async fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
-    let file = File::open(file).await?;
+pub async fn get_file_meta(path: impl AsRef<Path>) -> Result<Metadata, std::io::Error> {
+    let file = File::open(path).await?;
     file.metadata().await
 }
 
 #[inline(always)]
-pub async fn get_file_contents(file: &str) -> Result<Vec<u8>, std::io::Error> {
-    let mut file = File::open(file).await?;
+pub async fn get_file_contents(path: impl AsRef<Path>) -> Result<Vec<u8>, std::io::Error> {
+    let mut file = File::open(path).await?;
     let mut contents: Vec<u8> = Vec::new();
     file.read_to_end(&mut contents).await?;
     Ok(contents)
 }
 
 #[inline(always)]
-pub async fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
-    let mut file = File::create(file).await?;
+pub async fn put_file_contents(
+    path: impl AsRef<Path>,
+    contents: &[u8],
+) -> Result<(), std::io::Error> {
+    let mut file = File::create(path).await?;
     file.write_all(contents).await
 }

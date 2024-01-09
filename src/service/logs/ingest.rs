@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{BufRead, Read};
+use std::{
+    collections::HashMap,
+    io::{BufRead, Read},
+};
 
 use actix_web::http;
-use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -55,7 +57,7 @@ pub async fn ingest(
 ) -> Result<IngestionResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     // check stream
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
     if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
@@ -84,7 +86,7 @@ pub async fn ingest(
     // End Register Transforms for stream
 
     // Start get stream alerts
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::service::ingestion::get_stream_alerts(
         org_id,
         StreamType::Logs,
@@ -103,7 +105,7 @@ pub async fn ingest(
     let partition_keys = partition_det.partition_keys;
     let partition_time_level = partition_det.partition_time_level;
 
-    let mut write_buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (ep, data) = match in_req {
@@ -263,7 +265,7 @@ pub async fn ingest(
 pub fn apply_functions<'a>(
     item: json::Value,
     local_trans: &[StreamTransform],
-    stream_vrl_map: &'a AHashMap<String, VRLResultResolver>,
+    stream_vrl_map: &'a HashMap<String, VRLResultResolver>,
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value, anyhow::Error> {

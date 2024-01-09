@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use ahash::AHashMap as HashMap;
 
 use crate::{
     common::{
@@ -297,47 +296,6 @@ async fn trigger_alert(
     };
     match alerts::trigger(&org_id, stream_type, &stream_name, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert triggered")),
-        Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
-        },
-    }
-}
-
-/// PreviewAlert
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Alerts",
-    operation_id = "PreviewAlert",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-        ("alert_name" = String, Path, description = "Alert name"),
-    ),
-    responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
-        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[get("/{org_id}/{stream_name}/alerts/{alert_name}/preview")]
-async fn preview_alert(
-    path: web::Path<(String, String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name, name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
-    match alerts::preview(&org_id, stream_type, &stream_name, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
             (_, e) => Ok(MetaHttpResponse::internal_error(e)),

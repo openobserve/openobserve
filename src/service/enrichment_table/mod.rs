@@ -20,7 +20,6 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use ahash::AHashMap;
 use bytes::Bytes;
 use chrono::Utc;
 use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
@@ -41,8 +40,8 @@ use crate::{
     service::{
         compact::retention,
         db, format_stream_name,
-        ingestion::{chk_schema_by_record, write_file},
-        schema::stream_schema_exists,
+        ingestion::write_file,
+        schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
     },
 };
@@ -58,7 +57,7 @@ pub async fn save_enrichment_data(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let mut hour_key = String::new();
-    let mut buf: AHashMap<String, SchemaRecords> = AHashMap::new();
+    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let stream_name = &format_stream_name(table_name);
 
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
@@ -85,7 +84,8 @@ pub async fn save_enrichment_data(
         );
     }
 
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
+    let mut schema_evoluted = false;
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
@@ -140,15 +140,24 @@ pub async fn save_enrichment_data(
                     json::Value::Number(timestamp.into()),
                 );
                 let value_str = json::to_string(&json_record).unwrap();
-                chk_schema_by_record(
-                    &mut stream_schema_map,
-                    org_id,
-                    StreamType::EnrichmentTables,
-                    stream_name,
-                    timestamp,
-                    &value_str,
-                )
-                .await;
+
+                // check for schema evolution
+                if !schema_evoluted {
+                    let record_val = json::Value::Object(json_record.to_owned());
+                    if check_for_schema(
+                        org_id,
+                        stream_name,
+                        StreamType::EnrichmentTables,
+                        &mut stream_schema_map,
+                        &record_val,
+                        timestamp,
+                    )
+                    .await
+                    .is_ok()
+                    {
+                        schema_evoluted = true;
+                    }
+                }
 
                 if records.is_empty() {
                     let schema = stream_schema_map.get(stream_name).unwrap();

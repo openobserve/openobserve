@@ -16,7 +16,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use actix_web::web;
-use ahash::AHashMap;
 use chrono::{TimeZone, Utc};
 use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
 use datafusion::arrow::datatypes::Schema;
@@ -43,9 +42,9 @@ use crate::{
     },
     service::{
         db, format_stream_name,
-        ingestion::{chk_schema_by_record, evaluate_trigger, write_file, TriggerAlertData},
+        ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        schema::{set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
         search as search_service,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -83,12 +82,13 @@ pub async fn remote_write(
     let mut has_entry = false;
     let mut accept_record: bool;
     let mut cluster_name = String::new();
-    let mut metric_data_map: AHashMap<String, AHashMap<String, SchemaRecords>> = AHashMap::new();
-    let mut metric_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<alerts::Alert>> = AHashMap::new();
-    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
-    let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
-    let mut stream_partitioning_map: AHashMap<String, PartitioningDetails> = AHashMap::new();
+    let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
@@ -106,7 +106,7 @@ pub async fn remote_write(
             help: item.help.clone(),
             unit: item.unit.clone(),
         };
-        let mut extra_metadata: AHashMap<String, String> = AHashMap::new();
+        let mut extra_metadata: HashMap<String, String> = HashMap::new();
         extra_metadata.insert(
             METADATA_LABEL.to_string(),
             json::to_string(&metadata).unwrap(),
@@ -338,15 +338,24 @@ pub async fn remote_write(
                 json::Value::Number(timestamp.into()),
             );
             let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
-            chk_schema_by_record(
-                &mut metric_schema_map,
-                org_id,
-                StreamType::Metrics,
-                &metric_name,
-                timestamp,
-                &value_str,
-            )
-            .await;
+
+            // check for schema evolution
+            if schema_evoluted.get(&metric_name).is_none() {
+                let record_val = json::Value::Object(val_map.to_owned());
+                if check_for_schema(
+                    org_id,
+                    &metric_name,
+                    StreamType::Metrics,
+                    &mut metric_schema_map,
+                    &record_val,
+                    timestamp,
+                )
+                .await
+                .is_ok()
+                {
+                    schema_evoluted.insert(metric_name.to_owned(), true);
+                }
+            }
 
             let schema = metric_schema_map
                 .get(&metric_name)

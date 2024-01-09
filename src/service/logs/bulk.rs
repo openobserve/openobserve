@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{BufRead, BufReader};
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader},
+};
 
 use actix_web::web;
-use ahash::AHashMap;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -80,20 +82,20 @@ pub async fn ingest(
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let mut stream_vrl_map: AHashMap<String, VRLResultResolver> = AHashMap::new();
-    let mut stream_schema_map: AHashMap<String, Schema> = AHashMap::new();
-    let mut stream_data_map = AHashMap::new();
+    let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_data_map = HashMap::new();
 
-    let mut stream_transform_map: AHashMap<String, Vec<StreamTransform>> = AHashMap::new();
-    let mut stream_partition_keys_map: AHashMap<String, (StreamSchemaChk, PartitioningDetails)> =
-        AHashMap::new();
-    let mut stream_alerts_map: AHashMap<String, Vec<Alert>> = AHashMap::new();
+    let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
+    let mut stream_partition_keys_map: HashMap<String, (StreamSchemaChk, PartitioningDetails)> =
+        HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
     let mut action = String::from("");
     let mut stream_name = String::from("");
     let mut doc_id = String::from("");
-    let mut stream_trigger_map: AHashMap<String, TriggerAlertData> = AHashMap::new();
+    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -136,7 +138,7 @@ pub async fn ingest(
             .await;
             // End get stream alert
 
-            if !stream_partition_keys_map.contains_key(&stream_name.clone()) {
+            if !stream_partition_keys_map.contains_key(&stream_name) {
                 let stream_schema = stream_schema_exists(
                     org_id,
                     &stream_name,
@@ -156,7 +158,7 @@ pub async fn ingest(
             stream_data_map
                 .entry(stream_name.clone())
                 .or_insert_with(|| BulkStreamData {
-                    data: AHashMap::new(),
+                    data: HashMap::new(),
                 });
         } else {
             next_line_is_data = false;
@@ -407,7 +409,7 @@ fn add_record_status(
     failure_type: Option<String>,
     failure_reason: Option<String>,
 ) {
-    let mut item = AHashMap::new();
+    let mut item = HashMap::new();
 
     match failure_type {
         Some(failure_type) => {

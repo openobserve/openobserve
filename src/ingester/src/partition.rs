@@ -23,10 +23,13 @@ use std::{
 use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use config::{
-    ider,
     meta::stream::FileMeta,
     metrics,
-    utils::{parquet::new_parquet_writer, record_batch_ext::RecordBatchExt, schema_ext::SchemaExt},
+    utils::{
+        parquet::{generate_filename_with_time_range, new_parquet_writer},
+        record_batch_ext::RecordBatchExt,
+        schema_ext::SchemaExt,
+    },
     CONFIG,
 };
 use snafu::ResultExt;
@@ -90,14 +93,6 @@ impl Partition {
         path.push(stream_name);
         path.push(thread_id.to_string());
         for (hour, data) in r.iter() {
-            let file_name = ider::generate();
-            let mut path = path.clone();
-            path.push(hour.to_string());
-            path.push(file_name);
-            path.set_extension("par");
-            create_dir_all(path.parent().unwrap())
-                .context(CreateFileSnafu { path: path.clone() })?;
-
             let mut file_meta = FileMeta::default();
             data.data.iter().for_each(|r| {
                 file_meta.original_size += r.data_json_size as i64;
@@ -120,7 +115,15 @@ impl Partition {
                     .context(WriteParquetRecordBatchSnafu)?;
             }
             writer.close().context(WriteParquetRecordBatchSnafu)?;
+
             // write into local file
+            let file_name = generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts);
+            let mut path = path.clone();
+            path.push(hour.to_string());
+            path.push(file_name);
+            path.set_extension("par");
+            create_dir_all(path.parent().unwrap())
+                .context(CreateFileSnafu { path: path.clone() })?;
             let mut f = OpenOptions::new()
                 .create(true)
                 .write(true)

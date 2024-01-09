@@ -191,8 +191,8 @@ pub async fn merge_by_stream(
         let schema = schema.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
-            let mut files_with_size = files_with_size.to_owned();
             // sort by file size
+            let mut files_with_size = files_with_size.to_owned();
             files_with_size.sort_by(|a, b| a.meta.original_size.cmp(&b.meta.original_size));
             // delete duplicated files
             files_with_size.dedup_by(|a, b| a.key == b.key);
@@ -329,7 +329,7 @@ async fn merge_files(
             break;
         }
         new_file_size += file.meta.original_size;
-        new_file_list.push(file.to_owned());
+        new_file_list.push(file.clone());
         log::info!("[COMPACT] merge small file: {}", &file.key);
         // metrics
         metrics::COMPACT_MERGED_FILES
@@ -463,7 +463,8 @@ async fn merge_files(
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
 
     log::info!(
-        "[COMPACT] merge file succeeded, new file: {}, orginal_size: {}, compressed_size: {}",
+        "[COMPACT] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
         new_file_meta.compressed_size,

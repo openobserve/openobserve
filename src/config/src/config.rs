@@ -268,6 +268,8 @@ pub struct Common {
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]
+    pub feature_query_partition_strategy: String,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -350,8 +352,6 @@ pub struct Common {
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,
-    #[env_config(name = "ZO_NODE_QUERY_ALLOCATION_STRATEGY", default = "file_size")]
-    pub node_query_allocation_strategy: String,
 }
 
 #[derive(EnvConfig)]

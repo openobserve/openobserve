@@ -18,7 +18,10 @@ use config::{
     ider,
     meta::stream::StreamType,
     metrics,
-    utils::{parquet::read_metadata, schema_ext::SchemaExt},
+    utils::{
+        parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
+        schema_ext::SchemaExt,
+    },
     CONFIG,
 };
 use opentelemetry::global;
@@ -179,17 +182,33 @@ impl Metrics for Querier {
         wal::lock_files(&files).await;
 
         for file in files.iter() {
+            // check time range by filename
+            let (file_min_ts, file_max_ts) = parse_time_range_from_filename(file);
+            if (file_min_ts > 0 && file_max_ts > 0)
+                && ((end_time > 0 && file_min_ts > end_time)
+                    || (start_time > 0 && file_max_ts < start_time))
+            {
+                log::debug!(
+                    "skip wal parquet file: {} time_range: [{},{}]",
+                    &file,
+                    file_min_ts,
+                    file_max_ts
+                );
+                wal::release_files(&[file.clone()]).await;
+                continue;
+            }
+            // check time range by parquet metadata
             let source_file = wal_dir.to_string() + "/" + file;
             let Ok(body) = get_file_contents(&source_file) else {
                 continue;
             };
             let body = bytes::Bytes::from(body);
-            let parquet_meta = read_metadata(&body).await.unwrap_or_default();
+            let parquet_meta = read_metadata_from_bytes(&body).await.unwrap_or_default();
             if (start_time > 0 && parquet_meta.max_ts < start_time)
                 || (end_time > 0 && parquet_meta.min_ts > end_time)
             {
                 log::debug!(
-                    "skip wal file: {} time_range: [{},{}]",
+                    "skip wal parquet file: {} time_range: [{},{}]",
                     file,
                     parquet_meta.min_ts,
                     parquet_meta.max_ts

@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap;
+use std::collections::HashMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
@@ -22,8 +23,8 @@ use uuid::Uuid;
 
 use crate::common::infra::errors::*;
 
-static FILES: Lazy<RwLock<AHashMap<String, File>>> = Lazy::new(Default::default);
-static DATA: Lazy<RwLock<AHashMap<String, Bytes>>> = Lazy::new(Default::default);
+static FILES: Lazy<RwLock<HashMap<String, File>>> = Lazy::new(Default::default);
+static DATA: Lazy<RwLock<HashMap<String, Bytes>>> = Lazy::new(Default::default);
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();
@@ -50,6 +51,10 @@ impl Directory {
     pub fn set(&self, path: &str, data: Bytes) -> Result<()> {
         let key = format!("/{}/{}", self.location, path);
         set(&key, data)
+    }
+    pub fn get(&self, path: &str) -> Result<Bytes> {
+        let key = format!("/{}/{}", self.location, path);
+        get(&key)
     }
 }
 
