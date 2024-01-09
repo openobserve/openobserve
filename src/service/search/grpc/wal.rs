@@ -86,7 +86,7 @@ pub async fn search_parquet(
         match get_file_contents(&source_file) {
             Err(_) => {
                 log::error!(
-                    "[session_id {session_id}] skip wal file: {} get file content error",
+                    "[session_id {session_id}] skip wal parquet file: {} get file content error",
                     &file.key
                 );
                 files.retain(|x| x != file);
@@ -103,7 +103,7 @@ pub async fn search_parquet(
                         tmpfs::set(&file_name, file_data).expect("tmpfs set success");
                     } else {
                         log::debug!(
-                            "[session_id {session_id}] skip wal file: {} time_range: [{},{}]",
+                            "[session_id {session_id}] skip wal parquet file: {} time_range: [{},{}]",
                             &file.key,
                             parquet_meta.min_ts,
                             parquet_meta.max_ts
@@ -152,7 +152,7 @@ pub async fn search_parquet(
     }
 
     log::info!(
-        "[session_id {session_id}] wal->mem->search: load groups {}, files {}, scan_size {}",
+        "[session_id {session_id}] wal->parquet->search: load groups {}, files {}, scan_size {}",
         files_group.len(),
         scan_stats.files,
         scan_stats.original_size
