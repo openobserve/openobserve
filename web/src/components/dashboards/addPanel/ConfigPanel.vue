@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-slot
         :type="'number'"
         placeholder="Auto"
+        data-test="dashboard-config-legend-width"
       ></q-input>
       <div class="unit-container">
         <button
@@ -97,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData?.data?.config?.legend_width?.unit === 'px',
           }"
           style="height: 100%; width: 100%; font-size: 14px"
+          :data-test="`dashboard-config-legend-width-unit-${dashboardPanelData?.data?.config?.legend_width?.unit === 'px' ? 'active' : 'inactive'}`"
         >
           px
         </button>
@@ -107,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData?.data?.config?.legend_width?.unit === '%',
           }"
           style="height: 100%; width: 100%; font-size: 14px"
+          :data-test="`dashboard-config-legend-width-unit-${dashboardPanelData?.data?.config?.legend_width?.unit === '%' ? 'active' : 'inactive'}`"
         >
           %
         </button>
@@ -509,6 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           (dashboardPanelData.data.config.axis_width =
             value !== '' ? value : null)
       "
+      data-test="dashboard-config-axis-width"
     >
     </q-input>
 
@@ -525,6 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-model="dashboardPanelData.data.config.axis_border_show"
       :label="t('dashboard.showBorder')"
+      data-test="dashboard-config-axis-border"
     />
   </div>
 </template>
