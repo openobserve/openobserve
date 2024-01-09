@@ -42,6 +42,8 @@
     "details": "Details",
     "tags": "Tags",
     "process": "Process",
+    "axisWidth": "Axis Width",
+    "legendWidth": "Legend Width",
     "exceptions": "Exceptions"
   },
   "search": {
@@ -460,6 +462,7 @@
     "oneFieldConfigMessage": "Add 1 field or Configure it from the Config",
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
+    "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
     "basemapLabel": "Base Map",
