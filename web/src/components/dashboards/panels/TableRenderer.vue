@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :rows="data.rows || []"
     :columns="data.columns"
     row-key="id"
+    ref="tableRef"
   >
     <template v-slot:top-right>
       <q-btn
@@ -32,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-right="archive"
         label="Export to csv"
         no-caps
-        style="height: 5px;"
+        style="height: 5px"
         @click="exportTable"
       />
     </template>
@@ -54,6 +55,7 @@ export default defineComponent({
   },
   setup(props: any) {
     const $q = useQuasar();
+    const tableRef: any = ref(null);
 
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
@@ -78,7 +80,7 @@ export default defineComponent({
         props?.data?.columns?.map((col: any) => wrapCsvValue(col.label)),
       ]
         .concat(
-          props?.data?.rows?.map((row: any) =>
+          tableRef?.value?.filteredSortedRows?.map((row: any) =>
             props?.data?.columns
               ?.map((col: any) =>
                 wrapCsvValue(
@@ -115,6 +117,7 @@ export default defineComponent({
         rowsPerPage: 0,
       }),
       exportTable,
+      tableRef,
     };
   },
 });
