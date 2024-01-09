@@ -163,7 +163,7 @@ const nameToColor = (name: any, colorArray: any) => {
 function shadeColor(color: any, value: any, min: any, max: any) {
   let percent = (value - min) / (max - min);
   let num = parseInt(color.replace("#", ""), 16),
-    amt = Math.round(0.5 * percent * 100),
+    amt = Math.round(1.55 * percent * 100),
     R = (num >> 16) + amt,
     B = ((num >> 8) & 0x00ff) + amt,
     G = (num & 0x0000ff) + amt;
@@ -228,6 +228,13 @@ const getSeriesValueFromArray = (panelSchema: any, values: any) => {
   return seriesvalue;
 };
 
+const colorBasedOnValue = (colors: any, min: any, max: any, value: any) => {
+  let range = max - min;
+  let step = range / colors.length;
+  let index = Math.min(Math.floor((value - min) / step), colors.length - 1);
+  return colors[index];
+}
+
 export const getColor = (
   panelSchema: any,
   searchQueryData: any,
@@ -260,10 +267,11 @@ export const getColor = (
     case "continuous": {
       const { min, max } = getMinMaxValue(searchQueryData);
 
+      const value = getSeriesValueFromArray(panelSchema, valuesArr);
       // based on selected color and value pass different shades of same color
       return shadeColor(
-        panelSchema?.config?.color?.fixedColor ?? "#5b8ff9",
-        getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
+        colorBasedOnValue(["#42f566", '#c3cc41', "#f5424b"], min, max, value ?? 50),
+        value ?? 50,
         min ?? 0,
         max ?? 100
       );
