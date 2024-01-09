@@ -281,7 +281,6 @@ async fn merge_files(
         }
         new_file_size += file.meta.original_size;
         new_file_list.push(file.clone());
-        log::info!("[INGESTER:JOB] merge small file: {}", &file.key);
     }
     // these files are too small, just skip upload and wait for next round
     if !force_upload && new_file_size < CONFIG.limit.max_file_size_on_disk as i64 {
@@ -293,6 +292,7 @@ async fn merge_files(
     let mut file_schema = None;
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in retain_file_list.iter_mut() {
+        log::info!("[INGESTER:JOB] merge small file: {}", &file.key);
         let data = match get_file_contents(&wal_dir.join(&file.key)).await {
             Ok(body) => body,
             Err(err) => {
