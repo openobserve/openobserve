@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type != 'table' &&
         dashboardPanelData.data.type != 'heatmap' &&
         dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'geomap'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
@@ -49,7 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type != 'table' &&
         dashboardPanelData.data.type != 'heatmap' &&
         dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'geomap'
       "
       outlined
       v-model="dashboardPanelData.data.config.legends_position"
@@ -73,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'table' &&
           dashboardPanelData.data.type != 'heatmap' &&
           dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge'
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap'
         "
         v-model.number="legendWidthValue"
         :label="t('common.legendWidth')"
@@ -95,7 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'table' &&
           dashboardPanelData.data.type != 'heatmap' &&
           dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge'
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap'
         "
       >
         <button
@@ -136,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-select
       outlined
-      v-if="dashboardPanelData.data.type != 'table'"
+      v-if="dashboardPanelData.data.type != 'table' && dashboardPanelData.data.type != 'geomap'"
       v-model="dashboardPanelData.data.config.unit"
       :options="unitOptions"
       dense
