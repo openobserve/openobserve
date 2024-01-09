@@ -370,7 +370,6 @@ pub async fn oo_validator(
     req: ServiceRequest,
     auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    println!("auth_info: {:?}", auth_info);
     if auth_info.auth.starts_with("Basic") {
         let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
             .expect("Failed to decode base64 string");
@@ -393,12 +392,14 @@ pub async fn oo_validator(
 }
 
 pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
-    o2_enterprise::enterprise::openfga::authorizer::is_allowed(
-        user_id,
-        &auth_info.method,
-        &auth_info.o2_type,
-    )
-    .await
+    let object_str = auth_info.o2_type;
+    let obj_str = if object_str.contains("##replace_user_id##") {
+        object_str.replace("##replace_user_id##", user_id)
+    } else {
+        object_str
+    };
+    o2_enterprise::enterprise::openfga::authorizer::is_allowed(user_id, &auth_info.method, &obj_str)
+        .await
 }
 
 #[cfg(test)]

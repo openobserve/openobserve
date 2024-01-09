@@ -161,7 +161,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
     )
 )]
-#[get("/{org_id}/organizations/passcode")]
+#[get("/{org_id}/passcode")]
 async fn get_user_passcode(
     user_email: UserEmail,
     org_id: web::Path<String>,
@@ -191,7 +191,7 @@ async fn get_user_passcode(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
     )
 )]
-#[put("/{org_id}/organizations/passcode")]
+#[put("/{org_id}/passcode")]
 async fn update_user_passcode(
     user_email: UserEmail,
     org_id: web::Path<String>,
@@ -221,7 +221,7 @@ async fn update_user_passcode(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )
 )]
-#[get("/{org_id}/organizations/rumtoken")]
+#[get("/{org_id}/rumtoken")]
 async fn get_user_rumtoken(
     user_email: UserEmail,
     org_id: web::Path<String>,
@@ -251,7 +251,7 @@ async fn get_user_rumtoken(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )
 )]
-#[put("/{org_id}/organizations/rumtoken")]
+#[put("/{org_id}/rumtoken")]
 async fn update_user_rumtoken(
     user_email: UserEmail,
     org_id: web::Path<String>,
@@ -281,7 +281,7 @@ async fn update_user_rumtoken(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
     )
 )]
-#[post("/{org_id}/organizations/rumtoken")]
+#[post("/{org_id}/rumtoken")]
 async fn create_user_rumtoken(
     user_email: UserEmail,
     org_id: web::Path<String>,

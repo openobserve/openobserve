@@ -20,7 +20,7 @@ const apiKeys = {
     return http().get(`/api/usertoken`);
   },
   listRUMTokens: (org_id: string) => {
-    return http().get(`/api/${org_id}/organizations/rumtoken`);
+    return http().get(`/api/${org_id}/rumtoken`);
   },
   createUserAPIKey: (data: object) => {
     return http().post(`/api/usertoken`, data);
@@ -29,10 +29,10 @@ const apiKeys = {
     return http().put(`/api/usertoken/${data.id}`, data);
   },
   createRUMToken: (org_id: string) => {
-    return http().post(`/api/${org_id}/organizations/rumtoken`);
+    return http().post(`/api/${org_id}/rumtoken`);
   },
   updateRUMToken: (org_id: string, id: string) => {
-    return http().put(`/api/${org_id}/organizations/rumtoken`);
+    return http().put(`/api/${org_id}/rumtoken`);
   },
   deleteUserAPIKey: (id: string) => {
     return http().delete(`/api/usertoken/${id}`);
