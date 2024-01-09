@@ -564,33 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div style="display: flex; align-items: center;">
-      <q-select
-        v-model="dashboardPanelData.data.config.color.mode"
-        :options="colorOptions"
-        outlined
-        dense
-        label="Color palette"
-        class="showLabelOnTop"
-        stack-label
-        emit-value
-        :display-value="`${
-          dashboardPanelData.data.config.color.mode ?? 'palette-classic'
-        }`"
-        style="width: 100%"
-      >
-      </q-select>
-      <div
-        class="color-input-wrapper"
-        v-if="['fixed','shades'].includes(dashboardPanelData.data.config.color.mode)"
-        style="margin-top: 30px; margin-left: 5px;"
-      >
-        <input
-          type="color"
-          v-model="dashboardPanelData.data.config.color.fixedColor"
-        />
-      </div>
-    </div>
+    <color-palette-drop-down/>
 
     <div class="space"></div>
   </div>
@@ -598,22 +572,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, watch, onBeforeMount } from "vue";
+import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
+import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 
 export default defineComponent({
+  components: { ColorPaletteDropDown },
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
-
-    // on before mount need to check whether color object is there or not else use palette-classic as a default
-    onBeforeMount(() => {
-      if (!dashboardPanelData?.data?.config?.color) {
-        dashboardPanelData.data.config.color = {
-          mode: "palette-classic",
-        };
-      }
-    });
 
     const basemapTypeOptions = [
       {
@@ -694,25 +661,6 @@ export default defineComponent({
       },
     ];
 
-    const colorOptions = [
-      {
-        label: "fixed",
-        value: "fixed",
-      },
-      {
-        label: "shades",
-        value: "shades",
-      },
-      {
-        label: "palette-classic",
-        value: "palette-classic",
-      },
-      {
-        label: "continuous",
-        value: "continuous",
-      },
-    ];
-
     const unitOptions = [
       {
         label: t("dashboard.default"),
@@ -777,7 +725,6 @@ export default defineComponent({
       isWeightFieldPresent,
       setUnit,
       legendWidthValue,
-      colorOptions,
     };
   },
 });
