@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-select>
 
     <div class="space"></div>
+    
     <div class="input-container">
       <q-input
         v-if="
