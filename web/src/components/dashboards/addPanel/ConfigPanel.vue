@@ -16,20 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <q-toggle
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge'
-      "
-      v-model="dashboardPanelData.data.config.show_legends"
-      :label="t('dashboard.showLegendsLabel')"
-      data-test="dashboard-config-show-legend"
-    />
-
-    <div class="space"></div>
-
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm">{{ t("dashboard.description") }}</div>
       <q-input
@@ -41,6 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-description"
       />
     </div>
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'heatmap' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'gauge'
+      "
+      v-model="dashboardPanelData.data.config.show_legends"
+      :label="t('dashboard.showLegendsLabel')"
+      data-test="dashboard-config-show-legend"
+    />
 
     <div class="space"></div>
 
@@ -65,6 +65,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-legend-position"
     >
     </q-select>
+
+    <div class="space"></div>
+    <div class="input-container">
+      <q-input
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge'
+        "
+        v-model.number="legendWidthValue"
+        :label="t('common.legendWidth')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop q-mr-sm"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        :type="'number'"
+        placeholder="Auto"
+        data-test="dashboard-config-legend-width"
+      ></q-input>
+      <div class="unit-container">
+        <button
+          @click="setUnit('px')"
+          :class="{
+            active:
+              dashboardPanelData?.data?.config.legend_width?.unit === null ||
+              dashboardPanelData?.data?.config?.legend_width?.unit === 'px',
+          }"
+          style="height: 100%; width: 100%; font-size: 14px"
+          :data-test="`dashboard-config-legend-width-unit-${dashboardPanelData?.data?.config?.legend_width?.unit === 'px' ? 'active' : 'inactive'}`"
+        >
+          px
+        </button>
+        <button
+          @click="setUnit('%')"
+          :class="{
+            active:
+              dashboardPanelData?.data?.config?.legend_width?.unit === '%',
+          }"
+          style="height: 100%; width: 100%; font-size: 14px"
+          :data-test="`dashboard-config-legend-width-unit-${dashboardPanelData?.data?.config?.legend_width?.unit === '%' ? 'active' : 'inactive'}`"
+        >
+          %
+        </button>
+      </div>
+    </div>
 
     <div class="space"></div>
 
@@ -268,7 +318,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">
           Query Limit
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" data-test="dashboard-config-limit-info"/>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-limit-info"
+            />
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -303,7 +358,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">
           {{ t("dashboard.legendLabel") }}
           <div>
-            <q-icon class="q-ml-xs" size="20px" name="info" data-test="dashboard-config-promql-legend-info"/>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-promql-legend-info"
+            />
             <q-tooltip
               class="bg-grey-8"
               anchor="top middle"
@@ -425,12 +485,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row items-center all-pointer-events">Gauge Max Value</div>
       </template>
     </q-input>
+
+    <q-input
+      v-if="
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'geomap' &&
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'pie' &&
+        dashboardPanelData.data.type != 'donut'
+      "
+      v-model.number="dashboardPanelData.data.config.axis_width"
+      :label="t('common.axisWidth')"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      :type="'number'"
+      placeholder="Auto"
+      @update:model-value="
+        (value) =>
+          (dashboardPanelData.data.config.axis_width =
+            value !== '' ? value : null)
+      "
+      data-test="dashboard-config-axis-width"
+    >
+    </q-input>
+
+    <div class="space"></div>
+
+    <q-toggle
+      v-if="
+        dashboardPanelData.data.type != 'gauge' &&
+        dashboardPanelData.data.type != 'metric' &&
+        dashboardPanelData.data.type != 'geomap' &&
+        dashboardPanelData.data.type != 'table' &&
+        dashboardPanelData.data.type != 'pie' &&
+        dashboardPanelData.data.type != 'donut'
+      "
+      v-model="dashboardPanelData.data.config.axis_border_show"
+      :label="t('dashboard.showBorder')"
+      data-test="dashboard-config-axis-border"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, watch } from "vue";
+import { computed, defineComponent, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -444,6 +550,48 @@ export default defineComponent({
         value: "osm",
       },
     ];
+
+    onBeforeMount(() => {
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.legend_width) {
+        dashboardPanelData.data.config.legend_width = {
+          value: null,
+          unit: "px",
+        };
+      }
+    });
+
+    const legendWidthValue = computed({
+      get() {
+        return dashboardPanelData.data.config?.legend_width?.value;
+      },
+      set(value) {
+        // Ensure that the nested structure is initialized
+        if (!dashboardPanelData.data.config.legend_width) {
+          dashboardPanelData.data.config.legend_width = {
+            value: null,
+            unit: "px",
+          };
+        }
+
+        // Set the value
+        dashboardPanelData.data.config.legend_width.value =
+          value !== "" ? value : null;
+      },
+    });
+
+    const setUnit = (unit: any) => {
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.legend_width) {
+        dashboardPanelData.data.config.legend_width = {
+          value: null,
+          unit: null,
+        };
+      }
+
+      // Set the unit
+      dashboardPanelData.data.config.legend_width.unit = unit;
+    };
 
     const layerTypeOptions = [
       {
@@ -532,6 +680,8 @@ export default defineComponent({
       legendsPositionOptions,
       unitOptions,
       isWeightFieldPresent,
+      setUnit,
+      legendWidthValue,
     };
   },
 });
@@ -545,5 +695,46 @@ export default defineComponent({
 .space {
   margin-top: 10px;
   margin-bottom: 10px;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+}
+
+.input-container button-group {
+  border: 1px solid gray !important;
+  border-radius: 9px;
+}
+
+.input-container button {
+  display: block;
+  cursor: pointer;
+  background-color: #f0eaea;
+  border: none;
+  font-size: 16px;
+  padding: 3px 10px;
+}
+
+.input-container button-left {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.input-container button-right {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.input-container button.active {
+  background-color: var(--q-primary) !important;
+  font-weight: bold;
+  color: white;
+}
+.unit-container {
+  display: flex;
+  height: 40px;
+  margin-top: 15px;
+  width: 100px;
 }
 </style>

@@ -103,14 +103,19 @@ export const convertPromQLData = (
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: true,
-      left: "30",
-      right:
-        legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-          ? 220
-          : "40",
+      containLabel: panelSchema.config?.axis_width == null ? true : false,
+      //based on config width set grid
+      left: panelSchema.config?.axis_width ?? 5,
+      right: 20,
       top: "15",
-      bottom: "30",
+      bottom:
+        legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+          ? panelSchema.config?.axis_width == null
+            ? 30
+            : 50
+          : panelSchema.config?.axis_width == null
+          ? 5
+          : "25",
     },
     tooltip: {
       show: true,
@@ -196,8 +201,14 @@ export const convertPromQLData = (
     },
     xAxis: {
       type: "time",
+      axisLine: {
+        show: panelSchema.config?.axis_border_show || false,
+      },
       splitLine: {
         show: true,
+        lineStyle: {
+          opacity: 0.5,
+        },
       },
     },
     yAxis: {
@@ -215,10 +226,13 @@ export const convertPromQLData = (
         },
       },
       axisLine: {
-        show: true,
+        show: panelSchema.config?.axis_border_show || false,
       },
       splitLine: {
         show: true,
+        lineStyle: {
+          opacity: 0.5,
+        },
       },
     },
     toolbox: {
@@ -518,6 +532,76 @@ export const convertPromQLData = (
   });
 
   options.series = options.series.flat();
+
+  const calculateWidthText = (text: string): number => {
+    if (!text) return 0;
+
+    const span = document.createElement("span");
+    document.body.appendChild(span);
+
+    span.style.font = "sans-serif";
+    span.style.fontSize = "12px";
+    span.style.height = "auto";
+    span.style.width = "auto";
+    span.style.top = "0px";
+    span.style.position = "absolute";
+    span.style.whiteSpace = "no-wrap";
+    span.innerHTML = text;
+
+    const width = Math.ceil(span.clientWidth);
+    span.remove();
+    return width;
+  };
+
+  //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
+  //only check for vertical side only
+  if (
+    legendConfig.orient == "vertical" &&
+    panelSchema.config?.show_legends &&
+    panelSchema.type != "gauge" &&
+    panelSchema.type != "metric"
+  ) {
+    const maxValue = options.series
+      .map((it: any) => it.name)
+      .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
+
+    let legendWidth;
+
+    if (
+      panelSchema.config.legend_width &&
+      !isNaN(parseFloat(panelSchema.config.legend_width.value))
+      // ["px", "%"].includes(panelSchema.config.legend_width.unit)
+    ) {
+      if (panelSchema.config.legend_width.unit === "%") {
+        // If in percentage, calculate percentage of the chartPanelRef width
+        const percentage = panelSchema.config.legend_width.value / 100;
+        legendWidth = chartPanelRef.value?.offsetWidth * percentage;
+      } else {
+        // If in pixels, use the provided value
+        legendWidth = panelSchema.config.legend_width.value;
+      }
+    } else {
+      // If legend_width is not provided or has invalid format, calculate it based on other criteria
+      legendWidth =
+        Math.min(
+          chartPanelRef.value?.offsetWidth / 3,
+          calculateWidthText(maxValue) + 60
+        ) ?? 20;
+    }
+
+    options.grid.right = legendWidth;
+    options.legend.textStyle.width = legendWidth - 55;
+  }
+
+  //check if is there any data else filter out axis or series data
+  if (!options?.series?.length && !options?.xAxis?.length) {
+    return {
+      options: {
+        series: [],
+        xAxis: [],
+      },
+    };
+  }
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;

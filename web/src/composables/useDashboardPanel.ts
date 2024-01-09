@@ -46,6 +46,12 @@ const getDefaultDashboardPanelData: any = () => ({
       unit: null,
       unit_custom: null,
       decimals: 2,
+      axis_width: null,
+      axis_border_show: false,
+      legend_width: {
+        value: null,
+        unit: "px",
+      },
       base_map: {
         type: "osm",
       },
