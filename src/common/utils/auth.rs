@@ -219,28 +219,27 @@ impl FromRequest for AuthExtractor {
         let org_id = path_columns[0].to_string();
 
         let object_type = if url_len == 1 {
-            if (method.eq("POST") || method.eq("GET")) && path_columns[0].eq("organizations") {
+            if method.eq("GET") && path_columns[0].eq("organizations") {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 };
 
-                format!("org:o2_ALL")
+                format!("org:##replace_user_id##")
             } else {
                 path_columns[0].to_string()
             }
-        } else if url_len == 2 {
-            path_columns[url_len - 1].to_string()
-        } else if crate::common::meta::types::END_POINTS.contains(&path_columns[url_len - 1]) {
-            if method.eq("GET") {
-                method = "LIST".to_string();
-            }
-            format!("{}:{}_all", path_columns[url_len - 1].to_string(), org_id)
         } else {
-            format!(
-                "{}:{}",
-                path_columns[url_len - 2],
-                path_columns[url_len - 1]
-            )
+            if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
+                format!("stream:{org_id}")
+            } else {
+                format!(
+                    "{}:{}",
+                    crate::common::meta::types::OFGA_MODELS
+                        .get(path_columns[url_len - 1])
+                        .unwrap_or(&path_columns[url_len - 1]),
+                    path_columns[url_len - 2]
+                )
+            }
         };
 
         if let Some(auth_header) = req.headers().get("Authorization") {
