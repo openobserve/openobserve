@@ -184,7 +184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expandedLogs="expandedLogs"
                       @update:datetime="setHistogramDate"
                       @update:scroll="getMoreData"
-                      @update:scroll-up="getLessData"
                       @expandlog="toggleExpandLog"
                     />
                   </div>
@@ -278,8 +277,8 @@ export default defineComponent({
         //     ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
         //     150 -
         //   1;
-        this.searchObj.data.resultGrid.currentPage =
-          this.searchObj.data.resultGrid.currentPage + 1;
+        // this.searchObj.data.resultGrid.currentPage =
+        //   this.searchObj.data.resultGrid.currentPage + 1;
 
         await this.getQueryData(true);
         this.refreshHistogramChart();

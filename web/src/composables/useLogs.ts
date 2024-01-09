@@ -47,13 +47,13 @@ import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
+import { start } from "repl";
 
 const defaultObject = {
   organizationIdetifier: "",
   runQuery: false,
   loading: true,
   config: {
-    recordsPerPage: 250,
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
@@ -100,7 +100,7 @@ const defaultObject = {
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 150,
+      rowsPerPage: 250,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -129,7 +129,7 @@ const defaultObject = {
     },
     resultGrid: {
       currentDateTime: new Date(),
-      currentPage: 0,
+      currentPage: 1,
       columns: <any>[],
     },
     transforms: <any>[],
@@ -267,7 +267,7 @@ const useLogs = () => {
       chartParams: {},
     };
     searchObj.data.resultGrid.columns = [];
-    searchObj.data.resultGrid.currentPage = 0;
+    searchObj.data.resultGrid.currentPage = 1;
     searchObj.runQuery = false;
     searchObj.data.errorMsg = "";
   }
@@ -396,9 +396,9 @@ const useLogs = () => {
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from:
-            searchObj.config.recordsPerPage *
-              searchObj.data.resultGrid.currentPage || 0,
-          size: searchObj.config.recordsPerPage,
+            searchObj.meta.resultGrid.rowsPerPage *
+              (searchObj.data.resultGrid.currentPage - 1) || 0,
+          size: searchObj.meta.resultGrid.rowsPerPage,
         },
         aggs: {
           histogram:
@@ -556,7 +556,7 @@ const useLogs = () => {
       }
 
       if (
-        searchObj.data.resultGrid.currentPage > 0 ||
+        searchObj.data.resultGrid.currentPage > 1 ||
         searchObj.meta.showHistogram === false
       ) {
         delete req.aggs;
@@ -576,7 +576,7 @@ const useLogs = () => {
         req.query.sql = b64EncodeUnicode(req.query.sql);
         if (
           !searchObj.meta.sqlMode &&
-          searchObj.data.resultGrid.currentPage == 0
+          searchObj.data.resultGrid.currentPage == 1
         ) {
           req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
         }
@@ -658,10 +658,13 @@ const useLogs = () => {
               dismiss();
               if (res.data.from > 0) {
                 searchObj.data.queryResults.from = res.data.from;
-                searchObj.data.queryResults.scan_size += res.data.scan_size;
-                searchObj.data.queryResults.took += res.data.took;
+                searchObj.data.queryResults.scan_size = res.data.scan_size;
+                searchObj.data.queryResults.took = res.data.took;
                 // searchObj.data.queryResults.hits.push(...res.data.hits);
                 searchObj.data.queryResults.hits = res.data.hits;
+                if (searchObj.data.queryResults.total < res.data.total) {
+                  searchObj.data.queryResults.total = res.data.total;
+                }
               } else {
                 resetFieldValues();
                 if (
@@ -970,12 +973,14 @@ const useLogs = () => {
   };
 
   function getHistogramTitle() {
+    const currentPage = searchObj.data.resultGrid.currentPage - 1;
+    const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+    const endCount = startCount + searchObj.data.queryResults.hits.length - 1;
     const title =
       "Showing " +
-      searchObj.data.resultGrid.currentPage * searchObj.config.recordsPerPage +
+      startCount +
       " to " +
-      (searchObj.data.resultGrid.currentPage * searchObj.config.recordsPerPage +
-        searchObj.config.recordsPerPage) +
+      endCount +
       " out of " +
       searchObj.data.queryResults.total.toLocaleString() +
       " hits in " +
