@@ -50,7 +50,7 @@ const getDefaultDashboardPanelData: any = () => ({
       axis_border_show: false,
       legend_width: {
         value: null,
-        unit: null,
+        unit: "px",
       },
       base_map: {
         type: "osm",

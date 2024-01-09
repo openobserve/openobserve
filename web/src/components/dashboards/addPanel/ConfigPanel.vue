@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setUnit('px')"
           :class="{
             active:
-              dashboardPanelData.data.config.legend_width.unit === null ||
-              dashboardPanelData.data.config.legend_width.unit === 'px',
+              dashboardPanelData?.data?.config.legend_width?.unit === null ||
+              dashboardPanelData?.data?.config?.legend_width?.unit === 'px',
           }"
           style="height: 100%; width: 100%; font-size: 14px"
         >
@@ -103,7 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           @click="setUnit('%')"
           :class="{
-            active: dashboardPanelData.data.config.legend_width.unit === '%',
+            active:
+              dashboardPanelData?.data?.config?.legend_width?.unit === '%',
           }"
           style="height: 100%; width: 100%; font-size: 14px"
         >
@@ -530,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, watch } from "vue";
+import { computed, defineComponent, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 
 export default defineComponent({
@@ -544,6 +545,20 @@ export default defineComponent({
         value: "osm",
       },
     ];
+    console.log(
+      "dashboardPanelData",
+      dashboardPanelData?.data?.config?.legend_width
+    );
+
+    onBeforeMount(() => {
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.legend_width) {
+        dashboardPanelData.data.config.legend_width = {
+          value: null,
+          unit: "px",
+        };
+      }
+    });
 
     const legendWidthValue = computed({
       get() {
@@ -560,7 +575,7 @@ export default defineComponent({
         if (!dashboardPanelData.data.config.legend_width) {
           dashboardPanelData.data.config.legend_width = {
             value: null,
-            unit: null,
+            unit: "px",
           };
         }
 
@@ -580,7 +595,7 @@ export default defineComponent({
           unit: null,
         };
       }
-      
+
       // Set the unit
       dashboardPanelData.data.config.legend_width.unit = unit;
     };
