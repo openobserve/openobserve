@@ -28,7 +28,7 @@ export const getUnitValue = (
         if (Math.abs(unitValue) < 1024) {
           return {
             value: `${value < 0 ? "-" : ""}${
-              parseFloat(Math.abs(unitValue)).toFixed(decimals) ?? 0
+              parseFloat(Math.abs(unitValue)?.toString()).toFixed(decimals) ?? 0
             }`,
             unit: unitInfo.unit,
           };
@@ -141,7 +141,7 @@ export const getUnitValue = (
 
       // Handle both positive and negative values
       for (let unit of units) {
-        const absValue = Math.abs(value);
+        const absValue: any = Math.abs(value);
 
         if (absValue < 1024) {
           return {
@@ -157,7 +157,7 @@ export const getUnitValue = (
       // Handle both positive and negative values for PB/s
       return {
         value: `${value < 0 ? "-" : ""}${
-          parseFloat(Math.abs(value))?.toFixed(decimals) ?? 0
+          parseFloat(Math.abs(value)?.toString())?.toFixed(decimals) ?? 0
         }`,
         unit: "PB/s",
       };
@@ -191,7 +191,7 @@ export const getUnitValue = (
         if (Math.abs(unitValue) < 1024) {
           return {
             value: `${value < 0 ? "-" : ""}${
-              parseFloat(Math.abs(unitValue))?.toFixed(decimals) ?? 0
+              parseFloat(Math.abs(unitValue)?.toString())?.toFixed(decimals) ?? 0
             }`,
             unit: unitInfo.unit,
           };
@@ -219,7 +219,7 @@ export const getUnitValue = (
         if (Math.abs(unitValue) < 1024) {
           return {
             value: `${value < 0 ? "-" : ""}${
-              parseFloat(Math.abs(unitValue))?.toFixed(decimals) ?? 0
+              parseFloat(Math.abs(unitValue)?.toString())?.toFixed(decimals) ?? 0
             }`,
             unit: unitInfo.unit,
           };
