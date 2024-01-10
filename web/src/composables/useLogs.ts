@@ -155,6 +155,7 @@ const defaultObject = {
     tempFunctionContent: "",
     tempFunctionLoading: false,
     savedViews: <any>[],
+    customDownloadQueryObj: <any>{},
   },
 };
 
@@ -648,6 +649,7 @@ const useLogs = () => {
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
+          searchObj.data.customDownloadQueryObj = queryReq;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
@@ -1385,6 +1387,7 @@ const useLogs = () => {
     getSavedViews,
     onStreamChange,
     generateURLQuery,
+    buildSearch,
   };
 };
 

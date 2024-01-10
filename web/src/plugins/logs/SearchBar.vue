@@ -79,7 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey" size="xs" />
+                    <q-icon name="delete"
+color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -164,19 +165,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
-        <q-btn
-          data-test="logs-search-bar-reset-function-btn"
-          class="q-mr-sm download-logs-btn q-px-sm"
-          size="sm"
-          v-bind:disable="
-            searchObj.data.queryResults &&
-            searchObj.data.queryResults.hasOwnProperty('hits') &&
-            !searchObj.data.queryResults.hits.length
-          "
-          icon="download"
-          :title="t('search.exportLogs')"
-          @click="downloadLogs"
-        ></q-btn>
+        <q-btn-group class="q-ml-xs no-outline q-pa-none no-border">
+          <q-btn-dropdown
+            data-test="logs-search-bar-reset-function-btn"
+            class="q-mr-sm download-logs-btn q-px-xs"
+            size="sm"
+            icon="download"
+            :title="t('search.exportLogs')"
+          >
+            <q-list>
+              <q-item
+                class="q-pa-sm saved-view-item"
+                clickable
+                v-close-popup
+                v-bind:disable="
+                  searchObj.data.queryResults &&
+                  searchObj.data.queryResults.hasOwnProperty('hits') &&
+                  !searchObj.data.queryResults.hits.length
+                "
+              >
+                <q-item-section
+                  @click.stop="downloadLogs(searchObj.data.queryResults.hits)"
+                  v-close-popup
+                >
+                  <q-item-label>{{ t("search.downloadTable") }}</q-item-label>
+                </q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item class="q-pa-sm saved-view-item" clickable
+v-close-popup>
+                <q-item-section
+                  @click.stop="toggleCustomDownloadDialog"
+                  v-close-popup
+                >
+                  <q-item-label>{{ t("search.customRange") }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+        </q-btn-group>
         <q-btn
           data-test="logs-search-bar-share-link-btn"
           class="q-mr-sm download-logs-btn q-px-sm"
@@ -297,6 +324,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('confirmDialog.ok')"
             color="positive"
             @click="confirmDialogOK"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <q-dialog v-model="customDownloadDialog">
+      <q-card>
+        <q-card-section>
+          {{ t("search.customDownloadMessage") }}
+        </q-card-section>
+
+        <q-card-section>
+          <q-input
+            type="number"
+            data-test="custom-download-initial-number-input"
+            v-model="downloadCustomInitialNumber"
+            :label="t('search.initialNumber')"
+            default-value="0"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            tabindex="0"
+          />
+          <q-select
+            data-test="custom-download-range-select"
+            v-model="downloadCustomRange"
+            :options="downloadCustomRangeOptions"
+            :label="t('search.range')"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+          />
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn
+            data-test="logs-search-bar-confirm-dialog-cancel-btn"
+            :label="t('confirmDialog.cancel')"
+            color="primary"
+            v-close-popup
+          />
+          <q-btn
+            data-test="logs-search-bar-confirm-dialog-ok-btn"
+            :label="t('search.btnDownload')"
+            color="positive"
+            @click="downloadRangeData"
           />
         </q-card-actions>
       </q-card>
@@ -518,6 +598,7 @@ import useLogs from "@/composables/useLogs";
 import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
+import searchService from "@/services/search";
 
 import { Parser } from "node-sql-parser/build/mysql";
 import segment from "@/services/segment_analytics";
@@ -584,6 +665,36 @@ export default defineComponent({
     confirmDeleteSavedViews() {
       this.deleteSavedViews();
     },
+    toggleCustomDownloadDialog() {
+      this.customDownloadDialog = true;
+    },
+    downloadRangeData() {
+      // const queryReq = this.buildSearch();
+      // console.log(this.searchObj.data.customDownloadQueryObj)
+      this.searchObj.data.customDownloadQueryObj.query.from = parseInt(
+        this.downloadCustomInitialNumber
+      );
+      this.searchObj.data.customDownloadQueryObj.query.size =
+        this.downloadCustomRange;
+      searchService
+        .search({
+          org_identifier: this.searchObj.organizationIdetifier,
+          query: this.searchObj.data.customDownloadQueryObj,
+          page_type: this.searchObj.data.stream.streamType,
+        })
+        .then((res) => {
+          this.customDownloadDialog = false;
+          this.downloadLogs(res.data.hits);
+        })
+        .catch((err) => {
+          this.$q.notify({
+            message: err.message,
+            color: "negative",
+            position: "top",
+            timeout: 2000,
+          });
+        });
+    },
   },
   props: {
     fieldValues: {
@@ -607,6 +718,7 @@ export default defineComponent({
       getStreams,
       updateUrlQueryParams,
       generateURLQuery,
+      buildSearch,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -785,10 +897,11 @@ export default defineComponent({
       return csv;
     };
 
-    const downloadLogs = () => {
+    const downloadLogs = (data) => {
+      console.log(data);
       const filename = "logs-data.csv";
-      const data = jsonToCsv(searchObj.data.queryResults.hits);
-      const file = new File([data], filename, {
+      const dataobj = jsonToCsv(data);
+      const file = new File([dataobj], filename, {
         type: "text/csv",
       });
       const url = URL.createObjectURL(file);
@@ -1507,6 +1620,11 @@ export default defineComponent({
       searchObj.data.editorValue = "";
     };
 
+    const customDownloadDialog = ref(false);
+    const downloadCustomInitialNumber = ref(0);
+    const downloadCustomRange = ref(100);
+    const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
+
     return {
       t,
       store,
@@ -1560,6 +1678,11 @@ export default defineComponent({
       shareLink,
       getImageURL,
       resetFilters,
+      customDownloadDialog,
+      downloadCustomInitialNumber,
+      downloadCustomRange,
+      downloadCustomRangeOptions,
+      buildSearch,
     };
   },
   computed: {
@@ -1878,7 +2001,7 @@ export default defineComponent({
   padding: 4px 5px !important;
 }
 
-.body--dark{
+.body--dark {
   .btn-function {
     filter: brightness(100);
   }
