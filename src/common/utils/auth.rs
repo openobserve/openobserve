@@ -218,6 +218,23 @@ impl FromRequest for AuthExtractor {
         let url_len = path_columns.len();
         let org_id = path_columns[0].to_string();
 
+        if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
+            if let Some(auth_header) = req.headers().get("Authorization") {
+                if let Ok(auth_str) = auth_header.to_str() {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method,
+                        o2_type: format!("stream:{org_id}"),
+                        org_id,
+                        is_ingestion_ep: true,
+                    }));
+                }
+            }
+            return ready(Err(actix_web::error::ErrorUnauthorized(
+                "Unauthorized Access",
+            )));
+        }
+        println!("path {} & len {}", path, url_len);
         let object_type = if url_len == 1 {
             if method.eq("GET") && path_columns[0].eq("organizations") {
                 if method.eq("GET") {
@@ -228,18 +245,22 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[0].to_string()
             }
+        } else if url_len == 2 {
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 1])
+                    .unwrap_or(&path_columns[url_len - 1]),
+                path_columns[url_len - 2]
+            )
         } else {
-            if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-                format!("stream:{org_id}")
-            } else {
-                format!(
-                    "{}:{}",
-                    crate::common::meta::types::OFGA_MODELS
-                        .get(path_columns[url_len - 1])
-                        .unwrap_or(&path_columns[url_len - 1]),
-                    path_columns[url_len - 2]
-                )
-            }
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 1])
+                    .unwrap_or(&path_columns[url_len - 1]),
+                path_columns[url_len - 3]
+            )
         };
 
         if let Some(auth_header) = req.headers().get("Authorization") {

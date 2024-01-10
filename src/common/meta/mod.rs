@@ -35,4 +35,3 @@ pub mod telemetry;
 pub mod traces;
 pub mod usage;
 pub mod user;
-pub mod types;

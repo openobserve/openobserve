@@ -418,6 +418,11 @@ pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -
         .await
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor) -> bool {
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
