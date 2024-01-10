@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="xs"
               outline
               icon="arrow_back_ios_new"
+              data-test="dashboard-back-btn"
             />
             <span class="q-table__title q-mx-md q-mt-xs">{{
               currentDashboardData.data.title
@@ -76,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="refresh"
               @click="refreshData"
+              data-test="dashboard-refresh-btn"
             >
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
@@ -91,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="share"
               @click="shareLink"
+              data-test="dashboard-share-btn"
               ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
             >
             <q-btn
@@ -100,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               no-caps
               icon="settings"
+              data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
             >
               <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
@@ -111,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
               @click="toggleFullscreen"
+              data-test="dashboard-fullscreen-btn"
               ><q-tooltip>{{isFullscreen ? t("dashboard.exitFullscreen") : t("dashboard.fullscreen") }}</q-tooltip></q-btn
             >
           </div>
