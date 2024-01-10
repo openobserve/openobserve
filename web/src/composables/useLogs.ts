@@ -693,8 +693,8 @@ const useLogs = () => {
                     }
                   }
 
-                  searchObj.data.queryResults.hits =
-                    searchObj.data.queryResults.hits.splice(0, 150);
+                  // searchObj.data.queryResults.hits =
+                  //   searchObj.data.queryResults.hits.splice(0, 150);
                 } else {
                   searchObj.data.queryResults = res.data;
                 }
@@ -764,10 +764,11 @@ const useLogs = () => {
           })
           .then((res) => {
             dismiss();
+            searchObj.data.errorMsg = "";
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObj.loading = false;
             resolve(true);
@@ -999,7 +1000,10 @@ const useLogs = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      if (searchObj.data.queryResults.aggs) {
+      if (
+        searchObj.data.queryResults.hasOwnProperty("aggs") &&
+        searchObj.data.queryResults.aggs
+      ) {
         searchObj.data.queryResults.aggs.histogram.map(
           (bucket: {
             zo_sql_key: string | number | Date;
@@ -1142,7 +1146,7 @@ const useLogs = () => {
           const customMessage = logsErrorMessage(err.response.data.code);
           searchObj.data.errorCode = err.response.data.code;
           if (customMessage != "") {
-            searchObj.data.errorMsg = t(customMessage);
+            searchObj.data.errorMsg = customMessage;
           }
         })
         .finally(() => (searchObj.loading = false));
@@ -1160,7 +1164,7 @@ const useLogs = () => {
       clearInterval(store.state.refreshIntervalID);
       const refreshIntervalID = setInterval(async () => {
         // searchObj.loading = true;
-        await getQueryData(true);
+        await getQueryData(false);
         generateHistogramData();
         updateGridColumns();
         searchObj.meta.histogramDirtyFlag = true;
