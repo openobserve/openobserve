@@ -31,18 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @variablesData="variablesDataUpdated"
         />
       </div>
-      <div class="row q-px-md">
-        <div class="col-6 view-error-table q-pa-sm">
-          <div class="q-pb-sm text-bold q-pl-xs">Top Error Views</div>
-          <AppTable
-            :columns="columns"
-            :rows="errorsByView"
-            style="height: auto"
-            :virtualScroll="false"
-            height="200px"
-          />
-        </div>
-      </div>
     </div>
     <div
       v-show="isLoading.length"
@@ -63,35 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onActivated,
-  nextTick,
-  onMounted,
-} from "vue";
+import { defineComponent, ref, watch, onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
-import {
-  parseDuration,
-  generateDurationLabel,
-  getDurationObjectFromParams,
-  getQueryParamsForDuration,
-} from "@/utils/date";
 import { reactive } from "vue";
-import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import errorDashboard from "@/utils/rum/errors.json";
-import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
 
 export default defineComponent({
   name: "ErrorsDashboard",
   components: {
     RenderDashboardCharts,
-    AppTable,
   },
   props: {
     dateTime: {
@@ -146,52 +117,10 @@ export default defineComponent({
       }, 1000);
     };
 
-    const getResourceErrors = () => {
-      errorsByView.value = [];
-
-      let whereClause = `WHERE type='error'`;
-      variablesData.value?.values?.length &&
-        variablesData.value.values.forEach((element: any) => {
-          if (element.type === "query_values" && !!element.value) {
-            whereClause += ` and ${element.name}='${element.value}'`;
-          }
-        });
-
-      const req = {
-        query: {
-          sql: `SELECT SPLIT_PART(view_url, '?', 1) AS url, count(*) as error_count FROM "_rumdata" ${whereClause} group by url order by error_count desc`,
-          start_time: props.selectedDate.startTime,
-          end_time: props.selectedDate.endTime,
-          from: 0,
-          size: 150,
-          sql_mode: "full",
-        },
-      };
-
-      searchService
-        .search({
-          org_identifier: store.state.selectedOrganization.identifier,
-          query: req,
-          page_type: "logs",
-        })
-        .then((res) => {
-          res.data.hits.forEach((element: any) => {
-            errorsByView.value.push(element);
-          });
-        });
-    };
-
     // variables data
     const variablesDataUpdated = (data: any) => {
       if (JSON.stringify(variablesData.value) === JSON.stringify(data)) return;
-
       variablesData.value = data;
-      if (variablesData.value?.values?.length) {
-        const areVariablesLoaded = variablesData.value.values.every(
-          (element: any) => element.value
-        );
-        if (areVariablesLoaded) getResourceErrors();
-      }
     };
 
     const columns = [
@@ -229,16 +158,6 @@ export default defineComponent({
     const addSettingsData = () => {
       showDashboardSettingsDialog.value = true;
     };
-
-    watch(
-      () => props.selectedDate,
-      (newVal, oldValue) => {
-        if (JSON.stringify(newVal) !== JSON.stringify(oldValue)) {
-          getResourceErrors();
-        }
-      },
-      { immediate: true }
-    );
 
     return {
       currentDashboardData,

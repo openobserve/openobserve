@@ -25,47 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="api-performance-dashboards"
       :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
     >
-      <div class="q-px-md">
-        <VariablesValueSelector
-          :variablesConfig="apiDashboard?.variables"
-          :selectedTimeDate="dateTime"
+      <div class="q-px-sm performance-dashboard">
+        <RenderDashboardCharts
+          ref="errorRenderDashboardChartsRef"
+          :viewOnly="true"
+          :dashboardData="currentDashboardData.data"
+          :currentTimeObj="dateTime"
           @variablesData="variablesDataUpdated"
         />
-      </div>
-      <div class="row q-px-md">
-        <div class="col-6 q-px-xs q-py-xs">
-          <div class="view-error-table q-pa-sm">
-            <div class="q-pb-sm text-bold q-pl-xs">Top Slowest Resources</div>
-            <AppTable
-              :columns="slowResourceColumn"
-              :rows="topSlowResources"
-              :virtualScroll="false"
-              height="200px"
-            />
-          </div>
-        </div>
-        <div class="col-6 q-px-xs q-py-xs">
-          <div class="view-error-table q-pa-sm">
-            <div class="q-pb-sm text-bold q-pl-xs">Top Heaviest Resources</div>
-            <AppTable
-              :columns="heavyResourceColumn"
-              :rows="topHeavyResources"
-              :virtualScroll="false"
-              height="200px"
-            />
-          </div>
-        </div>
-        <div class="col-6 q-px-xs q-py-xs">
-          <div class="view-error-table q-pa-sm">
-            <div class="q-pb-sm text-bold q-pl-xs">Top Error Resources</div>
-            <AppTable
-              :columns="errorResourceColumns"
-              :rows="topErrorResources"
-              :virtualScroll="false"
-              height="200px"
-            />
-          </div>
-        </div>
       </div>
     </div>
     <div
@@ -93,16 +60,14 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
-import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
-import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import apiDashboard from "@/utils/rum/api.json";
+import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 
 export default defineComponent({
   name: "ApiDashboard",
   components: {
-    AppTable,
-    VariablesValueSelector,
+    RenderDashboardCharts,
   },
   props: {
     dateTime: {
@@ -140,68 +105,7 @@ export default defineComponent({
       if (JSON.stringify(variablesData.value) === JSON.stringify(data)) return;
 
       variablesData.value = data;
-      if (variablesData.value?.values?.length) {
-        const areVariablesLoaded = variablesData.value.values.every(
-          (element: any) => element.value
-        );
-        if (areVariablesLoaded) {
-          getTopErrorResources();
-          getTopHeavyResources();
-          getTopSlowResources();
-        }
-      }
     };
-
-    const slowResourceColumn = [
-      {
-        name: "url",
-        label: "Resource URL",
-        field: (row) => row["url"],
-        align: "left",
-      },
-      {
-        name: "max_duration",
-        label: "Duration (ms)",
-        field: (row: any) => row["max_duration"],
-        align: "left",
-        sortable: true,
-        style: { width: "56px !important" },
-      },
-    ];
-
-    const errorResourceColumns = [
-      {
-        name: "url",
-        label: "Resource URL",
-        field: (row) => row["url"],
-        align: "left",
-      },
-      {
-        name: "error_count",
-        label: "Error Count",
-        field: (row: any) => row["error_count"],
-        align: "left",
-        sortable: true,
-        style: { width: "56px" },
-      },
-    ];
-
-    const heavyResourceColumn = [
-      {
-        name: "url",
-        label: "Resource URL",
-        field: (row) => row["url"],
-        align: "left",
-      },
-      {
-        name: "max_resource_size",
-        label: "Size (kb)",
-        field: (row: any) => row["max_resource_size"],
-        align: "left",
-        sortable: true,
-        style: { width: "56px" },
-      },
-    ];
 
     onMounted(async () => {
       await loadDashboard();
@@ -384,12 +288,6 @@ export default defineComponent({
       addSettingsData,
       showDashboardSettingsDialog,
       loadDashboard,
-      topSlowResources,
-      topHeavyResources,
-      heavyResourceColumn,
-      slowResourceColumn,
-      errorResourceColumns,
-      topErrorResources,
       apiDashboard,
       isLoading,
     };

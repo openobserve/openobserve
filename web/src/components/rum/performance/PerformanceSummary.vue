@@ -30,9 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before_panels>
           <div class="flex items-center q-pb q-pt-md text-subtitle1 text-bold">
-            <div class="col text-center">{{ t("rum.webVitalsLabel") }}</div>
-            <div class="col text-center">{{ t("rum.errorLabel") }}</div>
-            <div class="col text-center">{{ t("rum.sessionLabel") }}</div>
+            <div class="text-center" style="width: 25%">
+              {{ t("rum.webVitalsLabel") }}
+            </div>
+            <div class="text-center" style="width: 25%">
+              {{ t("rum.errorLabel") }}
+            </div>
+            <div class="text-center" style="width: 25%">
+              {{ t("rum.sessionLabel") }}
+            </div>
           </div>
         </template>
       </RenderDashboardCharts>
@@ -63,19 +69,17 @@ import {
   onMounted,
   nextTick,
   onActivated,
-  onDeactivated,
   type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
+import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
-import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "PerformanceSummary",

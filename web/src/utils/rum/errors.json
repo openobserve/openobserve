@@ -54,6 +54,54 @@
         }
       ],
       "layout": { "x": 0, "y": 0, "w": 6, "h": 8, "i": 1 }
+    },
+    {
+      "id": "Panel_ID646412",
+      "type": "table",
+      "title": "Top Error Views",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT SPLIT_PART(view_url, '?', 1) as \"x_axis_1\", count(*) as \"y_axis_1\"  FROM \"_rumdata\" where type='error' and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "View Url",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null
+              }
+            ],
+            "y": [
+              {
+                "label": "Error Count",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": "#5960b2",
+                "aggregationFunction": "count"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 6, "y": 0, "w": 6, "h": 8, "i": 2 }
     }
   ],
   "variables": {
