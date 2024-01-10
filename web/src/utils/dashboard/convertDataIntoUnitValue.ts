@@ -24,16 +24,23 @@ export const getUnitValue = (
       ];
       for (let unitInfo of units) {
         const unitValue: any = value ? value / unitInfo.divisor : 0;
-        if (unitValue < 1024) {
+
+        if (Math.abs(unitValue) < 1024) {
           return {
-            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(Math.abs(unitValue)).toFixed(decimals) ?? 0
+            }`,
             unit: unitInfo.unit,
           };
         }
       }
-      const val: any = value ? value / units[units.length - 1].divisor : 0;
+
+      // Handle both positive and negative values for PB
+      const absValue: any = Math.abs(value) ? Math.abs(value / units[units.length - 1].divisor) : 0;
       return {
-        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(absValue).toFixed(decimals) ?? 0
+        }`,
         unit: "PB",
       };
     }
@@ -131,17 +138,27 @@ export const getUnitValue = (
     }
     case "bps": {
       const units = ["B", "KB", "MB", "GB", "TB"];
+
+      // Handle both positive and negative values
       for (let unit of units) {
-        if (value < 1024) {
+        const absValue = Math.abs(value);
+
+        if (absValue < 1024) {
           return {
-            value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(absValue)?.toFixed(decimals) ?? 0
+            }`,
             unit: `${unit}/s`,
           };
         }
         value /= 1024;
       }
+
+      // Handle both positive and negative values for PB/s
       return {
-        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(Math.abs(value))?.toFixed(decimals) ?? 0
+        }`,
         unit: "PB/s",
       };
     }
@@ -210,17 +227,13 @@ export const getUnitValue = (
     }
     case "default": {
       return {
-        value: isNaN(value)
-          ? value
-          : (+value)?.toFixed(decimals) ?? 0,
+        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
     default: {
       return {
-        value: isNaN(value)
-          ? value
-          : (+value)?.toFixed(decimals) ?? 0,
+        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
