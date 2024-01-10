@@ -583,12 +583,12 @@ pub(crate) async fn get_series(
         .map(|f| f.name().as_str())
         .filter(|&s| s != CONFIG.common.column_timestamp && s != VALUE_LABEL && s != HASH_LABEL)
         .collect::<Vec<_>>()
-        .join(", ");
+        .join("\", \"");
     if label_names.is_empty() {
         return Ok(vec![]);
     }
 
-    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), {label_names} FROM {metric_name}");
+    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), \"{label_names}\" FROM {metric_name}");
     let mut sql_where = Vec::new();
     if let Some(selector) = selector {
         for mat in selector.matchers.matchers.iter() {
