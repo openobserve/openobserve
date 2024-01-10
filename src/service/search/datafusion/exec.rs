@@ -17,6 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use ahash::AHashMap as HashMap;
 use config::{
+    ider,
     meta::stream::{FileKey, FileMeta, StreamType},
     utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_values},
     CONFIG, PARQUET_BATCH_SIZE,
@@ -481,14 +482,8 @@ pub async fn merge(
         return Ok(batches.to_owned());
     }
 
-    // let start = std::time::Instant::now();
-
     // write temp file
     let (schema, work_dir) = merge_write_recordbatch(batches)?;
-    // log::info!(
-    //     "merge_write_recordbatch took {:.3} seconds.",
-    //     start.elapsed().as_secs_f64()
-    // );
     if schema.fields().is_empty() {
         return Ok(vec![]);
     }
@@ -512,11 +507,6 @@ pub async fn merge(
             return Err(e);
         }
     };
-
-    // log::info!(
-    //     "merge_rewrite_sql took {:.3} seconds.",
-    //     start.elapsed().as_secs_f64()
-    // );
 
     // query data
     let mut ctx = prepare_datafusion_context(&SearchType::Normal)?;
@@ -569,8 +559,6 @@ pub async fn merge(
     }
     ctx.deregister_table("tbl")?;
 
-    // log::info!("Merge took {:.3} seconds.", start.elapsed().as_secs_f64());
-
     // clear temp file
     tmpfs::delete(&work_dir, true).unwrap();
 
@@ -579,7 +567,7 @@ pub async fn merge(
 
 fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, String)> {
     let mut i = 0;
-    let work_dir = format!("/tmp/merge/{}/", chrono::Utc::now().timestamp_micros());
+    let work_dir = format!("/tmp/merge/{}/", ider::generate());
     let mut schema = Schema::empty();
     for row in batches.iter() {
         if row.num_rows() == 0 {

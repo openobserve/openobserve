@@ -85,10 +85,7 @@ pub async fn search_parquet(
         let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
         match get_file_contents(&source_file) {
             Err(_) => {
-                log::error!(
-                    "[session_id {session_id}] skip wal parquet file: {} get file content error",
-                    &file.key
-                );
+                // file already deleted
                 files.retain(|x| x != file);
             }
             Ok(file_data) => {
