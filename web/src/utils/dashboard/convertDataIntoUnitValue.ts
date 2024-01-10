@@ -139,7 +139,6 @@ export const getUnitValue = (
     case "bps": {
       const units = ["B", "KB", "MB", "GB", "TB"];
 
-      // Handle both positive and negative values
       for (let unit of units) {
         const absValue: any = Math.abs(value);
 
