@@ -38,7 +38,7 @@ pub enum Error {
         source: io::Error,
         path: PathBuf,
     },
-    #[snafu(display("Failed to delete file {}: {}", path.display(), source))]
+    #[snafu(display("Failed to sync file {}: {}", path.display(), source))]
     FileSync {
         source: io::Error,
         path: PathBuf,
