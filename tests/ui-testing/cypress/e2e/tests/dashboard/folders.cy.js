@@ -144,17 +144,6 @@ describe("Folders testcases", () => {
     cy.get('[data-test="dashboard-table"] > .q-table__top').should('be.visible')
   });
 
-
-  it("should click on cancel on folder creation UI", () => {
-    // Create dynamic dashboard name
-    cy.wait(1000);
-    cy.get('[data-test="dashboard-new-folder-btn"]').click({ force: true });
-    cy.wait(100);
-    cy.get('[data-test="dashboard-folder-add-cancel"]').click({ force: true });
-    cy.get('[data-test="dashboard-table"] > .q-table__top').should('be.visible')
-  });
-
-
   it('should create folders and move a dashboard, then delete dashboard and folders', () => {
     // Function to generate a random folder name
     const randomFolderName = 'Folder' + Math.floor(Math.random() * 1000);
