@@ -209,6 +209,7 @@ import {
   nextTick,
   onBeforeMount,
   onBeforeUnmount,
+  watch,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -361,7 +362,7 @@ export default defineComponent({
         queryParams.stream_type !== searchObj.data.stream.streamType ||
         queryParams.stream !== searchObj.data.stream.selectedStream.value;
 
-      if (isStreamChanged) {
+      if (isStreamChanged && queryParams.type === "stream_explorer") {
         restoreUrlQueryParams();
         loadLogsData();
         return;
@@ -386,6 +387,21 @@ export default defineComponent({
         MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
       }
     });
+
+    /**
+     * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
+     * This watcher is used to check if the user has changed the stream type from stream explorer to logs.
+     * This gets triggered when stream explorer is active and user clicks on logs icon from left menu sidebar. Then we need to redirect the user to logs page again.
+     */
+    watch(
+      () => router.currentRoute.value.query.type,
+      (type, prev) => {
+        if (prev === "stream_explorer" && !type) {
+          searchObj.meta.pageType = "logs";
+          loadLogsData();
+        }
+      }
+    );
 
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;

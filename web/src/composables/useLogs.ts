@@ -108,6 +108,7 @@ const defaultObject = {
     },
     scrollInfo: {},
     flagWrapContent: false,
+    pageType: "logs",
   },
   data: {
     query: <any>"",
@@ -368,6 +369,10 @@ const useLogs = () => {
       query["functionContent"] = b64EncodeUnicode(
         searchObj.data.tempFunctionContent
       );
+    }
+
+    if (searchObj.meta.pageType !== "logs") {
+      query["type"] = searchObj.meta.pageType;
     }
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
@@ -1230,6 +1235,10 @@ const useLogs = () => {
       searchObj.data.stream.streamType = queryParams.type;
     } else {
       searchObj.data.stream.streamType = "logs";
+    }
+
+    if (queryParams.type) {
+      searchObj.meta.pageType = queryParams.type;
     }
 
     router.push({

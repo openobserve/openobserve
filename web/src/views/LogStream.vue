@@ -485,6 +485,7 @@ export default defineComponent({
           period: "15m",
           refresh: "0",
           query: "",
+          type: "stream_explorer",
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
