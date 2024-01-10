@@ -73,12 +73,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
-        // todo: remove this line
-        if file.contains("/logs/default/") {
-            println!("file: {}", file);
-        }
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
-            log::error!("[INGESTER:JOB] Failed to read parquet file meta: {}", file);
             continue;
         };
         let file = Path::new(&file)
