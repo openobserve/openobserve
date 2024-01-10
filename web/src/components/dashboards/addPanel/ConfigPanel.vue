@@ -580,6 +580,11 @@ export default defineComponent({
           unit: "px",
         };
       }
+
+      if(!dashboardPanelData.data.config.axis_border_show) {
+        
+        dashboardPanelData.data.config.axis_border_show = false;
+      }
     });
 
     const legendWidthValue = computed({
