@@ -19,11 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-show="!errorDetail" style="height: 100%; width: 100%">
       <GeoMapRenderer
         v-if="panelSchema.type == 'geomap'"
-        :data="panelData.chartType == 'geomap' ? panelData : { options: {backgroundColor: 'transparent'} }"
+        :data="
+          panelData.chartType == 'geomap'
+            ? panelData
+            : { options: { backgroundColor: 'transparent' } }
+        "
       />
       <TableRenderer
         v-else-if="panelSchema.type == 'table'"
-        :data="panelData.chartType == 'table' ? panelData : { options: {backgroundColor: 'transparent'} }"
+        :data="
+          panelData.chartType == 'table'
+            ? panelData
+            : { options: { backgroundColor: 'transparent' } }
+        "
+        ref="tableRendererRef"
       />
       <ChartRenderer
         v-else
@@ -34,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panelData.chartType != 'geomap' &&
             panelData.chartType != 'table')
             ? panelData
-            : { options: {backgroundColor: 'transparent'} } 
+            : { options: { backgroundColor: 'transparent' } }
         "
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
       />
@@ -114,6 +123,9 @@ export default defineComponent({
       variablesData,
       chartPanelRef
     );
+
+    // need tableRendererRef to access downloadTableAsCSV method
+    const tableRendererRef = ref(null);
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -253,6 +265,7 @@ export default defineComponent({
       panelData,
       noData,
       metadata,
+      tableRendererRef,
     };
   },
 });
