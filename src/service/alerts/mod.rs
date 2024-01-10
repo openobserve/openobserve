@@ -102,14 +102,14 @@ pub async fn save(
             if alert.query_condition.sql.is_none()
                 || alert.query_condition.sql.as_ref().unwrap().is_empty()
             {
-                return Err(anyhow::anyhow!("Alert should have a SQL"));
+                return Err(anyhow::anyhow!("Alert with SQL mode should have a query"));
             }
         }
         QueryType::PromQL => {
             if alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
             {
-                return Err(anyhow::anyhow!("Alert should have a PromQL"));
+                return Err(anyhow::anyhow!("Alert with PromQL mode should have a query"));
             }
         }
     }
