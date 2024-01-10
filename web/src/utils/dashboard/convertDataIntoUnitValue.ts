@@ -24,16 +24,23 @@ export const getUnitValue = (
       ];
       for (let unitInfo of units) {
         const unitValue: any = value ? value / unitInfo.divisor : 0;
-        if (unitValue < 1024) {
+
+        if (Math.abs(unitValue) < 1024) {
           return {
-            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(Math.abs(unitValue)?.toString()).toFixed(decimals) ?? 0
+            }`,
             unit: unitInfo.unit,
           };
         }
       }
-      const val: any = value ? value / units[units.length - 1].divisor : 0;
+
+      // Handle both positive and negative values for PB
+      const absValue: any = Math.abs(value) ? Math.abs(value / units[units.length - 1].divisor) : 0;
       return {
-        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(absValue).toFixed(decimals) ?? 0
+        }`,
         unit: "PB",
       };
     }
@@ -57,9 +64,9 @@ export const getUnitValue = (
       for (let i = units.length - 1; i >= 0; i--) {
         const unitInfo = units[i];
         const unitValue = value / unitInfo.divisor;
-        if (unitValue >= 1) {
+        if (Math.abs(unitValue) >= 1) {
           return {
-            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
+            value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(unitValue)?.toFixed(decimals) ?? 0)}`,
             unit: unitInfo.unit,
           };
         }
@@ -67,7 +74,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
+        value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(value / units[0].divisor)?.toFixed(decimals) ?? 0)}`,
         unit: units[0].unit,
       };
     }
@@ -86,9 +93,9 @@ export const getUnitValue = (
       for (let i = units.length - 1; i >= 0; i--) {
         const unitInfo = units[i];
         const unitValue = value / unitInfo.divisor;
-        if (unitValue >= 1) {
+        if (Math.abs(unitValue) >= 1) {
           return {
-            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
+            value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(unitValue)?.toFixed(decimals) ?? 0)}`,
             unit: unitInfo.unit,
           };
         }
@@ -96,7 +103,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
+        value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(value / units[0].divisor)?.toFixed(decimals) ?? 0)}`,
         unit: units[0].unit,
       };
     }
@@ -115,9 +122,9 @@ export const getUnitValue = (
       for (let i = units.length - 1; i >= 0; i--) {
         const unitInfo = units[i];
         const unitValue = value / unitInfo.divisor;
-        if (unitValue >= 1) {
+        if (Math.abs(unitValue) >= 1) {
           return {
-            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
+            value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(unitValue)?.toFixed(decimals) ?? 0)}`,
             unit: unitInfo.unit,
           };
         }
@@ -125,23 +132,32 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
+        value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(value / units[0].divisor)?.toFixed(decimals) ?? 0)}`,
         unit: units[0].unit,
       };
     }
     case "bps": {
       const units = ["B", "KB", "MB", "GB", "TB"];
+
       for (let unit of units) {
-        if (value < 1024) {
+        const absValue: any = Math.abs(value);
+
+        if (absValue < 1024) {
           return {
-            value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(absValue)?.toFixed(decimals) ?? 0
+            }`,
             unit: `${unit}/s`,
           };
         }
         value /= 1024;
       }
+
+      // Handle both positive and negative values for PB/s
       return {
-        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(Math.abs(value)?.toString())?.toFixed(decimals) ?? 0
+        }`,
         unit: "PB/s",
       };
     }
@@ -171,16 +187,20 @@ export const getUnitValue = (
       for (let unitInfo of units) {
         const unitValue: any = value ? value / unitInfo.divisor : 0;
 
-        if (unitValue < 1024) {
+        if (Math.abs(unitValue) < 1024) {
           return {
-            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(Math.abs(unitValue)?.toString())?.toFixed(decimals) ?? 0
+            }`,
             unit: unitInfo.unit,
           };
         }
       }
-      const val: any = value ? value / units[units.length - 1].divisor : 0;
+      const val: any = Math.abs(value) ? Math.abs(value / units[units.length - 1].divisor) : 0;
       return {
-        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(val)?.toFixed(decimals) ?? 0
+        }`,
         unit: "PB",
       };
     }
@@ -195,32 +215,32 @@ export const getUnitValue = (
       ];
       for (let unitInfo of units) {
         const unitValue: any = value ? value / unitInfo.divisor : 0;
-        if (unitValue < 1024) {
+        if (Math.abs(unitValue) < 1024) {
           return {
-            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(Math.abs(unitValue)?.toString())?.toFixed(decimals) ?? 0
+            }`,
             unit: unitInfo.unit,
           };
         }
       }
-      const val: any = value ? value / units[units.length - 1].divisor : 0;
+      const val: any = Math.abs(value) ? Math.abs(value / units[units.length - 1].divisor) : 0;
       return {
-        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(val)?.toFixed(decimals) ?? 0
+        }`,
         unit: "PB",
       };
     }
     case "default": {
       return {
-        value: isNaN(value)
-          ? value
-          : (+value)?.toFixed(decimals) ?? 0,
+        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
     default: {
       return {
-        value: isNaN(value)
-          ? value
-          : (+value)?.toFixed(decimals) ?? 0,
+        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
