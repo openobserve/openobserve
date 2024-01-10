@@ -290,7 +290,16 @@ impl QueryCondition {
                 }
             }
             QueryType::PromQL => {
-                return Err(anyhow::anyhow!("PromQL is not supported yet"));
+                if let Some(v) = self.promql.as_ref() {
+                    if v.is_empty() {
+                        return Ok(None);
+                    } else {
+                        // TODO handle promql
+                        return Ok(None);
+                    }
+                } else {
+                    return Ok(None);
+                }
             }
         };
 
