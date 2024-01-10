@@ -1,4 +1,5 @@
 @import "./base.css";
+@import "./inputs.scss";
 
 #app {
   max-width: 1280px;
@@ -32,4 +33,8 @@ a,
     grid-template-columns: 1fr 1fr;
     padding: 0 2rem;
   }
+}
+
+.small-input {
+  padding-top: 8px;
 }

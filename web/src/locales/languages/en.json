@@ -658,7 +658,8 @@
     "start": "start",
     "pause": "Pause",
     "groupBy": "Group by",
-    "row": "Row Template"
+    "row": "Row Template",
+    "preview": "Preview"
   },
   "alert_templates": {
     "header": "Templates",

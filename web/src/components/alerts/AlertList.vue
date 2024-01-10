@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="routeTo('alertTemplates')"
                 />
               </template>
-              <template v-if="!destinations.length">
+              <template v-if="!destinations.length && templates.length">
                 <div class="text-subtitle1">
                   It looks like you haven't created any Destinations yet. To
                   create an Alert, you'll need to have at least one Destination
@@ -575,7 +575,8 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           alert.stream_name,
           alert.name,
-          !alert?.enabled
+          !alert?.enabled,
+          alert.stream_type
         )
         .then(() => {
           alert.enabled = !alert.enabled;
