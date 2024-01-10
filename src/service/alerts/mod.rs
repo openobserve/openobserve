@@ -96,29 +96,22 @@ pub async fn save(
                 // if it has result we should fire the alert when enable aggregation
                 alert.trigger_condition.operator = Operator::GreaterThanEquals;
                 alert.trigger_condition.threshold = 1;
-            } else if alert.query_condition.conditions.is_none()
-                || alert
-                    .query_condition
-                    .conditions
-                    .as_ref()
-                    .unwrap()
-                    .is_empty()
-            {
-                return Err(anyhow::anyhow!("Alert should have conditions"));
             }
         }
         QueryType::SQL => {
             if alert.query_condition.sql.is_none()
                 || alert.query_condition.sql.as_ref().unwrap().is_empty()
             {
-                return Err(anyhow::anyhow!("Alert should have a SQL"));
+                return Err(anyhow::anyhow!("Alert with SQL mode should have a query"));
             }
         }
         QueryType::PromQL => {
             if alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
             {
-                return Err(anyhow::anyhow!("Alert should have a PromQL"));
+                return Err(anyhow::anyhow!(
+                    "Alert with PromQL mode should have a query"
+                ));
             }
         }
     }
@@ -282,11 +275,7 @@ impl QueryCondition {
         let sql = match self.query_type {
             QueryType::Custom => {
                 if let Some(v) = self.conditions.as_ref() {
-                    if self.aggregation.is_none() && v.is_empty() {
-                        return Ok(None);
-                    } else {
-                        build_sql(alert, v).await?
-                    }
+                    build_sql(alert, v).await?
                 } else {
                     return Ok(None);
                 }
@@ -303,7 +292,8 @@ impl QueryCondition {
                 }
             }
             QueryType::PromQL => {
-                return Err(anyhow::anyhow!("PromQL is not supported yet"));
+                // TODO handle promql
+                return Ok(None);
             }
         };
 
