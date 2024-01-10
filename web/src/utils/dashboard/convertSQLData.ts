@@ -177,7 +177,7 @@ export const convertSQLData = (
       bottom:
         legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
           ? panelSchema.config?.axis_width == null
-            ? 40
+            ? 50
             : 60
           : panelSchema.config?.axis_width == null
           ? 20
