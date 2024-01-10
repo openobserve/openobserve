@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <q-btn v-close-popup="true" round flat icon="cancel" data-test="dashboard-add-cancel" />
         </div>
       </div>
     </q-card-section>
@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :readonly="beingUpdated"
           :disabled="beingUpdated"
           :label="t('dashboard.id')"
+          data-test="dashboard-id"
         />
         <q-input
           v-model="dashboardData.name"
@@ -47,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="input-border"
           bg-color="input-bg"
           class="q-py-md showLabelOnTop"
-          data-test="dashboard-name"
+          data-test="add-dashboard-name"
           stack-label
           outlined
           filled
@@ -66,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
+          data-test="add-dashboard-description"
         />
 
         <span>&nbsp;</span>
@@ -80,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             text-color="light-text"
             padding="sm md"
             no-caps
+            data-test="dashboard-add-cancel"
           />
           <q-btn
             data-test="dashboard-add-submit"
