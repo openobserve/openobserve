@@ -46,7 +46,9 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
 ) -> Result<(), anyhow::Error> {
-    alert.name = name.to_string();
+    if !name.is_empty() {
+        alert.name = name.trim().to_string();
+    }
     alert.org_id = org_id.to_string();
     alert.stream_type = stream_type;
     alert.stream_name = stream_name.to_string();
@@ -126,7 +128,7 @@ pub async fn save(
     );
 
     // save the alert
-    db::alerts::set(org_id, stream_type, stream_name, name, alert).await
+    db::alerts::set(org_id, stream_type, stream_name, alert).await
 }
 
 pub async fn get(
@@ -183,7 +185,7 @@ pub async fn enable(
         }
     };
     alert.enabled = value;
-    db::alerts::set(org_id, stream_type, stream_name, name, alert)
+    db::alerts::set(org_id, stream_type, stream_name, alert)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

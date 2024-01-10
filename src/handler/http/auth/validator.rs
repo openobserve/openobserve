@@ -73,10 +73,10 @@ pub async fn validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                if check_permissions(user_id, auth_info).await {
-                    return Ok(req);
+                if auth_info.is_ingestion_ep || check_permissions(user_id, auth_info).await {
+                    Ok(req)
                 } else {
-                    return Err((ErrorForbidden("Unauthorized Access"), req));
+                    Err((ErrorForbidden("Unauthorized Access"), req))
                 }
             } else {
                 Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -390,7 +390,7 @@ pub async fn oo_validator(
         Err((ErrorUnauthorized("Unauthorized Access"), req))
     }
 }
-
+#[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
     let object_str = auth_info.o2_type;
     let obj_str = if object_str.contains("##replace_user_id##") {
@@ -400,6 +400,11 @@ pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -
     };
     o2_enterprise::enterprise::openfga::authorizer::is_allowed(user_id, &auth_info.method, &obj_str)
         .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor) -> bool {
+    true
 }
 
 #[cfg(test)]

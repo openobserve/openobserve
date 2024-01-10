@@ -15,12 +15,15 @@
 
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+#[cfg(feature = "enterprise")]
 use config::CONFIG;
 use futures::future::{ready, Ready};
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
-    meta::{ingestion::INGESTION_EP, organization::DEFAULT_ORG, user::UserRole},
+    meta::{organization::DEFAULT_ORG, user::UserRole},
 };
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
@@ -53,6 +56,20 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
     }
 }
 
+#[cfg(feature = "enterprise")]
+pub async fn set_ownership(org_id: &str, obj_type: &str, obj_id: &str) {
+    let obj_str = format!(
+        "{}:{}",
+        o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+            .get(obj_type)
+            .unwrap(),
+        obj_id
+    );
+    o2_enterprise::enterprise::openfga::authorizer::set_owning_org(org_id, &obj_str).await;
+}
+#[cfg(not(feature = "enterprise"))]
+pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj_id: &str) {}
+
 pub struct UserEmail {
     pub user_id: String,
 }
@@ -79,12 +96,14 @@ pub struct AuthExtractor {
     pub method: String,
     pub o2_type: String,
     pub org_id: String,
+    pub is_ingestion_ep: bool,
 }
 
 impl FromRequest for AuthExtractor {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
 
+    #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
@@ -98,6 +117,23 @@ impl FromRequest for AuthExtractor {
         let url_len = path_columns.len();
         let org_id = path_columns[0].to_string();
 
+        if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
+            if let Some(auth_header) = req.headers().get("Authorization") {
+                if let Ok(auth_str) = auth_header.to_str() {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method,
+                        o2_type: format!("stream:{org_id}"),
+                        org_id,
+                        is_ingestion_ep: true,
+                    }));
+                }
+            }
+            return ready(Err(actix_web::error::ErrorUnauthorized(
+                "Unauthorized Access",
+            )));
+        }
+        println!("path {} & len {}", path, url_len);
         let object_type = if url_len == 1 {
             if method.eq("GET") && path_columns[0].eq("organizations") {
                 if method.eq("GET") {
@@ -108,18 +144,22 @@ impl FromRequest for AuthExtractor {
             } else {
                 path_columns[0].to_string()
             }
+        } else if url_len == 2 {
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 1])
+                    .unwrap_or(&path_columns[url_len - 1]),
+                path_columns[url_len - 2]
+            )
         } else {
-            if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-                format!("stream:{org_id}")
-            } else {
-                format!(
-                    "{}:{}",
-                    crate::common::meta::types::OFGA_MODELS
-                        .get(path_columns[url_len - 1])
-                        .unwrap_or(&path_columns[url_len - 1]),
-                    path_columns[url_len - 2]
-                )
-            }
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 1])
+                    .unwrap_or(&path_columns[url_len - 1]),
+                path_columns[url_len - 3]
+            )
         };
 
         if let Some(auth_header) = req.headers().get("Authorization") {
@@ -129,6 +169,25 @@ impl FromRequest for AuthExtractor {
                     method,
                     o2_type: object_type,
                     org_id,
+                    is_ingestion_ep: false,
+                }));
+            }
+        }
+        ready(Err(actix_web::error::ErrorUnauthorized(
+            "Unauthorized Access",
+        )))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        if let Some(auth_header) = req.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    is_ingestion_ep: true, // bypass check permissions
                 }));
             }
         }

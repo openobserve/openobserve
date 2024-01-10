@@ -37,11 +37,13 @@ pub async fn save(
             destination.template
         ));
     }
-    destination.name = name.to_string();
+    if !name.is_empty() {
+        destination.name = name.to_string();
+    }
     if destination.name.is_empty() {
         return Err(anyhow::anyhow!("Alert destination name is required"));
     }
-    db::alerts::destinations::set(org_id, name, destination).await
+    db::alerts::destinations::set(org_id, destination).await
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {

@@ -19,17 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div class="row items-center no-wrap q-mx-md q-my-sm">
         <div class="flex items-center">
-          <div
-            class="flex justify-center items-center q-mr-md cursor-pointer"
-            style="
+          <div class="flex justify-center items-center q-mr-md cursor-pointer" style="
               border: 1.5px solid;
               border-radius: 50%;
               width: 22px;
               height: 22px;
-            "
-            title="Go Back"
-            @click="router.back()"
-          >
+            " title="Go Back" @click="router.back()">
             <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
           <div class="col" data-test="add-destination-title">
@@ -45,174 +40,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div class="row q-col-gutter-sm q-pt-lg q-px-lg q-my-md">
         <div class="col-6 q-py-xs">
-          <q-input
-            data-test="add-destination-name-input"
-            v-model="formData.name"
-            :label="t('alerts.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdatingDestination"
-            v-bind:disable="isUpdatingDestination"
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-            tabindex="0"
-          />
+          <q-input data-test="add-destination-name-input" v-model="formData.name" :label="t('alerts.name') + ' *'"
+            color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense
+            v-bind:readonly="isUpdatingDestination" v-bind:disable="isUpdatingDestination"
+            :rules="[(val: any) => !!val.trim() || 'Field is required!']" tabindex="0" />
         </div>
         <div class="col-6 row q-py-xs">
           <div class="col-12">
-            <q-select
-              data-test="add-destination-template-select"
-              v-model="formData.template"
-              :label="t('alert_destinations.template') + ' *'"
-              :options="getFormattedTemplates"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
-            />
+            <q-select data-test="add-destination-template-select" v-model="formData.template"
+              :label="t('alert_destinations.template') + ' *'" :options="getFormattedTemplates" color="input-border"
+              bg-color="input-bg" class="showLabelOnTop no-case" stack-label outlined filled dense
+              :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
           </div>
         </div>
         <div class="col-6 q-py-xs">
-          <q-input
-            data-test="add-destination-url-input"
-            v-model="formData.url"
-            :label="t('alert_destinations.url') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-            tabindex="0"
-          />
+          <q-input data-test="add-destination-url-input" v-model="formData.url"
+            :label="t('alert_destinations.url') + ' *'" color="input-border" bg-color="input-bg" class="showLabelOnTop"
+            stack-label outlined filled dense :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            tabindex="0" />
         </div>
         <div class="col-6 q-py-xs destination-method-select">
-          <q-select
-            data-test="add-destination-method-select"
-            v-model="formData.method"
-            :label="t('alert_destinations.method') + ' *'"
-            :options="apiMethods"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            :popup-content-style="{ textTransform: 'uppercase' }"
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            tabindex="0"
-          />
+          <q-select data-test="add-destination-method-select" v-model="formData.method"
+            :label="t('alert_destinations.method') + ' *'" :options="apiMethods" color="input-border" bg-color="input-bg"
+            class="showLabelOnTop" stack-label outlined :popup-content-style="{ textTransform: 'uppercase' }" filled dense
+            :rules="[(val: any) => !!val || 'Field is required!']" tabindex="0" />
         </div>
         <div class="col-12 q-py-sm">
           <div class="text-bold q-py-xs" style="paddingleft: 10px">Headers</div>
-          <div
-            v-for="(header, index) in apiHeaders"
-            :key="header.uuid"
-            class="row q-col-gutter-sm q-pb-sm"
-          >
+          <div v-for="(header, index) in apiHeaders" :key="header.uuid" class="row q-col-gutter-sm q-pb-sm">
             <div class="col-5 q-ml-none">
-              <q-input
-                :data-test="`add-destination-header-${header['key']}-key-input`"
-                v-model="header.key"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                :placeholder="t('alert_destinations.api_header')"
-                dense
-                tabindex="0"
-              />
+              <q-input :data-test="`add-destination-header-${header['key']}-key-input`" v-model="header.key"
+                color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled
+                :placeholder="t('alert_destinations.api_header')" dense tabindex="0" />
             </div>
             <div class="col-5 q-ml-none">
-              <q-input
-                :data-test="`add-destination-header-${header['key']}-value-input`"
-                v-model="header.value"
-                :placeholder="t('alert_destinations.api_header_value')"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                isUpdatingDestination
-                tabindex="0"
-              />
+              <q-input :data-test="`add-destination-header-${header['key']}-value-input`" v-model="header.value"
+                :placeholder="t('alert_destinations.api_header_value')" color="input-border" bg-color="input-bg"
+                class="showLabelOnTop" stack-label outlined filled dense isUpdatingDestination tabindex="0" />
             </div>
             <div class="col-2 q-ml-none">
-              <q-btn
-                :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                icon="delete"
-                class="q-ml-xs iconHoverBtn"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('alert_templates.edit')"
-                @click="deleteApiHeader(header)"
-              />
-              <q-btn
-                data-test="add-destination-add-header-btn"
-                v-if="index === apiHeaders.length - 1"
-                icon="add"
-                class="q-ml-xs iconHoverBtn"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('alert_templates.edit')"
-                @click="addApiHeader()"
-              />
+              <q-btn :data-test="`add-destination-header-${header['key']}-delete-btn`" icon="delete"
+                class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
+                :title="t('alert_templates.edit')" @click="deleteApiHeader(header)" />
+              <q-btn data-test="add-destination-add-header-btn" v-if="index === apiHeaders.length - 1" icon="add"
+                class="q-ml-xs iconHoverBtn" padding="sm" unelevated size="sm" round flat
+                :title="t('alert_templates.edit')" @click="addApiHeader()" />
             </div>
           </div>
         </div>
         <div class="col-12 q-py-sm">
           <div class="q-py-sm">
-            <q-toggle
-              class="q-mt-sm"
-              v-model="formData.skip_tls_verify"
-              :label="t('alert_destinations.skip_tls_verify')"
-            />
+            <q-toggle class="q-mt-sm" v-model="formData.skip_tls_verify"
+              :label="t('alert_destinations.skip_tls_verify')" />
           </div>
         </div>
       </div>
     </div>
     <div class="flex justify-center q-mt-lg">
-      <q-btn
-        data-test="add-destination-cancel-btn"
-        v-close-popup="true"
-        class="q-mb-md text-bold"
-        :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        no-caps
-        @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-destination-submit-btn"
-        :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        @click="saveDestination"
-        no-caps
-      />
+      <q-btn data-test="add-destination-cancel-btn" v-close-popup="true" class="q-mb-md text-bold"
+        :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps @click="$emit('cancel:hideform')" />
+      <q-btn data-test="add-destination-submit-btn" :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md"
+        color="secondary" padding="sm xl" @click="saveDestination" no-caps />
     </div>
   </q-page>
 </template>
@@ -296,6 +184,7 @@ const isValidDestination = computed(
     formData.value.url &&
     formData.value.method &&
     formData.value.template
+
 );
 const saveDestination = () => {
   if (!isValidDestination.value) {
@@ -315,34 +204,67 @@ const saveDestination = () => {
   apiHeaders.value.forEach((header) => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
-  destinationService
-    .create({
-      org_identifier: store.state.selectedOrganization.identifier,
-      destination_name: formData.value.name,
-      data: {
-        url: formData.value.url,
-        method: formData.value.method,
-        skip_tls_verify: formData.value.skip_tls_verify,
-        template: formData.value.template,
-        headers: headers,
-      },
-    })
-    .then(() => {
-      dismiss();
-      emit("get:destinations");
-      emit("cancel:hideform");
-      q.notify({
-        type: "positive",
-        message: `Destination saved successfully.`,
+  if (isUpdatingDestination.value) {
+    destinationService
+      .update({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: formData.value.name,
+        data: {
+          url: formData.value.url,
+          method: formData.value.method,
+          skip_tls_verify: formData.value.skip_tls_verify,
+          template: formData.value.template,
+          headers: headers,
+          name: formData.value.name,
+        },
+      })
+      .then(() => {
+        dismiss();
+        emit("get:destinations");
+        emit("cancel:hideform");
+        q.notify({
+          type: "positive",
+          message: `Destination saved successfully.`,
+        });
+      })
+      .catch((err) => {
+        dismiss();
+        q.notify({
+          type: "negative",
+          message: err.response.data.error,
+        });
       });
-    })
-    .catch((err) => {
-      dismiss();
-      q.notify({
-        type: "negative",
-        message: err.response.data.error,
+  } else {
+    destinationService
+      .create({
+        org_identifier: store.state.selectedOrganization.identifier,
+        destination_name: formData.value.name,
+        data: {
+          url: formData.value.url,
+          method: formData.value.method,
+          skip_tls_verify: formData.value.skip_tls_verify,
+          template: formData.value.template,
+          headers: headers,
+          name: formData.value.name,
+        },
+      })
+      .then(() => {
+        dismiss();
+        emit("get:destinations");
+        emit("cancel:hideform");
+        q.notify({
+          type: "positive",
+          message: `Destination saved successfully.`,
+        });
+      })
+      .catch((err) => {
+        dismiss();
+        q.notify({
+          type: "negative",
+          message: err.response.data.error,
+        });
       });
-    });
+  }
 };
 const addApiHeader = (key: string = "", value: string = "") => {
   apiHeaders.value.push({ key: key, value: value, uuid: getUUID() });
@@ -370,7 +292,7 @@ const deleteApiHeader = (header: any) => {
 </style>
 <style lang="scss">
 .destination-method-select {
-  .q-field__native > :first-child {
+  .q-field__native> :first-child {
     text-transform: uppercase !important;
   }
 }

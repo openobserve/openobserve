@@ -24,11 +24,14 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
     if template.body.is_null() || template.body.as_str().unwrap_or_default().is_empty() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
-    template.name = name.to_string();
+    if !name.is_empty() {
+        template.name = name.to_owned();
+    }
     if template.name.is_empty() {
         return Err(anyhow::anyhow!("Alert template name is required"));
     }
-    db::alerts::templates::set(org_id, name, template.clone()).await
+
+    db::alerts::templates::set(org_id, template.clone()).await
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {

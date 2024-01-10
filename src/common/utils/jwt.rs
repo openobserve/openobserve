@@ -90,8 +90,6 @@ pub async fn process_token(
         get_user_org_tuple, get_user_role_tuple, update_tuples,
     };
 
-    use crate::common::meta::types;
-
     let dec_token = res.1.unwrap();
 
     let groups = match dec_token.claims.get("groups") {
@@ -135,11 +133,11 @@ pub async fn process_token(
             o2_enterprise::enterprise::openfga::authorizer::get_org_creation_tuples(
                 &org.name,
                 &mut tuples,
-                types::OFGA_MODELS
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
                     .iter()
                     .map(|(_, fga_entity)| *fga_entity)
                     .collect(),
-                types::NON_OWNING_ORG.to_vec(),
+                o2_enterprise::enterprise::openfga::meta::mapping::NON_OWNING_ORG.to_vec(),
             );
             if index == 0 {
                 // this is to allow user call organization api with org

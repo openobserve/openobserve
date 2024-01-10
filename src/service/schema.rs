@@ -536,6 +536,9 @@ async fn handle_new_schema(
                 )
                 .await
                 .unwrap();
+
+                #[cfg(feature = "enterprise")]
+                crate::common::utils::auth::set_ownership(org_id, "streams", stream_name).await;
                 lock.unlock().await.map_err(server_internal_error).unwrap();
                 log::info!(
                     "Releasing lock for stream {} after schema is set",
@@ -595,6 +598,8 @@ async fn handle_new_schema(
                     )
                     .await
                     .unwrap();
+                    #[cfg(feature = "enterprise")]
+                    crate::common::utils::auth::set_ownership(org_id, "streams", stream_name).await;
                     drop(lock_acquired); // release lock
                     return Some(SchemaEvolution {
                         schema_compatible: true,

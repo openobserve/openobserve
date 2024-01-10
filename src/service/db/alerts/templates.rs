@@ -42,11 +42,11 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
     Ok(json::from_slice(&db.get(&key).await?).unwrap())
 }
 
-pub async fn set(org_id: &str, name: &str, template: Template) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, template: Template) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let mut template = template;
     template.is_default = Some(org_id == DEFAULT_ORG);
-    let key = format!("/templates/{org_id}/{name}");
+    let key = format!("/templates/{org_id}/{}", template.name);
     Ok(db
         .put(
             &key,

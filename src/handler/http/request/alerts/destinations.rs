@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, web, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpResponse};
 
 use crate::{
     common::meta::{alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse},
@@ -40,8 +40,39 @@ use crate::{
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/alerts/destinations/{destination_name}")]
+#[post("/{org_id}/alerts/destinations")]
 pub async fn save_destination(
+    path: web::Path<String>,
+    dest: web::Json<Destination>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let dest = dest.into_inner();
+    match destinations::save(&org_id, "", dest).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+/// UpdateDestination
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "UpdateDestination",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("destination_name" = String, Path, description = "Destination name"),
+      ),
+    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/alerts/destinations/{destination_name}")]
+pub async fn update_destination(
     path: web::Path<(String, String)>,
     dest: web::Json<Destination>,
 ) -> Result<HttpResponse, Error> {

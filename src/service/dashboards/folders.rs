@@ -22,7 +22,6 @@ use crate::{
     common::meta::{
         dashboards::{Folder, FolderList, DEFAULT_FOLDER},
         http::HttpResponse as MetaHttpResponse,
-        types,
     },
     service::db,
 };
@@ -57,12 +56,8 @@ pub async fn save_folder(
 
     match db::dashboards::folders::put(org_id, folder).await {
         Ok(folder) => {
-            let obj_str = format!(
-                "{}:{}",
-                types::OFGA_MODELS.get("folders").unwrap_or(&"folder"),
-                folder.folder_id
-            );
-            o2_enterprise::enterprise::openfga::authorizer::set_owning_org(org_id, &obj_str).await;
+            #[cfg(feature = "enterprise")]
+            crate::common::utils::auth::set_ownership(org_id, "folders", &folder.folder_id).await;
             Ok(HttpResponse::Ok().json(folder))
         }
         Err(error) => Ok(

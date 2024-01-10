@@ -1,8 +1,10 @@
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::O2EntityAuthorization;
 
+#[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles")]
 pub async fn create_role(
     org_id: web::Path<String>,
@@ -17,6 +19,16 @@ pub async fn create_role(
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/roles")]
+pub async fn create_role(
+    _org_id: web::Path<String>,
+    _role_id: web::Json<String>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
 #[get("/{org_id}/roles")]
 pub async fn get_roles(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
@@ -26,6 +38,13 @@ pub async fn get_roles(org_id: web::Path<String>) -> Result<HttpResponse, Error>
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/roles")]
+pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles/{role_id}/permissions")]
 pub async fn add_role_permissions(
     path: web::Path<(String, String)>,
@@ -44,6 +63,16 @@ pub async fn add_role_permissions(
     }
 }
 
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/roles/{role_id}/permissions")]
+pub async fn add_role_permissions(
+    _path: web::Path<(String, String)>,
+    _permissions: web::Json<Vec<String>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
 #[get("/{org_id}/roles/{role_id}/permissions")]
 pub async fn get_all_role_permissions(
     path: web::Path<(String, String)>,
@@ -57,4 +86,12 @@ pub async fn get_all_role_permissions(
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/roles/{role_id}/permissions")]
+pub async fn get_all_role_permissions(
+    _path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

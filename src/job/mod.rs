@@ -192,6 +192,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { prom::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
 
+    #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::init_open_fga().await;
 
     // Shouldn't serve request until initialization finishes

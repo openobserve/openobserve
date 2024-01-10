@@ -24,12 +24,11 @@ use config::CONFIG;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, dex::service::auth::get_jwks};
 
+use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::jwt;
-use crate::{
-    common::utils::auth::AuthExtractor,
-    service::{db, users},
-};
+#[cfg(feature = "enterprise")]
+use crate::service::{db, users};
 
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
@@ -100,8 +99,8 @@ pub async fn token_validator(
                         header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                     );
 
-                    if check_permissions(user_id, auth_info).await {
-                        return Ok(req);
+                    if auth_info.is_ingestion_ep || check_permissions(user_id, auth_info).await {
+                        Ok(req)
                     } else {
                         return Err((ErrorForbidden("Unauthorized Access"), req));
                     }
@@ -119,7 +118,7 @@ pub async fn token_validator(
 #[cfg(not(feature = "enterprise"))]
 pub async fn token_validator(
     req: ServiceRequest,
-    _token: &str,
+    _token: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     use actix_web::error::ErrorForbidden;
 

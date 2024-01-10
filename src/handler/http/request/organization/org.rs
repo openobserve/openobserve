@@ -321,6 +321,6 @@ async fn create_org(
     let result = organization::create_org(&org).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Err(Error::from(err)),
+        Err(err) => Err(err),
     }
 }
