@@ -188,16 +188,20 @@ export const getUnitValue = (
       for (let unitInfo of units) {
         const unitValue: any = value ? value / unitInfo.divisor : 0;
 
-        if (unitValue < 1024) {
+        if (Math.abs(unitValue) < 1024) {
           return {
-            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(Math.abs(unitValue))?.toFixed(decimals) ?? 0
+            }`,
             unit: unitInfo.unit,
           };
         }
       }
-      const val: any = value ? value / units[units.length - 1].divisor : 0;
+      const val: any = Math.abs(value) ? Math.abs(value / units[units.length - 1].divisor) : 0;
       return {
-        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(val)?.toFixed(decimals) ?? 0
+        }`,
         unit: "PB",
       };
     }
@@ -212,16 +216,20 @@ export const getUnitValue = (
       ];
       for (let unitInfo of units) {
         const unitValue: any = value ? value / unitInfo.divisor : 0;
-        if (unitValue < 1024) {
+        if (Math.abs(unitValue) < 1024) {
           return {
-            value: `${parseFloat(unitValue)?.toFixed(decimals) ?? 0}`,
+            value: `${value < 0 ? "-" : ""}${
+              parseFloat(Math.abs(unitValue))?.toFixed(decimals) ?? 0
+            }`,
             unit: unitInfo.unit,
           };
         }
       }
-      const val: any = value ? value / units[units.length - 1].divisor : 0;
+      const val: any = Math.abs(value) ? Math.abs(value / units[units.length - 1].divisor) : 0;
       return {
-        value: `${parseFloat(val)?.toFixed(decimals) ?? 0}`,
+        value: `${value < 0 ? "-" : ""}${
+          parseFloat(val)?.toFixed(decimals) ?? 0
+        }`,
         unit: "PB",
       };
     }
