@@ -96,15 +96,6 @@ pub async fn save(
                 // if it has result we should fire the alert when enable aggregation
                 alert.trigger_condition.operator = Operator::GreaterThanEquals;
                 alert.trigger_condition.threshold = 1;
-            } else if alert.query_condition.conditions.is_none()
-                || alert
-                    .query_condition
-                    .conditions
-                    .as_ref()
-                    .unwrap()
-                    .is_empty()
-            {
-                return Err(anyhow::anyhow!("Alert should have conditions"));
             }
         }
         QueryType::SQL => {
@@ -282,11 +273,7 @@ impl QueryCondition {
         let sql = match self.query_type {
             QueryType::Custom => {
                 if let Some(v) = self.conditions.as_ref() {
-                    if self.aggregation.is_none() && v.is_empty() {
-                        return Ok(None);
-                    } else {
-                        build_sql(alert, v).await?
-                    }
+                    build_sql(alert, v).await?
                 } else {
                     return Ok(None);
                 }
