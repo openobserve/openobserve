@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             indicator-color="transparent"
             inline-label
             vertical
+            class="q-mx-xs"
           >
             <q-route-tab
               data-test="alert-alerts-tab"
@@ -99,7 +100,7 @@ export default defineComponent({
     const activeTab: any = ref("destinations");
     const templates = ref([]);
     const destinations = ref([]);
-    const splitterModel = ref(220);
+    const splitterModel = ref(160);
 
     onBeforeMount(() => {
       redirectRoute();
@@ -159,13 +160,14 @@ export default defineComponent({
 .alerts-tabs {
   .q-tabs {
     &--vertical {
-      margin: 20px 16px 0 16px;
+      margin: 16px 8px 0 8px;
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         margin-bottom: 0.5rem;
         text-transform: capitalize;
+        min-height: 40px !important;
         &__content.tab_content {
           .q-tab {
             &__icon + &__label {

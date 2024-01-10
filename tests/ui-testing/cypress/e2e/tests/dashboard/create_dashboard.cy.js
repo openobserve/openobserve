@@ -232,9 +232,10 @@ describe("Create a new dashboard", () => {
 
     // get the dropdown value
     cy.get("div.q-item").contains("Histogram").click();
+    cy.wait(1000);
 
     // change the label value
-    cy.get('[data-test="dashboard-x-item-input"]').clear().type("X-value");
+    cy.get('[data-test="dashboard-x-item-input"]', {timeout:2000}).clear().type("X-value");
     // Assert that the input field has the updated value
     cy.get('[data-test="dashboard-x-item-input"]').should(
       "have.value",
@@ -486,7 +487,7 @@ describe("Create a new dashboard", () => {
 
     cy.get('[data-test="dashboard-customSql"]').click();
     // cy.get('[data-test="dashboard-query-data"]').click({force:true});
-    cy.get('[data-test="dashboard-panel-query-editor"]').type(
+    cy.get('[data-test="dashboard-panel-query-editor"]',{timeout:2000}).type(
       dashboardData.QueryValue
     );
     cy.get(

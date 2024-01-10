@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
+    <q-card-section class="q-px-md q-py-md" data-test="dashboard-folder-move-header">
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-body1 text-bold">
@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="moveFolderForm" @submit.stop="onSubmit.execute()">
+    <q-card-section class="q-w-md q-mx-lg" data-test="dashboard-folder-move-body">
+      <q-form ref="moveFolderForm" @submit.stop="onSubmit.execute()" data-test="dashboard-folder-move-form">
         <q-input
           v-model="store.state.organizationData.folders.find((item: any) => item.folderId === activeFolderId).name"
           :label="t('dashboard.currentFolderLabel')"
