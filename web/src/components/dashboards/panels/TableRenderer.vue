@@ -94,7 +94,7 @@ export default defineComponent({
 
       if (status === true) {
         $q.notify({
-          message: "table downloaded as a csv",
+          message: "Table downloaded as a CSV file",
           color: "positive",
           timeout: 2000,
         });
