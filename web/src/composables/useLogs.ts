@@ -108,6 +108,7 @@ const defaultObject = {
     },
     scrollInfo: {},
     flagWrapContent: false,
+    pageType: "logs",
   },
   data: {
     query: <any>"",
@@ -249,7 +250,8 @@ const useLogs = () => {
     searchObj.data.stream.filterField = "";
     searchObj.data.stream.addToFilter = "";
     searchObj.data.stream.functions = [];
-    searchObj.data.stream.streamType = "logs";
+    searchObj.data.stream.streamType =
+      (router.currentRoute.value.query.stream_type as string) || "logs";
     searchObj.data.stream.streamLists = [];
     resetQueryData();
     resetSearchAroundData();
@@ -333,6 +335,10 @@ const useLogs = () => {
 
     const query: any = {};
 
+    if (searchObj.data.stream.streamType) {
+      query["stream_type"] = searchObj.data.stream.streamType;
+    }
+
     if (searchObj.data.stream.selectedStream.label) {
       query["stream"] = searchObj.data.stream.selectedStream.label;
     }
@@ -363,6 +369,10 @@ const useLogs = () => {
       query["functionContent"] = b64EncodeUnicode(
         searchObj.data.tempFunctionContent
       );
+    }
+
+    if (searchObj.meta.pageType !== "logs") {
+      query["type"] = searchObj.meta.pageType;
     }
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
@@ -1219,6 +1229,16 @@ const useLogs = () => {
         b64DecodeUnicode(queryParams.functionContent) || "";
       searchObj.meta.functionEditorPlaceholderFlag = false;
       searchObj.meta.toggleFunction = true;
+    }
+
+    if (queryParams.stream_type) {
+      searchObj.data.stream.streamType = queryParams.type;
+    } else {
+      searchObj.data.stream.streamType = "logs";
+    }
+
+    if (queryParams.type) {
+      searchObj.meta.pageType = queryParams.type;
     }
 
     router.push({

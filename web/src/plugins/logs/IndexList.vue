@@ -427,7 +427,10 @@ export default defineComponent({
       updatedLocalLogFilterField();
     }
 
-    const openFilterCreator = (event: any, { name, ftsKey, isSchemaField }: any) => {
+    const openFilterCreator = (
+      event: any,
+      { name, ftsKey, isSchemaField }: any
+    ) => {
       if (ftsKey) {
         event.stopPropagation();
         event.preventDefault();
@@ -546,6 +549,7 @@ export default defineComponent({
             size: 10,
             query_context: query_context,
             query_fn: query_fn,
+            type: searchObj.data.stream.streamType,
           })
           .then((res: any) => {
             if (res.data.hits.length) {

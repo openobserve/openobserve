@@ -478,10 +478,14 @@ export default defineComponent({
 
     const exploreStream = (props: any) => {
       router.push({
-        name: "streamExplorer",
+        name: "logs",
         query: {
-          stream_name: props.row.name,
           stream_type: props.row.stream_type,
+          stream: props.row.name,
+          period: "15m",
+          refresh: "0",
+          query: "",
+          type: "stream_explorer",
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
