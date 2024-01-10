@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>alert_period, alert_operator, alert_threshold</div>
             <div>alert_count, alert_agg_value</div>
             <div>alert_start_time, alert_end_time</div>
-            <div><b>row</b> as a line template variable</div>
+            <div><b>rows</b> multiple lines of row template</div>
             <div><b>All of the stream fields are variables.</b></div>
           </div>
           <div class="q-pb-md q-px-xs">

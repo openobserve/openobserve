@@ -98,7 +98,8 @@ pub struct QueryCondition {
     pub query_type: QueryType,
     pub conditions: Option<Vec<Condition>>,
     pub sql: Option<String>,
-    pub promql: Option<String>,
+    pub promql: Option<String>,              // (cpu usage / cpu total)
+    pub promql_condition: Option<Condition>, // value >= 80
     pub aggregation: Option<Aggregation>,
 }
 
