@@ -387,6 +387,7 @@ const setupSession = async () => {
       height: playerHeight,
       mutateChildNodes: true,
       speed: playerState.value.speed.value,
+      skipInactive: playerState.value.skipInactivity,
     },
   });
 
