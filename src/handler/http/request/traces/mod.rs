@@ -100,6 +100,7 @@ async fn handle_req(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
         ("filter" = Option<String>, Query, description = "filter, eg: a=b AND c=d"),
         ("from" = i64, Query, description = "from"), // topN
         ("size" = i64, Query, description = "size"), // topN
@@ -126,15 +127,15 @@ async fn handle_req(
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/traces/latest")]
+#[get("/{org_id}/{stream_name}/traces/latest")]
 pub async fn get_latest_traces(
-    org_id: web::Path<String>,
+    path: web::Path<(String, String)>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = uuid::Uuid::new_v4().to_string();
 
-    let org_id = org_id.into_inner();
+    let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let filter = match query.get("filter") {
@@ -170,7 +171,7 @@ pub async fn get_latest_traces(
 
     // search
     let query_sql = format!(
-        "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM default",
+        "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
         CONFIG.common.column_timestamp
     );
     let query_sql = if filter.is_empty() {
@@ -268,7 +269,7 @@ pub async fn get_latest_traces(
         .collect::<Vec<String>>()
         .join("','");
     let query_sql = format!(
-        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM default WHERE trace_id IN ('{}') ORDER BY {} ASC",
+        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{}') ORDER BY {} ASC",
         CONFIG.common.column_timestamp, trace_ids, CONFIG.common.column_timestamp,
     );
     req.query.from = 0;
@@ -289,7 +290,7 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        "default",
+                        &stream_name,
                         stream_type.to_string().as_str(),
                     ])
                     .observe(time);
@@ -298,7 +299,7 @@ pub async fn get_latest_traces(
                         "/api/org/traces/latest",
                         "500",
                         &org_id,
-                        "default",
+                        &stream_name,
                         stream_type.to_string().as_str(),
                     ])
                     .inc();
@@ -376,7 +377,7 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            "default",
+            &stream_name,
             stream_type.to_string().as_str(),
         ])
         .observe(time);
@@ -385,7 +386,7 @@ pub async fn get_latest_traces(
             "/api/org/traces/latest",
             "200",
             &org_id,
-            "default",
+            &stream_name,
             stream_type.to_string().as_str(),
         ])
         .inc();

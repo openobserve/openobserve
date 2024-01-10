@@ -427,7 +427,7 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 256)] // MB
-    pub max_file_size: u64,
+    pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours

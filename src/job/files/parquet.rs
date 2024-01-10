@@ -78,6 +78,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             println!("file: {}", file);
         }
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
+            log::error!("[INGESTER:JOB] Failed to read parquet file meta: {}", file);
             continue;
         };
         let file = Path::new(&file)
@@ -276,11 +277,11 @@ async fn merge_files(
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
 
-    let mut new_file_size = 0;
+    let mut new_file_size: i64 = 0;
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
-        if new_file_size > 0
+        if new_file_size > CONFIG.limit.max_file_size_on_disk as i64
             && new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64
         {
             break;

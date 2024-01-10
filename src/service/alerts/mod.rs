@@ -109,7 +109,9 @@ pub async fn save(
             if alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
             {
-                return Err(anyhow::anyhow!("Alert with PromQL mode should have a query"));
+                return Err(anyhow::anyhow!(
+                    "Alert with PromQL mode should have a query"
+                ));
             }
         }
     }
@@ -290,16 +292,8 @@ impl QueryCondition {
                 }
             }
             QueryType::PromQL => {
-                if let Some(v) = self.promql.as_ref() {
-                    if v.is_empty() {
-                        return Ok(None);
-                    } else {
-                        // TODO handle promql
-                        return Ok(None);
-                    }
-                } else {
-                    return Ok(None);
-                }
+                // TODO handle promql
+                return Ok(None);
             }
         };
 
