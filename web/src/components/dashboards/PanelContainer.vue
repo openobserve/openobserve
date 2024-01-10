@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="panelcontainer"
-    @mouseover="() => (showFullScreenBtn = true)"
-    @mouseleave="() => (showFullScreenBtn = false)"
+    @mouseover="() => (isCurrentlyHoveredPanel = true)"
+    @mouseleave="() => (isCurrentlyHoveredPanel = false)"
   >
     <div class="drag-allow">
       <q-bar
@@ -28,23 +28,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
         data-test="dashboard-panel-bar"
       >
-        <q-icon v-if="!viewOnly" name="drag_indicator" data-test="dashboard-panel-drag"/>
+        <q-icon
+          v-if="!viewOnly"
+          name="drag_indicator"
+          data-test="dashboard-panel-drag"
+        />
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
         <q-space />
         <q-icon
-          v-if="!viewOnly && showFullScreenBtn && props.data.description != ''"
+          v-if="
+            !viewOnly && isCurrentlyHoveredPanel && props.data.description != ''
+          "
           name="info_outline"
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap;">{{ props.data.description }}</div>
+            <div style="white-space: pre-wrap">
+              {{ props.data.description }}
+            </div>
           </q-tooltip>
         </q-icon>
         <q-btn
-          v-if="!viewOnly && showFullScreenBtn"
+          v-if="!viewOnly && isCurrentlyHoveredPanel"
           icon="fullscreen"
           flat
           size="sm"
@@ -52,6 +60,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onPanelModifyClick('ViewPanel')"
           title="Full screen"
           data-test="dashboard-panel-fullscreen-btn"
+        />
+        <!-- if table chart then download button as a csv file -->
+        <q-btn
+          v-if="
+            !viewOnly && isCurrentlyHoveredPanel && props.data.type == 'table'
+          "
+          icon="download"
+          flat
+          size="sm"
+          padding="1px"
+          @click="
+            PanleSchemaRendererRef?.tableRendererRef?.downloadTableAsCSV(
+              props.data.title
+            )
+          "
+          title="Download as a CSV"
+          data-test="dashboard-panel-table-download-as-csv-btn"
         />
         <q-btn
           v-if="dependentAdHocVariable"
@@ -138,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :variablesData="props.variablesData"
       @metadata-update="metaDataValue"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
+      ref="PanleSchemaRendererRef"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
       <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
@@ -195,6 +221,9 @@ export default defineComponent({
     };
     const showText = ref(false);
 
+    // need PanleSchemaRendererRef for table download as a csv
+    const PanleSchemaRendererRef: any = ref(null);
+
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
       if (!metaData.value) return false;
@@ -215,7 +244,7 @@ export default defineComponent({
     });
 
     // for full screen button
-    const showFullScreenBtn: any = ref(false);
+    const isCurrentlyHoveredPanel: any = ref(false);
 
     //for edit panel
     const onEditPanel = (data: any) => {
@@ -291,7 +320,7 @@ export default defineComponent({
       onEditPanel,
       onDuplicatePanel,
       deletePanelDialog,
-      showFullScreenBtn,
+      isCurrentlyHoveredPanel,
       outlinedWarning,
       store,
       metaDataValue,
@@ -299,7 +328,8 @@ export default defineComponent({
       showViewPanel,
       dependentAdHocVariable,
       confirmDeletePanelDialog,
-      showText
+      showText,
+      PanleSchemaRendererRef,
     };
   },
   methods: {

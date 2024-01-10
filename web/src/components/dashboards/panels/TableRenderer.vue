@@ -27,16 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     row-key="id"
     ref="tableRef"
   >
-    <template v-slot:top-right>
-      <q-btn
-        color="primary"
-        icon-right="archive"
-        label="Export to csv"
-        no-caps
-        style="padding: 5px; font-size: small"
-        @click="exportTable"
-      />
-    </template>
   </q-table>
 </template>
 
@@ -74,7 +64,7 @@ export default defineComponent({
       return `"${formatted}"`;
     }
 
-    const exportTable = () => {
+    const downloadTableAsCSV = (title?: any) => {
       // naive encoding to csv format
       const content = [
         props?.data?.columns?.map((col: any) => wrapCsvValue(col.label)),
@@ -96,7 +86,11 @@ export default defineComponent({
         )
         .join("\r\n");
 
-      const status = exportFile("table-export.csv", content, "text/csv");
+      const status = exportFile(
+        (title ?? "table-export") + ".csv",
+        content,
+        "text/csv"
+      );
 
       if (status === true) {
         $q.notify({
@@ -116,7 +110,7 @@ export default defineComponent({
       pagination: ref({
         rowsPerPage: 0,
       }),
-      exportTable,
+      downloadTableAsCSV,
       tableRef,
     };
   },
