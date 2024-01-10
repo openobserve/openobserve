@@ -64,9 +64,9 @@ export const getUnitValue = (
       for (let i = units.length - 1; i >= 0; i--) {
         const unitInfo = units[i];
         const unitValue = value / unitInfo.divisor;
-        if (unitValue >= 1) {
+        if (Math.abs(unitValue) >= 1) {
           return {
-            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
+            value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(unitValue)?.toFixed(decimals) ?? 0)}`,
             unit: unitInfo.unit,
           };
         }
@@ -74,7 +74,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
+        value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(value / units[0].divisor)?.toFixed(decimals) ?? 0)}`,
         unit: units[0].unit,
       };
     }
@@ -93,9 +93,9 @@ export const getUnitValue = (
       for (let i = units.length - 1; i >= 0; i--) {
         const unitInfo = units[i];
         const unitValue = value / unitInfo.divisor;
-        if (unitValue >= 1) {
+        if (Math.abs(unitValue) >= 1) {
           return {
-            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
+            value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(unitValue)?.toFixed(decimals) ?? 0)}`,
             unit: unitInfo.unit,
           };
         }
@@ -103,7 +103,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
+        value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(value / units[0].divisor)?.toFixed(decimals) ?? 0)}`,
         unit: units[0].unit,
       };
     }
@@ -122,9 +122,9 @@ export const getUnitValue = (
       for (let i = units.length - 1; i >= 0; i--) {
         const unitInfo = units[i];
         const unitValue = value / unitInfo.divisor;
-        if (unitValue >= 1) {
+        if (Math.abs(unitValue) >= 1) {
           return {
-            value: parseFloat(unitValue?.toFixed(decimals) ?? 0),
+            value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(unitValue)?.toFixed(decimals) ?? 0)}`,
             unit: unitInfo.unit,
           };
         }
@@ -132,7 +132,7 @@ export const getUnitValue = (
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
-        value: parseFloat((value / units[0].divisor)?.toFixed(decimals) ?? 0),
+        value: `${value < 0 ? "-" : ""}${parseFloat(Math.abs(value / units[0].divisor)?.toFixed(decimals) ?? 0)}`,
         unit: units[0].unit,
       };
     }
