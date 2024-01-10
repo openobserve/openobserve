@@ -25,30 +25,37 @@ pub enum Error {
     WalError {
         source: wal::Error,
     },
+    #[snafu(display("Failed to open file {}: {}", path.display(), source))]
     OpenFileError {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to open directory {}: {}", path.display(), source))]
     OpenDirError {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to create file {}: {}", path.display(), source))]
     CreateFileError {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to delete file {}: {}", path.display(), source))]
     DeleteFileError {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to rename file {}: {}", path.display(), source))]
     RenameFileError {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to read file {}: {}", path.display(), source))]
     ReadFileError {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to write file {}: {}", path.display(), source))]
     WriteFileError {
         source: io::Error,
         path: PathBuf,

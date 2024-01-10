@@ -23,18 +23,22 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[snafu(visibility(pub))]
 pub enum Error {
     FileIdentifierMismatch {},
+    #[snafu(display("Failed to open file {}: {}", path.display(), source))]
     FileOpen {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to read file {}: {}", path.display(), source))]
     FileRead {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to write file {}: {}", path.display(), source))]
     FileWrite {
         source: io::Error,
         path: PathBuf,
     },
+    #[snafu(display("Failed to delete file {}: {}", path.display(), source))]
     FileSync {
         source: io::Error,
         path: PathBuf,

@@ -92,21 +92,19 @@ where
 
         let (actual_compressed_len, actual_checksum) = decompressing_read.into_inner().checksum();
 
-        ensure!(
-            expected_len == actual_compressed_len,
-            LengthMismatchSnafu {
+        if expected_len != actual_compressed_len {
+            return Err(Error::LengthMismatch {
                 expected: expected_len,
-                actual: actual_compressed_len
-            }
-        );
+                actual: actual_compressed_len,
+            });
+        }
 
-        ensure!(
-            expected_checksum == actual_checksum,
-            ChecksumMismatchSnafu {
+        if expected_checksum != actual_checksum {
+            return Err(Error::ChecksumMismatch {
                 expected: expected_checksum,
-                actual: actual_checksum
-            }
-        );
+                actual: actual_checksum,
+            });
+        }
 
         Ok(Some(data))
     }
