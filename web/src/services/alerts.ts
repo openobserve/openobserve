@@ -64,10 +64,21 @@ const alerts = {
     org_identifier: string,
     stream_name: string,
     alert_name: string,
-    enable: boolean
+    enable: boolean,
+    stream_type: string
   ) => {
-    const url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}/enable?value=${enable}`;
+    const url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}/enable?value=${enable}&type=${stream_type}`;
     return http().put(url);
+  },
+
+  preview: (
+    org_identifier: string,
+    stream_name: string,
+    alert_name: string,
+    stream_type: string
+  ) => {
+    const url = `/api/${org_identifier}/${stream_name}/alerts/${alert_name}/preview?type=${stream_type}`;
+    return http().get(url);
   },
 };
 
