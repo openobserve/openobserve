@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!-- eslint-disable vue/attribute-hyphenation -->
-<!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="tracePage" id="tracePage" style="min-height: auto">
     <div id="tracesSecondLevel">
