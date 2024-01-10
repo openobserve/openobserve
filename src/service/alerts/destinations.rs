@@ -18,7 +18,11 @@ use actix_web::http;
 use crate::{
     common::{
         infra::config::STREAM_ALERTS,
-        meta::alerts::destinations::{Destination, DestinationWithTemplate},
+        meta::{
+            alerts::destinations::{Destination, DestinationWithTemplate},
+            authz::Authz,
+        },
+        utils::auth::{remove_ownership, set_ownership},
     },
     service::db,
 };
@@ -43,7 +47,15 @@ pub async fn save(
     if destination.name.is_empty() {
         return Err(anyhow::anyhow!("Alert destination name is required"));
     }
-    db::alerts::destinations::set(org_id, destination).await
+    match db::alerts::destinations::set(org_id, &destination).await {
+        Ok(_) => {
+            if name.is_empty() {
+                set_ownership(org_id, "destinations", Authz::new(&destination.name)).await;
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
@@ -86,7 +98,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
         ));
     }
 
-    db::alerts::destinations::delete(org_id, name)
-        .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+    match db::alerts::destinations::delete(org_id, name).await {
+        Ok(_) => {
+            remove_ownership(org_id, "destinations", Authz::new(name)).await;
+            Ok(())
+        }
+        Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),
+    }
 }

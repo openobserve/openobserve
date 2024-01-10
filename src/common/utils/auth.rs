@@ -20,6 +20,8 @@ use config::CONFIG;
 use futures::future::{ready, Ready};
 
 #[cfg(feature = "enterprise")]
+use crate::common::meta::authz::Authz;
+#[cfg(feature = "enterprise")]
 use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
@@ -57,18 +59,36 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn set_ownership(org_id: &str, obj_type: &str, obj_id: &str) {
-    let obj_str = format!(
-        "{}:{}",
-        o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-            .get(obj_type)
-            .unwrap(),
-        obj_id
-    );
-    o2_enterprise::enterprise::openfga::authorizer::set_owning_org(org_id, &obj_str).await;
+pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
+    use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap(), obj.obj_id);
+
+    authorizer::set_ownership(
+        org_id,
+        &obj_str,
+        &obj.parent,
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap_or(&""),
+    )
+    .await;
 }
 #[cfg(not(feature = "enterprise"))]
-pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj_id: &str) {}
+pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
+
+#[cfg(feature = "enterprise")]
+pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
+    use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap(), obj.obj_id);
+    authorizer::remove_ownership(
+        org_id,
+        &obj_str,
+        &obj.parent,
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap_or(&""),
+    )
+    .await;
+}
+#[cfg(not(feature = "enterprise"))]
+pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 pub struct UserEmail {
     pub user_id: String,
@@ -151,6 +171,14 @@ impl FromRequest for AuthExtractor {
                     .get(path_columns[url_len - 1])
                     .unwrap_or(&path_columns[url_len - 1]),
                 path_columns[url_len - 2]
+            )
+        } else if method.eq("PUT") || method.eq("DELETE") {
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 2])
+                    .unwrap_or(&path_columns[url_len - 2]),
+                path_columns[url_len - 1]
             )
         } else {
             format!(

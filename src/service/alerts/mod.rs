@@ -27,9 +27,12 @@ use crate::{
                 destinations::{DestinationWithTemplate, HTTPType},
                 Alert, Condition, Operator, QueryCondition, QueryType,
             },
-            search,
+            search, authz::Authz,
         },
-        utils::json::{self, Map, Value},
+        utils::{
+            auth::{remove_ownership, set_ownership},
+            json::{self, Map, Value},
+        },
     },
     service::{db, search as SearchService},
 };
@@ -128,7 +131,15 @@ pub async fn save(
     );
 
     // save the alert
-    db::alerts::set(org_id, stream_type, stream_name, alert).await
+    match db::alerts::set(org_id, stream_type, stream_name, &alert).await {
+        Ok(_) => {
+            if name.is_empty() {
+                set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn get(
@@ -163,9 +174,13 @@ pub async fn delete(
             anyhow::anyhow!("Alert not found"),
         ));
     }
-    db::alerts::delete(org_id, stream_type, stream_name, name)
-        .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+    match db::alerts::delete(org_id, stream_type, stream_name, name).await {
+        Ok(_) => {
+            remove_ownership(org_id, "alerts", Authz::new(name)).await;
+            Ok(())
+        }
+        Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),
+    }
 }
 
 pub async fn enable(
@@ -185,7 +200,7 @@ pub async fn enable(
         }
     };
     alert.enabled = value;
-    db::alerts::set(org_id, stream_type, stream_name, alert)
+    db::alerts::set(org_id, stream_type, stream_name, &alert)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

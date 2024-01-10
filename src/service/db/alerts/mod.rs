@@ -60,7 +60,7 @@ pub async fn set(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    alert: Alert,
+    alert: &Alert,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!(
@@ -70,7 +70,7 @@ pub async fn set(
     if let Err(e) = db
         .put(
             &key,
-            json::to_vec(&alert).unwrap().into(),
+            json::to_vec(alert).unwrap().into(),
             infra_db::NEED_WATCH,
         )
         .await

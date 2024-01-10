@@ -16,7 +16,11 @@
 use actix_web::http;
 
 use crate::{
-    common::{infra::config::ALERTS_DESTINATIONS, meta::alerts::templates::Template},
+    common::{
+        infra::config::ALERTS_DESTINATIONS,
+        meta::{alerts::templates::Template, authz::Authz},
+        utils::auth::{remove_ownership, set_ownership},
+    },
     service::db,
 };
 
@@ -31,7 +35,15 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
         return Err(anyhow::anyhow!("Alert template name is required"));
     }
 
-    db::alerts::templates::set(org_id, template.clone()).await
+    match db::alerts::templates::set(org_id, &mut template).await {
+        Ok(_) => {
+            if name.is_empty() {
+                set_ownership(org_id, "templates", Authz::new(&template.name)).await;
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
@@ -63,7 +75,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
             anyhow::anyhow!("Alert template not found {}", name),
         ));
     }
-    db::alerts::templates::delete(org_id, name)
-        .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+    match db::alerts::templates::delete(org_id, name).await {
+        Ok(_) => {
+            remove_ownership(org_id, "templates", Authz::new(name)).await;
+            Ok(())
+        }
+        Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),
+    }
 }
