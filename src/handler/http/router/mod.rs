@@ -32,7 +32,6 @@ use utoipa_swagger_ui::SwaggerUi;
 use super::{
     auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
     request::{
-        authz::fga,
         dashboards::{folders::*, *},
         enrichment_table, functions, kv, logs, metrics, organization, prom, rum, search, status,
         stream, syslog, traces, users, *,
@@ -319,10 +318,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(logs::ingest::json)
             .service(logs::ingest::handle_kinesis_request)
             .service(logs::ingest::handle_gcp_request)
-            //.service(fga::create_role)
-            //.service(fga::get_all_role_permissions)
-            //.service(fga::add_role_permissions)
-            //.service(fga::get_roles)
             .service(organization::org::create_org),
     );
 }
