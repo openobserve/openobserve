@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="panelcontainer"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
+    data-test="dashboard-panel-container"
   >
     <div class="drag-allow">
       <q-bar

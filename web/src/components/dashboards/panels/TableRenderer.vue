@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :columns="data.columns"
     row-key="id"
     ref="tableRef"
+    data-test="dashboard-panel-table"
   >
   </q-table>
 </template>
