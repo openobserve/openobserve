@@ -89,7 +89,8 @@ describe("Create a new dashboard", () => {
         cy.get('[data-test="dashboard-name"]').type(dashboardName);
         cy.get('[data-test="dashboard-add-submit"]').click({force:true});
         cy.url().should("include", dashboardData.ViewDashboardUrl);
-        cy.get('.q-pa-sm > :nth-child(1) > .q-btn > .q-btn__content > .q-icon').click({force:true})
+        cy.wait(300)
+        cy.get('.flex.justify-between > :nth-child(1) > .q-btn > .q-btn__content > .q-icon').click({force:true})
         
         // find the dashboard name and click on the delete dashboard button. We can see that confirm dialog and click on cancel button
 
