@@ -80,8 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'gauge' &&
           dashboardPanelData.data.type != 'geomap' &&
           dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.config.legends_position != 'bottom' &&
-          dashboardPanelData.data.config.legends_position != null
+          dashboardPanelData.data.config.legends_position == 'right'
         "
         v-model.number="legendWidthValue"
         :label="t('common.legendWidth')"
@@ -106,8 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'gauge' &&
           dashboardPanelData.data.type != 'geomap' &&
           dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.config.legends_position != 'bottom' &&
-          dashboardPanelData.data.config.legends_position != null
+          dashboardPanelData.data.config.legends_position == 'right'
         "
       >
         <button
