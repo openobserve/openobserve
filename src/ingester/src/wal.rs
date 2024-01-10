@@ -137,6 +137,22 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
                     log::error!("Unable to read entry from: {}, skip the entry", source);
                     continue;
                 }
+                Err(wal::Error::LengthMismatch { expected, actual }) => {
+                    log::error!(
+                        "Unable to read entry: Length mismatch: expected {}, actual {}, skip the entry",
+                        expected,
+                        actual
+                    );
+                    continue;
+                }
+                Err(wal::Error::ChecksumMismatch { expected, actual }) => {
+                    log::error!(
+                        "Unable to read entry: Checksum mismatch: expected {}, actual {}, skip the entry",
+                        expected,
+                        actual
+                    );
+                    continue;
+                }
                 Err(e) => {
                     return Err(Error::WalError { source: e });
                 }
