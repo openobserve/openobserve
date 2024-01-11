@@ -185,7 +185,6 @@ const useLogs = () => {
       yData: [],
       chartParams: {},
     };
-    searchObj.data.tempFunctionContent = "";
     searchObj.data.query = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
