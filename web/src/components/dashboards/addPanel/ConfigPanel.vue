@@ -564,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <color-palette-drop-down />
+    <color-palette-drop-down v-if="dashboardPanelData.data.type != 'metric'"/>
 
     <div class="space"></div>
   </div>

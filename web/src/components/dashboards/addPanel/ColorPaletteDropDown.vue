@@ -15,63 +15,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="display: flex; align-items: center">
-    <q-select
-      v-model="dashboardPanelData.data.config.color.mode"
-      :options="colorOptions"
-      outlined
-      dense
-      label="Color palette"
-      class="showLabelOnTop"
-      stack-label
-      emit-value
-      :display-value="`${
-        dashboardPanelData.data.config.color.mode ?? 'palette-classic'
-      }`"
-      style="width: 100%"
-    >
-      <template v-slot:option="props">
-        <q-item v-bind="props.itemProps">
-          <q-item-section style="padding: 2px">
-            <q-item-label>{{ props.opt.label }}</q-item-label>
-            <q-item-label caption>
-              <div
-                v-if="Array.isArray(props.opt.subLabel)"
-                class="color-container"
-              >
+  <div>
+    <div style="display: flex; align-items: center">
+      <q-select
+        v-model="dashboardPanelData.data.config.color.mode"
+        :options="colorOptions"
+        outlined
+        dense
+        label="Color palette"
+        class="showLabelOnTop"
+        stack-label
+        :display-value="`${
+          dashboardPanelData.data.config.color.mode ?? 'palette-classic'
+        }`"
+        @update:model-value="onColorModeChange"
+        style="width: 100%"
+      >
+        <template v-slot:option="props">
+          <q-item v-bind="props.itemProps">
+            <q-item-section style="padding: 2px">
+              <q-item-label>{{ props.opt.label }}</q-item-label>
+              <q-item-label caption>
                 <div
-                  :style="{
-                    background: `linear-gradient(to right, ${props.opt.subLabel.join(
-                      ', '
-                    )})`,
-                    width: '100%',
-                    height: '8px',
-                    borderRadius: '3px',
-                  }"
-                ></div>
-              </div>
-              <div v-else>
-                <div style="font-weight: 200">
-                  {{ props.opt.subLabel }}
+                  v-if="Array.isArray(props.opt.subLabel)"
+                  class="color-container"
+                >
+                  <div
+                    :style="{
+                      background: `linear-gradient(to right, ${props.opt.subLabel.join(
+                        ', '
+                      )})`,
+                      width: '100%',
+                      height: '8px',
+                      borderRadius: '3px',
+                    }"
+                  ></div>
                 </div>
-              </div>
-            </q-item-label>
-          </q-item-section>
-        </q-item>
-      </template>
-    </q-select>
+                <div v-else>
+                  <div style="font-weight: 200">
+                    {{ props.opt.subLabel }}
+                  </div>
+                </div>
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-select>
+      <div
+        class="color-input-wrapper"
+        v-if="
+          ['fixed', 'shades'].includes(
+            dashboardPanelData.data.config.color.mode
+          )
+        "
+        style="margin-top: 30px; margin-left: 5px"
+      >
+        <input
+          type="color"
+          v-model="dashboardPanelData.data.config.color.fixedColor[0]"
+          format-model="rgb"
+        />
+      </div>
+    </div>
     <div
-      class="color-input-wrapper"
+      class="q-pt-md"
       v-if="
-        ['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)
+        ['green-yellow-red', 'red-yellow-green', 'shades'].includes(
+          dashboardPanelData.data.config.color.mode
+        )
       "
-      style="margin-top: 30px; margin-left: 5px"
     >
-      <input
-        type="color"
-        v-model="dashboardPanelData.data.config.color.fixedColor"
-        format-model="rgb"
-      />
+      Color series by:
+      <div>
+        <q-btn-toggle
+          v-model="dashboardPanelData.data.config.color.seriesBy"
+          push
+          toggle-color="primary"
+          size="md"
+          :options="[
+            { label: 'Last', value: 'last' },
+            { label: 'Min', value: 'min' },
+            { label: 'Max', value: 'max' },
+          ]"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -91,7 +118,8 @@ export default defineComponent({
       if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
           mode: "palette-classic",
-          fixedColor: "#53ca53",
+          fixedColor: ["#53ca53"],
+          seriesBy: "last",
         };
       }
     });
@@ -124,10 +152,22 @@ export default defineComponent({
       },
     ];
 
+    const onColorModeChange = (value: any) => {
+      // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor
+      if (["fixed", "shades"].includes(value.value)) {
+        dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
+      } else {
+        // else assign sublabel to fixedcolor
+        dashboardPanelData.data.config.color.fixedColor = value.subLabel;
+      }
+      dashboardPanelData.data.config.color.mode = value.value;
+    };
+
     return {
       dashboardPanelData,
       promqlMode,
       colorOptions,
+      onColorModeChange,
     };
   },
 });

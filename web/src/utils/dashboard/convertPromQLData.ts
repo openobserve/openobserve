@@ -21,7 +21,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
-import { getColor } from "./colorPalette";
+import { getColor, getMinMaxValue } from "./colorPalette";
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -288,6 +288,17 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
+  // if color type is shades, continuous then required to calculate min and max for chart.
+  let chartMin: any = Infinity;
+  let chartMax: any = -Infinity;
+  if (
+    ["shades", "green-yellow-red", "red-yellow-green"].includes(
+      panelSchema?.config?.color?.mode
+    )
+  ) {
+    [chartMin, chartMax] = getMinMaxValue(searchQueryData);
+  }
+
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -309,12 +320,13 @@ export const convertPromQLData = (
                 itemStyle: {
                   color: getColor(
                     panelSchema,
-                    searchQueryData,
                     getPromqlLegendName(
                       metric.metric,
                       panelSchema.queries[index].config.promql_legend
                     ),
-                    values
+                    values,
+                    chartMin,
+                    chartMax
                   ),
                 },
                 // colorBy: "data",
@@ -394,12 +406,13 @@ export const convertPromQLData = (
             itemStyle: {
               color: getColor(
                 panelSchema,
-                searchQueryData,
                 getPromqlLegendName(
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
-                values
+                values,
+                chartMin,
+                chartMax
               ),
             },
             title: {
@@ -624,7 +637,6 @@ export const convertPromQLData = (
   }
 
   console.log("options", JSON.parse(JSON.stringify(options)));
-  
 
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {

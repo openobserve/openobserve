@@ -67,7 +67,7 @@ function shadeColor(color: any, value: any, min: any, max: any) {
   return "#" + newColor;
 }
 
-const getMinMaxValue = (searchQueryData: any) => {
+export const getMinMaxValue = (searchQueryData: any) => {
   // need min and max value for color
   let min = Infinity;
   let max = -Infinity;
@@ -86,10 +86,7 @@ const getMinMaxValue = (searchQueryData: any) => {
       });
     }
   });
-  return {
-    min,
-    max,
-  };
+  return [min, max];
 };
 
 const getSeriesValueFromArray = (panelSchema: any, values: any) => {
@@ -179,56 +176,52 @@ class Color {
 
 export const getColor = (
   panelSchema: any,
-  searchQueryData: any,
   seriesName: any,
-  valuesArr?: any
+  valuesArr?: any,
+  chartMin?: any,
+  chartMax?: any
 ) => {
   // switch case based on panelSchema.color type
   switch (panelSchema?.config?.color?.mode) {
-    case "fixed": {      
-      return panelSchema?.config?.color?.fixedColor ?? "#53ca53";
+    case "fixed": {
+      return panelSchema?.config?.color?.fixedColor ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53" : "#53ca53";
     }
     case "shades": {
-      // getMinMaxValue
-      const { min, max } = getMinMaxValue(searchQueryData);
       // based on selected color pass different shades of same color
       return shadeColor(
-        panelSchema?.config?.color?.fixedColor ?? "#53ca53",
+        panelSchema?.config?.color?.fixedColor ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53" : "#53ca53",
         getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
-        min ?? 0,
-        max ?? 100
+        chartMin ?? 0,
+        chartMax ?? 100
       );
     }
 
     case "palette-classic": {
       // return color using colorArrayBySeries
-      // NOTE: value will be series name
+      // NOTE: here value will be series name
       return nameToColor(seriesName, colorArrayBySeries);
     }
 
     case "green-yellow-red": {
-      const { min, max } = getMinMaxValue(searchQueryData);
 
       const value = getSeriesValueFromArray(panelSchema, valuesArr);
 
-      let scale = new Scale(['#ff0000', '#ffff00', '#00FF00'].map((color) => new Color(color)));
+      let scale = new Scale(panelSchema?.config?.color?.fixedColor?.map((color: any) => new Color(color)));
 
-      scale.setDomain([min ?? 0, max ?? 100]);
+      scale.setDomain([chartMin ?? 0, chartMax ?? 100]);
 
       return scale.getColor(value).toCssString();
     }
 
     case "red-yellow-green": {
-      const { min, max } = getMinMaxValue(searchQueryData);
 
       const value = getSeriesValueFromArray(panelSchema, valuesArr);
 
-      let scale = new Scale(['#00FF00', '#ffff00', '#ff0000'].map((color) => new Color(color)));
+      let scale = new Scale(panelSchema?.config?.color?.fixedColor?.map((color: any) => new Color(color)));
 
-      scale.setDomain([min ?? 0, max ?? 100]);      
+      scale.setDomain([chartMin ?? 0, chartMax ?? 100]);
 
       return scale.getColor(value).toCssString();
-
     }
 
     // case "scheme":
