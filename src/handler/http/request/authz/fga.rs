@@ -14,8 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-#[cfg(feature = "enterprise")]
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use actix_web::{get, post, web, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::O2EntityAuthorization;
