@@ -87,6 +87,7 @@ pub async fn token_validator(
                 if user.is_some() {
                     // / Hack for prometheus, need support POST and check the header
                     let mut req = req;
+
                     if req.method().eq(&Method::POST) && !req.headers().contains_key("content-type")
                     {
                         req.headers_mut().insert(
@@ -99,7 +100,7 @@ pub async fn token_validator(
                         header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                     );
 
-                    if auth_info.is_ingestion_ep || check_permissions(user_id, auth_info).await {
+                    if auth_info.bypass_check || check_permissions(user_id, auth_info).await {
                         Ok(req)
                     } else {
                         Err((ErrorForbidden("Unauthorized Access"), req))

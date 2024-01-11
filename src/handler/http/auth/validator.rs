@@ -73,7 +73,7 @@ pub async fn validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                if auth_info.is_ingestion_ep || check_permissions(user_id, auth_info).await {
+                if auth_info.bypass_check || check_permissions(user_id, auth_info).await {
                     Ok(req)
                 } else {
                     Err((ErrorForbidden("Unauthorized Access"), req))
