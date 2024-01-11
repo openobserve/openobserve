@@ -56,7 +56,7 @@ const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
     config.enableAnalytics = res.data.telemetry_enabled.toString();
-    if (res.data.telemetry_enabled == true && config.isCloud == "true") {
+    if (res.data.telemetry_enabled == true && config.isCloud == "true" && 1==0) {
       Sentry.init({
         app,
         dsn: config.sentryDSN,
