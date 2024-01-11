@@ -181,7 +181,7 @@ async fn list_stream_functions(
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/{stream_name}/functions/{name}")]
+#[delete("/{org_id}/streams/{stream_name}/functions/{name}")]
 async fn delete_stream_function(
     path: web::Path<(String, String, String)>,
     req: HttpRequest,
@@ -222,7 +222,7 @@ async fn delete_stream_function(
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/{stream_name}/functions/{name}")]
+#[put("/{org_id}/streams/{stream_name}/functions/{name}")]
 pub async fn add_function_to_stream(
     path: web::Path<(String, String, String)>,
     stream_order: web::Json<StreamOrder>,

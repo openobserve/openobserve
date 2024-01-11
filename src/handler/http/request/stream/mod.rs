@@ -18,7 +18,7 @@ use std::{
     io::{Error, ErrorKind},
 };
 
-use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
 use config::meta::stream::StreamType;
 
 use crate::{
@@ -50,7 +50,7 @@ use crate::{
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/{stream_name}/schema")]
+#[get("/{org_id}/streams/{stream_name}/schema")]
 async fn schema(
     path: web::Path<(String, String)>,
     req: HttpRequest,
@@ -90,7 +90,7 @@ async fn schema(
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/{stream_name}/settings")]
+#[put("/{org_id}/streams/{stream_name}/settings")]
 async fn settings(
     path: web::Path<(String, String)>,
     settings: web::Json<StreamSettings>,
@@ -145,7 +145,7 @@ async fn settings(
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/{stream_name}/delete_fields")]
+#[put("/{org_id}/streams/{stream_name}/delete_fields")]
 async fn delete_fields(
     path: web::Path<(String, String)>,
     fields: web::Json<StreamDeleteFields>,
@@ -200,7 +200,7 @@ async fn delete_fields(
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/{stream_name}")]
+#[delete("/{org_id}/streams/{stream_name}")]
 async fn delete(
     path: web::Path<(String, String)>,
     req: HttpRequest,

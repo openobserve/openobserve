@@ -170,13 +170,31 @@ impl FromRequest for AuthExtractor {
                     .unwrap_or(&path_columns[url_len - 1]),
                 path_columns[url_len - 2]
             )
+        } else if url_len == 3 {
+            if method.eq("PUT") || method.eq("DELETE") {
+                format!(
+                    "{}:{}",
+                    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                        .get(path_columns[url_len - 2])
+                        .unwrap_or(&path_columns[url_len - 2]),
+                    path_columns[url_len - 1]
+                )
+            } else {
+                format!(
+                    "{}:{}",
+                    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                        .get(path_columns[url_len - 1])
+                        .unwrap_or(&path_columns[url_len - 1]),
+                    path_columns[url_len - 3]
+                )
+            }
         } else if method.eq("PUT") || method.eq("DELETE") {
             format!(
                 "{}:{}",
                 o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 2])
-                    .unwrap_or(&path_columns[url_len - 2]),
-                path_columns[url_len - 1]
+                    .get(path_columns[url_len - 4])
+                    .unwrap_or(&path_columns[url_len - 4]),
+                path_columns[url_len - 3]
             )
         } else {
             format!(
