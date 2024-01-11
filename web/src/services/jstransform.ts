@@ -74,8 +74,8 @@ const jstransform = {
     function_name: string,
     data: any
   ) => {
-    return http().post(
-      `/api/${org_identifier}/${stream_name}/functions/${function_name}?type=${stream_type}`,
+    return http().put(
+      `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`,
       data
     );
   },
@@ -86,7 +86,7 @@ const jstransform = {
     function_name: string
   ) => {
     return http().delete(
-      `/api/${org_identifier}/${stream_name}/functions/${function_name}?type=${stream_type}`
+      `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`
     );
   },
   create_enrichment_table: (
