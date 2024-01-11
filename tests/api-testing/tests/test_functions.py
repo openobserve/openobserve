@@ -178,7 +178,7 @@ def test_e2e_allfunctionstreams(create_session, base_url):
     stream_name = "test"
 
     resp_get_streamfunction = session.get(
-        f"{base_url}api/{org_id}/{stream_name}/functions"
+        f"{base_url}api/{org_id}/streams/{stream_name}/functions"
     )
 
     print(resp_get_streamfunction.content)
@@ -213,7 +213,7 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
 
     resp_get_streamfunction = session.get(
-        f"{base_url}api/{org_id}/{stream_name}/functions"
+        f"{base_url}api/{org_id}/streams/{stream_name}/functions"
     )
 
     print(resp_get_streamfunction.content)
@@ -222,8 +222,8 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
     ), f"Get all functions streams list 200, but got {resp_get_streamfunction.status_code} {resp_get_streamfunction.content}"
 
     payload = {"order": 2}
-    resp_add_streamfunction = session.post(
-        f"{base_url}api/{org_id}/{stream_name}/functions/pytestfunction",
+    resp_add_streamfunction = session.put(
+        f"{base_url}api/{org_id}/streams/{stream_name}/functions/pytestfunction",
         json=payload,
     )
 
@@ -232,7 +232,7 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
         resp_add_streamfunction.status_code == 200
     ), f"Add stream to function 200, but got {resp_add_streamfunction.status_code} {resp_add_streamfunction.content}"
     resp_delete_streamfunction = session.delete(
-        f"{base_url}api/{org_id}/{stream_name}/functions/pytestfunction"
+        f"{base_url}api/{org_id}/streams/{stream_name}/functions/pytestfunction"
     )
     assert (
         resp_delete_streamfunction.status_code == 200

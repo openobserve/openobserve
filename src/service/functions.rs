@@ -25,10 +25,11 @@ use crate::{
     common::{
         infra::config::STREAM_FUNCTIONS,
         meta::{
+            authz::Authz,
             functions::{
                 FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform,
             },
-            http::HttpResponse as MetaHttpResponse, authz::Authz,
+            http::HttpResponse as MetaHttpResponse,
         },
         utils::auth::{remove_ownership, set_ownership},
     },

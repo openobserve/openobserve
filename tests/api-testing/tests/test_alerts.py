@@ -69,7 +69,7 @@ def test_e2e_templatescreation(create_session, base_url):
     payload = {"body": "invalid", "ise2e": True, "name": template_name}
     # create template under alerts
     resp_get_alltemplates = session.post(
-        f"{url}api/{org_id}/alerts/templates/{template_name}", json=payload
+        f"{url}api/{org_id}/alerts/templates", json=payload
     )
 
     print(resp_get_alltemplates.content)
@@ -120,23 +120,25 @@ def test_e2e_createdestination(create_session, base_url):
 
     # createtemplate
     resp_create_destinations = session.post(
-        f"{url}api/{org_id}/alerts/templates/pytesttemplate",
+        f"{url}api/{org_id}/alerts/templates",
         json=payload,
         headers=headers,
     )
     print(resp_create_destinations.content)
-
+    
+    destination_name = "py-destinations"
     payload = {
         "url": "www",
         "method": "post",
         "skip_tls_verify": skip_tls_verify_value,
         "template": "pytesttemplate",
         "headers": {"test": "test"},
+        "name":"py-destinations"
     }
-    destination_name = "py-destinations"
+   
     # create destination
     resp_create_destinations = session.post(
-        f"{url}api/{org_id}/alerts/destinations/{destination_name}",
+        f"{url}api/{org_id}/alerts/destinations",
         json=payload,
         headers=headers,
     )
@@ -189,7 +191,7 @@ def test_e2e_createdestination(create_session, base_url):
     alert_name = "py-alert"
     is_real_time = False
     payload = {
-        "name": "pytest-alert",
+        "name": alert_name,
         "stream_type": "logs",
         "stream_name": "newpy_tests",
         "is_real_time": is_real_time,
@@ -219,7 +221,7 @@ def test_e2e_createdestination(create_session, base_url):
         "description": "",
     }
     resp_create_alert = session.post(
-        f"{url}api/{org_id}/{stream_name}/alerts/{alert_name}",
+        f"{url}api/{org_id}/{stream_name}/alerts",
         json=payload,
         headers=headers,
     )
