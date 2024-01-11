@@ -52,7 +52,7 @@ pub async fn token_validator(
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     match jwt::verify_decode_token(
-        &auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
+        auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &O2_CONFIG.dex.client_id,
         false,
@@ -102,7 +102,7 @@ pub async fn token_validator(
                     if auth_info.is_ingestion_ep || check_permissions(user_id, auth_info).await {
                         Ok(req)
                     } else {
-                        return Err((ErrorForbidden("Unauthorized Access"), req));
+                        Err((ErrorForbidden("Unauthorized Access"), req))
                     }
                 } else {
                     Err((ErrorUnauthorized("Unauthorized Access"), req))
