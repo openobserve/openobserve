@@ -210,6 +210,7 @@ import {
   onBeforeMount,
   onBeforeUnmount,
   watch,
+  onUnmounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -385,10 +386,13 @@ export default defineComponent({
     // }
 
     onDeactivated(() => {
-      // resetSearchObj();
+      resetSearchObj();
       // searchBarRef.value.resetFunctionContent();
       // setQuery("");
       // clearInterval(refreshIntervalID);
+    });
+    onUnmounted(() => {
+      resetSearchObj();
     });
 
     onActivated(async () => {
