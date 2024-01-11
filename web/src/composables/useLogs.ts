@@ -706,8 +706,7 @@ const useLogs = () => {
               //extract fields from query response
               extractFields();
 
-              if (!isPagination) generateHistogramData();
-              else {
+              if (isPagination){
                 searchObj.data.histogram.chartParams.title =
                   getHistogramTitle();
               }
@@ -979,7 +978,7 @@ const useLogs = () => {
   };
 
   function getHistogramTitle() {
-    const currentPage = searchObj.data.resultGrid.currentPage - 1;
+    const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     const endCount = startCount + searchObj.data.queryResults.hits.length - 1;
     const title =

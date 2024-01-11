@@ -31,9 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-pagination
             v-model="pageNumberInput"
             :max="
-              Math.round(
-                searchObj.data.queryResults.total /
-                  searchObj.meta.resultGrid.rowsPerPage
+              Math.max(
+                1,
+                Math.round(
+                  searchObj.data.queryResults.total /
+                    searchObj.meta.resultGrid.rowsPerPage
+                )
               )
             "
             input
@@ -346,30 +349,39 @@ export default defineComponent({
   methods: {
     getPageData(actionType: string) {
       if (actionType == "prev") {
-        if (this.searchObj.data.resultGrid.currentPage > 1) {
+        if (parseInt(this.searchObj.data.resultGrid.currentPage) > 1) {
           this.searchObj.data.resultGrid.currentPage =
-            this.searchObj.data.resultGrid.currentPage - 1;
-          this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
+            parseInt(this.searchObj.data.resultGrid.currentPage) - 1;
+          this.pageNumberInput = Math.max(
+            1,
+            parseInt(this.searchObj.data.resultGrid.currentPage)
+          );
           this.$emit("update:scroll");
           this.searchTableRef.scrollTo(0);
         }
       } else if (actionType == "next") {
         if (
-          this.searchObj.data.resultGrid.currentPage <=
+          parseInt(this.searchObj.data.resultGrid.currentPage) <=
           Math.round(
             this.searchObj.data.queryResults.total /
               this.searchObj.meta.resultGrid.rowsPerPage
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
-            this.searchObj.data.resultGrid.currentPage + 1;
-          this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
+            parseInt(this.searchObj.data.resultGrid.currentPage) + 1;
+          this.pageNumberInput = Math.max(
+            1,
+            parseInt(this.searchObj.data.resultGrid.currentPage)
+          );
           this.$emit("update:scroll");
           this.searchTableRef.scrollTo(0);
         }
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
-        this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
+        this.pageNumberInput = Math.max(
+          1,
+          parseInt(this.searchObj.data.resultGrid.currentPage)
+        );
         this.$emit("update:scroll");
         this.searchTableRef.scrollTo(0);
       } else if (actionType == "pageChange") {
@@ -386,7 +398,10 @@ export default defineComponent({
               "Page number is out of range. Please provide valid page number.",
             timeout: 1000,
           });
-          this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
+          this.pageNumberInput = Math.max(
+            1,
+            parseInt(this.searchObj.data.resultGrid.currentPage)
+          );
           return false;
         }
 
