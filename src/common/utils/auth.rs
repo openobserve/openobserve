@@ -206,63 +206,6 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let mut method = req.method().to_string();
-        let local_path = req.path().to_string();
-        let path =
-            match local_path.strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str()) {
-                Some(path) => path,
-                None => &local_path,
-            };
-
-        let path_columns = path.split('/').collect::<Vec<&str>>();
-        let url_len = path_columns.len();
-        let org_id = path_columns[0].to_string();
-
-        if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        is_ingestion_ep: true,
-                    }));
-                }
-            }
-            return ready(Err(actix_web::error::ErrorUnauthorized(
-                "Unauthorized Access",
-            )));
-        }
-        println!("path {} & len {}", path, url_len);
-        let object_type = if url_len == 1 {
-            if method.eq("GET") && path_columns[0].eq("organizations") {
-                if method.eq("GET") {
-                    method = "LIST".to_string();
-                };
-
-                format!("org:##replace_user_id##")
-            } else {
-                path_columns[0].to_string()
-            }
-        } else if url_len == 2 {
-            format!(
-                "{}:{}",
-                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 1])
-                    .unwrap_or(&path_columns[url_len - 1]),
-                path_columns[url_len - 2]
-            )
-        } else {
-            format!(
-                "{}:{}",
-                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 1])
-                    .unwrap_or(&path_columns[url_len - 1]),
-                path_columns[url_len - 3]
-            )
-        };
-
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 return ready(Ok(AuthExtractor {
@@ -274,9 +217,9 @@ impl FromRequest for AuthExtractor {
                 }));
             }
         }
-        ready(Err(actix_web::error::ErrorUnauthorized(
+        return ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
-        )))
+        )));
     }
 }
 
