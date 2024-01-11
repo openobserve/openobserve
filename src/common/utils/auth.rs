@@ -114,7 +114,7 @@ pub struct AuthExtractor {
     pub method: String,
     pub o2_type: String,
     pub org_id: String,
-    pub is_ingestion_ep: bool,
+    pub bypass_check: bool,
 }
 
 impl FromRequest for AuthExtractor {
@@ -143,7 +143,7 @@ impl FromRequest for AuthExtractor {
                         method,
                         o2_type: format!("stream:{org_id}"),
                         org_id,
-                        is_ingestion_ep: true,
+                        bypass_check: true,
                     }));
                 }
             }
@@ -170,32 +170,64 @@ impl FromRequest for AuthExtractor {
                     .unwrap_or(&path_columns[url_len - 1]),
                 path_columns[url_len - 2]
             )
+        } else if url_len == 3 {
+            if method.eq("PUT") || method.eq("DELETE") {
+                format!(
+                    "{}:{}",
+                    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                        .get(path_columns[1])
+                        .unwrap_or(&path_columns[1]),
+                    path_columns[2]
+                )
+            } else {
+                format!(
+                    "{}:{}",
+                    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                        .get(path_columns[2])
+                        .unwrap_or(&path_columns[2]),
+                    path_columns[0]
+                )
+            }
         } else if method.eq("PUT") || method.eq("DELETE") {
+            if path_columns[url_len - 1].eq("delete_fields") {
+                method = "DELETE".to_string();
+            }
             format!(
                 "{}:{}",
                 o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 2])
-                    .unwrap_or(&path_columns[url_len - 2]),
-                path_columns[url_len - 1]
+                    .get(path_columns[1])
+                    .unwrap_or(&path_columns[1]),
+                path_columns[2]
             )
         } else {
             format!(
                 "{}:{}",
                 o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 1])
-                    .unwrap_or(&path_columns[url_len - 1]),
-                path_columns[url_len - 3]
+                    .get(path_columns[1])
+                    .unwrap_or(&path_columns[1]),
+                path_columns[2]
             )
         };
 
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
+                if (method.eq("POST") && path_columns[1].eq("_search"))
+                    || path.contains("/prometheus/api/v1/query")
+                {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method: "".to_string(),
+                        o2_type: "".to_string(),
+                        org_id: "".to_string(),
+                        bypass_check: true, // bypass check permissions
+                    }));
+                }
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method,
                     o2_type: object_type,
                     org_id,
-                    is_ingestion_ep: false,
+                    bypass_check: false,
                 }));
             }
         }
@@ -213,7 +245,7 @@ impl FromRequest for AuthExtractor {
                     method: "".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
-                    is_ingestion_ep: true, // bypass check permissions
+                    bypass_check: true, // bypass check permissions
                 }));
             }
         }
