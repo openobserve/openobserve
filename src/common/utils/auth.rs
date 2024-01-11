@@ -245,7 +245,7 @@ impl FromRequest for AuthExtractor {
                     method: "".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
-                    is_ingestion_ep: true, // bypass check permissions
+                    bypass_check: true, // bypass check permissions
                 }));
             }
         }
