@@ -30,10 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
             v-model="pageNumberInput"
+            :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
             :max="
-              Math.round(
-                searchObj.data.queryResults.total /
-                  searchObj.meta.resultGrid.rowsPerPage
+              Math.max(
+                1,
+                Math.round(
+                  searchObj.data.queryResults.total /
+                    searchObj.meta.resultGrid.rowsPerPage
+                )
               )
             "
             input
@@ -111,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           wordBreak: 'break-word',
           height:
             !searchObj.meta.showHistogram || searchObj.meta.sqlMode
-              ? 'calc(100% - 0px)'
-              : 'calc(100% - 120px)',
+              ? 'calc(100% - 40px)'
+              : 'calc(100% - 140px)',
         }"
       >
         <template v-slot:before>
@@ -164,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
+              :data-test="'log-table-column-' + index + '-' + column.name"
               class="field_list"
               style="cursor: pointer"
             >
@@ -303,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onMounted } from "vue";
+import { computed, defineComponent, ref, onMounted, onUpdated } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -346,8 +351,7 @@ export default defineComponent({
     getPageData(actionType: string) {
       if (actionType == "prev") {
         if (this.searchObj.data.resultGrid.currentPage > 1) {
-          this.searchObj.data.resultGrid.currentPage =
-            this.searchObj.data.resultGrid.currentPage - 1;
+          this.searchObj.data.resultGrid.currentPage = this.searchObj.data.resultGrid.currentPage - 1;
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
           this.$emit("update:scroll");
           this.searchTableRef.scrollTo(0);
@@ -360,8 +364,7 @@ export default defineComponent({
               this.searchObj.meta.resultGrid.rowsPerPage
           )
         ) {
-          this.searchObj.data.resultGrid.currentPage =
-            this.searchObj.data.resultGrid.currentPage + 1;
+          this.searchObj.data.resultGrid.currentPage = this.searchObj.data.resultGrid.currentPage + 1;
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
           this.$emit("update:scroll");
           this.searchTableRef.scrollTo(0);
@@ -428,8 +431,7 @@ export default defineComponent({
     const noOfRecordsTitle = ref("");
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100, 250, 500, 1000];
-    const pageNumberInput = ref(1);
-
+    
     const {
       searchObj,
       updatedLocalLogFilterField,
@@ -437,6 +439,7 @@ export default defineComponent({
       extractFTSFields,
       evaluateWrapContentFlag,
     } = useLogs();
+    const pageNumberInput = ref(1);
     const totalHeight = ref(0);
 
     const searchTableRef: any = ref(null);
@@ -445,6 +448,10 @@ export default defineComponent({
 
     onMounted(() => {
       reDrawChart();
+    });
+
+    onUpdated(() => {
+      pageNumberInput.value = searchObj.data.resultGrid.currentPage;
     });
 
     const reDrawChart = () => {
