@@ -213,7 +213,7 @@ def test_e2e_addDeleteStreamFunction(create_session, base_url):
     ), f"Expected 200, but got {resp_create_function.status_code} {resp_create_function.content}"
 
     resp_get_streamfunction = session.get(
-        f"{base_url}api/{org_id}/{stream_name}/functions"
+        f"{base_url}api/{org_id}/streams/{stream_name}/functions"
     )
 
     print(resp_get_streamfunction.content)
