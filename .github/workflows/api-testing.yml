@@ -19,7 +19,8 @@ env:
   ZO_BASE_URL: http://localhost:5080/
 
 jobs:
-  build:
+  api_integration_tests:
+    name: api_integration_tests
     runs-on: ubuntu-latest
     steps:
       - name: Remove unused tools
