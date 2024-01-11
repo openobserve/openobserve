@@ -226,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <div class="space"></div>
+      
       <div v-if="dashboardPanelData.data.type == 'geomap'">
         <span>Initial View:</span>
         <div class="row">
