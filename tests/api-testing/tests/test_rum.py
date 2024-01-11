@@ -15,7 +15,7 @@ def test_e2e_rumtoken(create_session, base_url):
     session = create_session
     org_id = "default"
 
-    resp_get_rumtoken = session.get(f"{base_url}api/{org_id}/organizations/rumtoken")
+    resp_get_rumtoken = session.get(f"{base_url}api/{org_id}/rumtoken")
 
     # get rumtoken
     print(resp_get_rumtoken.content)
@@ -92,7 +92,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
     rum_org = "default"
     logs_url = f"{base_url}rum/v1/{rum_org}/logs"
     ip_address = "182.70.14.246"
-    resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/organizations/rumtoken")
+    resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/rumtoken")
 
     # get rumtoken
     print(resp_get_rumtoken.content)
@@ -193,7 +193,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
 #     session = create_session
 #     url = base_url
 #     org_id = "e2e"
-#     resp_generate_rumtoken = session.post(f"{base_url}api/{org_id}/organizations/rumtoken")
+#     resp_generate_rumtoken = session.post(f"{base_url}api/{org_id}/rumtoken")
 #     print(resp_generate_rumtoken.content)
 #     rum_token = resp_generate_rumtoken.json()["data"]["rum_token"]
 
@@ -207,7 +207,7 @@ def test_e2e_rumingestinglogs(create_session, base_url):
 #     session = create_session
 #     url = base_url
 #     org_id = "e2e"
-#     resp_update_rumtoken = session.put(f"{base_url}api/{org_id}/organizations/rumtoken")
+#     resp_update_rumtoken = session.put(f"{base_url}api/{org_id}/rumtoken")
 #     print(resp_update_rumtoken.content)
 #     rum_token = resp_update_rumtoken.json()["data"]["rum_token"]
 
@@ -224,7 +224,7 @@ def test_e2e_rumdataingestandsearch(create_session, base_url):
     rum_org = "default"
     ip_address = "182.70.14.246"
     headers = {"X-Forwarded-For": ip_address, "Content-Type": "application/json"}
-    resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/organizations/rumtoken")
+    resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/rumtoken")
 
     # get rumtoken
     print(resp_get_rumtoken.content)
@@ -318,7 +318,7 @@ def test_e2e_rumverifygeodata(create_session, base_url):
     logs_url = f"{base_url}rum/v1/{rum_org}/logs"
     ip_address = "182.70.14.246"
     headers = {"X-Forwarded-For": ip_address, "Content-Type": "application/json"}
-    resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/organizations/rumtoken")
+    resp_get_rumtoken = session.get(f"{base_url}api/{rum_org}/rumtoken")
 
     # get rumtoken
     print(resp_get_rumtoken.content)
