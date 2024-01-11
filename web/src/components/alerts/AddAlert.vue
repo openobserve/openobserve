@@ -929,7 +929,6 @@ export default defineComponent({
 
 .add-alert-form {
   .q-field--dense .q-field__control {
-    height: 40px !important;
 
     .q-field__native span {
       overflow: hidden;
