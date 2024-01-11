@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::io::{Error, ErrorKind};
+
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
-                IngestionPasscode, IngestionTokensContainer, OrgSummary, RumIngestionToken,
+                IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
+                RumIngestionToken,
             },
             user::UserOrg,
         },
@@ -154,6 +157,20 @@ async fn update_passcode_inner(
             user: db_user.email,
             passcode: token,
         })
+    }
+}
+
+#[tracing::instrument]
+pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
+    match db::organization::set(org).await {
+        Ok(_) => Ok(org.clone()),
+        Err(e) => {
+            log::error!("Error creating org: {}", e);
+            Err(Error::new(
+                ErrorKind::Other,
+                format!("Error creating org: {}", e),
+            ))
+        }
     }
 }
 

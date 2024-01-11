@@ -19,9 +19,13 @@ use actix_web::{http, HttpResponse};
 use config::ider;
 
 use crate::{
-    common::meta::{
-        dashboards::{Folder, FolderList, DEFAULT_FOLDER},
-        http::HttpResponse as MetaHttpResponse,
+    common::{
+        meta::{
+            authz::Authz,
+            dashboards::{Folder, FolderList, DEFAULT_FOLDER},
+            http::HttpResponse as MetaHttpResponse,
+        },
+        utils::auth::{remove_ownership, set_ownership},
     },
     service::db,
 };
@@ -55,7 +59,10 @@ pub async fn save_folder(
     }
 
     match db::dashboards::folders::put(org_id, folder).await {
-        Ok(folder) => Ok(HttpResponse::Ok().json(folder)),
+        Ok(folder) => {
+            set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
+            Ok(HttpResponse::Ok().json(folder))
+        }
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -139,10 +146,13 @@ pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse
         )));
     }
     match db::dashboards::folders::delete(org_id, folder_id).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Dashboard folder deleted".to_string(),
-        ))),
+        Ok(_) => {
+            remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "Dashboard folder deleted".to_string(),
+            )))
+        }
         Err(e) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

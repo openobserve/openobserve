@@ -35,6 +35,17 @@ const alerts = {
     data: any
   ) => {
     return http().post(
+      `/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`,
+      data
+    );
+  },
+  update: (
+    org_identifier: string,
+    stream_name: string,
+    stream_type: string,
+    data: any
+  ) => {
+    return http().put(
       `/api/${org_identifier}/${stream_name}/alerts/${data.name}?type=${stream_type}`,
       data
     );
