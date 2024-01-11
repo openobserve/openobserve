@@ -27,7 +27,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             usage::{RequestStats, UsageType},
         },
-        utils::{auth::AuthExtractor, base64, functions, http::get_stream_type_from_request, json},
+        utils::{base64, functions, http::get_stream_type_from_request, json},
     },
     service::{search as SearchService, usage::report_request_usage_stats},
 };
@@ -125,27 +125,32 @@ pub async fn search(
     }
 
     // Check permissions on stream
-    // For getting stream name from query to check permission
-    let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
-    let resp = crate::service::search::sql::Sql::new(&rpc_req)
-        .await
-        .unwrap();
-    let user_id = in_req.headers().get("user_id").unwrap();
-    if !crate::handler::http::auth::validator::check_permissions(
-        user_id.to_str().unwrap(),
-        AuthExtractor {
-            auth: "".to_string(),
-            method: "GET".to_string(),
-            o2_type: format!("stream:{}", resp.stream_name),
-            org_id: org_id.clone(),
-            bypass_check: false,
-        },
-    )
-    .await
+    #[cfg(feature = "enterprise")]
     {
-        return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        use crate::common::utils::auth::AuthExtractor;
+        println!("Checking permissions on stream");
+        // For getting stream name from query to check permission
+        let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
+        let resp = crate::service::search::sql::Sql::new(&rpc_req)
+            .await
+            .unwrap();
+        let user_id = in_req.headers().get("user_id").unwrap();
+        if !crate::handler::http::auth::validator::check_permissions(
+            user_id.to_str().unwrap(),
+            AuthExtractor {
+                auth: "".to_string(),
+                method: "GET".to_string(),
+                o2_type: format!("stream:{}", resp.stream_name),
+                org_id: org_id.clone(),
+                bypass_check: false,
+            },
+        )
+        .await
+        {
+            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        }
+        // Check permissions on stream ends
     }
-    // Check permissions on stream ends
 
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
 
