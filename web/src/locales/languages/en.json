@@ -86,7 +86,13 @@
     "savedViewAction": "Create/Update Saved View",
     "savedViewDropdownLabel": "Saved Views",
     "savedViewName": "View Name",
-    "shareLink": "Share Link"
+    "shareLink": "Share Link",
+    "downloadTable": "Download Table",
+    "customRange": "Custom Range",
+    "initialNumber": "Initial Number",
+    "range": "No of Records",
+    "btnDownload": "Download",
+    "customDownloadMessage": "Enter the initial number and select the range for downloading data."
   },
   "menu": {
     "home": "Home",

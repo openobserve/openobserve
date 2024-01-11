@@ -47,6 +47,7 @@ import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
+import { start } from "repl";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -99,7 +100,7 @@ const defaultObject = {
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 150,
+      rowsPerPage: 250,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -128,7 +129,7 @@ const defaultObject = {
     },
     resultGrid: {
       currentDateTime: new Date(),
-      currentPage: 0,
+      currentPage: 1,
       columns: <any>[],
     },
     transforms: <any>[],
@@ -154,6 +155,7 @@ const defaultObject = {
     tempFunctionContent: "",
     tempFunctionLoading: false,
     savedViews: <any>[],
+    customDownloadQueryObj: <any>{},
   },
 };
 
@@ -266,7 +268,7 @@ const useLogs = () => {
       chartParams: {},
     };
     searchObj.data.resultGrid.columns = [];
-    searchObj.data.resultGrid.currentPage = 0;
+    searchObj.data.resultGrid.currentPage = 1;
     searchObj.runQuery = false;
     searchObj.data.errorMsg = "";
   }
@@ -394,11 +396,10 @@ const useLogs = () => {
           sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
-          from: searchObj.data.queryResults?.hits?.length || 0,
-          size: parseInt(
-            (searchObj.data.queryResults?.hits?.length || 0) + 150,
-            10
-          ),
+          from:
+            searchObj.meta.resultGrid.rowsPerPage *
+              (searchObj.data.resultGrid.currentPage - 1) || 0,
+          size: searchObj.meta.resultGrid.rowsPerPage,
         },
         aggs: {
           histogram:
@@ -556,7 +557,7 @@ const useLogs = () => {
       }
 
       if (
-        searchObj.data.resultGrid.currentPage > 0 ||
+        searchObj.data.resultGrid.currentPage > 1 ||
         searchObj.meta.showHistogram === false
       ) {
         delete req.aggs;
@@ -576,7 +577,7 @@ const useLogs = () => {
         req.query.sql = b64EncodeUnicode(req.query.sql);
         if (
           !searchObj.meta.sqlMode &&
-          searchObj.data.resultGrid.currentPage == 0
+          searchObj.data.resultGrid.currentPage == 1
         ) {
           req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
         }
@@ -648,6 +649,7 @@ const useLogs = () => {
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
+          searchObj.data.customDownloadQueryObj = queryReq;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
@@ -658,9 +660,13 @@ const useLogs = () => {
               dismiss();
               if (res.data.from > 0) {
                 searchObj.data.queryResults.from = res.data.from;
-                searchObj.data.queryResults.scan_size += res.data.scan_size;
-                searchObj.data.queryResults.took += res.data.took;
-                searchObj.data.queryResults.hits.push(...res.data.hits);
+                searchObj.data.queryResults.scan_size = res.data.scan_size;
+                searchObj.data.queryResults.took = res.data.took;
+                // searchObj.data.queryResults.hits.push(...res.data.hits);
+                searchObj.data.queryResults.hits = res.data.hits;
+                if (searchObj.data.queryResults.total < res.data.total) {
+                  searchObj.data.queryResults.total = res.data.total;
+                }
               } else {
                 resetFieldValues();
                 if (
@@ -687,8 +693,8 @@ const useLogs = () => {
                     }
                   }
 
-                  searchObj.data.queryResults.hits =
-                    searchObj.data.queryResults.hits.splice(0, 150);
+                  // searchObj.data.queryResults.hits =
+                  //   searchObj.data.queryResults.hits.splice(0, 150);
                 } else {
                   searchObj.data.queryResults = res.data;
                 }
@@ -758,10 +764,11 @@ const useLogs = () => {
           })
           .then((res) => {
             dismiss();
+            searchObj.data.errorMsg = "";
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            // searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
             searchObj.loading = false;
             resolve(true);
@@ -969,9 +976,14 @@ const useLogs = () => {
   };
 
   function getHistogramTitle() {
+    const currentPage = searchObj.data.resultGrid.currentPage - 1;
+    const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+    const endCount = startCount + searchObj.data.queryResults.hits.length - 1;
     const title =
       "Showing " +
-      searchObj.data.queryResults.hits.length.toLocaleString() +
+      startCount +
+      " to " +
+      endCount +
       " out of " +
       searchObj.data.queryResults.total.toLocaleString() +
       " hits in " +
@@ -988,7 +1000,10 @@ const useLogs = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      if (searchObj.data.queryResults.aggs) {
+      if (
+        searchObj.data.queryResults.hasOwnProperty("aggs") &&
+        searchObj.data.queryResults.aggs
+      ) {
         searchObj.data.queryResults.aggs.histogram.map(
           (bucket: {
             zo_sql_key: string | number | Date;
@@ -1131,7 +1146,7 @@ const useLogs = () => {
           const customMessage = logsErrorMessage(err.response.data.code);
           searchObj.data.errorCode = err.response.data.code;
           if (customMessage != "") {
-            searchObj.data.errorMsg = t(customMessage);
+            searchObj.data.errorMsg = customMessage;
           }
         })
         .finally(() => (searchObj.loading = false));
@@ -1149,7 +1164,7 @@ const useLogs = () => {
       clearInterval(store.state.refreshIntervalID);
       const refreshIntervalID = setInterval(async () => {
         // searchObj.loading = true;
-        await getQueryData(true);
+        await getQueryData(false);
         generateHistogramData();
         updateGridColumns();
         searchObj.meta.histogramDirtyFlag = true;
@@ -1376,6 +1391,7 @@ const useLogs = () => {
     getSavedViews,
     onStreamChange,
     generateURLQuery,
+    buildSearch,
   };
 };
 
