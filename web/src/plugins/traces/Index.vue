@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="indexListRef"
               data-test="logs-search-index-list"
               :key="searchObj.data.stream.streamLists"
-              @update:changeStream="onChangeStream"
             />
           </template>
           <template #separator>
@@ -571,7 +570,6 @@ export default defineComponent({
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
         const queryParams = getUrlQueryParams();
-        console.log(queryParams);
         router.push({ query: queryParams });
         return req;
       } catch (e) {
@@ -923,8 +921,6 @@ export default defineComponent({
               });
             }
           });
-
-          console.log("changed selected stream fields");
 
           schema.forEach((row: any) => {
             // let keys = deepKeys(row);
@@ -1376,7 +1372,6 @@ export default defineComponent({
       refreshTimezone,
       indexListRef,
       copyTracesUrl,
-      onChangeStream,
     };
   },
   computed: {
