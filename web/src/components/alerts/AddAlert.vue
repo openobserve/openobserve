@@ -695,12 +695,16 @@ export default defineComponent({
         );
     };
 
+    const getSelectedTab = computed(() => {
+      return scheduledAlertRef.value?.tab || null;
+    });
+
     const previewAlert = async () => {
-      if (scheduledAlertRef.value.tab === "custom")
+      if (getSelectedTab.value === "custom")
         previewQuery.value = generateSqlQuery();
-      else if (scheduledAlertRef.value.tab === "sql")
+      else if (getSelectedTab.value === "sql")
         previewQuery.value = formData.value.query_condition.sql;
-      else if (scheduledAlertRef.value.tab === "promql")
+      else if (getSelectedTab.value === "promql")
         previewQuery.value = formData.value.query_condition.promql;
 
       await nextTick();
@@ -761,7 +765,7 @@ export default defineComponent({
 
     const getAlertPayload = () => {
       const payload = cloneDeep(formData.value);
-      const selectedTab = scheduledAlertRef.value.tab;
+      const selectedTab = getSelectedTab.value;
 
       payload.is_real_time = payload.is_real_time === "true";
 
@@ -790,21 +794,18 @@ export default defineComponent({
 
       payload.description = formData.value.description.trim();
 
-      if (!isAggregationEnabled.value || selectedTab !== "custom") {
+      if (!isAggregationEnabled.value || selectedTab.value !== "custom") {
         payload.query_condition.aggregation = null;
       }
 
-      if (selectedTab === "sql" || scheduledAlertRef.value.tab === "promql")
+      if (selectedTab.value === "sql" || selectedTab.value === "promql")
         payload.query_condition.conditions = [];
 
-      if (
-        scheduledAlertRef.value.tab === "sql" ||
-        scheduledAlertRef.value.tab === "custom"
-      ) {
+      if (selectedTab.value === "sql" || selectedTab.value === "custom") {
         payload.promql_condition = null;
       }
 
-      if (scheduledAlertRef.value.tab === "promql") {
+      if (selectedTab.value === "promql") {
         payload.query_condition.sql = "";
       }
 
