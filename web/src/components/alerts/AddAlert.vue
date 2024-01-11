@@ -711,6 +711,35 @@ export default defineComponent({
       previewAlertRef.value.refreshData();
     };
 
+    const getFromattedCondition = (
+      column: string,
+      operator: string,
+      value: number | string
+    ) => {
+      let condition = "";
+      switch (operator) {
+        case "=":
+        case "<>":
+        case "<":
+        case ">":
+        case "<=":
+        case ">=":
+          condition = column + ` ${operator} ${value}`;
+          break;
+        case "Contains":
+          condition = column + ` LIKE '%${value}%'`;
+          break;
+        case "NotContains":
+          condition = column + ` NOT LIKE '%${value}%'`;
+          break;
+        default:
+          condition = column + ` ${operator} ${value}`;
+          break;
+      }
+
+      return condition;
+    };
+
     const generateSqlQuery = () => {
       // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
@@ -720,13 +749,22 @@ export default defineComponent({
       let whereClause = formData.value.query_condition.conditions
         .map((condition: any) => {
           if (condition.column && condition.operator && condition.value) {
+            // If value is string then add single quotes
             const value =
-              streamFieldsMap.value[condition.column].type === "Int64"
+              streamFieldsMap.value[condition.column].type === "Int64" ||
+              condition.operator === "Contains" ||
+              condition.operator === "NotContains"
                 ? condition.value
                 : `'${condition.value}'`;
-            return `${condition.column}${condition.operator}${value}`;
+
+            return getFromattedCondition(
+              condition.column,
+              condition.operator,
+              value
+            );
           }
         })
+        .filter((condition: any) => condition && condition?.trim()?.length)
         .join(" AND ");
 
       whereClause = whereClause?.trim().length ? " WHERE " + whereClause : "";
@@ -739,6 +777,9 @@ export default defineComponent({
       } else {
         const aggFn = formData.value.query_condition.aggregation.function;
         const column = formData.value.query_condition.aggregation.having.column;
+
+        const isAggValid = aggFn?.trim()?.length && column?.trim()?.length;
+
         let groupBy = "";
         formData.value.query_condition.aggregation.group_by.forEach(
           (column: any) => {
@@ -746,10 +787,17 @@ export default defineComponent({
           }
         );
 
-        query +=
-          ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
-          whereClause +
-          ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+        if (isAggValid) {
+          query +=
+            ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+            whereClause +
+            ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+        } else {
+          query +=
+            ` COUNT(*) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+            whereClause +
+            ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+        }
       }
 
       return query;
@@ -765,7 +813,8 @@ export default defineComponent({
 
     const getAlertPayload = () => {
       const payload = cloneDeep(formData.value);
-      const selectedTab = getSelectedTab.value;
+
+      console.log(cloneDeep(payload));
 
       payload.is_real_time = payload.is_real_time === "true";
 
@@ -794,18 +843,18 @@ export default defineComponent({
 
       payload.description = formData.value.description.trim();
 
-      if (!isAggregationEnabled.value || selectedTab.value !== "custom") {
+      if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
         payload.query_condition.aggregation = null;
       }
 
-      if (selectedTab.value === "sql" || selectedTab.value === "promql")
+      if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
         payload.query_condition.conditions = [];
 
-      if (selectedTab.value === "sql" || selectedTab.value === "custom") {
+      if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
         payload.promql_condition = null;
       }
 
-      if (selectedTab.value === "promql") {
+      if (getSelectedTab.value === "promql") {
         payload.query_condition.sql = "";
       }
 
