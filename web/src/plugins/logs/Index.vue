@@ -346,6 +346,8 @@ export default defineComponent({
       restoreUrlQueryParams,
       handleRunQuery,
       generateHistogramData,
+      resetStreamData,
+      resetSearchObj,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -386,13 +388,11 @@ export default defineComponent({
     // }
 
     onDeactivated(() => {
-      resetSearchObj();
-      // searchBarRef.value.resetFunctionContent();
-      // setQuery("");
-      // clearInterval(refreshIntervalID);
+      resetStreamData();
     });
     onUnmounted(() => {
       resetSearchObj();
+      resetStreamData();
     });
 
     onActivated(async () => {

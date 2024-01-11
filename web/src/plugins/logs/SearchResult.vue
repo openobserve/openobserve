@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
+              :data-test="'log-table-column-' + index + '-' + column.name"
               class="field_list"
               style="cursor: pointer"
             >

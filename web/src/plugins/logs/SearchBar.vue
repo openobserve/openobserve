@@ -79,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete"
-color="grey" size="xs" />
+                    <q-icon name="delete" color="grey"
+size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -192,8 +192,8 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable
-v-close-popup>
+              <q-item class="q-pa-sm saved-view-item"
+clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -244,7 +244,7 @@ v-close-popup>
               class="q-pa-none search-button"
               @click="handleRunQuery"
               :disable="
-                searchObj.loading ||
+                searchObj.loading == 'true' ||
                 (searchObj.data.hasOwnProperty('streamResults') &&
                   searchObj.data.streamResults.length == 0)
               "
@@ -587,6 +587,8 @@ import {
   watch,
   toRaw,
   onActivated,
+  onUnmounted,
+  onDeactivated,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
@@ -991,23 +993,54 @@ export default defineComponent({
     onMounted(async () => {
       initFunctionEditor();
 
-      if (router.currentRoute.value.query.functionContent) {
+      if (
+        router.currentRoute.value.query.functionContent ||
+        searchObj.data.tempFunctionContent
+      ) {
         searchObj.meta.toggleFunction = true;
-        fnEditorobj.setValue(
-          b64DecodeUnicode(router.currentRoute.value.query.functionContent)
-        );
+        const fnContent = router.currentRoute.value.query.functionContent
+          ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
+          : searchObj.data.tempFunctionContent;
+        fnEditorobj.setValue(fnContent);
         fnEditorobj.layout();
         searchObj.config.fnSplitterModel = 60;
       }
 
       window.addEventListener("click", () => {
         fnEditorobj.layout();
-        // queryEditorRef.value.resetEditorLayout();
+      });
+    });
+
+    onUnmounted(() => {
+      window.removeEventListener("click", () => {
+        fnEditorobj.layout();
       });
     });
 
     onActivated(() => {
       udpateQuery();
+
+      if (
+        router.currentRoute.value.query.functionContent ||
+        searchObj.data.tempFunctionContent
+      ) {
+        searchObj.meta.toggleFunction = true;
+        const fnContent = router.currentRoute.value.query.functionContent
+          ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
+          : searchObj.data.tempFunctionContent;
+        fnEditorobj.setValue(fnContent);
+        fnEditorobj.layout();
+        searchObj.config.fnSplitterModel = 60;
+        window.removeEventListener("click", () => {
+          fnEditorobj.layout();
+        });
+      }
+    });
+
+    onDeactivated(() => {
+      window.removeEventListener("click", () => {
+        fnEditorobj.layout();
+      });
     });
 
     const saveFunction = () => {

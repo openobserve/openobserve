@@ -185,8 +185,10 @@ const useLogs = () => {
       yData: [],
       chartParams: {},
     };
+    searchObj.data.tempFunctionContent = "";
     searchObj.data.query = "";
     searchObj.meta.sqlMode = false;
+    searchObj.runQuery = false;
   };
 
   const updatedLocalLogFilterField = (): void => {
@@ -710,10 +712,13 @@ const useLogs = () => {
 
               //update grid columns
               updateGridColumns();
-              searchObj.loading = false;
-              if (histogramQueryReq.hasOwnProperty("aggs")) {
+              if (
+                res.data.hits.length > 0 &&
+                histogramQueryReq.hasOwnProperty("aggs")
+              ) {
                 getHistogramQueryData(histogramQueryReq);
               }
+              searchObj.loading = false;
               resolve(true);
             })
             .catch((err) => {
@@ -766,7 +771,6 @@ const useLogs = () => {
             searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
             // searchObj.data.histogram.chartParams.title = getHistogramTitle();
-
             searchObj.loading = false;
             resolve(true);
           })
@@ -1368,6 +1372,7 @@ const useLogs = () => {
     searchObj,
     getStreams,
     resetSearchObj,
+    resetStreamData,
     updatedLocalLogFilterField,
     getFunctions,
     getStreamList,
