@@ -142,7 +142,7 @@ pub async fn update_function(
         (status = 200, description = "Success", content_type = "application/json", body = StreamFunctionsList),
     )
 )]
-#[get("/{org_id}/{stream_name}/functions")]
+#[get("/{org_id}/streams/{stream_name}/functions")]
 async fn list_stream_functions(
     path: web::Path<(String, String)>,
     req: HttpRequest,

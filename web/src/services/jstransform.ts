@@ -64,7 +64,7 @@ const jstransform = {
     stream_type: string
   ) => {
     return http().get(
-      `/api/${org_identifier}/${stream_name}/functions?type=${stream_type}`
+      `/api/${org_identifier}/streams/${stream_name}/functions?type=${stream_type}`
     );
   },
   apply_stream_function: (
