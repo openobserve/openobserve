@@ -28,6 +28,7 @@ import {
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import { getColor, getSQLMinMaxValue } from "./colorPalette";
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
@@ -413,6 +414,17 @@ export const convertSQLData = (
     series: [],
   };
 
+   // if color type is shades, continuous then required to calculate min and max for chart.
+   let chartMin: any = Infinity;
+   let chartMax: any = -Infinity;
+   if (
+     ["shades", "green-yellow-red", "red-yellow-green"].includes(
+       panelSchema?.config?.color?.mode
+     )
+   ) {
+     [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, searchQueryData);
+   }
+
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
   switch (panelSchema.type) {
@@ -475,39 +487,64 @@ export const convertSQLData = (
               (it: any) => it.alias == yAxis
             ).label;
 
+            const values = Array.from(
+              new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+            ).map(
+              (it: any) =>
+                searchQueryData[0].find(
+                  (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+                )?.[yAxis] || 0
+            );
+
             return stackedXAxisUniqueValue?.map((key: any) => {
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                 ...getPropsByChartTypeForSeries(panelSchema.type),
-                data: Array.from(
-                  new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-                ).map(
-                  (it: any) =>
-                    searchQueryData[0].find(
-                      (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-                    )?.[yAxis] || 0
-                ),
+                data: values,
+                itemStyle: {
+                  color: getColor(
+                    panelSchema,
+                    yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
+                    values,
+                    chartMin,
+                    chartMax
+                  ),
+                },
               };
               return seriesObj;
             });
           })
           .flat();
       } else if (panelSchema.type == "line" || panelSchema.type == "area") {
+
+        
         //if x and y length is not 2 and 1 respectively then do following
         options.series = yAxisKeys?.map((key: any) => {
+          const values = getAxisDataFromKey(key);
+          const name = panelSchema?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label;
+
           const seriesObj = {
-            name: panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == key
-            )?.label,
-            color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
+            name,
+            // color:
+            //   panelSchema.queries[0]?.fields?.y.find(
+            //     (it: any) => it.alias == key
+            //   )?.color || "#5960b2",
             opacity: 0.8,
+            itemStyle: {
+              color: getColor(
+                panelSchema,
+                name,
+                values,
+                chartMin,
+                chartMax
+              ),
+            },
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            data: getAxisDataFromKey(key),
+            data: values,
           };
           return seriesObj;
         });
@@ -560,17 +597,30 @@ export const convertSQLData = (
           return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
         };
         options.series = yAxisKeys?.map((key: any) => {
+          const name = panelSchema?.queries[0]?.fields?.y.find(
+            (it: any) => it.alias == key
+          )?.label;
+
+          const values = getAxisDataFromKey(key);
+
           const seriesObj = {
-            name: panelSchema?.queries[0]?.fields?.y.find(
-              (it: any) => it.alias == key
-            )?.label,
-            color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
+            name,
+            // color:
+            //   panelSchema.queries[0]?.fields?.y.find(
+            //     (it: any) => it.alias == key
+            //   )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
-            data: getAxisDataFromKey(key),
+            data: values,
+            itemStyle: {
+              color: getColor(
+                panelSchema,
+                name,
+                values,
+                chartMin,
+                chartMax
+              ),
+            },
           };
           return seriesObj;
         });

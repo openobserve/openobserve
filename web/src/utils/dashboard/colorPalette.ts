@@ -33,7 +33,6 @@ export const colorArrayBySeries = [
   "#eec59c",
 ];
 
-
 export const getIndexForName = (name: any, colorArray: any) => {
   let index = 0;
   for (let i = 0; i < 15; i++) {
@@ -67,7 +66,7 @@ function shadeColor(color: any, value: any, min: any, max: any) {
   return "#" + newColor;
 }
 
-export const getMinMaxValue = (searchQueryData: any) => {
+export const getMetricMinMaxValue = (searchQueryData: any) => {
   // need min and max value for color
   let min = Infinity;
   let max = -Infinity;
@@ -89,9 +88,26 @@ export const getMinMaxValue = (searchQueryData: any) => {
   return [min, max];
 };
 
+export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
+  // need min and max value for color
+  let min = Infinity;
+  let max = -Infinity;
+  
+  searchQueryData[0]?.forEach((data: any) => {
+    yaxiskeys?.forEach((key: any) => {
+      if (data[key] !== undefined && !isNaN(data[key]) && data[key] !== null) {
+        min = Math.min(min, data[key]);
+        max = Math.max(max, data[key]);
+      }
+    });
+  });
+
+  return [min, max];
+};
+
 const getSeriesValueFromArray = (panelSchema: any, values: any) => {
   // if color is based on value then need to find seriesmin or seriesmax or last value
-  let seriesvalue = values[values.length - 1][1];
+  let seriesvalue = values?.length > 0 ? values[values.length - 1][1] : 50;
   if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
@@ -184,12 +200,24 @@ export const getColor = (
   // switch case based on panelSchema.color type
   switch (panelSchema?.config?.color?.mode) {
     case "fixed": {
-      return panelSchema?.config?.color?.fixedColor ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53" : "#53ca53";
+      return panelSchema?.config?.color?.fixedColor
+        ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53"
+        : "#53ca53";
     }
     case "shades": {
+      console.log(
+        "shades",
+        valuesArr,
+        chartMin,
+        chartMax,
+        panelSchema?.config?.color
+      );
+
       // based on selected color pass different shades of same color
       return shadeColor(
-        panelSchema?.config?.color?.fixedColor ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53" : "#53ca53",
+        panelSchema?.config?.color?.fixedColor
+          ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53"
+          : "#53ca53",
         getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
         chartMin ?? 0,
         chartMax ?? 100
@@ -203,10 +231,15 @@ export const getColor = (
     }
 
     case "green-yellow-red": {
-
+      
       const value = getSeriesValueFromArray(panelSchema, valuesArr);
+      console.log("green-yellow-red",valuesArr, value);
 
-      let scale = new Scale(panelSchema?.config?.color?.fixedColor?.map((color: any) => new Color(color)));
+      let scale = new Scale(
+        panelSchema?.config?.color?.fixedColor?.map(
+          (color: any) => new Color(color)
+        )
+      );
 
       scale.setDomain([chartMin ?? 0, chartMax ?? 100]);
 
@@ -214,10 +247,13 @@ export const getColor = (
     }
 
     case "red-yellow-green": {
-
       const value = getSeriesValueFromArray(panelSchema, valuesArr);
 
-      let scale = new Scale(panelSchema?.config?.color?.fixedColor?.map((color: any) => new Color(color)));
+      let scale = new Scale(
+        panelSchema?.config?.color?.fixedColor?.map(
+          (color: any) => new Color(color)
+        )
+      );
 
       scale.setDomain([chartMin ?? 0, chartMax ?? 100]);
 

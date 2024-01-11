@@ -21,7 +21,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
-import { getColor, getMinMaxValue } from "./colorPalette";
+import { getColor, getMetricMinMaxValue } from "./colorPalette";
 
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
@@ -296,7 +296,7 @@ export const convertPromQLData = (
       panelSchema?.config?.color?.mode
     )
   ) {
-    [chartMin, chartMax] = getMinMaxValue(searchQueryData);
+    [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
   }
 
   options.series = searchQueryData.map((it: any, index: number) => {
@@ -635,8 +635,6 @@ export const convertPromQLData = (
     options.grid.right = legendWidth;
     options.legend.textStyle.width = legendWidth - 55;
   }
-
-  console.log("options", JSON.parse(JSON.stringify(options)));
 
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {
