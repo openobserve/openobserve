@@ -191,6 +191,7 @@ import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import { computed } from "vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -271,6 +272,10 @@ export default defineComponent({
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
+
+    const selectedStreamName = computed(
+      () => searchObj.data.stream.selectedStream.value
+    );
 
     function getQueryTransform() {
       try {
@@ -365,8 +370,9 @@ export default defineComponent({
 
     function loadStreamLists() {
       try {
+        const queryParams = router.currentRoute.value.query;
         searchObj.data.stream.streamLists = [];
-        searchObj.data.stream.selectedStream = { label: "", value: "" };
+        searchObj.data.stream.selectedStream = {};
         if (searchObj.data.streamResults.list.length > 0) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -377,7 +383,12 @@ export default defineComponent({
             };
             searchObj.data.stream.streamLists.push(itemObj);
 
-            if (item.stats.doc_time_max >= lastUpdatedStreamTime) {
+            if (queryParams.stream === item.name) {
+              selectedStreamItemObj = itemObj;
+            } else if (
+              !queryParams.stream &&
+              item.stats.doc_time_max >= lastUpdatedStreamTime
+            ) {
               lastUpdatedStreamTime = item.stats.doc_time_max;
               selectedStreamItemObj = itemObj;
             }
@@ -559,7 +570,6 @@ export default defineComponent({
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
         const queryParams = getUrlQueryParams();
-        console.log(queryParams);
         router.push({ query: queryParams });
         return req;
       } catch (e) {
@@ -757,6 +767,7 @@ export default defineComponent({
             filter: filter || "",
             size: queryReq.query.size,
             from: queryReq.query.from,
+            stream_name: selectedStreamName.value,
           })
           .then(async (res) => {
             searchObj.loading = false;
@@ -862,12 +873,21 @@ export default defineComponent({
           const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
-          searchObj.data.streamResults.list.forEach((stream: any) => {
-            if (searchObj.data.stream.selectedStream.value == stream.name) {
-              schema.push(...stream.schema);
-              ftsKeys = new Set([...stream.settings.full_text_search_keys]);
-            }
-          });
+          if (searchObj.data.stream.selectedStream.value === "default2") {
+            searchObj.data.streamResults.list.forEach((stream: any) => {
+              if (searchObj.data.stream.selectedStream.value == stream.name) {
+                schema.slice(0, 15).push(...stream.schema);
+                ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+              }
+            });
+          } else {
+            searchObj.data.streamResults.list.forEach((stream: any) => {
+              if (searchObj.data.stream.selectedStream.value == stream.name) {
+                schema.push(...stream.schema);
+                ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+              }
+            });
+          }
 
           const idFields = {
             trace_id: 1,
@@ -1193,6 +1213,13 @@ export default defineComponent({
       if (queryParams.filter_type) {
         searchObj.meta.filterType = queryParams.filter_type;
       }
+
+      if (queryParams.stream) {
+        searchObj.data.stream.selectedStream = {
+          label: queryParams.stream,
+          value: queryParams.stream,
+        };
+      }
     }
 
     const copyTracesUrl = (customTimeRange = null) => {
@@ -1236,6 +1263,8 @@ export default defineComponent({
     function getUrlQueryParams(getShareLink: false) {
       const date = searchObj.data.datetime;
       const query = {};
+
+      query["stream"] = selectedStreamName.value;
 
       if (date.type == "relative" && !getShareLink) {
         query["period"] = date.relativeTimePeriod;
@@ -1294,7 +1323,7 @@ export default defineComponent({
       // const filters = searchObj.data.stream.filters;
       const parser = new Parser();
 
-      const defaultQuery = "SELECT * FROM 'default' WHERE ";
+      const defaultQuery = `SELECT * FROM ${selectedStreamName.value} WHERE `;
 
       const parsedQuery = parser.astify(defaultQuery + query);
 
@@ -1419,6 +1448,7 @@ export default defineComponent({
           if (oldStream.value) this.setQuery(this.searchObj.meta.sqlMode);
           setTimeout(() => {
             this.runQueryFn();
+            extractFields();
           }, 500);
         }
       },
