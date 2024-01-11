@@ -44,224 +44,402 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div class="space"></div>
-
-    <q-select
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'heatmap' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.config.show_legends
-      "
-      outlined
-      v-model="dashboardPanelData.data.config.legends_position"
-      :options="legendsPositionOptions"
-      dense
-      :label="t('dashboard.legendsPositionLabel')"
-      class="showLabelOnTop"
-      stack-label
-      emit-value
-      :display-value="`${
-        dashboardPanelData.data.config.legends_position ?? 'Auto'
-      }`"
-      data-test="dashboard-config-legend-position"
-    >
-    </q-select>
-
-    <div class="space"></div>
-
-    <div class="input-container">
-      <q-input
+    <div class="o2-input">
+      <q-select
         v-if="
           dashboardPanelData.data.type != 'table' &&
           dashboardPanelData.data.type != 'heatmap' &&
           dashboardPanelData.data.type != 'metric' &&
           dashboardPanelData.data.type != 'gauge' &&
           dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.config.legends_position == 'right'
+          dashboardPanelData.data.config.show_legends
         "
-        v-model.number="legendWidthValue"
-        :label="t('common.legendWidth')"
+        outlined
+        v-model="dashboardPanelData.data.config.legends_position"
+        :options="legendsPositionOptions"
+        dense
+        :label="t('dashboard.legendsPositionLabel')"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.legends_position ?? 'Auto'
+        }`"
+        data-test="dashboard-config-legend-position"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
+      <div class="input-container">
+        <q-input
+          v-if="
+            dashboardPanelData.data.type != 'table' &&
+            dashboardPanelData.data.type != 'heatmap' &&
+            dashboardPanelData.data.type != 'metric' &&
+            dashboardPanelData.data.type != 'gauge' &&
+            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.config.show_legends &&
+            dashboardPanelData.data.config.legends_position == 'right'
+          "
+          v-model.number="legendWidthValue"
+          :label="t('common.legendWidth')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop q-mr-sm"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          data-test="dashboard-config-legend-width"
+        ></q-input>
+        <div
+          class="unit-container"
+          v-if="
+            dashboardPanelData.data.type != 'table' &&
+            dashboardPanelData.data.type != 'heatmap' &&
+            dashboardPanelData.data.type != 'metric' &&
+            dashboardPanelData.data.type != 'gauge' &&
+            dashboardPanelData.data.type != 'geomap' &&
+            dashboardPanelData.data.config.show_legends &&
+            dashboardPanelData.data.config.legends_position == 'right'
+          "
+        >
+          <button
+            @click="setUnit('px')"
+            :class="{
+              active:
+                dashboardPanelData?.data?.config.legend_width?.unit === null ||
+                dashboardPanelData?.data?.config?.legend_width?.unit === 'px',
+            }"
+            style="height: 100%; width: 100%; font-size: 14px"
+            :data-test="`dashboard-config-legend-width-unit-${
+              dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
+                ? 'active'
+                : 'inactive'
+            }`"
+          >
+            px
+          </button>
+          <button
+            @click="setUnit('%')"
+            :class="{
+              active:
+                dashboardPanelData?.data?.config?.legend_width?.unit === '%',
+            }"
+            style="height: 100%; width: 100%; font-size: 14px"
+            :data-test="`dashboard-config-legend-width-unit-${
+              dashboardPanelData?.data?.config?.legend_width?.unit === '%'
+                ? 'active'
+                : 'inactive'
+            }`"
+          >
+            %
+          </button>
+        </div>
+      </div>
+
+      <div class="space"></div>
+
+      <q-select
+        outlined
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'geomap'
+        "
+        v-model="dashboardPanelData.data.config.unit"
+        :options="unitOptions"
+        dense
+        :label="t('dashboard.unitLabel')"
+        class="showLabelOnTop selectedLabel"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.unit
+            ? unitOptions.find(
+                (it) => it.value == dashboardPanelData.data.config.unit
+              )?.label
+            : 'Default'
+        }`"
+        data-test="dashboard-config-unit"
+      >
+      </q-select>
+      <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
+      <q-input
+        v-if="dashboardPanelData.data.config.unit == 'custom'"
+        v-model="dashboardPanelData.data.config.unit_custom"
+        :label="t('dashboard.customunitLabel')"
         color="input-border"
         bg-color="input-bg"
-        class="q-py-md showLabelOnTop q-mr-sm"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        filled
+        dense
+        label-slot
+        data-test="dashboard-config-custom-unit"
+      />
+      <div class="space"></div>
+      <q-input
+        v-if="dashboardPanelData.data.type != 'geomap'"
+        type="number"
+        v-model.number="dashboardPanelData.data.config.decimals"
+        value="2"
+        min="0"
+        max="100"
+        @update:model-value="
+        (value: any) => (dashboardPanelData.data.config.decimals = ( typeof value == 'number' && value >= 0) ? value : 2)
+      "
+        :rules="[
+          (val) =>
+            (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
+        ]"
+        label="Decimals"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        filled
+        dense
+        label-slot
+        data-test="dashboard-config-decimals"
+      />
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="dashboardPanelData.data.type == 'geomap'"
+        outlined
+        v-model="dashboardPanelData.data.config.base_map.type"
+        :options="basemapTypeOptions"
+        dense
+        :label="t('dashboard.basemapLabel')"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="'OpenStreetMap'"
+        data-test="dashboard-config-basemap"
+      >
+      </q-select>
+
+      <div class="space"></div>
+      <div v-if="dashboardPanelData.data.type == 'geomap'">
+        <span>Initial View:</span>
+        <div class="row">
+          <q-input
+            v-model.number="dashboardPanelData.data.config.map_view.lat"
+            :label="t('dashboard.lattitudeLabel')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-6 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            label-slot
+            :type="'number'"
+            data-test="dashboard-config-lattitude"
+          >
+          </q-input>
+          <q-input
+            v-model.number="dashboardPanelData.data.config.map_view.lng"
+            :label="t('dashboard.longitudeLabel')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-6 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            label-slot
+            :type="'number'"
+            data-test="dashboard-config-longitude"
+          >
+          </q-input>
+        </div>
+        <q-input
+          v-model.number="dashboardPanelData.data.config.map_view.zoom"
+          :label="t('dashboard.zoomLabel')"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          data-test="dashboard-config-zoom"
+        >
+        </q-input>
+      </div>
+
+      <div class="space"></div>
+
+      <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
+      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
+      <div
+        v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
+        class="q-py-md showLabelOnTop"
+      >
+        Query
+        <q-tabs
+          v-model="dashboardPanelData.layout.currentQueryIndex"
+          narrow-indicator
+          dense
+          inline-label
+          outside-arrows
+          mobile-arrows
+          data-test="dashboard-config-query-tab"
+        >
+          <q-tab
+            no-caps
+            v-for="(tab, index) in dashboardPanelData.data.queries"
+            :key="index"
+            :name="index"
+            :label="'Query ' + (index + 1)"
+            :data-test="`dashboard-config-query-tab-${index}`"
+          >
+          </q-tab>
+        </q-tabs>
+      </div>
+      <!-- </q-input> -->
+      <div class="space"></div>
+
+      <!-- for auto sql query limit -->
+      <!-- it should not be promql and custom query -->
+      <q-input
+        v-if="
+          !promqlMode &&
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        "
+        v-model.number="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.limit
+        "
+        :value="0"
+        :min="0"
+        @update:model-value="
+          (value) =>
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].config.limit = value ? value : 0)
+        "
+        label="Limit"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-sm showLabelOnTop"
         stack-label
         outlined
         filled
         dense
         label-slot
+        placeholder="0"
         :type="'number'"
-        placeholder="Auto"
-        data-test="dashboard-config-legend-width"
-      ></q-input>
-      <div
-        class="unit-container"
-        v-if="
-          dashboardPanelData.data.type != 'table' &&
-          dashboardPanelData.data.type != 'heatmap' &&
-          dashboardPanelData.data.type != 'metric' &&
-          dashboardPanelData.data.type != 'gauge' &&
-          dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends &&
-          dashboardPanelData.data.config.legends_position == 'right'
-        "
+        data-test="dashboard-config-limit"
       >
-        <button
-          @click="setUnit('px')"
-          :class="{
-            active:
-              dashboardPanelData?.data?.config.legend_width?.unit === null ||
-              dashboardPanelData?.data?.config?.legend_width?.unit === 'px',
-          }"
-          style="height: 100%; width: 100%; font-size: 14px"
-          :data-test="`dashboard-config-legend-width-unit-${
-            dashboardPanelData?.data?.config?.legend_width?.unit === 'px'
-              ? 'active'
-              : 'inactive'
-          }`"
-        >
-          px
-        </button>
-        <button
-          @click="setUnit('%')"
-          :class="{
-            active:
-              dashboardPanelData?.data?.config?.legend_width?.unit === '%',
-          }"
-          style="height: 100%; width: 100%; font-size: 14px"
-          :data-test="`dashboard-config-legend-width-unit-${
-            dashboardPanelData?.data?.config?.legend_width?.unit === '%'
-              ? 'active'
-              : 'inactive'
-          }`"
-        >
-          %
-        </button>
-      </div>
-    </div>
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            Query Limit
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-limit-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+              >
+                Limit for the query result
+              </q-tooltip>
+            </div>
+          </div>
+        </template>
+      </q-input>
 
-    <div class="space"></div>
-
-    <q-select
-      outlined
-      v-if="
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'geomap'
-      "
-      v-model="dashboardPanelData.data.config.unit"
-      :options="unitOptions"
-      dense
-      :label="t('dashboard.unitLabel')"
-      class="showLabelOnTop selectedLabel"
-      stack-label
-      emit-value
-      :display-value="`${
-        dashboardPanelData.data.config.unit
-          ? unitOptions.find(
-              (it) => it.value == dashboardPanelData.data.config.unit
-            )?.label
-          : 'Default'
-      }`"
-      data-test="dashboard-config-unit"
-    >
-    </q-select>
-    <!-- :rules="[(val: any) => !!val || 'Field is required!']" -->
-    <q-input
-      v-if="dashboardPanelData.data.config.unit == 'custom'"
-      v-model="dashboardPanelData.data.config.unit_custom"
-      :label="t('dashboard.customunitLabel')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      filled
-      dense
-      label-slot
-      data-test="dashboard-config-custom-unit"
-    />
-
-    <q-input
-      v-if="dashboardPanelData.data.type != 'geomap'"
-      type="number"
-      v-model.number="dashboardPanelData.data.config.decimals"
-      value="2"
-      min="0"
-      max="100"
-      @update:model-value="
-        (value: any) => (dashboardPanelData.data.config.decimals = ( typeof value == 'number' && value >= 0) ? value : 2)
-      "
-      :rules="[
-        (val) =>
-          (val >= 0 && val <= 100) || 'Decimals must be between 0 and 100',
-      ]"
-      label="Decimals"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      filled
-      dense
-      label-slot
-      data-test="dashboard-config-decimals"
-    />
-
-    <div class="space"></div>
-
-    <q-select
-      v-if="dashboardPanelData.data.type == 'geomap'"
-      outlined
-      v-model="dashboardPanelData.data.config.base_map.type"
-      :options="basemapTypeOptions"
-      dense
-      :label="t('dashboard.basemapLabel')"
-      class="showLabelOnTop"
-      stack-label
-      emit-value
-      :display-value="'OpenStreetMap'"
-      data-test="dashboard-config-basemap"
-    >
-    </q-select>
-
-    <div class="space"></div>
-    <div v-if="dashboardPanelData.data.type == 'geomap'">
-      <span>Initial View:</span>
-      <div class="row">
-        <q-input
-          v-model.number="dashboardPanelData.data.config.map_view.lat"
-          :label="t('dashboard.lattitudeLabel')"
-          color="input-border"
-          bg-color="input-bg"
-          class="col-6 q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          label-slot
-          :type="'number'"
-          data-test="dashboard-config-lattitude"
-        >
-        </q-input>
-        <q-input
-          v-model.number="dashboardPanelData.data.config.map_view.lng"
-          :label="t('dashboard.longitudeLabel')"
-          color="input-border"
-          bg-color="input-bg"
-          class="col-6 q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          label-slot
-          :type="'number'"
-          data-test="dashboard-config-longitude"
-        >
-        </q-input>
-      </div>
       <q-input
-        v-model.number="dashboardPanelData.data.config.map_view.zoom"
-        :label="t('dashboard.zoomLabel')"
+        v-if="promqlMode"
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.promql_legend
+        "
+        :label="t('common.legend')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        data-test="dashboard-config-promql-legend"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.legendLabel") }}
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-promql-legend-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+              >
+                {{ t("dashboard.overrideMessage") }}
+              </q-tooltip>
+            </div>
+          </div>
+        </template>
+      </q-input>
+
+      <div class="space"></div>
+
+      <q-select
+        v-if="dashboardPanelData.data.type == 'geomap'"
+        outlined
+        v-model="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.layer_type
+        "
+        :options="layerTypeOptions"
+        dense
+        :label="t('dashboard.layerType')"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.layer_type
+        }`"
+        data-test="dashboard-config-layer-type"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
+      <q-input
+        v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent"
+        v-model.number="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.weight_fixed
+        "
+        :label="t('common.weight')"
         color="input-border"
         bg-color="input-bg"
         class="q-py-md showLabelOnTop"
@@ -271,295 +449,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         label-slot
         :type="'number'"
-        data-test="dashboard-config-zoom"
+        data-test="dashboard-config-weight"
       >
       </q-input>
-    </div>
 
-    <div class="space"></div>
-
-    <!-- <q-input v-if="promqlMode" v-model="dashboardPanelData.data.config.promql_legend" label="Legend" color="input-border"
-      bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense label-slot> -->
-    <div
-      v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
-      class="q-py-md showLabelOnTop"
-    >
-      Query
-      <q-tabs
-        v-model="dashboardPanelData.layout.currentQueryIndex"
-        narrow-indicator
+      <q-input
+        v-if="dashboardPanelData.data.type === 'gauge'"
+        v-model.number="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.min
+        "
+        :value="0"
+        @update:model-value="
+          (value) =>
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].config.min = value ? value : 0)
+        "
+        label="Gauge Min Value"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
         dense
-        inline-label
-        outside-arrows
-        mobile-arrows
-        data-test="dashboard-config-query-tab"
+        label-slot
+        :type="'number'"
+        data-test="dashboard-config-gauge-min"
       >
-        <q-tab
-          no-caps
-          v-for="(tab, index) in dashboardPanelData.data.queries"
-          :key="index"
-          :name="index"
-          :label="'Query ' + (index + 1)"
-          :data-test="`dashboard-config-query-tab-${index}`"
-        >
-        </q-tab>
-      </q-tabs>
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">Gauge Min Value</div>
+        </template>
+      </q-input>
+      <q-input
+        v-if="dashboardPanelData.data.type === 'gauge'"
+        v-model.number="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.max
+        "
+        :value="100"
+        @update:model-value="
+          (value) =>
+            (dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].config.max = value ? value : 100)
+        "
+        label="Gauge Max Value"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        placeholder="100"
+        :type="'number'"
+        data-test="dashboard-config-gauge-max"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">Gauge Max Value</div>
+        </template>
+      </q-input>
+
+      <q-input
+        v-if="
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut'
+        "
+        v-model.number="dashboardPanelData.data.config.axis_width"
+        :label="t('common.axisWidth')"
+        color="input-border"
+        bg-color="input-bg"
+        class="q-py-md showLabelOnTop"
+        stack-label
+        outlined
+        filled
+        dense
+        label-slot
+        :type="'number'"
+        placeholder="Auto"
+        @update:model-value="
+          (value) =>
+            (dashboardPanelData.data.config.axis_width =
+              value !== '' ? value : null)
+        "
+        data-test="dashboard-config-axis-width"
+      >
+      </q-input>
+
+      <div class="space"></div>
+
+      <q-toggle
+        v-if="
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'pie' &&
+          dashboardPanelData.data.type != 'donut'
+        "
+        v-model="dashboardPanelData.data.config.axis_border_show"
+        :label="t('dashboard.showBorder')"
+        data-test="dashboard-config-axis-border"
+      />
     </div>
-    <!-- </q-input> -->
-    <div class="space"></div>
-
-    <!-- for auto sql query limit -->
-    <!-- it should not be promql and custom query -->
-    <q-input
-      v-if="
-        !promqlMode &&
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-      "
-      v-model.number="
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.limit
-      "
-      :value="0"
-      :min="0"
-      @update:model-value="
-        (value) =>
-          (dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].config.limit = value ? value : 0)
-      "
-      label="Limit"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-sm showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      placeholder="0"
-      :type="'number'"
-      data-test="dashboard-config-limit"
-    >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          Query Limit
-          <div>
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-limit-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              Limit for the query result
-            </q-tooltip>
-          </div>
-        </div>
-      </template>
-    </q-input>
-
-    <q-input
-      v-if="promqlMode"
-      v-model="
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.promql_legend
-      "
-      :label="t('common.legend')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      data-test="dashboard-config-promql-legend"
-    >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          {{ t("dashboard.legendLabel") }}
-          <div>
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-promql-legend-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              {{ t("dashboard.overrideMessage") }}
-            </q-tooltip>
-          </div>
-        </div>
-      </template>
-    </q-input>
-
-    <div class="space"></div>
-
-    <q-select
-      v-if="dashboardPanelData.data.type == 'geomap'"
-      outlined
-      v-model="
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.layer_type
-      "
-      :options="layerTypeOptions"
-      dense
-      :label="t('dashboard.layerType')"
-      class="showLabelOnTop"
-      stack-label
-      emit-value
-      :display-value="`${
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.layer_type
-      }`"
-      data-test="dashboard-config-layer-type"
-    >
-    </q-select>
-
-    <div class="space"></div>
-
-    <q-input
-      v-if="dashboardPanelData.data.type == 'geomap' && !isWeightFieldPresent"
-      v-model.number="
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.weight_fixed
-      "
-      :label="t('common.weight')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      :type="'number'"
-      data-test="dashboard-config-weight"
-    >
-    </q-input>
-
-    <q-input
-      v-if="dashboardPanelData.data.type === 'gauge'"
-      v-model.number="
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.min
-      "
-      :value="0"
-      @update:model-value="
-        (value) =>
-          (dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].config.min = value ? value : 0)
-      "
-      label="Gauge Min Value"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      :type="'number'"
-      data-test="dashboard-config-gauge-min"
-    >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">Gauge Min Value</div>
-      </template>
-    </q-input>
-    <q-input
-      v-if="dashboardPanelData.data.type === 'gauge'"
-      v-model.number="
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.max
-      "
-      :value="100"
-      @update:model-value="
-        (value) =>
-          (dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].config.max = value ? value : 100)
-      "
-      label="Gauge Max Value"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      placeholder="100"
-      :type="'number'"
-      data-test="dashboard-config-gauge-max"
-    >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">Gauge Max Value</div>
-      </template>
-    </q-input>
-
-    <q-input
-      v-if="
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'pie' &&
-        dashboardPanelData.data.type != 'donut'
-      "
-      v-model.number="dashboardPanelData.data.config.axis_width"
-      :label="t('common.axisWidth')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      :type="'number'"
-      placeholder="Auto"
-      @update:model-value="
-        (value) =>
-          (dashboardPanelData.data.config.axis_width =
-            value !== '' ? value : null)
-      "
-      data-test="dashboard-config-axis-width"
-    >
-    </q-input>
-
-    <div class="space"></div>
-
-    <q-toggle
-      v-if="
-        dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'metric' &&
-        dashboardPanelData.data.type != 'geomap' &&
-        dashboardPanelData.data.type != 'table' &&
-        dashboardPanelData.data.type != 'pie' &&
-        dashboardPanelData.data.type != 'donut'
-      "
-      v-model="dashboardPanelData.data.config.axis_border_show"
-      :label="t('dashboard.showBorder')"
-      data-test="dashboard-config-axis-border"
-    />
   </div>
 </template>
 
@@ -766,8 +767,8 @@ export default defineComponent({
 }
 .unit-container {
   display: flex;
-  height: 40px;
-  margin-top: 15px;
+  height: 36px;
+  margin-top: 9px;
   width: 100px;
 }
 </style>
