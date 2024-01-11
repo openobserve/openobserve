@@ -32,7 +32,6 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("template_name" = String, Path, description = "Template name"),
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
     responses(

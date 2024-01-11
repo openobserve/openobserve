@@ -32,7 +32,6 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("destination_name" = String, Path, description = "Destination name"),
       ),
     request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
     responses(

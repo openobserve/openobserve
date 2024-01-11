@@ -158,7 +158,7 @@ impl FromRequest for AuthExtractor {
                     method = "LIST".to_string();
                 };
 
-                format!("org:##replace_user_id##")
+                format!("org:##user_id##")
             } else {
                 path_columns[0].to_string()
             }

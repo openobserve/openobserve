@@ -393,8 +393,8 @@ pub async fn oo_validator(
 #[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
     let object_str = auth_info.o2_type;
-    let obj_str = if object_str.contains("##replace_user_id##") {
-        object_str.replace("##replace_user_id##", user_id)
+    let obj_str = if object_str.contains("##user_id##") {
+        object_str.replace("##user_id##", user_id)
     } else {
         object_str
     };
