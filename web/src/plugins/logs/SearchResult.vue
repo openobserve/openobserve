@@ -111,8 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           wordBreak: 'break-word',
           height:
             !searchObj.meta.showHistogram || searchObj.meta.sqlMode
-              ? 'calc(100% - 0px)'
-              : 'calc(100% - 120px)',
+              ? 'calc(100% - 40px)'
+              : 'calc(100% - 140px)',
         }"
       >
         <template v-slot:before>
