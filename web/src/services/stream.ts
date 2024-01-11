@@ -33,7 +33,7 @@ const stream = {
   },
 
   schema: (org_identifier: string, stream_name: string, type: string) => {
-    let url = `/api/${org_identifier}/${stream_name}/schema`;
+    let url = `/api/${org_identifier}/streams/${stream_name}/schema`;
 
     if (type != "") {
       url += "?type=" + type;
@@ -47,12 +47,12 @@ const stream = {
     type: string,
     data: any
   ) => {
-    let url = `/api/${org_identifier}/${stream_name}/settings`;
+    let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {
       url += "?type=" + type;
     }
-    return http().post(url, data);
+    return http().put(url, data);
   },
 
   fieldValues: ({
@@ -112,12 +112,12 @@ const stream = {
     stream_type: string
   ) => {
     return http().delete(
-      `/api/${org_identifier}/${stream_name}?type=${stream_type}`
+      `/api/${org_identifier}/streams/${stream_name}?type=${stream_type}`
     );
   },
 
   deleteFields: (org_identifier: string, stream_name: string, fields: []) => {
-    return http().post(`/api/${org_identifier}/${stream_name}/delete_fields`, {
+    return http().put(`/api/${org_identifier}/streams/${stream_name}/delete_fields`, {
       fields,
     });
   },

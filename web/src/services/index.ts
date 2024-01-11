@@ -45,12 +45,12 @@ var index = {
     type: string,
     data: any
   ) => {
-    let url = `/api/${org_identifier}/${stream_name}/settings`;
+    let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {
       url += "?type=" + type;
     }
-    return http().post(url, data);
+    return http().put(url, data);
   },
 };
 
