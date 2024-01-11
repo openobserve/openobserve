@@ -172,26 +172,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :query="previewQuery" :aggregationEnabled="isAggregationEnabled" />
         </div>
 
-        <div>
-          <q-input data-test="add-alert-description-input" v-model="formData.description" :label="t('alerts.description')"
-            color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense tabindex="0"
-            style="width: 550px" />
-        </div>
+              <q-input data-test="add-alert-row-input" v-model="formData.row_template" :label="t('alerts.row')"
+                color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense
+                tabindex="0" style="width: 550px" />
+            </div>
 
-        <div>
-          <q-input data-test="add-alert-row-input" v-model="formData.row_template" :label="t('alerts.row')"
-            color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense tabindex="0"
-            style="width: 550px" />
+            <div class="flex justify-start q-mt-lg">
+              <q-btn data-test="add-alert-cancel-btn" v-close-popup="true" class="q-mb-md text-bold"
+                :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps
+                @click="$emit('cancel:hideform')" />
+              <q-btn data-test="add-alert-submit-btn" :label="t('alerts.save')"
+                class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl" type="submit" no-caps />
+            </div>
+          </q-form>
         </div>
-
-        <div class="flex justify-start q-mt-lg">
-          <q-btn data-test="add-alert-cancel-btn" v-close-popup="true" class="q-mb-md text-bold"
-            :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps
-            @click="$emit('cancel:hideform')" />
-          <q-btn data-test="add-alert-submit-btn" :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary" padding="sm xl" type="submit" no-caps />
+        <div style="width: 400px; height: 200px; position: sticky; top: 0" class="q-mb-lg q-px-md">
+          <div class="text-bold q-pb-xs text-grey-9">Preview</div>
+          <preview-alert style="border: 1px solid #ececec" ref="previewAlertRef" :formData="formData"
+            :query="previewQuery" :aggregationEnabled="isAggregationEnabled" />
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
 </template>
