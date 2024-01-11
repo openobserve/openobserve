@@ -24,15 +24,20 @@ use config::CONFIG;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, dex::service::auth::get_jwks};
 
+use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::jwt;
+#[cfg(feature = "enterprise")]
+use crate::service::{db, users};
 
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
     req: ServiceRequest,
-    token: &str,
+    auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    use crate::service::{db, users};
+    use actix_web::error::ErrorForbidden;
+
+    use super::validator::check_permissions;
 
     let user;
     let keys = get_jwks().await;
@@ -47,7 +52,7 @@ pub async fn token_validator(
     let path_columns = path.split('/').collect::<Vec<&str>>();
 
     match jwt::verify_decode_token(
-        token.strip_prefix("Bearer").unwrap().trim(),
+        auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &O2_CONFIG.dex.client_id,
         false,
@@ -94,7 +99,11 @@ pub async fn token_validator(
                         header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                     );
 
-                    Ok(req)
+                    if auth_info.is_ingestion_ep || check_permissions(user_id, auth_info).await {
+                        Ok(req)
+                    } else {
+                        Err((ErrorForbidden("Unauthorized Access"), req))
+                    }
                 } else {
                     Err((ErrorUnauthorized("Unauthorized Access"), req))
                 }
@@ -109,7 +118,7 @@ pub async fn token_validator(
 #[cfg(not(feature = "enterprise"))]
 pub async fn token_validator(
     req: ServiceRequest,
-    _token: &str,
+    _token: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     use actix_web::error::ErrorForbidden;
 

@@ -60,15 +60,17 @@ pub async fn set(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    name: &str,
-    alert: Alert,
+    alert: &Alert,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
+    let key = format!(
+        "/alerts/{org_id}/{stream_type}/{stream_name}/{}",
+        alert.name
+    );
     if let Err(e) = db
         .put(
             &key,
-            json::to_vec(&alert).unwrap().into(),
+            json::to_vec(alert).unwrap().into(),
             infra_db::NEED_WATCH,
         )
         .await

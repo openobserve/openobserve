@@ -39,6 +39,44 @@ pub mod templates;
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
+      ),
+    request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/{stream_name}/alerts")]
+pub async fn save_alert(
+    path: web::Path<(String, String)>,
+    alert: web::Json<Alert>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+    match alerts::save(&org_id, stream_type, &stream_name, "", alert.into_inner()).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+/// UpdateAlert
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "UpdateAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
         ("alert_name" = String, Path, description = "Alert name"),
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
@@ -47,8 +85,8 @@ pub mod templates;
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/{stream_name}/alerts/{alert_name}")]
-pub async fn save_alert(
+#[put("/{org_id}/{stream_name}/alerts/{alert_name}")]
+pub async fn update_alert(
     path: web::Path<(String, String, String)>,
     alert: web::Json<Alert>,
     req: HttpRequest,
@@ -63,7 +101,7 @@ pub async fn save_alert(
     };
     let name = name.trim();
     match alerts::save(&org_id, stream_type, &stream_name, name, alert.into_inner()).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

@@ -15,11 +15,15 @@
 
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+#[cfg(feature = "enterprise")]
+use config::CONFIG;
 use futures::future::{ready, Ready};
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::ingestion::INGESTION_EP;
 use crate::common::{
     infra::config::{PASSWORD_HASH, USERS},
-    meta::{organization::DEFAULT_ORG, user::UserRole},
+    meta::{authz::Authz, organization::DEFAULT_ORG, user::UserRole},
 };
 
 pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
@@ -52,6 +56,38 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
     }
 }
 
+#[cfg(feature = "enterprise")]
+pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
+    use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap(), obj.obj_id);
+
+    authorizer::set_ownership(
+        org_id,
+        &obj_str,
+        &obj.parent,
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap_or(&""),
+    )
+    .await;
+}
+#[cfg(not(feature = "enterprise"))]
+pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
+
+#[cfg(feature = "enterprise")]
+pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
+    use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap(), obj.obj_id);
+    authorizer::remove_ownership(
+        org_id,
+        &obj_str,
+        &obj.parent,
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap_or(&""),
+    )
+    .await;
+}
+#[cfg(not(feature = "enterprise"))]
+pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
+
 pub struct UserEmail {
     pub user_id: String,
 }
@@ -72,26 +108,114 @@ impl FromRequest for UserEmail {
     }
 }
 
+#[derive(Debug)]
 pub struct AuthExtractor {
     pub auth: String,
+    pub method: String,
+    pub o2_type: String,
+    pub org_id: String,
+    pub is_ingestion_ep: bool,
 }
 
 impl FromRequest for AuthExtractor {
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
 
+    #[cfg(feature = "enterprise")]
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        let mut method = req.method().to_string();
+        let local_path = req.path().to_string();
+        let path =
+            match local_path.strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str()) {
+                Some(path) => path,
+                None => &local_path,
+            };
+
+        let path_columns = path.split('/').collect::<Vec<&str>>();
+        let url_len = path_columns.len();
+        let org_id = path_columns[0].to_string();
+
+        if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
+            if let Some(auth_header) = req.headers().get("Authorization") {
+                if let Ok(auth_str) = auth_header.to_str() {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method,
+                        o2_type: format!("stream:{org_id}"),
+                        org_id,
+                        is_ingestion_ep: true,
+                    }));
+                }
+            }
+            return ready(Err(actix_web::error::ErrorUnauthorized(
+                "Unauthorized Access",
+            )));
+        }
+        println!("path {} & len {}", path, url_len);
+        let object_type = if url_len == 1 {
+            if method.eq("GET") && path_columns[0].eq("organizations") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                };
+
+                "org:##user_id##".to_string()
+            } else {
+                path_columns[0].to_string()
+            }
+        } else if url_len == 2 {
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 1])
+                    .unwrap_or(&path_columns[url_len - 1]),
+                path_columns[url_len - 2]
+            )
+        } else if method.eq("PUT") || method.eq("DELETE") {
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 2])
+                    .unwrap_or(&path_columns[url_len - 2]),
+                path_columns[url_len - 1]
+            )
+        } else {
+            format!(
+                "{}:{}",
+                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                    .get(path_columns[url_len - 1])
+                    .unwrap_or(&path_columns[url_len - 1]),
+                path_columns[url_len - 3]
+            )
+        };
+
+        if let Some(auth_header) = req.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: object_type,
+                    org_id,
+                    is_ingestion_ep: false,
+                }));
+            }
+        }
+        ready(Err(actix_web::error::ErrorUnauthorized(
+            "Unauthorized Access",
+        )))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    is_ingestion_ep: true, // bypass check permissions
                 }));
             }
-        } else if let Some(cookie) = req.cookie("access_token") {
-            let access_token = cookie.value().to_string();
-            return ready(Ok(AuthExtractor {
-                auth: format!("Bearer {}", access_token),
-            }));
         }
         ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
