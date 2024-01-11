@@ -117,15 +117,21 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  selectedTab: {
+    type: String,
+    default: "",
+  },
 });
 
 onBeforeMount(() => {
   dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
   dashboardPanelData.data.type = "line";
-  dashboardPanelData.data.queryType = "sql";
+  dashboardPanelData.data.queryType =
+    props.selectedTab === "promql" ? "promql" : "sql";
   dashboardPanelData.data.queries[0].query = props.query;
-  dashboardPanelData.data.queries[0].fields.stream = "segment";
-  dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+  dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+  dashboardPanelData.data.queries[0].fields.stream_type =
+    props.formData.stream_type;
   dashboardPanelData.data.queries[0].customQuery = true;
 });
 
@@ -185,6 +191,11 @@ const refreshData = () => {
   dashboardPanelData.data.queries[0].fields.y = yAxis;
 
   dashboardPanelData.data.queries[0].query = props.query;
+  dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
+  dashboardPanelData.data.queries[0].fields.stream_type =
+    props.formData.stream_type;
+  dashboardPanelData.data.queryType =
+    props.selectedTab === "promql" ? "promql" : "sql";
 
   chartData.value = cloneDeep(dashboardPanelData.data);
 };

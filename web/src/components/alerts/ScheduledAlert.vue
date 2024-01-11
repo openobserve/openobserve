@@ -12,6 +12,11 @@
       >
         <q-tab name="custom" :label="t('alerts.custom')" />
         <q-tab name="sql" :label="t('alerts.sql')" />
+        <q-tab
+          v-if="alertData.stream_type === 'metrics'"
+          name="promql"
+          :label="t('alerts.promql')"
+        />
       </q-tabs>
     </div>
     <template v-if="tab === 'custom'">
@@ -25,25 +30,85 @@
       />
     </template>
     <template v-else>
-      <div class="text-bold q-mr-sm q-my-sm">SQL</div>
-      <query-editor
-        ref="queryEditorRef"
-        editor-id="alerts-query-editor"
-        class="monaco-editor q-mb-md"
-        v-model:query="query"
-        @update:query="updateQueryValue"
-      />
+      <div class="text-bold q-mr-sm q-my-sm">
+        {{ tab === "promql" ? "Promql" : "SQL" }}
+      </div>
+      <template v-if="tab === 'sql'">
+        <query-editor
+          ref="queryEditorRef"
+          editor-id="alerts-query-editor"
+          class="monaco-editor q-mb-md"
+          v-model:query="query"
+          @update:query="updateQueryValue"
+        />
+      </template>
+      <template v-if="tab === 'promql'">
+        <query-editor
+          ref="queryEditorRef"
+          editor-id="alerts-query-editor"
+          class="monaco-editor q-mb-md"
+          v-model:query="promqlQuery"
+          @update:query="updateQueryValue"
+        />
+      </template>
     </template>
 
     <div class="q-mt-sm">
-      <div class="flex justify-start items-center text-bold q-mb-lg">
+      <div
+        v-if="
+          alertData.stream_type === 'metrics' &&
+          tab === 'promql' &&
+          promqlCondition
+        "
+        class="flex justify-start items-center text-bold q-mb-lg o2-input"
+      >
+        <div style="width: 180px">Trigger if the value is</div>
+        <div class="flex justify-start items-center">
+          <q-select
+            data-test="add-alert-stream-select"
+            v-model="promqlCondition.operator"
+            :options="triggerOperators"
+            color="input-border"
+            bg-color="input-bg"
+            class="no-case q-py-none q-mr-xs"
+            filled
+            borderless
+            dense
+            use-input
+            hide-selected
+            fill-input
+            style="width: 88px; border-right: none"
+            @update:model-value="updatePromqlCondition"
+          />
+          <div
+            style="width: 160px; margin-left: 0 !important"
+            class="silence-notification-input o2-input"
+          >
+            <q-input
+              data-test="add-alert-delay-input"
+              v-model="promqlCondition.value"
+              type="number"
+              dense
+              filled
+              min="0"
+              style="background: none"
+              placeholder="Value"
+              @update:model-value="updatePromqlCondition"
+            />
+          </div>
+        </div>
+      </div>
+      <div
+        v-if="tab === 'custom'"
+        class="flex justify-start items-center text-bold q-mb-lg"
+      >
         <div style="width: 172px">Aggregation</div>
         <q-toggle
           v-model="_isAggregationEnabled"
           size="sm"
           color="primary"
           class="text-bold q-pl-0"
-          :disable="tab === 'sql'"
+          :disable="tab === 'sql' || tab === 'promql'"
           @update:model-value="updateAggregation"
         />
       </div>
@@ -341,6 +406,9 @@ const props = defineProps([
   "query_type",
   "aggregation",
   "isAggregationEnabled",
+  "alertData",
+  "promql",
+  "promql_condition",
 ]);
 
 const emits = defineEmits([
@@ -352,6 +420,8 @@ const emits = defineEmits([
   "update:aggregation",
   "update:isAggregationEnabled",
   "input:update",
+  "update:promql",
+  "update:promql_condition",
 ]);
 
 const { t } = useI18n();
@@ -360,13 +430,19 @@ const triggerData = ref(props.trigger);
 
 const query = ref(props.sql);
 
+const promqlQuery = ref(props.promql);
+
 const tab = ref(props.query_type || "custom");
 
 const store = useStore();
 
 const aggFunctions = ["avg", "max", "min", "count"];
 
-const _isAggregationEnabled = ref(props.isAggregationEnabled);
+const _isAggregationEnabled = ref(
+  tab.value === "custom" && props.isAggregationEnabled
+);
+
+const promqlCondition = ref(props.promql_condition);
 
 const aggregationData = ref(props.aggregation);
 
@@ -383,15 +459,6 @@ const getNumericColumns = computed(() => {
 
 const filteredNumericColumns = ref(getNumericColumns.value);
 
-watch(
-  () => props.isAggregationEnabled,
-  (val) => {
-    if (val) {
-      _isAggregationEnabled.value = val;
-    }
-  }
-);
-
 const addField = () => {
   emits("field:add");
 };
@@ -404,8 +471,11 @@ const removeField = (field: any) => {
 
 const updateQueryValue = (value: string) => {
   query.value = value;
-  emits("update:sql", value);
-  emits("input:update", "sql", value);
+
+  if (tab.value === "sql") emits("update:sql", value);
+  if (tab.value === "promql") emits("update:promql", value);
+
+  emits("input:update", "query", value);
 };
 
 const updateTrigger = () => {
@@ -414,14 +484,37 @@ const updateTrigger = () => {
 };
 
 const updateTab = () => {
-  _isAggregationEnabled.value = false;
+  updateQuery();
+  updateAggregationToggle();
   emits("update:query_type", tab.value);
   emits("input:update", "query_type", tab.value);
 };
 
-defineExpose({
-  tab,
-});
+const getDefaultPromqlCondition = () => {
+  return {
+    column: "value",
+    operator: ">=",
+    value: 80,
+  };
+};
+
+const updateQuery = () => {
+  if (tab.value === "promql") {
+    const condition = !props.promql_condition
+      ? getDefaultPromqlCondition()
+      : props.promql_condition;
+    promqlCondition.value = condition;
+    emits("update:promql_condition", condition);
+    promqlQuery.value = props.promql;
+  }
+
+  if (tab.value === "sql") query.value = props.sql;
+};
+
+const updatePromqlCondition = () => {
+  emits("update:promql_condition", promqlCondition.value);
+  emits("input:update", "promql_condition", promqlCondition.value);
+};
 
 const addGroupByColumn = () => {
   const aggregationDataCopy = { ...aggregationData.value };
@@ -481,12 +574,20 @@ const filterNumericColumns = (val: string, update: Function) => {
     );
   });
 };
+
+const updateAggregationToggle = () => {
+  _isAggregationEnabled.value =
+    tab.value === "custom" && props.isAggregationEnabled;
+};
+defineExpose({
+  tab,
+});
 </script>
 
 <style lang="scss" scoped>
 .scheduled-alert-tabs {
   border: 1px solid $primary;
-  width: 210px;
+  width: 300px;
   border-radius: 4px;
   overflow: hidden;
 }
