@@ -187,7 +187,6 @@ const useLogs = () => {
     };
     searchObj.data.query = "";
     searchObj.meta.sqlMode = false;
-    searchObj.runQuery = false;
   };
 
   const updatedLocalLogFilterField = (): void => {
