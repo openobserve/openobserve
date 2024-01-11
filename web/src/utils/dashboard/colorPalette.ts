@@ -92,7 +92,7 @@ export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
   // need min and max value for color
   let min = Infinity;
   let max = -Infinity;
-  
+
   searchQueryData[0]?.forEach((data: any) => {
     yaxiskeys?.forEach((key: any) => {
       if (data[key] !== undefined && !isNaN(data[key]) && data[key] !== null) {
@@ -229,20 +229,14 @@ export const getColor = (
         : "#53ca53";
     }
     case "shades": {
-      console.log(
-        "shades",
-        valuesArr,
-        chartMin,
-        chartMax,
-        panelSchema?.config?.color
-      );
-
       // based on selected color pass different shades of same color
       return shadeColor(
         panelSchema?.config?.color?.fixedColor
           ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53"
           : "#53ca53",
-          getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50,
+        panelSchema.queryType == "promql"
+          ? getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50
+          : getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
         chartMin ?? 0,
         chartMax ?? 100
       );
@@ -255,9 +249,10 @@ export const getColor = (
     }
 
     case "green-yellow-red": {
-      
-      const value = getSeriesValueFrom2DArray(panelSchema, valuesArr);
-      console.log("green-yellow-red",valuesArr, value);
+      const value =
+        panelSchema?.queryType == "promql"
+          ? getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50
+          : getSeriesValueFromArray(panelSchema, valuesArr) ?? 50;
 
       let scale = new Scale(
         panelSchema?.config?.color?.fixedColor?.map(
@@ -271,7 +266,10 @@ export const getColor = (
     }
 
     case "red-yellow-green": {
-      const value = getSeriesValueFrom2DArray(panelSchema, valuesArr);
+      const value =
+        panelSchema?.queryType == "promql"
+          ? getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50
+          : getSeriesValueFromArray(panelSchema, valuesArr) ?? 50;
 
       let scale = new Scale(
         panelSchema?.config?.color?.fixedColor?.map(

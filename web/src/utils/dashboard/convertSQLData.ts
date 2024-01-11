@@ -486,17 +486,15 @@ export const convertSQLData = (
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == yAxis
             ).label;
-
-            const values = Array.from(
-              new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-            ).map(
-              (it: any) =>
-                searchQueryData[0].find(
-                  (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-                )?.[yAxis] || 0
-            );
-
             return stackedXAxisUniqueValue?.map((key: any) => {
+              const values = Array.from(
+                new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+              ).map(
+                (it: any) =>
+                  searchQueryData[0].find(
+                    (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+                  )?.[yAxis] || 0
+              );
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
@@ -508,7 +506,7 @@ export const convertSQLData = (
                     panelSchema,
                     yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                     values,
-                    chartMin,
+                    0,
                     chartMax
                   ),
                 },
@@ -629,16 +627,28 @@ export const convertSQLData = (
     }
     case "bar": {
       options.series = yAxisKeys?.map((key: any) => {
+        const values = getAxisDataFromKey(key);
+        const name = panelSchema?.queries[0]?.fields?.y.find(
+          (it: any) => it.alias == key
+        )?.label;
+        
         const seriesObj = {
-          name: panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+          name,
+          // color:
+          //   panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+          //     ?.color || "#5960b2",
           opacity: 0.8,
           ...getPropsByChartTypeForSeries(panelSchema.type),
-          data: getAxisDataFromKey(key),
+          data: values,
+          itemStyle: {
+            color: getColor(
+              panelSchema,
+              name,
+              values,
+              chartMin,
+              chartMax
+            ),
+          },
         };
         return seriesObj;
       });
@@ -647,16 +657,28 @@ export const convertSQLData = (
     case "h-bar": {
       //generate trace based on the y axis keys
       options.series = yAxisKeys?.map((key: any) => {
+        const values = getAxisDataFromKey(key);
+        const name = panelSchema?.queries[0]?.fields?.y.find(
+          (it: any) => it.alias == key
+        )?.label;
+
         const seriesObj = {
-          name: panelSchema?.queries[0]?.fields?.y.find(
-            (it: any) => it.alias == key
-          )?.label,
-          color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+          name,
+          // color:
+          //   panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
+          //     ?.color || "#5960b2",
           opacity: 0.8,
           ...getPropsByChartTypeForSeries(panelSchema.type),
-          data: getAxisDataFromKey(key),
+          data: values,
+          itemStyle: {
+            color: getColor(
+              panelSchema,
+              name,
+              values,
+              chartMin,
+              chartMax
+            ),
+          },
         };
         return seriesObj;
       });
@@ -819,17 +841,30 @@ export const convertSQLData = (
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
+        const values = Array.from(
+          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+        ).map(
+          (it: any) =>
+            searchQueryData[0].find(
+              (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+            )?.[yAxisKeys[0]] || 0
+        );
+
+        const name = key;
+
         const seriesObj = {
-          name: key,
+          name,
           ...getPropsByChartTypeForSeries(panelSchema.type),
-          data: Array.from(
-            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-          ).map(
-            (it: any) =>
-              searchQueryData[0].find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
-          ),
+          data: values,
+          itemStyle: {
+            color: getColor(
+              panelSchema,
+              name,
+              values,
+              chartMin,
+              chartMax
+            ),
+          },
         };
         return seriesObj;
       });
@@ -1018,17 +1053,29 @@ export const convertSQLData = (
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
+        const name = key;
+        const values =  Array.from(
+          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+        ).map(
+          (it: any) =>
+            searchQueryData[0].find(
+              (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+            )?.[yAxisKeys[0]] || 0
+        );
+
         const seriesObj = {
           name: key,
           ...getPropsByChartTypeForSeries(panelSchema.type),
-          data: Array.from(
-            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-          ).map(
-            (it: any) =>
-              searchQueryData[0].find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
-          ),
+          data: values,
+          itemStyle: {
+            color: getColor(
+              panelSchema,
+              name,
+              values,
+              chartMin,
+              chartMax
+            ),
+          },
         };
         return seriesObj;
       });
@@ -1213,6 +1260,15 @@ export const convertSQLData = (
               },
             },
           ],
+          itemStyle: {
+            color: getColor(
+              panelSchema,
+              xAxisValue[index] ?? "",
+              yAxisValue,
+              chartMin,
+              chartMax
+            ),
+          },
           detail: {
             valueAnimation: true,
             offsetCenter: [0, 0],
