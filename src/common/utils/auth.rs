@@ -175,34 +175,37 @@ impl FromRequest for AuthExtractor {
                 format!(
                     "{}:{}",
                     o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                        .get(path_columns[url_len - 2])
-                        .unwrap_or(&path_columns[url_len - 2]),
-                    path_columns[url_len - 1]
+                        .get(path_columns[1])
+                        .unwrap_or(&path_columns[1]),
+                    path_columns[2]
                 )
             } else {
                 format!(
                     "{}:{}",
                     o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                        .get(path_columns[url_len - 1])
-                        .unwrap_or(&path_columns[url_len - 1]),
-                    path_columns[url_len - 3]
+                        .get(path_columns[2])
+                        .unwrap_or(&path_columns[2]),
+                    path_columns[0]
                 )
             }
         } else if method.eq("PUT") || method.eq("DELETE") {
+            if path_columns[url_len - 1].eq("delete_fields") {
+                method = "DELETE".to_string();
+            }
             format!(
                 "{}:{}",
                 o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 4])
-                    .unwrap_or(&path_columns[url_len - 4]),
-                path_columns[url_len - 3]
+                    .get(path_columns[1])
+                    .unwrap_or(&path_columns[1]),
+                path_columns[2]
             )
         } else {
             format!(
                 "{}:{}",
                 o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[url_len - 1])
-                    .unwrap_or(&path_columns[url_len - 1]),
-                path_columns[url_len - 3]
+                    .get(path_columns[1])
+                    .unwrap_or(&path_columns[1]),
+                path_columns[2]
             )
         };
 
