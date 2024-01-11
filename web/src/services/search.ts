@@ -101,6 +101,7 @@ const search = {
     end_time,
     from,
     size,
+    stream_name,
   }: {
     org_identifier: string;
     filter: string;
@@ -108,8 +109,9 @@ const search = {
     end_time: number;
     from: number;
     size: number;
+    stream_name: string;
   }) => {
-    const url = `/api/${org_identifier}/traces/latest?filter=${filter}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
+    const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${filter}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
     return http().get(url);
   },
 };
