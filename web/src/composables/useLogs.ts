@@ -159,9 +159,8 @@ const defaultObject = {
   },
 };
 
-const searchObj = reactive(Object.assign({}, defaultObject));
-
 const useLogs = () => {
+  const searchObj = reactive(Object.assign({}, defaultObject));
   const store = useStore();
   const { t } = useI18n();
   const $q = useQuasar();
@@ -172,6 +171,8 @@ const useLogs = () => {
   const parser = new Parser();
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
+
+  searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
 
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
@@ -705,18 +706,20 @@ const useLogs = () => {
               //extract fields from query response
               extractFields();
 
-              if (!isPagination) generateHistogramData();
-              else {
+              if (isPagination){
                 searchObj.data.histogram.chartParams.title =
                   getHistogramTitle();
               }
 
               //update grid columns
               updateGridColumns();
-              searchObj.loading = false;
-              if (histogramQueryReq.hasOwnProperty("aggs")) {
+              if (
+                res.data.hits.length > 0 &&
+                histogramQueryReq.hasOwnProperty("aggs")
+              ) {
                 getHistogramQueryData(histogramQueryReq);
               }
+              searchObj.loading = false;
               resolve(true);
             })
             .catch((err) => {
@@ -769,7 +772,6 @@ const useLogs = () => {
             searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
             // searchObj.data.histogram.chartParams.title = getHistogramTitle();
-
             searchObj.loading = false;
             resolve(true);
           })
@@ -976,7 +978,7 @@ const useLogs = () => {
   };
 
   function getHistogramTitle() {
-    const currentPage = searchObj.data.resultGrid.currentPage - 1;
+    const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     const endCount = startCount + searchObj.data.queryResults.hits.length - 1;
     const title =
@@ -1371,6 +1373,7 @@ const useLogs = () => {
     searchObj,
     getStreams,
     resetSearchObj,
+    resetStreamData,
     updatedLocalLogFilterField,
     getFunctions,
     getStreamList,
