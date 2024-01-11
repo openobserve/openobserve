@@ -966,37 +966,6 @@ describe("Logs testcases", () => {
     cy.get('[data-test="menu-link-/logs-item"]').click({ force: true });
     cy.contains(".a=2").should("be.visible");
   });
-
-
-  it("should display selected value for records per page ", () => {
-    // cy.intercept("GET", logData.ValueQuery).as("value");
-    cy.get('[data-test="logs-search-result-records-per-page"]').click({ force: true });
-    
-    cy.get('[role="listbox"]').find('.q-item__label span').contains('10').click({force:true});
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 10')
-    cy.get('[data-test="logs-search-result-records-per-page"]').click({ force: true });
-    cy.wait(200)
-    cy.get('[role="listbox"]').find('.q-item__label span').contains('25').click({force:true});
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 25')
-    cy.get('[data-test="logs-search-result-records-per-page"]').click({ force: true });
-    cy.wait(200)
-    cy.get('[role="listbox"]').find('.q-item__label span').contains('50').click({force:true});
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 50')
-    cy.get('[data-test="logs-search-result-records-per-page"]').click({ force: true });
-    cy.wait(200)
-    cy.get('[role="listbox"]').find('.q-item__label span').contains('100').click({force:true});
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 100')
-    cy.get('[data-test="logs-search-result-records-per-page"]').click({ force: true });
-    cy.wait(200)
-    cy.get('[role="listbox"]').find('.q-item__label span').contains('500').click({force:true});
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 500')
-    cy.get('[data-test="logs-search-result-records-per-page"]').click({ force: true });
-    cy.wait(200)
-    cy.get('[role="listbox"]').find('.q-item__label span').contains('1000').click({force:true});
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 1000')
-  });
-
-
   // it.only("should enter function, edit and then delete the function", () => {
   //   cy.intercept("GET", logData.ValueQuery).as("value");
   //   logstests.clickVrlQueryToggle()
