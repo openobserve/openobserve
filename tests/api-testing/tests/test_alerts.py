@@ -125,16 +125,17 @@ def test_e2e_createdestination(create_session, base_url):
         headers=headers,
     )
     print(resp_create_destinations.content)
-
+    
+    destination_name = "py-destinations"
     payload = {
         "url": "www",
         "method": "post",
         "skip_tls_verify": skip_tls_verify_value,
         "template": "pytesttemplate",
         "headers": {"test": "test"},
-        "name":{destination_name}
+        "name":"py-destinations"
     }
-    destination_name = "py-destinations"
+   
     # create destination
     resp_create_destinations = session.post(
         f"{url}api/{org_id}/alerts/destinations",
