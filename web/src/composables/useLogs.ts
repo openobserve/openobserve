@@ -172,6 +172,8 @@ const useLogs = () => {
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
 
+  searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
+
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
