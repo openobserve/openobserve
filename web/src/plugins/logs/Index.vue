@@ -272,11 +272,13 @@ export default defineComponent({
           this.searchObj.data.queryResults.size +
             this.searchObj.data.queryResults.from
       ) {
-        this.searchObj.data.resultGrid.currentPage =
-          ((this.searchObj.data.queryResults?.hits?.length || 0) +
-            ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
-            150 -
-          1;
+        // this.searchObj.data.resultGrid.currentPage =
+        //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
+        //     ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
+        //     150 -
+        //   1;
+        // this.searchObj.data.resultGrid.currentPage =
+        //   this.searchObj.data.resultGrid.currentPage + 1;
 
         await this.getQueryData(true);
         this.refreshHistogramChart();
@@ -292,6 +294,40 @@ export default defineComponent({
         }
       }
     },
+    async getLessData() {
+      if (
+        this.searchObj.meta.sqlMode == false &&
+        this.searchObj.meta.refreshInterval == 0 &&
+        this.searchObj.data.queryResults.total >
+          this.searchObj.data.queryResults.from &&
+        this.searchObj.data.queryResults.total >
+          this.searchObj.data.queryResults.size &&
+        this.searchObj.data.queryResults.total >
+          this.searchObj.data.queryResults.size +
+            this.searchObj.data.queryResults.from
+      ) {
+        // this.searchObj.data.resultGrid.currentPage =
+        //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
+        //     ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
+        //     150 -
+        //   1;
+        this.searchObj.data.resultGrid.currentPage =
+          this.searchObj.data.resultGrid.currentPage - 1;
+
+        await this.getQueryData(true);
+        this.refreshHistogramChart();
+
+        if (config.isCloud == "true") {
+          segment.track("Button Click", {
+            button: "Get Less Data",
+            user_org: this.store.state.selectedOrganization.identifier,
+            user_id: this.store.state.userInfo.email,
+            stream_name: this.searchObj.data.stream.selectedStream.value,
+            page: "Search Logs",
+          });
+        }
+      }
+    }
   },
   setup() {
     const store = useStore();
