@@ -217,9 +217,9 @@ impl FromRequest for AuthExtractor {
                 }));
             }
         }
-        return ready(Err(actix_web::error::ErrorUnauthorized(
+        ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
-        )));
+        )))
     }
 }
 
