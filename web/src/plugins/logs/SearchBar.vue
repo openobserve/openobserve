@@ -367,15 +367,21 @@ clickable v-close-popup>
 
         <q-card-actions align="right">
           <q-btn
+            unelevated
+            no-caps
+            class="q-mr-sm text-bold"
             data-test="logs-search-bar-confirm-dialog-cancel-btn"
             :label="t('confirmDialog.cancel')"
-            color="primary"
+            color="secondary"
             v-close-popup
           />
           <q-btn
+          unelevated
+            no-caps
+            class="q-mr-sm text-bold"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
             :label="t('search.btnDownload')"
-            color="positive"
+            color="primary"
             @click="downloadRangeData"
           />
         </q-card-actions>
