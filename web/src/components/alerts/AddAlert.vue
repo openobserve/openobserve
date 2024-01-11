@@ -34,127 +34,144 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <q-separator />
-    <div class="q-px-lg q-my-md" style="max-height: calc(100vh - 138px); overflow: auto">
-      <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
-        <div class="flex justify-start items-center q-pb-sm q-col-gutter-md">
-          <div class="alert-name-input" style="padding-top: 12px">
-            <q-input data-test="add-alert-name-input" v-model="formData.name" :label="t('alerts.name') + ' *'"
-              color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense
-              v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated"
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']" tabindex="0" style="min-width: 250px" />
-          </div>
-          <div class="alert-stream-type" style="padding-top: 0">
-            <q-select v-model="formData.stream_type" :options="streamTypes" :label="t('alerts.streamType') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }" color="input-border" bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case" stack-label outlined filled dense v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated" @update:model-value="updateStreams()"
-              :rules="[(val: any) => !!val || 'Field is required!']" style="min-width: 150px" />
-          </div>
-          <div style="padding-top: 0">
-            <q-select data-test="add-alert-stream-select" v-model="formData.stream_name" :options="filteredStreams"
-              :label="t('alerts.stream_name') + ' *'" :loading="isFetchingStreams" color="input-border"
-              bg-color="input-bg" class="q-py-sm showLabelOnTop no-case"
-              :popup-content-style="{ textTransform: 'lowercase' }" filled borderless dense use-input hide-selected
-              fill-input v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated" :input-debounce="400"
-              @filter="filterStreams" @update:model-value="updateStreamFields(formData.stream_name)"
-              :rules="[(val: any) => !!val || 'Field is required!']" style="min-width: 250px" />
-          </div>
-        </div>
-        <div class="q-gutter-sm">
-          <q-radio data-test="add-alert-scheduled-alert-radio" v-bind:readonly="beingUpdated"
-            v-bind:disable="beingUpdated" v-model="formData.is_real_time" :checked="formData.is_real_time" val="false"
-            :label="t('alerts.scheduled')" class="q-ml-none" />
-          <q-radio data-test="add-alert-realtime-alert-radio" v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated"
-            v-model="formData.is_real_time" :checked="!formData.is_real_time" val="true" :label="t('alerts.realTime')"
-            class="q-ml-none" />
-        </div>
-        <div v-if="formData.is_real_time === 'true'" class="q-py-sm showLabelOnTop text-bold text-h7"
-          data-test="add-alert-query-input-title">
-          <real-time-alert :columns="filteredColumns" :conditions="formData.query_condition.conditions"
-            @field:add="addField" @field:remove="removeField" />
-        </div>
-        <div v-else>
-          <scheduled-alert ref="scheduledAlertRef" :columns="filteredColumns"
-            :conditions="formData.query_condition.conditions" v-model:trigger="formData.trigger_condition"
-            v-model:sql="formData.query_condition.sql" v-model:query_type="formData.query_condition.type"
-            v-model:aggregation="formData.query_condition.aggregation" v-model:isAggregationEnabled="isAggregationEnabled"
-            @field:add="addField" @field:remove="removeField" class="q-mt-sm" />
-        </div>
+    <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="
+        max-height: calc(100vh - 138px);
+        overflow: auto;
+        scroll-behavior: smooth;
+      ">
+      <div class="row justify-start items-start" style="width: 1024px">
+        <div style="width: calc(100% - 401px)">
+          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+            <div class="flex justify-start items-center q-pb-sm q-col-gutter-md">
+              <div class="alert-name-input o2-input" style="padding-top: 12px">
+                <q-input data-test="add-alert-name-input" v-model="formData.name" :label="t('alerts.name') + ' *'"
+                  color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense
+                  v-bind:readonly="beingUpdated" v-bind:disable="beingUpdated"
+                  :rules="[(val: any) => !!val.trim() || 'Field is required!']" tabindex="0" style="min-width: 220px" />
+              </div>
+              <div class="alert-stream-type o2-input" style="padding-top: 0">
+                <q-select v-model="formData.stream_type" :options="streamTypes" :label="t('alerts.streamType') + ' *'"
+                  :popup-content-style="{ textTransform: 'lowercase' }" color="input-border" bg-color="input-bg"
+                  class="q-py-sm showLabelOnTop no-case" stack-label outlined filled dense v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated" @update:model-value="updateStreams()"
+                  :rules="[(val: any) => !!val || 'Field is required!']" style="min-width: 120px" />
+              </div>
+              <div class="o2-input" style="padding-top: 0">
+                <q-select data-test="add-alert-stream-select" v-model="formData.stream_name" :options="filteredStreams"
+                  :label="t('alerts.stream_name') + ' *'" :loading="isFetchingStreams"
+                  :popup-content-style="{ textTransform: 'lowercase' }" color="input-border" bg-color="input-bg"
+                  class="q-py-sm showLabelOnTop no-case" stack-label outlined filled dense v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated" :input-debounce="400" @filter="filterStreams"
+                  @update:model-value="updateStreamFields(formData.stream_name)"
+                  :rules="[(val: any) => !!val || 'Field is required!']" style="min-width: 220px" />
+              </div>
+            </div>
+            <div class="q-gutter-sm">
+              <q-radio data-test="add-alert-scheduled-alert-radio" v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated" v-model="formData.is_real_time" :checked="formData.is_real_time" val="false"
+                :label="t('alerts.scheduled')" class="q-ml-none" />
+              <q-radio data-test="add-alert-realtime-alert-radio" v-bind:readonly="beingUpdated"
+                v-bind:disable="beingUpdated" v-model="formData.is_real_time" :checked="!formData.is_real_time" val="true"
+                :label="t('alerts.realTime')" class="q-ml-none" />
+            </div>
+            <div v-if="formData.is_real_time === 'true'" class="q-py-sm showLabelOnTop text-bold text-h7"
+              data-test="add-alert-query-input-title">
+              <real-time-alert :columns="filteredColumns" :conditions="formData.query_condition.conditions"
+                @field:add="addField" @field:remove="removeField" @input:update="onInputUpdate" />
+            </div>
+            <div v-else>
+              <scheduled-alert ref="scheduledAlertRef" :columns="filteredColumns"
+                :conditions="formData.query_condition.conditions" v-model:trigger="formData.trigger_condition"
+                v-model:sql="formData.query_condition.sql" v-model:query_type="formData.query_condition.type"
+                v-model:aggregation="formData.query_condition.aggregation"
+                v-model:isAggregationEnabled="isAggregationEnabled" @field:add="addField" @field:remove="removeField"
+                @input:update="onInputUpdate" class="q-mt-sm" />
+            </div>
 
-        <div class="col-12 flex justify-start items-center q-mt-xs">
-          <div class="q-py-sm showLabelOnTop text-bold text-h7" data-test="add-alert-delay-title" style="width: 180px">
-            {{ t("alerts.silenceNotification") + " *" }}
-          </div>
-          <div style="min-height: 58px">
-            <div class="col-8 row justify-left align-center q-gutter-sm">
-              <div class="flex items-center" style="border: 1px solid rgba(0, 0, 0, 0.05)">
-                <div style="width: 87px; margin-left: 0 !important" class="silence-notification-input">
-                  <q-input data-test="add-alert-delay-input" v-model="formData.trigger_condition.silence" type="number"
-                    dense filled min="1" style="background: none" />
+            <div class="col-12 flex justify-start items-center q-mt-xs">
+              <div class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md" data-test="add-alert-delay-title"
+                style="width: 180px">
+                {{ t("alerts.silenceNotification") + " *" }}
+              </div>
+              <div style="min-height: 58px">
+                <div class="col-8 row justify-left align-center q-gutter-sm">
+                  <div class="flex items-center" style="border: 1px solid rgba(0, 0, 0, 0.05)">
+                    <div style="width: 87px; margin-left: 0 !important" class="silence-notification-input">
+                      <q-input data-test="add-alert-delay-input" v-model="formData.trigger_condition.silence"
+                        type="number" dense filled min="1" style="background: none" />
+                    </div>
+                    <div style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        background: #f2f2f2;
+                        height: 40px;
+                      " class="flex justify-center items-center">
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
                 </div>
-                <div style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    background: #f2f2f2;
-                    height: 40px;
-                  " class="flex justify-center items-center">
-                  {{ t("alerts.minutes") }}
+                <div v-if="formData.trigger_condition.silence < 1" class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px">
+                  Field is required!
                 </div>
               </div>
             </div>
-            <div v-if="formData.trigger_condition.silence < 1" class="text-red-8 q-pt-xs"
-              style="font-size: 11px; line-height: 12px">
-              Field is required!
+
+            <div class="o2-input flex justify-start items-center">
+              <div class="text-bold q-pb-sm" style="width: 180px">
+                {{ t("alerts.destination") + " *" }}
+              </div>
+              <q-select data-test="add-alert-destination-select" v-model="formData.destinations"
+                :options="getFormattedDestinations" color="input-border" bg-color="input-bg q-mt-sm" class="no-case"
+                stack-label outlined filled dense multiple :rules="[(val: any) => !!val || 'Field is required!']"
+                style="width: 250px">
+                <template v-slot:option="option">
+                  <q-list dense>
+                    <q-item tag="label">
+                      <q-item-section avatar>
+                        <q-checkbox size="xs" dense v-model="formData.destinations" :val="option.opt" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="ellipsis">{{ option.opt }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </template>
+              </q-select>
             </div>
 
-        <div class="q-mt-lg">
-          <div class="text-bold">{{ t("alerts.destination") + " *" }}</div>
-          <q-select data-test="add-alert-destination-select" v-model="formData.destinations"
-            :options="getFormattedDestinations" color="input-border" bg-color="input-bg q-mt-sm" class="no-case"
-            stack-label outlined filled dense multiple :rules="[(val: any) => !!val || 'Field is required!']"
-            style="width: 250px">
-            <template v-slot:option="option">
-              <q-list dense>
-                <q-item tag="label">
-                  <q-item-section avatar>
-                    <q-checkbox size="xs" dense v-model="formData.destinations" :val="option.opt" />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="ellipsis">{{ option.opt }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </template>
-          </q-select>
-        </div>
+            <div class="q-mt-md">
+              <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
+              <variables-input class="o2-input" :variables="formData.context_attributes" @add:variable="addVariable"
+                @remove:variable="removeVariable" />
+            </div>
 
-        <div>
-          <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
-          <variables-input :variables="formData.context_attributes" @add:variable="addVariable"
-            @remove:variable="removeVariable" />
-        </div>
+            <div class="o2-input">
+              <q-input data-test="add-alert-description-input" v-model="formData.description"
+                :label="t('alerts.description')" color="input-border" bg-color="input-bg" class="showLabelOnTop q-mb-sm"
+                stack-label outlined filled dense tabindex="0" style="width: 550px" />
 
-        <div>
-          <q-input data-test="add-alert-description-input" v-model="formData.description" :label="t('alerts.description')"
-            color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense tabindex="0"
-            style="width: 550px" />
-        </div>
+              <q-input data-test="add-alert-row-input" v-model="formData.row_template" :label="t('alerts.row')"
+                color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense
+                tabindex="0" style="width: 550px" />
+            </div>
 
-        <div>
-          <q-input data-test="add-alert-row-input" v-model="formData.row_template" :label="t('alerts.row')"
-            color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense tabindex="0"
-            style="width: 550px" />
+            <div class="flex justify-start q-mt-lg">
+              <q-btn data-test="add-alert-cancel-btn" v-close-popup="true" class="q-mb-md text-bold"
+                :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps
+                @click="$emit('cancel:hideform')" />
+              <q-btn data-test="add-alert-submit-btn" :label="t('alerts.save')"
+                class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl" type="submit" no-caps />
+            </div>
+          </q-form>
         </div>
-
-        <div class="flex justify-start q-mt-lg">
-          <q-btn data-test="add-alert-cancel-btn" v-close-popup="true" class="q-mb-md text-bold"
-            :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps
-            @click="$emit('cancel:hideform')" />
-          <q-btn data-test="add-alert-submit-btn" :label="t('alerts.save')" class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary" padding="sm xl" type="submit" no-caps />
+        <div style="width: 400px; height: 200px; position: sticky; top: 0" class="q-mb-lg q-px-md">
+          <div class="text-bold q-pb-xs text-grey-9">Preview</div>
+          <preview-alert style="border: 1px solid #ececec" ref="previewAlertRef" :formData="formData"
+            :query="previewQuery" :aggregationEnabled="isAggregationEnabled" />
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
 </template>
