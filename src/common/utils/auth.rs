@@ -114,7 +114,7 @@ pub struct AuthExtractor {
     pub method: String,
     pub o2_type: String,
     pub org_id: String,
-    pub is_ingestion_ep: bool,
+    pub bypass_check: bool,
 }
 
 impl FromRequest for AuthExtractor {
@@ -143,7 +143,7 @@ impl FromRequest for AuthExtractor {
                         method,
                         o2_type: format!("stream:{org_id}"),
                         org_id,
-                        is_ingestion_ep: true,
+                        bypass_check: true,
                     }));
                 }
             }
@@ -211,12 +211,23 @@ impl FromRequest for AuthExtractor {
 
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
+                if (method.eq("POST") && path_columns[1].eq("_search"))
+                    || path.contains("/prometheus/api/v1/query")
+                {
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method: "".to_string(),
+                        o2_type: "".to_string(),
+                        org_id: "".to_string(),
+                        bypass_check: true, // bypass check permissions
+                    }));
+                }
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method,
                     o2_type: object_type,
                     org_id,
-                    is_ingestion_ep: false,
+                    bypass_check: false,
                 }));
             }
         }
