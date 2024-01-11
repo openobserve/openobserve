@@ -71,7 +71,8 @@ pub async fn process_token(
                     .map(|(_, fga_entity)| *fga_entity)
                     .collect(),
                 o2_enterprise::enterprise::openfga::meta::mapping::NON_OWNING_ORG.to_vec(),
-            );
+            )
+            .await;
             if index == 0 {
                 // this is to allow user call organization api with org
                 tuples.push(get_user_org_tuple(&user_email, &user_email));
