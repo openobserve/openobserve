@@ -105,7 +105,7 @@ export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
   return [min, max];
 };
 
-const getSeriesValueFromArray = (panelSchema: any, values: any) => {
+const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
   // if color is based on value then need to find seriesmin or seriesmax or last value
   let seriesvalue = values?.length > 0 ? values[values.length - 1][1] : 50;
   if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
@@ -121,6 +121,30 @@ const getSeriesValueFromArray = (panelSchema: any, values: any) => {
         // value[1] should not NaN
         if (!isNaN(value[1])) {
           seriesvalue = Math.max(value[1], seriesvalue);
+        }
+      });
+    }
+  }
+
+  return seriesvalue;
+};
+
+const getSeriesValueFromArray = (panelSchema: any, values: any) => {
+  // if color is based on value then need to find seriesmin or seriesmax or last value
+  let seriesvalue = values?.length > 0 ? values[values.length - 1] : 50;
+  if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
+    if (panelSchema?.config?.color?.seriesBy == "min") {
+      values.forEach((value: any) => {
+        // value[1] should not NaN
+        if (!isNaN(value)) {
+          seriesvalue = Math.min(value, seriesvalue);
+        }
+      });
+    } else if (panelSchema?.config?.color?.seriesBy == "max") {
+      values.forEach((value: any) => {
+        // value[1] should not NaN
+        if (!isNaN(value)) {
+          seriesvalue = Math.max(value, seriesvalue);
         }
       });
     }
@@ -218,7 +242,7 @@ export const getColor = (
         panelSchema?.config?.color?.fixedColor
           ? panelSchema?.config?.color?.fixedColor[0] ?? "#53ca53"
           : "#53ca53",
-        getSeriesValueFromArray(panelSchema, valuesArr) ?? 50,
+          getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50,
         chartMin ?? 0,
         chartMax ?? 100
       );
@@ -232,7 +256,7 @@ export const getColor = (
 
     case "green-yellow-red": {
       
-      const value = getSeriesValueFromArray(panelSchema, valuesArr);
+      const value = getSeriesValueFrom2DArray(panelSchema, valuesArr);
       console.log("green-yellow-red",valuesArr, value);
 
       let scale = new Scale(
@@ -247,7 +271,7 @@ export const getColor = (
     }
 
     case "red-yellow-green": {
-      const value = getSeriesValueFromArray(panelSchema, valuesArr);
+      const value = getSeriesValueFrom2DArray(panelSchema, valuesArr);
 
       let scale = new Scale(
         panelSchema?.config?.color?.fixedColor?.map(
