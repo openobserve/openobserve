@@ -193,7 +193,6 @@ import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
-import { q } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "PageSearch",
@@ -1356,11 +1355,6 @@ export default defineComponent({
       indexListRef.value.duration.input.max = max;
     };
 
-    const onChangeStream = () => {
-      getQueryData();
-      extractFields();
-    };
-
     return {
       store,
       router,
@@ -1459,6 +1453,7 @@ export default defineComponent({
           if (oldStream.value) this.setQuery(this.searchObj.meta.sqlMode);
           setTimeout(() => {
             this.runQueryFn();
+            extractFields();
           }, 500);
         }
       },
