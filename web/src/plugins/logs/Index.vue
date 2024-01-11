@@ -328,7 +328,7 @@ export default defineComponent({
           });
         }
       }
-    },
+    }
   },
   setup() {
     const store = useStore();
@@ -388,25 +388,11 @@ export default defineComponent({
     // }
 
     onDeactivated(() => {
-      // resetStreamData();
-      searchObj.data.queryResults = {};
-      searchObj.data.sortedQueryResults = [];
-      searchObj.data.histogram = {
-        xData: [],
-        yData: [],
-        chartParams: {},
-      };
+      resetStreamData();
     });
     onUnmounted(() => {
-      searchObj.data.queryResults = {};
-      searchObj.data.sortedQueryResults = [];
-      searchObj.data.histogram = {
-        xData: [],
-        yData: [],
-        chartParams: {},
-      };
-      // resetSearchObj();
-      // resetStreamData();
+      resetSearchObj();
+      resetStreamData();
     });
 
     onActivated(async () => {
