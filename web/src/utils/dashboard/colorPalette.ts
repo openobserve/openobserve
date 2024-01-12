@@ -82,6 +82,21 @@ const nameToColor = (name, colorArray) => {
   return color;
 };
 
+function stringToColor(str) {
+  // Create a hash from the string
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  // Convert the hash to an HSL color
+  let hue = hash % 360;
+  let saturation = hash % 25 + 100; // Saturation range between 75-100%
+  let lightness = hash % 15 + 100;  // Lightness range between 70-85%
+  
+  return 'hsl(' + hue + ', ' + saturation + '%, ' + lightness + '%)';
+}
+
 function shadeColor(color: any, value: any, min: any, max: any) {
   let percent = (value - min) / (max - min);
   let num = parseInt(color.replace("#", ""), 16),
@@ -281,18 +296,18 @@ export const getColor = (
       // return color using colorArrayBySeries
       // NOTE: here value will be series name
       // return nameToColor(seriesName, colorArrayBySeries);
-      function stringToColor(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
+    //   function stringToColor(str) {
+    //     let hash = 0;
+    //     for (let i = 0; i < str.length; i++) {
+    //         hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    //     }
     
-        // Convert the hash to a number between 0 and 360
-        let hue = hash % 361;
+    //     // Convert the hash to a number between 0 and 360
+    //     let hue = hash % 361;
     
-        // Generate the HSL color
-        return `hsl(${hue}, 50%, 50%)`;
-    }
+    //     // Generate the HSL color
+    //     return `hsl(${hue}, 50%, 50%)`;
+    // }
     return stringToColor(seriesName);
     }
 
