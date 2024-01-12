@@ -9,7 +9,7 @@ use crate::common::{
     utils::{file::get_file_meta, json},
 };
 
-const ITEM_PREFIXES: [&str; 13] = [
+const ITEM_PREFIXES: [&str; 11] = [
     "/user",
     "/schema",
     "/syslog",
@@ -21,8 +21,6 @@ const ITEM_PREFIXES: [&str; 13] = [
     "/alerts",       // alert
     "/trigger",      // alert
     "/compact",
-    "/organization",
-    "/kv",
 ];
 
 pub async fn run() -> Result<(), anyhow::Error> {

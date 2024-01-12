@@ -516,6 +516,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
     };
 
     let mut parts = local_key.split('/').collect::<Vec<&str>>();
+    let empty_str = "";
     let entity = parts[0];
 
     if db_key.starts_with("/user") {
@@ -549,8 +550,8 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
         "function" | "templates" | "destinations" | "kv" | "metrics_members" | "metrics_leader"
         | "trigger" | "folders" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
-                pk_value: parts[1].to_string(),
-                rk_value: format!("{}/{}", parts[0], parts[2]),
+                pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
+                rk_value: format!("{}/{}", parts[0], parts.get(2).unwrap_or(&empty_str)),
                 name: CONFIG.dynamo.org_meta_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
@@ -558,9 +559,9 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 entity: entity.to_string(),
             },
             DbOperation::List => {
-                if parts.len() == 1 || parts[1].is_empty() {
+                if parts.len() == 1 || parts.get(1).unwrap_or(&empty_str).is_empty() {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
@@ -570,7 +571,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     }
                 } else {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
@@ -584,8 +585,14 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
 
         "alerts" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
-                pk_value: parts[1].to_string(),
-                rk_value: format!("{}/{}/{}/{}", parts[0], parts[2], parts[3], parts[4]),
+                pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
+                rk_value: format!(
+                    "{}/{}/{}/{}",
+                    parts[0],
+                    parts.get(2).unwrap_or(&empty_str),
+                    parts.get(3).unwrap_or(&empty_str),
+                    parts.get(4).unwrap_or(&empty_str)
+                ),
                 name: CONFIG.dynamo.org_meta_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
@@ -593,9 +600,9 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 entity: entity.to_string(),
             },
             DbOperation::List => {
-                if parts.len() == 1 || parts[1].is_empty() {
+                if parts.len() == 1 || parts.get(1).unwrap_or(&empty_str).is_empty() {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
@@ -605,7 +612,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     }
                 } else {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
@@ -618,8 +625,13 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
         },
         "schema" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
-                pk_value: parts[1].to_string(),
-                rk_value: format!("{}/{}/{}", parts[0], parts[2], parts[3]),
+                pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
+                rk_value: format!(
+                    "{}/{}/{}",
+                    parts[0],
+                    parts.get(2).unwrap_or(&empty_str),
+                    parts.get(3).unwrap_or(&empty_str)
+                ),
                 name: CONFIG.dynamo.schema_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
@@ -627,9 +639,9 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 entity: entity.to_string(),
             },
             DbOperation::List => {
-                if parts.len() == 1 || parts[1].is_empty() {
+                if parts.len() == 1 || parts.get(1).unwrap_or(&empty_str).is_empty() {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.schema_table.clone(),
                         pk: "org".to_string(),
@@ -639,7 +651,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     }
                 } else {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.schema_table.clone(),
                         pk: "org".to_string(),
@@ -652,8 +664,13 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
         },
         "dashboard" => match operation {
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => DynamoTableDetails {
-                pk_value: parts[1].to_string(),
-                rk_value: format!("{}/{}/{}", parts[0], parts[2], parts[3]),
+                pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
+                rk_value: format!(
+                    "{}/{}/{}",
+                    parts[0],
+                    parts.get(2).unwrap_or(&empty_str),
+                    parts.get(3).unwrap_or(&empty_str)
+                ),
                 name: CONFIG.dynamo.org_meta_table.clone(),
                 pk: "org".to_string(),
                 rk: "key".to_string(),
@@ -661,9 +678,9 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 entity: entity.to_string(),
             },
             DbOperation::List => {
-                if parts.len() == 1 || parts[1].is_empty() {
+                if parts.len() == 1 || parts.get(1).unwrap_or(&empty_str).is_empty() {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
@@ -673,8 +690,8 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     }
                 } else {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
-                        rk_value: format!("{}/{}", parts[0], parts[2]),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
+                        rk_value: format!("{}/{}", parts[0], parts.get(2).unwrap_or(&empty_str)),
                         name: CONFIG.dynamo.org_meta_table.clone(),
                         pk: "org".to_string(),
                         rk: "key".to_string(),
@@ -688,18 +705,27 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
             DbOperation::Get | DbOperation::Put | DbOperation::Delete => {
                 parts.swap(1, 2);
                 let rk_value = if local_key.starts_with("compact/organization/") {
-                    format!("{}/{}", parts[0], parts[2])
+                    format!("{}/{}", parts[0], parts.get(2).unwrap_or(&empty_str))
                 } else if local_key.starts_with("compact/delete/") {
                     format!(
                         "{}/{}/{}/{}/{}",
-                        parts[0], parts[2], parts[3], parts[4], parts[5]
+                        parts[0],
+                        parts.get(2).unwrap_or(&empty_str),
+                        parts.get(3).unwrap_or(&empty_str),
+                        parts.get(4).unwrap_or(&empty_str),
+                        parts.get(5).unwrap_or(&empty_str)
                     )
                 } else {
-                    format!("{}/{}/{}", parts[0], parts[2], parts[3])
+                    format!(
+                        "{}/{}/{}",
+                        parts[0],
+                        parts.get(2).unwrap_or(&empty_str),
+                        parts.get(3).unwrap_or(&empty_str)
+                    )
                 };
 
                 DynamoTableDetails {
-                    pk_value: parts[1].to_string(),
+                    pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                     rk_value,
                     name: CONFIG.dynamo.compact_table.clone(),
                     pk: "org".to_string(),
@@ -714,9 +740,12 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                 } else {
                     parts[0].to_string()
                 };
-                if parts.len() == 1 || parts[1].is_empty() || local_key.eq("compact/delete/") {
+                if parts.len() == 1
+                    || parts.get(1).unwrap_or(&empty_str).is_empty()
+                    || local_key.eq("compact/delete/")
+                {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value,
                         name: CONFIG.dynamo.compact_table.clone(),
                         pk: "org".to_string(),
@@ -726,7 +755,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
                     }
                 } else {
                     DynamoTableDetails {
-                        pk_value: parts[1].to_string(),
+                        pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
                         rk_value: parts[0].to_string(),
                         name: CONFIG.dynamo.compact_table.clone(),
                         pk: "org".to_string(),
@@ -739,7 +768,7 @@ pub fn get_dynamo_key(db_key: &str, operation: DbOperation) -> DynamoTableDetail
         },
 
         _ => DynamoTableDetails {
-            pk_value: parts[1].to_string(),
+            pk_value: parts.get(1).unwrap_or(&empty_str).to_string(),
             rk_value: parts[0].to_string(),
             name: CONFIG.dynamo.org_meta_table.clone(),
             pk: "org".to_string(),
