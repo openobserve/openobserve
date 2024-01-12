@@ -530,11 +530,7 @@ export default defineComponent({
     });
 
     const showPreview = computed(() => {
-      return (
-        formData.value.name &&
-        formData.value.stream_type &&
-        formData.value.stream_name
-      );
+      return formData.value.stream_type && formData.value.stream_name;
     });
 
     const updateCondtions = (e: any) => {
@@ -808,11 +804,26 @@ export default defineComponent({
           }
         );
 
+        const percentileFunctions: any = {
+          p50: 0.5,
+          p75: 0.75,
+          p90: 0.9,
+          p95: 0.95,
+          p99: 0.99,
+        };
+
         if (isAggValid) {
-          query +=
-            ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
-            whereClause +
-            ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+          if (percentileFunctions[aggFn]) {
+            query +=
+              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+              whereClause +
+              ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+          } else {
+            query +=
+              ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+              whereClause +
+              ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+          }
         } else {
           query +=
             ` COUNT(*) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
@@ -827,7 +838,7 @@ export default defineComponent({
     const debouncedPreviewAlert = debounce(previewAlert, 500);
 
     const onInputUpdate = async (name: string, value: any) => {
-      if (showPreview.value && validateInputs(getAlertPayload(), false)) {
+      if (showPreview.value) {
         debouncedPreviewAlert();
       }
     };
