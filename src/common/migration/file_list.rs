@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::common::{
-    infra::{config::CONFIG, file_list as infra_file_list},
+    infra::{
+        config::CONFIG,
+        file_list::{self as infra_file_list, FileList},
+    },
     meta::{common::FileKey, stream::PartitionTimeLevel, StreamType},
     utils::{file::get_file_meta, time::BASE_TIME},
 };
@@ -55,6 +58,13 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
 
 /// Run the file list migration for DynamoDB to add new fields `created_at` and `org`.
 pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
+    println!("load file_list from dynamodb");
+    let src_file_list = if !CONFIG.common.local_mode {
+        Box::<infra_file_list::dynamo::DynamoFileList>::default()
+    } else {
+        panic!("disable local mode to migrate from dynamodb");
+    };
+
     // load stream list
     db::schema::cache().await?;
     // load file list from DynamoDB
@@ -71,15 +81,16 @@ pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(org_id, stream_type);
             for stream_name in streams.iter() {
-                let files = infra_file_list::query(
-                    org_id,
-                    stream_type,
-                    stream_name,
-                    PartitionTimeLevel::Unset,
-                    (start_time, end_time),
-                )
-                .await
-                .expect("file list get failed");
+                let files = src_file_list
+                    .query(
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        PartitionTimeLevel::Unset,
+                        (start_time, end_time),
+                    )
+                    .await
+                    .expect("file list get failed");
                 let put_items = files
                     .into_iter()
                     .map(|(file_key, file_meta)| FileKey::new(&file_key, file_meta, false))
@@ -89,11 +100,21 @@ pub async fn run_for_dynamo() -> Result<(), anyhow::Error> {
                     .expect("file list put failed");
             }
         }
+
+        // load file_list_deleted from DynamoDB
+        let files = src_file_list
+            .query_deleted(org_id, end_time)
+            .await
+            .expect("file list get failed");
+        if let Err(e) = infra_file_list::batch_add_deleted(org_id, end_time, &files).await {
+            log::error!("load file_list_deleted into db err: {}", e);
+            continue;
+        }
     }
     // create secondary index
-    infra_file_list::dynamo::create_table_file_list_org_crated_at_index()
-        .await
-        .expect("file list migration create index failed");
+    // infra_file_list::dynamo::create_table_file_list_org_crated_at_index()
+    //     .await
+    //     .expect("file list migration create index failed");
     Ok(())
 }
 

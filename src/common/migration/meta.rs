@@ -29,7 +29,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if CONFIG.common.local_mode {
         load_meta_from_sled().await
     } else {
-        load_meta_from_etcd().await
+        load_meta_from_dynamodb().await
     }
 }
 
@@ -81,19 +81,19 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
-    println!("load meta from etcd");
+pub async fn load_meta_from_dynamodb() -> Result<(), anyhow::Error> {
+    println!("load meta from dynamodb");
     let (src, dest) = if !CONFIG.common.local_mode {
-        (Box::<db::etcd::Etcd>::default(), db::get_db().await)
+        (Box::<db::dynamo::DynamoDb>::default(), db::get_db().await)
     } else {
-        panic!("disable local mode to migrate from etcd");
+        panic!("disable local mode to migrate from dynamodb");
     };
 
     for item in ITEM_PREFIXES {
         let time = std::time::Instant::now();
         let res = src.list(item).await?;
         println!(
-            "resources length for prefix {} from etcd is {}",
+            "resources length for prefix {} from dynamodb is {}",
             item,
             res.len()
         );
@@ -112,7 +112,7 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
                     count += 1;
                 }
                 Err(e) => {
-                    println!("error while migrating key {} from etcd {}", key, e);
+                    println!("error while migrating key {} from dynamodb {}", key, e);
                 }
             }
             if count % 100 == 0 {
@@ -125,7 +125,7 @@ pub async fn load_meta_from_etcd() -> Result<(), anyhow::Error> {
             }
         }
         println!(
-            "migrated  prefix {} from etcd , took {} secs",
+            "migrated  prefix {} from dynamodb , took {} secs",
             item,
             time.elapsed().as_secs()
         );
