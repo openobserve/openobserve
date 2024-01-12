@@ -188,13 +188,10 @@ async fn main() -> Result<(), anyhow::Error> {
     grpc_stopped_rx.await.ok();
     log::info!("gRPC server stopped");
 
-    // stop telemetry
-    meta::telemetry::Telemetry::new()
-        .event("OpenObserve - Server stopped", None, false)
-        .await;
     // leave the cluster
     _ = cluster::leave().await;
     log::info!("left cluster");
+
     // flush WAL cache to disk
     infra::wal::flush_all_to_disk().await;
     // flush compact offset cache to disk disk
@@ -204,6 +201,11 @@ async fn main() -> Result<(), anyhow::Error> {
     _ = db.close().await;
     // flush distinct values
     _ = distinct_values::close().await;
+
+    // stop telemetry
+    meta::telemetry::Telemetry::new()
+        .event("OpenObserve - Server stopped", None, false)
+        .await;
 
     log::info!("server stopped");
 
