@@ -18,8 +18,9 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use config::{meta::stream::StreamType, CONFIG};
+use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
 
+use super::promql;
 use crate::{
     common::{
         meta::{
@@ -114,6 +115,7 @@ pub async fn save(
         QueryType::PromQL => {
             if alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
+                || alert.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
                     "Alert with PromQL mode should have a query"
@@ -290,33 +292,93 @@ impl QueryCondition {
         &self,
         alert: &Alert,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
-                if let Some(v) = self.conditions.as_ref() {
-                    build_sql(alert, v).await?
-                } else {
+                let Some(v) = self.conditions.as_ref() else {
                     return Ok(None);
-                }
+                };
+                build_sql(alert, v).await?
             }
             QueryType::SQL => {
-                if let Some(v) = self.sql.as_ref() {
-                    if v.is_empty() {
-                        return Ok(None);
-                    } else {
-                        v.to_string()
-                    }
-                } else {
+                let Some(v) = self.sql.as_ref() else {
                     return Ok(None);
+                };
+                if v.is_empty() {
+                    return Ok(None);
+                } else {
+                    v.to_string()
                 }
             }
             QueryType::PromQL => {
-                // TODO handle promql
-                return Ok(None);
+                let Some(v) = self.promql.as_ref() else {
+                    return Ok(None);
+                };
+                if v.is_empty() {
+                    return Ok(None);
+                }
+                let start = now
+                    - Duration::minutes(alert.trigger_condition.period)
+                        .num_microseconds()
+                        .unwrap();
+                let end = now;
+                let condition = self.promql_condition.as_ref().unwrap();
+                let req = promql::MetricsQueryRequest {
+                    query: format!(
+                        "({}) {} {}",
+                        v,
+                        condition.operator.to_string(),
+                        condition.value.as_f64().unwrap_or_default()
+                    ),
+                    start,
+                    end,
+                    step: std::cmp::max(
+                        promql::micros(promql::MINIMAL_INTERVAL),
+                        (end - start) / promql::MAX_DATA_POINTS,
+                    ),
+                };
+                let resp = promql::search::search(&alert.org_id, &req, 0).await?;
+                let promql::value::Value::Matrix(value) = resp else {
+                    log::warn!(
+                        "Alert evaluate: PromQL query {} returned unexpected response: {:?}",
+                        v,
+                        resp
+                    );
+                    return Ok(None);
+                };
+                return if value.len() < alert.trigger_condition.threshold as usize {
+                    Ok(None)
+                } else {
+                    Ok(Some(
+                        value
+                            .iter()
+                            .map(|v| {
+                                let labels_map = v
+                                    .labels
+                                    .iter()
+                                    .map(|l| (l.name.as_str(), l.value.as_str()))
+                                    .collect::<FxIndexMap<_, _>>();
+                                v.samples
+                                    .iter()
+                                    .map(|s| {
+                                        let mut map = Map::with_capacity(labels_map.len() + 2);
+                                        for (key, value) in labels_map.iter() {
+                                            map.insert(key.to_string(), value.to_string().into());
+                                        }
+                                        map.insert("_timestamp".to_string(), s.timestamp.into());
+                                        map.insert("value".to_string(), s.value.into());
+                                        map
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .flatten()
+                            .collect(),
+                    ))
+                };
             }
         };
 
         // fire the query
-        let now = Utc::now().timestamp_micros();
         let req = search::Request {
             query: search::Query {
                 sql: sql.clone(),
