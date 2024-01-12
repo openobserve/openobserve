@@ -76,28 +76,29 @@
       >
         <div style="width: 180px">Trigger if the value is</div>
         <div class="flex justify-start items-center">
-          <q-select
-            data-test="scheduled-alert-promlq-condition-operator-select"
-            v-model="promqlCondition.operator"
-            :options="triggerOperators"
-            color="input-border"
-            bg-color="input-bg"
-            class="no-case q-py-none q-mr-xs"
-            filled
-            borderless
-            dense
-            use-input
-            hide-selected
-            fill-input
-            style="width: 88px; border-right: none"
-            @update:model-value="updatePromqlCondition"
-          />
+          <div data-test="scheduled-alert-promlq-condition-operator-select">
+            <q-select
+              v-model="promqlCondition.operator"
+              :options="triggerOperators"
+              color="input-border"
+              bg-color="input-bg"
+              class="no-case q-py-none q-mr-xs"
+              filled
+              borderless
+              dense
+              use-input
+              hide-selected
+              fill-input
+              style="width: 88px; border-right: none"
+              @update:model-value="updatePromqlCondition"
+            />
+          </div>
           <div
+            data-test="scheduled-alert-promlq-condition-value"
             style="width: 160px; margin-left: 0 !important"
             class="silence-notification-input o2-input"
           >
             <q-input
-              data-test="scheduled-alert-promlq-condition-value"
               v-model="promqlCondition.value"
               type="number"
               dense
@@ -150,27 +151,28 @@
               :data-test="`scheduled-alert-group-by-${index + 1}`"
               class="flex justify-start items-center no-wrap o2-input"
             >
-              <q-select
-                data-test="scheduled-alert-group-by-column-select"
-                v-model="aggregationData.group_by[index]"
-                :options="filteredFields"
-                color="input-border"
-                bg-color="input-bg"
-                class="no-case q-py-none q-mb-sm"
-                filled
-                borderless
-                dense
-                use-input
-                emit-value
-                hide-selected
-                placeholder="Select column"
-                fill-input
-                :input-debounce="400"
-                @filter="filterColumns"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                style="width: 200px"
-                @update:model-value="updateTrigger"
-              />
+              <div data-test="scheduled-alert-group-by-column-select">
+                <q-select
+                  v-model="aggregationData.group_by[index]"
+                  :options="filteredFields"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="no-case q-py-none q-mb-sm"
+                  filled
+                  borderless
+                  dense
+                  use-input
+                  emit-value
+                  hide-selected
+                  placeholder="Select column"
+                  fill-input
+                  :input-debounce="400"
+                  @filter="filterColumns"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="width: 200px"
+                  @update:model-value="updateTrigger"
+                />
+              </div>
               <q-btn
                 data-test="scheduled-alert-group-by-delete-btn"
                 :icon="outlinedDelete"
@@ -214,9 +216,11 @@
         <div style="width: calc(100% - 180px)" class="position-relative">
           <template v-if="_isAggregationEnabled && aggregationData">
             <div class="flex justify-start items-center">
-              <div class="threshould-input q-mr-xs o2-input">
+              <div
+                data-test="scheduled-alert-threshold-function-select"
+                class="threshould-input q-mr-xs o2-input"
+              >
                 <q-select
-                  data-test="scheduled-alert-threshold-function-select"
                   v-model="aggregationData.function"
                   :options="aggFunctions"
                   color="input-border"
@@ -232,9 +236,11 @@
                   @update:model-value="updateTrigger"
                 />
               </div>
-              <div class="threshould-input q-mr-xs o2-input">
+              <div
+                class="threshould-input q-mr-xs o2-input"
+                data-test="scheduled-alert-threshold-column-select"
+              >
                 <q-select
-                  data-test="scheduled-alert-threshold-column-select"
                   v-model="aggregationData.having.column"
                   :options="filteredNumericColumns"
                   color="input-border"
@@ -252,9 +258,11 @@
                   @update:model-value="updateTrigger"
                 />
               </div>
-              <div class="threshould-input q-mr-xs o2-input q-mt-sm">
+              <div
+                data-test="scheduled-alert-threshold-operator-select"
+                class="threshould-input q-mr-xs o2-input q-mt-sm"
+              >
                 <q-select
-                  data-test="scheduled-alert-threshold-operator-select"
                   v-model="aggregationData.having.operator"
                   :options="triggerOperators"
                   color="input-border"
@@ -272,11 +280,11 @@
               </div>
               <div class="flex items-center q-mt-sm">
                 <div
+                  data-test="scheduled-alert-threshold-value-input"
                   style="width: 250px; margin-left: 0 !important"
                   class="silence-notification-input o2-input"
                 >
                   <q-input
-                    data-test="scheduled-alert-threshold-value-input"
                     v-model="aggregationData.having.value"
                     type="number"
                     dense
@@ -305,9 +313,11 @@
           </template>
           <template v-else>
             <div class="flex justify-start items-center">
-              <div class="threshould-input">
+              <div
+                class="threshould-input"
+                data-test="scheduled-alert-threshold-operator-select"
+              >
                 <q-select
-                  data-test="scheduled-alert-threshold-operator-select"
                   v-model="triggerData.operator"
                   :options="triggerOperators"
                   color="input-border"
@@ -331,9 +341,9 @@
                 <div
                   style="width: 89px; margin-left: 0 !important"
                   class="silence-notification-input"
+                  data-test="scheduled-alert-threshold-value-input"
                 >
                   <q-input
-                    data-test="scheduled-alert-threshold-value-input"
                     v-model="triggerData.threshold"
                     type="number"
                     dense
@@ -385,11 +395,11 @@
             style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
           >
             <div
+              data-test="scheduled-alert-period-input"
               style="width: 87px; margin-left: 0 !important"
               class="silence-notification-input"
             >
               <q-input
-                data-test="scheduled-alert-period-input"
                 v-model="triggerData.period"
                 type="number"
                 dense

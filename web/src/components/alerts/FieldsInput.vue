@@ -25,9 +25,11 @@
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
         :data-test="`alert-conditions-${index + 1}`"
       >
-        <div class="q-ml-none o2-input">
+        <div
+          data-test="alert-conditions-select-column"
+          class="q-ml-none o2-input"
+        >
           <q-select
-            data-test="alert-conditions-select-column"
             v-model="field.column"
             :options="filteredFields"
             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -48,9 +50,11 @@
             style="min-width: 220px"
           />
         </div>
-        <div class="q-ml-none o2-input">
+        <div
+          data-test="alert-conditions-operator-select"
+          class="q-ml-none o2-input"
+        >
           <q-select
-            data-test="alert-conditions-operator-select"
             v-model="field.operator"
             :options="triggerOperators"
             :popup-content-style="{ textTransform: 'capitalize' }"
@@ -66,9 +70,11 @@
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
-        <div class="q-ml-none flex items-end o2-input">
+        <div
+          data-test="alert-conditions-value-input"
+          class="q-ml-none flex items-end o2-input"
+        >
           <q-input
-            data-test="alert-conditions-value-input"
             v-model="field.value"
             :options="streamFields"
             :popup-content-style="{ textTransform: 'capitalize' }"

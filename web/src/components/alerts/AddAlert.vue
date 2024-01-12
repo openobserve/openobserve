@@ -57,9 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md"
             >
-              <div class="alert-name-input o2-input" style="padding-top: 12px">
+              <div
+                data-test="add-alert-name-input"
+                class="alert-name-input o2-input"
+                style="padding-top: 12px"
+              >
                 <q-input
-                  data-test="add-alert-name-input"
                   v-model="formData.name"
                   :label="t('alerts.name') + ' *'"
                   color="input-border"
@@ -76,9 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="min-width: 220px"
                 />
               </div>
-              <div class="alert-stream-type o2-input" style="padding-top: 0">
+              <div
+                data-test="add-alert-stream-type-select"
+                class="alert-stream-type o2-input"
+                style="padding-top: 0"
+              >
                 <q-select
-                  data-test="add-alert-stream-type-select"
                   v-model="formData.stream_type"
                   :options="streamTypes"
                   :label="t('alerts.streamType') + ' *'"
@@ -97,9 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="min-width: 120px"
                 />
               </div>
-              <div class="o2-input" style="padding-top: 0">
+              <div
+                data-test="add-alert-stream-select"
+                class="o2-input"
+                style="padding-top: 0"
+              >
                 <q-select
-                  data-test="add-alert-stream-select"
                   v-model="formData.stream_name"
                   :options="filteredStreams"
                   :label="t('alerts.stream_name') + ' *'"
@@ -194,11 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px solid rgba(0, 0, 0, 0.05)"
                   >
                     <div
+                      data-test="add-alert-delay-input"
                       style="width: 87px; margin-left: 0 !important"
                       class="silence-notification-input"
                     >
                       <q-input
-                        data-test="add-alert-delay-input"
                         v-model="formData.trigger_condition.silence"
                         type="number"
                         dense
@@ -240,44 +249,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("alerts.destination") + " *" }}
               </div>
-              <q-select
-                data-test="add-alert-destination-select"
-                v-model="formData.destinations"
-                :options="getFormattedDestinations"
-                color="input-border"
-                bg-color="input-bg q-mt-sm"
-                class="no-case"
-                stack-label
-                outlined
-                filled
-                dense
-                multiple
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                style="width: 250px"
-              >
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item
-                      tag="label"
-                      :data-test="`add-alert-detination-${option.opt}-select-item`"
-                    >
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="formData.destinations"
-                          :val="option.opt"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis"
-                          >{{ option.opt }}
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-              </q-select>
+              <div data-test="add-alert-destination-select">
+                <q-select
+                  v-model="formData.destinations"
+                  :options="getFormattedDestinations"
+                  color="input-border"
+                  bg-color="input-bg q-mt-sm"
+                  class="no-case"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  multiple
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="width: 250px"
+                >
+                  <template v-slot:option="option">
+                    <q-list dense>
+                      <q-item
+                        tag="label"
+                        :data-test="`add-alert-detination-${option.opt}-select-item`"
+                      >
+                        <q-item-section avatar>
+                          <q-checkbox
+                            size="xs"
+                            dense
+                            v-model="formData.destinations"
+                            :val="option.opt"
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="ellipsis"
+                            >{{ option.opt }}
+                          </q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </template>
+                </q-select>
+              </div>
             </div>
 
             <div class="q-mt-md">
@@ -291,35 +301,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="o2-input">
-              <q-input
-                data-test="add-alert-description-input"
-                v-model="formData.description"
-                :label="t('alerts.description')"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop q-mb-sm"
-                stack-label
-                outlined
-                filled
-                dense
-                tabindex="0"
-                style="width: 550px"
-              />
-
-              <q-input
-                data-test="add-alert-row-input"
-                v-model="formData.row_template"
-                :label="t('alerts.row')"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                tabindex="0"
-                style="width: 550px"
-              />
+              <div data-test="add-alert-description-input">
+                <q-input
+                  v-model="formData.description"
+                  :label="t('alerts.description')"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop q-mb-sm"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  style="width: 550px"
+                />
+              </div>
+              <div data-test="add-alert-row-input">
+                <q-input
+                  v-model="formData.row_template"
+                  :label="t('alerts.row')"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  style="width: 550px"
+                />
+              </div>
             </div>
 
             <div class="flex justify-start q-mt-lg">
