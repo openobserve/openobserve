@@ -1,8 +1,9 @@
 <template>
   <div>
-    <div class="text-bold">Conditions *</div>
+    <div data-test="alert-conditions-text" class="text-bold">Conditions *</div>
     <template v-if="!fields.length">
       <q-btn
+        data-test="alert-conditions-add-btn"
         color="primary"
         class="q-mt-sm text-bold add-field"
         label="Add Condition"
@@ -22,8 +23,12 @@
         v-for="(field, index) in (fields as any)"
         :key="field.uuid"
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
+        :data-test="`alert-conditions-${index + 1}`"
       >
-        <div class="q-ml-none o2-input">
+        <div
+          data-test="alert-conditions-select-column"
+          class="q-ml-none o2-input"
+        >
           <q-select
             v-model="field.column"
             :options="filteredFields"
@@ -45,7 +50,10 @@
             style="min-width: 220px"
           />
         </div>
-        <div class="q-ml-none o2-input">
+        <div
+          data-test="alert-conditions-operator-select"
+          class="q-ml-none o2-input"
+        >
           <q-select
             v-model="field.operator"
             :options="triggerOperators"
@@ -62,7 +70,10 @@
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
-        <div class="q-ml-none flex items-end o2-input">
+        <div
+          data-test="alert-conditions-value-input"
+          class="q-ml-none flex items-end o2-input"
+        >
           <q-input
             v-model="field.value"
             :options="streamFields"
@@ -85,7 +96,7 @@
           style="margin-bottom: 12px"
         >
           <q-btn
-            :data-test="`add-destination-header-${field['key']}-delete-btn`"
+            data-test="alert-conditions-delete-condition-btn"
             :icon="outlinedDelete"
             class="q-ml-xs iconHoverBtn"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -95,12 +106,11 @@
             round
             flat
             :title="t('alert_templates.edit')"
-            :disable="fields.length === 1"
             @click="deleteApiHeader(field)"
             style="min-width: auto"
           />
           <q-btn
-            data-test="add-destination-add-header-btn"
+            data-test="alert-conditions-add-condition-btn"
             v-if="index === fields.length - 1"
             icon="add"
             class="q-ml-xs iconHoverBtn"
