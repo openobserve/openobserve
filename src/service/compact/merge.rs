@@ -325,9 +325,7 @@ async fn merge_files(
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
-        if new_file_size > CONFIG.limit.max_file_size_on_disk as i64
-            && new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64
-        {
+        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
             break;
         }
         new_file_size += file.meta.original_size;
