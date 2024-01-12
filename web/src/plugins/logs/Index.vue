@@ -686,8 +686,15 @@ export default defineComponent({
       }
     },
     fullSQLMode(newVal) {
-      this.setQuery(newVal);
-      this.searchResultRef.reDrawChart();
+      if(newVal) {
+        this.setQuery(newVal);
+      } else {
+        this.searchObj.meta.sqlMode = false;
+        this.searchObj.data.query = "";
+        this.searchObj.data.editorValue = "";
+      }
+      this.getQueryData();
+      // this.searchResultRef.reDrawChart();
     },
     refreshHistogram() {
       if (this.searchObj.meta.histogramDirtyFlag == true) {
