@@ -325,14 +325,11 @@ async fn merge_files(
     let mut new_file_list = Vec::new();
     let mut deleted_files = Vec::new();
     for file in files_with_size.iter() {
-        if new_file_size > CONFIG.limit.max_file_size_on_disk as i64
-            && new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64
-        {
+        if new_file_size + file.meta.original_size > CONFIG.compact.max_file_size as i64 {
             break;
         }
         new_file_size += file.meta.original_size;
         new_file_list.push(file.clone());
-        log::info!("[COMPACT] merge small file: {}", &file.key);
         // metrics
         metrics::COMPACT_MERGED_FILES
             .with_label_values(&[org_id, stream_type.to_string().as_str()])
@@ -350,6 +347,7 @@ async fn merge_files(
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
+        log::info!("[COMPACT] merge small file: {}", &file.key);
         let data = match storage::get(&file.key).await {
             Ok(body) => body,
             Err(err) => {
