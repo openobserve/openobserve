@@ -481,27 +481,27 @@ export default defineComponent({
       useLocalOrganization(selectedOrg.value);
       // store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
 
-      if (
-        config.isCloud &&
-        selectedOrg.value.subscription_type == config.freePlan
-      ) {
-        await billings
-          .list_subscription(selectedOrg.value.identifier)
-          .then(async (res: any) => {
-            if (res.data.data.length == 0) {
-              router.push({ name: "plans" });
-            } else if (
-              res.data.data.CustomerBillingObj.customer_id == null ||
-              res.data.data.CustomerBillingObj.customer_id == ""
-            ) {
-              router.push({ name: "plans" });
-            } else {
-              await verifyStreamExist(selectedOrg.value);
-            }
-          });
-      } else {
-        await verifyStreamExist(selectedOrg.value);
-      }
+      // if (
+      //   config.isCloud &&
+      //   selectedOrg.value.subscription_type == config.freePlan
+      // ) {
+      //   await billings
+      //     .list_subscription(selectedOrg.value.identifier)
+      //     .then(async (res: any) => {
+      //       if (res.data.data.length == 0) {
+      //         router.push({ name: "plans" });
+      //       } else if (
+      //         res.data.data.CustomerBillingObj.customer_id == null ||
+      //         res.data.data.CustomerBillingObj.customer_id == ""
+      //       ) {
+      //         router.push({ name: "plans" });
+      //       } else {
+      //         await verifyStreamExist(selectedOrg.value);
+      //       }
+      //     });
+      // } else {
+      await verifyStreamExist(selectedOrg.value);
+      // }
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
