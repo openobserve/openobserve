@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_destinations.header") }}
           </div>
           <q-input
+            data-test="destination-list-search-input"
             v-model="filterQuery"
             borderless
             filled

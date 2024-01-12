@@ -41,12 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div style="width: 600px" class="q-mt-xl">
               <template v-if="!templates.length">
-                <div class="text-subtitle1">
+                <div
+                  class="text-subtitle1"
+                  data-test="alert-list-create-template-text"
+                >
                   It looks like you haven't created any Templates yet. To create
                   an Alert, you'll need to have at least one Destination and one
                   Template in place
                 </div>
                 <q-btn
+                  data-test="alert-list-create-template-btn"
                   class="q-mt-md"
                   label="Create Template"
                   size="md"
@@ -57,12 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-if="!destinations.length && templates.length">
-                <div class="text-subtitle1">
+                <div
+                  class="text-subtitle1"
+                  data-test="alert-list-create-destination-text"
+                >
                   It looks like you haven't created any Destinations yet. To
                   create an Alert, you'll need to have at least one Destination
                   and one Template in place
                 </div>
                 <q-btn
+                  data-test="alert-list-create-destination-btn"
                   class="q-mt-md"
                   label="Create Destination"
                   size="md"
@@ -81,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div
+              data-test="alert-list-loading-alert"
               v-if="alertStateLoadingMap[props.row.name]"
               style="display: inline-block; width: 33.14px; height: auto"
               class="flex justify-center items-center q-ml-xs"
@@ -96,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-btn
               v-else
-              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
               :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
               class="q-ml-xs material-symbols-outlined"
               padding="sm"
@@ -144,10 +153,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title" data-test="alerts-list-title">
+          <div s class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
           <q-input
+            data-test="alert-list-search-input"
             v-model="filterQuery"
             borderless
             filled
