@@ -1,8 +1,9 @@
 <template>
   <div>
-    <div class="text-bold">Conditions *</div>
+    <div data-test="alert-conditions-text" class="text-bold">Conditions *</div>
     <template v-if="!fields.length">
       <q-btn
+        data-test="alert-conditions-add-btn"
         color="primary"
         class="q-mt-sm text-bold add-field"
         label="Add Condition"
@@ -22,9 +23,11 @@
         v-for="(field, index) in (fields as any)"
         :key="field.uuid"
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
+        :data-test="`alert-conditions-${index + 1}`"
       >
         <div class="q-ml-none o2-input">
           <q-select
+            data-test="alert-conditions-select-column"
             v-model="field.column"
             :options="filteredFields"
             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -47,6 +50,7 @@
         </div>
         <div class="q-ml-none o2-input">
           <q-select
+            data-test="alert-conditions-operator-select"
             v-model="field.operator"
             :options="triggerOperators"
             :popup-content-style="{ textTransform: 'capitalize' }"
@@ -64,6 +68,7 @@
         </div>
         <div class="q-ml-none flex items-end o2-input">
           <q-input
+            data-test="alert-conditions-value-input"
             v-model="field.value"
             :options="streamFields"
             :popup-content-style="{ textTransform: 'capitalize' }"
@@ -85,7 +90,7 @@
           style="margin-bottom: 12px"
         >
           <q-btn
-            :data-test="`add-destination-header-${field['key']}-delete-btn`"
+            data-test="alert-conditions-delete-condition-btn"
             :icon="outlinedDelete"
             class="q-ml-xs iconHoverBtn"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -99,7 +104,7 @@
             style="min-width: auto"
           />
           <q-btn
-            data-test="add-destination-add-header-btn"
+            data-test="alert-conditions-add-condition-btn"
             v-if="index === fields.length - 1"
             icon="add"
             class="q-ml-xs iconHoverBtn"

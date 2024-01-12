@@ -2,6 +2,7 @@
   <div class="scheduled-alerts">
     <div class="scheduled-alert-tabs q-mb-lg">
       <q-tabs
+        data-test="scheduled-alert-tabs"
         v-model="tab"
         no-caps
         outside-arrows
@@ -10,9 +11,18 @@
         class="bg-white text-primary"
         @update:model-value="updateTab"
       >
-        <q-tab name="custom" :label="t('alerts.custom')" />
-        <q-tab name="sql" :label="t('alerts.sql')" />
         <q-tab
+          data-test="scheduled-alert-custom-tab"
+          name="custom"
+          :label="t('alerts.custom')"
+        />
+        <q-tab
+          data-test="scheduled-alert-sql-tab"
+          name="sql"
+          :label="t('alerts.sql')"
+        />
+        <q-tab
+          data-test="scheduled-alert-metrics-tab"
           v-if="alertData.stream_type === 'metrics'"
           name="promql"
           :label="t('alerts.promql')"
@@ -35,6 +45,7 @@
       </div>
       <template v-if="tab === 'sql'">
         <query-editor
+          data-test="scheduled-alert-sql-editor"
           ref="queryEditorRef"
           editor-id="alerts-query-editor"
           class="monaco-editor q-mb-md"
@@ -44,6 +55,7 @@
       </template>
       <template v-if="tab === 'promql'">
         <query-editor
+          data-test="scheduled-alert-promql-editor"
           ref="queryEditorRef"
           editor-id="alerts-query-editor"
           class="monaco-editor q-mb-md"
@@ -65,7 +77,7 @@
         <div style="width: 180px">Trigger if the value is</div>
         <div class="flex justify-start items-center">
           <q-select
-            data-test="add-alert-stream-select"
+            data-test="scheduled-alert-promlq-condition-operator-select"
             v-model="promqlCondition.operator"
             :options="triggerOperators"
             color="input-border"
@@ -85,7 +97,7 @@
             class="silence-notification-input o2-input"
           >
             <q-input
-              data-test="add-alert-delay-input"
+              data-test="scheduled-alert-promlq-condition-value"
               v-model="promqlCondition.value"
               type="number"
               dense
@@ -102,8 +114,11 @@
         v-if="tab === 'custom'"
         class="flex justify-start items-center text-bold q-mb-lg"
       >
-        <div style="width: 172px">Aggregation</div>
+        <div data-test="scheduled-alert-aggregation-title" style="width: 172px">
+          Aggregation
+        </div>
         <q-toggle
+          data-test="scheduled-alert-aggregation-toggle"
           v-model="_isAggregationEnabled"
           size="sm"
           color="primary"
@@ -116,7 +131,11 @@
         v-if="_isAggregationEnabled && aggregationData"
         class="flex items-center no-wrap q-mr-sm q-mb-sm"
       >
-        <div class="text-bold" style="width: 180px">
+        <div
+          data-test="scheduled-alert-group-by-title"
+          class="text-bold"
+          style="width: 180px"
+        >
           {{ t("alerts.groupBy") }}
         </div>
         <div
@@ -127,9 +146,12 @@
             v-for="(group, index) in aggregationData.group_by"
             :key="group"
           >
-            <div class="flex justify-start items-center no-wrap o2-input">
+            <div
+              :data-test="`scheduled-alert-group-by-${index + 1}`"
+              class="flex justify-start items-center no-wrap o2-input"
+            >
               <q-select
-                data-test="add-alert-stream-select"
+                data-test="scheduled-alert-group-by-column-select"
                 v-model="aggregationData.group_by[index]"
                 :options="filteredFields"
                 color="input-border"
@@ -150,6 +172,7 @@
                 @update:model-value="updateTrigger"
               />
               <q-btn
+                data-test="scheduled-alert-group-by-delete-btn"
                 :icon="outlinedDelete"
                 class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
                 :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -165,6 +188,7 @@
             </div>
           </template>
           <q-btn
+            data-test="scheduled-alert-group-by-add-btn"
             icon="add"
             class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -180,7 +204,11 @@
         </div>
       </div>
       <div class="flex justify-start items-center q-mb-xs no-wrap q-pb-md">
-        <div class="text-bold" style="width: 180px">
+        <div
+          data-test="scheduled-alert-threshold-title"
+          class="text-bold"
+          style="width: 180px"
+        >
           {{ t("alerts.threshold") + " *" }}
         </div>
         <div style="width: calc(100% - 180px)" class="position-relative">
@@ -188,7 +216,7 @@
             <div class="flex justify-start items-center">
               <div class="threshould-input q-mr-xs o2-input">
                 <q-select
-                  data-test="add-alert-stream-select"
+                  data-test="scheduled-alert-threshold-function-select"
                   v-model="aggregationData.function"
                   :options="aggFunctions"
                   color="input-border"
@@ -206,7 +234,7 @@
               </div>
               <div class="threshould-input q-mr-xs o2-input">
                 <q-select
-                  data-test="add-alert-stream-select"
+                  data-test="scheduled-alert-threshold-column-select"
                   v-model="aggregationData.having.column"
                   :options="filteredNumericColumns"
                   color="input-border"
@@ -226,7 +254,7 @@
               </div>
               <div class="threshould-input q-mr-xs o2-input q-mt-sm">
                 <q-select
-                  data-test="add-alert-stream-select"
+                  data-test="scheduled-alert-threshold-operator-select"
                   v-model="aggregationData.having.operator"
                   :options="triggerOperators"
                   color="input-border"
@@ -248,7 +276,7 @@
                   class="silence-notification-input o2-input"
                 >
                   <q-input
-                    data-test="add-alert-delay-input"
+                    data-test="scheduled-alert-threshold-value-input"
                     v-model="aggregationData.having.value"
                     type="number"
                     dense
@@ -262,6 +290,7 @@
               </div>
             </div>
             <div
+              data-test="scheduled-alert-threshold-error-text"
               v-if="
                 !aggregationData.function ||
                 !aggregationData.having.column ||
@@ -278,7 +307,7 @@
             <div class="flex justify-start items-center">
               <div class="threshould-input">
                 <q-select
-                  data-test="add-alert-stream-select"
+                  data-test="scheduled-alert-threshold-operator-select"
                   v-model="triggerData.operator"
                   :options="triggerOperators"
                   color="input-border"
@@ -304,7 +333,7 @@
                   class="silence-notification-input"
                 >
                   <q-input
-                    data-test="add-alert-delay-input"
+                    data-test="scheduled-alert-threshold-value-input"
                     v-model="triggerData.threshold"
                     type="number"
                     dense
@@ -315,6 +344,7 @@
                   />
                 </div>
                 <div
+                  data-test="scheduled-alert-threshold-unit"
                   style="
                     min-width: 90px;
                     margin-left: 0 !important;
@@ -331,6 +361,7 @@
               </div>
             </div>
             <div
+              data-test="scheduled-alert-threshold-error-text"
               v-if="!triggerData.operator || !Number(triggerData.threshold)"
               class="text-red-8 q-pt-xs absolute"
               style="font-size: 11px; line-height: 12px"
@@ -341,7 +372,11 @@
         </div>
       </div>
       <div class="flex items-center q-mr-sm">
-        <div class="text-bold" style="width: 180px">
+        <div
+          data-test="scheduled-alert-period-title"
+          class="text-bold"
+          style="width: 180px"
+        >
           {{ t("alerts.period") + " *" }}
         </div>
         <div style="min-height: 58px">
@@ -354,7 +389,7 @@
               class="silence-notification-input"
             >
               <q-input
-                data-test="add-alert-delay-input"
+                data-test="scheduled-alert-period-input"
                 v-model="triggerData.period"
                 type="number"
                 dense
@@ -365,6 +400,7 @@
               />
             </div>
             <div
+              data-test="scheduled-alert-period-unit"
               style="
                 min-width: 90px;
                 margin-left: 0 !important;
@@ -378,6 +414,7 @@
             </div>
           </div>
           <div
+            data-test="scheduled-alert-period-error-text"
             v-if="!Number(triggerData.period)"
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"

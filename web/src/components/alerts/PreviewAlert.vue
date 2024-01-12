@@ -1,6 +1,6 @@
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
-    <div style="height: 200px">
+    <div style="height: 200px" data-test="alert-preview-chart">
       <PanelSchemaRenderer
         v-if="chartData"
         :height="6"

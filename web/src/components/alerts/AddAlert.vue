@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="full-width">
     <div class="row items-center no-wrap q-mx-md q-my-sm">
-      <div class="flex items-center" data-test="add-alert-title">
+      <div class="flex items-center">
         <div
+          data-test="add-alert-back-btn"
           class="flex justify-center items-center q-mr-md cursor-pointer"
           style="
             border: 1.5px solid;
@@ -31,10 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-if="beingUpdated" class="text-h6">
+        <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
           {{ t("alerts.updateTitle") }}
         </div>
-        <div v-else class="text-h6">{{ t("alerts.addTitle") }}</div>
+        <div v-else class="text-h6" data-test="add-alert-title">
+          {{ t("alerts.addTitle") }}
+        </div>
       </div>
     </div>
 
@@ -75,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="alert-stream-type o2-input" style="padding-top: 0">
                 <q-select
+                  data-test="add-alert-stream-type-select"
                   v-model="formData.stream_type"
                   :options="streamTypes"
                   :label="t('alerts.streamType') + ' *'"
@@ -204,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div
+                      data-test="add-alert-delay-unit"
                       style="
                         min-width: 90px;
                         margin-left: 0 !important;
@@ -217,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
+                  data-test="add-alert-delay-error"
                   v-if="formData.trigger_condition.silence < 1"
                   class="text-red-8 q-pt-xs"
                   style="font-size: 11px; line-height: 12px"
@@ -227,7 +233,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="o2-input flex justify-start items-center">
-              <div class="text-bold q-pb-sm" style="width: 180px">
+              <div
+                data-test="add-alert-destination-title"
+                class="text-bold q-pb-sm"
+                style="width: 180px"
+              >
                 {{ t("alerts.destination") + " *" }}
               </div>
               <q-select
@@ -247,7 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-slot:option="option">
                   <q-list dense>
-                    <q-item tag="label">
+                    <q-item
+                      tag="label"
+                      :data-test="`add-alert-detination-${option.opt}-select-item`"
+                    >
                       <q-item-section avatar>
                         <q-checkbox
                           size="xs"
