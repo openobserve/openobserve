@@ -42,9 +42,44 @@ export const getIndexForName = (name: any, colorArray: any) => {
   return index % colorArray.length;
 };
 
-const nameToColor = (name: any, colorArray: any) => {
+// const nameToColor = (name: any, colorArray: any) => {
+//   const index = getIndexForName(name, colorArray);
+//   return colorArray[index];
+// };
+const usedColors = new Map();
+const nameColorMap = new Map();
+
+const adjustColor = (color, amount) => {
+  const usePound = color[0] === "#";
+  const num = usePound ? color.slice(1) : color;
+  const scale = amount < 0 ? 0 : 255;
+  const inverseScale = amount < 0 ? -amount : 1 - amount;
+
+  const r = scale - Math.round((scale - parseInt(num.substring(0, 2), 16)) * inverseScale);
+  const g = scale - Math.round((scale - parseInt(num.substring(2, 4), 16)) * inverseScale);
+  const b = scale - Math.round((scale - parseInt(num.substring(4, 6), 16)) * inverseScale);
+
+  return (usePound ? "#" : "") + (0x1000000 + (r << 16) | (g << 8) | b).toString(16).slice(1);
+};
+
+const nameToColor = (name, colorArray) => {
+  if (nameColorMap.has(name)) {
+    return nameColorMap.get(name);
+  }
+
   const index = getIndexForName(name, colorArray);
-  return colorArray[index];
+  let color = colorArray[index];
+
+  if (usedColors.has(color)) {
+    const amount = usedColors.get(color) * 99; // Adjust the shade by 10% each time
+    color = adjustColor(color, amount);
+    usedColors.set(color, usedColors.get(color) + 1);
+  } else {
+    usedColors.set(color, 1);
+  }
+
+  nameColorMap.set(name, color);
+  return color;
 };
 
 function shadeColor(color: any, value: any, min: any, max: any) {
@@ -245,7 +280,20 @@ export const getColor = (
     case "palette-classic": {
       // return color using colorArrayBySeries
       // NOTE: here value will be series name
-      return nameToColor(seriesName, colorArrayBySeries);
+      // return nameToColor(seriesName, colorArrayBySeries);
+      function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+    
+        // Convert the hash to a number between 0 and 360
+        let hue = hash % 361;
+    
+        // Generate the HSL color
+        return `hsl(${hue}, 50%, 50%)`;
+    }
+    return stringToColor(seriesName);
     }
 
     case "green-yellow-red": {
