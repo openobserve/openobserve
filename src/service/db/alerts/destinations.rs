@@ -38,7 +38,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error>
 
 pub async fn set(org_id: &str, destination: &Destination) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/destinations/{org_id}/{}",destination.name);
+    let key = format!("/destinations/{org_id}/{}", destination.name);
     Ok(db
         .put(
             &key,
