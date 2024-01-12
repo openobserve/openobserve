@@ -166,7 +166,7 @@ def test_e2e_getschema(create_session, base_url):
     url = base_url
     org_id = "default"
 
-    resp_get_streamschema = session.get(f"{url}api/{org_id}/newpy_tests/schema")
+    resp_get_streamschema = session.get(f"{url}api/{org_id}/streams/newpy_tests/schema")
 
     print(resp_get_streamschema.content)
     assert (
@@ -181,7 +181,7 @@ def test_e2e_deleteinvalidstreams(create_session, base_url):
     url = base_url
     org_id = "default"
 
-    resp_get_deletestreams = session.delete(f"{url}api/{org_id}/invalidstream")
+    resp_get_deletestreams = session.delete(f"{url}api/{org_id}/streams/invalidstream")
 
     print(resp_get_deletestreams.content)
     assert (
@@ -195,7 +195,7 @@ def test_e2e_incorrectstreamesettings(create_session, base_url):
     session = create_session
     url = base_url
     org_id = "default"
-    resp_get_streamssettings = session.post(f"{url}api/{org_id}/newpy_tests/settings")
+    resp_get_streamssettings = session.put(f"{url}api/{org_id}/streams/newpy_tests/settings")
 
     print(resp_get_streamssettings.content)
     assert (
@@ -210,7 +210,7 @@ def test_e2e_deletevalidstreams(create_session, base_url):
     url = base_url
     org_id = "default"
 
-    resp_get_allstreams = session.delete(f"{url}api/{org_id}/newpy_tests")
+    resp_get_allstreams = session.delete(f"{url}api/{org_id}/streams/newpy_tests")
 
     print(resp_get_allstreams.content)
     assert (

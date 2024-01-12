@@ -18,6 +18,12 @@ import http from "./http";
 const destination = {
   create: ({ org_identifier, destination_name, data }: any) => {
     return http().post(
+      `/api/${org_identifier}/alerts/destinations`,
+      data
+    );
+  },
+  update: ({ org_identifier, destination_name, data }: any) => {
+    return http().put(
       `/api/${org_identifier}/alerts/destinations/${destination_name}`,
       data
     );

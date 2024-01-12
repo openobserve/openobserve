@@ -5,7 +5,7 @@ def test_e2e_organisations(create_session, base_url):
     url = base_url
     org_id = "default"
 
-    resp_get_allorgs = session.get(f"{url}api/{org_id}/organizations")
+    resp_get_allorgs = session.get(f"{url}api/organizations")
 
     print(resp_get_allorgs.content)
     assert (
@@ -50,7 +50,7 @@ def test_e2e_passcode(create_session, base_url):
     url = base_url
     org_id = "default"
 
-    resp_get_allorgs = session.get(f"{url}api/{org_id}/organizations/passcode")
+    resp_get_allorgs = session.get(f"{url}api/{org_id}/passcode")
 
     print(resp_get_allorgs.content)
     assert (

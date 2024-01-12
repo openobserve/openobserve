@@ -18,6 +18,12 @@ import http from "./http";
 const template = {
   create: ({ org_identifier, template_name, data }: any) => {
     return http().post(
+      `/api/${org_identifier}/alerts/templates`,
+      data
+    );
+  },
+  update: ({ org_identifier, template_name, data }: any) => {
+    return http().put(
       `/api/${org_identifier}/alerts/templates/${template_name}`,
       data
     );

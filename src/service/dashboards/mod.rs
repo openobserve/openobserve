@@ -21,10 +21,14 @@ use config::ider;
 use crate::{
     common::{
         meta::{
+            authz::Authz,
             dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
             http::HttpResponse as MetaHttpResponse,
         },
-        utils::json,
+        utils::{
+            auth::{remove_ownership, set_ownership},
+            json,
+        },
     },
     service::db::dashboards,
 };
@@ -43,7 +47,22 @@ pub async fn create_dashboard(
     match dashboards::folders::get(org_id, folder_id).await {
         Ok(_) => {
             let dashboard_id = ider::generate();
-            save_dashboard(org_id, &dashboard_id, folder_id, body).await
+            match save_dashboard(org_id, &dashboard_id, folder_id, body).await {
+                Ok(res) => {
+                    set_ownership(
+                        org_id,
+                        "dashboards",
+                        Authz {
+                            obj_id: dashboard_id,
+                            parent_type: "folders".to_owned(),
+                            parent: folder_id.to_owned(),
+                        },
+                    )
+                    .await;
+                    Ok(res)
+                }
+                Err(_) => todo!(),
+            }
         }
         Err(_) => {
             if folder_id == DEFAULT_FOLDER {
@@ -54,7 +73,27 @@ pub async fn create_dashboard(
                 };
                 folders::save_folder(org_id, folder, true).await?;
                 let dashboard_id = ider::generate();
-                save_dashboard(org_id, &dashboard_id, folder_id, body).await
+                match save_dashboard(org_id, &dashboard_id, folder_id, body).await {
+                    Ok(res) => {
+                        set_ownership(
+                            org_id,
+                            "dashboards",
+                            Authz {
+                                obj_id: dashboard_id,
+                                parent_type: "folders".to_owned(),
+                                parent: folder_id.to_owned(),
+                            },
+                        )
+                        .await;
+                        Ok(res)
+                    }
+                    Err(error) => Ok(HttpResponse::InternalServerError().json(
+                        MetaHttpResponse::message(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            error.to_string(),
+                        ),
+                    )),
+                }
             } else {
                 Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                     http::StatusCode::NOT_FOUND.into(),
@@ -113,10 +152,22 @@ pub async fn delete_dashboard(
         )));
     }
     match dashboards::delete(org_id, dashboard_id, folder_id).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Dashboard deleted".to_string(),
-        ))),
+        Ok(_) => {
+            remove_ownership(
+                org_id,
+                "dashboards",
+                Authz {
+                    obj_id: dashboard_id.to_owned(),
+                    parent_type: "folders".to_owned(),
+                    parent: folder_id.to_owned(),
+                },
+            )
+            .await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "Dashboard deleted".to_string(),
+            )))
+        }
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

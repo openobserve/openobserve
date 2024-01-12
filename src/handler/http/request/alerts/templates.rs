@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, web, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpResponse};
 
 use crate::{
     common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse},
@@ -32,6 +32,37 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+      ),
+    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/alerts/templates")]
+pub async fn save_template(
+    path: web::Path<String>,
+    tmpl: web::Json<Template>,
+) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+    let tmpl = tmpl.into_inner();
+    // let name = name.trim();
+    match templates::save(&org_id, "", tmpl).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+/// UpdateTemplate
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "UpdateTemplate",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
     request_body(content = Template, description = "Template data", content_type = "application/json"),    
@@ -40,8 +71,8 @@ use crate::{
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/alerts/templates/{template_name}")]
-pub async fn save_template(
+#[put("/{org_id}/alerts/templates/{template_name}")]
+pub async fn update_template(
     path: web::Path<(String, String)>,
     tmpl: web::Json<Template>,
 ) -> Result<HttpResponse, Error> {
@@ -49,7 +80,7 @@ pub async fn save_template(
     let tmpl = tmpl.into_inner();
     let name = name.trim();
     match templates::save(&org_id, name, tmpl).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
+        Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

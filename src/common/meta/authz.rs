@@ -13,23 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
-pub mod dashboards;
-pub mod enrichment_table;
-pub mod functions;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod prom;
-pub mod rum;
-pub mod search;
-pub mod status;
-pub mod stream;
-pub mod syslog;
-pub mod traces;
-pub mod users;
-pub mod authz;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct Authz {
+    pub obj_id: String,
+    pub parent_type: String,
+    pub parent: String,
+}
+impl Authz {
+    pub fn new(obj_id: &str) -> Authz {
+        Authz {
+            obj_id: obj_id.to_string(),
+            ..Default::default()
+        }
+    }
+}

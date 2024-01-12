@@ -23,8 +23,8 @@ use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::jwt::{process_token, verify_decode_token},
-    crate::handler::http::auth::validator::PKCE_STATE_ORG,
+    crate::common::utils::jwt::verify_decode_token,
+    crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
     actix_web::{http::header, web, HttpRequest},
     o2_enterprise::enterprise::{
         common::infra::config::O2_CONFIG,

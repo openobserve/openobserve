@@ -25,11 +25,13 @@ use crate::{
     common::{
         infra::config::STREAM_FUNCTIONS,
         meta::{
+            authz::Authz,
             functions::{
                 FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform,
             },
             http::HttpResponse as MetaHttpResponse,
         },
+        utils::auth::{remove_ownership, set_ownership},
     },
     service::{db, ingestion::compile_vrl_function},
 };
@@ -73,11 +75,13 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
                     error.to_string(),
                 )),
             );
+        } else {
+            set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                FN_SUCCESS.to_string(),
+            )))
         }
-        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            FN_SUCCESS.to_string(),
-        )))
     }
 }
 
@@ -168,10 +172,14 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     }
     let result = db::functions::delete(&org_id, &fn_name).await;
     match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            FN_DELETED.to_string(),
-        ))),
+        Ok(_) => {
+            remove_ownership(&org_id, "functions", Authz::new(&fn_name)).await;
+
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                FN_DELETED.to_string(),
+            )))
+        }
         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             StatusCode::NOT_FOUND.into(),
             FN_NOT_FOUND.to_string(),

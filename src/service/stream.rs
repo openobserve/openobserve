@@ -27,6 +27,7 @@ use crate::{
         infra::{cache::stats, config::STREAM_SCHEMAS},
         meta::{
             self,
+            authz::Authz,
             http::HttpResponse as MetaHttpResponse,
             prom,
             stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
@@ -263,6 +264,8 @@ pub async fn delete_stream(
             )),
         );
     };
+
+    crate::common::utils::auth::remove_ownership(org_id, "streams", Authz::new(stream_name)).await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),
