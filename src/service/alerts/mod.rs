@@ -20,14 +20,16 @@ use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
 use config::{meta::stream::StreamType, CONFIG};
 
+use super::promql;
 use crate::{
     common::{
         meta::{
             alerts::{
                 destinations::{DestinationWithTemplate, HTTPType},
-                Alert, Condition, Operator, QueryCondition, QueryType,
+                AggFunction, Alert, Condition, Operator, QueryCondition, QueryType,
             },
-            search, authz::Authz,
+            authz::Authz,
+            search,
         },
         utils::{
             auth::{remove_ownership, set_ownership},
@@ -113,6 +115,7 @@ pub async fn save(
         QueryType::PromQL => {
             if alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
+                || alert.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
                     "Alert with PromQL mode should have a query"
@@ -289,33 +292,94 @@ impl QueryCondition {
         &self,
         alert: &Alert,
     ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+        let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
-                if let Some(v) = self.conditions.as_ref() {
-                    build_sql(alert, v).await?
-                } else {
+                let Some(v) = self.conditions.as_ref() else {
                     return Ok(None);
-                }
+                };
+                build_sql(alert, v).await?
             }
             QueryType::SQL => {
-                if let Some(v) = self.sql.as_ref() {
-                    if v.is_empty() {
-                        return Ok(None);
-                    } else {
-                        v.to_string()
-                    }
-                } else {
+                let Some(v) = self.sql.as_ref() else {
                     return Ok(None);
+                };
+                if v.is_empty() {
+                    return Ok(None);
+                } else {
+                    v.to_string()
                 }
             }
             QueryType::PromQL => {
-                // TODO handle promql
-                return Ok(None);
+                let Some(v) = self.promql.as_ref() else {
+                    return Ok(None);
+                };
+                if v.is_empty() {
+                    return Ok(None);
+                }
+                let start = now
+                    - Duration::minutes(alert.trigger_condition.period)
+                        .num_microseconds()
+                        .unwrap();
+                let end = now;
+                let condition = self.promql_condition.as_ref().unwrap();
+                let req = promql::MetricsQueryRequest {
+                    query: format!(
+                        "({}) {} {}",
+                        v,
+                        match &condition.operator {
+                            &Operator::EqualTo => "==".to_string(),
+                            _ => condition.operator.to_string(),
+                        },
+                        condition.value.as_f64().unwrap_or_default()
+                    ),
+                    start,
+                    end,
+                    step: std::cmp::max(
+                        promql::micros(promql::MINIMAL_INTERVAL),
+                        (end - start) / promql::MAX_DATA_POINTS,
+                    ),
+                };
+                let resp = promql::search::search(&alert.org_id, &req, 0).await?;
+                let promql::value::Value::Matrix(value) = resp else {
+                    log::warn!(
+                        "Alert evaluate: PromQL query {} returned unexpected response: {:?}",
+                        v,
+                        resp
+                    );
+                    return Ok(None);
+                };
+                // TODO calculate the sample in a row, suddenly a sample can be ignored
+                let value = value
+                    .into_iter()
+                    .filter(|f| f.samples.len() >= alert.trigger_condition.threshold as usize)
+                    .collect::<Vec<_>>();
+                return if value.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(
+                        value
+                            .iter()
+                            .map(|v| {
+                                let mut val = Map::with_capacity(v.labels.len() + 2);
+                                for label in v.labels.iter() {
+                                    val.insert(
+                                        label.name.to_string(),
+                                        label.value.to_string().into(),
+                                    );
+                                }
+                                let last_sample = v.samples.last().unwrap();
+                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
+                                val.insert("value".to_string(), last_sample.value.into());
+                                val
+                            })
+                            .collect(),
+                    ))
+                };
             }
         };
 
         // fire the query
-        let now = Utc::now().timestamp_micros();
         let req = search::Request {
             query: search::Query {
                 sql: sql.clone(),
@@ -465,13 +529,26 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         };
         build_expr(&agg.having, "alert_agg_value", data_type)?
     };
+
+    let func_expr = match agg.function {
+        AggFunction::Avg => format!("AVG(\"{}\")", agg.having.column),
+        AggFunction::Max => format!("MAX(\"{}\")", agg.having.column),
+        AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
+        AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
+        AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
+        AggFunction::P50 => format!("approx_percentile_cont(\"{}\", 0.5)", agg.having.column),
+        AggFunction::P75 => format!("approx_percentile_cont(\"{}\", 0.75)", agg.having.column),
+        AggFunction::P90 => format!("approx_percentile_cont(\"{}\", 0.9)", agg.having.column),
+        AggFunction::P95 => format!("approx_percentile_cont(\"{}\", 0.95)", agg.having.column),
+        AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
+    };
+
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
-                "SELECT {}, {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+                "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
-                agg.function.to_string(),
-                agg.having.column,
+                func_expr,
                 CONFIG.common.column_timestamp,
                 CONFIG.common.column_timestamp,
                 alert.stream_name,
@@ -483,9 +560,8 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
     }
     if sql.is_empty() {
         sql = format!(
-            "SELECT {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            agg.function.to_string(),
-            agg.having.column,
+            "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
+            func_expr,
             CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp,
             alert.stream_name,
