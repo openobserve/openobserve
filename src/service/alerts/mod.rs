@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use config::{meta::stream::StreamType, FxIndexMap, CONFIG};
+use config::{meta::stream::StreamType, CONFIG};
 
 use super::promql;
 use crate::{
@@ -327,7 +327,10 @@ impl QueryCondition {
                     query: format!(
                         "({}) {} {}",
                         v,
-                        condition.operator.to_string(),
+                        match &condition.operator {
+                            &Operator::EqualTo => "==".to_string(),
+                            _ => condition.operator.to_string(),
+                        },
                         condition.value.as_f64().unwrap_or_default()
                     ),
                     start,
@@ -346,32 +349,30 @@ impl QueryCondition {
                     );
                     return Ok(None);
                 };
-                return if value.len() < alert.trigger_condition.threshold as usize {
+                // TODO calculate the sample in a row, suddenly a sample can be ignored
+                let value = value
+                    .into_iter()
+                    .filter(|f| f.samples.len() >= alert.trigger_condition.threshold as usize)
+                    .collect::<Vec<_>>();
+                return if value.is_empty() {
                     Ok(None)
                 } else {
                     Ok(Some(
                         value
                             .iter()
                             .map(|v| {
-                                let labels_map = v
-                                    .labels
-                                    .iter()
-                                    .map(|l| (l.name.as_str(), l.value.as_str()))
-                                    .collect::<FxIndexMap<_, _>>();
-                                v.samples
-                                    .iter()
-                                    .map(|s| {
-                                        let mut map = Map::with_capacity(labels_map.len() + 2);
-                                        for (key, value) in labels_map.iter() {
-                                            map.insert(key.to_string(), value.to_string().into());
-                                        }
-                                        map.insert("_timestamp".to_string(), s.timestamp.into());
-                                        map.insert("value".to_string(), s.value.into());
-                                        map
-                                    })
-                                    .collect::<Vec<_>>()
+                                let mut val = Map::with_capacity(v.labels.len() + 2);
+                                for label in v.labels.iter() {
+                                    val.insert(
+                                        label.name.to_string(),
+                                        label.value.to_string().into(),
+                                    );
+                                }
+                                let last_sample = v.samples.last().unwrap();
+                                val.insert("_timestamp".to_string(), last_sample.timestamp.into());
+                                val.insert("value".to_string(), last_sample.value.into());
+                                val
                             })
-                            .flatten()
                             .collect(),
                     ))
                 };
