@@ -577,9 +577,9 @@ export const convertPromQLData = (
         legendWidth = panelSchema.config.legend_width.value;
       }
     } else {
-      const maxValue = options.series
-        .map((it: any) => it.name)
-        .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
+      const maxValue = options.series.reduce((max: any, it: any) => {
+        return max.length < it?.name?.length ? it?.name : max;
+      }, "");
 
       // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =

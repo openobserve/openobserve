@@ -1461,19 +1461,13 @@ export const convertSQLData = (
     } else {
       let maxValue: string;
       if (panelSchema.type === "pie" || panelSchema.type === "donut") {
-        maxValue = options.series[0].data
-          .map((item: any) => item.name)
-          .reduce(
-            (max: any, it: any) => (max.length < it.length ? it : max),
-            ""
-          );
+        maxValue = options.series[0].data.reduce((max: any, it: any) => {
+          return max.length < it?.name?.length ? it?.name : max;
+        }, "");
       } else {
-        maxValue = options.series
-          .map((it: any) => it.name)
-          .reduce(
-            (max: any, it: any) => (max.length < it.length ? it : max),
-            ""
-          );
+        maxValue = options.series.reduce((max: any, it: any) => {
+          return max.length < it?.name?.length ? it?.name : max;
+        }, "");
       }
 
       // If legend_width is not provided or has invalid format, calculate it based on other criteria
