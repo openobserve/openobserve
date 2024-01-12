@@ -25,9 +25,10 @@ use crate::{
         meta::{
             alerts::{
                 destinations::{DestinationWithTemplate, HTTPType},
-                Alert, Condition, Operator, QueryCondition, QueryType,
+                AggFunction, Alert, Condition, Operator, QueryCondition, QueryType,
             },
-            search, authz::Authz,
+            authz::Authz,
+            search,
         },
         utils::{
             auth::{remove_ownership, set_ownership},
@@ -465,13 +466,26 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
         };
         build_expr(&agg.having, "alert_agg_value", data_type)?
     };
+
+    let func_expr = match agg.function {
+        AggFunction::Avg => format!("AVG(\"{}\")", agg.having.column),
+        AggFunction::Max => format!("MAX(\"{}\")", agg.having.column),
+        AggFunction::Min => format!("MIN(\"{}\")", agg.having.column),
+        AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
+        AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
+        AggFunction::P50 => format!("approx_percentile_cont(\"{}\", 0.5)", agg.having.column),
+        AggFunction::P75 => format!("approx_percentile_cont(\"{}\", 0.75)", agg.having.column),
+        AggFunction::P90 => format!("approx_percentile_cont(\"{}\", 0.9)", agg.having.column),
+        AggFunction::P95 => format!("approx_percentile_cont(\"{}\", 0.95)", agg.having.column),
+        AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
+    };
+
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
-                "SELECT {}, {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+                "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
-                agg.function.to_string(),
-                agg.having.column,
+                func_expr,
                 CONFIG.common.column_timestamp,
                 CONFIG.common.column_timestamp,
                 alert.stream_name,
@@ -483,9 +497,8 @@ async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, an
     }
     if sql.is_empty() {
         sql = format!(
-            "SELECT {}(\"{}\") AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            agg.function.to_string(),
-            agg.having.column,
+            "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
+            func_expr,
             CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp,
             alert.stream_name,
