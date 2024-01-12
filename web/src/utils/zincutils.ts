@@ -334,12 +334,6 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       .nameList(local_organization?.value?.identifier, "", false)
       .then((response) => {
         if (response.data.list.length == 0) {
-          q.notify({
-            type: "warning",
-            message:
-              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
-            timeout: 5000,
-          });
           next({ path: "/ingestion" });
         } else {
           next();
