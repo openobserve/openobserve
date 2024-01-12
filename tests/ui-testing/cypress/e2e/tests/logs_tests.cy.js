@@ -878,11 +878,9 @@ describe("Logs testcases", () => {
           // skip the first row
           cy.wrap($el)
             .find("td:first() div div:nth-child(2) span span")
-            .should(($span) => {
-              const date = $span.text();
-              const dateWithinRange =
-                date >= startDateStr && date <= endDateStr;
-              expect(dateWithinRange).to.be.true;
+            .should(($el) => {
+              const date = $el.text();
+              expect(date >= startDateStr && date <= endDateStr).to.be.true;
             });
         }
       });
@@ -966,6 +964,43 @@ describe("Logs testcases", () => {
     cy.get('[data-test="menu-link-/logs-item"]').click({ force: true });
     cy.contains(".a=2").should("be.visible");
   });
+  
+  it("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
+    // Wait for 2 seconds
+    cy.wait(2000);
+    // Type the value of a variable into an input field
+    cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[data-cy="date-time-button"]').click({ force: true });
+    cy.get('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
+      force: true,
+    });
+    logstests.addFeildandSubValue();
+    logstests.addsubFeildValue();
+    //click on the field
+    // get the data from the value variable
+    cy.wait("@value", { timeout: 5000 })
+      .its("response.statusCode")
+      .should("eq", 200);
+    logstests.addsubFeildValue();
+    cy.get("@value").its("response.body.hits").should("be.an", "array");
+    logstests.clickFeildSubvalue();
+    cy.wait(2000);
+    logstests.valueAddedOnPlusClick();
+    cy.intercept("GET", logData.ValueQuery).as("value");
+    logstests.clickOnFirstField();
+    cy.wait("@value", { timeout: 5000 })
+      .its("response.statusCode")
+      .should("eq", 200);
+    cy.get("@value").its("response.body.hits").should("be.an", "array");
+    logstests.addSecondFieldOnEditor();
+    logstests.clickOnEqualToButton();
+    logstests.bothFieldAddedOnEqualToClick();
+    cy.get('[aria-label="SQL Mode"] > .q-toggle__label').click({ force: true });
+    applyQueryButton();
+    cy.get('[aria-label="SQL Mode"] > .q-toggle__label').click({ force: true });
+    cy.get('.q-spinner').should('not.be.visible')
+  });
+
   // it.only("should enter function, edit and then delete the function", () => {
   //   cy.intercept("GET", logData.ValueQuery).as("value");
   //   logstests.clickVrlQueryToggle()
