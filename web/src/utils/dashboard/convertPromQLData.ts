@@ -561,10 +561,6 @@ export const convertPromQLData = (
     panelSchema.type != "gauge" &&
     panelSchema.type != "metric"
   ) {
-    const maxValue = options.series
-      .map((it: any) => it.name)
-      .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
-
     let legendWidth;
 
     if (
@@ -581,6 +577,10 @@ export const convertPromQLData = (
         legendWidth = panelSchema.config.legend_width.value;
       }
     } else {
+      const maxValue = options.series
+        .map((it: any) => it.name)
+        .reduce((max: any, it: any) => (max.length < it.length ? it : max), "");
+
       // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
         Math.min(

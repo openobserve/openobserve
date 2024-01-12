@@ -189,8 +189,6 @@ export const usePanelDataLoader = (
         return;
       }
 
-      console.log("startISOTimestamp", startISOTimestamp);
-
       state.loading = true;
 
       // Check if the query type is "promql"
