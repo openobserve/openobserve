@@ -12,8 +12,9 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-use std::{collections::HashSet, io::Error};
+#[cfg(feature = "enterprise")]
+use std::collections::HashSet;
+use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use promql_parser::parser;
@@ -118,9 +119,9 @@ pub async fn remote_write(
 pub async fn query_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestQuery>,
-    in_req: HttpRequest,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query(&org_id.into_inner(), req.into_inner(), in_req).await
+    query(&org_id.into_inner(), req.into_inner(), _in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query")]
@@ -128,20 +129,20 @@ pub async fn query_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestQuery>,
     web::Form(form): web::Form<meta::prom::RequestQuery>,
-    in_req: HttpRequest,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
         form
     } else {
         req.into_inner()
     };
-    query(&org_id.into_inner(), req, in_req).await
+    query(&org_id.into_inner(), req, _in_req).await
 }
 
 async fn query(
     org_id: &str,
     req: meta::prom::RequestQuery,
-    in_req: HttpRequest,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -152,7 +153,7 @@ async fn query(
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         for name in visitor.name {
-            let user_id = in_req.headers().get("user_id").unwrap();
+            let user_id = _in_req.headers().get("user_id").unwrap();
             if !crate::handler::http::auth::validator::check_permissions(
                 user_id.to_str().unwrap(),
                 crate::common::utils::auth::AuthExtractor {
@@ -255,9 +256,9 @@ async fn query(
 pub async fn query_range_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestRangeQuery>,
-    in_req: HttpRequest,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), in_req).await
+    query_range(&org_id.into_inner(), req.into_inner(), _in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_range")]
@@ -265,20 +266,20 @@ pub async fn query_range_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestRangeQuery>,
     web::Form(form): web::Form<meta::prom::RequestRangeQuery>,
-    in_req: HttpRequest,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
         form
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, in_req).await
+    query_range(&org_id.into_inner(), req, _in_req).await
 }
 
 async fn query_range(
     org_id: &str,
     req: meta::prom::RequestRangeQuery,
-    in_req: HttpRequest,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
@@ -289,7 +290,7 @@ async fn query_range(
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         for name in visitor.name {
-            let user_id = in_req.headers().get("user_id").unwrap();
+            let user_id = _in_req.headers().get("user_id").unwrap();
             if !crate::handler::http::auth::validator::check_permissions(
                 user_id.to_str().unwrap(),
                 crate::common::utils::auth::AuthExtractor {

@@ -128,7 +128,7 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     {
         use crate::common::utils::auth::AuthExtractor;
-        println!("Checking permissions on stream");
+        // println!("Checking permissions on stream");
         // For getting stream name from query to check permission
         let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
         let resp = crate::service::search::sql::Sql::new(&rpc_req)
