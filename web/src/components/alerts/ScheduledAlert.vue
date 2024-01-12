@@ -436,7 +436,14 @@ const tab = ref(props.query_type || "custom");
 
 const store = useStore();
 
-const aggFunctions = ["avg", "max", "min", "count"];
+// const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
+const regularFunctions = ["avg", "max", "min", "count"];
+
+const aggFunctions = computed(() =>
+  props.alertData.stream_type === "metrics"
+    ? [...regularFunctions]
+    : [...regularFunctions]
+);
 
 const _isAggregationEnabled = ref(
   tab.value === "custom" && props.isAggregationEnabled

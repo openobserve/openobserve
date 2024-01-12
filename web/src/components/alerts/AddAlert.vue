@@ -164,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:promql="formData.query_condition.promql"
                 v-model:query_type="formData.query_condition.type"
                 v-model:aggregation="formData.query_condition.aggregation"
-                v-model:promql_condition="formData.promql_condition"
+                v-model:promql_condition="
+                  formData.query_condition.promql_condition
+                "
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 @field:add="addField"
                 @field:remove="removeField"
@@ -404,11 +406,11 @@ const defaultValue: any = () => {
         having: {
           column: "",
           operator: ">=",
-          value: 0,
+          value: 1,
         },
       },
+      promql_condition: null,
     },
-    promql_condition: null,
     trigger_condition: {
       period: 10,
       operator: ">=",
@@ -507,18 +509,7 @@ export default defineComponent({
       return (
         formData.value.name &&
         formData.value.stream_type &&
-        formData.value.stream_name &&
-        areConditionsValid
-      );
-    });
-
-    const areConditionsValid = computed(() => {
-      return formData.value.query_condition.conditions.every(
-        (condition: any) => {
-          condition.column.trim().length &&
-            condition.operator.trim().length &&
-            condition.value.trim().length;
-        }
+        formData.value.stream_name
       );
     });
 
@@ -707,6 +698,10 @@ export default defineComponent({
       else if (getSelectedTab.value === "promql")
         previewQuery.value = formData.value.query_condition.promql;
 
+      if (formData.value.is_real_time === "true") {
+        previewQuery.value = generateSqlQuery();
+      }
+
       await nextTick();
       previewAlertRef.value.refreshData();
     };
@@ -744,7 +739,9 @@ export default defineComponent({
       // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, COUNT(*) as zo_sql_val FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key ORDER BY zo_sql_key ASC
 
       // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val, geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
-      let query = "SELECT histogram(_timestamp) AS zo_sql_key,";
+      let query = `SELECT histogram(${
+        store.state.zoConfig.timestamp_column || "_timestamp"
+      }) AS zo_sql_key,`;
 
       let whereClause = formData.value.query_condition.conditions
         .map((condition: any) => {
@@ -814,8 +811,6 @@ export default defineComponent({
     const getAlertPayload = () => {
       const payload = cloneDeep(formData.value);
 
-      console.log(cloneDeep(payload));
-
       payload.is_real_time = payload.is_real_time === "true";
 
       payload.context_attributes = {};
@@ -851,7 +846,7 @@ export default defineComponent({
         payload.query_condition.conditions = [];
 
       if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
-        payload.promql_condition = null;
+        payload.query_condition.promql_condition = null;
       }
 
       if (getSelectedTab.value === "promql") {

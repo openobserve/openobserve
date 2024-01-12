@@ -19,6 +19,7 @@ import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
+import { useStore } from "vuex";
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
@@ -138,6 +139,8 @@ onBeforeMount(() => {
 const chartPanelRef = ref(null);
 const chartData = ref({});
 
+const store = useStore();
+
 const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
@@ -149,24 +152,16 @@ const refreshData = () => {
     end_time: new Date(endTime),
   };
 
-  const axis = {
-    aggregationFunction: "histogram",
-    alias: "zo_sql_key",
-    color: null,
-    column: "_timestamp",
-    label: " ",
-  };
-
-  const xAxis = [
+  let xAxis = [
     {
       alias: "zo_sql_key",
       color: null,
-      column: "_timestamp",
-      label: " ",
+      column: store.state.zoConfig.timestamp_column || "_timestamp",
+      label: "Timestamp",
     },
   ];
 
-  const yAxis = [];
+  let yAxis = [];
 
   if (props.isAggregationEnabled) {
     yAxis.push({
@@ -174,17 +169,22 @@ const refreshData = () => {
         props.formData.value.query_condition.aggregation.function,
       alias: "zo_sql_val",
       color: null,
-      column: "_timestamp",
-      label: " ",
+      column: store.state.zoConfig.timestamp_column || "_timestamp",
+      label: "",
     });
   } else {
     yAxis.push({
       aggregationFunction: "count",
       alias: "zo_sql_val",
       color: null,
-      column: "_timestamp",
-      label: " ",
+      column: store.state.zoConfig.timestamp_column || "_timestamp",
+      label: "",
     });
+  }
+
+  if (props.selectedTab === "promql") {
+    xAxis = [];
+    yAxis = [];
   }
 
   dashboardPanelData.data.queries[0].fields.x = xAxis;
