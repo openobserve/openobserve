@@ -228,11 +228,6 @@ describe("Alerts testcases", () => {
     cy.get(".q-notification__message")
       .contains("Destination saved successfully")
       .should("be.visible");
-    // cy.get('tbody tr').each(($row) => {
-    // Delete each row
-    // cy.wrap($row).find('[data-test*="-delete-destination"]').click();
-    // cy.get('[data-test="confirm-button"]').click({ force: true });
-    // });
   });
 
   it("should click cancel button under destinations", () => {
