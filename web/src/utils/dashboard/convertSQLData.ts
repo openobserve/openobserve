@@ -180,7 +180,7 @@ export const convertSQLData = (
             ? 50
             : 60
           : panelSchema.config?.axis_width == null
-          ? 20
+          ? 35
           : "40",
     },
     tooltip: {
@@ -1443,10 +1443,6 @@ export const convertSQLData = (
     panelSchema.type != "gauge" &&
     panelSchema.type != "metric"
   ) {
-    const maxValue = options.series
-      .map((it: any) => it.name)
-      .reduce((max: any, it: any) => (max.length < it.length ? it : max));
-
     let legendWidth;
 
     if (
@@ -1463,12 +1459,23 @@ export const convertSQLData = (
         legendWidth = panelSchema.config.legend_width.value;
       }
     } else {
+      let maxValue: string;
+      if (panelSchema.type === "pie" || panelSchema.type === "donut") {
+        maxValue = options.series[0].data.reduce((max: any, it: any) => {
+          return max.length < it?.name?.length ? it?.name : max;
+        }, "");
+      } else {
+        maxValue = options.series.reduce((max: any, it: any) => {
+          return max.length < it?.name?.length ? it?.name : max;
+        }, "");
+      }
+
       // If legend_width is not provided or has invalid format, calculate it based on other criteria
       legendWidth =
         Math.min(
           chartPanelRef.value?.offsetWidth / 3,
           calculateWidthText(maxValue) + 60
-        ) ?? 20;
+        ) ?? 20;      
     }
 
     options.grid.right = legendWidth;
