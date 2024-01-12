@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_templates.header") }}
           </div>
           <q-input
+            data-test="template-list-search-input"
             v-model="filterQuery"
             borderless
             filled

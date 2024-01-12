@@ -2,6 +2,7 @@
   <div class="col-12 q-py-sm variables-input">
     <template v-if="!variables.length">
       <q-btn
+        data-test="alert-variables-add-btn"
         label="Add Variable"
         size="sm"
         class="text-bold add-variable"
@@ -20,10 +21,11 @@
         v-for="(variable, index) in (variables as any)"
         :key="variable.uuid"
         class="q-col-gutter-sm q-pb-sm flex items-center"
+        :data-test="`alert-variables-${index + 1}`"
       >
         <div class="q-ml-none">
           <q-input
-            :data-test="`add-destination-header-${variable['key']}-key-input`"
+            data-test="alert-variables-key-input"
             v-model="variable.key"
             color="input-border"
             bg-color="input-bg"
@@ -38,7 +40,7 @@
         </div>
         <div class="q-ml-none">
           <q-input
-            :data-test="`add-destination-header-${variable['key']}-value-input`"
+            data-test="alert-variables-value-input"
             v-model="variable.value"
             :placeholder="t('common.value')"
             color="input-border"
@@ -54,7 +56,7 @@
         </div>
         <div class="col-2 q-ml-none">
           <q-btn
-            :data-test="`add-destination-header-${variable['key']}-delete-btn`"
+            data-test="alert-variables-delete-variable-btn"
             :icon="outlinedDelete"
             class="q-ml-xs iconHoverBtn"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -67,7 +69,7 @@
             @click="removeVariable(variable)"
           />
           <q-btn
-            data-test="add-destination-add-header-btn"
+            data-test="alert-variables-add-variable-btn"
             v-if="index === variables.length - 1"
             icon="add"
             class="q-ml-xs iconHoverBtn"
