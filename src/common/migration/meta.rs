@@ -80,7 +80,7 @@ pub async fn load_meta_from_sled() -> Result<(), anyhow::Error> {
 }
 
 pub async fn load_meta_from_dynamodb() -> Result<(), anyhow::Error> {
-    println!("load meta from dynamodb");
+    println!("load meta from dynamoDB");
     let (src, dest) = if !CONFIG.common.local_mode {
         (Box::<db::dynamo::DynamoDb>::default(), db::get_db().await)
     } else {
