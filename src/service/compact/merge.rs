@@ -330,7 +330,6 @@ async fn merge_files(
         }
         new_file_size += file.meta.original_size;
         new_file_list.push(file.clone());
-        log::info!("[COMPACT] merge small file: {}", &file.key);
         // metrics
         metrics::COMPACT_MERGED_FILES
             .with_label_values(&[org_id, stream_type.to_string().as_str()])
@@ -348,6 +347,7 @@ async fn merge_files(
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in &new_file_list {
+        log::info!("[COMPACT] merge small file: {}", &file.key);
         let data = match storage::get(&file.key).await {
             Ok(body) => body,
             Err(err) => {
