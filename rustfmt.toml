@@ -1,7 +1,7 @@
 version = "Two"
 unstable_features = true
 
-comment_width = 100
+comment_width = 120
 wrap_comments = true
 format_code_in_doc_comments = true
 format_macro_bodies = true
