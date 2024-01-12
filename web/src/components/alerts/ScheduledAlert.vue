@@ -484,7 +484,7 @@ const tab = ref(props.query_type || "custom");
 const store = useStore();
 
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
-const regularFunctions = ["avg", "max", "min", "count"];
+const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
 const aggFunctions = computed(() =>
   props.alertData.stream_type === "metrics"
@@ -548,7 +548,7 @@ const getDefaultPromqlCondition = () => {
   return {
     column: "value",
     operator: ">=",
-    value: 80,
+    value: 0,
   };
 };
 
