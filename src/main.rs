@@ -184,13 +184,15 @@ async fn main() -> Result<(), anyhow::Error> {
     // init http server
     init_http_server().await?;
     log::info!("HTTP server stopped");
-    grpc_shutudown_tx.send(()).ok();
-    grpc_stopped_rx.await.ok();
-    log::info!("gRPC server stopped");
 
     // leave the cluster
     _ = cluster::leave().await;
     log::info!("left cluster");
+
+    // stop gRPC server
+    grpc_shutudown_tx.send(()).ok();
+    grpc_stopped_rx.await.ok();
+    log::info!("gRPC server stopped");
 
     // flush WAL cache to disk
     infra::wal::flush_all_to_disk().await;
