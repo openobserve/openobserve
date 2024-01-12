@@ -180,7 +180,7 @@ export const convertSQLData = (
             ? 50
             : 60
           : panelSchema.config?.axis_width == null
-          ? 20
+          ? 35
           : "40",
     },
     tooltip: {
