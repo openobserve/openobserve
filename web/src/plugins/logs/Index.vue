@@ -90,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="q-pb-lg">
                     <q-spinner-hourglass
+                      data-test="logs-search-loading-spinner"
                       color="primary"
                       size="40px"
                       style="margin: 0 auto; display: block"
