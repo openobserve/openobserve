@@ -141,6 +141,7 @@ impl Engine {
                     (Value::Float(left), Value::Vector(right)) => {
                         binaries::vector_scalar_bin_op(expr, &right, left, true).await?
                     }
+                    (Value::None, _) | (_, Value::None) => Value::None,
                     _ => {
                         log::debug!(
                             "[PromExpr::Binary] either lhs or rhs vector is found to be empty"
