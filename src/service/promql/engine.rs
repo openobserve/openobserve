@@ -17,7 +17,6 @@ use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
-use config::CONFIG;
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -30,17 +29,20 @@ use futures::future::try_join_all;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier,
-        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, TokenType, UnaryExpr,
+        AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier, MatrixSelector,
+        NumberLiteral, Offset, ParenExpr, StringLiteral, token, TokenType, UnaryExpr,
         VectorSelector,
     },
 };
 use rayon::prelude::*;
 
+use config::CONFIG;
+
 use crate::{
     common::meta::prom::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
     service::promql::{aggregations, binaries, functions, micros, value::*},
 };
+use crate::service::promql::aggregations::POLICY;
 
 pub struct Engine {
     ctx: Arc<super::exec::Query>,
@@ -488,41 +490,38 @@ impl Engine {
         let sample_time = self.time;
         let input = self.exec_expr(expr).await?;
 
-        Ok(match op.id() {
-            token::T_SUM => aggregations::sum(sample_time, modifier, &input)?,
-            token::T_AVG => aggregations::avg(sample_time, modifier, &input)?,
-            token::T_COUNT => aggregations::count(sample_time, modifier, &input)?,
-            token::T_MIN => aggregations::min(sample_time, modifier, &input)?,
-            token::T_MAX => aggregations::max(sample_time, modifier, &input)?,
-            token::T_GROUP => aggregations::group(sample_time, modifier, &input)?,
-            token::T_STDDEV => aggregations::stddev(sample_time, modifier, &input)?,
-            token::T_STDVAR => aggregations::stdvar(sample_time, modifier, &input)?,
-            token::T_TOPK => {
-                aggregations::topk(self, param.clone().unwrap(), modifier, &input).await?
+        match POLICY.get(&op.id()).map(|&handle| handle(sample_time, modifier, &input)) {
+            Some(result) => result,
+            None => {
+                Ok(match op.id() {
+                    token::T_TOPK => {
+                        aggregations::topk(self, param.clone().unwrap(), modifier, &input).await?
+                    }
+                    token::T_BOTTOMK => {
+                        aggregations::bottomk(self, param.clone().unwrap(), modifier, &input).await?
+                    }
+                    token::T_COUNT_VALUES => {
+                        aggregations::count_values(
+                            self,
+                            sample_time,
+                            param.clone().unwrap(),
+                            modifier,
+                            &input,
+                        )
+                            .await?
+                    }
+                    token::T_QUANTILE => {
+                        aggregations::quantile(self, sample_time, param.clone().unwrap(), &input).await?
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "Unsupported Aggregate: {:?}",
+                            op
+                        )));
+                    }
+                })
             }
-            token::T_BOTTOMK => {
-                aggregations::bottomk(self, param.clone().unwrap(), modifier, &input).await?
-            }
-            token::T_COUNT_VALUES => {
-                aggregations::count_values(
-                    self,
-                    sample_time,
-                    param.clone().unwrap(),
-                    modifier,
-                    &input,
-                )
-                .await?
-            }
-            token::T_QUANTILE => {
-                aggregations::quantile(self, sample_time, param.clone().unwrap(), &input).await?
-            }
-            _ => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Aggregate: {:?}",
-                    op
-                )));
-            }
-        })
+        }
     }
 
     async fn call_expr_first_arg(&mut self, args: &FunctionArgs) -> Result<Value> {

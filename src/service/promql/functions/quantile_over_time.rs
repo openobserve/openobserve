@@ -17,8 +17,9 @@ use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::{
     common::quantile,
-    value::{InstantValue, Labels, LabelsExt, Sample, Value},
+    value::{InstantValue, LabelsExt, Sample, Value},
 };
+use crate::service::promql::aggregations::prepare_vector;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
 pub(crate) fn quantile_over_time(timestamp: i64, phi_quantile: f64, data: &Value) -> Result<Value> {
@@ -65,12 +66,4 @@ pub(crate) fn eval(
         }
     }
     Ok(Value::Vector(rate_values))
-}
-
-fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
-    let values = vec![InstantValue {
-        labels: Labels::default(),
-        sample: Sample { timestamp, value },
-    }];
-    Ok(Value::Vector(values))
 }

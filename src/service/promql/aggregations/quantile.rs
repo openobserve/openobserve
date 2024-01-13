@@ -19,9 +19,10 @@ use rayon::prelude::*;
 
 use crate::service::promql::{
     common::quantile as calculate_quantile,
-    value::{InstantValue, Labels, Sample, Value},
     Engine,
+    value::Value,
 };
+use crate::service::promql::aggregations::prepare_vector;
 
 pub async fn quantile(
     ctx: &mut Engine,
@@ -48,7 +49,7 @@ pub async fn quantile(
         }
     };
 
-    if qtile < 0 as f64 || qtile > 1_f64 || qtile.is_nan() {
+    if !(0f64..=1_f64).contains(&qtile) {
         let value = match qtile.signum() as i32 {
             1 => f64::INFINITY,
             -1 => f64::NEG_INFINITY,
@@ -65,12 +66,4 @@ pub async fn quantile(
 
     let quantile_value = calculate_quantile(&values, qtile).unwrap();
     prepare_vector(timestamp, quantile_value)
-}
-
-fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
-    let values = vec![InstantValue {
-        labels: Labels::default(),
-        sample: Sample { timestamp, value },
-    }];
-    Ok(Value::Vector(values))
 }

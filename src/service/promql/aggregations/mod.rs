@@ -15,17 +15,32 @@
 
 use std::sync::Arc;
 
-use ahash::AHashMap as HashMap;
-use config::FxIndexMap;
+use ahash::{AHashMap as HashMap, AHashMap};
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
-use promql_parser::parser::{Expr as PromExpr, LabelModifier};
+use once_cell::sync::Lazy;
+use promql_parser::parser::{Expr as PromExpr, LabelModifier, token, TokenId};
+use rayon::prelude::*;
+
+pub(crate) use avg::avg;
+pub(crate) use bottomk::bottomk;
+use config::FxIndexMap;
+pub(crate) use count::count;
+pub(crate) use count_values::count_values;
+pub(crate) use group::group;
+pub(crate) use max::max;
+pub(crate) use min::min;
+pub(crate) use quantile::quantile;
+pub(crate) use stddev::stddev;
+pub(crate) use stdvar::stdvar;
+pub(crate) use sum::sum;
+pub(crate) use topk::topk;
 
 use crate::{
     common::meta::prom::{HASH_LABEL, NAME_LABEL},
     service::promql::{
-        value::{Label, Labels, LabelsExt, Signature, Value},
         Engine,
+        value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
     },
 };
 
@@ -41,19 +56,6 @@ mod stddev;
 mod stdvar;
 mod sum;
 mod topk;
-
-pub(crate) use avg::avg;
-pub(crate) use bottomk::bottomk;
-pub(crate) use count::count;
-pub(crate) use count_values::count_values;
-pub(crate) use group::group;
-pub(crate) use max::max;
-pub(crate) use min::min;
-pub(crate) use quantile::quantile;
-pub(crate) use stddev::stddev;
-pub(crate) use stdvar::stdvar;
-pub(crate) use sum::sum;
-pub(crate) use topk::topk;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ArithmeticItem {
@@ -82,6 +84,21 @@ pub(crate) struct TopItem {
     pub(crate) index: usize,
     pub(crate) value: f64,
 }
+
+type PolicyType = fn(i64, &Option<LabelModifier>, &Value) -> Result<Value>;
+
+pub static POLICY: Lazy<std::collections::HashMap<TokenId, PolicyType>> = Lazy::new(|| {
+    let mut map: std::collections::HashMap<TokenId, PolicyType> = std::collections::HashMap::with_capacity(8);
+    map.insert(token::T_SUM, sum);
+    map.insert(token::T_AVG, avg);
+    map.insert(token::T_COUNT, count);
+    map.insert(token::T_MIN, min);
+    map.insert(token::T_MAX, max);
+    map.insert(token::T_GROUP, group);
+    map.insert(token::T_STDDEV, stddev);
+    map.insert(token::T_STDVAR, stdvar);
+    map
+});
 
 pub fn labels_to_include(
     include_labels: &[String],
@@ -413,4 +430,24 @@ pub(crate) fn eval_count_values(
         }
     }
     Ok(Some(score_values))
+}
+
+pub(crate) fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
+    let values = vec![InstantValue {
+        labels: Labels::default(),
+        sample: Sample { timestamp, value },
+    }];
+    Ok(Value::Vector(values))
+}
+
+pub(crate) fn score_to_instant_value(timestamp: i64, score_values: Option<AHashMap<Signature, ArithmeticItem>>) -> Vec<InstantValue> {
+    let values = score_values
+        .unwrap()
+        .par_iter()
+        .map(|it| InstantValue {
+            labels: it.1.labels.clone(),
+            sample: Sample::new(timestamp, it.1.value),
+        })
+        .collect();
+    values
 }
