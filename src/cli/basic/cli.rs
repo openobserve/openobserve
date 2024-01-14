@@ -60,7 +60,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .help("init this path as data root dir"),
                 ),
             clap::Command::new("migrate-file-list")
-                .about("migrate file-list from s3 to dynamo db")
+                .about("migrate file-list")
                 .args([
                     clap::Arg::new("prefix")
                         .short('p')
@@ -73,13 +73,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .long("from")
                         .value_name("from")
                         .required(true)
-                        .help("migrate from"),
+                        .help("migrate from: sled, sqlite, etcd, mysql, postgresql"),
                     clap::Arg::new("to")
                         .short('t')
                         .long("to")
                         .value_name("to")
                         .required(true)
-                        .help("migrate to"),
+                        .help("migrate to: sqlite, mysql, postgresql"),
                 ]),
             clap::Command::new("migrate-meta")
                 .about("migrate meta")
@@ -89,13 +89,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .long("from")
                         .value_name("from")
                         .required(true)
-                        .help("migrate from"),
+                        .help("migrate from: sled, sqlite, etcd, mysql, postgresql"),
                     clap::Arg::new("to")
                         .short('t')
                         .long("to")
                         .value_name("to")
                         .required(true)
-                        .help("migrate to"),
+                        .help("migrate to: sqlite, etcd, mysql, postgresql"),
                 ]),
             clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
             clap::Command::new("delete-parquet")
