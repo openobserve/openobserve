@@ -16,8 +16,7 @@
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 
-use crate::service::promql::aggregations::score_to_instant_value;
-use crate::service::promql::value::Value;
+use crate::service::promql::{aggregations::score_to_instant_value, value::Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
 pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
@@ -25,5 +24,8 @@ pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Res
     if score_values.is_none() {
         return Ok(Value::None);
     }
-    Ok(Value::Vector(score_to_instant_value(timestamp, score_values)))
+    Ok(Value::Vector(score_to_instant_value(
+        timestamp,
+        score_values,
+    )))
 }

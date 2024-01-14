@@ -16,10 +16,10 @@
 use datafusion::error::{DataFusionError, Result};
 
 use crate::service::promql::{
+    aggregations::prepare_vector,
     common::quantile,
     value::{InstantValue, LabelsExt, Sample, Value},
 };
-use crate::service::promql::aggregations::prepare_vector;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
 pub(crate) fn quantile_over_time(timestamp: i64, phi_quantile: f64, data: &Value) -> Result<Value> {

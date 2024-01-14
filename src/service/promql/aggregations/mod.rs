@@ -15,16 +15,15 @@
 
 use std::sync::Arc;
 
-use ahash::{AHashMap as HashMap, AHashMap};
+use ahash::{AHashMap as HashMap};
+use config::FxIndexMap;
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
-use once_cell::sync::Lazy;
-use promql_parser::parser::{Expr as PromExpr, LabelModifier, token, TokenId};
+use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
 pub(crate) use avg::avg;
 pub(crate) use bottomk::bottomk;
-use config::FxIndexMap;
 pub(crate) use count::count;
 pub(crate) use count_values::count_values;
 pub(crate) use group::group;
@@ -84,21 +83,6 @@ pub(crate) struct TopItem {
     pub(crate) index: usize,
     pub(crate) value: f64,
 }
-
-type PolicyType = fn(i64, &Option<LabelModifier>, &Value) -> Result<Value>;
-
-pub static POLICY: Lazy<std::collections::HashMap<TokenId, PolicyType>> = Lazy::new(|| {
-    let mut map: std::collections::HashMap<TokenId, PolicyType> = std::collections::HashMap::with_capacity(8);
-    map.insert(token::T_SUM, sum);
-    map.insert(token::T_AVG, avg);
-    map.insert(token::T_COUNT, count);
-    map.insert(token::T_MIN, min);
-    map.insert(token::T_MAX, max);
-    map.insert(token::T_GROUP, group);
-    map.insert(token::T_STDDEV, stddev);
-    map.insert(token::T_STDVAR, stdvar);
-    map
-});
 
 pub fn labels_to_include(
     include_labels: &[String],
@@ -440,7 +424,10 @@ pub(crate) fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
     Ok(Value::Vector(values))
 }
 
-pub(crate) fn score_to_instant_value(timestamp: i64, score_values: Option<AHashMap<Signature, ArithmeticItem>>) -> Vec<InstantValue> {
+pub(crate) fn score_to_instant_value(
+    timestamp: i64,
+    score_values: Option<HashMap<Signature, ArithmeticItem>>,
+) -> Vec<InstantValue> {
     let values = score_values
         .unwrap()
         .par_iter()

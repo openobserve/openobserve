@@ -16,8 +16,7 @@
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
 
-use crate::service::promql::aggregations::score_to_instant_value;
-use crate::service::promql::value::Value;
+use crate::service::promql::{aggregations::score_to_instant_value, value::Value};
 
 pub fn max(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values =
@@ -32,5 +31,8 @@ pub fn max(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Resul
     if score_values.is_none() {
         return Ok(Value::None);
     }
-    Ok(Value::Vector(score_to_instant_value(timestamp, score_values)))
+    Ok(Value::Vector(score_to_instant_value(
+        timestamp,
+        score_values,
+    )))
 }

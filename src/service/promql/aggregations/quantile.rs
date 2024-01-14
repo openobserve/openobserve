@@ -18,11 +18,8 @@ use promql_parser::parser::Expr as PromExpr;
 use rayon::prelude::*;
 
 use crate::service::promql::{
-    common::quantile as calculate_quantile,
-    Engine,
-    value::Value,
+    aggregations::prepare_vector, common::quantile as calculate_quantile, Engine, value::Value,
 };
-use crate::service::promql::aggregations::prepare_vector;
 
 pub async fn quantile(
     ctx: &mut Engine,
@@ -49,7 +46,7 @@ pub async fn quantile(
         }
     };
 
-    if !(0f64..=1_f64).contains(&qtile) {
+    if qtile < 0 as f64 || qtile > 1_f64 || qtile.is_nan() {
         let value = match qtile.signum() as i32 {
             1 => f64::INFINITY,
             -1 => f64::NEG_INFINITY,
