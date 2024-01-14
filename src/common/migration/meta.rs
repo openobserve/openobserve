@@ -44,7 +44,6 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
         _ => panic!("invalid source"),
     };
     let dest: Box<dyn infra_db::Db> = match to.to_lowercase().as_str().trim() {
-        "sled" => Box::<infra_db::sled::SledDb>::default(),
         "sqlite" => Box::<infra_db::sqlite::SqliteDb>::default(),
         "etcd" => Box::<infra_db::etcd::Etcd>::default(),
         "mysql" => Box::<infra_db::mysql::MysqlDb>::default(),

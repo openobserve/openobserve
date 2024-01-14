@@ -218,8 +218,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 from, to, prefix
             );
             migration::file_list::run(&prefix, &from, &to).await?;
-            println!("Running migration file_list_deleted");
-            migration::file_list::run_for_deleted(&from, &to).await?;
         }
         "migrate-meta" => {
             let from = match command.get_one::<String>("from") {
