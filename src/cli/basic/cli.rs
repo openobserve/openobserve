@@ -17,7 +17,7 @@ use config::CONFIG;
 
 use crate::{
     cli::data::{
-        cli::{args, Cli},
+        cli::{args as dataArgs, Cli as dataCli},
         export, import, Context,
     },
     common::{infra, infra::config::USERS, meta, migration, utils::file::set_permission},
@@ -40,9 +40,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         ),
                 ),
             clap::Command::new("import")
-                .about("import openobserve data").args(args()),
+                .about("import openobserve data").args(dataArgs()),
             clap::Command::new("export")
-                .about("export openobserve data").args(args()),
+                .about("export openobserve data").args(dataArgs()),
             clap::Command::new("view")
                 .about("view openobserve data")
                 .arg(
@@ -61,15 +61,42 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 ),
             clap::Command::new("migrate-file-list")
                 .about("migrate file-list from s3 to dynamo db")
-                .arg(
+                .args([
                     clap::Arg::new("prefix")
                         .short('p')
                         .long("prefix")
                         .value_name("prefix")
                         .required(false)
                         .help("only migrate specified prefix, default is all"),
-                ),
-            clap::Command::new("migrate-meta").about("migrate meta"),
+                    clap::Arg::new("from")
+                        .short('f')
+                        .long("from")
+                        .value_name("from")
+                        .required(true)
+                        .help("migrate from"),
+                    clap::Arg::new("to")
+                        .short('t')
+                        .long("to")
+                        .value_name("to")
+                        .required(true)
+                        .help("migrate to"),
+                ]),
+            clap::Command::new("migrate-meta")
+                .about("migrate meta")
+                .args([
+                    clap::Arg::new("from")
+                        .short('f')
+                        .long("from")
+                        .value_name("from")
+                        .required(true)
+                        .help("migrate from"),
+                    clap::Arg::new("to")
+                        .short('t')
+                        .long("to")
+                        .value_name("to")
+                        .required(true)
+                        .help("migrate to"),
+                ]),
             clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
             clap::Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
@@ -178,14 +205,33 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 Some(prefix) => prefix.to_string(),
                 None => "".to_string(),
             };
-            println!("Running migration file_list with prefix: {}", prefix);
-            migration::file_list::run(&prefix).await?;
+            let from = match command.get_one::<String>("from") {
+                Some(from) => from.to_string(),
+                None => "".to_string(),
+            };
+            let to = match command.get_one::<String>("to") {
+                Some(to) => to.to_string(),
+                None => "".to_string(),
+            };
+            println!(
+                "Running migration file_list from {} to {}, with prefix: {}",
+                from, to, prefix
+            );
+            migration::file_list::run(&prefix, &from, &to).await?;
             println!("Running migration file_list_deleted");
-            migration::file_list::run_for_deleted().await?;
+            migration::file_list::run_for_deleted(&from, &to).await?;
         }
         "migrate-meta" => {
-            println!("Running migration");
-            migration::meta::run().await?
+            let from = match command.get_one::<String>("from") {
+                Some(from) => from.to_string(),
+                None => "".to_string(),
+            };
+            let to = match command.get_one::<String>("to") {
+                Some(to) => to.to_string(),
+                None => "".to_string(),
+            };
+            println!("Running migration metadata from {} to {}", from, to);
+            migration::meta::run(&from, &to).await?
         }
         "migrate-dashboards" => {
             println!("Running migration dashboard");
@@ -203,10 +249,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
-            return import::Import::operator(Cli::arg_matches(command.clone()));
+            return import::Import::operator(dataCli::arg_matches(command.clone()));
         }
         "export" => {
-            return export::Export::operator(Cli::arg_matches(command.clone()));
+            return export::Export::operator(dataCli::arg_matches(command.clone()));
         }
         _ => {
             return Err(anyhow::anyhow!("unsupport sub command: {name}"));

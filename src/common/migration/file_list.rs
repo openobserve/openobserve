@@ -21,7 +21,7 @@ use crate::{
     service::{compact::stats::update_stats_from_file_list, db},
 };
 
-pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
+pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error> {
     if get_file_meta(&CONFIG.common.data_wal_dir).is_err() {
         // there is no local wal files, no need upgrade
         return Ok(());
@@ -56,7 +56,7 @@ pub async fn run(prefix: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn run_for_deleted() -> Result<(), anyhow::Error> {
+pub async fn run_for_deleted(from: &str, to: &str) -> Result<(), anyhow::Error> {
     if get_file_meta(&CONFIG.common.data_wal_dir).is_err() {
         // there is no local wal files, no need upgrade
         return Ok(());
