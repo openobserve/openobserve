@@ -804,12 +804,21 @@ export default defineComponent({
 
         const isAggValid = aggFn?.trim()?.length && column?.trim()?.length;
 
-        let groupBy = "";
+        let groupByAlias = "";
+        let groupByCols: string[] = [];
         formData.value.query_condition.aggregation.group_by.forEach(
           (column: any) => {
-            if (column.trim().length) groupBy += `,${column}`;
+            if (column.trim().length) groupByCols.push(column);
           }
         );
+
+        let concatGroupBy = "";
+        if (groupByCols.length) {
+          groupByAlias = ", x_axis_2";
+          concatGroupBy = `, concat(${groupByCols.join(
+            ",' : ',"
+          )}) as x_axis_2`;
+        }
 
         const percentileFunctions: any = {
           p50: 0.5,
@@ -822,20 +831,20 @@ export default defineComponent({
         if (isAggValid) {
           if (percentileFunctions[aggFn]) {
             query +=
-              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
               whereClause +
-              ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
           } else {
             query +=
-              ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+              ` ${aggFn}(${column}) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
               whereClause +
-              ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+              ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
           }
         } else {
           query +=
-            ` COUNT(*) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+            ` COUNT(*) as zo_sql_val ${concatGroupBy} FROM ${formData.value.stream_name} ` +
             whereClause +
-            ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+            ` GROUP BY zo_sql_key ${groupByAlias} ORDER BY zo_sql_key ASC`;
         }
       }
 
