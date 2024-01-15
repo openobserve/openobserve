@@ -25,7 +25,7 @@ mod writer;
 
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
-pub use writer::{check_memtable_size, get_writer, read_from_memtable, Writer};
+pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
 
 pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
