@@ -117,15 +117,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="input-border"
                   bg-color="input-bg"
                   class="q-py-sm showLabelOnTop no-case"
-                  stack-label
-                  outlined
                   filled
                   dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  :input-debounce="400"
                   v-bind:readonly="beingUpdated"
                   v-bind:disable="beingUpdated"
-                  :input-debounce="400"
                   @filter="filterStreams"
                   @update:model-value="updateStreamFields(formData.stream_name)"
+                  behavior="menu"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   style="min-width: 220px !important; width: 220px !important"
                 />
@@ -845,6 +847,9 @@ export default defineComponent({
 
     const getAlertPayload = () => {
       const payload = cloneDeep(formData.value);
+
+      // Deleting uuid from payload as it was added for reference of frontend
+      if (payload.uuid) delete payload.uuid;
 
       payload.is_real_time = payload.is_real_time === "true";
 
