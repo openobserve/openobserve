@@ -88,7 +88,7 @@ pub async fn add_role_permissions(
 
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/roles/{role_id}/permissions")]
-pub async fn get_all_role_permissions(
+pub async fn get_role_permissions(
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, role_id) = path.into_inner();
