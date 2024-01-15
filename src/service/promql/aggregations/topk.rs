@@ -16,7 +16,7 @@
 use datafusion::error::Result;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 
-use crate::service::promql::{value::Value, Engine};
+use crate::service::promql::{Engine, value::Value};
 
 pub async fn topk(
     ctx: &mut Engine,

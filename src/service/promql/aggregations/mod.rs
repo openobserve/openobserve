@@ -15,17 +15,31 @@
 
 use std::sync::Arc;
 
-use ahash::AHashMap as HashMap;
+use ahash::{AHashMap as HashMap};
 use config::FxIndexMap;
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
+use rayon::prelude::*;
+
+pub(crate) use avg::avg;
+pub(crate) use bottomk::bottomk;
+pub(crate) use count::count;
+pub(crate) use count_values::count_values;
+pub(crate) use group::group;
+pub(crate) use max::max;
+pub(crate) use min::min;
+pub(crate) use quantile::quantile;
+pub(crate) use stddev::stddev;
+pub(crate) use stdvar::stdvar;
+pub(crate) use sum::sum;
+pub(crate) use topk::topk;
 
 use crate::{
     common::meta::prom::{HASH_LABEL, NAME_LABEL},
     service::promql::{
-        value::{Label, Labels, LabelsExt, Signature, Value},
         Engine,
+        value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
     },
 };
 
@@ -41,19 +55,6 @@ mod stddev;
 mod stdvar;
 mod sum;
 mod topk;
-
-pub(crate) use avg::avg;
-pub(crate) use bottomk::bottomk;
-pub(crate) use count::count;
-pub(crate) use count_values::count_values;
-pub(crate) use group::group;
-pub(crate) use max::max;
-pub(crate) use min::min;
-pub(crate) use quantile::quantile;
-pub(crate) use stddev::stddev;
-pub(crate) use stdvar::stdvar;
-pub(crate) use sum::sum;
-pub(crate) use topk::topk;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ArithmeticItem {
@@ -413,4 +414,27 @@ pub(crate) fn eval_count_values(
         }
     }
     Ok(Some(score_values))
+}
+
+pub(crate) fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
+    let values = vec![InstantValue {
+        labels: Labels::default(),
+        sample: Sample { timestamp, value },
+    }];
+    Ok(Value::Vector(values))
+}
+
+pub(crate) fn score_to_instant_value(
+    timestamp: i64,
+    score_values: Option<HashMap<Signature, ArithmeticItem>>,
+) -> Vec<InstantValue> {
+    let values = score_values
+        .unwrap()
+        .par_iter()
+        .map(|it| InstantValue {
+            labels: it.1.labels.clone(),
+            sample: Sample::new(timestamp, it.1.value),
+        })
+        .collect();
+    values
 }
