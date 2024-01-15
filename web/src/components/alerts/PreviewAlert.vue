@@ -165,8 +165,7 @@ const refreshData = () => {
 
   if (props.isAggregationEnabled) {
     yAxis.push({
-      aggregationFunction:
-        props.formData.value.query_condition.aggregation.function,
+      aggregationFunction: props.formData.query_condition.aggregation.function,
       alias: "zo_sql_val",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
@@ -179,6 +178,19 @@ const refreshData = () => {
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
       label: "",
+    });
+  }
+
+  if (
+    props.selectedTab === "custom" &&
+    props.formData.query_condition.aggregation.group_by.length > 0 &&
+    props.formData.query_condition.aggregation.group_by[0].trim() !== ""
+  ) {
+    xAxis.push({
+      alias: "x_axis_2",
+      color: null,
+      column: props.formData.query_condition.aggregation.group_by[0],
+      label: "x_axis_2",
     });
   }
 
