@@ -636,7 +636,7 @@ export default defineComponent({
           field.values.map((value: any) => {
             values.add(value.zo_sql_key);
             return {
-              key: value.zo_sql_key ? value.zo_sql_key : "null",
+              key: value.zo_sql_key?.toString() ? value.zo_sql_key : "null",
               count: formatLargeNumber(value.zo_sql_num),
             };
           }) || [];
@@ -646,7 +646,7 @@ export default defineComponent({
             if (values.has(value)) return;
             else
               fieldValues.value[field.field]["values"].unshift({
-                key: value,
+                key: value?.toString() || "null",
                 count: "0",
               });
           }

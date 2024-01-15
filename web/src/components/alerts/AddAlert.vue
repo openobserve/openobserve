@@ -117,15 +117,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   color="input-border"
                   bg-color="input-bg"
                   class="q-py-sm showLabelOnTop no-case"
-                  stack-label
-                  outlined
                   filled
                   dense
+                  use-input
+                  hide-selected
+                  fill-input
+                  :input-debounce="400"
                   v-bind:readonly="beingUpdated"
                   v-bind:disable="beingUpdated"
-                  :input-debounce="400"
                   @filter="filterStreams"
                   @update:model-value="updateStreamFields(formData.stream_name)"
+                  behavior="menu"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   style="min-width: 220px !important; width: 220px !important"
                 />
@@ -223,6 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-left: 0 !important;
                         background: #f2f2f2;
                         height: 40px;
+                      "
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'bg-grey-10'
+                          : 'bg-grey-2'
                       "
                       class="flex justify-center items-center"
                     >
@@ -360,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 400px; height: 200px; position: sticky; top: 0"
           class="q-mb-lg q-px-md"
         >
-          <div class="text-bold q-pb-xs text-grey-9">Preview</div>
+          <div class="text-bold q-pb-xs">Preview</div>
           <preview-alert
             style="border: 1px solid #ececec"
             ref="previewAlertRef"
@@ -530,11 +537,7 @@ export default defineComponent({
     });
 
     const showPreview = computed(() => {
-      return (
-        formData.value.name &&
-        formData.value.stream_type &&
-        formData.value.stream_name
-      );
+      return formData.value.stream_type && formData.value.stream_name;
     });
 
     const updateCondtions = (e: any) => {
@@ -808,11 +811,26 @@ export default defineComponent({
           }
         );
 
+        const percentileFunctions: any = {
+          p50: 0.5,
+          p75: 0.75,
+          p90: 0.9,
+          p95: 0.95,
+          p99: 0.99,
+        };
+
         if (isAggValid) {
-          query +=
-            ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
-            whereClause +
-            ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+          if (percentileFunctions[aggFn]) {
+            query +=
+              ` approx_percentile_cont(${column}, ${percentileFunctions[aggFn]}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+              whereClause +
+              ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+          } else {
+            query +=
+              ` ${aggFn}(${column}) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
+              whereClause +
+              ` GROUP BY zo_sql_key ${groupBy} ORDER BY zo_sql_key ASC`;
+          }
         } else {
           query +=
             ` COUNT(*) as zo_sql_val ${groupBy} FROM ${formData.value.stream_name} ` +
@@ -827,13 +845,16 @@ export default defineComponent({
     const debouncedPreviewAlert = debounce(previewAlert, 500);
 
     const onInputUpdate = async (name: string, value: any) => {
-      if (showPreview.value && validateInputs(getAlertPayload(), false)) {
+      if (showPreview.value) {
         debouncedPreviewAlert();
       }
     };
 
     const getAlertPayload = () => {
       const payload = cloneDeep(formData.value);
+
+      // Deleting uuid from payload as it was added for reference of frontend
+      if (payload.uuid) delete payload.uuid;
 
       payload.is_real_time = payload.is_real_time === "true";
 

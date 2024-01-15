@@ -32,6 +32,7 @@ export interface Alert {
   enabled: boolean;
   context_attributes: { [key: string]: string };
   description: string;
+  uuid?: string;
 }
 
 // Alert object which is modified in frontend to display in table and form
@@ -43,6 +44,7 @@ export interface AlertListItem {
   enabled: boolean;
   alert_type: string;
   description: string;
+  uuid?: string;
 }
 
 // Template payload which is sent to backend

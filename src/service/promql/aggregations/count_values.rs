@@ -17,8 +17,8 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 
 use crate::service::promql::{
-    Engine,
     value::{InstantValue, Label, Sample, Value},
+    Engine,
 };
 
 pub async fn count_values(
