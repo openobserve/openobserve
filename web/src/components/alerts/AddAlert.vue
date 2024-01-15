@@ -815,7 +815,9 @@ export default defineComponent({
         let concatGroupBy = "";
         if (groupByCols.length) {
           groupByAlias = ", x_axis_2";
-          concatGroupBy = `, concat(${groupByCols.join(",':',")}) as x_axis_2`;
+          concatGroupBy = `, concat(${groupByCols.join(
+            ",' : ',"
+          )}) as x_axis_2`;
         }
 
         const percentileFunctions: any = {
