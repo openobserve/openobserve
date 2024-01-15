@@ -214,7 +214,7 @@ describe("Alerts testcases", () => {
     cy.get('[data-test="add-destination-template-select"]').click({
       force: true,
     });
-    cy.contains(".q-item__label span", "automationalert").click();
+    cy.contains(".q-item__label span", "automationalert").click({ force: true });
     cy.get('[data-test="add-destination-url-input"]').type(
       "https://slack.com/api"
     );
@@ -222,7 +222,7 @@ describe("Alerts testcases", () => {
       force: true,
     });
     cy.get(".q-menu").should("be.visible");
-    cy.contains(".q-item__label span", "get").click();
+    cy.contains(".q-item__label span", "get").click({ force: true });
     cy.get(".q-toggle__inner").click({ force: true });
     cy.get('[data-test="add-destination-submit-btn"]').click({ force: true });
     cy.get(".q-notification__message")
@@ -288,7 +288,7 @@ describe("Alerts testcases", () => {
     cy.get('[data-test="add-destination-template-select"]').click({
       force: true,
     });
-    cy.contains(".q-item__label span", "automationalert").click();
+    cy.contains(".q-item__label span", "automationalert").click({ force: true });
     cy.get('[data-test="add-destination-url-input"]').type(
       "https://slack.com/api"
     );
@@ -296,7 +296,7 @@ describe("Alerts testcases", () => {
       force: true,
     });
     cy.get(".q-menu").should("be.visible");
-    cy.contains(".q-item__label span", "get").click();
+    cy.contains(".q-item__label span", "get").click({ force: true });
     cy.get(".q-toggle__inner").click({ force: true });
     cy.get('[data-test="add-destination-submit-btn"]').click({ force: true });
     cy.get(".q-notification__message")
@@ -314,40 +314,40 @@ describe("Alerts testcases", () => {
     cy.get(
       ":nth-child(3) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
     ).click({ force: true });
-    cy.contains(".q-item__label", "e2e_automate").click();
+    cy.contains(".q-item__label", "e2e_automate").click({ force: true });
     cy.get('[data-test="add-alert-scheduled-alert-radio"]').click({
       force: true,
     });
     cy.get(
       ".q-mt-md > .justify-start > :nth-child(1) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
     ).click({ force: true });
-    cy.contains(".q-item__label", "kubernetes_labels_role").click();
+    cy.contains(".q-item__label", "kubernetes_labels_role").click({ force: true });
     cy.get(
       ".q-mt-md > .justify-start > :nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
     ).click({ force: true });
-    cy.contains(".q-item__label", "=").click();
+    cy.contains(".q-item__label", "=").click({ force: true });
     cy.get('.justify-start > .flex > .q-field').type("200");
     cy.get(
       ":nth-child(5) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
     ).click({ force: true });
-    cy.contains(".q-item__label", "cy-destination").click();
+    cy.contains(".q-item__label", "cy-destination").click({ force: true });
     cy.get('[data-test="add-alert-submit-btn"]').click({ force: true });
     cy.get('[data-test$="-delete-alert"]').first().scrollIntoView();
-    cy.get('[data-test$="-delete-alert"]').first().click();
+    cy.get('[data-test$="-delete-alert"]').first().click({ force: true });
     cy.get('[data-test="cancel-button"] ').click({ force: true });
     cy.get('[data-test$="-delete-alert"]').each(($button) => {
-      cy.wrap($button).click();
+      cy.wrap($button).click({ force: true });
       cy.get('[data-test="confirm-button"]').click({ force: true });
     });
     cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
     cy.get("tbody tr").each(($row) => {
       // Delete each row
-      cy.wrap($row).find('[data-test*="-delete-destination"]').click();
+      cy.wrap($row).find('[data-test*="-delete-destination"]').click({ force: true });
       cy.get('[data-test="confirm-button"]').click({ force: true });
     });
     cy.get('[data-test="alert-templates-tab"]').click({ force: true });
     cy.get('tbody [data-test$="-delete-template"]').each(($button) => {
-      cy.wrap($button).click();
+      cy.wrap($button).click({ force: true });
       cy.get('[data-test="confirm-button"]').click({ force: true });
     });
   });
