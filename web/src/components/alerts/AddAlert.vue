@@ -226,6 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         background: #f2f2f2;
                         height: 40px;
                       "
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'bg-grey-10'
+                          : 'bg-grey-2'
+                      "
                       class="flex justify-center items-center"
                     >
                       {{ t("alerts.minutes") }}
@@ -362,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 400px; height: 200px; position: sticky; top: 0"
           class="q-mb-lg q-px-md"
         >
-          <div class="text-bold q-pb-xs text-grey-9">Preview</div>
+          <div class="text-bold q-pb-xs">Preview</div>
           <preview-alert
             style="border: 1px solid #ececec"
             ref="previewAlertRef"
