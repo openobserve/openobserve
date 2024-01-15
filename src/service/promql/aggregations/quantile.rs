@@ -18,9 +18,7 @@ use promql_parser::parser::Expr as PromExpr;
 use rayon::prelude::*;
 
 use crate::service::promql::{
-    common::quantile as calculate_quantile,
-    value::{InstantValue, Labels, Sample, Value},
-    Engine,
+    aggregations::prepare_vector, common::quantile as calculate_quantile, Engine, value::Value,
 };
 
 pub async fn quantile(
@@ -65,12 +63,4 @@ pub async fn quantile(
 
     let quantile_value = calculate_quantile(&values, qtile).unwrap();
     prepare_vector(timestamp, quantile_value)
-}
-
-fn prepare_vector(timestamp: i64, value: f64) -> Result<Value> {
-    let values = vec![InstantValue {
-        labels: Labels::default(),
-        sample: Sample { timestamp, value },
-    }];
-    Ok(Value::Vector(values))
 }

@@ -15,9 +15,8 @@
 
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
-use rayon::prelude::*;
 
-use crate::service::promql::value::{InstantValue, Sample, Value};
+use crate::service::promql::{aggregations::score_to_instant_value, value::Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
 pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
@@ -25,13 +24,8 @@ pub fn group(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Res
     if score_values.is_none() {
         return Ok(Value::None);
     }
-    let values = score_values
-        .unwrap()
-        .par_iter()
-        .map(|v| InstantValue {
-            labels: v.1.labels.clone(),
-            sample: Sample::new(timestamp, v.1.value),
-        })
-        .collect();
-    Ok(Value::Vector(values))
+    Ok(Value::Vector(score_to_instant_value(
+        timestamp,
+        score_values,
+    )))
 }
