@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-td :props="props">
             <div
               data-test="alert-list-loading-alert"
-              v-if="alertStateLoadingMap[props.row.name]"
+              v-if="alertStateLoadingMap[props.row.uuid]"
               style="display: inline-block; width: 33.14px; height: auto"
               class="flex justify-center items-center q-ml-xs"
               :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
@@ -237,7 +237,11 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import {
+  getImageURL,
+  getUUID,
+  verifyOrganizationStatus,
+} from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
   outlinedDelete,
@@ -354,7 +358,12 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
-          alerts.value = res.data.list;
+          alerts.value = res.data.list.map((alert: any) => {
+            return {
+              ...alert,
+              uuid: getUUID(),
+            };
+          });
           alertsRows.value = alerts.value.map((data: any) => {
             let conditions = "--";
             if (data.query_condition.conditions?.length) {
@@ -378,10 +387,11 @@ export default defineComponent({
               enabled: data.enabled,
               conditions: conditions,
               description: data.description,
+              uuid: data.uuid,
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
-            alertStateLoadingMap.value[alert.name] = false;
+            alertStateLoadingMap.value[alert.uuid as string] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -481,7 +491,7 @@ export default defineComponent({
     };
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
-        (alert: any) => alert.name === props.row?.name
+        (alert: any) => alert.uuid === props.row?.uuid
       ) as Alert;
       let action;
       if (!props.row) {
@@ -576,9 +586,9 @@ export default defineComponent({
     };
 
     const toggleAlertState = (row: any) => {
-      alertStateLoadingMap.value[row.name] = true;
+      alertStateLoadingMap.value[row.uuid] = true;
       const alert: Alert = alerts.value.find(
-        (alert) => alert.name === row.name
+        (alert) => alert.uuid === row.uuid
       ) as Alert;
       alertsService
         .toggleState(
@@ -591,11 +601,11 @@ export default defineComponent({
         .then(() => {
           alert.enabled = !alert.enabled;
           alertsRows.value.forEach((alert) => {
-            alert.name === row.name ? (alert.enabled = !alert.enabled) : null;
+            alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
           });
         })
         .finally(() => {
-          alertStateLoadingMap.value[row.name] = false;
+          alertStateLoadingMap.value[row.uuid] = false;
         });
     };
 

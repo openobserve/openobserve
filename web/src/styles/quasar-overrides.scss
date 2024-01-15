@@ -170,6 +170,10 @@ body {
       }
     }
 
+    &.q-field--dark .q-field__control {
+      background-color: #ffffff12;
+    }
+
     .q-field__bottom {
       padding: 0.1rem 0 0;
     }
