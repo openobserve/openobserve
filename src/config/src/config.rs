@@ -230,6 +230,10 @@ pub struct Common {
     pub cluster_name: String,
     #[env_config(name = "ZO_INSTANCE_NAME", default = "")]
     pub instance_name: String,
+    #[env_config(name = "ZO_WEB_URL", default = "")] // http://localhost:5080
+    pub web_url: String,
+    #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
+    pub base_uri: String,
     #[env_config(name = "ZO_INGESTER_SIDECAR_ENABLED", default = false)]
     pub ingester_sidecar_enabled: bool,
     #[env_config(name = "ZO_INGESTER_SIDECAR_QUERIER", default = false)]
@@ -244,8 +248,6 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_BASE_URI", default = "")]
-    pub base_uri: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
@@ -756,6 +758,14 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // for web
+    if cfg.common.web_url.ends_with('/') {
+        cfg.common.web_url = cfg.common.web_url.trim_end_matches('/').to_string();
+    }
+    if cfg.common.base_uri.ends_with('/') {
+        cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
+    }
+    // for data
     if cfg.common.data_dir.is_empty() {
         cfg.common.data_dir = "./data/openobserve/".to_string();
     }
@@ -785,9 +795,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
-    }
-    if cfg.common.base_uri.ends_with('/') {
-        cfg.common.base_uri = cfg.common.base_uri.trim_end_matches('/').to_string();
     }
     if cfg.sled.data_dir.is_empty() {
         cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);

@@ -142,8 +142,8 @@ pub async fn handle_triggers(
     }
 
     // send notification
-    if let Some(ret) = ret {
-        alert.send_notification(&ret).await?;
+    if let Some((sql, data)) = ret {
+        alert.send_notification(&sql, &data).await?;
     }
 
     // update trigger

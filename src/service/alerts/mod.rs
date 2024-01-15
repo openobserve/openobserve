@@ -33,6 +33,7 @@ use crate::{
         },
         utils::{
             auth::{remove_ownership, set_ownership},
+            base64,
             json::{self, Map, Value},
         },
     },
@@ -224,7 +225,7 @@ pub async fn trigger(
         }
     };
     alert
-        .send_notification(&[])
+        .send_notification("", &[])
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -233,9 +234,9 @@ impl Alert {
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<Option<(String, Vec<Map<String, Value>>)>, anyhow::Error> {
         if self.is_real_time {
-            self.query_condition.evaluate_realtime(row).await
+            self.query_condition.evaluate_realtime(self, row).await
         } else {
             self.query_condition.evaluate_scheduled(self).await
         }
@@ -243,11 +244,12 @@ impl Alert {
 
     pub async fn send_notification(
         &self,
+        sql: &str,
         rows: &[Map<String, Value>],
     ) -> Result<(), anyhow::Error> {
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            if let Err(e) = send_notification(self, &dest, rows).await {
+            if let Err(e) = send_notification(self, &dest, sql, rows).await {
                 log::error!(
                     "Error sending notification for {}/{}/{}/{} err: {}",
                     self.org_id,
@@ -265,8 +267,9 @@ impl Alert {
 impl QueryCondition {
     pub async fn evaluate_realtime(
         &self,
+        alert: &Alert,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<Option<(String, Vec<Map<String, Value>>)>, anyhow::Error> {
         let row = match row {
             Some(row) => row,
             None => {
@@ -285,13 +288,14 @@ impl QueryCondition {
                 return Ok(None);
             }
         }
-        Ok(Some(vec![row.to_owned()]))
+        let sql = build_sql(alert, conditions).await?;
+        Ok(Some((sql, vec![row.to_owned()])))
     }
 
     pub async fn evaluate_scheduled(
         &self,
         alert: &Alert,
-    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
+    ) -> Result<Option<(String, Vec<Map<String, Value>>)>, anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
@@ -357,7 +361,8 @@ impl QueryCondition {
                 return if value.is_empty() {
                     Ok(None)
                 } else {
-                    Ok(Some(
+                    Ok(Some((
+                        req.query.clone(),
                         value
                             .iter()
                             .map(|v| {
@@ -374,7 +379,7 @@ impl QueryCondition {
                                 val
                             })
                             .collect(),
-                    ))
+                    )))
                 };
             }
         };
@@ -408,12 +413,13 @@ impl QueryCondition {
         if resp.total < alert.trigger_condition.threshold as usize {
             Ok(None)
         } else {
-            Ok(Some(
+            Ok(Some((
+                sql,
                 resp.hits
                     .iter()
                     .map(|hit| hit.as_object().unwrap().clone())
                     .collect(),
-            ))
+            )))
         }
     }
 }
@@ -727,12 +733,13 @@ fn build_expr(
 pub async fn send_notification(
     alert: &Alert,
     dest: &DestinationWithTemplate,
+    sql: &str,
     rows: &[Map<String, Value>],
 ) -> Result<(), anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         "".to_string()
     } else {
-        process_row_template(&alert.row_template, alert, rows)
+        process_row_template(&alert.row_template, alert, sql, rows)
     };
     let resp = json::to_string(&dest.template.body)?;
     let resp = process_dest_template(&resp, alert, rows, &rows_tpl_val);
@@ -776,7 +783,12 @@ pub async fn send_notification(
     Ok(())
 }
 
-fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> String {
+fn process_row_template(
+    tpl: &String,
+    alert: &Alert,
+    sql: &str,
+    rows: &[Map<String, Value>],
+) -> String {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -837,6 +849,19 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
         } else {
             String::from("N/A")
         };
+
+        // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
+        let alert_url = format!(
+            "{}{}/web/logs?org_identifier={}&stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}",
+            CONFIG.common.web_url,
+            CONFIG.common.base_uri,
+            alert.org_id,
+            alert.stream_type,
+            alert.stream_name,
+            alert_start_time,
+            alert_end_time,
+            base64::encode(sql),
+        );
         resp = resp
             .replace("{org_name}", &alert.org_id)
             .replace("{stream_type}", &alert.stream_type.to_string())
@@ -857,7 +882,8 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             )
             .replace("{alert_count}", &alert_count.to_string())
             .replace("{alert_start_time}", &alert_start_time)
-            .replace("{alert_end_time}", &alert_end_time);
+            .replace("{alert_end_time}", &alert_end_time)
+            .replace("{alert_url}", &alert_url);
 
         if let Some(attrs) = &alert.context_attributes {
             for (key, value) in attrs.iter() {
