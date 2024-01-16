@@ -225,7 +225,7 @@ pub async fn trigger(
         }
     };
     alert
-        .send_notification("", &[])
+        .send_notification(&[])
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -234,9 +234,9 @@ impl Alert {
     pub async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<(String, Vec<Map<String, Value>>)>, anyhow::Error> {
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         if self.is_real_time {
-            self.query_condition.evaluate_realtime(self, row).await
+            self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition.evaluate_scheduled(self).await
         }
@@ -244,12 +244,11 @@ impl Alert {
 
     pub async fn send_notification(
         &self,
-        sql: &str,
         rows: &[Map<String, Value>],
     ) -> Result<(), anyhow::Error> {
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            if let Err(e) = send_notification(self, &dest, sql, rows).await {
+            if let Err(e) = send_notification(self, &dest, rows).await {
                 log::error!(
                     "Error sending notification for {}/{}/{}/{} err: {}",
                     self.org_id,
@@ -267,9 +266,8 @@ impl Alert {
 impl QueryCondition {
     pub async fn evaluate_realtime(
         &self,
-        alert: &Alert,
         row: Option<&Map<String, Value>>,
-    ) -> Result<Option<(String, Vec<Map<String, Value>>)>, anyhow::Error> {
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         let row = match row {
             Some(row) => row,
             None => {
@@ -288,14 +286,13 @@ impl QueryCondition {
                 return Ok(None);
             }
         }
-        let sql = build_sql(alert, conditions).await?;
-        Ok(Some((sql, vec![row.to_owned()])))
+        Ok(Some(vec![row.to_owned()]))
     }
 
     pub async fn evaluate_scheduled(
         &self,
         alert: &Alert,
-    ) -> Result<Option<(String, Vec<Map<String, Value>>)>, anyhow::Error> {
+    ) -> Result<Option<Vec<Map<String, Value>>>, anyhow::Error> {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
@@ -361,8 +358,7 @@ impl QueryCondition {
                 return if value.is_empty() {
                     Ok(None)
                 } else {
-                    Ok(Some((
-                        req.query.clone(),
+                    Ok(Some(
                         value
                             .iter()
                             .map(|v| {
@@ -379,7 +375,7 @@ impl QueryCondition {
                                 val
                             })
                             .collect(),
-                    )))
+                    ))
                 };
             }
         };
@@ -413,13 +409,12 @@ impl QueryCondition {
         if resp.total < alert.trigger_condition.threshold as usize {
             Ok(None)
         } else {
-            Ok(Some((
-                sql,
+            Ok(Some(
                 resp.hits
                     .iter()
                     .map(|hit| hit.as_object().unwrap().clone())
                     .collect(),
-            )))
+            ))
         }
     }
 }
@@ -733,13 +728,12 @@ fn build_expr(
 pub async fn send_notification(
     alert: &Alert,
     dest: &DestinationWithTemplate,
-    sql: &str,
     rows: &[Map<String, Value>],
 ) -> Result<(), anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         "".to_string()
     } else {
-        process_row_template(&alert.row_template, alert, sql, rows)
+        process_row_template(&alert.row_template, alert, rows).await
     };
     let resp = json::to_string(&dest.template.body)?;
     let resp = process_dest_template(&resp, alert, rows, &rows_tpl_val);
@@ -783,12 +777,7 @@ pub async fn send_notification(
     Ok(())
 }
 
-fn process_row_template(
-    tpl: &String,
-    alert: &Alert,
-    sql: &str,
-    rows: &[Map<String, Value>],
-) -> String {
+async fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> String {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -850,18 +839,52 @@ fn process_row_template(
             String::from("N/A")
         };
 
-        // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
-        let alert_url = format!(
-            "{}{}/web/logs?org_identifier={}&stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}",
-            CONFIG.common.web_url,
-            CONFIG.common.base_uri,
-            alert.org_id,
-            alert.stream_type,
-            alert.stream_name,
-            alert_start_time,
-            alert_end_time,
-            base64::encode(sql),
-        );
+        let mut alert_query = String::new();
+        let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
+            if let Some(promql) = &alert.query_condition.promql {
+                let condition = alert.query_condition.promql_condition.as_ref().unwrap();
+                alert_query = format!(
+                    "({}) {} {}",
+                    promql,
+                    match condition.operator {
+                        Operator::EqualTo => "==".to_string(),
+                        _ => condition.operator.to_string(),
+                    },
+                    condition.value.as_f64().unwrap_or_default()
+                );
+            }
+            // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
+            format!(
+                "{}{}/web/metrics?org_identifier={}&stream_type={}&stream={}&from={}&to={}&query={}",
+                CONFIG.common.web_url,
+                CONFIG.common.base_uri,
+                alert.org_id,
+                alert.stream_type,
+                alert.stream_name,
+                alert_start_time,
+                alert_end_time,
+                base64::encode(&alert_query),
+            )
+        } else {
+            if let Some(conditions) = &alert.query_condition.conditions {
+                if let Ok(v) = build_sql(alert, conditions).await {
+                    alert_query = v;
+                }
+            }
+            // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
+            format!(
+                "{}{}/web/logs?org_identifier={}&stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}",
+                CONFIG.common.web_url,
+                CONFIG.common.base_uri,
+                alert.org_id,
+                alert.stream_type,
+                alert.stream_name,
+                alert_start_time,
+                alert_end_time,
+                base64::encode(&alert_query),
+            )
+        };
+
         resp = resp
             .replace("{org_name}", &alert.org_id)
             .replace("{stream_type}", &alert.stream_type.to_string())

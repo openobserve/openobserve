@@ -50,7 +50,7 @@ use crate::{
 
 pub mod grpc;
 
-pub type TriggerAlertData = Vec<(Alert, (String, Vec<Map<String, Value>>))>;
+pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -181,8 +181,8 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
         return;
     }
     let trigger = trigger.unwrap();
-    for (alert, (sql, val)) in trigger.iter() {
-        if let Err(e) = alert.send_notification(sql, val).await {
+    for (alert, val) in trigger.iter() {
+        if let Err(e) = alert.send_notification(val).await {
             log::error!("Failed to send notification: {}", e)
         }
     }
