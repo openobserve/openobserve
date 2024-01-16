@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :span="span"
         :spanData="spanData"
         :baseTracePosition="baseTracePosition"
-      ></span-details>
+      />
     </template>
   </div>
 </template>
