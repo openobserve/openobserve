@@ -158,7 +158,15 @@ export default defineComponent({
       }
 
       // do we have variables & date?
-      if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
+      if (
+        !props.variablesConfig?.list ||
+        (props.selectedTimeDate.start_time &&
+          props.selectedTimeDate.start_time instanceof Date &&
+          !isNaN(props.selectedTimeDate.start_time)) ||
+        (props.selectedTimeDate.end_time &&
+          props.selectedTimeDate.end_time instanceof Date &&
+          !isNaN(props.selectedTimeDate.end_time))
+      ) {
         variablesData.values = [];
         variablesData.isVariablesLoading = false;
         emitVariablesData();
