@@ -116,9 +116,12 @@ export default defineComponent({
       // set current hovered series name in state
       hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName);
 
-      // scroll legend upto current series index
-      const legendOption = chart?.getOption()?.legend[0];
+      // Below logic is to scroll legend upto current series index
+      // which creates wrong legend highlight issue in tooltip
+      // so commented out
 
+      // scroll legend upto current series index
+      // const legendOption = chart?.getOption()?.legend[0];
       // if (legendOption) {
       // legendOption.scrollDataIndex = params?.seriesIndex || 0;
       // chart?.setOption({ legend: [legendOption] });
