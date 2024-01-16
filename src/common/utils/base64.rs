@@ -48,6 +48,10 @@ pub(crate) fn decode_raw(s: &str) -> Result<Vec<u8>, Error> {
         .map_err(|e| Error::new(ErrorKind::InvalidData, format!("base64 decode error: {e}")))
 }
 
+pub(crate) fn encode(s: &str) -> String {
+    base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

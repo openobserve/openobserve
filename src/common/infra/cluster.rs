@@ -247,6 +247,14 @@ pub async fn leave() -> Result<()> {
     Ok(())
 }
 
+pub async fn update_node(uuid: &str, node: &Node) -> Result<()> {
+    let mut client = etcd::get_etcd_client().await.clone();
+    let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, uuid);
+    let val = json::to_string(node).unwrap();
+    let _resp = client.put(key, val, None).await?;
+    Ok(())
+}
+
 pub fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
     if NODES.is_empty() {
         return None;

@@ -95,7 +95,7 @@ pub async fn ingest(
     let mut action = String::from("");
     let mut stream_name = String::from("");
     let mut doc_id = String::from("");
-    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
