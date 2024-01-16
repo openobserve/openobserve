@@ -947,6 +947,14 @@ async fn process_dest_template(
         "scheduled"
     };
 
+    // Hack time range for alert url
+    if alert_start_time == alert_end_time {
+        alert_start_time = alert_end_time
+            - Duration::minutes(alert.trigger_condition.period)
+                .num_microseconds()
+                .unwrap();
+    }
+
     let mut alert_query = String::new();
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
