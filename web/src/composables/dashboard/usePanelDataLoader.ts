@@ -31,7 +31,11 @@ export const usePanelDataLoader = (
   variablesData: any,
   chartPanelRef: any
 ) => {
-  const log = (...args: any[]) => {};
+  const log = (...args: any[]) => {
+    // if (true) {
+    //   console.log(panelSchema?.value?.title + ": ", ...args);
+    // }
+  };
 
   const state = reactive({
     data: [] as any,
@@ -157,6 +161,10 @@ export const usePanelDataLoader = (
 
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
+        log("loadData: there are no queries to execute");
+        state.loading = false;
+        state.data = [];
+        state.metadata = {}
         return;
       }
 
