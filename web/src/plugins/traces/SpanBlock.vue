@@ -218,11 +218,14 @@ export default defineComponent({
         style.left =
           getLeftPosition.value * onePercent - labelWidth + 10 + "px";
       } else {
+        const left =
+          getLeftPosition.value +
+          (Math.floor(getWidth.value) ? getWidth.value : 1);
+
         style.left =
-          (getLeftPosition.value +
-            (Math.floor(getWidth.value) ? getWidth.value : 1)) *
-            onePercent +
-          "px";
+          (left * onePercent - getLeftPosition.value * onePercent < 19
+            ? getLeftPosition.value * onePercent + 19
+            : left * onePercent) + "px";
       }
       return style;
     });
