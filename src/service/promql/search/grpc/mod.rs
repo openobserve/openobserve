@@ -54,15 +54,15 @@ impl TableProvider for StorageProvider {
     ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
         let mut resp = Vec::new();
         // register storage table
+        let session_id = self.session_id.to_owned() + "-storage-" + stream_name;
         let ctx =
-            storage::create_context(&self.session_id, org_id, stream_name, time_range, filters)
-                .await?;
+            storage::create_context(&session_id, org_id, stream_name, time_range, filters).await?;
         resp.push(ctx);
         // register Wal table
         if self.need_wal {
+            let session_id = self.session_id.to_owned() + "-wal-" + stream_name;
             let wal_ctx_list =
-                wal::create_context(&self.session_id, org_id, stream_name, time_range, filters)
-                    .await?;
+                wal::create_context(&session_id, org_id, stream_name, time_range, filters).await?;
             for ctx in wal_ctx_list {
                 resp.push(ctx);
             }
@@ -121,7 +121,7 @@ pub async fn search(
     // clear session
     search::datafusion::storage::file_list::clear(&session_id);
     // clear tmpfs
-    tmpfs::delete(&format!("/{}/", session_id), true).unwrap();
+    tmpfs::delete(&session_id, true).unwrap();
 
     scan_stats.format_to_mb();
     let mut resp = cluster_rpc::MetricsQueryResponse {

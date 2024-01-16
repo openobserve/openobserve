@@ -151,8 +151,8 @@ async fn add_valid_record(
     write_buf: &mut HashMap<String, SchemaRecords>,
     record_val: &mut Map<String, Value>,
     need_trigger: bool,
-) -> Result<TriggerAlertData, anyhow::Error> {
-    let mut trigger: Vec<(Alert, Vec<Map<String, Value>>)> = Vec::new();
+) -> Result<Option<TriggerAlertData>, anyhow::Error> {
+    let mut trigger: TriggerAlertData = Vec::new();
     let timestamp: i64 = record_val
         .get(&CONFIG.common.column_timestamp)
         .unwrap()

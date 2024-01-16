@@ -20,10 +20,12 @@ const emits = defineEmits(["field:add", "field:remove", "input:update"]);
 
 const addField = (field: any) => {
   emits("field:add", field);
+  emits("input:update", "conditions", field);
 };
 
 const removeField = (field: any) => {
   emits("field:remove", field);
+  emits("input:update", "conditions", field);
 };
 </script>
 

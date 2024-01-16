@@ -18,7 +18,7 @@
   <div style="height: calc(100vh - 57px)" class="scroll">
     <div class="flex justify-between items-center q-pa-md">
       <div class="flex items-center q-table__title q-mr-md">
-        <span>
+        <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
@@ -29,16 +29,19 @@
           v-model="histogramInterval"
           class="q-ml-sm"
           style="width: 150px"
+          data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
 
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          data-test="dashboard-viewpanel-date-time-picker"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
           @trigger="refreshData"
+          data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
           class="q-ml-sm"
@@ -47,7 +50,7 @@
           no-caps
           icon="refresh"
           @click="refreshData"
-          data-test="dashboard-refresh-data-btn"
+          data-test="dashboard-viewpanel-refresh-data-btn"
         />
         <q-btn
           no-caps
@@ -61,17 +64,20 @@
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 130px); overflow-y: auto">
+    <div class="row" style="height: calc(100vh - 130px); overflow: hidden">
       <div class="col" style="width: 100%; height: 100%">
-        <div class="row" style="height: 100%; overflow-y: auto">
+        <div class="row" style="height: 100%">
           <div class="col" style="height: 100%">
             <div class="layout-panel-container col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
-                :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
+                :showDynamicFilters="
+                  currentDashboardData.data?.variables?.showDynamicFilters
+                "
                 :selectedTimeDate="dashboardPanelData.meta.dateTime"
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
+                data-test="dashboard-viewpanel-variables-value-selector"
               />
               <div style="flex: 1">
                 <PanelSchemaRenderer
@@ -82,9 +88,13 @@
                   :width="6"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
+                  data-test="dashboard-viewpanel-panel-schema-renderer"
                 />
               </div>
-              <DashboardErrorsComponent :errors="errorData" />
+              <DashboardErrorsComponent
+                :errors="errorData"
+                data-test="dashboard-viewpanel-dashboard-errors"
+              />
             </div>
           </div>
         </div>
@@ -163,6 +173,11 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
+
+      // resize the chart when variables data is updated
+      // because if variable requires some more space then need to resize chart
+      // NOTE: need to improve this logic it should only called if the variable requires more space
+      window.dispatchEvent(new Event("resize"));
     };
     const currentDashboardData: any = reactive({
       data: {},

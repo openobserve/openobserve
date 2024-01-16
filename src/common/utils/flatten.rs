@@ -149,27 +149,27 @@ mod tests {
 
     #[test]
     fn test_check_key_lowercase() {
-        assert_eq!(check_key("hello"), true);
+        assert!(check_key("hello"));
     }
 
     #[test]
     fn test_check_key_numeric() {
-        assert_eq!(check_key("123"), true);
+        assert!(check_key("123"));
     }
 
     #[test]
     fn test_check_key_underscore() {
-        assert_eq!(check_key("my_key"), true);
+        assert!(check_key("my_key"));
     }
 
     #[test]
     fn test_check_key_mixed_case() {
-        assert_eq!(check_key("Hello_World"), false);
+        assert!(!check_key("Hello_World"));
     }
 
     #[test]
     fn test_check_key_special_characters() {
-        assert_eq!(check_key("key!"), false);
+        assert!(!check_key("key!"));
     }
 
     #[test]

@@ -211,7 +211,7 @@ mod tests {
             let data = RumExtraData::filter_tags(&query_data);
 
             // Assert that the tags are filtered correctly
-            assert!(data.len() > 0);
+            assert!(!data.is_empty());
             assert!(data.get("sdk_version").unwrap() == "0.2.9");
             assert!(data.get("api").unwrap() == "fetch");
             assert!(data.get("env").unwrap() == "production");

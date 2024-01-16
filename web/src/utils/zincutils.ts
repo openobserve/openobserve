@@ -301,25 +301,27 @@ export const getPath = () => {
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   const q = useQuasar();
-  if (
-    config.isCloud &&
-    store.state.selectedOrganization.subscription_type == config.freePlan
-  ) {
-    await billings
-      .list_subscription(store.state.selectedOrganization.identifier)
-      .then((res: any) => {
-        if (res.data.data.length == 0) {
-          next({ path: "/billings/plans" });
-        }
 
-        if (
-          res.data.data.CustomerBillingObj.customer_id == null ||
-          res.data.data.CustomerBillingObj.customer_id == ""
-        ) {
-          next({ path: "/billings/plans" });
-        }
-      });
-  }
+  // descopped for now to check impact of redirection on data ingestion page.
+  // if (
+  //   config.isCloud &&
+  //   store.state.selectedOrganization.subscription_type == config.freePlan
+  // ) {
+  //   await billings
+  //     .list_subscription(store.state.selectedOrganization.identifier)
+  //     .then((res: any) => {
+  //       if (res.data.data.length == 0) {
+  //         next({ path: "/billings/plans" });
+  //       }
+
+  //       if (
+  //         res.data.data.CustomerBillingObj.customer_id == null ||
+  //         res.data.data.CustomerBillingObj.customer_id == ""
+  //       ) {
+  //         next({ path: "/billings/plans" });
+  //       }
+  //     });
+  // }
 
   if (
     to.path.indexOf("/ingestion") == -1 &&
@@ -332,12 +334,6 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       .nameList(local_organization?.value?.identifier, "", false)
       .then((response) => {
         if (response.data.list.length == 0) {
-          q.notify({
-            type: "warning",
-            message:
-              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
-            timeout: 5000,
-          });
           next({ path: "/ingestion" });
         } else {
           next();

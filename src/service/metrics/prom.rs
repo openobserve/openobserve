@@ -31,7 +31,7 @@ use crate::{
             errors::{Error, Result},
         },
         meta::{
-            alerts::{self, Alert},
+            alerts,
             functions::StreamTransform,
             prom::*,
             search,
@@ -86,7 +86,7 @@ pub async fn remote_write(
     let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
@@ -97,7 +97,6 @@ pub async fn remote_write(
         .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
 
     // parse metadata
-    let req_metadata_len = request.metadata.len();
     for item in request.metadata {
         let metric_name = format_stream_name(&item.metric_family_name.clone());
         let metadata = Metadata {
@@ -115,26 +114,6 @@ pub async fn remote_write(
             .await
             .unwrap();
     }
-
-    // TODO: delete for debug
-    let mut streams = std::collections::HashSet::new();
-    for series in request.timeseries.iter() {
-        let metric_name = match series.labels.iter().find(|label| label.name == NAME_LABEL) {
-            Some(v) => v.value.clone(),
-            None => continue,
-        };
-        streams.insert(metric_name);
-    }
-    log::info!(
-        "/prometheus/api/v1/write: metadatas: {}, streams: {}, samples: {}",
-        req_metadata_len,
-        streams.len(),
-        request
-            .timeseries
-            .iter()
-            .map(|ts| ts.samples.len())
-            .sum::<usize>(),
-    );
 
     // maybe empty, we can return immediately
     if request.timeseries.is_empty() {
@@ -394,8 +373,7 @@ pub async fn remote_write(
                     metric_name.clone()
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
-                        Vec::new();
+                    let mut trigger_alerts: TriggerAlertData = Vec::new();
                     for alert in alerts {
                         if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
                             trigger_alerts.push((alert.clone(), v));

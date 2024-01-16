@@ -50,7 +50,7 @@ use crate::{
 
 pub mod grpc;
 
-pub type TriggerAlertData = Option<Vec<(Alert, Vec<Map<String, Value>>)>>;
+pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
@@ -176,7 +176,7 @@ pub async fn get_stream_alerts(
     stream_alerts_map.insert(key, alerts);
 }
 
-pub async fn evaluate_trigger(trigger: TriggerAlertData) {
+pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
     if trigger.is_none() {
         return;
     }

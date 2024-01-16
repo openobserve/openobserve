@@ -21,6 +21,7 @@ use crate::service::promql::{
     common::std_deviation2,
     value::{InstantValue, Sample, Value},
 };
+
 pub fn stddev(timestamp: i64, param: &Option<LabelModifier>, data: &Value) -> Result<Value> {
     let score_values = super::eval_std_dev_var(param, data, "stddev")?;
     if score_values.is_none() {

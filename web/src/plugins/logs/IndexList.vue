@@ -557,7 +557,9 @@ export default defineComponent({
                 .find((field: any) => field.field === name)
                 .values.map((value: any) => {
                   return {
-                    key: value.zo_sql_key ? value.zo_sql_key : "null",
+                    key: value.zo_sql_key?.toString()
+                      ? value.zo_sql_key
+                      : "null",
                     count: formatLargeNumber(value.zo_sql_num),
                   };
                 });

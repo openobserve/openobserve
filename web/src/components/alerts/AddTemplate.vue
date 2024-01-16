@@ -17,12 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none" style="min-height: inherit">
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
-        <div class="flex justify-center items-center q-mr-md cursor-pointer" style="
+        <div
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
             border: 1.5px solid;
             border-radius: 50%;
             width: 22px;
             height: 22px;
-          " title="Go Back" @click="router.back()">
+          "
+          title="Go Back"
+          @click="router.back()"
+        >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
         <div class="col" data-test="add-template-title">
@@ -38,30 +43,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator style="width: 100%" />
 
-    <q-splitter v-model="splitterModel" unit="%" style="min-height: calc(100vh - 122px)">
+    <q-splitter
+      v-model="splitterModel"
+      unit="%"
+      style="min-height: calc(100vh - 122px)"
+    >
       <template v-slot:before>
         <div class="row q-pa-md">
           <div class="col-12 q-pb-md q-pt-sm">
-            <q-input data-test="add-template-name-input" v-model="formData.name" :label="t('alerts.name') + ' *'"
-              color="input-border" bg-color="input-bg" class="showLabelOnTop" stack-label outlined filled dense
-              v-bind:readonly="isUpdatingTemplate" v-bind:disable="isUpdatingTemplate"
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']" tabindex="0" />
+            <q-input
+              data-test="add-template-name-input"
+              v-model="formData.name"
+              :label="t('alerts.name') + ' *'"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              v-bind:readonly="isUpdatingTemplate"
+              v-bind:disable="isUpdatingTemplate"
+              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+              tabindex="0"
+            />
           </div>
           <div class="col-12 q-pb-md q-pt-xs">
-            <div class="q-pb-sm text-bold" data-test="add-template-body-input-title">
+            <div
+              class="q-pb-sm text-bold"
+              data-test="add-template-body-input-title"
+            >
               {{ t("alert_templates.body") + " *" }}
             </div>
-            <div data-test="add-template-body-input" ref="editorRef" id="editor" :label="t('alerts.sql')" stack-label
-              style="border: 1px solid #dbdbdb; border-radius: 5px" class="showLabelOnTop" resize
-              :rules="[(val: any) => !!val || 'Field is required!']" />
+            <div
+              data-test="add-template-body-input"
+              ref="editorRef"
+              id="editor"
+              :label="t('alerts.sql')"
+              stack-label
+              style="border: 1px solid #dbdbdb; border-radius: 5px"
+              class="showLabelOnTop"
+              resize
+              :rules="[(val: any) => !!val || 'Field is required!']"
+            />
           </div>
           <div class="col-12 flex justify-center q-mt-lg">
-            <q-btn data-test="add-template-cancel-btn" v-close-popup="true" class="q-mb-md text-bold"
-              :label="t('alerts.cancel')" text-color="light-text" padding="sm md" no-caps
-              @click="$emit('cancel:hideform')" />
-            <q-btn data-test="add-template-submit-btn" :label="t('alerts.save')"
-              class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl" @click="saveTemplate"
-              no-caps />
+            <q-btn
+              data-test="add-template-cancel-btn"
+              v-close-popup="true"
+              class="q-mb-md text-bold"
+              :label="t('alerts.cancel')"
+              text-color="light-text"
+              padding="sm md"
+              no-caps
+              @click="$emit('cancel:hideform')"
+            />
+            <q-btn
+              data-test="add-template-submit-btn"
+              :label="t('alerts.save')"
+              class="q-mb-md text-bold no-border q-ml-md"
+              color="secondary"
+              padding="sm xl"
+              @click="saveTemplate"
+              no-caps
+            />
           </div>
         </div>
       </template>
@@ -76,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
             <div>alert_count, alert_agg_value</div>
-            <div>alert_start_time, alert_end_time</div>
+            <div>alert_start_time, alert_end_time, alert_url</div>
             <div><b>rows</b> multiple lines of row template</div>
             <div><b>All of the stream fields are variables.</b></div>
           </div>
@@ -84,15 +129,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-bold text-body-1 q-pb-sm">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
-            <div v-for="template in sampleTemplates" class="q-pb-md" :key="template.name">
+            <div
+              v-for="(template, index) in sampleTemplates"
+              class="q-pb-md"
+              :key="template.name"
+              :data-test="`add-template-sample-template-${index}`"
+            >
               <div class="flex justify-between items-center">
                 <div class="q-pb-xs">{{ template.name }}</div>
-                <q-icon class="cursor-pointer" name="content_copy" size="14px" @click="copyTemplateBody(template.body)" />
+                <q-icon
+                  data-test="add-template-sample-template-copy-btn"
+                  class="cursor-pointer"
+                  name="content_copy"
+                  size="14px"
+                  @click="copyTemplateBody(template.body)"
+                />
               </div>
-              <div class="add-template q-px-sm rounded-borders">
+              <div
+                data-test="add-template-sample-template-text"
+                class="add-template q-px-sm rounded-borders"
+              >
                 <pre class="example-template-body q-my-0">
                     {{ template.body }}
-                  </pre>
+                  </pre
+                >
               </div>
             </div>
           </div>
@@ -256,7 +316,6 @@ const saveTemplate = () => {
     message: "Please wait...",
     timeout: 2000,
   });
-
 
   if (isUpdatingTemplate.value) {
     templateService

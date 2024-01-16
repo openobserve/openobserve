@@ -41,12 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div style="width: 600px" class="q-mt-xl">
               <template v-if="!templates.length">
-                <div class="text-subtitle1">
+                <div
+                  class="text-subtitle1"
+                  data-test="alert-list-create-template-text"
+                >
                   It looks like you haven't created any Templates yet. To create
                   an Alert, you'll need to have at least one Destination and one
                   Template in place
                 </div>
                 <q-btn
+                  data-test="alert-list-create-template-btn"
                   class="q-mt-md"
                   label="Create Template"
                   size="md"
@@ -57,12 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-if="!destinations.length && templates.length">
-                <div class="text-subtitle1">
+                <div
+                  class="text-subtitle1"
+                  data-test="alert-list-create-destination-text"
+                >
                   It looks like you haven't created any Destinations yet. To
                   create an Alert, you'll need to have at least one Destination
                   and one Template in place
                 </div>
                 <q-btn
+                  data-test="alert-list-create-destination-btn"
                   class="q-mt-md"
                   label="Create Destination"
                   size="md"
@@ -81,7 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div
-              v-if="alertStateLoadingMap[props.row.name]"
+              data-test="alert-list-loading-alert"
+              v-if="alertStateLoadingMap[props.row.uuid]"
               style="display: inline-block; width: 33.14px; height: auto"
               class="flex justify-center items-center q-ml-xs"
               :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
@@ -96,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <q-btn
               v-else
-              :data-test="`alert-list-${props.row.name}-udpate-alert`"
+              :data-test="`alert-list-${props.row.name}-pause-start-alert`"
               :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
               class="q-ml-xs material-symbols-outlined"
               padding="sm"
@@ -144,10 +153,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title" data-test="alerts-list-title">
+          <div s class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
           <q-input
+            data-test="alert-list-search-input"
             v-model="filterQuery"
             borderless
             filled
@@ -227,7 +237,11 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import {
+  getImageURL,
+  getUUID,
+  verifyOrganizationStatus,
+} from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import {
   outlinedDelete,
@@ -344,7 +358,12 @@ export default defineComponent({
         .then((res) => {
           var counter = 1;
           resultTotal.value = res.data.list.length;
-          alerts.value = res.data.list;
+          alerts.value = res.data.list.map((alert: any) => {
+            return {
+              ...alert,
+              uuid: getUUID(),
+            };
+          });
           alertsRows.value = alerts.value.map((data: any) => {
             let conditions = "--";
             if (data.query_condition.conditions?.length) {
@@ -368,10 +387,11 @@ export default defineComponent({
               enabled: data.enabled,
               conditions: conditions,
               description: data.description,
+              uuid: data.uuid,
             };
           });
           alertsRows.value.forEach((alert: AlertListItem) => {
-            alertStateLoadingMap.value[alert.name] = false;
+            alertStateLoadingMap.value[alert.uuid as string] = false;
           });
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -471,7 +491,7 @@ export default defineComponent({
     };
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
-        (alert: any) => alert.name === props.row?.name
+        (alert: any) => alert.uuid === props.row?.uuid
       ) as Alert;
       let action;
       if (!props.row) {
@@ -566,9 +586,9 @@ export default defineComponent({
     };
 
     const toggleAlertState = (row: any) => {
-      alertStateLoadingMap.value[row.name] = true;
+      alertStateLoadingMap.value[row.uuid] = true;
       const alert: Alert = alerts.value.find(
-        (alert) => alert.name === row.name
+        (alert) => alert.uuid === row.uuid
       ) as Alert;
       alertsService
         .toggleState(
@@ -581,11 +601,11 @@ export default defineComponent({
         .then(() => {
           alert.enabled = !alert.enabled;
           alertsRows.value.forEach((alert) => {
-            alert.name === row.name ? (alert.enabled = !alert.enabled) : null;
+            alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
           });
         })
         .finally(() => {
-          alertStateLoadingMap.value[row.name] = false;
+          alertStateLoadingMap.value[row.uuid] = false;
         });
     };
 
