@@ -11,8 +11,8 @@ env:
     AWS_REGION: us-east-1
 
 jobs:
-    build:
-      name: build
+    build_pr_image:
+      name: build_pr_image
       permissions:
         id-token: write
         contents: read

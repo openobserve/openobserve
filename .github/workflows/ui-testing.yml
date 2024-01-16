@@ -21,8 +21,8 @@ env:
   CYPRESS_ORGNAME: default
 
 jobs:
-  build:
-
+  ui_integration_tests:
+    name: ui_integration_tests
     runs-on: 
       labels: ubuntu-latest
     strategy:
