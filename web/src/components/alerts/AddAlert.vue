@@ -941,6 +941,7 @@ export default defineComponent({
 
       if (input.query_condition.aggregation) {
         if (
+          isNaN(input.trigger_condition.threshold) ||
           !input.query_condition.aggregation.having.value.toString().trim()
             .length ||
           !input.query_condition.aggregation.having.column ||
@@ -959,7 +960,8 @@ export default defineComponent({
       }
 
       if (
-        !input.trigger_condition.threshold.toString().trim().length ||
+        isNaN(input.trigger_condition.threshold) ||
+        input.trigger_condition.threshold < 1 ||
         !input.trigger_condition.operator
       ) {
         notify &&
@@ -1028,8 +1030,9 @@ export default defineComponent({
   },
 
   created() {
+    // TODO OK: Refactor this code
     this.formData.ingest = ref(false);
-    this.formData = { ...defaultValue, ...this.modelValue };
+    this.formData = { ...defaultValue, ...cloneDeep(this.modelValue) };
     this.formData.is_real_time = this.formData.is_real_time.toString();
     this.beingUpdated = this.isUpdated;
     this.updateStreams(false)?.then(() => {
@@ -1042,7 +1045,7 @@ export default defineComponent({
     ) {
       this.beingUpdated = true;
       this.disableColor = "grey-5";
-      this.formData = this.modelValue;
+      this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
     }
 

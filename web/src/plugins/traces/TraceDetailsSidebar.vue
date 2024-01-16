@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="closeSidebar"
     ></q-btn>
   </div>
-  <div class="q-pb-sm q-pt-xs flex">
+  <div class="q-pb-sm q-pt-xs flex flex-wrap">
     <div
       :title="span.operation_name"
       class="q-px-sm q-pb-none ellipsis non-selectable"
@@ -44,6 +44,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="font-size: 14px"
     >
       <span class="text-grey-7">Service Name: </span> {{ span.service_name }}
+    </div>
+    <div
+      class="q-px-sm ellipsis non-selectable"
+      :title="getDuration"
+      style="font-size: 14px"
+    >
+      <span class="text-grey-7">Duration: </span>
+      <span>{{ getDuration }}</span>
     </div>
   </div>
   <q-tabs
@@ -310,6 +318,7 @@ import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
+import { formatTimeWithSuffix } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -341,6 +350,10 @@ export default defineComponent({
       () => {
         spanDetails.value = getFormattedSpanDetails();
       }
+    );
+
+    const getDuration = computed(() =>
+      formatTimeWithSuffix(props.span.duration)
     );
 
     onBeforeMount(() => {
@@ -519,6 +532,7 @@ export default defineComponent({
       formatStackTrace,
       getExceptionEvents,
       exceptionEventColumns,
+      getDuration,
     };
   },
 });
