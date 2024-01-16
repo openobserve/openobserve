@@ -1475,7 +1475,7 @@ export const convertSQLData = (
         Math.min(
           chartPanelRef.value?.offsetWidth / 3,
           calculateWidthText(maxValue) + 60
-        ) ?? 20;      
+        ) ?? 20;
     }
 
     options.grid.right = legendWidth;
@@ -1586,6 +1586,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "bar",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "line":
       return {
@@ -1594,6 +1595,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         showSymbol: false,
         areaStyle: null,
+        lineStyle: { width: 1.5 },
       };
     case "scatter":
       return {
@@ -1619,6 +1621,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
           show: true,
         },
         radius: "80%",
+        lineStyle: { width: 1.5 },
       };
     case "donut":
       return {
@@ -1639,11 +1642,13 @@ const getPropsByChartTypeForSeries = (type: string) => {
         labelLine: {
           show: false,
         },
+        lineStyle: { width: 1.5 },
       };
     case "h-bar":
       return {
         type: "bar",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "area":
       return {
@@ -1652,6 +1657,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         areaStyle: {},
         showSymbol: false,
+        lineStyle: { width: 1.5 },
       };
     case "stacked":
       return {
@@ -1660,6 +1666,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
+        lineStyle: { width: 1.5 },
       };
     case "heatmap":
       return {
@@ -1673,6 +1680,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
             shadowColor: "rgba(0, 0, 0, 0.5)",
           },
         },
+        lineStyle: { width: 1.5 },
       };
     case "area-stacked":
       return {
@@ -1684,6 +1692,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
           focus: "series",
         },
         showSymbol: false,
+        lineStyle: { width: 1.5 },
       };
     case "metric":
       return {
@@ -1697,6 +1706,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
+        lineStyle: { width: 1.5 },
       };
     case "gauge":
       return {
