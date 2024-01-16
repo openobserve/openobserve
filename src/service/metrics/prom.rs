@@ -31,7 +31,7 @@ use crate::{
             errors::{Error, Result},
         },
         meta::{
-            alerts::{self, Alert},
+            alerts,
             functions::StreamTransform,
             prom::*,
             search,
@@ -86,7 +86,7 @@ pub async fn remote_write(
     let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, TriggerAlertData> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
 
@@ -373,8 +373,7 @@ pub async fn remote_write(
                     metric_name.clone()
                 );
                 if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
-                        Vec::new();
+                    let mut trigger_alerts: TriggerAlertData = Vec::new();
                     for alert in alerts {
                         if let Ok(Some(v)) = alert.evaluate(Some(val_map)).await {
                             trigger_alerts.push((alert.clone(), v));

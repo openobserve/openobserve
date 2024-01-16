@@ -84,7 +84,7 @@ async fn ingest_inner(
 
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
-    let mut trigger: TriggerAlertData = None;
+    let mut trigger: Option<TriggerAlertData> = None;
 
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(

@@ -84,7 +84,7 @@ pub async fn usage_ingest(
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
 
-    let mut trigger: TriggerAlertData = None;
+    let mut trigger: Option<TriggerAlertData> = None;
 
     let partition_det =
         crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
@@ -301,7 +301,7 @@ pub async fn handle_grpc_request(
     );
     // End Register Transforms for stream
 
-    let mut trigger: TriggerAlertData = None;
+    let mut trigger: Option<TriggerAlertData> = None;
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
