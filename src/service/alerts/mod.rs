@@ -792,6 +792,8 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
         for (key, value) in row.iter() {
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
+            } else if value.is_f64() {
+                format!("{:.2}", value.as_f64().unwrap_or_default())
             } else {
                 value.to_string()
             };
@@ -886,6 +888,8 @@ async fn process_dest_template(
         for (key, value) in row.iter() {
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
+            } else if value.is_f64() {
+                format!("{:.2}", value.as_f64().unwrap_or_default())
             } else {
                 value.to_string()
             };
