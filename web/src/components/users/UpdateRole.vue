@@ -32,18 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <q-card-section class="q-w-md q-mx-lg">
       <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-        <q-input
-          v-model="orgMemberData.first_name"
-          :label="t('user.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          readonly
-          filled
-          dense
-        />
+        <q-input v-model="orgMemberData.first_name" :label="t('user.name')" color="input-border" bg-color="input-bg"
+          class="q-py-md showLabelOnTop" stack-label outlined readonly filled dense />
 
         <!--
         <q-input
@@ -60,37 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         -->
 
-        <q-select
-          v-model="orgMemberData.role"
-          :label="t('user.role')"
-          :options="roleOptions"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-pt-md q-pb-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-        />
+        <q-select v-model="orgMemberData.role" :label="t('user.role')" :options="roleOptions" color="input-border"
+          bg-color="input-bg" class="q-pt-md q-pb-sm showLabelOnTop" stack-label outlined filled dense />
 
         <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold no-border"
-            :label="t('user.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-          />
-          <q-btn
-            :label="t('user.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
+          <q-btn v-close-popup="true" class="q-mb-md text-bold no-border" :label="t('user.cancel')"
+            text-color="light-text" padding="sm md" color="accent" no-caps />
+          <q-btn :label="t('user.save')" class="q-mb-md text-bold no-border q-ml-md" color="secondary" padding="sm xl"
+            type="submit" no-caps />
         </div>
       </q-form>
     </q-card-section>
@@ -129,7 +96,7 @@ export default defineComponent({
     const store: any = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
-    const roleOptions = ["admin", "member"];
+    const roleOptions = ["admin"];
     const orgMemberData: any = ref(defaultValue());
     const updateUserForm: any = ref(null);
 

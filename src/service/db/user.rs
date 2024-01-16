@@ -162,10 +162,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: DBUser = json::from_slice(&ev.value.unwrap()).unwrap();
                 let users = item_value.get_all_users();
-                for user in users {
+                for mut user in users {
                     if user.role.eq(&UserRole::Root) {
                         ROOT_USER.insert("root".to_string(), user.clone());
-                    }
+                    } else {
+                        user.role = UserRole::Admin;
+                    };
                     USERS.insert(format!("{}/{}", user.org, item_key), user);
                 }
                 // Invalidate the entire RUM-TOKEN-CACHE
@@ -196,9 +198,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         // let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
         let users = json_val.get_all_users();
-        for user in users {
+        for mut user in users {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
+            } else {
+                user.role = UserRole::Admin;
             }
             USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
