@@ -47,7 +47,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_offset, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::warn!("[STATS] for organization {org_id} are being calculated by {node}");
+            log::debug!("[STATS] for organization {org_id} are being calculated by {node}");
             continue;
         }
 
@@ -56,7 +56,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
 
         let (last_query_ts, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::warn!("[STATS] for organization {org_id} are being calculated by {node}");
+            log::debug!("[STATS] for organization {org_id} are being calculated by {node}");
             continue;
         }
         // release lock

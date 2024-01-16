@@ -77,7 +77,7 @@ export default defineComponent({
       tls: url.protocol === "https:" ? "On" : "Off",
     };
 
-    const copyHTTPTracesContentURL = `${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/v1/traces`;
+    const copyHTTPTracesContentURL = `${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/traces`;
     const copyHTTPTracesContentPasscode = `Basic [BASIC_PASSCODE]`;
     const copyGRPCTracesContent = `endpoint: ${endpoint.value.host}
 headers: 

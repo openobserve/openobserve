@@ -43,7 +43,7 @@ const jstransform = {
     stream_type: string,
     data: any
   ) => {
-    return http().post(
+    return http().put(
       `/api/${org_identifier}/${stream_name}/functions/${data.name}?type=${stream_type}`,
       data
     );

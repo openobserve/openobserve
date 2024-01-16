@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{get, HttpResponse};
+use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use ahash::AHashMap as HashMap;
 use config::{CONFIG, HAS_FUNCTIONS, INSTANCE_ID, SQL_FULL_TEXT_SEARCH_FIELDS};
 use datafusion::arrow::datatypes::{Field, Schema};
@@ -36,7 +36,7 @@ use {
 use crate::{
     common::{
         infra::{cache, cluster, config::*, file_list},
-        meta::functions::ZoFunction,
+        meta::{functions::ZoFunction, http::HttpResponse as MetaHttpResponse},
         utils::json,
     },
     service::{db, search::datafusion::DEFAULT_FUNCTIONS},
@@ -262,5 +262,36 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     match refresh_token(&token).await {
         Ok(token_response) => HttpResponse::Ok().json(token_response),
         Err(_) => HttpResponse::Unauthorized().finish(),
+    }
+}
+
+#[put("/node/enable")]
+async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
+    let node_id = cluster::LOCAL_NODE_UUID.clone();
+    let Some(mut node) = cluster::get_node_by_uuid(&node_id) else {
+        return Ok(MetaHttpResponse::not_found("node not found"));
+    };
+
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let enable = match query.get("value") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    node.scheduled = enable;
+    match cluster::update_node(&node_id, &node).await {
+        Ok(_) => Ok(MetaHttpResponse::json(true)),
+        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+#[put("/node/flush")]
+async fn flush_node() -> Result<HttpResponse, Error> {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+        return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
+    };
+
+    match ingester::flush_all().await {
+        Ok(_) => Ok(MetaHttpResponse::json(true)),
+        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
 }

@@ -233,7 +233,7 @@
                   hide-selected
                   fill-input
                   style="width: 120px"
-                  @update:model-value="updateTrigger"
+                  @update:model-value="updateAggregation"
                 />
               </div>
               <div
@@ -255,7 +255,7 @@
                   fill-input
                   @filter="filterNumericColumns"
                   style="width: 250px"
-                  @update:model-value="updateTrigger"
+                  @update:model-value="updateAggregation"
                 />
               </div>
               <div
@@ -275,7 +275,7 @@
                   hide-selected
                   fill-input
                   style="width: 120px"
-                  @update:model-value="updateTrigger"
+                  @update:model-value="updateAggregation"
                 />
               </div>
               <div class="flex items-center q-mt-sm">
@@ -292,7 +292,7 @@
                     min="0"
                     style="background: none"
                     placeholder="Value"
-                    @update:model-value="updateTrigger"
+                    @update:model-value="updateAggregation"
                   />
                 </div>
               </div>
@@ -484,7 +484,7 @@ const tab = ref(props.query_type || "custom");
 const store = useStore();
 
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
-const regularFunctions = ["avg", "max", "min", "count"];
+const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
 const aggFunctions = computed(() =>
   props.alertData.stream_type === "metrics"
@@ -548,7 +548,7 @@ const getDefaultPromqlCondition = () => {
   return {
     column: "value",
     operator: ">=",
-    value: 80,
+    value: 0,
   };
 };
 

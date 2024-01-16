@@ -62,7 +62,9 @@ pub struct Writer {
 
 // check total memory size
 pub fn check_memtable_size() -> Result<()> {
-    let total_mem_size = metrics::INGEST_MEMTABLE_BYTES.with_label_values(&[]).get();
+    let total_mem_size = metrics::INGEST_MEMTABLE_ARROW_BYTES
+        .with_label_values(&[])
+        .get();
     if total_mem_size >= CONFIG.limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
     } else {
@@ -103,6 +105,21 @@ pub async fn read_from_memtable(
         }
     }
     Ok(batches)
+}
+
+pub async fn flush_all() -> Result<()> {
+    for w in WRITERS.iter() {
+        let mut w = w.write().await;
+        let keys = w.keys().cloned().collect::<Vec<_>>();
+        for r in w.values() {
+            r.close().await?; // close writer
+            metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+        }
+        for key in keys {
+            w.remove(&key);
+        }
+    }
+    Ok(())
 }
 
 impl Writer {
@@ -192,6 +209,28 @@ impl Writer {
 
         // write into memtable
         self.memtable.write().await.write(schema, entry).await?;
+        Ok(())
+    }
+
+    pub async fn close(&self) -> Result<()> {
+        // rotation wal
+        let wal = self.wal.lock().await;
+        wal.sync().context(WalSnafu)?;
+        let path = wal.path().clone();
+        drop(wal);
+
+        // rotation memtable
+        let mut mem = self.memtable.write().await;
+        let new_mem = MemTable::new();
+        let old_mem = std::mem::replace(&mut *mem, new_mem);
+        drop(mem);
+
+        let thread_id = self.thread_id;
+        let key = self.key.clone();
+        IMMUTABLES
+            .write()
+            .await
+            .insert(path, immutable::Immutable::new(thread_id, key, old_mem));
         Ok(())
     }
 

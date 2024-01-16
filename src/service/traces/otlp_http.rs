@@ -152,7 +152,7 @@ pub async fn traces_json(
     );
     // End Register Transforms for stream
 
-    let mut trigger: TriggerAlertData = None;
+    let mut trigger: Option<TriggerAlertData> = None;
 
     let mut service_name: String = traces_stream_name.to_string();
     // let export_req: ExportTraceServiceRequest =
@@ -374,10 +374,7 @@ pub async fn traces_json(
                         let key =
                             format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
                         if let Some(alerts) = stream_alerts_map.get(&key) {
-                            let mut trigger_alerts: Vec<(
-                                Alert,
-                                Vec<json::Map<String, json::Value>>,
-                            )> = Vec::new();
+                            let mut trigger_alerts: TriggerAlertData = Vec::new();
                             for alert in alerts {
                                 if let Ok(Some(v)) = alert.evaluate(Some(record_val)).await {
                                     trigger_alerts.push((alert.clone(), v));

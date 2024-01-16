@@ -34,7 +34,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // get the working node for the organization
     let node = db::alerts::alert_manager::get_mark(org_id).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-        log::warn!("[ALERT_MANAGER] is processing by {node}");
+        log::debug!("[ALERT_MANAGER] is processing by {node}");
         return Ok(());
     }
 
@@ -45,7 +45,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // first
     let node = db::alerts::alert_manager::get_mark(org_id).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-        log::warn!("[ALERT_MANAGER] is processing by {node}");
+        log::debug!("[ALERT_MANAGER] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(());
     }
@@ -142,8 +142,8 @@ pub async fn handle_triggers(
     }
 
     // send notification
-    if let Some(ret) = ret {
-        alert.send_notification(&ret).await?;
+    if let Some(data) = ret {
+        alert.send_notification(&data).await?;
     }
 
     // update trigger

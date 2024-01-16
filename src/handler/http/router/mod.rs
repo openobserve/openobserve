@@ -201,6 +201,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             ))
             .wrap(cors.clone())
             .service(status::cache_status)
+            .service(status::enable_node)
+            .service(status::flush_node)
             .service(users::list)
             .service(users::save)
             .service(users::delete)

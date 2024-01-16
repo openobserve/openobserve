@@ -35,10 +35,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
 
 async fn upgrade_052_053() -> Result<(), anyhow::Error> {
     // migration for metadata
-    meta::run().await?;
+    meta::run("sled", "sqlite").await?;
 
     // migration for file_list
-    file_list::run("").await?;
+    file_list::run("", "sled", "sqlite").await?;
 
     Ok(())
 }

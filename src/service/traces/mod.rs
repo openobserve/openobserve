@@ -147,7 +147,7 @@ pub async fn handle_trace_request(
     );
     // End Register Transforms for stream
 
-    let mut trigger: TriggerAlertData = None;
+    let mut trigger: Option<TriggerAlertData> = None;
 
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
@@ -309,8 +309,7 @@ pub async fn handle_trace_request(
                     // Start check for alert trigger
                     let key = format!("{}/{}/{}", &org_id, StreamType::Traces, traces_stream_name);
                     if let Some(alerts) = stream_alerts_map.get(&key) {
-                        let mut trigger_alerts: Vec<(Alert, Vec<json::Map<String, json::Value>>)> =
-                            Vec::new();
+                        let mut trigger_alerts: TriggerAlertData = Vec::new();
                         for alert in alerts {
                             if let Ok(Some(v)) = alert.evaluate(Some(record_val)).await {
                                 trigger_alerts.push((alert.clone(), v));
