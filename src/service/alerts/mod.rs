@@ -733,10 +733,10 @@ pub async fn send_notification(
     let rows_tpl_val = if alert.row_template.is_empty() {
         "".to_string()
     } else {
-        process_row_template(&alert.row_template, alert, rows).await
+        process_row_template(&alert.row_template, alert, rows)
     };
     let resp = json::to_string(&dest.template.body)?;
-    let resp = process_dest_template(&resp, alert, rows, &rows_tpl_val);
+    let resp = process_dest_template(&resp, alert, rows, &rows_tpl_val).await;
     let msg: Value = json::from_str(&resp)?;
     let msg: Value = match &msg {
         Value::String(obj) => match json::from_str(obj) {
@@ -777,7 +777,7 @@ pub async fn send_notification(
     Ok(())
 }
 
-async fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> String {
+fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> String {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -822,7 +822,7 @@ async fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, V
                 }
             }
         }
-        let alert_start_time = if alert_start_time > 0 {
+        let alert_start_time_str = if alert_start_time > 0 {
             Local
                 .timestamp_nanos(alert_start_time * 1000)
                 .format("%Y-%m-%dT%H:%M:%S")
@@ -830,59 +830,13 @@ async fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, V
         } else {
             String::from("N/A")
         };
-        let alert_end_time = if alert_end_time > 0 {
+        let alert_end_time_str = if alert_end_time > 0 {
             Local
                 .timestamp_nanos(alert_end_time * 1000)
                 .format("%Y-%m-%dT%H:%M:%S")
                 .to_string()
         } else {
             String::from("N/A")
-        };
-
-        let mut alert_query = String::new();
-        let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
-            if let Some(promql) = &alert.query_condition.promql {
-                let condition = alert.query_condition.promql_condition.as_ref().unwrap();
-                alert_query = format!(
-                    "({}) {} {}",
-                    promql,
-                    match condition.operator {
-                        Operator::EqualTo => "==".to_string(),
-                        _ => condition.operator.to_string(),
-                    },
-                    condition.value.as_f64().unwrap_or_default()
-                );
-            }
-            // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
-            format!(
-                "{}{}/web/metrics?org_identifier={}&stream_type={}&stream={}&from={}&to={}&query={}",
-                CONFIG.common.web_url,
-                CONFIG.common.base_uri,
-                alert.org_id,
-                alert.stream_type,
-                alert.stream_name,
-                alert_start_time,
-                alert_end_time,
-                base64::encode(&alert_query),
-            )
-        } else {
-            if let Some(conditions) = &alert.query_condition.conditions {
-                if let Ok(v) = build_sql(alert, conditions).await {
-                    alert_query = v;
-                }
-            }
-            // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
-            format!(
-                "{}{}/web/logs?org_identifier={}&stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}",
-                CONFIG.common.web_url,
-                CONFIG.common.base_uri,
-                alert.org_id,
-                alert.stream_type,
-                alert.stream_name,
-                alert_start_time,
-                alert_end_time,
-                base64::encode(&alert_query),
-            )
         };
 
         resp = resp
@@ -904,9 +858,8 @@ async fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, V
                 &alert.trigger_condition.threshold.to_string(),
             )
             .replace("{alert_count}", &alert_count.to_string())
-            .replace("{alert_start_time}", &alert_start_time)
-            .replace("{alert_end_time}", &alert_end_time)
-            .replace("{alert_url}", &alert_url);
+            .replace("{alert_start_time}", &alert_start_time_str)
+            .replace("{alert_end_time}", &alert_end_time_str);
 
         if let Some(attrs) = &alert.context_attributes {
             for (key, value) in attrs.iter() {
@@ -920,7 +873,7 @@ async fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, V
     rows_tpl.join("\\\\n")
 }
 
-fn process_dest_template(
+async fn process_dest_template(
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
@@ -971,7 +924,7 @@ fn process_dest_template(
             }
         }
     }
-    let alert_start_time = if alert_start_time > 0 {
+    let alert_start_time_str = if alert_start_time > 0 {
         Local
             .timestamp_nanos(alert_start_time * 1000)
             .format("%Y-%m-%dT%H:%M:%S")
@@ -979,7 +932,7 @@ fn process_dest_template(
     } else {
         String::from("N/A")
     };
-    let alert_end_time = if alert_end_time > 0 {
+    let alert_end_time_str = if alert_end_time > 0 {
         Local
             .timestamp_nanos(alert_end_time * 1000)
             .format("%Y-%m-%dT%H:%M:%S")
@@ -992,6 +945,52 @@ fn process_dest_template(
         "realtime"
     } else {
         "scheduled"
+    };
+
+    let mut alert_query = String::new();
+    let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
+        if let Some(promql) = &alert.query_condition.promql {
+            let condition = alert.query_condition.promql_condition.as_ref().unwrap();
+            alert_query = format!(
+                "({}) {} {}",
+                promql,
+                match condition.operator {
+                    Operator::EqualTo => "==".to_string(),
+                    _ => condition.operator.to_string(),
+                },
+                condition.value.as_f64().unwrap_or_default()
+            );
+        }
+        // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
+        format!(
+            "{}{}/web/metrics?org_identifier={}&stream_type={}&stream={}&from={}&to={}&query={}",
+            CONFIG.common.web_url,
+            CONFIG.common.base_uri,
+            alert.org_id,
+            alert.stream_type,
+            alert.stream_name,
+            alert_start_time,
+            alert_end_time,
+            base64::encode(&alert_query),
+        )
+    } else {
+        if let Some(conditions) = &alert.query_condition.conditions {
+            if let Ok(v) = build_sql(alert, conditions).await {
+                alert_query = v;
+            }
+        }
+        // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
+        format!(
+            "{}{}/web/logs?org_identifier={}&stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}",
+            CONFIG.common.web_url,
+            CONFIG.common.base_uri,
+            alert.org_id,
+            alert.stream_type,
+            alert.stream_name,
+            alert_start_time,
+            alert_end_time,
+            base64::encode(&alert_query),
+        )
     };
 
     let mut resp = tpl
@@ -1013,8 +1012,9 @@ fn process_dest_template(
             &alert.trigger_condition.threshold.to_string(),
         )
         .replace("{alert_count}", &alert_count.to_string())
-        .replace("{alert_start_time}", &alert_start_time)
-        .replace("{alert_end_time}", &alert_end_time)
+        .replace("{alert_start_time}", &alert_start_time_str)
+        .replace("{alert_end_time}", &alert_end_time_str)
+        .replace("{alert_url}", &alert_url)
         .replace("{rows}", rows_tpl_val);
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
