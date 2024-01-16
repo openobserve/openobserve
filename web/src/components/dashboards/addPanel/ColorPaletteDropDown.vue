@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="q-pt-md"
       v-if="
-        ['green-yellow-red', 'red-yellow-green', 'shades'].includes(
+        ['green-yellow-red', 'red-yellow-green'].includes(
           dashboardPanelData.data.config.color.mode
         )
       "
@@ -156,6 +156,7 @@ export default defineComponent({
       // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor
       if (["fixed", "shades"].includes(value.value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
+        dashboardPanelData.data.config.color.seriesBy = "last";
       } else {
         // else assign sublabel to fixedcolor
         dashboardPanelData.data.config.color.fixedColor = value.subLabel;

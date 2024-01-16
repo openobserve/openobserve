@@ -27,11 +27,130 @@ export const colorArrayBySeries = [
   "#27e162",
   "#e08de6",
   "#de6086",
-  "rgba(161,225,200,0.48)",
   "#ec8ceb",
   "#99e9f1",
   "#eec59c",
 ];
+
+// Convert a hex color to HSL
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1, 3), 16) / 255;
+  let g = parseInt(hex.slice(3, 5), 16) / 255;
+  let b = parseInt(hex.slice(5, 7), 16) / 255;
+
+  let max = Math.max(r, g, b),
+    min = Math.min(r, g, b);
+  let h,
+    s,
+    l = (max + min) / 2;
+
+  if (max === min) {
+    h = s = 0; // achromatic
+  } else {
+    let d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return { h, s, l };
+}
+
+// Convert an HSL color to hex
+function hslToHex(hsl) {
+  let r, g, b;
+
+  if (hsl.s === 0) {
+    r = g = b = hsl.l; // achromatic
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    let q = hsl.l < 0.5 ? hsl.l * (1 + hsl.s) : hsl.l + hsl.s - hsl.l * hsl.s;
+    let p = 2 * hsl.l - q;
+    r = hue2rgb(p, q, hsl.h + 1 / 3);
+    g = hue2rgb(p, q, hsl.h);
+    b = hue2rgb(p, q, hsl.h - 1 / 3);
+  }
+
+  let toHex = (x) => {
+    let hex = Math.round(x * 255).toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  };
+
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+}
+
+// Get a color for a name
+function getColorForName(name) {
+  var hash = hashName(name);
+  var colorIndex = hash % colorArrayBySeries.length;
+  var baseColor = hexToHsl(colorArrayBySeries[colorIndex]);
+
+  // create a unique hue, saturation, and lightness value
+  baseColor.h = (baseColor.h + (hash % 360) / 360.0) % 1;
+  baseColor.s = baseColor.s + ((hash % 20) - 10) / 100.0; // vary by up to 10%
+  baseColor.l = baseColor.l + ((hash % 20) - 10) / 100.0; // vary by up to 10%
+
+  return hslToHex(baseColor);
+}
+
+// Define your hash function
+function hashName(name) {
+  var hash = 0;
+  for (var i = 0; i < name.length; i++) {
+    hash += name.charCodeAt(i);
+  }
+  return hash;
+}
+
+// // Convert a hex color to RGB
+// function hexToRgb(hex: any) {
+//     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+//     return result ? {
+//         r: parseInt(result[1], 16),
+//         g: parseInt(result[2], 16),
+//         b: parseInt(result[3], 16)
+//     } : null;
+// }
+
+// // Convert an RGB color to hex
+// function rgbToHex(rgb) {
+//     return "#" + ((1 << 24) | (rgb.r << 16) | (rgb.g << 8) | rgb.b).toString(16).slice(1);
+// }
+
+// // Get a color for a name
+// function getColorForName(name: any) {
+//   var hash = hashName(name);
+//   var colorIndex = hash % colorArrayBySeries.length;
+//   var baseColor: any = hexToRgb(colorArrayBySeries[colorIndex]);
+
+//   // Create a unique offset for each RGB value
+//   var offset = Math.floor(hash / 256);
+
+//   var gradientColor = {
+//       r: (baseColor.r + offset) % 256,
+//       g: (baseColor.g + offset * 2) % 256,
+//       b: (baseColor.b + offset * 3) % 256
+//   };
+
+//   return rgbToHex(gradientColor);
+// }
 
 export const getIndexForName = (name: any, colorArray: any) => {
   let index = 0;
@@ -55,11 +174,20 @@ const adjustColor = (color, amount) => {
   const scale = amount < 0 ? 0 : 255;
   const inverseScale = amount < 0 ? -amount : 1 - amount;
 
-  const r = scale - Math.round((scale - parseInt(num.substring(0, 2), 16)) * inverseScale);
-  const g = scale - Math.round((scale - parseInt(num.substring(2, 4), 16)) * inverseScale);
-  const b = scale - Math.round((scale - parseInt(num.substring(4, 6), 16)) * inverseScale);
+  const r =
+    scale -
+    Math.round((scale - parseInt(num.substring(0, 2), 16)) * inverseScale);
+  const g =
+    scale -
+    Math.round((scale - parseInt(num.substring(2, 4), 16)) * inverseScale);
+  const b =
+    scale -
+    Math.round((scale - parseInt(num.substring(4, 6), 16)) * inverseScale);
 
-  return (usePound ? "#" : "") + (0x1000000 + (r << 16) | (g << 8) | b).toString(16).slice(1);
+  return (
+    (usePound ? "#" : "") +
+    ((0x1000000 + (r << 16)) | (g << 8) | b).toString(16).slice(1)
+  );
 };
 
 const nameToColor = (name, colorArray) => {
@@ -86,15 +214,15 @@ function stringToColor(str) {
   // Create a hash from the string
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
 
   // Convert the hash to an HSL color
   let hue = hash % 360;
-  let saturation = hash % 25 + 100; // Saturation range between 75-100%
-  let lightness = hash % 15 + 100;  // Lightness range between 70-85%
-  
-  return 'hsl(' + hue + ', ' + saturation + '%, ' + lightness + '%)';
+  let saturation = (hash % 25) + 100; // Saturation range between 75-100%
+  let lightness = (hash % 15) + 100; // Lightness range between 70-85%
+
+  return "hsl(" + hue + ", " + saturation + "%, " + lightness + "%)";
 }
 
 function shadeColor(color: any, value: any, min: any, max: any) {
@@ -157,7 +285,12 @@ export const getSQLMinMaxValue = (yaxiskeys: any, searchQueryData: any) => {
 
 const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
   // if color is based on value then need to find seriesmin or seriesmax or last value
-  let seriesvalue = values?.length > 0 ? values[values.length - 1][1] : 50;
+  let seriesvalue =
+    values?.length > 0
+      ? !isNaN(values[values.length - 1][1])
+        ? values[values.length - 1][1]
+        : 50
+      : 50;
   if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
@@ -295,20 +428,20 @@ export const getColor = (
     case "palette-classic": {
       // return color using colorArrayBySeries
       // NOTE: here value will be series name
-      // return nameToColor(seriesName, colorArrayBySeries);
-    //   function stringToColor(str) {
-    //     let hash = 0;
-    //     for (let i = 0; i < str.length; i++) {
-    //         hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    //     }
-    
-    //     // Convert the hash to a number between 0 and 360
-    //     let hue = hash % 361;
-    
-    //     // Generate the HSL color
-    //     return `hsl(${hue}, 50%, 50%)`;
-    // }
-    return stringToColor(seriesName);
+      return getColorForName(seriesName);
+      //   function stringToColor(str) {
+      //     let hash = 0;
+      //     for (let i = 0; i < str.length; i++) {
+      //         hash = str.charCodeAt(i) + ((hash << 5) - hash);
+      //     }
+
+      //     // Convert the hash to a number between 0 and 360
+      //     let hue = hash % 361;
+
+      //     // Generate the HSL color
+      //     return `hsl(${hue}, 50%, 50%)`;
+      // }
+      // return stringToColor(seriesName);
     }
 
     case "green-yellow-red": {
@@ -351,7 +484,7 @@ export const getColor = (
 
     default: {
       // return color using colorArrayBySeries
-      return nameToColor(seriesName, colorArrayBySeries);
+      return getColorForName(seriesName);
     }
   }
 };

@@ -756,7 +756,9 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
-        areaStyle: {},
+        areaStyle: {
+          opacity: 0.4,
+        },
         showSymbol: false,
         lineStyle: { width: 1.5 },
       };
@@ -771,7 +773,9 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         smooth: true,
         stack: "Total",
-        areaStyle: {},
+        areaStyle: {
+          opacity: 0.4,
+        },
         showSymbol: false,
         emphasis: {
           focus: "series",
