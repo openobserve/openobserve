@@ -673,6 +673,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "bar",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "line":
       return {
@@ -680,6 +681,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         showSymbol: false,
+        lineStyle: { width: 1.5 },
       };
     case "scatter":
       return {
@@ -691,17 +693,20 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "pie",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "donut":
       return {
         type: "pie",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "h-bar":
       return {
         type: "bar",
         orientation: "h",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "area":
       return {
@@ -710,11 +715,13 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         areaStyle: {},
         showSymbol: false,
+        lineStyle: { width: 1.5 },
       };
     case "stacked":
       return {
         type: "bar",
         emphasis: { focus: "series" },
+        lineStyle: { width: 1.5 },
       };
     case "area-stacked":
       return {
@@ -726,6 +733,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: {
           focus: "series",
         },
+        lineStyle: { width: 1.5 },
       };
     case "gauge":
       return {
@@ -755,6 +763,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "bar",
         emphasis: { focus: "series" },
         orientation: "h",
+        lineStyle: { width: 1.5 },
       };
     default:
       return {
