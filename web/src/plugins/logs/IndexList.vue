@@ -477,12 +477,12 @@ export default defineComponent({
       try {
         let query_context = "";
         let query = searchObj.data.query;
-        if (searchObj.meta.sqlMode == true) {
+        if (searchObj.meta.sqlMode && query.trim().length) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
           query_context =
             b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')) || "";
-        } else {
+        } else if (query.trim().length) {
           let parseQuery = query.split("|");
           let queryFunctions = "";
           let whereClause = "";
@@ -569,6 +569,7 @@ export default defineComponent({
             fieldValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
+        console.log(err);
         $q.notify({
           type: "negative",
           message: "Error while fetching field values",
