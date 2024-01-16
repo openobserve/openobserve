@@ -481,6 +481,7 @@ export default defineComponent({
 
     const onMetricChange = () => {
       updateMetricLabels();
+      emit("update:change-metric", searchObj.data.metrics.selectedMetric);
     };
     const setSelectedMetricType = (option: any) => {
       searchObj.data.metrics.selectedMetricType = option.type;

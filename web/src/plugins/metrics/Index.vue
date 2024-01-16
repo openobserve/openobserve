@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <metric-list
             data-test="logs-search-index-list"
             @select-label="addLabelToEditor"
+            @update:change-metric="onMetricChange"
           />
         </template>
         <template #separator>
@@ -44,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="row">
             <div
-              class="text-left col auto q-px-sm q-py-xs flex justify-start metrics-date-time"
+              class="text-left col-2 auto q-px-sm q-py-xs flex justify-start metrics-date-time"
             >
               <syntax-guide-metrics class="q-mr-sm" />
             </div>
@@ -84,6 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("metrics.runQuery") }}
               </q-btn>
+              <q-btn
+                data-test="logs-search-bar-share-link-btn"
+                class="q-mx-sm download-logs-btn q-px-sm q-py-xs"
+                size="sm"
+                icon="share"
+                style="height: 30px"
+                :title="t('search.shareLink')"
+                @click="shareLink"
+              />
             </div>
           </div>
           <div>
@@ -241,7 +251,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar, date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -741,6 +751,9 @@ export default defineComponent({
     };
 
     const onMetricChange = async (metric) => {
+      if (!searchObj.data.metrics.selectedMetric?.value) return;
+
+      console.log("metric", metric);
       const query = metric?.value + "{}";
       nextTick(() => {
         metricsQueryEditorRef.value.setValue(query);
@@ -771,14 +784,14 @@ export default defineComponent({
       }
     }
 
-    function updateUrlQueryParams() {
+    function generateURLQuery(isShareLink = false) {
       try {
         const date = searchObj.data.datetime;
         const query = {
           stream: searchObj.data.metrics.selectedMetric?.value,
         };
 
-        if (date.type == "relative") {
+        if (date.type == "relative" && !isShareLink) {
           query["period"] = date.relativeTimePeriod;
         } else {
           query["from"] = date.startTime;
@@ -791,11 +804,17 @@ export default defineComponent({
         }
         query["org_identifier"] = store.state.selectedOrganization.identifier;
 
-        router.push({ query });
+        return query;
       } catch (err) {
         console.log(err);
       }
     }
+
+    function updateUrlQueryParams() {
+      const query = generateURLQuery();
+      router.push({ query });
+    }
+
     const addLabelToEditor = (label) => {
       try {
         const parsedQuery = parsePromQlQuery(searchObj.data.query);
@@ -836,6 +855,40 @@ export default defineComponent({
       refreshData();
     };
 
+    const shareLink = () => {
+      const queryObj = generateURLQuery(true);
+      const queryString = Object.entries(queryObj)
+        .map(
+          ([key, value]) =>
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+        )
+        .join("&");
+
+      let shareURL = window.location.origin + window.location.pathname;
+
+      console.log("shareURL", shareURL);
+
+      if (queryString != "") {
+        shareURL += "?" + queryString;
+      }
+
+      copyToClipboard(shareURL)
+        .then(() => {
+          $q.notify({
+            type: "positive",
+            message: "Link Copied Successfully!",
+            timeout: 5000,
+          });
+        })
+        .catch(() => {
+          $q.notify({
+            type: "negative",
+            message: "Error while copy link.",
+            timeout: 5000,
+          });
+        });
+    };
+
     return {
       t,
       store,
@@ -866,6 +919,7 @@ export default defineComponent({
       onSplitterUpdate,
       resetSearchObj,
       onChangeRefreshInterval,
+      shareLink,
     };
   },
   computed: {
@@ -885,8 +939,15 @@ export default defineComponent({
   watch: {
     selectedMetric: {
       deep: true,
-      handler: function (metric) {
-        if (this.searchObj.data.metrics.selectedMetric?.value) {
+      handler: function (metric, oldMetric) {
+        // This is temporary fix
+        // This is to handle the stream selection for first time
+        // Avoid calling onMetricChange() when there is data query i.e when user loads shared link or url has query param
+        if (
+          this.searchObj.data.metrics.selectedMetric?.value &&
+          !oldMetric &&
+          !this.searchObj.data.query
+        ) {
           this.onMetricChange(metric);
         }
       },
