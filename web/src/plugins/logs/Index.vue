@@ -329,7 +329,7 @@ export default defineComponent({
           });
         }
       }
-    }
+    },
   },
   setup() {
     const store = useStore();
@@ -387,10 +387,6 @@ export default defineComponent({
     //     console.log(e);
     //   }
     // }
-
-    onDeactivated(() => {
-      resetStreamData();
-    });
     onUnmounted(() => {
       resetSearchObj();
       resetStreamData();
@@ -687,7 +683,7 @@ export default defineComponent({
       }
     },
     fullSQLMode(newVal) {
-      if(newVal) {
+      if (newVal) {
         this.setQuery(newVal);
       } else {
         this.searchObj.meta.sqlMode = false;

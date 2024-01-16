@@ -439,48 +439,52 @@ export default defineComponent({
       values: string[],
       prevValues: string[]
     ) => {
-      const parser = new Parser();
+      try {
+        const parser = new Parser();
 
-      const valuesString = values
-        .map((value: string) => "'" + value + "'")
-        .join(",");
+        const valuesString = values
+          .map((value: string) => "'" + value + "'")
+          .join(",");
 
-      let query = `SELECT * FROM ${selectedStreamName.value} `;
+        let query = `SELECT * FROM '${selectedStreamName.value}' `;
 
-      if (!searchObj.data.editorValue?.length) {
-        searchObj.data.editorValue = `${column} IN (${valuesString})`;
-      } else if (!prevValues.length) {
-        searchObj.data.editorValue += ` AND ${column} IN (${valuesString})`;
+        if (!searchObj.data.editorValue?.length) {
+          searchObj.data.editorValue = `${column} IN (${valuesString})`;
+        } else if (!prevValues.length) {
+          searchObj.data.editorValue += ` AND ${column} IN (${valuesString})`;
+        }
+
+        query += " WHERE " + searchObj.data.editorValue;
+
+        const parsedQuery: any = parser.astify(query);
+
+        if (!values.length) {
+          parsedQuery.where = removeCondition(parsedQuery.where, column);
+        } else if (prevValues.length) {
+          modifyWhereClause(parsedQuery?.where, column, values);
+        }
+
+        // Convert the AST back to SQL query
+        let modifiedQuery = parser.sqlify(parsedQuery);
+        if (modifiedQuery) {
+          searchObj.data.editorValue = (modifiedQuery.split("WHERE")[1] || "")
+            .replace(/`/g, "")
+            .trim();
+
+          // Saving query in this variable, as while switching back from advance to basic we don't have to recreate the query from filters
+          searchObj.data.advanceFiltersQuery = searchObj.data.editorValue;
+        }
+
+        if (
+          column === "service_name" &&
+          expandedFilters.value.includes("operation_name")
+        )
+          getSpecialFieldsValues("operation_name");
+
+        filterExpandedFieldValues();
+      } catch (e) {
+        console.log("Error while creating query from filters");
       }
-
-      query += " WHERE " + searchObj.data.editorValue;
-
-      const parsedQuery: any = parser.astify(query);
-
-      if (!values.length) {
-        parsedQuery.where = removeCondition(parsedQuery.where, column);
-      } else if (prevValues.length) {
-        modifyWhereClause(parsedQuery?.where, column, values);
-      }
-
-      // Convert the AST back to SQL query
-      let modifiedQuery = parser.sqlify(parsedQuery);
-      if (modifiedQuery) {
-        searchObj.data.editorValue = (modifiedQuery.split("WHERE")[1] || "")
-          .replace(/`/g, "")
-          .trim();
-
-        // Saving query in this variable, as while switching back from advance to basic we don't have to recreate the query from filters
-        searchObj.data.advanceFiltersQuery = searchObj.data.editorValue;
-      }
-
-      if (
-        column === "service_name" &&
-        expandedFilters.value.includes("operation_name")
-      )
-        getSpecialFieldsValues("operation_name");
-
-      filterExpandedFieldValues();
     };
 
     const filterExpandedFieldValues = () => {

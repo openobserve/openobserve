@@ -348,7 +348,7 @@
                     type="number"
                     dense
                     filled
-                    min="0"
+                    min="1"
                     style="background: none"
                     @update:model-value="updateTrigger"
                   />
