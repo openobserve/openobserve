@@ -1372,6 +1372,7 @@ export default defineComponent({
       refreshTimezone,
       indexListRef,
       copyTracesUrl,
+      extractFields,
     };
   },
   computed: {
@@ -1448,7 +1449,7 @@ export default defineComponent({
           if (oldStream.value) this.setQuery(this.searchObj.meta.sqlMode);
           setTimeout(() => {
             this.runQueryFn();
-            extractFields();
+            this.extractFields();
           }, 500);
         }
       },
