@@ -119,10 +119,15 @@ export default defineComponent({
       // scroll legend upto current series index
       const legendOption = chart?.getOption()?.legend[0];
 
-      if (legendOption) {
-        legendOption.scrollDataIndex = params?.seriesIndex || 0;
-        chart?.setOption({ legend: [legendOption] });
-      }
+      // if (legendOption) {
+      // legendOption.scrollDataIndex = params?.seriesIndex || 0;
+      // chart?.setOption({ legend: [legendOption] });
+      // chart?.dispatchAction({
+      //   type: "legendScroll",
+      //   scrollDataIndex: params?.seriesIndex || 0,
+      //   legendId: params?.seriesId,
+      // });
+      // }
     };
 
     const mouseOutEffectFn = () => {
@@ -172,7 +177,7 @@ export default defineComponent({
     };
 
     const chartInitialSetUp = () => {
-      chart?.on("mouseover", mouseHoverEffectFn);
+      chart?.on("mousemove", mouseHoverEffectFn);
       chart?.on("mouseout", mouseOutEffectFn);
       chart?.on("globalout", () => {
         mouseHoverEffectFn({});
