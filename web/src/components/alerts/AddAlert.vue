@@ -941,6 +941,7 @@ export default defineComponent({
 
       if (input.query_condition.aggregation) {
         if (
+          isNaN(input.trigger_condition.threshold) ||
           !input.query_condition.aggregation.having.value.toString().trim()
             .length ||
           !input.query_condition.aggregation.having.column ||
@@ -959,7 +960,8 @@ export default defineComponent({
       }
 
       if (
-        !input.trigger_condition.threshold.toString().trim().length ||
+        isNaN(input.trigger_condition.threshold) ||
+        input.trigger_condition.threshold < 1 ||
         !input.trigger_condition.operator
       ) {
         notify &&

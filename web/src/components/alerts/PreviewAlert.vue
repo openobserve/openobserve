@@ -183,8 +183,8 @@ const refreshData = () => {
 
   if (
     props.selectedTab === "custom" &&
-    props.formData.query_condition.aggregation.group_by.length > 0 &&
-    props.formData.query_condition.aggregation.group_by[0].trim() !== ""
+    props.formData.query_condition?.aggregation?.group_by?.length > 0 &&
+    props.formData.query_condition?.aggregation?.group_by[0]?.trim() !== ""
   ) {
     xAxis.push({
       alias: "x_axis_2",
