@@ -332,7 +332,7 @@ impl QueryCondition {
                             &Operator::EqualTo => "==".to_string(),
                             _ => condition.operator.to_string(),
                         },
-                        condition.value.as_f64().unwrap_or_default()
+                        to_float(&condition.value)
                     ),
                     start,
                     end,
@@ -958,7 +958,7 @@ async fn process_dest_template(
                     Operator::EqualTo => "==".to_string(),
                     _ => condition.operator.to_string(),
                 },
-                condition.value.as_f64().unwrap_or_default()
+                to_float(&condition.value)
             );
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
@@ -1038,4 +1038,12 @@ fn format_variable_value(val: &str) -> String {
     val.replace('\n', "\\\\n")
         .replace('\r', "\\\\r")
         .replace('\"', "\\\\\\\"")
+}
+
+fn to_float(val: &Value) -> f64 {
+    if val.is_number() {
+        val.as_f64().unwrap_or_default()
+    } else {
+        val.as_str().unwrap_or_default().parse().unwrap_or_default()
+    }
 }
