@@ -25,11 +25,7 @@ RUN mkdir -p /app/target/release/
 RUN RUSTFLAGS='-C target-feature=+avx,+avx2,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx512f,+avx512cd,+avx512er,+avx512bw,+avx512dq,+avx512vl' cargo build --profile release-prod --features mimalloc --target x86_64-unknown-linux-gnu
 RUN mv /app/target/x86_64-unknown-linux-gnu/release-prod/openobserve /app/target/release/openobserve
 
-FROM gcr.io/distroless/cc as runtime
-# FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
-# RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-# RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
-# RUN update-ca-certificates
+FROM gcr.io/distroless/cc-debian12 as runtime
 COPY --from=builder /app/target/release/openobserve /
 COPY --from=builder /lib/x86_64-linux-gnu/liblzma.so.5 /lib/x86_64-linux-gnu/liblzma.so.5
 COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
