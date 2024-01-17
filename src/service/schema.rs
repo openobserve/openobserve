@@ -539,7 +539,6 @@ async fn handle_new_schema(
                 )
                 .await
                 .unwrap();
-                println!("Setting ownership for stream {}", stream_name);
                 crate::common::utils::auth::set_ownership(
                     org_id,
                     "streams",
