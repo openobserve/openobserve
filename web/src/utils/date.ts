@@ -235,3 +235,13 @@ export const getRelativePeriod = (period: string) => {
   };
   return mapping[period];
 };
+
+export const invalidDate = (startTime: any, endTime: any) => {
+  if (
+    !(startTime && startTime instanceof Date && !isNaN(startTime)) ||
+    !(endTime && endTime instanceof Date && !isNaN(endTime))
+  ) {
+    return true; 
+  }
+  return false;
+};
