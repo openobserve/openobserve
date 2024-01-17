@@ -119,9 +119,9 @@ pub async fn remote_write(
 pub async fn query_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestQuery>,
-    _in_req: HttpRequest,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query(&org_id.into_inner(), req.into_inner(), _in_req).await
+    query(&org_id.into_inner(), req.into_inner(), in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query")]
@@ -129,14 +129,14 @@ pub async fn query_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestQuery>,
     web::Form(form): web::Form<meta::prom::RequestQuery>,
-    _in_req: HttpRequest,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
         form
     } else {
         req.into_inner()
     };
-    query(&org_id.into_inner(), req, _in_req).await
+    query(&org_id.into_inner(), req, in_req).await
 }
 
 async fn query(
@@ -256,9 +256,9 @@ async fn query(
 pub async fn query_range_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestRangeQuery>,
-    _in_req: HttpRequest,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner(), _in_req).await
+    query_range(&org_id.into_inner(), req.into_inner(), in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_range")]
@@ -266,14 +266,14 @@ pub async fn query_range_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestRangeQuery>,
     web::Form(form): web::Form<meta::prom::RequestRangeQuery>,
-    _in_req: HttpRequest,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
         form
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req, _in_req).await
+    query_range(&org_id.into_inner(), req, in_req).await
 }
 
 async fn query_range(
