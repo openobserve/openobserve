@@ -323,6 +323,7 @@ export const convertSQLData = (
                     return arr.includes(i);
                   },
             overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
+            // hide axis label if overlaps
             hideOverlap: true,
             width: 100,
             margin: 18 * (xAxisKeys.length - index - 1) + 5,

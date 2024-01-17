@@ -211,6 +211,7 @@ export const convertPromQLData = (
         },
       },
       axisLabel: {
+        // hide axis label if overlaps
         hideOverlap: true,
       },
     },
