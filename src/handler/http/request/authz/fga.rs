@@ -18,6 +18,8 @@ use actix_web::{get, post, web, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::O2EntityAuthorization;
 
+use crate::common::meta::user::UserGroup;
+
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles")]
 pub async fn create_role(
@@ -106,6 +108,36 @@ pub async fn get_role_permissions(
 #[get("/{org_id}/roles/{role_id}/permissions")]
 pub async fn get_role_permissions(
     _path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[post("/{org_id}/group")]
+pub async fn create_group(
+    org_id: web::Path<String>,
+    user_group: web::Json<UserGroup>,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+    let user_grp = user_group.into_inner();
+
+    match o2_enterprise::enterprise::openfga::authorizer::create_group(
+        &org_id,
+        &user_grp.name,
+        user_grp.users,
+    )
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/group")]
+pub async fn create_group(
+    _org_id: web::Path<String>,
+    _user_group: web::Json<UserGroup>,
 ) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

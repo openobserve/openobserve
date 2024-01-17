@@ -246,3 +246,9 @@ pub struct RoleOrg {
     pub role: UserRole,
     pub org: String,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct UserGroup {
+    pub name: String,
+    pub users: std::collections::HashSet<String>,
+}
