@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="row items-center">
                   <div
                     class="row no-wrap items-center q-mb-xs"
-                    v-for="(filter, index) in variableData.query_data.filters"
+                    v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
                     <q-select
@@ -419,7 +419,7 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
-        filters: [{ name: "namespace_name", operator: "=", value: "$custom" }],
+        filter: [{ name: "namespace_name", operator: "=", value: "$custom" }],
       },
       value: "",
       options: [],
@@ -428,10 +428,10 @@ export default defineComponent({
     console.log("variableData", variableData.query_data);
 
     const addFilter = () => {
-      if (!variableData.query_data.filters) {
-        variableData.query_data.filters = [];
+      if (!variableData.query_data.filter) {
+        variableData.query_data.filter = [];
       }
-      variableData.query_data.filters.push({
+      variableData.query_data.filter.push({
         name: "",
         operator: "=",
         value: "",
@@ -439,7 +439,7 @@ export default defineComponent({
     };
 
     const removeFilter = (index: any) => {
-      variableData.query_data.filters.splice(index, 1);
+      variableData.query_data.filter.splice(index, 1);
     };
 
     const editMode = ref(false);
