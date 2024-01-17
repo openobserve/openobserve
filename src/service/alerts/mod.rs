@@ -952,7 +952,7 @@ async fn process_dest_template(
     };
 
     // Hack time range for alert url
-    if alert_start_time == alert_end_time {
+    if alert_end_time - alert_start_time < Duration::minutes(1).num_microseconds().unwrap() {
         alert_start_time = alert_end_time
             - Duration::minutes(alert.trigger_condition.period)
                 .num_microseconds()
