@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       dense
                       v-model="filter.name"
-                      :display-value="filter.name"
+                      :display-value="filter.name ? filter.name.name : ''"
                       :options="fieldsFilteredOptions"
                       input-debounce="0"
                       behavior="menu"
