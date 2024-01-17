@@ -212,7 +212,7 @@ export const convertPromQLData = (
       },
       axisLabel: {
         hideOverlap: true,
-      }
+      },
     },
     yAxis: {
       type: "value",
