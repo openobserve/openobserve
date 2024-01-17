@@ -323,6 +323,7 @@ export const convertSQLData = (
                     return arr.includes(i);
                   },
             overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
+            hideOverlap: true,
             width: 100,
             margin: 18 * (xAxisKeys.length - index - 1) + 5,
           },
@@ -1236,6 +1237,7 @@ export const convertSQLData = (
         }
       });
       options.xAxis[0].type = "time";
+      // options.xAxis[0].minInterval = 30000;
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
