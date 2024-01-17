@@ -524,13 +524,13 @@ export const deleteTab = async (
   store: any,
   dashboardId: any,
   folderId: any,
-  tabName: any,
+  deleteTabName: any,
   moveToTabName?: any
 ) => {
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
   const deleteTabIndex = currentDashboard.tabs.findIndex(
-    (tab: any) => tab.name == tabName
+    (tab: any) => tab.name == deleteTabName
   );
 
   if (moveToTabName) {
@@ -546,6 +546,48 @@ export const deleteTab = async (
     // delete the tab without moving panels to other tab
     currentDashboard.tabs.splice(deleteTabIndex, 1);
   }
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard,
+    folderId ?? "default"
+  );
+};
+
+// move panel to another tab
+export const movePanelToAnotherTab = async (
+  store: any,
+  dashboardId: any,
+  panelId: any,
+  folderId: any,
+  currentTabName: any,
+  moveToTabName?: any
+) => {
+  const currentDashboard = findDashboard(dashboardId, store, folderId);
+
+  let currentTabNameIndex = -1;
+  let moveToTabNameIndex = -1;
+
+  // get both tab index
+  currentDashboard.tabs.forEach((tab: any) => {
+    tab.name === currentTabName
+      ? (currentTabNameIndex = currentDashboard.tabs.indexOf(tab))
+      : null;
+    tab.name === moveToTabName
+      ? (moveToTabNameIndex = currentDashboard.tabs.indexOf(tab))
+      : null;
+  });
+
+  // panel data
+  const panelData = currentDashboard.tabs[currentTabNameIndex].panels.find(
+    (it: any) => it.id == panelId
+  );
+
+  // move panel from current tab to moveToTab
+  currentDashboard.tabs[moveToTabNameIndex].panels.push(panelData);
+
+  // update dashboard
   return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
