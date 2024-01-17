@@ -15,6 +15,7 @@ aws-sdk-dynamodb.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
+chrono-tz.workspace = true
 dashmap.workspace = true
 dotenv_config.workspace = true
 dotenvy.workspace = true

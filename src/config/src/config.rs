@@ -491,6 +491,8 @@ pub struct Log {
     // logger timestamp local setup, eg: %Y-%m-%dT%H:%M:%SZ
     #[env_config(name = "ZO_LOG_LOCAL_TIME_FORMAT", default = "")]
     pub local_time_format: String,
+    #[env_config(name = "ZO_LOG_LOCAL_TIME_ZONE", default = "")]
+    pub local_time_zone: String,
     #[env_config(name = "ZO_EVENTS_ENABLED", default = false)]
     pub events_enabled: bool,
     #[env_config(

@@ -16,6 +16,7 @@
 // refer: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/trait.FormatEvent.html#examples
 
 use chrono::{Local, Utc};
+use chrono_tz::Tz;
 use tracing::{Event, Subscriber};
 use tracing_log::NormalizeEvent;
 use tracing_subscriber::{
@@ -36,7 +37,14 @@ impl FormatTime for CustomTimeFormat {
         if CONFIG.log.local_time_format.is_empty() {
             write!(w, "{}", Utc::now().to_rfc3339())
         } else {
-            write!(w, "{}", Local::now().format(&CONFIG.log.local_time_format))
+            let time = if let Ok(tz) = CONFIG.log.local_time_zone.parse::<Tz>() {
+                Local::now()
+                    .with_timezone(&tz)
+                    .format(&CONFIG.log.local_time_format)
+            } else {
+                Local::now().format(&CONFIG.log.local_time_format)
+            };
+            write!(w, "{}", time)
         }
     }
 }

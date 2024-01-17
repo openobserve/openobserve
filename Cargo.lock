@@ -2057,6 +2057,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
+ "chrono-tz",
  "dashmap",
  "dotenv_config",
  "dotenvy",

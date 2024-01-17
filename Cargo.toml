@@ -215,6 +215,7 @@ base64 = "0.21"
 bytes = "1.4"
 byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono-tz = "0.8.4"
 dashmap = { version = "5.4", features = ["serde"] }
 arrow = { version = "49", features = ["simd", "ipc_compression"] }
 arrow-json = "49"
