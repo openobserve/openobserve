@@ -154,6 +154,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-btn>
                 </q-input>
               </div>
+              <div>
+                <div
+                  data-test="dashboard-query-values-filter"
+                  class="text-body1 text-bold q-mt-lg"
+                >
+                  Filters
+                </div>
+                <div class="row items-center">
+                  <div
+                    class="row no-wrap items-center q-mb-xs"
+                    v-for="(filter, index) in variableData.query_data.filters"
+                    :key="index"
+                  >
+                    <q-select
+                      filled
+                      outlined
+                      dense
+                      v-model="filter.name"
+                      :display-value="filter.name"
+                      :options="fieldsFilteredOptions"
+                      input-debounce="0"
+                      behavior="menu"
+                      use-input
+                      stack-label
+                      option-label="name"
+                      data-test="dashboard-query-values-filter-name-selector"
+                      @filter="fieldsFilterFn"
+                      :placeholder="filter.name ? '' : 'Select Field'"
+                      class="textbox col no-case q-ml-sm"
+                    >
+                      <template v-slot:no-option>
+                        <q-item>
+                          <q-item-section class="text-italic text-grey"
+                            >No Data Found</q-item-section
+                          >
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <q-select
+                      dense
+                      filled
+                      v-model="filter.operator"
+                      :display-value="filter.operator ? filter.operator : ''"
+                      style="width: auto"
+                      class="operator"
+                      data-test="dashboard-query-values-filter-operator-selector"
+                    />
+                    <q-input
+                      v-model="filter.value"
+                      placeholder="Enter Value"
+                      dense
+                      filled
+                      debounce="1000"
+                      style="width: 125px"
+                      class=""
+                      data-test="dashboard-query-values-filter-value"
+                    />
+                    <q-btn
+                      class="q-ml-sm"
+                      size="sm"
+                      padding="13px 2px"
+                      square
+                      flat
+                      dense
+                      @click="removeFilter(index)"
+                      icon="close"
+                      :data-test="`dashboard-variable-adhoc-close-${index}`"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <q-btn
+                    no-caps
+                    icon="add"
+                    no-outline
+                    class="q-mt-md"
+                    @click="addFilter"
+                    data-test="dashboard-add-filter-btn"
+                  >
+                    Add Filter
+                  </q-btn>
+                </div>
+              </div>
             </div>
           </div>
           <div class="textbox" v-if="['constant'].includes(variableData.type)">
@@ -336,10 +419,28 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
+        filters: [{ name: "namespace_name", operator: "=", value: "$custom" }],
       },
       value: "",
       options: [],
     });
+
+    console.log("variableData", variableData.query_data);
+
+    const addFilter = () => {
+      if (!variableData.query_data.filters) {
+        variableData.query_data.filters = [];
+      }
+      variableData.query_data.filters.push({
+        name: "",
+        operator: "=",
+        value: "",
+      });
+    };
+
+    const removeFilter = (index: any) => {
+      variableData.query_data.filters.splice(index, 1);
+    };
 
     const editMode = ref(false);
 
@@ -582,6 +683,8 @@ export default defineComponent({
       title,
       onSubmit,
       addVariableForm,
+      addFilter,
+      removeFilter,
     };
   },
 });
