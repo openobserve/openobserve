@@ -534,18 +534,33 @@ export const deleteTab = async (
   );
 
   if (moveToTabName) {
-    // move panels to other tab and delete the tab
+    // move panels to other tab
     const moveToTabIndex = currentDashboard.tabs.findIndex(
       (tab: any) => tab.name == moveToTabName
     );
 
+    let maxI = 0;
+    let maxY = 0;
+
+    // for each panel, need to recalculate layout object
+    currentDashboard.tabs[moveToTabIndex].panels.map((it: any) => {
+      maxI = Math.max(it.layout?.i || 0, maxI);
+      maxY = Math.max(it.layout?.y || 0, maxY);
+    });
+
+    currentDashboard.tabs[deleteTabIndex].panels.forEach((panel: any) => {
+      maxY += 10;
+      panel.layout.i = ++maxI;
+      panel.layout.y = maxY;
+    });
+
     currentDashboard.tabs[moveToTabIndex].panels.push(
       ...currentDashboard.tabs[deleteTabIndex].panels
     );
-  } else {
-    // delete the tab without moving panels to other tab
-    currentDashboard.tabs.splice(deleteTabIndex, 1);
   }
+  // delete the tab
+  currentDashboard.tabs.splice(deleteTabIndex, 1);
+
   return await updateDashboard(
     store,
     store.state.selectedOrganization.identifier,
@@ -580,21 +595,19 @@ export const movePanelToAnotherTab = async (
   });
 
   // panel data
-  const panelData = currentDashboard.tabs[currentTabNameIndex].panels.find(
-    (it: any) => it.id == panelId
-  );
+  const panelDataIndex = currentDashboard.tabs[
+    currentTabNameIndex
+  ].panels.findIndex((it: any) => it.id == panelId);
 
-  // move panel from current tab to moveToTab
-  currentDashboard.tabs[moveToTabNameIndex].panels.push(panelData);
+  const panelData =
+    currentDashboard.tabs[currentTabNameIndex].panels[panelDataIndex];
 
-  // update dashboard
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId ?? "default"
-  );
+  // delete panel in currentTab
+  currentDashboard.tabs[currentTabNameIndex].panels.splice(panelDataIndex, 1);
+
+  // add panel in moveToTab
+  // NOTE: no need to call updateDashboard function, because it will be called in addPanel function
+  await addPanel(store, dashboardId, panelData, folderId, moveToTabName);
 };
 
 export const getFoldersList = async (store: any) => {

@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       title="Delete Tab"
       message="Are you sure you want to delete this Tab?"
-      @update:ok="deleteTab"
+      @update:ok="deleteTabFn"
       @update:cancel="confirmDeleteTabDialog = false"
       v-model="confirmDeleteTabDialog"
     />
@@ -112,6 +112,8 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute, useRouter } from "vue-router";
 import { watch } from "vue";
+import { deleteTab } from "@/utils/commons";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TabList",
@@ -133,6 +135,7 @@ export default defineComponent({
   },
   emits: ["saveDashboard"],
   setup(props, { emit }) {
+    const store = useStore();
     const router = useRouter();
     const route = useRoute();
     const showAddTabDialog = ref(false);
@@ -164,9 +167,20 @@ export default defineComponent({
       confirmDeleteTabDialog.value = true;
     };
 
-    const deleteTab = () => {
-      props?.dashboardData?.tabs?.splice(selectedTabIndexToDelete.value, 1);
-      emit("saveDashboard");
+    const deleteTabFn = async () => {
+      await deleteTab(
+        store,
+        route.query.dashboard,
+        route.query.folder,
+        tabs.value[selectedTabIndexToDelete.value].name,
+        "default"
+      );
+      router.push({
+        query: {
+          ...route.query,
+          tab: "default",
+        },
+      });
       confirmDeleteTabDialog.value = false;
     };
 
@@ -190,7 +204,7 @@ export default defineComponent({
       showDeleteTabDialogFn,
       confirmDeleteTabDialog,
       selectedTabIndexToDelete,
-      deleteTab,
+      deleteTabFn,
       hoveredTabIndex,
       selectedTab,
       tabs,
