@@ -235,3 +235,7 @@ export const getRelativePeriod = (period: string) => {
   };
   return mapping[period];
 };
+
+export const isInvalidDate = (date: any) => {
+  return !(date && date instanceof Date && !isNaN(date.getTime()));
+};

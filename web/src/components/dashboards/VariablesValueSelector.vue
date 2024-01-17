@@ -103,6 +103,7 @@ import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
+import { isInvalidDate } from "@/utils/date";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -150,8 +151,13 @@ export default defineComponent({
     };
 
     const getVariablesData = async () => {
+       if(isInvalidDate(props.selectedTimeDate?.start_time) || isInvalidDate(props.selectedTimeDate?.end_time)){
+        return
+       }
+
       // do we have variables & date?
-      if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
+      if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time)
+      {
         variablesData.values = [];
         variablesData.isVariablesLoading = false;
         emitVariablesData();
