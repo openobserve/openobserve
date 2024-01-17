@@ -247,6 +247,7 @@ export default defineComponent({
                   ? it?.query_data?.max_record_size
                   : 10,
                 type: it.query_data.stream_type,
+                filter: it.query_data.filters || [],
               })
               .then((res: any) => {
                 obj.isLoading = false;
