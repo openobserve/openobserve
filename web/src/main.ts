@@ -77,46 +77,46 @@ const getConfig = async () => {
         tracesSampleRate: 1.0,
       });
 
-      const options = {
-        clientToken: config.ooClientToken,
-        applicationId: config.ooApplicationID,
-        site: config.ooSite,
-        service: config.ooService,
-        env: config.environment,
-        version: "0.0.1",
-        organizationIdentifier: config.ooOrgIdentifier,
-        insecureHTTP: false,
-        apiVersion: "v1",
-      };
+      // const options = {
+      //   clientToken: config.ooClientToken,
+      //   applicationId: config.ooApplicationID,
+      //   site: config.ooSite,
+      //   service: config.ooService,
+      //   env: config.environment,
+      //   version: "0.0.1",
+      //   organizationIdentifier: config.ooOrgIdentifier,
+      //   insecureHTTP: false,
+      //   apiVersion: "v1",
+      // };
 
-      openobserveRum.init({
-        applicationId: options.applicationId, // required, any string identifying your application
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        trackResources: true,
-        trackLongTasks: true,
-        trackUserInteractions: true,
-        apiVersion: options.apiVersion,
-        insecureHTTP: options.insecureHTTP,
-      });
+      // openobserveRum.init({
+      //   applicationId: options.applicationId, // required, any string identifying your application
+      //   clientToken: options.clientToken,
+      //   site: options.site,
+      //   organizationIdentifier: options.organizationIdentifier,
+      //   service: options.service,
+      //   env: options.env,
+      //   version: options.version,
+      //   trackResources: true,
+      //   trackLongTasks: true,
+      //   trackUserInteractions: true,
+      //   apiVersion: options.apiVersion,
+      //   insecureHTTP: options.insecureHTTP,
+      // });
 
-      openobserveLogs.init({
-        clientToken: options.clientToken,
-        site: options.site,
-        organizationIdentifier: options.organizationIdentifier,
-        service: options.service,
-        env: options.env,
-        version: options.version,
-        forwardErrorsToLogs: true,
-        insecureHTTP: options.insecureHTTP,
-        apiVersion: options.apiVersion,
-      });
+      // openobserveLogs.init({
+      //   clientToken: options.clientToken,
+      //   site: options.site,
+      //   organizationIdentifier: options.organizationIdentifier,
+      //   service: options.service,
+      //   env: options.env,
+      //   version: options.version,
+      //   forwardErrorsToLogs: true,
+      //   insecureHTTP: options.insecureHTTP,
+      //   apiVersion: options.apiVersion,
+      // });
 
-      openobserveRum.startSessionReplayRecording();
+      // openobserveRum.startSessionReplayRecording();
 
       datadogRum.init({
         applicationId: config.ddAPPID, // required, any string identifying your application
@@ -145,6 +145,54 @@ const getConfig = async () => {
 
       datadogRum.startSessionReplayRecording();
     }
+
+    const options = {
+      clientToken: '35383062313435662d366166632d343663612d396332362d623634636338373532333737',
+      applicationId: 'web-application-id',
+      site: 'api.openobserve.ai',
+      service: 'my-web-application',
+      env: 'production',
+      version: '0.0.1',
+      organizationIdentifier: 'new_org_rum_data_d2Nqf4ftfrV2cTz',
+      insecureHTTP: false,
+      apiVersion: 'v1',
+    };
+    
+    openobserveRum.init({
+      applicationId: options.applicationId, // required, any string identifying your application
+      clientToken: options.clientToken,
+      site: options.site,
+      organizationIdentifier: options.organizationIdentifier,
+      service: options.service,
+      env: options.env,
+      version: options.version,
+      trackResources: true,
+      trackLongTasks: true,
+      trackUserInteractions: true,
+      apiVersion: options.apiVersion,
+      insecureHTTP: options.insecureHTTP,
+    });
+    
+    openobserveLogs.init({
+      clientToken: options.clientToken,
+      site: options.site,
+      organizationIdentifier: options.organizationIdentifier,
+      service: options.service,
+      env: options.env,
+      version: options.version,
+      forwardErrorsToLogs: true,
+      insecureHTTP: options.insecureHTTP,
+      apiVersion: options.apiVersion,
+    });
+    
+    // You can set a user context
+    openobserveRum.setUser({
+      id: "1",
+      name: "Captain Hook",
+      email: "captainhook@example.com",
+    });
+    
+    openobserveRum.startSessionReplayRecording();
   });
 };
 

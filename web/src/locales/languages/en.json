@@ -377,7 +377,10 @@
     "logsLabel": "Logs",
     "metricsLabel": "Metrics",
     "tracesLabel": "Traces",
-    "subnetMessage": "Enter multiple subnets separated by commas"
+    "subnetMessage": "Enter multiple subnets separated by commas",
+    "internal": "This Cluster",
+    "external": "Different Cluster",
+    "internalLabel": "Note: Use this option, if collector is installed in same cluster as O2"
   },
   "syslog": {
     "stream": "Stream",
