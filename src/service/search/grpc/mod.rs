@@ -184,7 +184,7 @@ pub async fn search(
     let mut hits_buf = Vec::new();
     let mut hits_total = 0;
     let result_query = merge_results.get("query").cloned().unwrap_or_default();
-    if !result_query.is_empty() && !result_query.is_empty() {
+    if !result_query.is_empty() {
         let schema = result_query[0].schema();
         let ipc_options = ipc::writer::IpcWriteOptions::default();
         let ipc_options = ipc_options
