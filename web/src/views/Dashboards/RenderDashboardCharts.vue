@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="selectedTabIndex !== null"
       class="q-mt-sm"
       :dashboardData="dashboardData"
-      v-model:selectedTabIndex="selectedTabIndex"
+      :selectedTabIndex="selectedTabIndex"
       @saveDashboard="saveDashboard"
     />
     <slot name="before_panels" />
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, provide, ref, watch } from "vue";
+import { computed, defineComponent, provide, ref } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -152,47 +152,22 @@ export default defineComponent({
     const viewPanelId = ref("");
 
     // selected tab index
-    const selectedTabIndex = ref(null);
-
-    const panels = computed(() => {
-      return selectedTabIndex.value !== null
-        ? props.dashboardData?.tabs[selectedTabIndex.value]?.panels
-        : [];
-    });
-
-    watch(
-      () => props.dashboardData.tabs,
-      () => {
-        // use route query for default tab index
+    const selectedTabIndex: any = computed(() => {
+      // wait if tabs is not loaded
+      if (Array.isArray(props.dashboardData?.tabs)) {
         const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
           (it: any) => it.name === route.query.tab ?? "default"
         );
+        return defaultTabIndex === -1 ? 0 : defaultTabIndex;
+      } else {
+        return null;
+      }
+    });
 
-        // if tabs array is there and default tab index is not undefined
-        if (
-          Array.isArray(props.dashboardData?.tabs) &&
-          defaultTabIndex !== undefined
-        ) {
-          // set default tab
-          selectedTabIndex.value = defaultTabIndex === -1 ? 0 : defaultTabIndex;
-        } else {
-          // set default tab as null
-          selectedTabIndex.value = null;
-        }
-      },
-      { deep: true }
-    );
-
-    // on selected tab index change, update route
-    watch(selectedTabIndex, (value) => {
-      // update route
-      value !== null &&
-        router.push({
-          query: {
-            ...route.query,
-            tab: props.dashboardData?.tabs[value]?.name ?? "default",
-          },
-        });
+    const panels: any = computed(() => {
+      return selectedTabIndex.value !== null
+        ? props.dashboardData?.tabs[selectedTabIndex.value]?.panels
+        : [];
     });
 
     // variables data
@@ -266,9 +241,9 @@ export default defineComponent({
       saveDashboard();
     };
 
-    const getDashboardLayout = (panels: any) => {
+    const getDashboardLayout: any = (panels: any) => {
       //map on each panels and return array of layouts
-      return panels?.map((item) => item.layout) || [];
+      return panels?.map((item: any) => item.layout) || [];
     };
 
     const getPanelLayout = (panelData, position) => {

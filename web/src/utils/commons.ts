@@ -512,6 +512,49 @@ export const getPanelId = () => {
   return "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 };
 
+// delete tabs
+// have two option to delete tab
+// 1. delete the tab with moving panels to other tab
+// 2. delete the tab without moving panels to other tab
+
+// it will take one arg called moveToTabName
+// if moveToTabName is not provided, it will delete the tab without moving panels
+// if moveToTabName is provided, it will delete the tab and move panels to other tab
+export const deleteTab = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  tabName: any,
+  moveToTabName?: any
+) => {
+  const currentDashboard = findDashboard(dashboardId, store, folderId);
+
+  const deleteTabIndex = currentDashboard.tabs.findIndex(
+    (tab: any) => tab.name == tabName
+  );
+
+  if (moveToTabName) {
+    // move panels to other tab and delete the tab
+    const moveToTabIndex = currentDashboard.tabs.findIndex(
+      (tab: any) => tab.name == moveToTabName
+    );
+
+    currentDashboard.tabs[moveToTabIndex].panels.push(
+      ...currentDashboard.tabs[deleteTabIndex].panels
+    );
+  } else {
+    // delete the tab without moving panels to other tab
+    currentDashboard.tabs.splice(deleteTabIndex, 1);
+  }
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard,
+    folderId ?? "default"
+  );
+};
+
 export const getFoldersList = async (store: any) => {
   let folders = (
     await dashboardService.list_Folders(

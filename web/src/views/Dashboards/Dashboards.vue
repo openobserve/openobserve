@@ -551,6 +551,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
           folder: activeFolderId.value || "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };
@@ -745,6 +746,7 @@ export default defineComponent({
           org_identifier: this.store.state.selectedOrganization.identifier,
           dashboard: dashboardId,
           folder: folderId,
+          tab: this.route.query.tab ?? "default",
         },
       });
     },

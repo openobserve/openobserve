@@ -131,7 +131,7 @@ export default defineComponent({
       },
     },
   },
-  emits: ["update:selectedTabIndex", "saveDashboard"],
+  emits: ["saveDashboard"],
   setup(props, { emit }) {
     const router = useRouter();
     const route = useRoute();
@@ -146,34 +146,6 @@ export default defineComponent({
     const tabs: any = computed(() => {
       return props.dashboardData?.tabs ?? [];
     });
-
-    
-    // watch dashboardData and change selectedTabIndex
-    // watch(
-    //   () => props.dashboardData.tabs,
-    //   () => {
-
-    //     console.log("route", route.query.tab);
-        
-    //     // use route query for default tab index
-    //     const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
-    //       (it: any) => it.name === route.query.tab ?? "default"
-    //     );
-
-    //     // if tabs array is there and default tab index is not undefined
-    //     if (
-    //       Array.isArray(props.dashboardData?.tabs) &&
-    //       defaultTabIndex !== undefined
-    //     ) {
-    //       // set default tab
-    //       selectedTab.value = defaultTabIndex === -1 ? 0 : defaultTabIndex;
-    //     } else {
-    //       // set default tab as null
-    //       selectedTab.value = null;
-    //     }
-    //   }
-    // );
-
 
     const updateTabList = () => {
       emit("saveDashboard");
@@ -199,13 +171,12 @@ export default defineComponent({
     };
 
     watch(selectedTab, () => {
-      emit("update:selectedTabIndex", selectedTab.value);
-      router.replace({
+      router.push({
         query: {
           ...route.query,
-          tab: tabs[selectedTab.value]?.name,
-        }
-      })
+          tab: tabs.value[selectedTab.value]?.name ?? "default",
+        },
+      });
     });
 
     return {
