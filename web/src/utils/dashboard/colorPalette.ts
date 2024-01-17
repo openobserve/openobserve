@@ -314,7 +314,7 @@ const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
 
 const getSeriesValueFromArray = (panelSchema: any, values: any) => {
   // if color is based on value then need to find seriesmin or seriesmax or last value
-  let seriesvalue = values?.length > 0 ? values[values.length - 1] : 50;
+  let seriesvalue = values?.length > 0 ? !isNaN(values[values.length - 1]) ? values[values.length - 1]: 50 : 50;
   if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
@@ -342,7 +342,7 @@ class Scale {
 
   constructor(colors: any) {
     this.colors = colors;
-    this.domain = [0, 1];
+    this.domain = [0, 100];
   }
 
   setDomain(domain: any) {
@@ -350,6 +350,10 @@ class Scale {
   }
 
   getColor(value: any) {
+
+    // NOTE: need to check value should not be NaN
+    // and it should not be less than domain[0] or greater than domain[1]
+
     let t = (value - this.domain[0]) / (this.domain[1] - this.domain[0]);
     let index = Math.floor(t * (this.colors.length - 1));
     let color1 = this.colors[index];
@@ -367,6 +371,7 @@ class Color {
   b: any;
 
   constructor(hex: any) {
+    // NOTE: use default color if hex is not valid
     let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (!result) {
       throw new Error(`Invalid color: ${hex}`);
