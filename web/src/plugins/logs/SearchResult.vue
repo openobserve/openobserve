@@ -72,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <ChartRenderer
+        v-if="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
         data-test="logs-search-result-bar-chart"
         :data="plotChart"
         style="max-height: 100px"

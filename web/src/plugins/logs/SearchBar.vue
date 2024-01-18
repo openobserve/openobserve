@@ -1655,8 +1655,14 @@ export default defineComponent({
     };
 
     const resetFilters = () => {
-      searchObj.data.query = "";
+      if (searchObj.meta.sqlMode == true) {
+        searchObj.data.query = `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`;
+      } else {
+        searchObj.data.query = "";
+      }
       searchObj.data.editorValue = "";
+      queryEditorRef.value.setValue(searchObj.data.query);
+      handleRunQuery();
     };
 
     const customDownloadDialog = ref(false);
