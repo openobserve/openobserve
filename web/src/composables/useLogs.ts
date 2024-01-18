@@ -557,6 +557,15 @@ const useLogs = () => {
         // console.log(unparsedSQL);
       }
 
+      // in case of sql mode or disable histogram to get total records we need to set track_total_hits to true
+      // because histogram query will not be executed
+      if (
+        searchObj.data.resultGrid.currentPage == 1 &&
+        (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
+      ) {
+        req.query.track_total_hits = true;
+      }
+
       if (
         searchObj.data.resultGrid.currentPage > 1 ||
         searchObj.meta.showHistogram === false
@@ -706,7 +715,7 @@ const useLogs = () => {
               //extract fields from query response
               extractFields();
 
-              if (isPagination){
+              if (isPagination) {
                 searchObj.data.histogram.chartParams.title =
                   getHistogramTitle();
               }
@@ -719,6 +728,15 @@ const useLogs = () => {
               ) {
                 getHistogramQueryData(histogramQueryReq);
               }
+
+              // disabled histogram case, generate histogram histogram title
+              if (
+                searchObj.data.resultGrid.currentPage == 1 &&
+                (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
+              ) {
+                searchObj.data.histogram.chartParams.title = getHistogramTitle();
+              }
+
               searchObj.loading = false;
               resolve(true);
             })
