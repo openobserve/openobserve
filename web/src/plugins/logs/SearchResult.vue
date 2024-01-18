@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'calc(100% - 140px)',
         }"
       >
-        <template v-slot:after>
+        <!-- <template v-slot:after>
           <tfoot
             class="tfoot-sticky text-left bg-warning absolute-bottom"
             style="opacity: 0.8"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </td>
             </tr>
           </tfoot>
-        </template>
+        </template> -->
         <template v-slot:before>
           <thead class="thead-sticky text-left">
             <tr>
