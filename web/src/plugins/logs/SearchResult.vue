@@ -113,28 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'calc(100% - 140px)',
         }"
       >
-        <!-- <template v-slot:after>
-          <tfoot
-            class="tfoot-sticky text-left bg-warning absolute-bottom"
-            style="opacity: 0.8"
-          >
-            <tr v-if="searchObj.loading == true">
-              <td
-                :colspan="searchObj.data.resultGrid.columns.length"
-                class="text-bold bg-warning text-black"
-                style="opacity: 0.8"
-              >
-                <div
-                  style="margin: 0 auto; display: block; text-align: center"
-                  class="text-subtitle1 text-weight-bold"
-                >
-                  <q-spinner-hourglass size="30px" color="black" />
-                  {{ t("confirmDialog.loading") }}
-                </div>
-              </td>
-            </tr>
-          </tfoot>
-        </template> -->
         <template v-slot:before>
           <thead class="thead-sticky text-left">
             <tr>
