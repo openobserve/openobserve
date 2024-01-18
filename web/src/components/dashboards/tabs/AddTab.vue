@@ -88,8 +88,9 @@ export default defineComponent({
   name: "AddTab",
   props: {
     tabId: {
-      type: [String, null],
-      default: null,
+      validator: (value) => {
+        return typeof value === "string" || value === null;
+      },
     },
     editMode: {
       type: Boolean,
