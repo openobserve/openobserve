@@ -1,6 +1,17 @@
 <template>
   <div class="column full-height">
-    <DashboardHeader :title="t('dashboard.tabSettingsTitle')" />
+    <DashboardHeader :title="t('dashboard.tabSettingsTitle')"
+      ><template #right>
+        <q-btn
+          class="text-bold no-border q-ml-md"
+          no-caps
+          no-outline
+          rounded
+          color="secondary"
+          :label="t(`dashboard.newTab`)"
+          @click="addVariables"
+        /> </template
+    ></DashboardHeader>
     <div class="flex justify-between draggable-row q-py-md text-bold">
       <div class="q-ml-xl">{{ t("dashboard.name") }}</div>
       <div class="q-mr-lg">{{ t("dashboard.actions") }}</div>
@@ -93,7 +104,7 @@ export default defineComponent({
     });
 
     const editingIndex = ref(-1);
-    const editedItemName = ref('');
+    const editedItemName = ref("");
 
     const handleDragEnd = async () => {
       //   await updateDashboard(
@@ -121,13 +132,13 @@ export default defineComponent({
         list.value[editingIndex.value].name = editedItemName.value;
         //add save name function here
         editingIndex.value = -1;
-        editedItemName.value = '';
+        editedItemName.value = "";
       }
     };
 
     const cancelEdit = () => {
       editingIndex.value = -1;
-      editedItemName.value = '';
+      editedItemName.value = "";
     };
 
     const deleteItem = (index: number) => {
@@ -179,10 +190,10 @@ export default defineComponent({
   padding: 4px;
   outline: none;
   transition: border-color 0.3s;
+  width: 55%;
 }
 
 .edit-input:focus {
-  border-color: $secondary; 
+  border-color: $secondary;
 }
-
 </style>
