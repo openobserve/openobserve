@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="display: flex">
     <q-tabs
-      v-model="selectedTabId"
+      v-model="selectedTabIdModel"
       :align="'left'"
       narrow-indicator
       dense
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
       style="max-width: calc(100% - 40px)"
     >
-      <q-route-tab
+      <q-tab
         no-caps
         :ripple="false"
         v-for="(tab, index) in tabs"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-      </q-route-tab>
+      </q-tab>
     </q-tabs>
     <q-btn
       class="q-ml-sm"
@@ -127,8 +127,11 @@ export default defineComponent({
       required: true,
       type: Object,
     },
+    selectedTabId: {
+      required: true,
+    },
   },
-  emits: ["saveDashboard"],
+  emits: ["saveDashboard", "update:selectedTabId"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -139,7 +142,14 @@ export default defineComponent({
     const selectedTabIdToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
     const hoveredTabId: any = ref(null);
-    const selectedTabId: any = ref(route.query.tab ?? "default");
+
+    // need one ref which will passed in tabList for selectedTab
+    const selectedTabIdModel: any = ref(props.selectedTabId);
+
+    // also, need to emit selectedTabId
+    watch(selectedTabIdModel, (newVal) => {
+      emit("update:selectedTabId", newVal);
+    });
 
     const tabs: any = computed(() => {
       return props.dashboardData?.tabs ?? [];
@@ -192,7 +202,7 @@ export default defineComponent({
       selectedTabIdToDelete,
       deleteTabFn,
       hoveredTabId,
-      selectedTabId,
+      selectedTabIdModel,
       tabs,
       route,
     };

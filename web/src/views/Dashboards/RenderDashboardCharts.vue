@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TabList
       v-if="selectedTabId !== null"
       class="q-mt-sm"
+      v-model:selectedTabId="selectedTabIdModel"
       :dashboardData="dashboardData"
       @saveDashboard="saveDashboard"
     />
@@ -120,13 +121,20 @@ import TabList from "@/components/dashboards/tabs/TabList.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
-  emits: ["onDeletePanel", "onViewPanel", "variablesData", "updated:data-zoom"],
+  emits: [
+    "onDeletePanel",
+    "onViewPanel",
+    "variablesData",
+    "updated:data-zoom",
+    "update:selectedTabId",
+  ],
   props: [
     "viewOnly",
     "dashboardData",
     "currentTimeObj",
     "initialVariableValues",
     "selectedDateForViewPanel",
+    "selectedTabId",
   ],
 
   components: {
@@ -150,39 +158,20 @@ export default defineComponent({
     // holds the view panel id
     const viewPanelId = ref("");
 
-    // selected tab index
-    const selectedTabId: any = computed(() => {
-      // wait if tabs is not loaded
-      if (Array.isArray(props.dashboardData?.tabs)) {
-        // if that tab is there then return it else default
-        const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
-          (it: any) => it.tabId === (route.query.tab ?? "default")
-        );
-        return defaultTabIndex === -1
-          ? "default"
-          : route.query.tab ?? "default";
-      } else {
-        return null;
-      }
-    });
-
-    onMounted(() => {
-      console.log("selectedTabId", route.query.tab);
-    });
-
-    watch(
-      () => route.query.tab,
-      () => {
-        console.log("tab changed", route.query.tab);
-      }
-    );
-
     const panels: any = computed(() => {
-      return selectedTabId.value !== null
+      return props.selectedTabId !== null
         ? props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === selectedTabId.value
+            (it: any) => it.tabId === props.selectedTabId
           )?.panels
         : [];
+    });
+
+    // need one ref which will passed in tabList for selectedTab
+    const selectedTabIdModel = ref(props.selectedTabId);
+
+    // also, need to emit selectedTabId
+    watch(selectedTabIdModel, (newVal) => {
+      emit("update:selectedTabId", newVal);
     });
 
     // variables data
@@ -330,7 +319,7 @@ export default defineComponent({
       layoutUpdate,
       showViewPanel,
       viewPanelId,
-      selectedTabId,
+      selectedTabIdModel,
       saveDashboard,
       panels,
     };

@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-    <div ref="fullscreenDiv" :class="`${isFullscreen ? 'fullscreen' : ''}  ${store.state.theme === 'light' ? 'bg-white' : 'dark-mode'}`">
+    <div
+      ref="fullscreenDiv"
+      :class="`${isFullscreen ? 'fullscreen' : ''}  ${
+        store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
+      }`"
+    >
       <div
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
@@ -116,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
-              ><q-tooltip>{{isFullscreen ? t("dashboard.exitFullscreen") : t("dashboard.fullscreen") }}</q-tooltip></q-btn
+              ><q-tooltip>{{
+                isFullscreen
+                  ? t("dashboard.exitFullscreen")
+                  : t("dashboard.fullscreen")
+              }}</q-tooltip></q-btn
             >
           </div>
         </div>
@@ -132,6 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
         @updated:data-zoom="onDataZoom"
+        v-model:selectedTabId="selectedTabId"
       />
 
       <q-dialog
@@ -190,6 +200,9 @@ export default defineComponent({
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
+    // selected tab v-model
+    const selectedTabId: any = ref(null);
+
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
@@ -246,7 +259,16 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-      
+
+      // set selected tab from query params
+      const selectedTab = currentDashboardData.data.tabs.find(
+        (tab: any) => tab.tabId === route.query.tab ?? "default"
+      );
+
+      selectedTabId.value = selectedTab
+        ? selectedTab.tabId ?? "default"
+        : "default";
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -380,13 +402,13 @@ export default defineComponent({
     });
 
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate], () => {
+    watch([refreshInterval, selectedDate, selectedTabId], () => {
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tabs: route.query.tabs,
+          tab: selectedTabId.value ?? route.query.tab,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
         },
@@ -500,6 +522,7 @@ export default defineComponent({
       getQueryParamsForDuration,
       onDataZoom,
       shareLink,
+      selectedTabId,
     };
   },
 });
