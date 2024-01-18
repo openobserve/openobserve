@@ -1207,7 +1207,7 @@ const useLogs = () => {
     ) {
       clearInterval(store.state.refreshIntervalID);
       const refreshIntervalID = setInterval(async () => {
-        // searchObj.loading = true;
+        searchObj.loading = true;
         await getQueryData(false);
         generateHistogramData();
         updateGridColumns();
