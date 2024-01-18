@@ -169,10 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-bold"
                 style="opacity: 0.7"
               >
-                <div
-                  style="margin: 0 auto; display: block; text-align: center"
-                  class="text-subtitle2 text-weight-bold"
-                >
+                <div class="text-subtitle2 text-weight-bold">
                   <q-spinner-hourglass size="20px" />
                   {{ t("confirmDialog.loading") }}
                 </div>
