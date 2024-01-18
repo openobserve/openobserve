@@ -30,7 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
             v-model="pageNumberInput"
-            :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
+            :key="
+              searchObj.data.queryResults.total +
+              '-' +
+              searchObj.data.resultGrid.currentPage
+            "
             :max="
               Math.max(
                 1,
@@ -70,23 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ChartRenderer
         data-test="logs-search-result-bar-chart"
         :data="plotChart"
-        v-show="
-          searchObj.meta.showHistogram &&
-          !searchObj.meta.sqlMode &&
-          searchObj.data.stream.streamType !== 'enrichment_tables'
-        "
         style="max-height: 100px"
         @updated:dataZoom="onChartUpdate"
       />
       <div
         class="q-pb-lg"
-        v-if="
-          searchObj.meta.showHistogram &&
-          !searchObj.meta.sqlMode &&
-          searchObj.data.stream.streamType !== 'enrichment_tables' &&
-          searchObj.data.histogram.xData.length === 0
-        "
         style="top: 50px; position: absolute; left: 45%"
+        v-if="searchObj.loadingHistogram == true"
       >
         <q-spinner-hourglass
           color="primary"
@@ -119,6 +113,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'calc(100% - 140px)',
         }"
       >
+        <template v-slot:after>
+          <tfoot
+            class="tfoot-sticky text-left bg-warning absolute-bottom"
+            style="opacity: 0.8"
+          >
+            <tr v-if="searchObj.loading == true">
+              <td
+                :colspan="searchObj.data.resultGrid.columns.length"
+                class="text-bold bg-warning text-black"
+                style="opacity: 0.8"
+              >
+                <div
+                  style="margin: 0 auto; display: block; text-align: center"
+                  class="text-subtitle1 text-weight-bold"
+                >
+                  <q-spinner-hourglass size="30px" color="black" />
+                  {{ t("confirmDialog.loading") }}
+                </div>
+              </td>
+            </tr>
+          </tfoot>
+        </template>
         <template v-slot:before>
           <thead class="thead-sticky text-left">
             <tr>
@@ -351,7 +367,8 @@ export default defineComponent({
     getPageData(actionType: string) {
       if (actionType == "prev") {
         if (this.searchObj.data.resultGrid.currentPage > 1) {
-          this.searchObj.data.resultGrid.currentPage = this.searchObj.data.resultGrid.currentPage - 1;
+          this.searchObj.data.resultGrid.currentPage =
+            this.searchObj.data.resultGrid.currentPage - 1;
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
           this.$emit("update:scroll");
           this.searchTableRef.scrollTo(0);
@@ -364,7 +381,8 @@ export default defineComponent({
               this.searchObj.meta.resultGrid.rowsPerPage
           )
         ) {
-          this.searchObj.data.resultGrid.currentPage = this.searchObj.data.resultGrid.currentPage + 1;
+          this.searchObj.data.resultGrid.currentPage =
+            this.searchObj.data.resultGrid.currentPage + 1;
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
           this.$emit("update:scroll");
           this.searchTableRef.scrollTo(0);
@@ -431,7 +449,7 @@ export default defineComponent({
     const noOfRecordsTitle = ref("");
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100, 250, 500, 1000];
-    
+
     const {
       searchObj,
       updatedLocalLogFilterField,
