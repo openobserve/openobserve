@@ -76,9 +76,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
+import { getTabId } from "@/utils/commons";
 
 const defaultValue = () => {
   return {
+    tabId: getTabId(),
     name: "",
     panels: [],
   };

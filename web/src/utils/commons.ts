@@ -502,6 +502,10 @@ export const getPanelId = () => {
   return "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 };
 
+export const getTabId = () => {
+  return (Math.floor(Math.random() * (99999 - 10 + 1)) + 10).toString();
+};
+
 // delete tabs
 // have two option to delete tab
 // 1. delete the tab with moving panels to other tab
