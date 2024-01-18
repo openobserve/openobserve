@@ -121,7 +121,8 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "Real User Monitoring",
-    "settings": "Settings"
+    "settings": "Settings",
+    "iam": "IAM"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -227,6 +228,12 @@
     "deleteAPIKeyMessage": "Are you sure you want to delete this User API Key? This action cannot be undone. Click OK to confirm.",
     "apiKeyNotFound": "User API Key Not Found.",
     "allowedOrg": "Allowed Organization"
+  },
+  "iam": {
+    "users": "Users",
+    "groups": "User Groups",
+    "roles": "Roles",
+    "organizations": "Organizations"
   },
   "ticket": {
     "header": "Support Tickets",

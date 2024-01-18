@@ -113,12 +113,16 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import usersService from "@/services/users";
-import UpdateUserRole from "@/components/users/UpdateRole.vue";
-import AddUser from "@/components/users/add.vue";
+import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
+import AddUser from "@/components/iam/users/AddUser.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
+import {
+  getImageURL,
+  verifyOrganizationStatus,
+  maskText,
+} from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
