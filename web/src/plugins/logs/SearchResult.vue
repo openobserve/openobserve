@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'calc(100% - 140px)',
         }"
       >
-        <template v-slot:after>
+        <!-- <template v-slot:after>
           <tfoot
             class="tfoot-sticky text-left bg-warning absolute-bottom"
             style="opacity: 0.8"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </td>
             </tr>
           </tfoot>
-        </template>
+        </template> -->
         <template v-slot:before>
           <thead class="thead-sticky text-left">
             <tr>
@@ -162,6 +162,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ col.label }}
                 </span>
               </th>
+            </tr>
+            <tr v-if="searchObj.loading == true">
+              <td
+                :colspan="searchObj.data.resultGrid.columns.length"
+                class="text-bold"
+                style="opacity: 0.7"
+              >
+                <div
+                  style="margin: 0 auto; display: block; text-align: center"
+                  class="text-subtitle2 text-weight-bold"
+                >
+                  <q-spinner-hourglass size="20px" />
+                  {{ t("confirmDialog.loading") }}
+                </div>
+              </td>
             </tr>
           </thead>
         </template>
