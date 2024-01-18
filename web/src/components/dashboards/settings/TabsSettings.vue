@@ -9,7 +9,7 @@
           rounded
           color="secondary"
           :label="t(`dashboard.newTab`)"
-          @click="addVariables"
+          @click="addNewItem"
         /> </template
     ></DashboardHeader>
     <div class="flex justify-between draggable-row q-py-md text-bold">
@@ -141,6 +141,11 @@ export default defineComponent({
       editedItemName.value = "";
     };
 
+    const addNewItem = () => {
+        //add tab popup should be open on click of this
+        console.log("Add new item");
+        
+    }
     const deleteItem = (index: number) => {
       console.log("Delete item:", index);
     };
@@ -157,6 +162,7 @@ export default defineComponent({
       deleteItem,
       handleDragEnd,
       outlinedDelete,
+      addNewItem
     };
   },
 });
