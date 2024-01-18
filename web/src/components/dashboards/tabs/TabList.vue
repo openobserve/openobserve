@@ -180,12 +180,9 @@ export default defineComponent({
         selectedTabIdToDelete.value,
         "default"
       );
-      router.push({
-        query: {
-          ...route.query,
-          tab: "default",
-        },
-      });
+
+      // go to that tab
+      selectedTabIdModel.value = "default";
       confirmDeleteTabDialog.value = false;
     };
 

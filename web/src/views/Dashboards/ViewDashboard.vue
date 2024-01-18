@@ -230,7 +230,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tabs ?? "default",
+          tab: route.query.tab ?? "default",
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,

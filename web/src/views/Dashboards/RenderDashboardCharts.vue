@@ -169,6 +169,13 @@ export default defineComponent({
     // need one ref which will passed in tabList for selectedTab
     const selectedTabIdModel = ref(props.selectedTabId);
 
+    watch(
+      () => props.selectedTabId,
+      (newVal) => {
+        selectedTabIdModel.value = newVal;
+      }
+    );
+
     // also, need to emit selectedTabId
     watch(selectedTabIdModel, (newVal) => {
       emit("update:selectedTabId", newVal);
