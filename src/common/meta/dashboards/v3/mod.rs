@@ -35,6 +35,7 @@ pub struct Dashboard {
     pub created: DateTime<FixedOffset>,
     #[serde(default)]
     pub tabs: Vec<Tab>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
 }
 
@@ -155,6 +156,14 @@ pub struct PanelConfig {
     unit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    decimals: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    axis_width: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    axis_border_show: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
 }
@@ -178,6 +187,8 @@ pub struct QueryConfig {
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub show_dynamic_filters: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -219,4 +230,12 @@ pub struct MapView {
     pub zoom: f64,
     pub lat: f64,
     pub lng: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct LegendWidth {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
 }
