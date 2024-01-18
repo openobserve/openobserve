@@ -42,8 +42,8 @@
     <div v-else>
       <q-tabs v-model="tab" horizontal
 align="left" no-caps>
-        <q-tab name="external" :label="t('ingestion.external')" />
-        <q-tab name="internal"
+        <q-tab data-test="kubernetes-default-tab" name="external" :label="t('ingestion.external')" />
+        <q-tab data-test="kubernetes-this-tab" name="internal"
 :label="t('ingestion.internal')"
           ><q-tooltip>
             {{ t("ingestion.internalLabel") }}
@@ -59,11 +59,11 @@ align="left" no-caps>
         transition-prev="jump-up"
         transition-next="jump-up"
       >
-        <q-tab-panel name="internal">
+        <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
           <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
         </q-tab-panel>
 
-        <q-tab-panel name="external">
+        <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">
           <ContentCopy class="q-mt-sm" :content="collectorCmd" />
         </q-tab-panel>
       </q-tab-panels>
