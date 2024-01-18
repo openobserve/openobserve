@@ -135,7 +135,7 @@ export default defineComponent({
             const tab: any = props.dashboardData.tabs.find(
               (tab: any) => tab.tabId === props.tabId
             );
-            tab.name = tabData.value;
+            tab.name = tabData.value.name;
             emit("saveDashboard");
             $q.notify({
               type: "positive",

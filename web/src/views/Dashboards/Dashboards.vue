@@ -155,7 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #body-cell-description="props">
             <q-td :props="props">
               <div :title="props.value">
-                {{ (props.value && props.value.length > 45) ? props.value.slice(0, 45) + '...' : props.value }}
+                {{
+                  props.value && props.value.length > 45
+                    ? props.value.slice(0, 45) + "..."
+                    : props.value
+                }}
               </div>
             </q-td>
           </template>
@@ -551,7 +555,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
           folder: activeFolderId.value || "default",
-          tab: route.query.tab ?? "default",
+          tab: "default",
         },
       });
     };
@@ -746,7 +750,7 @@ export default defineComponent({
           org_identifier: this.store.state.selectedOrganization.identifier,
           dashboard: dashboardId,
           folder: folderId,
-          tab: this.route.query.tab ?? "default",
+          tab: "default",
         },
       });
     },

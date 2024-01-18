@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, provide, ref } from "vue";
+import { computed, defineComponent, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -156,13 +156,26 @@ export default defineComponent({
       if (Array.isArray(props.dashboardData?.tabs)) {
         // if that tab is there then return it else default
         const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
-          (it: any) => it.tabId === route.query.tab ?? "default"
+          (it: any) => it.tabId === (route.query.tab ?? "default")
         );
-        return defaultTabIndex === -1 ? "default" : route.query.tab;
+        return defaultTabIndex === -1
+          ? "default"
+          : route.query.tab ?? "default";
       } else {
         return null;
       }
     });
+
+    onMounted(() => {
+      console.log("selectedTabId", route.query.tab);
+    });
+
+    watch(
+      () => route.query.tab,
+      () => {
+        console.log("tab changed", route.query.tab);
+      }
+    );
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null

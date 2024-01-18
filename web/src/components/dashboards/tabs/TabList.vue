@@ -28,13 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
       style="max-width: calc(100% - 40px)"
     >
-      <q-tab
+      <q-route-tab
         no-caps
         :ripple="false"
         v-for="(tab, index) in tabs"
         :key="index"
-        :name="index"
+        :name="tab.tabId"
         @click.stop
+        :to="{ query: { ...route.query, tab: tab.tabId } }"
         content-class="tab_content"
         @mouseover="() => (hoveredTabId = tab.tabId)"
         @mouseleave="hoveredTabId = null"
@@ -66,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-      </q-tab>
+      </q-route-tab>
     </q-tabs>
     <q-btn
       class="q-ml-sm"
@@ -178,15 +179,6 @@ export default defineComponent({
       confirmDeleteTabDialog.value = false;
     };
 
-    watch(selectedTabId, () => {
-      router.push({
-        query: {
-          ...route.query,
-          tab: selectedTabId.value ?? "default",
-        },
-      });
-    });
-
     return {
       showAddTabDialog,
       updateTabList,
@@ -202,6 +194,7 @@ export default defineComponent({
       hoveredTabId,
       selectedTabId,
       tabs,
+      route,
     };
   },
 });
