@@ -246,14 +246,7 @@ export default defineComponent({
     async getMoreData() {
       if (
         this.searchObj.meta.sqlMode == false &&
-        this.searchObj.meta.refreshInterval == 0 &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.from &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size +
-            this.searchObj.data.queryResults.from
+        this.searchObj.meta.refreshInterval == 0
       ) {
         // this.searchObj.data.resultGrid.currentPage =
         //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
@@ -262,7 +255,6 @@ export default defineComponent({
         //   1;
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
-
         this.searchObj.loading = true;
         await this.getQueryData(true);
         this.refreshHistogramChart();

@@ -395,7 +395,7 @@ export default defineComponent({
       } else if (actionType == "pageChange") {
         if (
           this.pageNumberInput >
-          Math.round(
+          Math.ceil(
             this.searchObj.data.queryResults.total /
               this.searchObj.meta.resultGrid.rowsPerPage
           )
