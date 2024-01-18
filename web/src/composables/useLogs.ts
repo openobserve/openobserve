@@ -728,6 +728,15 @@ const useLogs = () => {
               ) {
                 getHistogramQueryData(histogramQueryReq);
               }
+
+              // disabled histogram case, generate histogram histogram title
+              if (
+                searchObj.data.resultGrid.currentPage == 1 &&
+                (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
+              ) {
+                searchObj.data.histogram.chartParams.title = getHistogramTitle();
+              }
+
               searchObj.loading = false;
               resolve(true);
             })
