@@ -145,11 +145,7 @@ impl Sql {
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
-        let mut track_total_hits = if sql_mode.eq(&SqlMode::Full) {
-            false
-        } else {
-            req_query.track_total_hits
-        };
+        let track_total_hits = req_query.track_total_hits;
 
         // check SQL limitation
         // in context mode, disallow, [limit|offset|group by|having|join|union]
@@ -500,9 +496,6 @@ impl Sql {
         }
 
         // Hack for aggregation
-        if !req_aggs.is_empty() && meta.limit > 0 {
-            track_total_hits = true;
-        }
         if track_total_hits {
             req_aggs.insert(
                 "_count".to_string(),
