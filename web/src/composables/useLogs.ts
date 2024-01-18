@@ -711,17 +711,17 @@ const useLogs = () => {
                   const lastRecordTimeStamp = parseInt(
                     searchObj.data.queryResults.hits[0]._timestamp
                   );
-                  // searchObj.data.queryResults.hits = res.data.hits;
-                  for (let i = 0; i < res.data.hits.length; i++) {
-                    if (
-                      lastRecordTimeStamp <
-                      parseInt(res.data.hits[i]._timestamp)
-                    ) {
-                      searchObj.data.queryResults.hits.unshift(
-                        res.data.hits[i]
-                      );
-                    }
-                  }
+                  searchObj.data.queryResults.hits = res.data.hits;
+                  // for (let i = 0; i < res.data.hits.length; i++) {
+                  //   if (
+                  //     lastRecordTimeStamp <
+                  //     parseInt(res.data.hits[i]._timestamp)
+                  //   ) {
+                  //     searchObj.data.queryResults.hits.unshift(
+                  //       res.data.hits[i]
+                  //     );
+                  //   }
+                  // }
 
                   // searchObj.data.queryResults.hits =
                   //   searchObj.data.queryResults.hits.splice(0, 150);
