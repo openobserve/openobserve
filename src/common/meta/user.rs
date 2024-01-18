@@ -252,3 +252,11 @@ pub struct UserGroup {
     pub name: String,
     pub users: std::collections::HashSet<String>,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct UserGroupRequest {
+    pub add_users: Option<std::collections::HashSet<String>>,
+    pub remove_users: Option<std::collections::HashSet<String>>,
+    pub add_roles: Option<std::collections::HashSet<String>>,
+    pub remove_roles: Option<std::collections::HashSet<String>>,
+}

@@ -14,11 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, put, web, HttpResponse};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::dex::meta::auth::O2EntityAuthorization;
+use o2_enterprise::enterprise::dex::meta::auth::RolePermissionRequest;
 
-use crate::common::meta::user::UserGroup;
+use crate::common::meta::user::{UserGroup, UserGroupRequest};
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles")]
@@ -61,10 +61,10 @@ pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error
 }
 
 #[cfg(feature = "enterprise")]
-#[post("/{org_id}/roles/{role_id}/permissions")]
-pub async fn add_role_permissions(
+#[put("/{org_id}/roles/{role_id}/permissions")]
+pub async fn update_role_permissions(
     path: web::Path<(String, String)>,
-    permissions: web::Json<Vec<O2EntityAuthorization>>,
+    permissions: web::Json<RolePermissionRequest>,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, role_id) = path.into_inner();
     let permissions = permissions.into_inner();
@@ -81,9 +81,9 @@ pub async fn add_role_permissions(
 
 #[cfg(not(feature = "enterprise"))]
 #[post("/{org_id}/roles/{role_id}/permissions")]
-pub async fn add_role_permissions(
+pub async fn update_role_permissions(
     _path: web::Path<(String, String)>,
-    _permissions: web::Json<Vec<String>>,
+    _permissions: web::Json<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
@@ -135,6 +135,39 @@ pub async fn create_group(
 
 #[cfg(not(feature = "enterprise"))]
 #[post("/{org_id}/group")]
+pub async fn create_group(
+    _org_id: web::Path<String>,
+    _user_group: web::Json<UserGroup>,
+) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[put("/{org_id}/group/{group_name}")]
+pub async fn update_group(
+    path: web::Path<(String, String)>,
+    user_group: web::Json<UserGroupRequest>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, group_name) = path.into_inner();
+    let user_grp = user_group.into_inner();
+
+    match o2_enterprise::enterprise::openfga::authorizer::update_group(
+        &org_id,
+        &group_name,
+        user_grp.add_users,
+        user_grp.remove_users,
+        user_grp.add_roles,
+        user_grp.remove_roles,
+    )
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[put("/{org_id}/group")]
 pub async fn create_group(
     _org_id: web::Path<String>,
     _user_group: web::Json<UserGroup>,
