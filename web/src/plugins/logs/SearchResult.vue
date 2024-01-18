@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                Math.round(
+                Math.ceil(
                   searchObj.data.queryResults.total /
                     searchObj.meta.resultGrid.rowsPerPage
                 )
