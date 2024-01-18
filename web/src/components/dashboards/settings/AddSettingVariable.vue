@@ -172,10 +172,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       dense
                       v-model="filter.name"
-                      :display-value="filter.name ? filter.name.name : ''"
+                      :display-value="filter.name ? filter.name : ''"
                       :options="fieldsFilteredOptions"
                       input-debounce="0"
                       behavior="menu"
+                      @update:model-value="filterUpdated(index, $event)"
                       use-input
                       stack-label
                       option-label="name"
@@ -438,6 +439,10 @@ export default defineComponent({
       });
     };
 
+    const filterUpdated = (index: number, filter: any) => {
+      variableData.query_data.filter[index].name = filter.name;
+    };
+
     const removeFilter = (index: any) => {
       variableData.query_data.filter.splice(index, 1);
     };
@@ -685,6 +690,7 @@ export default defineComponent({
       addVariableForm,
       addFilter,
       removeFilter,
+      filterUpdated,
     };
   },
 });
