@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
+          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
         />
 
@@ -87,9 +87,9 @@ const defaultValue = () => {
 export default defineComponent({
   name: "AddTab",
   props: {
-    tabIndex: {
-      type: Number,
-      default: -1,
+    tabId: {
+      type: [String, null],
+      default: null,
     },
     editMode: {
       type: Boolean,
@@ -101,12 +101,18 @@ export default defineComponent({
     },
   },
   emits: ["saveDashboard"],
-  setup(props, { emit }) {
+  setup(props: any, { emit }) {
     const store: any = useStore();
     const addTabForm: any = ref(null);
     const tabData: any = ref(
       props.editMode
-        ? JSON.parse(JSON.stringify(props?.dashboardData?.tabs[props.tabIndex]))
+        ? JSON.parse(
+            JSON.stringify(
+              props?.dashboardData?.tabs.find(
+                (tab: any) => tab.tabId === props.tabId
+              )
+            )
+          )
         : defaultValue()
     );
     const isValidIdentifier: any = ref(true);
@@ -122,7 +128,11 @@ export default defineComponent({
         try {
           //if edit mode
           if (props.editMode) {
-            props.dashboardData.tabs[props.tabIndex] = tabData.value;
+            // only allowed to edit name
+            const tab: any = props.dashboardData.tabs.find(
+              (tab: any) => tab.tabId === props.tabId
+            );
+            tab.name = tabData.value;
             emit("saveDashboard");
             $q.notify({
               type: "positive",

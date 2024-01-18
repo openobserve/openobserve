@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="display: flex">
     <q-tabs
-      v-model="selectedTab"
+      v-model="selectedTabId"
       :align="'left'"
       narrow-indicator
       dense
@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :name="index"
         @click.stop
         content-class="tab_content"
-        @mouseover="() => (hoveredTabIndex = index)"
-        @mouseleave="hoveredTabIndex = -1"
+        @mouseover="() => (hoveredTabId = tab.tabId)"
+        @mouseleave="hoveredTabId = null"
       >
         <div class="full-width row justify-between no-wrap">
           <span
@@ -49,19 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="tab?.name"
             >{{ tab?.name }}</span
           >
-          <div v-if="hoveredTabIndex === index">
+          <div v-if="hoveredTabId === tab.tabId">
             <q-icon
               v-if="index"
               :name="outlinedEdit"
               class="q-ml-sm"
-              @click.stop="editTab(index)"
+              @click.stop="editTab(tab.tabId)"
               style="cursor: pointer; justify-self: end"
             />
             <q-icon
               v-if="index"
               :name="outlinedDelete"
               class="q-ml-sm"
-              @click.stop="showDeleteTabDialogFn(index)"
+              @click.stop="showDeleteTabDialogFn(tab.tabId)"
               style="cursor: pointer; justify-self: end"
             />
           </div>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
       <AddTab
         :edit-mode="isTabEditMode"
-        :tabIndex="selectedTabIndexToEdit ?? -1"
+        :tabId="selectedTabIdToEdit"
         :dashboardData="dashboardData"
         @saveDashboard="updateTabList"
       />
@@ -126,12 +126,6 @@ export default defineComponent({
       required: true,
       type: Object,
     },
-    selectedTabIndex: {
-      required: true,
-      validator: (value) => {
-        return typeof value === "number" || value === null;
-      },
-    },
   },
   emits: ["saveDashboard"],
   setup(props, { emit }) {
@@ -140,11 +134,11 @@ export default defineComponent({
     const route = useRoute();
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
-    const selectedTabIndexToEdit = ref(null);
-    const selectedTabIndexToDelete: any = ref(null);
+    const selectedTabIdToEdit = ref(null);
+    const selectedTabIdToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
-    const hoveredTabIndex = ref(-1);
-    const selectedTab: any = ref(props.selectedTabIndex);
+    const hoveredTabId: any = ref(null);
+    const selectedTabId: any = ref(route.query.tab ?? "default");
 
     const tabs: any = computed(() => {
       return props.dashboardData?.tabs ?? [];
@@ -156,14 +150,14 @@ export default defineComponent({
       isTabEditMode.value = false;
     };
 
-    const editTab = (index: any) => {
-      selectedTabIndexToEdit.value = index;
+    const editTab = (tabId: any) => {
+      selectedTabIdToEdit.value = tabId;
       isTabEditMode.value = true;
       showAddTabDialog.value = true;
     };
 
-    const showDeleteTabDialogFn = (index: any) => {
-      selectedTabIndexToDelete.value = index;
+    const showDeleteTabDialogFn = (tabId: any) => {
+      selectedTabIdToDelete.value = tabId;
       confirmDeleteTabDialog.value = true;
     };
 
@@ -172,7 +166,7 @@ export default defineComponent({
         store,
         route.query.dashboard,
         route.query.folder,
-        tabs.value[selectedTabIndexToDelete.value].name,
+        selectedTabIdToDelete.value,
         "default"
       );
       router.push({
@@ -184,11 +178,11 @@ export default defineComponent({
       confirmDeleteTabDialog.value = false;
     };
 
-    watch(selectedTab, () => {
+    watch(selectedTabId, () => {
       router.push({
         query: {
           ...route.query,
-          tab: tabs.value[selectedTab.value]?.name ?? "default",
+          tab: selectedTabId.value ?? "default",
         },
       });
     });
@@ -199,14 +193,14 @@ export default defineComponent({
       outlinedDelete,
       outlinedEdit,
       editTab,
-      selectedTabIndexToEdit,
+      selectedTabIdToEdit,
       isTabEditMode,
       showDeleteTabDialogFn,
       confirmDeleteTabDialog,
-      selectedTabIndexToDelete,
+      selectedTabIdToDelete,
       deleteTabFn,
-      hoveredTabIndex,
-      selectedTab,
+      hoveredTabId,
+      selectedTabId,
       tabs,
     };
   },

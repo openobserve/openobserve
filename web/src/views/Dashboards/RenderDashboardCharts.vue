@@ -26,10 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @variablesData="variablesDataUpdated"
     />
     <TabList
-      v-if="selectedTabIndex !== null"
+      v-if="selectedTabId !== null"
       class="q-mt-sm"
       :dashboardData="dashboardData"
-      :selectedTabIndex="selectedTabIndex"
       @saveDashboard="saveDashboard"
     />
     <slot name="before_panels" />
@@ -152,21 +151,24 @@ export default defineComponent({
     const viewPanelId = ref("");
 
     // selected tab index
-    const selectedTabIndex: any = computed(() => {
+    const selectedTabId: any = computed(() => {
       // wait if tabs is not loaded
       if (Array.isArray(props.dashboardData?.tabs)) {
+        // if that tab is there then return it else default
         const defaultTabIndex = props.dashboardData?.tabs?.findIndex(
-          (it: any) => it.name === route.query.tab ?? "default"
+          (it: any) => it.tabId === route.query.tab ?? "default"
         );
-        return defaultTabIndex === -1 ? 0 : defaultTabIndex;
+        return defaultTabIndex === -1 ? "default" : route.query.tab;
       } else {
         return null;
       }
     });
 
     const panels: any = computed(() => {
-      return selectedTabIndex.value !== null
-        ? props.dashboardData?.tabs[selectedTabIndex.value]?.panels
+      return selectedTabId.value !== null
+        ? props.dashboardData?.tabs?.find(
+            (it: any) => it.tabId === selectedTabId.value
+          )?.panels
         : [];
     });
 
@@ -315,7 +317,7 @@ export default defineComponent({
       layoutUpdate,
       showViewPanel,
       viewPanelId,
-      selectedTabIndex,
+      selectedTabId,
       saveDashboard,
       panels,
     };
