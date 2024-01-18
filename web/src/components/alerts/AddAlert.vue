@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         dense
                         filled
-                        min="1"
+                        min="0"
                         style="background: none"
                       />
                     </div>
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   data-test="add-alert-delay-error"
-                  v-if="formData.trigger_condition.silence < 1"
+                  v-if="formData.trigger_condition.silence < 0"
                   class="text-red-8 q-pt-xs"
                   style="font-size: 11px; line-height: 12px"
                 >
@@ -911,14 +911,11 @@ export default defineComponent({
     };
 
     const validateInputs = (input: any, notify: boolean = true) => {
-      if (
-        Number(input.trigger_condition.silence) < 1 ||
-        isNaN(Number(input.trigger_condition.silence))
-      ) {
+      if (isNaN(Number(input.trigger_condition.silence))) {
         notify &&
           q.notify({
             type: "negative",
-            message: "Silence Notification should be greater than 0",
+            message: "Silence Notification should not be empty",
             timeout: 1500,
           });
         return false;
