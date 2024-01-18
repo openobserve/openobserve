@@ -9,7 +9,7 @@ import { defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import UsersCloud from "@/enterprise/components/users/User.vue";
-import UsersOpenSource from "@/components/users/User.vue";
+import UsersOpenSource from "@/components/iam/users/User.vue";
 import config from "@/aws-exports";
 
 export default defineComponent({
