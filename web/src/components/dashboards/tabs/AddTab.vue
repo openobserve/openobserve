@@ -76,11 +76,12 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
-import { getTabId } from "@/utils/commons";
+import { addTab } from "@/utils/commons";
+import { useRoute } from "vue-router";
+import { editTab } from "../../../utils/commons";
 
 const defaultValue = () => {
   return {
-    tabId: getTabId(),
     name: "",
     panels: [],
   };
@@ -121,6 +122,7 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const $q = useQuasar();
+    const route = useRoute();
 
     const onSubmit = useLoading(async () => {
       await addTabForm.value.validate().then(async (valid: any) => {
@@ -132,11 +134,13 @@ export default defineComponent({
           //if edit mode
           if (props.editMode) {
             // only allowed to edit name
-            const tab: any = props.dashboardData.tabs.find(
-              (tab: any) => tab.tabId === props.tabId
+            await editTab(
+              store,
+              props.dashboardData,
+              route.query.folder ?? "default",
+              tabData.value.tabId,
+              tabData.value
             );
-            tab.name = tabData.value.name;
-            emit("saveDashboard");
             $q.notify({
               type: "positive",
               message: "Tab updated",
@@ -145,8 +149,12 @@ export default defineComponent({
           }
           //else new tab
           else {
-            props?.dashboardData?.tabs?.push(tabData.value);
-            emit("saveDashboard");
+            await addTab(
+              store,
+              props.dashboardData,
+              route.query.folder ?? "default",
+              tabData.value
+            );
             $q.notify({
               type: "positive",
               message: `Tab added successfully.`,

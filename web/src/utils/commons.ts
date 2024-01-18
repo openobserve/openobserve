@@ -560,6 +560,49 @@ export const deleteTab = async (
   );
 };
 
+export const editTab = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  tabId: any,
+  tabData: any
+) => {
+  const currentDashboardData = findDashboard(dashboardId, store, folderId);
+  const tab = getTabDataFromTabId(currentDashboardData, tabId);
+
+  // only name will change
+  tab.name = tabData.name;
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboardData,
+    folderId ?? "default"
+  );
+};
+
+export const addTab = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  newTabData: any
+) => {
+  // genereate tab id
+  newTabData.tabId = getTabId();
+
+  const currentDashboardData = findDashboard(dashboardId, store, folderId);
+  currentDashboardData.tabs.push(newTabData);
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboardData,
+    folderId ?? "default"
+  );
+};
+
 // move panel to another tab
 export const movePanelToAnotherTab = async (
   store: any,
