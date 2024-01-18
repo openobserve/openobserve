@@ -1,11 +1,25 @@
 <template>
   <div class="column full-height">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')" />
+    <div class="flex justify-between draggable-row q-py-md text-bold">
+      <div class="q-ml-xl">{{ t("dashboard.name") }}</div>
+      <div class="q-mr-lg">{{ t("dashboard.actions") }}</div>
+    </div>
     <div>
       <draggable v-model="list" :options="dragOptions" @end="handleDragEnd">
         <div v-for="(item, index) in list" :key="index" class="draggable-row">
           <div class="draggable-handle">
-            <span>{{ index + 1 }}</span>
+            <q-btn
+              icon="drag_indicator"
+              class="q-ml-xs"
+              padding="xs"
+              unelevated
+              size="sm"
+              round
+              flat
+              cursor="move"
+              :title="t('dashboard.edit')"
+            ></q-btn>
           </div>
           <div class="draggable-content">
             <span>{{ item.name }}</span>
@@ -112,13 +126,13 @@ export default defineComponent({
       editItem,
       deleteItem,
       handleDragEnd,
-      outlinedDelete
+      outlinedDelete,
     };
   },
 });
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .draggable-row {
   display: flex;
   border-bottom: 1px solid #cccccc70;
