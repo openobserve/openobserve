@@ -60,6 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="data_array"
               :label="t('dashboard.variableSettings')"
             />
+            <q-tab
+              name="tabSettings"
+              icon="tab"
+              :label="t('dashboard.tabSettings')"
+            />
           </q-tabs>
         </div>
       </template>
@@ -80,6 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tab-panel name="variableSettings">
               <VariableSettings @save="refreshRequired" />
             </q-tab-panel>
+
+            <q-tab-panel name="tabSettings">
+              <TabsSettings @save="refreshRequired" />
+            </q-tab-panel>
           </q-tab-panels>
         </div>
       </template>
@@ -94,6 +103,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import GeneralSettings from "../../components/dashboards/settings/GeneralSettings.vue";
 import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue";
+import TabsSettings from "../../components/dashboards/settings/TabsSettings.vue";
 import { getImageURL } from "../../utils/zincutils";
 
 export default defineComponent({
@@ -101,6 +111,7 @@ export default defineComponent({
   components: {
     VariableSettings,
     GeneralSettings,
+    TabsSettings
   },
   emits: ["refresh"],
   setup(props, { emit }) {
