@@ -40,17 +40,11 @@
       <ContentCopy class="q-mt-sm" :content="collectorCmd" />
     </div>
     <div v-else>
-      <q-tabs
-        v-model="tab"
-        no-caps
-        outside-arrows
-        mobile-arrows
-        align="left"
-        class="bg-secondary text-white shadow-2"
-        style="opacity: 0.8"
-      >
+      <q-tabs v-model="tab" horizontal
+align="left" no-caps>
         <q-tab name="external" :label="t('ingestion.external')" />
-        <q-tab name="internal" :label="t('ingestion.internal')"
+        <q-tab name="internal"
+:label="t('ingestion.internal')"
           ><q-tooltip>
             {{ t("ingestion.internalLabel") }}
           </q-tooltip></q-tab

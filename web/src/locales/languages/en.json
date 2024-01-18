@@ -379,7 +379,7 @@
     "tracesLabel": "Traces",
     "subnetMessage": "Enter multiple subnets separated by commas",
     "internal": "This Cluster",
-    "external": "Different Cluster",
+    "external": "Default",
     "internalLabel": "Note: Use this option, if collector is installed in same cluster as O2"
   },
   "syslog": {
