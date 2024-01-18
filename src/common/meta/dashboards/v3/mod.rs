@@ -57,6 +57,7 @@ pub struct Layout {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Tab {
+    pub tab_id: String,
     pub name: String,
     #[serde(default)]
     pub panels: Vec<Panel>,

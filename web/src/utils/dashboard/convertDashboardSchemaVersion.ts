@@ -92,6 +92,7 @@ export function convertDashboardSchemaVersion(data: any) {
         {
           panels: data.panels,
           name: "default",
+          tabId: "default",
         },
       ];
       // remove panels key from data
