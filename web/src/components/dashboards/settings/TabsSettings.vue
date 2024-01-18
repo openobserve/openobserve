@@ -12,7 +12,14 @@
             <q-icon name="drag_indicator" color="grey-13" class="'q-mr-xs" />
           </div>
           <div class="draggable-content">
-            <span>{{ item.name }}</span>
+            <span v-if="index !== editingIndex">{{ item.name }}</span>
+            <input
+              v-else
+              v-model="editedItemName"
+              @keyup.enter="saveEdit"
+              @keyup.esc="cancelEdit"
+              class="edit-input"
+            />
             <span class="q-ml-lg">
               <q-btn
                 icon="edit"
@@ -85,6 +92,9 @@ export default defineComponent({
       animation: 200,
     });
 
+    const editingIndex = ref(-1);
+    const editedItemName = ref('');
+
     const handleDragEnd = async () => {
       //   await updateDashboard(
       //     store,
@@ -102,7 +112,22 @@ export default defineComponent({
     };
 
     const editItem = (index: number) => {
-      console.log("Edit item:", index);
+      editingIndex.value = index;
+      editedItemName.value = list.value[index].name;
+    };
+
+    const saveEdit = () => {
+      if (editingIndex.value !== -1) {
+        list.value[editingIndex.value].name = editedItemName.value;
+        //add save name function here
+        editingIndex.value = -1;
+        editedItemName.value = '';
+      }
+    };
+
+    const cancelEdit = () => {
+      editingIndex.value = -1;
+      editedItemName.value = '';
     };
 
     const deleteItem = (index: number) => {
@@ -113,7 +138,11 @@ export default defineComponent({
       list,
       dragOptions,
       t,
+      editingIndex,
+      editedItemName,
       editItem,
+      saveEdit,
+      cancelEdit,
       deleteItem,
       handleDragEnd,
       outlinedDelete,
@@ -144,12 +173,16 @@ export default defineComponent({
   box-sizing: border-box;
 }
 
-/* .draggable-content span {
-  flex-grow: 1;
-  text-align: left;
+.edit-input {
+  border: 1px solid $primary;
+  border-radius: 4px;
+  padding: 4px;
+  outline: none;
+  transition: border-color 0.3s;
 }
 
-.draggable-content button {
-  margin-left: 8px;
-} */
+.edit-input:focus {
+  border-color: $secondary; 
+}
+
 </style>
