@@ -9,9 +9,29 @@
           </div>
           <div class="draggable-content">
             <span>{{ item.name }}</span>
-            <span>
-              <button @click="editItem(index)">Edit</button>
-              <button @click="deleteItem(index)">Delete</button>
+            <span class="q-ml-lg">
+              <q-btn
+                icon="edit"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('dashboard.edit')"
+                @click="editItem(index)"
+              ></q-btn>
+              <q-btn
+                :icon="outlinedDelete"
+                :title="t('dashboard.delete')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="deleteItem(index)"
+              ></q-btn>
             </span>
           </div>
         </div>
@@ -29,6 +49,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -45,6 +66,14 @@ export default defineComponent({
       { name: "Item 2" },
       { name: "Item 3" },
       { name: "Item 4" },
+      { name: "Item 5" },
+      { name: "Item 6" },
+      { name: "Item 7" },
+      { name: "Item 8" },
+      { name: "Item 9" },
+      { name: "Item 10" },
+      { name: "Item 11" },
+      { name: "Item 12" },
     ]);
 
     const { t } = useI18n();
@@ -53,13 +82,13 @@ export default defineComponent({
     });
 
     const handleDragEnd = async () => {
-    //   await updateDashboard(
-    //     store,
-    //     store.state.selectedOrganization.identifier,
-    //     props.dashboardData.dashboardId,
-    //     props.dashboardData,
-    //     route.query.folder ?? "default"
-    //   );
+      //   await updateDashboard(
+      //     store,
+      //     store.state.selectedOrganization.identifier,
+      //     props.dashboardData.dashboardId,
+      //     props.dashboardData,
+      //     route.query.folder ?? "default"
+      //   );
 
       $q.notify({
         type: "positive",
@@ -83,6 +112,7 @@ export default defineComponent({
       editItem,
       deleteItem,
       handleDragEnd,
+      outlinedDelete
     };
   },
 });
@@ -91,7 +121,7 @@ export default defineComponent({
 <style scoped>
 .draggable-row {
   display: flex;
-  border: 1px solid #ccc;
+  border-bottom: 1px solid #cccccc70;
   margin-bottom: 8px;
   cursor: move;
 }
@@ -99,7 +129,6 @@ export default defineComponent({
 .draggable-handle {
   flex: 0 0 30px;
   padding: 8px;
-  border-right: 1px solid #ccc;
   box-sizing: border-box;
 }
 
@@ -111,12 +140,12 @@ export default defineComponent({
   box-sizing: border-box;
 }
 
-.draggable-content span {
+/* .draggable-content span {
   flex-grow: 1;
   text-align: left;
 }
 
 .draggable-content button {
   margin-left: 8px;
-}
+} */
 </style>
