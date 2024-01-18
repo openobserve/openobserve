@@ -584,15 +584,18 @@ const useLogs = () => {
         searchObj.meta.showHistogram === false
       ) {
         delete req.aggs;
-        req.query.track_total_hits = true;
 
         if (searchObj.meta.showHistogram === false) {
           // delete searchObj.data.histogram;
-          searchObj.data.histogram = { xData: [], yData: [], chartParams: {
-            title: "",
-            unparsed_x_data: [],
-            timezone: "",
-          } };
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+          };
           searchObj.meta.histogramDirtyFlag = true;
         } else {
           searchObj.meta.histogramDirtyFlag = false;
@@ -620,7 +623,7 @@ const useLogs = () => {
 
   const getQueryData = (isPagination = false) => {
     return new Promise((resolve, reject) => {
-      let dismiss = () => {};
+      const dismiss = () => {};
       try {
         searchObj.meta.showDetailTab = false;
 
@@ -749,9 +752,11 @@ const useLogs = () => {
               // disabled histogram case, generate histogram histogram title
               if (
                 searchObj.data.resultGrid.currentPage == 1 &&
-                (searchObj.meta.showHistogram === false || searchObj.meta.sqlMode)
+                (searchObj.meta.showHistogram === false ||
+                  searchObj.meta.sqlMode)
               ) {
-                searchObj.data.histogram.chartParams.title = getHistogramTitle();
+                searchObj.data.histogram.chartParams.title =
+                  getHistogramTitle();
               }
 
               searchObj.loading = false;
