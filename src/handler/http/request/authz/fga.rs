@@ -113,7 +113,7 @@ pub async fn get_role_permissions(
 }
 
 #[cfg(feature = "enterprise")]
-#[post("/{org_id}/group")]
+#[post("/{org_id}/groups")]
 pub async fn create_group(
     org_id: web::Path<String>,
     user_group: web::Json<UserGroup>,
@@ -124,7 +124,7 @@ pub async fn create_group(
     match o2_enterprise::enterprise::openfga::authorizer::create_group(
         &org_id,
         &user_grp.name,
-        user_grp.users,
+        user_grp.users.unwrap_or_default(),
     )
     .await
     {
@@ -134,7 +134,7 @@ pub async fn create_group(
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[post("/{org_id}/group")]
+#[post("/{org_id}/groups")]
 pub async fn create_group(
     _org_id: web::Path<String>,
     _user_group: web::Json<UserGroup>,
@@ -143,7 +143,7 @@ pub async fn create_group(
 }
 
 #[cfg(feature = "enterprise")]
-#[put("/{org_id}/group/{group_name}")]
+#[put("/{org_id}/groups/{group_name}")]
 pub async fn update_group(
     path: web::Path<(String, String)>,
     user_group: web::Json<UserGroupRequest>,
@@ -167,10 +167,44 @@ pub async fn update_group(
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[put("/{org_id}/group")]
-pub async fn create_group(
+#[put("/{org_id}/groups/{group_name}")]
+pub async fn update_group(
     _org_id: web::Path<String>,
     _user_group: web::Json<UserGroup>,
 ) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/{org_id}/groups")]
+pub async fn get_groups(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+
+    match o2_enterprise::enterprise::openfga::authorizer::get_all_groups(&org_id).await {
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[put("/{org_id}/group/{group_name}")]
+pub async fn get_groups(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/{org_id}/groups/{group_name}")]
+pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (_org_id, group_name) = path.into_inner();
+
+    match o2_enterprise::enterprise::openfga::authorizer::get_group_details(&group_name).await {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/groups/{group_name}")]
+pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

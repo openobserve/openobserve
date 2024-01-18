@@ -250,7 +250,8 @@ pub struct RoleOrg {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UserGroup {
     pub name: String,
-    pub users: std::collections::HashSet<String>,
+    pub users: Option<std::collections::HashSet<String>>,
+    pub roles: Option<std::collections::HashSet<String>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
