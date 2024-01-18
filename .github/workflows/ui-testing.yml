@@ -78,4 +78,4 @@ jobs:
       #       browser: ${{ matrix.browser }}
       #       spec: cypress/e2e/tests
       - name: Cypress run
-        run: cd tests/ui-testing && npm install && npx cypress run --record --key ${CYPRESS_CLOUD_TOKEN} --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests
+        run: cd tests/ui-testing && npm install && npx cypress run --record --parallel --key ${CYPRESS_CLOUD_TOKEN} --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests
