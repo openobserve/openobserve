@@ -9,17 +9,7 @@
       <draggable v-model="list" :options="dragOptions" @end="handleDragEnd">
         <div v-for="(item, index) in list" :key="index" class="draggable-row">
           <div class="draggable-handle">
-            <q-btn
-              icon="drag_indicator"
-              class="q-ml-xs"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
-              cursor="move"
-              :title="t('dashboard.edit')"
-            ></q-btn>
+            <q-icon name="drag_indicator" color="grey-13" class="'q-mr-xs" />
           </div>
           <div class="draggable-content">
             <span>{{ item.name }}</span>
