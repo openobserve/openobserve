@@ -9,7 +9,7 @@
           rounded
           color="secondary"
           :label="t(`dashboard.newTab`)"
-          @click="addNewItem"
+          @click.stop="addNewItem"
         /> </template
     ></DashboardHeader>
     <div class="flex justify-between draggable-row q-py-md text-bold">
@@ -20,7 +20,7 @@
       <draggable
         v-model="currentDashboardData.data.tabs"
         :options="dragOptions"
-        @end="handleDragEnd"
+        @end.stop="handleDragEnd"
       >
         <div
           v-for="(tab, index) in currentDashboardData.data.tabs"
@@ -48,7 +48,7 @@
                 round
                 flat
                 :title="t('dashboard.cancel')"
-                @click="cancelEdit"
+                @click.stop="cancelEdit"
               ></q-btn>
               <q-btn
                 v-if="tab.tabId !== 'default'"
@@ -60,7 +60,7 @@
                 round
                 flat
                 :title="t('dashboard.save')"
-                @click="saveEdit"
+                @click.stop="saveEdit"
               ></q-btn>
             </div>
             <span class="q-ml-lg">
@@ -74,7 +74,7 @@
                 round
                 flat
                 :title="t('dashboard.edit')"
-                @click="editItem(tab.tabId)"
+                @click.stop="editItem(tab.tabId)"
               ></q-btn>
               <q-btn
                 v-if="tab.tabId !== 'default'"
@@ -86,7 +86,7 @@
                 size="sm"
                 round
                 flat
-                @click="deleteItem(tab.tabId)"
+                @click.stop="deleteItem(tab.tabId)"
               ></q-btn>
             </span>
           </div>
@@ -217,6 +217,7 @@ export default defineComponent({
 
         // emit refresh to rerender
         emit("refresh");
+        await getDashboardData();
 
         $q.notify({
           type: "positive",
@@ -224,13 +225,14 @@ export default defineComponent({
           timeout: 2000,
         });
 
-        //add save name function here
+        // reset edit mode
         editTabId.value = null;
         editTabObj.data = {};
       }
     };
 
     const cancelEdit = () => {
+      // reset edit mode
       editTabId.value = null;
       editTabObj.data = {};
     };
