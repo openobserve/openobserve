@@ -193,10 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <SinglePanelMove
       title="Move Panel to Another Tab"
-      message="Are you sure you want to move this Panel to another tab?"
+      message="Select destination tab"
       @update:ok="movePanelDialog"
       @update:cancel="confirmMovePanelDialog = false"
       v-model="confirmMovePanelDialog"
+      :dashboardData="props.data"
     />
   </div>
 </template>
@@ -344,8 +345,8 @@ export default defineComponent({
       emit("onDeletePanel", props.data.id);
     };
 
-    const movePanelDialog = async (data: any) => {
-      emit("onMovePanel", props.data.id, "default");
+    const movePanelDialog = async (selectedTabId: any) => {
+      emit("onMovePanel", props.data.id, selectedTabId);
     };
 
     return {

@@ -522,7 +522,7 @@ export const deleteTab = async (
     // move panels to other tab
     const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
 
-    let { maxI, maxY } = getMaxIAndMaxYFromTab(deleteTabData);
+    let { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
 
     // for each panel, need to recalculate layout object
     deleteTabData.panels.forEach((panel: any) => {

@@ -10,8 +10,9 @@
         <q-select
           dense
           filled
-          v-model="selectedLocation"
-          :options="tabLocations"
+          label="Select Tab"
+          v-model="selectedTabIdToMove"
+          :options="moveTabOptions"
           class="select-container"
         />
 
@@ -35,7 +36,7 @@
             @click="onConfirm"
             data-test="confirm-button"
           >
-            {{ t("confirmDialog.ok") }}
+            Move
           </q-btn>
         </div>
       </q-card-actions>
@@ -44,33 +45,71 @@
 </template>
 
 <script lang="ts">
+import { getDashboard } from "@/utils/commons";
+import { reactive } from "vue";
+import { onMounted } from "vue";
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "SinglePanelMove",
   emits: ["update:ok", "update:cancel"],
-  props: ["title", "message"],
+  props: ["title", "message", "dashboardData"],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const store = useStore();
+    const route = useRoute();
     const action = ref("delete");
-    const selectedLocation = ref(null);
-    const tabLocations = ["Location A", "Location B", "Location C"];
+    const selectedTabIdToMove: any = ref(null);
+
+    const moveTabOptions = ref([]);
+
+    const currentDashboardData: any = reactive({
+      data: {},
+    });
+
+    const getDashboardData = async () => {
+      currentDashboardData.data = await getDashboard(
+        store,
+        route.query.dashboard,
+        route.query.folder ?? "default"
+      );
+    };
+
+    onMounted(async () => {
+      await getDashboardData();
+
+      // update move tab options
+      const newMoveTabOptions: any = [];
+      currentDashboardData.data.tabs?.forEach((tab: any) => {
+        // if tab is to be deleted, do not include it in the options
+        if (tab.tabId != route.query.tab ?? "default") {
+          newMoveTabOptions.push({
+            label: tab.name,
+            value: tab.tabId,
+          });
+        }
+      });
+
+      moveTabOptions.value = newMoveTabOptions;
+    });
 
     const onCancel = () => {
       emit("update:cancel");
     };
 
     const onConfirm = () => {
-      emit("update:ok");
+      emit("update:ok", selectedTabIdToMove.value.value);
     };
     return {
       t,
       onCancel,
       onConfirm,
       action,
-      selectedLocation,
-      tabLocations,
+      selectedTabIdToMove,
+      moveTabOptions,
     };
   },
 });
