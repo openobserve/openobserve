@@ -191,9 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmDeletePanelDialog"
     />
 
-    <ConfirmDialog
-      title="Move Panel to another tab"
-      message="move to default tab"
+    <SinglePanelMove
+      title="Move Panel to Another Tab"
+      message="Are you sure you want to move this Panel to another tab?"
       @update:ok="movePanelDialog"
       @update:cancel="confirmMovePanelDialog = false"
       v-model="confirmMovePanelDialog"
@@ -211,6 +211,7 @@ import { useQuasar } from "quasar";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 
 export default defineComponent({
   name: "PanelContainer",
@@ -229,6 +230,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     QueryInspector,
     ConfirmDialog,
+    SinglePanelMove
   },
   setup(props, { emit }) {
     const store = useStore();
