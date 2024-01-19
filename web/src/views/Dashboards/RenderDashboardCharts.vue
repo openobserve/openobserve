@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
+              @onMovePanel="onMovePanel"
             >
             </PanelContainer>
           </div>
@@ -128,6 +129,7 @@ export default defineComponent({
     "updated:data-zoom",
     "update:selectedTabId",
     "refresh",
+    "onMovePanel",
   ],
   props: [
     "viewOnly",
@@ -182,9 +184,13 @@ export default defineComponent({
       emit("update:selectedTabId", newVal);
     });
 
-    const refreshDashboard = () =>{
+    const refreshDashboard = () => {
       emit("refresh");
-    }
+    };
+
+    const onMovePanel = (panelId: any, newTabId: any) => {
+      emit("onMovePanel", panelId, newTabId);
+    };
 
     // variables data
     const variablesData = reactive({});
@@ -334,6 +340,7 @@ export default defineComponent({
       selectedTabIdModel,
       panels,
       refreshDashboard,
+      onMovePanel,
     };
   },
   methods: {

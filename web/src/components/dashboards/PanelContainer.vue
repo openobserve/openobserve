@@ -152,6 +152,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </q-item-section>
             </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
+              @click="onPanelModifyClick('MovePanel')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-move-to-another-panel"
+                  class="q-pa-sm"
+                  >Move To Another Tab</q-item-label
+                >
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
       </q-bar>
@@ -177,6 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
     />
+
+    <ConfirmDialog
+      title="Move Panel to another tab"
+      message="move to default tab"
+      @update:ok="movePanelDialog"
+      @update:cancel="confirmMovePanelDialog = false"
+      v-model="confirmMovePanelDialog"
+    />
   </div>
 </template>
 
@@ -193,7 +214,7 @@ import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["onDeletePanel", "onViewPanel", "updated:data-zoom"],
+  emits: ["onDeletePanel", "onViewPanel", "updated:data-zoom", "onMovePanel"],
   props: [
     "data",
     "selectedTimeDate",
@@ -217,6 +238,7 @@ export default defineComponent({
     const metaData = ref();
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
+    const confirmMovePanelDialog = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -319,6 +341,11 @@ export default defineComponent({
     const deletePanelDialog = async (data: any) => {
       emit("onDeletePanel", props.data.id);
     };
+
+    const movePanelDialog = async (data: any) => {
+      emit("onMovePanel", props.data.id, "default");
+    };
+
     return {
       props,
       onEditPanel,
@@ -334,6 +361,8 @@ export default defineComponent({
       confirmDeletePanelDialog,
       showText,
       PanleSchemaRendererRef,
+      confirmMovePanelDialog,
+      movePanelDialog,
     };
   },
   methods: {
@@ -346,6 +375,8 @@ export default defineComponent({
         this.confirmDeletePanelDialog = true;
       } else if (evt == "DuplicatePanel") {
         this.onDuplicatePanel(this.props.data);
+      } else if (evt == "MovePanel") {
+        this.confirmMovePanelDialog = true;
       } else {
       }
     },

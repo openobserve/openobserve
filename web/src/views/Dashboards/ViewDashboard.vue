@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
+        @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
         v-model:selectedTabId="selectedTabId"
         @refresh="loadDashboard"
@@ -162,10 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onActivated, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import DateTimePicker from "../../components/DateTimePicker.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "../../utils/commons.ts";
+import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -427,6 +427,24 @@ export default defineComponent({
       await loadDashboard();
     };
 
+    // move single panel to another tab
+    const onMovePanel = async (panelId: any, newTabId: any) => {
+      await movePanelToAnotherTab(
+        store,
+        route.query.dashboard,
+        panelId,
+        route.query.folder ?? "default",
+        route.query.tab ?? "default",
+        newTabId
+      );
+      await loadDashboard();
+      $q.notify({
+        type: "positive",
+        message: "Panel Moved Successfully!",
+        timeout: 2000,
+      });
+    };
+
     const shareLink = () => {
       const urlObj = new URL(window.location.href);
       const urlSearchParams = urlObj?.searchParams;
@@ -524,6 +542,7 @@ export default defineComponent({
       onDataZoom,
       shareLink,
       selectedTabId,
+      onMovePanel,
     };
   },
 });
