@@ -182,6 +182,8 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub session_id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub function_error: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -207,6 +209,7 @@ impl Response {
             aggs: HashMap::new(),
             response_type: "".to_string(),
             session_id: "".to_string(),
+            function_error: "".to_string(),
         }
     }
 

@@ -439,7 +439,14 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                         registry.finish_load();
                         Some(program)
                     }
-                    Err(_) => None,
+                    Err(err) => {
+                        log::error!(
+                            "[session_id {session_id}] search->vrl: compile err: {:?}",
+                            err
+                        );
+                        result.function_error = err.to_string();
+                        None
+                    }
                 };
             match program {
                 Some(program) => json_rows
