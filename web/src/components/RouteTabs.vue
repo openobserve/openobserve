@@ -56,7 +56,7 @@ const handleTabChange = (tab: string) => {
 .o2-route-tabs {
   &.q-tabs {
     &--vertical {
-      margin: 16px 8px 0 8px;
+      padding: 16px 8px 0 8px;
       .q-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;

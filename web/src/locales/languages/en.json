@@ -44,7 +44,11 @@
     "process": "Process",
     "axisWidth": "Axis Width",
     "legendWidth": "Legend Width",
-    "exceptions": "Exceptions"
+    "exceptions": "Exceptions",
+    "nameRequired": "Name is required",
+    "edit": "Edit",
+    "delete": "Delete",
+    "actions": "Actions"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -233,7 +237,20 @@
     "users": "Users",
     "groups": "User Groups",
     "roles": "Roles",
-    "organizations": "Organizations"
+    "organizations": "Organizations",
+    "addGroup": "Add Group",
+    "addRole": "Add Role",
+    "roleName": "Role Name",
+    "groupName": "Group Name",
+    "permissionName": "Permission Name",
+    "permission": "Permission",
+    "all": "All",
+    "list": "List",
+    "get": "Get",
+    "create": "Create",
+    "update": "Update",
+    "delete": "Delete",
+    "entityName": "Entity Name"
   },
   "ticket": {
     "header": "Support Tickets",

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="bg-white">
     <div class="flex justify-between items-center q-px-md q-py-sm">
       <div style="font-size: 18px">
-        {{ t("iam.addGroup") }}
+        {{ t("iam.addRole") }}
       </div>
       <q-icon name="cancel" class="cursor-pointer" size="20px"></q-icon>
     </div>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="secondary"
           padding="sm xl"
           no-caps
-          @click="saveGroup"
+          @click="saveRole"
         />
       </div>
     </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createGroup, updateGroup } from "@/services/iam";
+import { createRole, updateRole } from "@/services/iam";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -74,7 +74,7 @@ const props = defineProps({
     type: String,
     default: "30vw",
   },
-  group: {
+  role: {
     type: Object,
     default: () => null,
   },
@@ -86,25 +86,25 @@ const props = defineProps({
 
 const emits = defineEmits(["cancel:hideform"]);
 
-const name = ref(props.group?.name || "");
+const name = ref(props.role?.name || "");
 
-const isUpdating = computed(() => !!props.group);
+const isUpdating = computed(() => !!props.role);
 
-const saveGroup = () => {
+const saveRole = () => {
   const params = {
     name: name.value,
     org_identifier: props.org_identifier,
   };
 
   if (isUpdating.value) {
-    _updateGroup(params);
+    _updateRole(params);
   } else {
-    _createGroup(params);
+    _createRole(params);
   }
 };
 
-const _createGroup = (params: { name: string; org_identifier: string }) => {
-  createGroup(params)
+const _createRole = (params: { name: string; org_identifier: string }) => {
+  createRole(params)
     .then((res) => {
       console.log(res);
     })
@@ -113,8 +113,8 @@ const _createGroup = (params: { name: string; org_identifier: string }) => {
     });
 };
 
-const _updateGroup = (params: { name: string; org_identifier: string }) => {
-  updateGroup(params)
+const _updateRole = (params: { name: string; org_identifier: string }) => {
+  updateRole(params)
     .then((res) => {
       console.log(res);
     })
