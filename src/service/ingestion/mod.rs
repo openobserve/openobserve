@@ -100,7 +100,10 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row:
     match result {
         Ok(res) => match res.try_into() {
             Ok(val) => val,
-            Err(_) => row.clone(),
+            Err(err) => {
+                log::error!("Returning original row , got error from vrl {:?}", err);
+                row.clone()
+            }
         },
         Err(err) => {
             log::error!("Returning original row , got error from vrl {:?}", err);
