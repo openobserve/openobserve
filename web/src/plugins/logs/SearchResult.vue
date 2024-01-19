@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-subtitle2 text-weight-bold bg-warning">
                 <q-btn
                   :icon="
-                    expandedLogs['function_error']
+                    expandedLogs['-1']
                       ? 'expand_more'
                       : 'chevron_right'
                   "
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </td>
           </tr>
-          <q-tr v-if="expandedLogs['function_error']">
+          <q-tr v-if="expandedLogs['-1']">
             <td
               :colspan="searchObj.data.resultGrid.columns.length"
               class="bg-warning"
