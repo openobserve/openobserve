@@ -26,6 +26,7 @@
           v-for="(tab, index) in currentDashboardData.data.tabs"
           :key="index"
           class="draggable-row"
+          :class="tab.tabId === 'default' ? 'q-pb-sm' : ''"
         >
           <div class="draggable-handle">
             <q-icon name="drag_indicator" color="grey-13" class="'q-mr-xs" />
