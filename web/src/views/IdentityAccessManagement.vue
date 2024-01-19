@@ -1,6 +1,6 @@
 <template>
   <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
-    <div class="flex no-wrap" style="height: calc(100vh - 57px) !important">
+    <div class="flex no-wrap" style="height: calc(100vh - 60px) !important">
       <div style="width: 160px" class="iam-tabs">
         <route-tabs
           dataTest="iam-tabs"
@@ -10,7 +10,7 @@
         />
       </div>
       <q-separator vertical />
-      <div style="width: 1023px">
+      <div style="width: calc(100% - 160px)">
         <RouterView />
       </div>
     </div>
@@ -42,18 +42,6 @@ const tabs = [
     class: "tab_content",
   },
   {
-    dataTest: "iam-organizations-tab",
-    name: "organizations",
-    to: {
-      name: "organizations",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    },
-    label: t("iam.organizations"),
-    class: "tab_content",
-  },
-  {
     dataTest: "iam-groups-tab",
     name: "groups",
     to: {
@@ -75,6 +63,18 @@ const tabs = [
       },
     },
     label: t("iam.roles"),
+    class: "tab_content",
+  },
+  {
+    dataTest: "iam-organizations-tab",
+    name: "organizations",
+    to: {
+      name: "organizations",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.organizations"),
     class: "tab_content",
   },
 ];
