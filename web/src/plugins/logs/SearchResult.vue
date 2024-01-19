@@ -172,11 +172,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   class="q-mr-xs"
                   data-test="table-row-expand-menu"
-                  @click.stop="expandLog('function_error', -1)"
+                  @click.stop="expandLog('function_error', '-1')"
                 ></q-btn
                 ><b>
-                  <q-icon name="warning" size="15px"></q-icon>
-                  {{ t("search.functionErrorLabel") }}</b
+                  <q-icon name="warning" size="15px"></q-icon> {{ t("search.functionErrorLabel") }}</b
                 >
               </div>
             </td>
