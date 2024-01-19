@@ -128,6 +128,7 @@ import { reactive } from "vue";
 import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
+import { updateDashboard } from "../../../utils/commons";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -176,13 +177,16 @@ export default defineComponent({
     });
 
     const handleDragEnd = async () => {
-      //   await updateDashboard(
-      //     store,
-      //     store.state.selectedOrganization.identifier,
-      //     props.dashboardData.dashboardId,
-      //     props.dashboardData,
-      //     route.query.folder ?? "default"
-      //   );
+      await updateDashboard(
+        store,
+        store.state.selectedOrganization.identifier,
+        currentDashboardData.data.dashboardId,
+        currentDashboardData.data,
+        route.query.folder ?? "default"
+      );
+
+      // emit refresh to rerender
+      emit("refresh");
 
       $q.notify({
         type: "positive",
@@ -193,8 +197,10 @@ export default defineComponent({
 
     const editItem = (tabId: any) => {
       editTabId.value = tabId;
-      editTabObj.data = currentDashboardData.data.tabs.find(
-        (tab: any) => tab.tabId === tabId
+      editTabObj.data = JSON.parse(
+        JSON.stringify(
+          currentDashboardData.data.tabs.find((tab: any) => tab.tabId === tabId)
+        )
       );
     };
 
