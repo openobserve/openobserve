@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tab-panel>
 
             <q-tab-panel name="tabSettings">
-              <TabsSettings @save="refreshRequired" />
+              <TabsSettings @refresh="refreshRequired" />
             </q-tab-panel>
           </q-tab-panels>
         </div>

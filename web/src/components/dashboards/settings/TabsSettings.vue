@@ -17,16 +17,29 @@
       <div class="q-mr-lg">{{ t("dashboard.actions") }}</div>
     </div>
     <div>
-      <draggable v-model="list" :options="dragOptions" @end="handleDragEnd">
-        <div v-for="(item, index) in list" :key="index" class="draggable-row">
+      <draggable
+        v-model="currentDashboardData.data.tabs"
+        :options="dragOptions"
+        @end="handleDragEnd"
+      >
+        <div
+          v-for="(tab, index) in currentDashboardData.data.tabs"
+          :key="index"
+          class="draggable-row"
+        >
           <div class="draggable-handle">
             <q-icon name="drag_indicator" color="grey-13" class="'q-mr-xs" />
           </div>
           <div class="draggable-content">
-            <span v-if="index !== editingIndex">{{ item.name }}</span>
+            <span v-if="tab.tabId !== editTabId">{{ tab.name }}</span>
             <div v-else class="flex">
-              <input v-model="editedItemName" class="edit-input" />
+              <input
+                v-if="tab.tabId !== 'default'"
+                v-model="editTabObj.data.name"
+                class="edit-input"
+              />
               <q-btn
+                v-if="tab.tabId !== 'default'"
                 icon="cancel"
                 class="q-ml-xs"
                 padding="sm"
@@ -38,6 +51,7 @@
                 @click="cancelEdit"
               ></q-btn>
               <q-btn
+                v-if="tab.tabId !== 'default'"
                 icon="check"
                 class="q-ml-xs"
                 padding="sm"
@@ -51,6 +65,7 @@
             </div>
             <span class="q-ml-lg">
               <q-btn
+                v-if="tab.tabId !== 'default'"
                 icon="edit"
                 class="q-ml-xs"
                 padding="sm"
@@ -59,9 +74,10 @@
                 round
                 flat
                 :title="t('dashboard.edit')"
-                @click="editItem(index)"
+                @click="editItem(tab.tabId)"
               ></q-btn>
               <q-btn
+                v-if="tab.tabId !== 'default'"
                 :icon="outlinedDelete"
                 :title="t('dashboard.delete')"
                 class="q-ml-xs"
@@ -70,13 +86,23 @@
                 size="sm"
                 round
                 flat
-                @click="deleteItem(index)"
+                @click="deleteItem(tab.tabId)"
               ></q-btn>
             </span>
           </div>
         </div>
       </draggable>
     </div>
+
+    <!-- add tab dialog -->
+    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
+      <AddTab
+        :edit-mode="isTabEditMode"
+        :tabId="selectedTabIdToEdit"
+        :dashboardData="currentDashboardData.data"
+        @refresh="refreshRequired"
+      />
+    </q-dialog>
   </div>
 </template>
 
@@ -87,42 +113,55 @@ import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import { updateDashboard } from "@/utils/commons";
+import { editTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import { reactive } from "vue";
+import { onMounted } from "vue";
+import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 
 export default defineComponent({
   name: "TabsSettings",
   components: {
     draggable: VueDraggableNext,
     DashboardHeader,
+    AddTab,
   },
-  setup(props) {
+  emits: ["refresh"],
+  setup(props, { emit }) {
     const store = useStore();
     const $q = useQuasar();
     const route = useRoute();
-    const list = ref([
-      { name: "Item 1" },
-      { name: "Item 2" },
-      { name: "Item 3" },
-      { name: "Item 4" },
-      { name: "Item 5" },
-      { name: "Item 6" },
-      { name: "Item 7" },
-      { name: "Item 8" },
-      { name: "Item 9" },
-      { name: "Item 10" },
-      { name: "Item 11" },
-      { name: "Item 12" },
-    ]);
+
+    const showAddTabDialog = ref(false);
+    const isTabEditMode = ref(false);
+    const selectedTabIdToEdit = ref("");
+
+    const currentDashboardData: any = reactive({
+      data: {},
+    });
+
+    const getDashboardData = async () => {
+      currentDashboardData.data = await getDashboard(
+        store,
+        route.query.dashboard,
+        route.query.folder ?? "default"
+      );
+    };
+
+    onMounted(async () => {
+      await getDashboardData();
+    });
 
     const { t } = useI18n();
     const dragOptions = ref({
       animation: 200,
     });
 
-    const editingIndex = ref(-1);
-    const editedItemName = ref("");
+    const editTabId = ref(null);
+    const editTabObj: any = reactive({
+      data: {},
+    });
 
     const handleDragEnd = async () => {
       //   await updateDashboard(
@@ -136,43 +175,69 @@ export default defineComponent({
       $q.notify({
         type: "positive",
         message: "Dashboard updated successfully.",
-        timeout: 5000,
+        timeout: 2000,
       });
     };
 
-    const editItem = (index: number) => {
-      editingIndex.value = index;
-      editedItemName.value = list.value[index].name;
+    const editItem = (tabId: any) => {
+      editTabId.value = tabId;
+      editTabObj.data = currentDashboardData.data.tabs.find(
+        (tab: any) => tab.tabId === tabId
+      );
     };
 
-    const saveEdit = () => {
-      if (editingIndex.value !== -1) {
-        list.value[editingIndex.value].name = editedItemName.value;
+    const saveEdit = async () => {
+      if (editTabId.value) {
+        // only allowed to edit name
+        await editTab(
+          store,
+          currentDashboardData.data.dashboardId,
+          route.query.folder ?? "default",
+          editTabObj.data.tabId,
+          editTabObj.data
+        );
+
+        // emit refresh to rerender
+        emit("refresh");
+
+        $q.notify({
+          type: "positive",
+          message: "Tab updated",
+          timeout: 2000,
+        });
+
         //add save name function here
-        editingIndex.value = -1;
-        editedItemName.value = "";
+        editTabId.value = null;
+        editTabObj.data = {};
       }
     };
 
     const cancelEdit = () => {
-      editingIndex.value = -1;
-      editedItemName.value = "";
+      editTabId.value = null;
+      editTabObj.data = {};
     };
 
     const addNewItem = () => {
-      //add tab popup should be open on click of this
-      console.log("Add new item");
+      isTabEditMode.value = false;
+      showAddTabDialog.value = true;
     };
-    const deleteItem = (index: number) => {
-      console.log("Delete item:", index);
+
+    const deleteItem = (tabId: any) => {
+      // console.log("Delete item:", index);
+    };
+
+    const refreshRequired = async () => {
+      emit("refresh");
+      await getDashboardData();
+      showAddTabDialog.value = false;
+      isTabEditMode.value = false;
     };
 
     return {
-      list,
       dragOptions,
       t,
-      editingIndex,
-      editedItemName,
+      editTabId,
+      editTabObj,
       editItem,
       saveEdit,
       cancelEdit,
@@ -180,6 +245,11 @@ export default defineComponent({
       handleDragEnd,
       outlinedDelete,
       addNewItem,
+      showAddTabDialog,
+      isTabEditMode,
+      selectedTabIdToEdit,
+      currentDashboardData,
+      refreshRequired,
     };
   },
 });
