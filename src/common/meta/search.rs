@@ -257,6 +257,21 @@ impl Response {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct SearchPartitionRequest {
+    pub sql: String,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SearchPartitionResponse {
+    pub file_num: usize,
+    pub original_size: usize,
+    pub compressed_size: usize,
+    pub partitions: Vec<[i64; 2]>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
