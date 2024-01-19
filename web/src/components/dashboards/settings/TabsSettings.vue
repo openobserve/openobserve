@@ -109,8 +109,8 @@
       v-model="deletePopupVisible"
       @update:cancel="deletePopupVisible = false"
       @update:ok="confirmDelete"
-      title="Move or delete panles of this tab"
-      message="Are you sure you want to move or delete all the panels of this tab?"
+      :tabId="tabIdToBeDeleted"
+      :dashboardData="currentDashboardData.data"
     />
   </div>
 </template>
@@ -122,7 +122,7 @@ import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import { editTab, getDashboard } from "@/utils/commons";
+import { deleteTab, editTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { reactive } from "vue";
@@ -150,6 +150,7 @@ export default defineComponent({
     const selectedTabIdToEdit = ref("");
 
     const deletePopupVisible = ref(false);
+    const tabIdToBeDeleted = ref(null);
 
     const currentDashboardData: any = reactive({
       data: {},
@@ -243,15 +244,25 @@ export default defineComponent({
       showAddTabDialog.value = true;
     };
 
-    const deleteItem = (index: number) => {
-      console.log("Delete item:", index);
+    const deleteItem = (tabId: any) => {
+      tabIdToBeDeleted.value = tabId;
       deletePopupVisible.value = true;
-      console.log("Delete popup visible:", deletePopupVisible.value);
     };
 
-    const confirmDelete = () => {
-      // Perform delete logic here
-      console.log("Deleting item...");
+    const confirmDelete = async (moveTabId: any) => {
+      await deleteTab(
+        store,
+        route.query.dashboard,
+        route.query.folder,
+        tabIdToBeDeleted.value,
+        moveTabId
+      );
+
+      // emit event
+      emit("refresh");
+      await getDashboardData();
+
+      tabIdToBeDeleted.value = null;
       deletePopupVisible.value = false;
     };
 
@@ -273,6 +284,7 @@ export default defineComponent({
       deleteItem,
       confirmDelete,
       deletePopupVisible,
+      tabIdToBeDeleted,
       handleDragEnd,
       outlinedDelete,
       addNewItem,
