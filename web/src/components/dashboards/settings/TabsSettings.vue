@@ -103,6 +103,14 @@
         @refresh="refreshRequired"
       />
     </q-dialog>
+    <!-- delete tab dialog -->
+    <TabsDeletePopUp
+      v-model="deletePopupVisible"
+      @update:cancel="deletePopupVisible = false"
+      @update:ok="confirmDelete"
+      title="Move or delete panles of this tab"
+      message="Are you sure you want to move or delete all the panels of this tab?"
+    />
   </div>
 </template>
 
@@ -119,6 +127,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { reactive } from "vue";
 import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
+import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -126,6 +135,7 @@ export default defineComponent({
     draggable: VueDraggableNext,
     DashboardHeader,
     AddTab,
+    TabsDeletePopUp,
   },
   emits: ["refresh"],
   setup(props, { emit }) {
@@ -136,6 +146,8 @@ export default defineComponent({
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit = ref("");
+
+    const deletePopupVisible = ref(false);
 
     const currentDashboardData: any = reactive({
       data: {},
@@ -222,8 +234,16 @@ export default defineComponent({
       showAddTabDialog.value = true;
     };
 
-    const deleteItem = (tabId: any) => {
-      // console.log("Delete item:", index);
+    const deleteItem = (index: number) => {
+      console.log("Delete item:", index);
+      deletePopupVisible.value = true;
+      console.log("Delete popup visible:", deletePopupVisible.value);
+    };
+
+    const confirmDelete = () => {
+      // Perform delete logic here
+      console.log("Deleting item...");
+      deletePopupVisible.value = false;
     };
 
     const refreshRequired = async () => {
@@ -242,6 +262,8 @@ export default defineComponent({
       saveEdit,
       cancelEdit,
       deleteItem,
+      confirmDelete,
+      deletePopupVisible,
       handleDragEnd,
       outlinedDelete,
       addNewItem,
