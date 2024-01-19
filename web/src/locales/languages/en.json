@@ -94,7 +94,7 @@
     "btnDownload": "Download",
     "customDownloadMessage": "Enter the initial number and select the range for downloading data.",
     "noRecordFound": "No Record Found",
-    "functionErrorLabel": "Function not applied: (expand for the details)"
+    "functionErrorLabel": "Function not applied: (expand for more details)"
   },
   "menu": {
     "home": "Home",
