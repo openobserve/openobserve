@@ -113,9 +113,11 @@ pub async fn search_partition(
         partitions: vec![],
     };
     let total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
-    let part_num = max(1, total_secs / CONFIG.limit.query_partition_secs);
+    let part_num = max(1, total_secs / CONFIG.limit.query_partition_by_secs);
     let mut step = max(
-        Duration::minutes(10).num_microseconds().unwrap(),
+        Duration::seconds(CONFIG.limit.query_partition_min_secs)
+            .num_microseconds()
+            .unwrap(),
         (req.end_time - req.start_time) / part_num as i64,
     );
     // step must be times of minute
