@@ -124,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>alert_start_time, alert_end_time, alert_url</div>
             <div><b>rows</b> multiple lines of row template</div>
             <div><b>All of the stream fields are variables.</b></div>
+            <div>{rows:N} {var:N} used to limit rows or string length.</div>
           </div>
           <div class="q-pb-md q-px-xs">
             <div class="text-bold text-body-1 q-pb-sm">
