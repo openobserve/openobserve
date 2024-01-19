@@ -93,7 +93,8 @@
     "range": "No of Records",
     "btnDownload": "Download",
     "customDownloadMessage": "Enter the initial number and select the range for downloading data.",
-    "noRecordFound": "No Record Found"
+    "noRecordFound": "No Record Found",
+    "functionErrorLabel": "Function not applied: (expand for the details)"
   },
   "menu": {
     "home": "Home",
