@@ -24,13 +24,31 @@
           </div>
           <div class="draggable-content">
             <span v-if="index !== editingIndex">{{ item.name }}</span>
-            <input
-              v-else
-              v-model="editedItemName"
-              @keyup.enter="saveEdit"
-              @keyup.esc="cancelEdit"
-              class="edit-input"
-            />
+            <div v-else class="flex">
+              <input v-model="editedItemName" class="edit-input" />
+              <q-btn
+                icon="cancel"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('dashboard.cancel')"
+                @click="cancelEdit"
+              ></q-btn>
+              <q-btn
+                icon="check"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('dashboard.save')"
+                @click="saveEdit"
+              ></q-btn>
+            </div>
             <span class="q-ml-lg">
               <q-btn
                 icon="edit"
@@ -142,10 +160,9 @@ export default defineComponent({
     };
 
     const addNewItem = () => {
-        //add tab popup should be open on click of this
-        console.log("Add new item");
-        
-    }
+      //add tab popup should be open on click of this
+      console.log("Add new item");
+    };
     const deleteItem = (index: number) => {
       console.log("Delete item:", index);
     };
@@ -162,7 +179,7 @@ export default defineComponent({
       deleteItem,
       handleDragEnd,
       outlinedDelete,
-      addNewItem
+      addNewItem,
     };
   },
 });
@@ -196,7 +213,7 @@ export default defineComponent({
   padding: 4px;
   outline: none;
   transition: border-color 0.3s;
-  width: 55%;
+  width: 100%;
 }
 
 .edit-input:focus {
