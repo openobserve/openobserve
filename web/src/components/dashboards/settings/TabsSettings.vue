@@ -33,7 +33,7 @@
           </div>
           <div class="draggable-content">
             <span v-if="tab.tabId !== editTabId">{{ tab.name }}</span>
-            <div v-else class="flex">
+            <div v-else style="display: flex; flex-direction: row">
               <input
                 v-if="tab.tabId !== 'default'"
                 v-model="editTabObj.data.name"
@@ -41,27 +41,25 @@
               />
               <q-btn
                 v-if="tab.tabId !== 'default'"
-                icon="cancel"
-                class="q-ml-xs"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('dashboard.cancel')"
-                @click.stop="cancelEdit"
-              ></q-btn>
-              <q-btn
-                v-if="tab.tabId !== 'default'"
                 icon="check"
                 class="q-ml-xs"
-                padding="sm"
                 unelevated
                 size="sm"
                 round
                 flat
                 :title="t('dashboard.save')"
                 @click.stop="saveEdit"
+              ></q-btn>
+              <q-btn
+                v-if="tab.tabId !== 'default'"
+                icon="close"
+                class="q-ml-xs"
+                unelevated
+                size="sm"
+                round
+                flat
+                :title="t('dashboard.cancel')"
+                @click.stop="cancelEdit"
               ></q-btn>
             </div>
             <span class="q-ml-lg">
@@ -74,6 +72,7 @@
                 size="sm"
                 round
                 flat
+                :disabled="tab.tabId === editTabId"
                 :title="t('dashboard.edit')"
                 @click.stop="editItem(tab.tabId)"
               ></q-btn>
@@ -247,6 +246,8 @@ export default defineComponent({
     const deleteItem = async (tabId: any) => {
       tabIdToBeDeleted.value = tabId;
       await nextTick();
+      // call cancelEdit to reset edit mode
+      cancelEdit();
       deletePopupVisible.value = true;
     };
 

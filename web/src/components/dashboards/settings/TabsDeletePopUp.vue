@@ -99,6 +99,11 @@ export default defineComponent({
         });
         // set action to delete
         action.value = "delete";
+        // set selectedTabToMovePanels to default
+        selectedTabToMovePanels.value = {
+          label: "Default",
+          value: "default",
+        };
         moveTabOptions.value = newMoveTabOptions;
       }
     );
