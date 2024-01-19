@@ -34,7 +34,7 @@ use crate::{
         utils::{
             auth::{remove_ownership, set_ownership},
             base64,
-            json::{self, Map, Value},
+            json::{Map, Value},
         },
     },
     service::{db, search as SearchService},
@@ -735,16 +735,7 @@ pub async fn send_notification(
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let resp = json::to_string(&dest.template.body)?;
-    let resp = process_dest_template(&resp, alert, rows, &rows_tpl_val).await;
-    let msg: Value = json::from_str(&resp)?;
-    let msg: Value = match &msg {
-        Value::String(obj) => match json::from_str(obj) {
-            Ok(obj) => obj,
-            Err(_) => msg,
-        },
-        _ => msg,
-    };
+    let msg = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
     let client = if dest.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -757,20 +748,28 @@ pub async fn send_notification(
         HTTPType::POST => client.post(url),
         HTTPType::PUT => client.put(url),
         HTTPType::GET => client.get(url),
-    }
-    .header("Content-type", "application/json");
+    };
 
     // Add additional headers if any from destination description
+    let mut has_context_type = false;
     if let Some(headers) = &dest.headers {
         for (key, value) in headers.iter() {
             if !key.is_empty() && !value.is_empty() {
+                if key.to_lowercase().trim() == "content-type" {
+                    has_context_type = true;
+                }
                 req = req.header(key, value);
             }
         }
     };
+    // set default content type
+    if !has_context_type {
+        req = req.header("Content-type", "application/json");
+    }
 
-    let resp = req.json(&msg).send().await?;
+    let resp = req.body(msg.clone()).send().await?;
     if !resp.status().is_success() {
+        log::error!("Alert body: {}", msg);
         return Err(anyhow::anyhow!("sent error: {:?}", resp.bytes().await));
     }
 
@@ -872,7 +871,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
         rows_tpl.push(resp);
     }
 
-    rows_tpl.join("\\\\n")
+    rows_tpl.join("\\n")
 }
 
 async fn process_dest_template(
@@ -952,9 +951,12 @@ async fn process_dest_template(
     };
 
     // Hack time range for alert url
-    if alert_end_time == 0 {
-        alert_end_time = Utc::now().timestamp_micros();
-    }
+    alert_end_time = if alert_end_time == 0 {
+        Utc::now().timestamp_micros()
+    } else {
+        // the frontend will drop the second, so we add 1 minute to the end time
+        alert_end_time + Duration::minutes(1).num_microseconds().unwrap()
+    };
     if alert_start_time == 0 {
         alert_start_time = alert_end_time
             - Duration::minutes(alert.trigger_condition.period)
@@ -1056,9 +1058,9 @@ async fn process_dest_template(
 }
 
 fn format_variable_value(val: &str) -> String {
-    val.replace('\n', "\\\\n")
-        .replace('\r', "\\\\r")
-        .replace('\"', "\\\\\\\"")
+    val.replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\"', "\\\"")
 }
 
 fn to_float(val: &Value) -> f64 {

@@ -25,7 +25,7 @@ use crate::{
 };
 
 pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<(), anyhow::Error> {
-    if template.body.is_null() || template.body.as_str().unwrap_or_default().is_empty() {
+    if template.body.is_empty() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
     if !name.is_empty() {

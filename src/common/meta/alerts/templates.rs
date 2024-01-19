@@ -16,14 +16,12 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::utils::json::Value;
-
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Template {
     #[serde(default)]
     pub name: String,
-    #[schema(value_type = Object)]
-    pub body: Value,
+    #[serde(default)]
+    pub body: String,
     #[serde(rename = "isDefault")]
     #[serde(default)]
     pub is_default: Option<bool>,
