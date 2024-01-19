@@ -112,8 +112,14 @@ pub async fn search_partition(
         compressed_size: files.iter().map(|f| f.meta.compressed_size).sum::<i64>() as usize,
         partitions: vec![],
     };
-    let total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
-    let part_num = max(1, total_secs / CONFIG.limit.query_partition_by_secs);
+    let mut total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
+    if total_secs * CONFIG.limit.query_group_base_speed * cpu_cores < resp.original_size {
+        total_secs += 1;
+    }
+    let mut part_num = max(1, total_secs / CONFIG.limit.query_partition_by_secs);
+    if part_num * CONFIG.limit.query_partition_by_secs < total_secs {
+        part_num += 1;
+    }
     let mut step = max(
         Duration::seconds(CONFIG.limit.query_partition_min_secs)
             .num_microseconds()
@@ -125,11 +131,11 @@ pub async fn search_partition(
 
     // generate partitions
     let mut partitions = Vec::with_capacity(part_num);
-    let mut start = req.start_time;
-    while start < req.end_time {
-        let end = min(start + step, req.end_time);
+    let mut end = req.end_time;
+    while end > req.start_time {
+        let start = max(end - step, req.start_time);
         partitions.push([start, end]);
-        start = end;
+        end = start;
     }
     resp.partitions = partitions;
     Ok(resp)

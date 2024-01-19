@@ -387,7 +387,7 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
-    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 30)] // seconds
+    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 10)] // seconds
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MIN_SECS", default = 600)] // seconds
     pub query_partition_min_secs: i64,
