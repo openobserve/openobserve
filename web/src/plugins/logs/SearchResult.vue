@@ -166,34 +166,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="text-subtitle2 text-weight-bold bg-warning">
                 <q-btn
-                  :icon="
-                    expandedLogs['function_error']
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
+                  :icon="expandedLogs['-1'] ? 'expand_more' : 'chevron_right'"
                   dense
                   size="xs"
                   flat
                   class="q-mr-xs"
                   data-test="table-row-expand-menu"
-                  @click.stop="expandLog('function_error', -1)"
+                  @click.stop="expandLog('function_error', '-1')"
                 ></q-btn
                 ><b>
-                  <q-icon name="warning" size="15px"></q-icon>
-                  {{ t("search.functionErrorLabel") }}</b
+                  <q-icon name="warning" size="15px"></q-icon> {{ t("search.functionErrorLabel") }}</b
                 >
               </div>
             </td>
           </tr>
-          <q-tr v-if="expandedLogs['function_error']">
+          <q-tr v-if="expandedLogs['-1']">
             <td
               :colspan="searchObj.data.resultGrid.columns.length"
               class="bg-warning"
-              style="opacity: 0.7"
-            >
-              <pre>{{ searchObj.data.functionError }}</pre>
             </td>
-          </q-tr>
         </template>
         <template v-slot="{ item: row, index }">
           <q-tr
