@@ -104,7 +104,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ["saveDashboard"],
+  emits: ["refresh"],
   setup(props: any, { emit }) {
     const store: any = useStore();
     const addTabForm: any = ref(null);
@@ -136,11 +136,15 @@ export default defineComponent({
             // only allowed to edit name
             await editTab(
               store,
-              props.dashboardData,
+              props.dashboardData.dashboardId,
               route.query.folder ?? "default",
               tabData.value.tabId,
               tabData.value
             );
+
+            // emit refresh to rerender
+            emit("refresh");
+
             $q.notify({
               type: "positive",
               message: "Tab updated",
@@ -151,10 +155,14 @@ export default defineComponent({
           else {
             await addTab(
               store,
-              props.dashboardData,
+              props.dashboardData.dashboardId,
               route.query.folder ?? "default",
               tabData.value
             );
+
+            // emit refresh to rerender
+            emit("refresh");
+
             $q.notify({
               type: "positive",
               message: `Tab added successfully.`,
@@ -162,8 +170,6 @@ export default defineComponent({
             });
           }
         } catch (err: any) {
-          console.log("err", err);
-
           $q.notify({
             type: "negative",
             message: JSON.stringify(

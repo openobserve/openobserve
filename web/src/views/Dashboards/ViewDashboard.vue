@@ -142,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @onDeletePanel="onDeletePanel"
         @updated:data-zoom="onDataZoom"
         v-model:selectedTabId="selectedTabId"
+        @refresh="loadDashboard"
       />
 
       <q-dialog

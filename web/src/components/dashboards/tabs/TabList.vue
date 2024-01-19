@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :edit-mode="isTabEditMode"
         :tabId="selectedTabIdToEdit"
         :dashboardData="dashboardData"
-        @saveDashboard="updateTabList"
+        @refresh="refreshDashboard"
       />
     </q-dialog>
 
@@ -131,7 +131,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ["saveDashboard", "update:selectedTabId"],
+  emits: ["refresh", "update:selectedTabId"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -155,8 +155,8 @@ export default defineComponent({
       return props.dashboardData?.tabs ?? [];
     });
 
-    const updateTabList = () => {
-      emit("saveDashboard");
+    const refreshDashboard = () => {
+      emit("refresh");
       showAddTabDialog.value = false;
       isTabEditMode.value = false;
     };
@@ -183,12 +183,17 @@ export default defineComponent({
 
       // go to that tab
       selectedTabIdModel.value = "default";
+
+      // emit event
+      emit("refresh");
+
+      // close dialog
       confirmDeleteTabDialog.value = false;
     };
 
     return {
       showAddTabDialog,
-      updateTabList,
+      refreshDashboard,
       outlinedDelete,
       outlinedEdit,
       editTab,

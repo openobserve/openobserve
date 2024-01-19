@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-mt-sm"
       v-model:selectedTabId="selectedTabIdModel"
       :dashboardData="dashboardData"
-      @saveDashboard="saveDashboard"
+      @refresh="refreshDashboard"
     />
     <slot name="before_panels" />
     <div class="displayDiv">
@@ -127,6 +127,7 @@ export default defineComponent({
     "variablesData",
     "updated:data-zoom",
     "update:selectedTabId",
+    "refresh",
   ],
   props: [
     "viewOnly",
@@ -180,6 +181,10 @@ export default defineComponent({
     watch(selectedTabIdModel, (newVal) => {
       emit("update:selectedTabId", newVal);
     });
+
+    const refreshDashboard = () =>{
+      emit("refresh");
+    }
 
     // variables data
     const variablesData = reactive({});
@@ -327,8 +332,8 @@ export default defineComponent({
       showViewPanel,
       viewPanelId,
       selectedTabIdModel,
-      saveDashboard,
       panels,
+      refreshDashboard,
     };
   },
   methods: {
