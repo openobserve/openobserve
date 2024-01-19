@@ -98,7 +98,7 @@ pub async fn update_template(
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = DestinationTemplate),
+        (status = 200, description = "Success",  content_type = "application/json", body = Template),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -123,7 +123,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<DestinationTemplate>),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]

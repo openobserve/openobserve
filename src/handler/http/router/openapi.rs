@@ -163,6 +163,8 @@ use crate::{common::meta, handler::http::request};
             meta::alerts::Condition,
             meta::alerts::Operator,
             meta::alerts::Aggregation,
+            meta::alerts::AggFunction,
+            meta::alerts::QueryType,
             meta::alerts::TriggerCondition,
             meta::alerts::QueryCondition,
             meta::alerts::destinations::Destination,
