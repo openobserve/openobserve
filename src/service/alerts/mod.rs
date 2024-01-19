@@ -34,7 +34,7 @@ use crate::{
         utils::{
             auth::{remove_ownership, set_ownership},
             base64,
-            json::{self, Map, Value},
+            json::{Map, Value},
         },
     },
     service::{db, search as SearchService},
@@ -731,20 +731,11 @@ pub async fn send_notification(
     rows: &[Map<String, Value>],
 ) -> Result<(), anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
-        "".to_string()
+        vec!["".to_string()]
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let resp = json::to_string(&dest.template.body)?;
-    let resp = process_dest_template(&resp, alert, rows, &rows_tpl_val).await;
-    let msg: Value = json::from_str(&resp)?;
-    let msg: Value = match &msg {
-        Value::String(obj) => match json::from_str(obj) {
-            Ok(obj) => obj,
-            Err(_) => msg,
-        },
-        _ => msg,
-    };
+    let msg = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
     let client = if dest.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -757,27 +748,35 @@ pub async fn send_notification(
         HTTPType::POST => client.post(url),
         HTTPType::PUT => client.put(url),
         HTTPType::GET => client.get(url),
-    }
-    .header("Content-type", "application/json");
+    };
 
     // Add additional headers if any from destination description
+    let mut has_context_type = false;
     if let Some(headers) = &dest.headers {
         for (key, value) in headers.iter() {
             if !key.is_empty() && !value.is_empty() {
+                if key.to_lowercase().trim() == "content-type" {
+                    has_context_type = true;
+                }
                 req = req.header(key, value);
             }
         }
     };
+    // set default content type
+    if !has_context_type {
+        req = req.header("Content-type", "application/json");
+    }
 
-    let resp = req.json(&msg).send().await?;
+    let resp = req.body(msg.clone()).send().await?;
     if !resp.status().is_success() {
+        log::error!("Alert body: {}", msg);
         return Err(anyhow::anyhow!("sent error: {:?}", resp.bytes().await));
     }
 
     Ok(())
 }
 
-fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> String {
+fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
     let alert_type = if alert.is_real_time {
         "realtime"
     } else {
@@ -797,9 +796,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             } else {
                 value.to_string()
             };
-            if resp.contains(&format!("{{{key}}}")) {
-                resp = resp.replace(&format!("{{{key}}}"), &format_variable_value(&value));
-            }
+            process_variable_replace(&mut resp, key, &VarValue::Str(&value));
 
             // calculate start and end time
             if key == &CONFIG.common.column_timestamp {
@@ -865,21 +862,21 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
 
         if let Some(attrs) = &alert.context_attributes {
             for (key, value) in attrs.iter() {
-                resp = resp.replace(&format!("{{{key}}}"), &format_variable_value(value));
+                process_variable_replace(&mut resp, key, &VarValue::Str(value));
             }
         }
 
         rows_tpl.push(resp);
     }
 
-    rows_tpl.join("\\\\n")
+    rows_tpl
 }
 
 async fn process_dest_template(
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
-    rows_tpl_val: &str,
+    rows_tpl_val: &[String],
 ) -> String {
     // format values
     let alert_count = rows.len();
@@ -952,6 +949,18 @@ async fn process_dest_template(
     };
 
     // Hack time range for alert url
+    alert_end_time = if alert_end_time == 0 {
+        Utc::now().timestamp_micros()
+    } else {
+        // the frontend will drop the second, so we add 1 minute to the end time
+        alert_end_time + Duration::minutes(1).num_microseconds().unwrap()
+    };
+    if alert_start_time == 0 {
+        alert_start_time = alert_end_time
+            - Duration::minutes(alert.trigger_condition.period)
+                .num_microseconds()
+                .unwrap();
+    }
     if alert_end_time - alert_start_time < Duration::minutes(1).num_microseconds().unwrap() {
         alert_start_time = alert_end_time
             - Duration::minutes(alert.trigger_condition.period)
@@ -1026,30 +1035,49 @@ async fn process_dest_template(
         .replace("{alert_count}", &alert_count.to_string())
         .replace("{alert_start_time}", &alert_start_time_str)
         .replace("{alert_end_time}", &alert_end_time_str)
-        .replace("{alert_url}", &alert_url)
-        .replace("{rows}", rows_tpl_val);
+        .replace("{alert_url}", &alert_url);
+    process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val));
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
-            resp = resp.replace(
-                &format!("{{{key}}}"),
-                &format_variable_value(&val.join(", ")),
-            );
+            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")));
         }
     }
     if let Some(attrs) = &alert.context_attributes {
         for (key, value) in attrs.iter() {
-            resp = resp.replace(&format!("{{{key}}}"), &format_variable_value(value));
+            process_variable_replace(&mut resp, key, &VarValue::Str(value));
         }
     }
 
     resp
 }
 
-fn format_variable_value(val: &str) -> String {
-    val.replace('\n', "\\\\n")
-        .replace('\r', "\\\\r")
-        .replace('\"', "\\\\\\\"")
+fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue) {
+    let pattern = "{".to_owned() + var_name + "}";
+    if tpl.contains(&pattern) {
+        *tpl = tpl.replace(&pattern, &var_val.to_string_with_length(0));
+        return;
+    }
+    let pattern = "{".to_owned() + var_name + ":";
+    if let Some(start) = tpl.find(&pattern) {
+        // find } start from position v
+        let p = start + pattern.len();
+        if let Some(end) = tpl[p..].find('}') {
+            let len = tpl[p..p + end].parse::<usize>().unwrap_or_default();
+            if len > 0 {
+                *tpl = tpl.replace(
+                    &tpl[start..p + end + 1],
+                    &var_val.to_string_with_length(len),
+                );
+            }
+        }
+    }
+}
+
+fn format_variable_value(val: String) -> String {
+    val.replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\"', "\\\"")
 }
 
 fn to_float(val: &Value) -> f64 {
@@ -1057,5 +1085,31 @@ fn to_float(val: &Value) -> f64 {
         val.as_f64().unwrap_or_default()
     } else {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
+    }
+}
+
+enum VarValue<'a> {
+    Str(&'a str),
+    Vector(&'a [String]),
+}
+
+impl<'a> VarValue<'a> {
+    fn len(&self) -> usize {
+        match self {
+            VarValue::Str(v) => v.chars().count(),
+            VarValue::Vector(v) => v.len(),
+        }
+    }
+
+    fn to_string_with_length(&self, n: usize) -> String {
+        let n = if n > 0 && n < self.len() {
+            n
+        } else {
+            self.len()
+        };
+        match self {
+            VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
+            VarValue::Vector(v) => v[0..n].join("\\n"),
+        }
     }
 }
