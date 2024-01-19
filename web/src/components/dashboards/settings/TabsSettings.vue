@@ -116,7 +116,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, nextTick, ref } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
@@ -244,8 +244,9 @@ export default defineComponent({
       showAddTabDialog.value = true;
     };
 
-    const deleteItem = (tabId: any) => {
+    const deleteItem = async (tabId: any) => {
       tabIdToBeDeleted.value = tabId;
+      await nextTick();
       deletePopupVisible.value = true;
     };
 

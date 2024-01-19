@@ -2,7 +2,12 @@
   <q-dialog>
     <q-card style="width: 600px" data-test="dialog-box">
       <q-card-section class="confirmBody">
-        <div class="head">Delete Tab</div>
+        <div class="head">
+          Delete
+          <span style="text-decoration: underline">{{
+            dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
+          }}</span>
+        </div>
         <div class="para">
           This action cannot be undone. Are you sure you want to delete this
           tab?
@@ -92,7 +97,8 @@ export default defineComponent({
             });
           }
         });
-
+        // set action to delete
+        action.value = "delete";
         moveTabOptions.value = newMoveTabOptions;
       }
     );
