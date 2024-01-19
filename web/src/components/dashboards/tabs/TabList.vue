@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="display: flex">
+  <div
+    style="display: flex"
+    @mouseover="isHovered = true"
+    @mouseleave="isHovered = false"
+  >
     <q-tabs
       v-model="selectedTabIdModel"
       :align="'left'"
@@ -50,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="tab?.name"
             >{{ tab?.name }}</span
           >
-          <div v-if="hoveredTabId === tab.tabId">
+          <!-- <div v-if="hoveredTabId === tab.tabId">
             <q-icon
               v-if="index"
               :name="outlinedEdit"
@@ -65,23 +69,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="showDeleteTabDialogFn(tab.tabId)"
               style="cursor: pointer; justify-self: end"
             />
-          </div>
+          </div> -->
         </div>
       </q-tab>
     </q-tabs>
     <q-btn
-      class="q-ml-sm"
-      outline
-      padding="xs"
+      v-show="isHovered"
+      class="text-bold no-border q-ml-xs"
       no-caps
+      no-outline
+      rounded
       icon="add"
+      padding="xs"
       @click="
         () => {
           isTabEditMode = false;
           showAddTabDialog = true;
         }
       "
-    />
+      ><q-tooltip>Add Tab</q-tooltip></q-btn
+    >
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
       <AddTab
         :edit-mode="isTabEditMode"
@@ -142,6 +149,7 @@ export default defineComponent({
     const selectedTabIdToDelete: any = ref(null);
     const confirmDeleteTabDialog = ref(false);
     const hoveredTabId: any = ref(null);
+    const isHovered = ref(false);
 
     // need one ref which will passed in tabList for selectedTab
     const selectedTabIdModel: any = ref(props.selectedTabId);
@@ -207,6 +215,7 @@ export default defineComponent({
       selectedTabIdModel,
       tabs,
       route,
+      isHovered,
     };
   },
 });
