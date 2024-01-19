@@ -165,6 +165,7 @@ const defaultObject = {
     tempFunctionLoading: false,
     savedViews: <any>[],
     customDownloadQueryObj: <any>{},
+    functionError: "",
   },
 };
 
@@ -757,6 +758,14 @@ const useLogs = () => {
               ) {
                 searchObj.data.histogram.chartParams.title =
                   getHistogramTitle();
+              }
+
+              searchObj.data.functionError = "";
+              if (
+                res.data.hasOwnProperty("function_error") &&
+                res.data.function_error
+              ) {
+                searchObj.data.functionError = res.data.function_error;
               }
 
               searchObj.loading = false;
