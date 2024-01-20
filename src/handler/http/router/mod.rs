@@ -253,6 +253,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(prom::format_query_post)
             .service(enrichment_table::save_enrichment_table)
             .service(search::search)
+            .service(search::search_partition)
             .service(search::around)
             .service(search::values)
             .service(search::saved_view::create_view)

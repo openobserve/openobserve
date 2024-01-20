@@ -42,6 +42,7 @@ pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
@@ -386,6 +387,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
+    #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 10)] // seconds
+    pub query_partition_by_secs: usize,
+    #[env_config(name = "ZO_QUERY_PARTITION_MIN_SECS", default = 600)] // seconds
+    pub query_partition_min_secs: i64,
+    #[env_config(name = "ZO_QUERY_GROUP_BASE_SPEED", default = 1024)] // MB/s/core
+    pub query_group_base_speed: usize,
     #[env_config(name = "ZO_INGEST_ALLOWED_UPTO", default = 5)] // in hours - in past
     pub ingest_allowed_upto: i64,
     #[env_config(name = "ZO_IGNORE_FILE_RETENTION_BY_STREAM", default = false)]
@@ -892,6 +899,18 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.mem_table_max_size = mem_total / 2; // 50%
     } else {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
+    }
+
+    // check query settings
+    cfg.limit.query_group_base_speed *= 1024 * 1024;
+    if cfg.limit.query_group_base_speed == 0 {
+        cfg.limit.query_group_base_speed = SIZE_IN_GB as usize;
+    }
+    if cfg.limit.query_partition_by_secs == 0 {
+        cfg.limit.query_partition_by_secs = 30;
+    }
+    if cfg.limit.query_partition_min_secs == 0 {
+        cfg.limit.query_partition_min_secs = 600;
     }
     Ok(())
 }
