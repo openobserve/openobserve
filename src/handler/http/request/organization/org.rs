@@ -37,9 +37,6 @@ use crate::{
     security(
         ("Authorization"= [])
     ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-      ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = OrganizationResponse),
     )
