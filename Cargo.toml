@@ -136,7 +136,6 @@ reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
   "stream",
 ] }
-rs-snowflake = "0.6"
 rust-embed-for-web = "11.1"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
@@ -170,7 +169,6 @@ uaparser = "0.6.1"
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
-uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 vector-enrichment = { package = "enrichment", git = "https://github.com/openobserve/vector", rev = "66667dd291482a440c5eb2032ef3cbfb7377b53b" }
 vrl = { version = "0.8.1", features = ["value", "compiler", "test"] }
 walkdir = "2"
@@ -241,13 +239,13 @@ reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
   "stream",
 ] }
-rs-snowflake = "0.6"
 segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha256 = "1.4.0"
 snafu = "0.7.5"
 snap = "1"
+svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"
 thiserror = "1.0"
@@ -258,7 +256,6 @@ tracing-log = "0.2"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
-uuid = { version = "1.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = "2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

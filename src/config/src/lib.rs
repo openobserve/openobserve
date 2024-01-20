@@ -24,6 +24,6 @@ pub use config::*;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     // init ider
-    ider::init()?;
+    ider::init();
     Ok(())
 }

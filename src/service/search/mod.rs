@@ -23,6 +23,7 @@ use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_bat
 use ahash::AHashMap as HashMap;
 use chrono::Duration;
 use config::{
+    ider,
     meta::stream::{FileKey, QueryPartitionStrategy, StreamType},
     CONFIG,
 };
@@ -65,7 +66,7 @@ pub async fn search(
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let session_id = if session_id.is_empty() {
-        uuid::Uuid::new_v4().to_string()
+        ider::uuid()
     } else {
         session_id.to_string()
     };

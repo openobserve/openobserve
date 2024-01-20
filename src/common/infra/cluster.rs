@@ -17,12 +17,12 @@ use std::{net::IpAddr, sync::Arc};
 
 use config::{
     cluster::LOCAL_NODE_ID,
+    ider,
     meta::cluster::{Node, NodeStatus, Role},
     RwHashMap, CONFIG, INSTANCE_ID,
 };
 use etcd_client::PutOptions;
 use once_cell::sync::Lazy;
-use uuid::Uuid;
 
 use crate::{
     common::{
@@ -411,7 +411,7 @@ pub fn load_local_mode_node() -> Node {
 
 #[inline(always)]
 fn load_local_node_uuid() -> String {
-    Uuid::new_v4().to_string()
+    ider::uuid()
 }
 
 #[inline(always)]

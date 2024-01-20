@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::{FileKey, FileMeta};
-use uuid::Uuid;
+use config::{
+    ider,
+    meta::stream::{FileKey, FileMeta},
+};
 
 use crate::{
     common::{meta, utils::json},
@@ -46,7 +48,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
         };
 
         let job = cluster_rpc::Job {
-            session_id: Uuid::new_v4().to_string(),
+            session_id: ider::uuid(),
             job: "".to_string(),
             stage: 0,
             partition: 0,
@@ -124,7 +126,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
         };
 
         let job = cluster_rpc::Job {
-            session_id: Uuid::new_v4().to_string(),
+            session_id: ider::uuid(),
             job: "".to_string(),
             stage: 0,
             partition: 0,
