@@ -706,9 +706,6 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;
