@@ -25,7 +25,7 @@ pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 
 pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Error> {
     let db = &infra_db::get_db().await;
-    let view_id = uuid::Uuid::new_v4().to_string();
+    let view_id = config::ider::uuid();
     let view = View {
         org_id: org_id.into(),
         view_id: view_id.clone(),

@@ -19,7 +19,7 @@ use std::{
 };
 
 use ahash::AHashMap as HashMap;
-use config::{meta::stream::StreamType, CONFIG};
+use config::{ider, meta::stream::StreamType, CONFIG};
 use futures::future::try_join_all;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -94,7 +94,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 
     // partition request, here plus 1 second, because division is integer, maybe
     // lose some precision XXX-REFACTORME: move this into a function
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = ider::uuid();
     let job_id = session_id[30..].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
         session_id,
