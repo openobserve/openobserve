@@ -455,6 +455,253 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <q-separator />
+    <!-- filters container -->
+    <div
+      v-if="
+        !(
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery && dashboardPanelData.data.queryType == 'sql'
+        )
+      "
+      style="display: flex; flex-direction: row"
+      class="q-pl-md"
+    >
+      <div class="layout-name">{{ t("panel.filters") }}</div>
+      <span class="layout-separator">:</span>
+      <div
+        class="axis-container droppable scroll row"
+        :class="{
+          'drop-target':
+            dashboardPanelData.meta.dragAndDrop.dragging &&
+            dashboardPanelData.meta.dragAndDrop.dragSource == 'fieldList',
+          'drop-entered':
+            dashboardPanelData.meta.dragAndDrop.dragging &&
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'f',
+        }"
+        @dragover="onDragOver($event, 'f')"
+        @drop="
+          onDrop(
+            $event,
+            'f'
+          )
+        "
+        @dragend="onDragEnd()"
+        data-test="dashboard-filter-layout"
+      >
+        <q-btn-group
+          class="axis-field q-mr-sm q-my-xs"
+          v-for="(filteredItem, index) in dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields?.filter"
+          :key="index"
+        >
+          <q-btn
+            square
+            icon-right="arrow_drop_down"
+            no-caps
+            dense
+            color="primary"
+            size="sm"
+            :label="filteredItem.column"
+            :data-test="`dashboard-filter-item-${filteredItem.column}`"
+            class="q-pl-sm"
+          >
+            <q-menu
+              class="q-pa-md"
+              @show="(e) => loadFilterItem(filteredItem.column)"
+              :data-test="`dashboard-filter-item-${filteredItem.column}-menu`"
+            >
+              <div>
+                <div class="q-pa-xs">
+                  <div class="q-gutter-xs">
+                    <q-tabs
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.filter[index].type
+                      "
+                      dense
+                    >
+                      <q-tab
+                        dense
+                        name="list"
+                        :label="t('common.list')"
+                        style="width: auto"
+                        data-test="dashboard-filter-list-tab"
+                      ></q-tab>
+                      <q-tab
+                        dense
+                        name="condition"
+                        :label="t('common.condition')"
+                        style="width: auto"
+                        data-test="dashboard-filter-condition-tab"
+                      ></q-tab>
+                    </q-tabs>
+                    <q-separator></q-separator>
+                    <q-tab-panels
+                      dense
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.filter[index].type
+                      "
+                      animated
+                    >
+                      <q-tab-panel
+                        data-test="dashboard-filter-condition-panel"
+                        dense
+                        name="condition"
+                        class="q-pa-none"
+                      >
+                        <div class="flex justify-between">
+                          <q-select
+                            dense
+                            filled
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.filter[index].operator
+                            "
+                            :options="options"
+                            :label="t('common.operator')"
+                            data-test="dashboard-filter-condition-dropdown"
+                            style="width: 100%"
+                            :rules="[(val) => !!val || 'Required']"
+                          />
+                          <q-input
+                            dense
+                            filled
+                            v-if="
+                              !['Is Null', 'Is Not Null'].includes(
+                                dashboardPanelData.data.queries[
+                                  dashboardPanelData.layout.currentQueryIndex
+                                ].fields?.filter[index]?.operator
+                              )
+                            "
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.filter[index].value
+                            "
+                            data-test="dashboard-filter-condition-input"
+                            :label="t('common.value')"
+                            style="width: 100%; margin-top: 5px"
+                            :rules="[(val) => val?.length > 0 || 'Required']"
+                          />
+                        </div>
+                      </q-tab-panel>
+                      <q-tab-panel
+                        data-test="dashboard-filter-list-panel"
+                        dense
+                        name="list"
+                        class="q-pa-none"
+                      >
+                        <q-select
+                          dense
+                          filled
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.filter[index].values
+                          "
+                          data-test="dashboard-filter-list-dropdown"
+                          :options="dashboardPanelData.meta.filterValue.find((it: any)=>it.column == filteredItem.column)?.value"
+                          :label="t('common.selectFilter')"
+                          multiple
+                          emit-value
+                          map-options
+                          :rules="[
+                            (val) =>
+                              val.length > 0 || 'At least 1 item required',
+                          ]"
+                        >
+                          <template v-slot:selected>
+                            {{
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.filter[index].values[0]?.length > 15
+                                ? dashboardPanelData.data.queries[
+                                    dashboardPanelData.layout.currentQueryIndex
+                                  ].fields.filter[index].values[0]?.substring(
+                                    0,
+                                    15
+                                  ) + "..."
+                                : dashboardPanelData.data.queries[
+                                    dashboardPanelData.layout.currentQueryIndex
+                                  ].fields.filter[index].values[0]
+                            }}
+
+                            {{
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.filter[index].values?.length > 1
+                                ? " +" +
+                                  (dashboardPanelData.data.queries[
+                                    dashboardPanelData.layout.currentQueryIndex
+                                  ].fields.filter[index].values?.length -
+                                    1)
+                                : ""
+                            }}
+                          </template>
+                          <template
+                            v-slot:option="{
+                              itemProps,
+                              opt,
+                              selected,
+                              toggleOption,
+                            }"
+                          >
+                            <q-item v-bind="itemProps">
+                              <q-item-section side>
+                                <q-checkbox
+                                  dense
+                                  :model-value="selected"
+                                  data-test="dashboard-filter-item-input"
+                                  @update:model-value="toggleOption(opt)"
+                                ></q-checkbox>
+                              </q-item-section>
+                              <q-item-section>
+                                <div v-html="opt"></div>
+                              </q-item-section>
+                            </q-item>
+                          </template>
+                        </q-select>
+                      </q-tab-panel>
+                    </q-tab-panels>
+                  </div>
+                </div>
+              </div>
+            </q-menu>
+          </q-btn>
+          <q-btn
+            size="xs"
+            dense
+            :data-test="`dashboard-filter-item-${filteredItem.column}-remove`"
+            @click="removeFilterItem(filteredItem.column)"
+            icon="close"
+          />
+        </q-btn-group>
+        <div
+          class="text-caption text-weight-bold text-center q-py-xs q-mt-xs"
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.filter < 1
+          "
+          style="
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          "
+        >
+          {{ t("dashboard.addFieldMessage") }}
+        </div>
+      </div>
+      <div></div>
+    </div>
   </div>
 </template>
 
@@ -476,6 +723,7 @@ export default defineComponent({
       latitude: true,
       longitude: true,
       weight: true,
+      filter: false,
     });
 
     const {
@@ -486,6 +734,7 @@ export default defineComponent({
       removeLatitude,
       removeLongitude,
       removeWeight,
+      removeFilterItem,
       addFilteredItem,
       loadFilterItem,
       promqlMode,
@@ -507,6 +756,7 @@ export default defineComponent({
           expansionItems.latitude = true;
           expansionItems.longitude = true;
           expansionItems.weight = true;
+          expansionItems.filter = true;
         }
       }
     );
@@ -530,6 +780,9 @@ export default defineComponent({
             break;
           case "weight":
             addWeight(dragElement);
+            break;
+          case "f":
+            addFilteredItem(dragElement?.name);
             break;
         }
       } else {
@@ -577,6 +830,9 @@ export default defineComponent({
           } else if (dragSource === "weight") {
             removeWeight();
           }
+        }
+        if (targetAxis === "f") {
+          return;
         }
 
         // Add to the new axis
@@ -659,6 +915,7 @@ export default defineComponent({
       removeLatitude,
       removeLongitude,
       removeWeight,
+      removeFilterItem,
       loadFilterItem,
       triggerOperators,
       pagination: ref({
@@ -677,6 +934,18 @@ export default defineComponent({
       promqlMode,
       weightLabel,
       onFieldDragStart,
+      options: [
+        "=",
+        "<>",
+        ">=",
+        "<=",
+        ">",
+        "<",
+        "Contains",
+        "Not Contains",
+        "Is Null",
+        "Is Not Null",
+      ],
     };
   },
 });
