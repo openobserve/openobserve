@@ -19,6 +19,7 @@ use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
 use config::{meta::stream::StreamType, CONFIG};
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::promql;
 use crate::{
@@ -403,7 +404,7 @@ impl QueryCondition {
             encoding: search::RequestEncoding::Empty,
             timeout: 0,
         };
-        let session_id = uuid::Uuid::new_v4().to_string();
+        let session_id = Ksuid::new(None, None).to_string();
         let resp =
             SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req).await?;
         if resp.total < alert.trigger_condition.threshold as usize {

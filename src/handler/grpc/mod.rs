@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::{FileKey, FileMeta};
-use uuid::Uuid;
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::{
     common::{meta, utils::json},
@@ -46,7 +46,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
         };
 
         let job = cluster_rpc::Job {
-            session_id: Uuid::new_v4().to_string(),
+            session_id: Ksuid::new(None, None).to_string(),
             job: "".to_string(),
             stage: 0,
             partition: 0,
@@ -124,7 +124,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
         };
 
         let job = cluster_rpc::Job {
-            session_id: Uuid::new_v4().to_string(),
+            session_id: Ksuid::new(None, None).to_string(),
             job: "".to_string(),
             stage: 0,
             partition: 0,

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use svix_ksuid::{Ksuid, KsuidLike};
+
 use crate::common::{
     infra::{db as infra_db, errors::Error},
     meta::saved_view::{
@@ -25,7 +27,7 @@ pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 
 pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Error> {
     let db = &infra_db::get_db().await;
-    let view_id = uuid::Uuid::new_v4().to_string();
+    let view_id = Ksuid::new(None, None).to_string();
     let view = View {
         org_id: org_id.into(),
         view_id: view_id.clone(),

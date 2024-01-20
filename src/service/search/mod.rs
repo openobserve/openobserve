@@ -27,6 +27,7 @@ use config::{
     CONFIG,
 };
 use once_cell::sync::Lazy;
+use svix_ksuid::{Ksuid, KsuidLike};
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -65,7 +66,7 @@ pub async fn search(
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let session_id = if session_id.is_empty() {
-        uuid::Uuid::new_v4().to_string()
+        Ksuid::new(None, None).to_string()
     } else {
         session_id.to_string()
     };

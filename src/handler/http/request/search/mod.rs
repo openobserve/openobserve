@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod saved_view;
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::{
     common::{
@@ -32,6 +32,8 @@ use crate::{
     },
     service::{search as SearchService, usage::report_request_usage_stats},
 };
+
+pub mod saved_view;
 
 /// SearchStreamData
 #[utoipa::path(
@@ -105,7 +107,7 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = Ksuid::new(None, None).to_string();
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -274,7 +276,7 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = Ksuid::new(None, None).to_string();
 
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
@@ -582,7 +584,7 @@ async fn values_v1(
     query: &web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = Ksuid::new(None, None).to_string();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -790,7 +792,7 @@ async fn values_v2(
     query: &web::Query<HashMap<String, String>>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = Ksuid::new(None, None).to_string();
 
     let mut query_sql = format!(
         "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
@@ -977,7 +979,7 @@ pub async fn search_partition(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = uuid::Uuid::new_v4().to_string();
+    let session_id = Ksuid::new(None, None).to_string();
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
