@@ -22,7 +22,6 @@ parquet.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snafu.workspace = true
-svix-ksuid.workspace = true
 tokio.workspace = true
 walkdir.workspace = true
 

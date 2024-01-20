@@ -3752,7 +3752,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu 0.7.5",
- "svix-ksuid",
  "tokio",
  "wal",
  "walkdir",
