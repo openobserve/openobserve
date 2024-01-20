@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="addNewItem"
         /> </template
     ></DashboardHeader>
-    <div class="flex justify-between draggable-row q-py-md text-bold">
+    <div class="flex justify-between q-py-md q-mb-sm text-bold border-bottom">
       <div class="q-ml-xl">{{ t("dashboard.name") }}</div>
       <div class="q-mr-lg">{{ t("dashboard.actions") }}</div>
     </div>
@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="currentDashboardData.data.tabs"
         :options="dragOptions"
         @end.stop="handleDragEnd"
+        @mousedown.stop
       >
         <div
           v-for="(tab, index) in currentDashboardData.data.tabs"

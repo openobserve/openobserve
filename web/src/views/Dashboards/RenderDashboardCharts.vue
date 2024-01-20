@@ -171,7 +171,7 @@ export default defineComponent({
       return props.selectedTabId !== null
         ? props.dashboardData?.tabs?.find(
             (it: any) => it.tabId === props.selectedTabId
-          )?.panels
+          )?.panels ?? []
         : [];
     });
 
