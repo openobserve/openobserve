@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'latitude')"
         @drop="onDrop($event, 'latitude')"
+        @dragenter="onDragEnter($event, 'latitude', null)"
         data-test="dashboard-latitude-layout"
       >
         <q-btn-group
@@ -173,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'longitude')"
         @drop="onDrop($event, 'longitude')"
+        @dragenter="onDragEnter($event, 'longitude', null)"
         data-test="dashboard-longitude-layout"
       >
         <q-btn-group
@@ -308,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'weight')"
         @drop="onDrop($event, 'weight')"
+        @dragenter="onDragEnter($event, 'weight', null)"
         data-test="dashboard-weight-layout"
       >
         <q-btn-group
@@ -481,12 +484,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'f',
         }"
         @dragover="onDragOver($event, 'f')"
-        @drop="
-          onDrop(
-            $event,
-            'f'
-          )
-        "
+        @drop="onDrop($event, 'f')"
+        @dragenter="onDragEnter($event, 'f', null)"
         @dragend="onDragEnd()"
         data-test="dashboard-filter-layout"
       >
@@ -803,32 +802,34 @@ export default defineComponent({
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields;
-          if (
-            (targetAxis === "latitude" && currentQueryField.latitude) ||
-            (targetAxis === "longitude" && currentQueryField.longitude) ||
-            (targetAxis === "weight" && currentQueryField.weight)
-          ) {
-            const maxAllowedAxisFields = 1;
+          if (targetAxis !== "f") {
+            if (
+              (targetAxis === "latitude" && currentQueryField.latitude) ||
+              (targetAxis === "longitude" && currentQueryField.longitude) ||
+              (targetAxis === "weight" && currentQueryField.weight)
+            ) {
+              const maxAllowedAxisFields = 1;
 
-            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+              const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
 
-            $q.notify({
-              type: "negative",
-              message: errorMessage,
-              timeout: 5000,
-            });
-            cleanupDraggingFields();
-            return;
-          }
+              $q.notify({
+                type: "negative",
+                message: errorMessage,
+                timeout: 5000,
+              });
+              cleanupDraggingFields();
+              return;
+            }
 
-          // Remove from the original axis
-          const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
-          if (dragSource === "latitude") {
-            removeLatitude();
-          } else if (dragSource === "longitude") {
-            removeLongitude();
-          } else if (dragSource === "weight") {
-            removeWeight();
+            // Remove from the original axis
+            const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
+            if (dragSource === "latitude") {
+              removeLatitude();
+            } else if (dragSource === "longitude") {
+              removeLongitude();
+            } else if (dragSource === "weight") {
+              removeWeight();
+            }
           }
         }
         if (targetAxis === "f") {
@@ -855,10 +856,23 @@ export default defineComponent({
     const onDragOver = (e: any, area: string) => {
       e.preventDefault();
     };
-
+    const onDragEnter = (e: any, area: string, index: any) => {
+      if (
+        dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
+        area === "f"
+      ) {
+        e.preventDefault();
+        return;
+      }
+      dashboardPanelData.meta.dragAndDrop.targetDragIndex =
+        index != null && index >= 0
+          ? index
+          : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+      dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
+      e.preventDefault();
+    };
 
     const onFieldDragStart = (e: any, item: any, axis: string) => {
-
       dashboardPanelData.meta.dragAndDrop.dragging = true;
       dashboardPanelData.meta.dragAndDrop.dragElement = item;
       dashboardPanelData.meta.dragAndDrop.dragSource = axis;
@@ -925,6 +939,7 @@ export default defineComponent({
       tab: ref("General"),
       getImageURL,
       onDrop,
+      onDragEnter,
       onDragStart,
       onDragEnd,
       onDragOver,
