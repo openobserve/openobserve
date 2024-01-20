@@ -38,9 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="padding: 10px"
       >
         <div class="radio-group">
-          <q-radio v-model="action" val="delete">
-            Delete all the panels of this tab
-          </q-radio>
           <div style="display: flex; flex-direction: row">
             <q-radio v-model="action" val="move">
               Move panels to another tab
@@ -54,6 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
+          <q-radio v-model="action" val="delete">
+            Delete all the panels of this tab
+          </q-radio>
         </div>
       </div>
 
@@ -97,7 +97,7 @@ export default defineComponent({
   props: ["tabId", "dashboardData"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const action = ref("delete");
+    const action = ref("move");
     const selectedTabToMovePanels = ref({ label: "Default", value: "default" });
     const moveTabOptions = ref([]);
 
@@ -114,8 +114,8 @@ export default defineComponent({
         }
       });
 
-      // set action to delete
-      action.value = "delete";
+      // set action to move as default
+      action.value = "move";
       // set selectedTabToMovePanels to default
       selectedTabToMovePanels.value = {
         label: "Default",

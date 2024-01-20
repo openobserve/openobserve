@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:no-option>
             <q-item>
               <q-item-section class="text-italic text-grey">
-                No Other Tab Available
+                No Other Tabs Available
               </q-item-section>
             </q-item>
           </template>

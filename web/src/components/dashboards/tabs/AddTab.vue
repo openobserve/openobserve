@@ -94,6 +94,7 @@ export default defineComponent({
       validator: (value) => {
         return typeof value === "string" || value === null;
       },
+      default: null,
     },
     editMode: {
       type: Boolean,

@@ -516,9 +516,8 @@ export const deleteTab = async (
 ) => {
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
-
   if (moveToTabId) {
+    const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
     // move panels to other tab
     const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
 

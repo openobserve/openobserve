@@ -279,18 +279,18 @@ export default defineComponent({
         tabIdToBeDeleted.value,
         moveTabId
       );
+      await getDashboardData();
 
       // emit event
       emit("refresh");
-      await getDashboardData();
 
       tabIdToBeDeleted.value = null;
       deletePopupVisible.value = false;
     };
 
     const refreshRequired = async () => {
-      emit("refresh");
       await getDashboardData();
+      emit("refresh");
       showAddTabDialog.value = false;
       isTabEditMode.value = false;
     };
