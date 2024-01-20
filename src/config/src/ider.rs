@@ -32,8 +32,7 @@ pub fn init() {
 }
 
 pub fn generate() -> String {
-    let id = IDER.lock().get_id();
-    id.to_string()
+    IDER.lock().get_id().to_string()
 }
 
 /// The `SnowflakeIdGenerator` type is snowflake algorithm wrapper.
