@@ -26,10 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @variablesData="variablesDataUpdated"
     />
     <TabList
-      v-if="selectedTabId !== null"
+      v-if="showTabs && selectedTabId !== null"
       class="q-mt-sm"
       v-model:selectedTabId="selectedTabIdModel"
       :dashboardData="dashboardData"
+      :viewOnly="viewOnly"
       @refresh="refreshDashboard"
     />
     <slot name="before_panels" />
@@ -132,14 +133,18 @@ export default defineComponent({
     "refresh",
     "onMovePanel",
   ],
-  props: [
-    "viewOnly",
-    "dashboardData",
-    "currentTimeObj",
-    "initialVariableValues",
-    "selectedDateForViewPanel",
-    "selectedTabId",
-  ],
+  props: {
+    viewOnly: {},
+    dashboardData: {},
+    currentTimeObj: {},
+    initialVariableValues: {},
+    selectedDateForViewPanel: {},
+    selectedTabId: {},
+    showTabs: {
+      type: Boolean,
+      default: false,
+    },
+  },
 
   components: {
     GridLayout: VueGridLayout.GridLayout,

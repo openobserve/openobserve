@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         v-model:selectedTabId="selectedTabId"
         @refresh="loadDashboard"
+        :showTabs="true"
       />
 
       <q-dialog
@@ -409,7 +410,10 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
-      console.log("watch selectedTabId", selectedTabId.value ?? route.query.tab);
+      console.log(
+        "watch selectedTabId",
+        selectedTabId.value ?? route.query.tab
+      );
 
       router.replace({
         query: {

@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-tab>
     </q-tabs>
     <q-btn
+      v-if="!viewOnly"
       v-show="isHovered"
       class="text-bold no-border q-ml-xs"
       no-caps
@@ -99,6 +100,10 @@ export default defineComponent({
     },
     selectedTabId: {
       required: true,
+    },
+    viewOnly: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["refresh", "update:selectedTabId"],
