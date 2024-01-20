@@ -13,10 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, io::Cursor, sync::Arc};
+use std::{
+    cmp::{max, min},
+    io::Cursor,
+    sync::Arc,
+};
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
 use ahash::AHashMap as HashMap;
+use chrono::Duration;
 use config::{
     meta::stream::{FileKey, QueryPartitionStrategy, StreamType},
     CONFIG,
@@ -70,6 +75,70 @@ pub async fn search(
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
     search_in_cluster(req).await
+}
+
+#[tracing::instrument(name = "service:search_partition:enter", skip(req))]
+pub async fn search_partition(
+    session_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: &search::SearchPartitionRequest,
+) -> Result<search::SearchPartitionResponse, Error> {
+    let query = cluster_rpc::SearchQuery {
+        start_time: req.start_time,
+        end_time: req.end_time,
+        sql: req.sql.to_string(),
+        ..Default::default()
+    };
+    let search_req = cluster_rpc::SearchRequest {
+        org_id: org_id.to_string(),
+        stream_type: stream_type.to_string(),
+        query: Some(query),
+        ..Default::default()
+    };
+    let meta = sql::Sql::new(&search_req).await?;
+
+    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+    let files = get_file_list(session_id, &meta, stream_type, partition_time_level).await;
+
+    let nodes = cluster::get_cached_online_querier_nodes().unwrap_or_default();
+    let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
+
+    let mut resp = search::SearchPartitionResponse {
+        file_num: files.len(),
+        original_size: files.iter().map(|f| f.meta.original_size).sum::<i64>() as usize,
+        compressed_size: files.iter().map(|f| f.meta.compressed_size).sum::<i64>() as usize,
+        partitions: vec![],
+    };
+    let mut total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
+    if total_secs * CONFIG.limit.query_group_base_speed * cpu_cores < resp.original_size {
+        total_secs += 1;
+    }
+    let mut part_num = max(1, total_secs / CONFIG.limit.query_partition_by_secs);
+    if part_num * CONFIG.limit.query_partition_by_secs < total_secs {
+        part_num += 1;
+    }
+    let mut step = max(
+        Duration::seconds(CONFIG.limit.query_partition_min_secs)
+            .num_microseconds()
+            .unwrap(),
+        (req.end_time - req.start_time) / part_num as i64,
+    );
+    // step must be times of minute
+    step = step - step % Duration::minutes(1).num_microseconds().unwrap();
+
+    // generate partitions
+    let mut partitions = Vec::with_capacity(part_num);
+    let mut end = req.end_time;
+    while end > req.start_time {
+        let start = max(end - step, req.start_time);
+        partitions.push([start, end]);
+        end = start;
+    }
+    resp.partitions = partitions;
+    Ok(resp)
 }
 
 async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {

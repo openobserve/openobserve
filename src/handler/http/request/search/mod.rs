@@ -938,3 +938,112 @@ async fn values_v2(
 
     Ok(HttpResponse::Ok().json(resp))
 }
+
+/// SearchStreamData
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "SearchPartition",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+        "sql": "select * from k8s ",
+        "start_time": 1675182660872049i64,
+        "end_time": 1675185660872049i64
+    })),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+            "took": 155,
+            "file_num": 10,
+            "original_size": 10240,
+            "compressed_size": 1024,
+            "partitions": [
+                [1674213225158000i64, 1674213225158000i64],
+                [1674213225158000i64, 1674213225158000i64],
+            ]
+        })),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/_search_partition")]
+pub async fn search_partition(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    let org_id = org_id.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or(StreamType::Logs),
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    let req: meta::search::SearchPartitionRequest = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    // do search
+    match SearchService::search_partition(&session_id, &org_id, stream_type, &req).await {
+        Ok(res) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_search_partition",
+                    "200",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_search_partition",
+                    "200",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            Ok(HttpResponse::Ok().json(res))
+        }
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_search_partition",
+                    "500",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_search_partition",
+                    "500",
+                    &org_id,
+                    "",
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search error: {:?}", err);
+            Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            })
+        }
+    }
+}

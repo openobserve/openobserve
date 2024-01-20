@@ -504,10 +504,7 @@ const filteredFields = ref(props.columns);
 
 const getNumericColumns = computed(() => {
   return props.columns.filter((column: any) => {
-    return (
-      column.type !== "Utf8" &&
-      column.value !== store.state.zoConfig.timestamp_column
-    );
+    return column.type !== "Utf8";
   });
 });
 
