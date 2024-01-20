@@ -265,7 +265,7 @@ export default defineComponent({
       console.log(" loadDashboard currentDashboardData", currentDashboardData);
 
       // set selected tab from query params
-      const selectedTab = currentDashboardData.data.tabs.find(
+      const selectedTab = currentDashboardData?.data?.tabs?.find(
         (tab: any) => tab.tabId === (route.query.tab ?? "default")
       );
 
