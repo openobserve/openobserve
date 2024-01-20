@@ -567,6 +567,9 @@ export const editTab = async (
     currentDashboardData,
     folderId ?? "default"
   );
+
+  // return updated tab
+  return tab;
 };
 
 export const addTab = async (
@@ -588,6 +591,9 @@ export const addTab = async (
     currentDashboardData,
     folderId ?? "default"
   );
+
+  // return new tab data with new tab id
+  return newTabData;
 };
 
 // move panel to another tab

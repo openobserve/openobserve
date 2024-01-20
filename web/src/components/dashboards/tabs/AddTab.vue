@@ -134,7 +134,7 @@ export default defineComponent({
           //if edit mode
           if (props.editMode) {
             // only allowed to edit name
-            await editTab(
+            const updatedTab = await editTab(
               store,
               props.dashboardData.dashboardId,
               route.query.folder ?? "default",
@@ -143,7 +143,7 @@ export default defineComponent({
             );
 
             // emit refresh to rerender
-            emit("refresh");
+            emit("refresh", updatedTab);
 
             $q.notify({
               type: "positive",
@@ -153,7 +153,7 @@ export default defineComponent({
           }
           //else new tab
           else {
-            await addTab(
+            const newTab = await addTab(
               store,
               props.dashboardData.dashboardId,
               route.query.folder ?? "default",
@@ -161,7 +161,7 @@ export default defineComponent({
             );
 
             // emit refresh to rerender
-            emit("refresh");
+            emit("refresh", newTab);
 
             $q.notify({
               type: "positive",

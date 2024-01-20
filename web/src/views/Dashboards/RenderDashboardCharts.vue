@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :height="getPanelLayout(item, 'h')"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
+              @refresh="refreshDashboard"
             >
             </PanelContainer>
           </div>

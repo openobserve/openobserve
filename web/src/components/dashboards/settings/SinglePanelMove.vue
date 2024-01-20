@@ -1,3 +1,21 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!-- eslint-disable vue/v-on-event-hyphenation -->
+<!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-dialog>
     <q-card style="width: 300px" data-test="dialog-box">
@@ -6,7 +24,17 @@
         <div class="para">{{ message }}</div>
       </q-card-section>
 
-      <q-card-actions class="confirmActions">
+      <div
+        style="
+          display: flex;
+          flex-direction: row;
+          width: 100%;
+          height: 40px;
+          padding-left: 10px;
+          padding-right: 10px;
+          padding-top: 5px;
+        "
+      >
         <q-select
           dense
           filled
@@ -14,8 +42,47 @@
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
           class="select-container"
-        />
+        >
+          <!-- template when on options -->
+          <template v-slot:no-option>
+            <q-item>
+              <q-item-section class="text-italic text-grey">
+                No Other Tab Available
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-select>
 
+        <q-btn
+          class="text-bold"
+          no-caps
+          outline
+          rounded
+          icon="add"
+          style="padding: 10px; height: 40px; margin-left: 2px"
+          @click="
+            () => {
+              isTabEditMode = false;
+              showAddTabDialog = true;
+            }
+          "
+          ><q-tooltip>Add Tab</q-tooltip></q-btn
+        >
+        <q-dialog
+          v-model="showAddTabDialog"
+          position="right"
+          full-height
+          maximized
+        >
+          <AddTab
+            :edit-mode="isTabEditMode"
+            :tabId="selectedTabIdToEdit"
+            :dashboardData="currentDashboardData.data"
+            @refresh="refreshRequired"
+          />
+        </q-dialog>
+      </div>
+      <q-card-actions class="confirmActions">
         <div class="button-container">
           <q-btn
             v-close-popup
@@ -35,6 +102,7 @@
             color="primary"
             @click="onConfirm"
             data-test="confirm-button"
+            :disable="selectedMoveTabId === null"
           >
             Move
           </q-btn>
@@ -52,10 +120,12 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
+import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  emits: ["update:ok", "update:cancel"],
+  components: { AddTab },
+  emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -63,6 +133,9 @@ export default defineComponent({
     const route = useRoute();
     const action = ref("delete");
     const selectedMoveTabId: any = ref(null);
+    const showAddTabDialog = ref(false);
+    const isTabEditMode = ref(false);
+    const selectedTabIdToEdit = ref(null);
 
     const moveTabOptions = ref([]);
 
@@ -78,7 +151,7 @@ export default defineComponent({
       );
     };
 
-    onMounted(async () => {
+    const getTabOptions = async () => {
       await getDashboardData();
 
       // update move tab options
@@ -94,6 +167,25 @@ export default defineComponent({
       });
 
       moveTabOptions.value = newMoveTabOptions;
+    };
+
+    const refreshRequired = async (tabData: any) => {
+      emit("refresh");
+      // update move tab options
+      await getTabOptions();
+
+      // set selectedMoveTabId to newly created tab
+      selectedMoveTabId.value = { label: tabData.name, value: tabData.tabId };
+
+      // close add tab dialog
+      showAddTabDialog.value = false;
+    };
+
+    onMounted(async () => {
+      await getTabOptions();
+      // set selectedMoveTabId to first tab from move tab options
+      selectedMoveTabId.value =
+        moveTabOptions.value.length > 0 ? moveTabOptions.value[0] : null;
     });
 
     const onCancel = () => {
@@ -110,6 +202,11 @@ export default defineComponent({
       action,
       selectedMoveTabId,
       moveTabOptions,
+      currentDashboardData,
+      showAddTabDialog,
+      isTabEditMode,
+      selectedTabIdToEdit,
+      refreshRequired,
     };
   },
 });
@@ -118,6 +215,5 @@ export default defineComponent({
 <style lang="scss" scoped>
 .select-container {
   width: 100%;
-  margin-bottom: 10px;
 }
 </style>

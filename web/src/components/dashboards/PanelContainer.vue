@@ -198,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="confirmMovePanelDialog"
       @update:cancel="confirmMovePanelDialog = false"
       v-model="confirmMovePanelDialog"
+      @refresh="$emit('refresh')"
     />
   </div>
 </template>
@@ -216,7 +217,13 @@ import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vu
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["onDeletePanel", "onViewPanel", "updated:data-zoom", "onMovePanel"],
+  emits: [
+    "onDeletePanel",
+    "onViewPanel",
+    "updated:data-zoom",
+    "onMovePanel",
+    "refresh",
+  ],
   props: [
     "data",
     "selectedTimeDate",
@@ -231,7 +238,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     QueryInspector,
     ConfirmDialog,
-    SinglePanelMove
+    SinglePanelMove,
   },
   setup(props, { emit }) {
     const store = useStore();
