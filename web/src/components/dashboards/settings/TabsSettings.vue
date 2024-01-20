@@ -106,6 +106,7 @@
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
+      :key="tabIdToBeDeleted"
       @update:cancel="deletePopupVisible = false"
       @update:ok="confirmDelete"
       :tabId="tabIdToBeDeleted"
@@ -149,7 +150,7 @@ export default defineComponent({
     const selectedTabIdToEdit = ref("");
 
     const deletePopupVisible = ref(false);
-    const tabIdToBeDeleted = ref(null);
+    const tabIdToBeDeleted: any = ref(null);
 
     const currentDashboardData: any = reactive({
       data: {},

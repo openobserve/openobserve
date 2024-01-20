@@ -11,7 +11,7 @@
           dense
           filled
           label="Select Tab"
-          v-model="selectedTabIdToMove"
+          v-model="selectedMoveTabId"
           :options="moveTabOptions"
           class="select-container"
         />
@@ -56,13 +56,13 @@ import { useStore } from "vuex";
 export default defineComponent({
   name: "SinglePanelMove",
   emits: ["update:ok", "update:cancel"],
-  props: ["title", "message", "dashboardData"],
+  props: ["title", "message"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");
-    const selectedTabIdToMove: any = ref(null);
+    const selectedMoveTabId: any = ref(null);
 
     const moveTabOptions = ref([]);
 
@@ -85,7 +85,7 @@ export default defineComponent({
       const newMoveTabOptions: any = [];
       currentDashboardData.data.tabs?.forEach((tab: any) => {
         // if tab is to be deleted, do not include it in the options
-        if (tab.tabId != route.query.tab ?? "default") {
+        if (tab.tabId != route.query.tab) {
           newMoveTabOptions.push({
             label: tab.name,
             value: tab.tabId,
@@ -101,14 +101,14 @@ export default defineComponent({
     };
 
     const onConfirm = () => {
-      emit("update:ok", selectedTabIdToMove.value.value);
+      emit("update:ok", selectedMoveTabId.value.value);
     };
     return {
       t,
       onCancel,
       onConfirm,
       action,
-      selectedTabIdToMove,
+      selectedMoveTabId,
       moveTabOptions,
     };
   },

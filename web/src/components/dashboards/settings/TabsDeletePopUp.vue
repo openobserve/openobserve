@@ -69,7 +69,7 @@
 </template>
 
 <script lang="ts">
-import { watch } from "vue";
+import { onMounted } from "vue";
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -83,30 +83,28 @@ export default defineComponent({
     const selectedTabToMovePanels = ref({ label: "Default", value: "default" });
     const moveTabOptions = ref([]);
 
-    watch(
-      () => props.dashboardData,
-      () => {
-        // update move tab options
-        const newMoveTabOptions: any = [];
-        props?.dashboardData?.tabs?.forEach((tab: any) => {
-          // if tab is to be deleted, do not include it in the options
-          if (tab.tabId != props.tabId) {
-            newMoveTabOptions.push({
-              label: tab.name,
-              value: tab.tabId,
-            });
-          }
-        });
-        // set action to delete
-        action.value = "delete";
-        // set selectedTabToMovePanels to default
-        selectedTabToMovePanels.value = {
-          label: "Default",
-          value: "default",
-        };
-        moveTabOptions.value = newMoveTabOptions;
-      }
-    );
+    onMounted(() => {
+      // update move tab options
+      const newMoveTabOptions: any = [];
+      props?.dashboardData?.tabs?.forEach((tab: any) => {
+        // if tab is to be deleted, do not include it in the options
+        if (tab.tabId != props.tabId) {
+          newMoveTabOptions.push({
+            label: tab.name,
+            value: tab.tabId,
+          });
+        }
+      });
+
+      // set action to delete
+      action.value = "delete";
+      // set selectedTabToMovePanels to default
+      selectedTabToMovePanels.value = {
+        label: "Default",
+        value: "default",
+      };
+      moveTabOptions.value = newMoveTabOptions;
+    });
 
     const onCancel = () => {
       emit("update:cancel");

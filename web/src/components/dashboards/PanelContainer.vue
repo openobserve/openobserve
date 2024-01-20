@@ -195,9 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title="Move Panel to Another Tab"
       message="Select destination tab"
       @update:ok="movePanelDialog"
+      :key="confirmMovePanelDialog"
       @update:cancel="confirmMovePanelDialog = false"
       v-model="confirmMovePanelDialog"
-      :dashboardData="props.data"
     />
   </div>
 </template>

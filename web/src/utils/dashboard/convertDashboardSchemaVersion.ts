@@ -91,7 +91,7 @@ export function convertDashboardSchemaVersion(data: any) {
       data.tabs = [
         {
           panels: data.panels,
-          name: "default",
+          name: "Default",
           tabId: "default",
         },
       ];
