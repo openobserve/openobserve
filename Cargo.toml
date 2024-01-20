@@ -152,7 +152,6 @@ sqlx = { version = "0.7", features = [
   "chrono",
 ] }
 strum = { version = "0.25", features = ["derive"] }
-svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 syslog_loose = "0.18.0"
 thiserror = "1.0"

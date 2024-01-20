@@ -17,9 +17,8 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use ahash::AHashMap;
-use config::{meta::stream::StreamType, metrics, CONFIG};
+use config::{ider, meta::stream::StreamType, metrics, CONFIG};
 use serde::Serialize;
-use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::{
     common::{
@@ -134,7 +133,7 @@ pub async fn get_latest_traces(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = Ksuid::new(None, None).to_string();
+    let session_id = ider::uuid();
 
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();

@@ -19,7 +19,7 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use svix_ksuid::{Ksuid, KsuidLike};
+use config::ider;
 
 use crate::{
     common::{
@@ -58,7 +58,7 @@ pub async fn post_user(
             db::user::get(Some(org_id), &usr_req.email).await
         };
         if existing_user.is_err() {
-            let salt = Ksuid::new(None, None).to_string();
+            let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
@@ -91,7 +91,7 @@ pub async fn post_user(
 
 pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
     if db_user.password.is_empty() {
-        let salt = Ksuid::new(None, None).to_string();
+        let salt = ider::uuid();
         let password = get_hash(&db_user.password, &salt);
         db_user.password = password;
         db_user.salt = salt;
@@ -475,7 +475,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
-    let salt = Ksuid::new(None, None).to_string();
+    let salt = ider::uuid();
     let password = get_hash(&usr_req.password, &salt);
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));

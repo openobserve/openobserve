@@ -20,6 +20,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: Lazy<Mutex<SnowflakeIdBucket>> = Lazy::new(|| {
     let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
@@ -31,8 +32,14 @@ pub fn init() {
     _ = generate();
 }
 
+/// Generate a distributed unique id with snowflake.
 pub fn generate() -> String {
     IDER.lock().get_id().to_string()
+}
+
+/// Generate a unique id like uuid.
+pub fn uuid() -> String {
+    Ksuid::new(None, None).to_string()
 }
 
 /// The `SnowflakeIdGenerator` type is snowflake algorithm wrapper.

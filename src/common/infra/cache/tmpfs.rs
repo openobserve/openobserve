@@ -19,7 +19,6 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::common::infra::errors::*;
 
@@ -61,7 +60,7 @@ impl Directory {
 impl Default for Directory {
     fn default() -> Self {
         Self {
-            location: Ksuid::new(None, None).to_string(),
+            location: config::ider::uuid(),
         }
     }
 }

@@ -33,6 +33,7 @@ getrandom.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 segment.workspace = true
+svix-ksuid.workspace = true
 sysinfo.workspace = true
 tokio.workspace = true
 tracing.workspace = true
