@@ -261,15 +261,20 @@ export default defineComponent({
         route.query.folder ?? "default"
       );
 
+      console.log(" loadDashboard currentDashboardData", currentDashboardData);
+
       // set selected tab from query params
       const selectedTab = currentDashboardData.data.tabs.find(
-        (tab: any) => tab.tabId === route.query.tab ?? "default"
+        (tab: any) => tab.tabId === (route.query.tab ?? "default")
       );
+
+      console.log(" loadDashboard selectedTab", selectedTab);
 
       selectedTabId.value = selectedTab
         ? selectedTab.tabId ?? "default"
         : "default";
 
+      console.log(" loadDashboard selectedTabId", selectedTabId.value);
       // if variables data is null, set it to empty list
       if (
         !(
@@ -404,6 +409,8 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
+      console.log("watch selectedTabId", selectedTabId.value ?? route.query.tab);
+
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,

@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('dashboard.save')"
                 @click.stop="saveEdit"
+                :disable="!editTabObj.data.name.trim()"
               ></q-btn>
               <q-btn
                 v-if="tab.tabId !== 'default'"

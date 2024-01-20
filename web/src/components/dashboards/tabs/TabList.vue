@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-tabs
       v-model="selectedTabIdModel"
-      :align="'center'"
+      :align="'left'"
       dense
       inline-label
       outside-arrows
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
+              width: 100%;
             "
             :title="tab?.name"
             >{{ tab?.name }}</span
@@ -72,10 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ><q-tooltip>Add Tab</q-tooltip></q-btn
     >
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
-      <AddTab
-        :dashboardData="dashboardData"
-        @refresh="refreshDashboard"
-      />
+      <AddTab :dashboardData="dashboardData" @refresh="refreshDashboard" />
     </q-dialog>
   </div>
 </template>
