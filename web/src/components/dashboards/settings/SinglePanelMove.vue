@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-card-actions class="confirmActions">
         <div class="button-container">
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             unelevated
             no-caps
             class="q-mr-sm"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("confirmDialog.cancel") }}
           </q-btn>
           <q-btn
-            v-close-popup
+            v-close-popup="true"
             unelevated
             no-caps
             class="no-border"

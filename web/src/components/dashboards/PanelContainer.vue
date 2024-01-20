@@ -248,7 +248,7 @@ export default defineComponent({
     const metaData = ref();
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
-    const confirmMovePanelDialog = ref(false);
+    const confirmMovePanelDialog: any = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="currentDashboardData.data.tabs"
         :options="dragOptions"
         @end.stop="handleDragEnd"
-        @mousedown.stop
+        @mousedown.stop="() => {}"
       >
         <div
           v-for="(tab, index) in currentDashboardData.data.tabs"
@@ -168,7 +168,7 @@ export default defineComponent({
 
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
-    const selectedTabIdToEdit = ref("");
+    const selectedTabIdToEdit: any = ref("");
 
     const deletePopupVisible = ref(false);
     const tabIdToBeDeleted: any = ref(null);
