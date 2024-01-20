@@ -238,7 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         props.pageIndex >=
                           dashboardPanelData.meta.stream.customQueryFields
                             .length) ||
-                      dashboardPanelData.data.type == 'geomap' || dashboardPanelData.data.type == 'maps'
+                      dashboardPanelData.data.type == 'geomap' ||
+                      dashboardPanelData.data.type == 'maps'
                     )
                   "
                 >
@@ -382,6 +383,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-add-y-data"
                   >
                     <div>+V</div>
+                  </q-btn>
+                  <q-btn
+                    padding="sm"
+                    @click="addFilteredItem(props.row.name)"
+                    data-test="dashboard-add-filter-maps-data"
+                  >
+                    <div>+F</div>
                   </q-btn>
                 </div>
                 <div
