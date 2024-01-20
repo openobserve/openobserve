@@ -984,15 +984,15 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?org_identifier={}&stream_type={}&stream={}&from={}&to={}&query={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&from={}&to={}&query={}&org_identifier={}",
             CONFIG.common.web_url,
             CONFIG.common.base_uri,
-            alert.org_id,
             alert.stream_type,
             alert.stream_name,
             alert_start_time,
             alert_end_time,
-            base64::encode(&alert_query),
+            base64::encode(&alert_query).replace('+', "%2B"),
+            alert.org_id,
         )
     } else {
         if let Some(conditions) = &alert.query_condition.conditions {
@@ -1002,15 +1002,15 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
         format!(
-            "{}{}/web/logs?org_identifier={}&stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}",
+            "{}{}/web/logs?stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
             CONFIG.common.web_url,
             CONFIG.common.base_uri,
-            alert.org_id,
             alert.stream_type,
             alert.stream_name,
             alert_start_time,
             alert_end_time,
-            base64::encode(&alert_query),
+            base64::encode(&alert_query).replace('+', "%2B"),
+            alert.org_id,
         )
     };
 
