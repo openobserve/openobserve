@@ -173,6 +173,7 @@ impl SnowflakeIdBucket {
     pub fn get_id(&mut self) -> i64 {
         if self.bucket.is_empty() {
             self.generate_ids();
+            self.bucket.reverse();
         }
         self.bucket.pop().unwrap()
     }
