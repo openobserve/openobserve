@@ -618,9 +618,6 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queries?.forEach((query: any) => {
