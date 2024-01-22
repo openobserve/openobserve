@@ -188,9 +188,9 @@ pub struct UpdateUser {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum UserRole {
     #[serde(rename = "admin")]
+    #[default]
     Admin,
     #[serde(rename = "member")]
-    #[default]
     Member,
     #[serde(rename = "root")]
     Root,

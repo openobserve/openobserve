@@ -73,6 +73,7 @@ pub async fn save(
     let initiator_id = user_email.user_id;
     let mut user = user.into_inner();
     user.email = user.email.trim().to_string();
+
     if user.role.eq(&meta::user::UserRole::Root) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -81,7 +82,7 @@ pub async fn save(
             )),
         );
     }
-
+    user.role = meta::user::UserRole::Admin;
     users::post_user(&org_id, user, &initiator_id).await
 }
 
@@ -110,7 +111,7 @@ pub async fn update(
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_string();
-    let user = user.into_inner();
+    let mut user = user.into_inner();
     if user.eq(&UpdateUser::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -119,6 +120,7 @@ pub async fn update(
             )),
         );
     }
+    user.role = Some(meta::user::UserRole::Admin);
     let initiator_id = &user_email.user_id;
     let self_update = user_email.user_id.eq(&email_id);
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
@@ -144,11 +146,12 @@ pub async fn update(
 #[post("/{org_id}/users/{email_id}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
-    role: web::Json<UserOrgRole>,
+    _role: web::Json<UserOrgRole>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
-    let role = role.into_inner().role;
+    // let role = role.into_inner().role;
+    let role = meta::user::UserRole::Admin;
     let initiator_id = user_email.user_id;
     users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
 }
