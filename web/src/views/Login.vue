@@ -19,12 +19,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { defineComponent, onBeforeMount } from "vue";
 import Login from "@/components/login/Login.vue";
+import config from "@/aws-exports";
+import authService from "@/services/auth";
+import configService from "@/services/config";
+import { useStore } from "vuex";
 
-export default {
+export default defineComponent({
   name: "LoginPage",
   components: {
     Login,
   },
-};
+  setup() {
+    const store = useStore();
+
+    onBeforeMount(async () => {
+      await configService
+        .get_config()
+        .then((res) => {
+          store.commit("setZoConfig", res.data);
+          if (config.isEnterprise == "true" && res.data.dex_enabled) {
+            try {
+              const dexData = authService.get_dex_login();
+              dexData.then((res) => {
+                if (res.data.url) {
+                  window.location.href = res.data.url;
+                }
+              });
+            } catch (error) {
+              console.error("Error during redirection:", error);
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Error while fetching config:", err);
+        });
+    });
+
+    return {
+      store,
+    };
+  },
+});
 </script>

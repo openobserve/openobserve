@@ -20,32 +20,12 @@ import {
   useLocalCurrentUser,
 } from "@/utils/zincutils";
 import useIngestionRoutes from "./shared/useIngestionRoutes";
-import config from "@/aws-exports";
-import authService from "@/services/auth";
-import { useStore } from "vuex";
 
 const useOSRoutes = () => {
   const parentRoutes = [
     {
       path: "/login",
       component: Login,
-      beforeEnter: async (to: any, from: any, next: any) => {
-        const store = useStore();
-        if (config.isEnterprise == "true" && store.state.zoConfig.dex_enabled) {
-          try {
-            const url = await authService.get_dex_login();
-            if (url) {
-              window.location.href = url;
-            } else {
-              next();
-            }
-          } catch (error) {
-            console.error("Error during redirection:", error);
-            next(false);
-          }
-        }
-        next();
-      },
     },
     {
       path: "/logout",
