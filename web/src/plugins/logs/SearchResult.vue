@@ -166,11 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="text-subtitle2 text-weight-bold bg-warning">
                 <q-btn
-                  :icon="
-                    expandedLogs['-1']
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
+                  :icon="expandedLogs['-1'] ? 'expand_more' : 'chevron_right'"
                   dense
                   size="xs"
                   flat
@@ -189,7 +185,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               :colspan="searchObj.data.resultGrid.columns.length"
               class="bg-warning"
+              style="opacity: 0.7"
+            >
+              <pre>{{ searchObj.data.functionError }}</pre>
             </td>
+          </q-tr>
         </template>
         <template v-slot="{ item: row, index }">
           <q-tr
