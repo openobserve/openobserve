@@ -203,30 +203,30 @@ export default defineComponent({
             selectedFolder.value.value ?? "default"
           );
         }
-        await callDashboard
-          .then(async (res: { data: any }) => {
-            const data = convertDashboardSchemaVersion(
-              res.data["v" + res.data.version]
-            );
+        try {
+          const res = await callDashboard;
 
-            //update store
-            await getAllDashboards(store, selectedFolder.value.value);
-            emit("updated", data.dashboardId, selectedFolder.value.value);
-            dashboardData.value = {
-              id: "",
-              name: "",
-              description: "",
-            };
-            await addDashboardForm.value.resetValidation();
-          })
-          .catch((err: any) => {
-            $q.notify({
-              type: "negative",
-              message: JSON.stringify(
-                err.response.data["error"] || "Dashboard creation failed."
-              ),
-            });
+          const data = convertDashboardSchemaVersion(
+            res.data["v" + res.data.version]
+          );
+
+          //update store
+          await getAllDashboards(store, selectedFolder.value.value);
+          emit("updated", data.dashboardId, selectedFolder.value.value);
+          dashboardData.value = {
+            id: "",
+            name: "",
+            description: "",
+          };
+          await addDashboardForm.value.resetValidation();
+        } catch (err: any) {
+          $q.notify({
+            type: "negative",
+            message: JSON.stringify(
+              err.response.data["error"] || "Dashboard creation failed."
+            ),
           });
+        }
       });
     });
 

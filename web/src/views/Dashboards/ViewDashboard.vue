@@ -410,17 +410,14 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
-      console.log(
-        "watch selectedTabId",
-        selectedTabId.value ?? route.query.tab
-      );
+      console.log("watch selectedTabId", selectedTabId.value);
 
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: selectedTabId.value ?? route.query.tab,
+          tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
         },

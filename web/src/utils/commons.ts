@@ -107,12 +107,15 @@ export function getConsumableDateTime(dateObj: any) {
 //get all dashboards by folderId
 //api call
 //save to store
+//get all dashboards by folderId
+//api call
+//save to store
 export const getAllDashboards = async (store: any, folderId: any) => {
   //call only if we have folderId
   if (!folderId) return;
-  // api call
-  return await dashboardService
-    .list(
+  try {
+    // api call
+    const res = await dashboardService.list(
       0,
       1000,
       "name",
@@ -120,21 +123,21 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       "",
       store.state.selectedOrganization.identifier,
       folderId
-    )
-    .then((res) => {
-      //dashboard version migration
-      res.data.dashboards = res.data.dashboards.map((dashboard: any) =>
-        convertDashboardSchemaVersion(dashboard["v" + dashboard.version])
-      );
-      // save to store
-      store.dispatch("setAllDashboardList", {
-        ...store.state.organizationData.allDashboardList,
-        [folderId]: res.data.dashboards.sort((a: any, b: any) =>
-          b.created.localeCompare(a.created)
-        ),
-      });
-    })
-    .catch((error) => {});
+    );
+    //dashboard version migration
+    res.data.dashboards = res.data.dashboards.map((dashboard: any) =>
+      convertDashboardSchemaVersion(dashboard["v" + dashboard.version])
+    );
+    // save to store
+    store.dispatch("setAllDashboardList", {
+      ...store.state.organizationData.allDashboardList,
+      [folderId]: res.data.dashboards.sort((a: any, b: any) =>
+        b.created.localeCompare(a.created)
+      ),
+    });
+  } catch (error) {
+    // handle error
+  }
 };
 
 //get all dashboards by folderId if not there then call api else return from store
@@ -416,16 +419,18 @@ export const updateDashboard = async (
   currentDashboardData: any,
   folderId: any
 ) => {
-  // make an api call to update the dashboard
-  return await dashboardService
-    .save(org, dashboardId, currentDashboardData, folderId)
-    .then(async (res) => {
-      // update dashboardList
-      await getAllDashboards(store, folderId);
-    })
-    .catch((error) => {
-      return error;
-    });
+  try {
+    const res = await dashboardService.save(
+      org,
+      dashboardId,
+      currentDashboardData,
+      folderId
+    );
+    await getAllDashboards(store, folderId);
+    return res;
+  } catch (error) {
+    return error;
+  }
 };
 
 export const getDashboard = async (

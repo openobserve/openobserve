@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       active-color="primary"
       @click.stop
       style="max-width: calc(100% - 40px)"
+      data-test="dashboard-tab-list"
     >
       <q-tab
         no-caps
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         content-class="tab_content"
         @mouseover="() => (hoveredTabId = tab.tabId)"
         @mouseleave="hoveredTabId = null"
+        :data-test="`dashboard-tab-${tab.tabId}`"
       >
         <div class="full-width row justify-between no-wrap">
           <span
@@ -52,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width: 100%;
             "
             :title="tab?.name"
+            :data-test="`dashboard-tab-${tab.tabId}-name`"
             >{{ tab?.name }}</span
           >
         </div>
@@ -71,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           showAddTabDialog = true;
         }
       "
+      data-test="dashboard-tab-add-btn"
       ><q-tooltip>Add Tab</q-tooltip></q-btn
     >
     <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>

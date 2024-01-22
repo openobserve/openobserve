@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog>
     <q-card style="width: 300px" data-test="dialog-box">
       <q-card-section class="confirmBody">
-        <div class="head">{{ title }}</div>
-        <div class="para">{{ message }}</div>
+        <div class="head" data-test="dashboard-tab-move-title">{{ title }}</div>
+        <div class="para" data-test="dashboard-tab-move-message">
+          {{ message }}
+        </div>
       </q-card-section>
 
       <div
@@ -42,10 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
           class="select-container"
+          data-test="dashboard-tab-move-select"
         >
           <!-- template when on options -->
           <template v-slot:no-option>
-            <q-item>
+            <q-item data-test="dashboard-tab-move-select-no-option">
               <q-item-section class="text-italic text-grey">
                 No Other Tabs Available
               </q-item-section>
@@ -66,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               showAddTabDialog = true;
             }
           "
+          data-test="dashboard-tab-move-add-tab-btn"
           ><q-tooltip>Add Tab</q-tooltip></q-btn
         >
         <q-dialog
@@ -79,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="selectedTabIdToEdit"
             :dashboardData="currentDashboardData.data"
             @refresh="refreshRequired"
+            data-test="dashboard-tab-move-add-tab-dialog"
           />
         </q-dialog>
       </div>

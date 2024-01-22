@@ -20,13 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog>
     <q-card style="width: 600px" data-test="dialog-box">
       <q-card-section class="confirmBody">
-        <div class="head">
+        <div class="head" data-test="dashboard-tab-delete-tab-head">
           Delete
-          <span style="text-decoration: underline">{{
-            dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
-          }}</span>
+          <span
+            style="text-decoration: underline"
+            data-test="dashboard-tab-delete-tab-name"
+            >{{
+              dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
+            }}</span
+          >
         </div>
-        <div class="para">
+        <div class="para" data-test="dashboard-tab-delete-tab-para">
           This action cannot be undone. Are you sure you want to delete this
           tab?
         </div>
@@ -36,10 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels?.length"
         style="padding: 10px"
+        data-test="dashboard-tab-delete-tab-panels-container"
       >
         <div class="radio-group">
           <div style="display: flex; flex-direction: row">
-            <q-radio v-model="action" val="move">
+            <q-radio
+              v-model="action"
+              val="move"
+              data-test="dashboard-tab-delete-tab-panels-move"
+            >
               Move panels to another tab
             </q-radio>
             <div v-if="action === 'move'" class="select-container">
@@ -48,10 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 filled
                 v-model="selectedTabToMovePanels"
                 :options="moveTabOptions"
+                data-test="dashboard-tab-delete-tab-panels-move-select"
               />
             </div>
           </div>
-          <q-radio v-model="action" val="delete">
+          <q-radio
+            v-model="action"
+            val="delete"
+            data-test="dashboard-tab-delete-tab-panels-delete"
+          >
             Delete all the panels of this tab
           </q-radio>
         </div>

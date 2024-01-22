@@ -19,11 +19,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div v-if="editMode" class="text-body1 text-bold">Edit Tab</div>
-          <div v-else class="text-body1 text-bold">Add Tab</div>
+          <div
+            v-if="editMode"
+            class="text-body1 text-bold"
+            data-test="dashboard-tab-edit"
+          >
+            Edit Tab
+          </div>
+          <div
+            v-else
+            class="text-body1 text-bold"
+            data-test="dashboard-tab-add"
+          >
+            Add Tab
+          </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
+          <q-btn
+            v-close-popup="true"
+            round
+            flat
+            icon="cancel"
+            data-test="dashboard-tab-cancel"
+          />
         </div>
       </div>
     </q-card-section>
@@ -42,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           :lazy-rules="true"
+          data-test="dashboard-add-tab-name"
         />
 
         <div class="flex justify-center q-mt-lg">
@@ -52,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             text-color="light-text"
             padding="sm md"
             no-caps
+            data-test="dashboard-add-cancel"
           />
           <q-btn
-            data-test="dashboard-add-submit"
             :disable="tabData.name.trim() === ''"
             :loading="onSubmit.isLoading.value"
             :label="t('dashboard.save')"
@@ -63,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             padding="sm xl"
             type="submit"
             no-caps
+            data-test="dashboard-add-tab-submit"
           />
         </div>
       </q-form>

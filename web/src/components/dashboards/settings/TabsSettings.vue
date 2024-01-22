@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="column full-height">
+  <div class="column full-height" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')"
       ><template #right>
         <q-btn
@@ -29,11 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="secondary"
           :label="t(`dashboard.newTab`)"
           @click.stop="addNewItem"
+          data-test="dashboard-tab-settings-add-tab"
         /> </template
     ></DashboardHeader>
     <div class="flex justify-between q-py-md q-mb-sm text-bold border-bottom">
-      <div class="q-ml-xl">{{ t("dashboard.name") }}</div>
-      <div class="q-mr-lg">{{ t("dashboard.actions") }}</div>
+      <div class="q-ml-xl" data-test="dashboard-tab-settings-name">
+        {{ t("dashboard.name") }}
+      </div>
+      <div class="q-mr-lg" data-test="dashboard-tab-settings-actions">
+        {{ t("dashboard.actions") }}
+      </div>
     </div>
     <div>
       <draggable
@@ -41,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="dragOptions"
         @end.stop="handleDragEnd"
         @mousedown.stop="() => {}"
+        data-test="dashboard-tab-settings-drag"
       >
         <div
           v-for="(tab, index) in currentDashboardData.data.tabs"
@@ -49,15 +55,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="tab.tabId === 'default' ? 'q-pb-sm' : ''"
         >
           <div class="draggable-handle">
-            <q-icon name="drag_indicator" color="grey-13" class="'q-mr-xs" />
+            <q-icon
+              name="drag_indicator"
+              color="grey-13"
+              class="'q-mr-xs"
+              data-test="dashboard-tab-settings-drag-handle"
+            />
           </div>
           <div class="draggable-content">
-            <span v-if="tab.tabId !== editTabId">{{ tab.name }}</span>
+            <span
+              v-if="tab.tabId !== editTabId"
+              data-test="dashboard-tab-settings-tab-name"
+              >{{ tab.name }}</span
+            >
             <div v-else style="display: flex; flex-direction: row">
               <input
                 v-if="tab.tabId !== 'default'"
                 v-model="editTabObj.data.name"
                 class="edit-input"
+                data-test="dashboard-tab-settings-tab-name-edit"
               />
               <q-btn
                 v-if="tab.tabId !== 'default'"
@@ -70,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.save')"
                 @click.stop="saveEdit"
                 :disable="!editTabObj.data.name.trim()"
+                data-test="dashboard-tab-settings-tab-name-edit-save"
               ></q-btn>
               <q-btn
                 v-if="tab.tabId !== 'default'"
@@ -81,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('dashboard.cancel')"
                 @click.stop="cancelEdit"
+                data-test="dashboard-tab-settings-tab-name-edit-cancel"
               ></q-btn>
             </div>
             <span class="q-ml-lg">
@@ -96,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="tab.tabId === editTabId"
                 :title="t('dashboard.edit')"
                 @click.stop="editItem(tab.tabId)"
+                data-test="dashboard-tab-settings-tab-edit-btn"
               ></q-btn>
               <q-btn
                 v-if="tab.tabId !== 'default'"
@@ -108,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 @click.stop="deleteItem(tab.tabId)"
+                data-test="dashboard-tab-settings-tab-delete-btn"
               ></q-btn>
             </span>
           </div>
