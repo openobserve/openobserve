@@ -232,6 +232,15 @@ export default defineComponent({
         switch (it.type) {
           case "query_values": {
             obj.isLoading = true;
+            console.log("query_data", it.query_data.filter);
+            const filterConditions = it.query_data.filter || [];
+
+            const constructedFilter = filterConditions.map((condition: any) => ({
+              name: condition.name,
+              operator: condition.operator,
+              value: condition.value,
+            }));
+
             return streamService
               .fieldValues({
                 org_identifier: store.state.selectedOrganization.identifier,
@@ -247,7 +256,7 @@ export default defineComponent({
                   ? it?.query_data?.max_record_size
                   : 10,
                 type: it.query_data.stream_type,
-                filter: it.query_data.filters || [],
+                filter: constructedFilter,
               })
               .then((res: any) => {
                 obj.isLoading = false;
