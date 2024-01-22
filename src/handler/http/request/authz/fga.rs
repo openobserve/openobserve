@@ -170,7 +170,7 @@ pub async fn update_group(
 #[put("/{org_id}/groups/{group_name}")]
 pub async fn update_group(
     _org_id: web::Path<String>,
-    _user_group: web::Json<UserGroup>,
+    _user_group: web::Json<UserGroupRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

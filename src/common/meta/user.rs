@@ -239,7 +239,7 @@ pub struct SignInResponse {
 pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
-    pub is_external: bool,
+    pub is_internal_user: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

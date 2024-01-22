@@ -146,27 +146,38 @@ async fn query(
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
         let mut visitor = promql::name_visitor::MetricNameVisitor {
             name: HashSet::new(),
         };
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-
-        for name in visitor.name {
-            let user_id = _in_req.headers().get("user_id").unwrap();
-            if !crate::handler::http::auth::validator::check_permissions(
-                user_id.to_str().unwrap(),
-                crate::common::utils::auth::AuthExtractor {
-                    auth: "".to_string(),
-                    method: "PUT".to_string(),
-                    o2_type: format!("stream:{}", name),
-                    org_id: org_id.to_string(),
-                    bypass_check: false,
-                },
-            )
-            .await
-            {
-                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        let user_id = _in_req.headers().get("user_id").unwrap();
+        if !is_root_user(user_id.to_str().unwrap()) {
+            for name in visitor.name {
+                let user: meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                    .unwrap()
+                    .clone();
+                if user.is_external
+                    && !crate::handler::http::auth::validator::check_permissions(
+                        user_id.to_str().unwrap(),
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!("stream:{}", name),
+                            org_id: org_id.to_string(),
+                            bypass_check: false,
+                        },
+                    )
+                    .await
+                {
+                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                }
             }
         }
     }
@@ -283,27 +294,38 @@ async fn query_range(
 ) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
         let mut visitor = promql::name_visitor::MetricNameVisitor {
             name: HashSet::new(),
         };
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-
-        for name in visitor.name {
-            let user_id = _in_req.headers().get("user_id").unwrap();
-            if !crate::handler::http::auth::validator::check_permissions(
-                user_id.to_str().unwrap(),
-                crate::common::utils::auth::AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!("stream:{}", name),
-                    org_id: org_id.to_string(),
-                    bypass_check: false,
-                },
-            )
-            .await
-            {
-                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+        let user_id = _in_req.headers().get("user_id").unwrap();
+        if !is_root_user(user_id.to_str().unwrap()) {
+            for name in visitor.name {
+                let user: meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                    .unwrap()
+                    .clone();
+                if user.is_external
+                    && !crate::handler::http::auth::validator::check_permissions(
+                        user_id.to_str().unwrap(),
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!("stream:{}", name),
+                            org_id: org_id.to_string(),
+                            bypass_check: false,
+                        },
+                    )
+                    .await
+                {
+                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                }
             }
         }
     }

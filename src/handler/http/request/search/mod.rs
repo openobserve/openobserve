@@ -127,7 +127,11 @@ pub async fn search(
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::utils::auth::AuthExtractor;
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
         // println!("Checking permissions on stream");
         // For getting stream name from query to check permission
         let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
@@ -135,19 +139,28 @@ pub async fn search(
             .await
             .unwrap();
         let user_id = in_req.headers().get("user_id").unwrap();
-        if !crate::handler::http::auth::validator::check_permissions(
-            user_id.to_str().unwrap(),
-            AuthExtractor {
-                auth: "".to_string(),
-                method: "GET".to_string(),
-                o2_type: format!("stream:{}", resp.stream_name),
-                org_id: org_id.clone(),
-                bypass_check: false,
-            },
-        )
-        .await
-        {
-            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+
+        if !is_root_user(user_id.to_str().unwrap()) {
+            let user: meta::user::User = USERS
+                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                .unwrap()
+                .clone();
+
+            if user.is_external
+                && !crate::handler::http::auth::validator::check_permissions(
+                    user_id.to_str().unwrap(),
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!("stream:{}", resp.stream_name),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                    },
+                )
+                .await
+            {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
         }
         // Check permissions on stream ends
     }

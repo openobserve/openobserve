@@ -66,12 +66,11 @@ pub async fn validator(
                         header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                     );
                 }
-
                 req.headers_mut().insert(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                if !res.is_external
+                if res.is_internal_user
                     || auth_info.bypass_check
                     || check_permissions(user_id, auth_info).await
                 {
@@ -120,7 +119,7 @@ pub async fn validate_credentials(
             return Ok(TokenValidationResponse {
                 is_valid: false,
                 user_email: "".to_string(),
-                is_external: true,
+                is_internal_user: false,
             });
         }
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -150,7 +149,7 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
-            is_external: true,
+            is_internal_user: false,
         });
     }
     let user = user.unwrap();
@@ -161,7 +160,7 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
-            is_external: user.is_external,
+            is_internal_user: !user.is_external,
         });
     }
 
@@ -170,7 +169,7 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
-            is_external: true,
+            is_internal_user: false,
         });
     }
     if !path.contains("/user")
@@ -182,7 +181,7 @@ pub async fn validate_credentials(
         Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
-            is_external: user.is_external,
+            is_internal_user: !user.is_external,
         })
     } else {
         Err(ErrorForbidden("Not allowed"))
@@ -201,7 +200,7 @@ async fn validate_user_from_db(
                 Ok(TokenValidationResponse {
                     is_valid: true,
                     user_email: user.email,
-                    is_external: user.is_external,
+                    is_internal_user: !user.is_external,
                 })
             } else {
                 Err(ErrorForbidden("Not allowed"))
