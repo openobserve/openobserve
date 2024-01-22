@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TabList
       v-if="showTabs && selectedTabId !== null"
       class="q-mt-sm"
-      v-model:selectedTabId="selectedTabIdModel"
       :dashboardData="dashboardData"
       :viewOnly="viewOnly"
       @refresh="refreshDashboard"
@@ -121,6 +120,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
+import { inject } from "vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -129,7 +129,6 @@ export default defineComponent({
     "onViewPanel",
     "variablesData",
     "updated:data-zoom",
-    "update:selectedTabId",
     "refresh",
     "onMovePanel",
   ],
@@ -139,7 +138,6 @@ export default defineComponent({
     currentTimeObj: {},
     initialVariableValues: {},
     selectedDateForViewPanel: {},
-    selectedTabId: {},
     showTabs: {
       type: Boolean,
       default: false,
@@ -167,27 +165,15 @@ export default defineComponent({
     // holds the view panel id
     const viewPanelId = ref("");
 
+    // inject selected tab
+    const selectedTabId = inject("selectedTabId");
+
     const panels: any = computed(() => {
-      return props.selectedTabId !== null
+      return selectedTabId.value !== null
         ? props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === props.selectedTabId
+            (it: any) => it.tabId === selectedTabId.value
           )?.panels ?? []
         : [];
-    });
-
-    // need one ref which will passed in tabList for selectedTab
-    const selectedTabIdModel = ref(props.selectedTabId);
-
-    watch(
-      () => props.selectedTabId,
-      (newVal) => {
-        selectedTabIdModel.value = newVal;
-      }
-    );
-
-    // also, need to emit selectedTabId
-    watch(selectedTabIdModel, (newVal) => {
-      emit("update:selectedTabId", newVal);
     });
 
     const refreshDashboard = () => {
@@ -343,7 +329,7 @@ export default defineComponent({
       layoutUpdate,
       showViewPanel,
       viewPanelId,
-      selectedTabIdModel,
+      selectedTabId,
       panels,
       refreshDashboard,
       onMovePanel,

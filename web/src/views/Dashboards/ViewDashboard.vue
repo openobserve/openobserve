@@ -142,7 +142,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @onDeletePanel="onDeletePanel"
         @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
-        v-model:selectedTabId="selectedTabId"
         @refresh="loadDashboard"
         :showTabs="true"
       />
@@ -161,7 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onActivated, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onActivated,
+  nextTick,
+  provide,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -202,8 +208,10 @@ export default defineComponent({
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
-    // selected tab v-model
+    // selected tab
     const selectedTabId: any = ref(null);
+    // provide it to child components
+    provide("selectedTabId", selectedTabId);
 
     // variables data
     const variablesData = reactive({});
@@ -232,7 +240,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab ?? "default",
+          tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
@@ -262,20 +270,15 @@ export default defineComponent({
         route.query.folder ?? "default"
       );
 
-      console.log(" loadDashboard currentDashboardData", currentDashboardData);
-
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
         (tab: any) => tab.tabId === (route.query.tab ?? "default")
       );
 
-      console.log(" loadDashboard selectedTab", selectedTab);
-
       selectedTabId.value = selectedTab
         ? selectedTab.tabId ?? "default"
         : "default";
 
-      console.log(" loadDashboard selectedTabId", selectedTabId.value);
       // if variables data is null, set it to empty list
       if (
         !(

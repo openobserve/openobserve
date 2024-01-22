@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="isHovered = false"
   >
     <q-tabs
-      v-model="selectedTabIdModel"
+      v-model="selectedTabId"
       :align="'left'"
       dense
       inline-label
@@ -39,10 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="index"
         :name="tab.tabId"
         @click.stop
-        :to="{ query: { ...route.query, tab: tab.tabId } }"
         content-class="tab_content"
-        @mouseover="() => (hoveredTabId = tab.tabId)"
-        @mouseleave="hoveredTabId = null"
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
         <div class="full-width row justify-between no-wrap">
@@ -84,12 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, ref } from "vue";
+import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute } from "vue-router";
-import { watch } from "vue";
 
 export default defineComponent({
   name: "TabList",
@@ -102,29 +98,19 @@ export default defineComponent({
       required: true,
       type: Object,
     },
-    selectedTabId: {
-      required: true,
-    },
     viewOnly: {
       type: Boolean,
       default: false,
     },
   },
-  emits: ["refresh", "update:selectedTabId"],
+  emits: ["refresh"],
   setup(props, { emit }) {
     const route = useRoute();
     const showAddTabDialog = ref(false);
-    const selectedTabIdToEdit = ref(null);
-    const hoveredTabId: any = ref(null);
     const isHovered = ref(false);
 
-    // need one ref which will passed in tabList for selectedTab
-    const selectedTabIdModel: any = ref(props.selectedTabId);
-
-    // also, need to emit selectedTabId
-    watch(selectedTabIdModel, (newVal) => {
-      emit("update:selectedTabId", newVal);
-    });
+    // inject selected tab
+    const selectedTabId: any = inject("selectedTabId");
 
     const tabs: any = computed(() => {
       return props.dashboardData?.tabs ?? [];
@@ -138,12 +124,10 @@ export default defineComponent({
     return {
       showAddTabDialog,
       refreshDashboard,
-      selectedTabIdToEdit,
-      hoveredTabId,
-      selectedTabIdModel,
       tabs,
       route,
       isHovered,
+      selectedTabId,
     };
   },
 });
