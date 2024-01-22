@@ -155,8 +155,4 @@ export default defineComponent({
   padding: 0;
   min-width: 40px;
 }
-
-.q-item--dark.q-link-function {
-  filter: brightness(100);
-}
 </style>
