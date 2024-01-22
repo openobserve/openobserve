@@ -35,10 +35,18 @@ const http = ({ headers } = {} as any) => {
       headers,
     });
   } else {
-    headers = {
-      Authorization: "Bearer " + localStorage.getItem("access_token"),
-      ...headers,
-    };
+    if ((store.state as any).zoConfig.dex_enabled) {
+      headers = {
+        Authorization: "Bearer " + localStorage.getItem("access_token"),
+        ...headers,
+      };
+    } else {
+      headers = {
+        Authorization:
+          localStorage.getItem("token"),
+        ...headers,
+      };
+    }
     instance = axios.create({
       // timeout: 10000,
       baseURL: store.state.API_ENDPOINT,
