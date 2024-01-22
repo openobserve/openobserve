@@ -157,6 +157,6 @@ export default defineComponent({
 }
 
 .q-item--dark.q-link-function {
-  filter: brightness(100);
+  // filter: brightness(100);
 }
 </style>
