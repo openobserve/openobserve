@@ -55,6 +55,7 @@ pub(crate) async fn verify_decode_token(
                     TokenValidationResponse {
                         is_valid: true,
                         user_email: user_email.to_owned(),
+                        is_external: true,
                     },
                     if get_decode_token {
                         Some(decoded_token)
