@@ -18,35 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table
-      ref="qTable"
-      :rows="orgMembers"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
-    >
+    <q-table ref="qTable" :rows="orgMembers" :columns="columns" row-key="id" :pagination="pagination"
+      :filter="filterQuery" :filter-method="filterData">
       <template #no-data>
         <NoData></NoData>
       </template>
       <template #body-cell-role="props">
-        <q-td
-          :props="props"
-          v-if="
-            ((currentUserRole == 'admin' && props.row.role !== 'root') ||
-              currentUserRole == 'root') &&
-            !props.row.isLoggedinUser
-          "
-        >
-          <q-select
-            dense
-            borderless
-            v-model="props.row.role"
-            :options="options"
-            style="width: 70px"
-            @update:model-value="updateUserRole(props.row)"
-          />
+        <q-td :props="props" v-if="((currentUserRole == 'admin' && props.row.role !== 'root') ||
+          currentUserRole == 'root') &&
+          !props.row.isLoggedinUser
+          ">
+          <q-select dense borderless v-model="props.row.role" :options="options" style="width: 70px"
+            @update:model-value="updateUserRole(props.row)" />
         </q-td>
         <q-td :props="props" v-else>
           {{ props.row.role }}
@@ -54,120 +37,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn
-            v-if="
-              (currentUserRole == 'admin' || currentUserRole == 'root') &&
-              !props.row.isLoggedinUser &&
-              props.row.role !== 'root'
-            "
-            :icon="outlinedDelete"
-            :title="t('user.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-            style="cursor: pointer !important"
-          />
-          <q-btn
-            v-if="
-              props.row.isLoggedinUser ||
-              currentUserRole == 'root' ||
-              (currentUserRole == 'admin' && props.row.role !== 'root')
-            "
-            icon="edit"
-            :title="t('user.update')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addRoutePush(props)"
-            style="cursor: pointer !important"
-          />
+          <q-btn v-if="(currentUserRole == 'admin' || currentUserRole == 'root') &&
+            !props.row.isLoggedinUser &&
+            props.row.role !== 'root'
+            " :icon="outlinedDelete" :title="t('user.delete')" class="q-ml-xs" padding="sm" unelevated size="sm" round
+            flat @click="confirmDeleteAction(props)" style="cursor: pointer !important" />
+          <q-btn v-if="props.row.isLoggedinUser ||
+            currentUserRole == 'root' ||
+            (currentUserRole == 'admin' && props.row.role !== 'root')
+            " icon="edit" :title="t('user.update')" class="q-ml-xs" padding="sm" unelevated size="sm" round flat
+            @click="addRoutePush(props)" style="cursor: pointer !important" />
         </q-td>
       </template>
       <template #top="scope">
-        <div
-          class="q-table__title full-width q-mb-md"
-          data-test="user-title-text"
-        >
+        <div class="q-table__title full-width q-mb-md" data-test="user-title-text">
           {{ t("user.header") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
-          <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6 q-pr-sm"
-            :placeholder="t('user.search')"
-          >
+          <q-input v-model="filterQuery" filled dense class="col-6 q-pr-sm" :placeholder="t('user.search')">
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
 
           <div class="col-6">
-            <q-btn
-              v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
-              class="q-ml-md q-mb-xs text-bold no-border"
-              style="float: right; cursor: pointer !important"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              icon="add"
-              dense
-              :label="t(`user.add`)"
-              @click="addRoutePush({})"
-            />
+            <q-btn v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
+              class="q-ml-md q-mb-xs text-bold no-border" style="float: right; cursor: pointer !important" padding="sm lg"
+              color="secondary" no-caps icon="add" dense :label="t(`user.add`)" @click="addRoutePush({})" />
           </div>
         </div>
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('user.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <QTablePagination :scope="scope" :pageTitle="t('user.header')" :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions" position="top" @update:changeRecordPerPage="changePagination" />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <QTablePagination :scope="scope" :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="bottom"
+          @update:changeRecordPerPage="changePagination" />
       </template>
     </q-table>
-    <q-dialog
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
+    <q-dialog v-model="showUpdateUserDialog" position="right" full-height maximized>
       <update-user-role v-model="selectedUser" @updated="updateMember" />
     </q-dialog>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-user
-        style="width: 35vw"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        :userRole="currentUserRole"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
+    <q-dialog v-model="showAddUserDialog" position="right" full-height maximized>
+      <add-user style="width: 35vw" v-model="selectedUser" :isUpdated="isUpdated" :userRole="currentUserRole"
+        @updated="addMember" @cancel:hideform="hideForm" />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -181,14 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-            @click="deleteUser"
-          >
+          <q-btn v-close-popup="true" unelevated no-caps class="no-border" color="primary" @click="deleteUser">
             {{ t("user.ok") }}
           </q-btn>
         </q-card-actions>
@@ -294,7 +201,7 @@ export default defineComponent({
       },
     ]);
     const userEmail: any = ref("");
-    const options = ["admin", "member"];
+    const options = ["admin"];
     const selectedRole = ref(options[0]);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
