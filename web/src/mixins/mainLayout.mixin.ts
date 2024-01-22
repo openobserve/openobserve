@@ -1,7 +1,8 @@
-import { onActivated, onMounted } from "vue";
+import { markRaw, onActivated, onMounted } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 import { getImageURL } from "@/utils/zincutils";
+import FunctionIcon from "@/components/icons/FunctionIcon.vue";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -15,7 +16,7 @@ const MainLayoutOpenSourceMixin = {
     const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
-        icon: "img:" + getImageURL("images/common/function.svg"),
+        iconComponent: markRaw(FunctionIcon),
         link: "/functions",
       });
 
