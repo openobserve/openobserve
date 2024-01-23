@@ -94,6 +94,7 @@ describe("Logs testcases", () => {
   it.only("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
     logstests.clickHistogramToggle(); 
+    cy.wait(3000)
     logstests.confirmLogsSearchHidden();
   });
 
