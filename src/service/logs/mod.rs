@@ -27,7 +27,7 @@ use crate::{
             ingestion::RecordStatus,
             stream::{PartitionTimeLevel, SchemaRecords},
         },
-        utils::json::{Map, Value},
+        utils::json::{Map, Value, estimate_json_bytes},
     },
     service::{
         ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
@@ -252,46 +252,6 @@ async fn add_valid_record(
     } else {
         Ok(Some(trigger))
     }
-}
-
-fn estimate_json_bytes(val: &Value) -> usize {
-    let mut size = 0;
-    match val {
-        Value::Object(map) => {
-            // {?} extra 2
-            size += 2;
-            for (k, v) in map {
-                // "key":?, extra 4 bytes
-                size += k.len() + estimate_json_bytes(v) + 4;
-            }
-            // remove ',' for last item
-            if !map.is_empty() {
-                size -= 1;
-            }
-        }
-        Value::Array(arr) => {
-            // []=>2 [?]=>2 [?,?] extra 1+n
-            size += std::cmp::min(arr.len(), 1) + 1;
-            for v in arr {
-                size += estimate_json_bytes(v);
-            }
-        }
-        Value::String(s) => {
-            // "?"=>2
-            size += s.len() + 2;
-        }
-        Value::Number(n) => {
-            size += n.to_string().len();
-        }
-        Value::Bool(b) => {
-            // true for 4 bytes, false for 5 bytes
-            size += if *b { 4 } else { 5 };
-        }
-        Value::Null => {
-            size += 4;
-        }
-    }
-    size
 }
 
 fn set_parsing_error(parse_error: &mut String, field: &Field) {

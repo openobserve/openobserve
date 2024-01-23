@@ -139,7 +139,7 @@ pub async fn save_enrichment_data(
                     CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
-                let value_str = json::to_string(&json_record).unwrap();
+
 
                 // check for schema evolution
                 if !schema_evoluted {
@@ -170,8 +170,10 @@ pub async fn save_enrichment_data(
                         Some(&schema_key),
                     );
                 }
-                records.push(Arc::new(json::Value::Object(json_record)));
-                records_size += value_str.len();
+                let record = json::Value::Object(json_record);
+                let record_size = json::estimate_json_bytes(&record);
+                records.push(Arc::new(record));
+                records_size += record_size;
             }
         }
     }
