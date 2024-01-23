@@ -41,7 +41,7 @@ export function clickHistogramToggle() {
 
 /** Verify if the chart is hidden */
 export function confirmLogsSearchHidden() {
-  cy.get(logsSearchBarChart, { timeout: 2000 }).should("be.hidden");
+  cy.get(logsSearchBarChart, { timeout: 2000 }).should("not.exist");
 }
 
 /** Verify if vrl function editor is visible */

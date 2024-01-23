@@ -90,13 +90,14 @@ describe("Logs testcases", () => {
   });
 
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
-  it("Should toggle chart when clicking on the histogram toggled", () => {
+  it("should toggle chart when clicking on the histogram toggle", () => {
+    cy.wait(2000)
     logstests.clickHistogramToggle();
     logstests.confirmLogsSearchHidden();
   });
 
   // This test checks that clicking on the histogram toggle button in SQL mode does not toggle the chart
-  it("Should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
+  it("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
     logstests.clickHistogramToggle();
     logstests.clickSearchBarSqlMode();
     logstests.confirmLogsSearchHidden();
@@ -104,7 +105,7 @@ describe("Logs testcases", () => {
   });
 
   // This test case checks if the function editor is toggled on/off when the 'functions toggle' button is clicked
-  it("Should toggle the function editor on functions toggle click", () => {
+  it("should toggle the function editor on functions toggle click", () => {
     logstests.displayVrlFunctionEditor();
     logstests.clickLogsSearchQueryToggle();
     logstests.vrlFunctionEditorHidden();
@@ -112,7 +113,7 @@ describe("Logs testcases", () => {
     logstests.displayVrlFunctionEditor();
   });
 
-  it("Should clear the value of a function on functions toggle click", () => {
+  it("should clear the value of a function on functions toggle click", () => {
     // Wait for 5 seconds
     cy.wait(5000);
     logstests.enterVrlFunctionvalue();
@@ -121,7 +122,7 @@ describe("Logs testcases", () => {
     logstests.attributeToNotHaveVrlFunctionvalue();
   });
 
-  it("Should load the values of a field when the field is expanded", () => {
+  it("should load the values of a field when the field is expanded", () => {
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
@@ -134,7 +135,7 @@ describe("Logs testcases", () => {
     );
   });
 
-  it("Should add the field to the editor when + is clicked", () => {
+  it("should add the field to the editor when + is clicked", () => {
     // Wait for 5 seconds
     cy.wait(4000);
     // get the value of the field name
@@ -151,7 +152,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("Should add the value to the editor when the = is clicked next to the field value", () => {
+  it("should add the value to the editor when the = is clicked next to the field value", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -184,7 +185,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("Should add the value to the editor when the != is clicked next to the field value", () => {
+  it("should add the value to the editor when the != is clicked next to the field value", () => {
     // Wait for 2 seconds
     cy.wait(5000);
     // Type the value of a variable into an input field
@@ -251,7 +252,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("Should add invalid query and display error", () => {
+  it("should add invalid query and display error", () => {
     // Type the value of a variable into an input field
     cy.intercept("GET", logData.ValueQuery).as("value");
 
@@ -270,7 +271,7 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-error-message"]').should("be.visible");
   });
 
-  it("Should click run query after SQL toggle on but without any query", () => {
+  it("should click run query after SQL toggle on but without any query", () => {
     // Wait for 2 seconds
     cy.wait(3000);
     // Type the value of a variable into an input field
@@ -285,7 +286,7 @@ describe("Logs testcases", () => {
     cy.contains("Invalid SQL Syntax").should("be.visible");
   });
 
-  it("Should enter a valid SQL query", () => {
+  it("should enter a valid SQL query", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -328,7 +329,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("Should contain options to include, exclude and add field to table under Json", () => {
+  it("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -419,7 +420,7 @@ describe("Logs testcases", () => {
     });
   });
 
-  it("Should contain options to include, exclude and add field to table under TABLE", () => {
+  it("should contain options to include, exclude and add field to table under TABLE", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -998,7 +999,7 @@ describe("Logs testcases", () => {
     cy.get('[aria-label="SQL Mode"] > .q-toggle__label').click({ force: true });
     applyQueryButton();
     cy.get('[aria-label="SQL Mode"] > .q-toggle__label').click({ force: true });
-    cy.get('.q-spinner').should('not.be.visible')
+    cy.get('.q-spinner').should('not.exist')
   });
 
   // it.only("should enter function, edit and then delete the function", () => {
