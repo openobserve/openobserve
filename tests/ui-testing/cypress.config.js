@@ -6,7 +6,7 @@ try {
 } catch (err) {}
 
 module.exports = defineConfig({
-  projectId: 'fmd3am',
+  projectId: '64nwum',
 //defaultCommandTimeout:4000,
   e2e: {
     setupNodeEvents(on, config) {
