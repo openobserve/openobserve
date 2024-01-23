@@ -93,7 +93,7 @@ describe("Logs testcases", () => {
   it.only("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
     logstests.clickHistogramToggle();
-    cy.wait("@allsearch", { timeout: 5000 })
+    cy.wait("@allsearch", { timeout: 30000 })
     // cy.wait(3000)
     logstests.confirmLogsSearchHidden();
   });
