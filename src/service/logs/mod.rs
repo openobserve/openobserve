@@ -239,7 +239,7 @@ async fn add_valid_record(
                 }
             });
             let record_val = Value::Object(record_val.clone());
-            let record_size = estimate_bytes(&record_val);
+            let record_size = estimate_json_bytes(&record_val);
             hour_buf.records.push(Arc::new(record_val));
             hour_buf.records_size += record_size;
             status.successful += 1;
@@ -254,24 +254,42 @@ async fn add_valid_record(
     }
 }
 
-fn estimate_bytes(val: &Value) -> usize {
+fn estimate_json_bytes(val: &Value) -> usize {
     let mut size = 0;
     match val {
         Value::Object(map) => {
+            // {?} extra 2
+            size += 2;
             for (k, v) in map {
-                size += k.len() + estimate_bytes(v);
+                // "key":?, extra 4 bytes
+                size += k.len() + estimate_json_bytes(v) + 4;
+            }
+            // remove ',' for last item
+            if !map.is_empty() {
+                size -= 1;
             }
         }
         Value::Array(arr) => {
+            // []=>2 [?]=>2 [?,?] extra 1+n
+            size += std::cmp::min(arr.len(), 1) + 1;
             for v in arr {
-                size += estimate_bytes(v);
+                size += estimate_json_bytes(v);
             }
         }
         Value::String(s) => {
-            size += s.len();
-        },
-        // for convenience, we treat all numbers/bool/null as 8 bytes
-        _ => size += 8
+            // "?"=>2
+            size += s.len() + 2;
+        }
+        Value::Number(n) => {
+            size += n.to_string().len();
+        }
+        Value::Bool(b) => {
+            // true for 4 bytes, false for 5 bytes
+            size += if *b { 4 } else { 5 };
+        }
+        Value::Null => {
+            size += 4;
+        }
     }
     size
 }
