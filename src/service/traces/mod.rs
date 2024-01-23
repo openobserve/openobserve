@@ -300,7 +300,7 @@ pub async fn handle_trace_request(
                     traces_stream_name,
                     StreamType::Traces,
                     &mut traces_schema_map,
-                    &json::Value::Object(record_val.clone()),
+                    record_val,
                     timestamp.try_into().unwrap(),
                 )
                 .await;
@@ -348,7 +348,7 @@ pub async fn handle_trace_request(
                 });
                 let record_val = record_val.to_owned();
                 let record_val = json::Value::Object(record_val);
-                let record_size = json::to_vec(&record_val).unwrap_or_default().len();
+                let record_size = json::estimate_json_bytes(&record_val);
                 hour_buf.records.push(Arc::new(record_val));
                 hour_buf.records_size += record_size;
 

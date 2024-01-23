@@ -27,7 +27,7 @@ use crate::{
             ingestion::RecordStatus,
             stream::{PartitionTimeLevel, SchemaRecords},
         },
-        utils::json::{self, Map, Value},
+        utils::json::{Map, Value, estimate_json_bytes},
     },
     service::{
         ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
@@ -165,7 +165,7 @@ async fn add_valid_record(
         &stream_meta.stream_name,
         StreamType::Logs,
         stream_schema_map,
-        &Value::Object(record_val.clone()),
+        record_val,
         timestamp,
     )
     .await?;
@@ -182,11 +182,12 @@ async fn add_valid_record(
     );
 
     if schema_evolution.schema_compatible {
-        let valid_record = if schema_evolution.types_delta.is_some() {
-            let delta = schema_evolution.types_delta.unwrap();
-            let ret_val = if !CONFIG.common.widening_schema_evolution {
+        let valid_record = if let Some(delta) = schema_evolution.types_delta {
+            let ret_val = if !CONFIG.common.widening_schema_evolution
+                || !schema_evolution.is_schema_changed
+            {
                 cast_to_type(record_val, delta)
-            } else if schema_evolution.is_schema_changed {
+            } else {
                 let local_delta = delta
                     .into_iter()
                     .filter(|x| x.metadata().contains_key("zo_cast"))
@@ -196,8 +197,6 @@ async fn add_valid_record(
                 } else {
                     Ok(())
                 }
-            } else {
-                cast_to_type(record_val, delta)
             };
             match ret_val {
                 Ok(_) => true,
@@ -240,7 +239,7 @@ async fn add_valid_record(
                 }
             });
             let record_val = Value::Object(record_val.clone());
-            let record_size = json::to_vec(&record_val).unwrap_or_default().len();
+            let record_size = estimate_json_bytes(&record_val);
             hour_buf.records.push(Arc::new(record_val));
             hour_buf.records_size += record_size;
             status.successful += 1;

@@ -139,17 +139,17 @@ pub async fn save_enrichment_data(
                     CONFIG.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
-                let value_str = json::to_string(&json_record).unwrap();
+
 
                 // check for schema evolution
                 if !schema_evoluted {
-                    let record_val = json::Value::Object(json_record.to_owned());
+                    let record_val = &json_record;
                     if check_for_schema(
                         org_id,
                         stream_name,
                         StreamType::EnrichmentTables,
                         &mut stream_schema_map,
-                        &record_val,
+                        record_val,
                         timestamp,
                     )
                     .await
@@ -170,8 +170,10 @@ pub async fn save_enrichment_data(
                         Some(&schema_key),
                     );
                 }
-                records.push(Arc::new(json::Value::Object(json_record)));
-                records_size += value_str.len();
+                let record = json::Value::Object(json_record);
+                let record_size = json::estimate_json_bytes(&record);
+                records.push(Arc::new(record));
+                records_size += record_size;
             }
         }
     }

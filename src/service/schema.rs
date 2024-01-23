@@ -23,11 +23,12 @@ use std::{
 use config::{
     meta::stream::StreamType,
     utils::{
-        schema::{infer_json_schema, infer_json_schema_from_values},
+        schema::{infer_json_schema, infer_json_schema_from_map},
         schema_ext::SchemaExt,
     },
     CONFIG,
 };
+use serde_json::{Map, Value};
 use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
@@ -281,7 +282,7 @@ pub async fn check_for_schema(
     stream_name: &str,
     stream_type: StreamType,
     stream_schema_map: &mut HashMap<String, Schema>,
-    record_val: &json::Value,
+    record_val: &Map<String, Value>,
     record_ts: i64,
 ) -> Result<SchemaEvolution, anyhow::Error> {
     let mut schema = if stream_schema_map.contains_key(stream_name) {
@@ -303,7 +304,7 @@ pub async fn check_for_schema(
     }
 
     let value_iter = [record_val].into_iter();
-    let inferred_schema = infer_json_schema_from_values(value_iter, stream_type).unwrap();
+    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     if schema.fields.eq(&inferred_schema.fields) {
         // return (true, None, schema.fields().to_vec());
@@ -860,7 +861,7 @@ mod tests {
             stream_name,
             StreamType::Logs,
             &mut map,
-            &record,
+            &record.as_object().unwrap(),
             1234234234234,
         )
         .await
