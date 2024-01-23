@@ -14,7 +14,7 @@ type PermissionType =
   | "None";
 
 export interface Permission {
-  object: string; // stream:geo or stream:role1
+  object: string; // stream:geo or stream:org_id
   permission: PermissionType;
 }
 
