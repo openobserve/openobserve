@@ -319,21 +319,19 @@ pub async fn remote_write(
             let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
-            if schema_evoluted.get(&metric_name).is_none() {
-                let record_val = &val_map;
-                if check_for_schema(
+            if schema_evoluted.get(&metric_name).is_none()
+                && check_for_schema(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    record_val,
+                    val_map,
                     timestamp,
                 )
                 .await
                 .is_ok()
-                {
-                    schema_evoluted.insert(metric_name.to_owned(), true);
-                }
+            {
+                schema_evoluted.insert(metric_name.to_owned(), true);
             }
 
             let schema = metric_schema_map

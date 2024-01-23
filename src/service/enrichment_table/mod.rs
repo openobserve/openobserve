@@ -140,23 +140,20 @@ pub async fn save_enrichment_data(
                     json::Value::Number(timestamp.into()),
                 );
 
-
                 // check for schema evolution
-                if !schema_evoluted {
-                    let record_val = &json_record;
-                    if check_for_schema(
+                if !schema_evoluted
+                    && check_for_schema(
                         org_id,
                         stream_name,
                         StreamType::EnrichmentTables,
                         &mut stream_schema_map,
-                        record_val,
+                        &json_record,
                         timestamp,
                     )
                     .await
                     .is_ok()
-                    {
-                        schema_evoluted = true;
-                    }
+                {
+                    schema_evoluted = true;
                 }
 
                 if records.is_empty() {

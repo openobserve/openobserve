@@ -378,21 +378,19 @@ pub async fn metrics_json_handler(
                         let value_str = json::to_string(&val_map).unwrap();
 
                         // check for schema evolution
-                        if schema_evoluted.get(local_metric_name).is_none() {
-                            let record_val = &val_map;
-                            if check_for_schema(
+                        if schema_evoluted.get(local_metric_name).is_none()
+                            && check_for_schema(
                                 org_id,
                                 local_metric_name,
                                 StreamType::Metrics,
                                 &mut metric_schema_map,
-                                record_val,
+                                val_map,
                                 timestamp,
                             )
                             .await
                             .is_ok()
-                            {
-                                schema_evoluted.insert(local_metric_name.to_owned(), true);
-                            }
+                        {
+                            schema_evoluted.insert(local_metric_name.to_owned(), true);
                         }
 
                         let schema = metric_schema_map
