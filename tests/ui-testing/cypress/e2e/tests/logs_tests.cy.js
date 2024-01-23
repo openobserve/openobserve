@@ -36,9 +36,9 @@ describe("Logs testcases", () => {
   });
 
   beforeEach(() => {
-    cy.intercept("*", (req) => {
-      delete req.headers["if-none-match"];
-    });
+    // cy.intercept("*", (req) => {
+    //   delete req.headers["if-none-match"];
+    // });
     cy.login();
     // ("ingests logs via API", () => {
     const orgId = Cypress.env("ORGNAME");
@@ -93,7 +93,7 @@ describe("Logs testcases", () => {
   it.only("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
     logstests.clickHistogramToggle();
-    cy.wait('@allsearch', { timeout: 20000 })
+    cy.wait("@allsearch", { timeout: 5000 })
     // cy.wait(3000)
     logstests.confirmLogsSearchHidden();
   });
