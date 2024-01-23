@@ -94,7 +94,7 @@ describe("Logs testcases", () => {
     cy.wait(3000)
     cy.get('[data-test="logs-search-result-bar-chart"]').should("be.visible");
     logstests.clickHistogramToggle();
-    cy.wait(2000)
+    cy.wait(3000)
     logstests.confirmLogsSearchHidden();
   });
 
