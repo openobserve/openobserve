@@ -53,7 +53,7 @@ export default defineComponent({
           .get_config()
           .then((res) => {
             store.commit("setZoConfig", res.data);
-            if (config.isEnterprise == "true" && res.data.dex_enabled) {
+            if (config.isEnterprise == "true" && res.data.dex_enabled == true) {
               try {
                 authService.get_dex_login().then((res) => {
                   if (res) {
