@@ -213,8 +213,6 @@ export default defineComponent({
     };
 
     const getDashboardLayout = (dashboardData) => {
-      console.log(dashboardData.panels?.map((item) => item.layout) || []);
-
       //map on each panels and return array of layouts
       return dashboardData.panels?.map((item) => item.layout) || [];
     };
