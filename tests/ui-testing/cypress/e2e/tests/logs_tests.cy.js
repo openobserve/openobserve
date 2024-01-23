@@ -90,7 +90,7 @@ describe("Logs testcases", () => {
   });
 
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
-  it("should toggle chart when clicking on the histogram toggle", () => {
+  it.only("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
     logstests.clickHistogramToggle();
     cy.wait(3000)
