@@ -47,7 +47,10 @@ pub fn infer_json_schema_from_map<I, V>(
     value_iter: I,
     stream_type: impl Into<StreamType>,
 ) -> Result<Schema, ArrowError>
-where I: Iterator<Item=V>, V: Borrow<Map<String, Value>> {
+where
+    I: Iterator<Item = V>,
+    V: Borrow<Map<String, Value>>,
+{
     let mut fields = None;
     for value in value_iter {
         if fields.is_none() {
