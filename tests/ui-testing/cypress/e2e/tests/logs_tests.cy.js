@@ -36,9 +36,9 @@ describe("Logs testcases", () => {
   });
 
   beforeEach(() => {
-    // cy.intercept("*", (req) => {
-    //   delete req.headers["if-none-match"];
-    // });
+    cy.intercept("*", (req) => {
+      delete req.headers["if-none-match"];
+    });
     cy.login();
     // ("ingests logs via API", () => {
     const orgId = Cypress.env("ORGNAME");
@@ -71,10 +71,11 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/organizations**").as("allorgs");
     cy.intercept("GET", "**/api/default/functions**").as("functions");
     cy.visit(`${logData.logsUrl}?org_identifier=${Cypress.env("ORGNAME")}`);
-
+    cy.intercept('POST', '**/api/default/_search**').as('allsearch')
+    cy.wait("@allsearch")
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
     cy.intercept("GET", "**/api/default/streams**").as("streams");
-    cy.intercept('GET', '**/api/default/_search**').as('allsearch')
+   
   });
 
   // This is a test case to navigate to the logs page
@@ -92,9 +93,7 @@ describe("Logs testcases", () => {
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
   it.only("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
-    logstests.clickHistogramToggle();
-    cy.wait("@allsearch", { timeout: 30000 })
-    // cy.wait(3000)
+    logstests.clickHistogramToggle(); 
     logstests.confirmLogsSearchHidden();
   });
 
