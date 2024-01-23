@@ -34,7 +34,7 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
         }
         Value::Array(arr) => {
             // []=>2 [?]=>2 [?,?] extra 1+n
-            size += std::cmp::min(arr.len(), 1) + 1;
+            size += std::cmp::max(arr.len(), 1) + 1;
             for v in arr {
                 size += estimate_json_bytes(v);
             }
