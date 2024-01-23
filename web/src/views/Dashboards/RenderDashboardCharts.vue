@@ -42,7 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :margin="[4, 4]"
       >
         <grid-item
-          class="gridBackground" :class="store.state.theme == 'dark' ? 'dark' : ''"
+          class="gridBackground"
+          :class="store.state.theme == 'dark' ? 'dark' : ''"
           v-for="item in dashboardData.panels"
           :key="item.id"
           :x="getPanelLayout(item, 'x')"

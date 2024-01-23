@@ -180,9 +180,16 @@ export const addPanel = async (
   let maxI = 0;
   let maxY = 0;
 
+  let lastPanel = currentDashboard.panels[currentDashboard.panels.length - 1];
+
   currentDashboard.panels.map((it: any) => {
     maxI = Math.max(it.layout?.i || 0, maxI);
     maxY = Math.max(it.layout?.y || 0, maxY);
+
+    // last panel will have max y
+    if (maxY == it.layout?.y) {
+      lastPanel = it;
+    }
   });
 
   // maxI =
@@ -197,12 +204,21 @@ export const addPanel = async (
   const newLayoutObj = {
     x: 0,
     y: currentDashboard.panels?.length > 0 ? maxY + 10 : 0,
-    w: 12,
-    h: 13,
+    w: 6,
+    h: 9,
     i: maxI + 1,
     panelId: panelData.id,
     static: false,
   };
+
+  // check if last panel has enthough space to add new panel
+  if (currentDashboard.panels.length > 0) {
+    //check if new panel can be added
+    if (12 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
+      newLayoutObj.y = lastPanel.layout.y;
+      newLayoutObj.x = lastPanel.layout.x + lastPanel.layout.w;
+    }
+  }
 
   // if (!currentDashboard.layouts) {
   //   currentDashboard.layouts = [];

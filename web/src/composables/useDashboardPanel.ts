@@ -306,7 +306,11 @@ const useDashboardPanelData = () => {
             ? "histogram"
             : null,
         sortBy:
-          row.name == store.state.zoConfig.timestamp_column ? "ASC" : null,
+          row.name == store.state.zoConfig.timestamp_column
+            ? dashboardPanelData.data.type == "table"
+              ? "DESC"
+              : "ASC"
+            : null,
       });
     }
 
