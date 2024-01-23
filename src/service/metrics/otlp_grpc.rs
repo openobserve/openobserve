@@ -89,7 +89,7 @@ pub async fn handle_grpc_request(
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
-    let mut schema_evoluted: HashMap<String, bool> = HashMap::new();
+    let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
@@ -284,7 +284,7 @@ pub async fn handle_grpc_request(
                     let value_str = json::to_string(&val_map).unwrap();
 
                     // check for schema evolution
-                    if schema_evoluted.get(local_metric_name).is_none()
+                    if schema_evolved.get(local_metric_name).is_none()
                         && check_for_schema(
                             org_id,
                             local_metric_name,
@@ -296,7 +296,7 @@ pub async fn handle_grpc_request(
                         .await
                         .is_ok()
                     {
-                        schema_evoluted.insert(local_metric_name.to_owned(), true);
+                        schema_evolved.insert(local_metric_name.to_owned(), true);
                     }
 
                     let buf = metric_data_map
