@@ -1,5 +1,5 @@
 <template>
-  <AppTable :rows="rows" :columns="columns" class="q-mt-sm">
+  <AppTable :rows="rows" :columns="columns" :hide-header="true" class="q-mt-sm">
     <template v-slot:permission="slotProps">
       <q-checkbox
         size="xs"
@@ -43,11 +43,32 @@ const rolePermissions = [
 
 const columns: any = [
   {
+    name: "expand",
+    label: "",
+    field: "expand",
+    align: "center",
+    style: "width: 45px",
+  },
+  {
     name: "name",
     field: "name",
     label: t("iam.entityName"),
     align: "left",
     sortable: true,
+  },
+  {
+    name: "type",
+    field: "type",
+    label: t("common.type"),
+    align: "left",
+    style: "width: 100px",
+  },
+  {
+    name: "resourceName",
+    field: "resourceName",
+    label: t("iam.resourceName"),
+    align: "left",
+    style: "width: 200px",
   },
   {
     name: "AllowAll",
@@ -56,7 +77,15 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
+  },
+  {
+    name: "AllowList",
+    field: "permission",
+    label: t("iam.list"),
+    align: "center",
+    slot: true,
+    style: "width: 80px",
   },
   {
     name: "AllowGet",
@@ -65,7 +94,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
   {
     name: "AllowDelete",
@@ -74,7 +103,15 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
+  },
+  {
+    name: "AllowPost",
+    field: "permission",
+    label: t("iam.create"),
+    align: "center",
+    slot: true,
+    style: "width: 80px",
   },
   {
     name: "AllowPut",
@@ -83,7 +120,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
 ];
 
@@ -97,6 +134,14 @@ const setPermissionTable = () => {
   );
 };
 
+const getUpdatedPermissions = () => {
+  return cloneDeep(
+    rows.value.map((permission: any) => ({
+      entity: permission.object,
+      permission: permission.permission,
+    }))
+  );
+};
 setPermissionTable();
 </script>
 

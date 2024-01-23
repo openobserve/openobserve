@@ -1,11 +1,81 @@
 <template>
-  <div style="font-size: 16px">Permissions</div>
-  <div>
-    <AppTable :rows="rows" :columns="columns" class="q-mt-sm">
+  <div class="o2-input flex items-end q-mb-sm justify-start">
+    <q-input
+      data-test="alert-list-search-input"
+      v-model="filter.searchKey"
+      borderless
+      filled
+      dense
+      class="q-mb-xs no-border q-mr-sm"
+      :placeholder="t('common.search')"
+      style="width: 300px"
+    >
+      <template #prepend>
+        <q-icon name="search" class="cursor-pointer" />
+      </template>
+    </q-input>
+    <q-select
+      v-model="filter.type"
+      :options="permissionTypes"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-xs q-mr-sm"
+      placeholder="Select Type"
+      use-input
+      fill-input
+      hide-selected
+      outlined
+      filled
+      dense
+      emit-value
+      style="width: 200px"
+    />
+    <q-select
+      v-model="filter.resource"
+      :options="getResources"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-xs q-mr-sm"
+      placeholder="Select Resource"
+      use-input
+      fill-input
+      hide-selected
+      outlined
+      filled
+      dense
+      emit-value
+      style="width: 200px"
+    />
+  </div>
+  <div class="flex items-center q-mb-md">
+    <span style="font-size: 14px"> Show </span>
+    <div
+      class="q-mx-sm"
+      style="border: 1px solid #d7d7d7; width: fit-content; border-radius: 2px"
+    >
+      <template v-for="visual in permissionDisplayOptions" :key="visual.value">
+        <q-btn
+          :color="visual.value === filter.permissions ? 'primary' : ''"
+          :flat="visual.value === filter.permissions ? false : true"
+          dense
+          no-caps
+          size="11px"
+          class="q-px-md visual-selection-btn"
+          @click="filter.permissions = visual.value"
+        >
+          {{ visual.label }}</q-btn
+        >
+      </template>
+    </div>
+    <span style="font-size: 14px"> Permissions </span>
+  </div>
+  <div class="q-mb-md text-bold">{{ permissions.length }} Permissions</div>
+  <div class="iam-permissions-table">
+    <AppTable :rows="rows" :columns="columns" :dense="true" class="q-mt-sm">
       <template v-slot:expand="slotProps">
         <q-icon
           :name="
-            expandedPermissions.has(slotProps.column.row.object)
+            expandedPermissions.has(slotProps.column.row.name)
               ? 'keyboard_arrow_up'
               : 'keyboard_arrow_down'
           "
@@ -28,26 +98,6 @@
         <entity-permission-table :permissions="entities" />
       </template>
     </AppTable>
-    <div class="flex justify-end q-mt-lg">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        class="text-bold"
-        :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        no-caps
-        @click="cancelPermissionsUpdate"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        no-caps
-        @click="updateRolePermissions"
-      />
-    </div>
   </div>
 </template>
 
@@ -66,13 +116,43 @@ const props = defineProps({
   },
 });
 
-const entities = [{ name: "default" }, { name: "k8s" }];
+const permissionTypes = [
+  {
+    label: "Resource",
+    value: "resource",
+  },
+  {
+    label: "Entity",
+    value: "entity",
+  },
+];
 
+const entities = [
+  { name: "default", permission: [], type: "Entity", resourceName: "stream" },
+  { name: "k8s", permission: [], type: "Entity", resourceName: "stream" },
+];
+const permissionDisplayOptions = [
+  {
+    label: "All",
+    value: "all",
+  },
+  {
+    label: "Selected",
+    value: "selected",
+  },
+];
 const { t } = useI18n();
 
 const rows: any = ref([]);
 
 const expandedPermissions = ref(new Set());
+
+const filter = ref({
+  resource: "",
+  type: "",
+  searchKey: "",
+  permissions: "selected",
+});
 
 const rolePermissions = [
   "AllowAll",
@@ -95,11 +175,25 @@ const columns: any = [
     style: "width: 45px",
   },
   {
-    name: "object",
-    field: "object",
-    label: t("iam.permissionName"),
+    name: "name",
+    field: "name",
+    label: t("common.name"),
     align: "left",
     sortable: true,
+  },
+  {
+    name: "type",
+    field: "type",
+    label: t("common.type"),
+    align: "left",
+    style: "width: 100px",
+  },
+  {
+    name: "resourceName",
+    field: "resourceName",
+    label: t("iam.resourceName"),
+    align: "left",
+    style: "width: 200px",
   },
   {
     name: "AllowAll",
@@ -108,7 +202,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
   {
     name: "AllowList",
@@ -117,7 +211,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
   {
     name: "AllowGet",
@@ -126,7 +220,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
   {
     name: "AllowDelete",
@@ -135,7 +229,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
   {
     name: "AllowPost",
@@ -144,7 +238,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
   {
     name: "AllowPut",
@@ -153,20 +247,20 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 100px",
+    style: "width: 80px",
   },
 ];
 
 const expandPermission = (permission: any) => {
-  if (expandedPermissions.value.has(permission.object)) {
-    expandedPermissions.value.delete(permission.object);
+  if (expandedPermissions.value.has(permission.name)) {
+    expandedPermissions.value.delete(permission.name);
   } else {
-    expandedPermissions.value.add(permission.object);
+    expandedPermissions.value.add(permission.name);
   }
 
   // Updating expand key in table
   rows.value.forEach((row: any) => {
-    if (row.object === permission.object) {
+    if (row.name === permission.name) {
       row.expand = !row.expand;
       row.slotName = "entity_table";
     }
@@ -177,17 +271,39 @@ const setPermissionTable = () => {
   rows.value = cloneDeep(
     props.permissions.map((permission: any, index: number) => ({
       ...permission,
-      permission: [],
       "#": index + 1,
     }))
   );
 };
 
-const updateRolePermissions = () => {};
+const getResources = [
+  {
+    label: "Stream",
+    value: "stream",
+  },
+  {
+    label: "Functions",
+    value: "functions",
+  },
+];
 
-const cancelPermissionsUpdate = () => {};
+const getUpdatedPermissions = () => {
+  return cloneDeep(
+    rows.value.map((permission: any) => ({
+      object: permission.object,
+      permission: permission.permission,
+    }))
+  );
+};
 
 setPermissionTable();
 </script>
 
 <style scoped></style>
+<style lang="scss">
+.iam-permissions-table {
+  .q-table--bordered {
+    border: none;
+  }
+}
+</style>

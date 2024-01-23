@@ -12,6 +12,26 @@
       style="height: calc(100vh - 101px); overflow-y: auto"
     >
       <permissions-table :permissions="permissions" />
+      <div class="flex justify-end q-mt-lg">
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          class="text-bold"
+          :label="t('alerts.cancel')"
+          text-color="light-text"
+          padding="sm md"
+          no-caps
+          @click="cancelPermissionsUpdate"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          :label="t('alerts.save')"
+          class="text-bold no-border q-ml-md"
+          color="secondary"
+          padding="sm xl"
+          no-caps
+          @click="updateRolePermissions"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -36,14 +56,24 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-const permissions: Permission[] = [
+const permissions: any[] = [
   {
-    object: "stream",
-    permission: "AllowAll",
+    name: "stream",
+    permission: [],
+    type: "Resource",
+    resourceName: "stream",
   },
   {
-    object: "functions",
-    permission: "AllowAll",
+    name: "functions",
+    permission: [],
+    type: "Resource",
+    resourceName: "stream",
+  },
+  {
+    name: "alerts",
+    permission: [],
+    type: "Resource",
+    resourceName: "Alerts",
   },
 ];
 const editingRole = ref(cloneDeep(props.role));
@@ -52,6 +82,12 @@ const setEditingRole = () => {
   editingRole.value = cloneDeep(props.role);
   editingRole.value.permissions = permissions;
 };
+
+const updateRolePermissions = () => {
+  console.log(permissions);
+};
+
+const cancelPermissionsUpdate = () => {};
 
 setEditingRole();
 </script>

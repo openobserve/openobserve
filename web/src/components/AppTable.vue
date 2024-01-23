@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     5. Component should have highlight property to highlight search text
     6. Rows should have boolean property to expand row. expandable: true
    -->
-  <div :style="{ height: height }" class="app-table-container">
+  <div :style="{ height: height, marginTop: 0 }" class="app-table-container">
     <template v-if="!rows.length">
       <div class="q-pt-md text-center text-subtitle">No Data Found</div>
     </template>
@@ -42,6 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-item-size="48"
         :rows-per-page-options="[0]"
         :pagination="_pagination"
+        :dense="dense"
+        :hide-header="hideHeader"
         @virtual-scroll="onScroll"
         class="full-height"
         :hide-bottom="!showPagination"
@@ -87,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="`e_${props.row.index}`"
             class="q-virtual-scroll--with-prev"
           >
-            <q-td colspan="100%">
+            <q-td colspan="100%" style="padding: 0; border-bottom: none">
               <slot :name="props.row.slotName" :row="props" />
             </q-td>
           </q-tr>
@@ -155,6 +157,14 @@ const props = defineProps({
   rowsPerPage: {
     type: Number,
     default: 20,
+  },
+  dense: {
+    type: Boolean,
+    default: false,
+  },
+  hideHeader: {
+    type: Boolean,
+    default: false,
   },
 });
 

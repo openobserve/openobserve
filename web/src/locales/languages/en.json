@@ -48,7 +48,9 @@
     "nameRequired": "Name is required",
     "edit": "Edit",
     "delete": "Delete",
-    "actions": "Actions"
+    "actions": "Actions",
+    "type": "Type",
+    "search": "Search"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -250,7 +252,9 @@
     "create": "Create",
     "update": "Update",
     "delete": "Delete",
-    "entityName": "Entity Name"
+    "entityName": "Entity Name",
+    "userName": "User Name",
+    "resourceName": "Resource Name"
   },
   "ticket": {
     "header": "Support Tickets",
