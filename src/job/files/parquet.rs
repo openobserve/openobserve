@@ -27,7 +27,7 @@ use config::{
     meta::stream::{FileKey, FileMeta, StreamType},
     metrics,
     utils::parquet::{read_metadata_from_bytes, read_metadata_from_file},
-    CONFIG,
+    FxIndexMap, CONFIG,
 };
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task::JoinHandle, time};
@@ -69,9 +69,10 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 
     let pattern = wal_dir.join("files/");
     let files = scan_files(&pattern, "parquet");
+    log::info!("[INGESTER:JOB] move files get: {}", files.len());
 
     // do partition by partition key
-    let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
+    let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
     for file in files {
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
             continue;
