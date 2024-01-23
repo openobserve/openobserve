@@ -28,12 +28,12 @@ use config::{
     },
     CONFIG,
 };
-use serde_json::{Map, Value};
 use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
 };
 use itertools::Itertools;
+use serde_json::{Map, Value};
 
 use crate::{
     common::{

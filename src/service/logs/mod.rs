@@ -27,7 +27,7 @@ use crate::{
             ingestion::RecordStatus,
             stream::{PartitionTimeLevel, SchemaRecords},
         },
-        utils::json::{Map, Value, estimate_json_bytes},
+        utils::json::{estimate_json_bytes, Map, Value},
     },
     service::{
         ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
