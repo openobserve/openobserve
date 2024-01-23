@@ -15,11 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login></login>
+  <login v-if="store.state.zoConfig.dex_enabled !== true"></login>
+  <div v-else class="text-bold q-page">
+    Wait while redirecting to login page...
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onBeforeMount, ref } from "vue";
+import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import config from "@/aws-exports";
 import authService from "@/services/auth";
@@ -31,7 +35,6 @@ import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 
-
 export default defineComponent({
   name: "LoginPage",
   components: {
@@ -42,87 +45,85 @@ export default defineComponent({
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref("");
     const q = useQuasar();
+    const router: any = useRouter();
 
     onBeforeMount(async () => {
-      await configService
-        .get_config()
-        .then((res) => {
-          store.commit("setZoConfig", res.data);
-          if (config.isEnterprise == "true" && res.data.dex_enabled) {
-            try {
-
-              authService.get_dex_login().then((res) => {
-                if (res) {
-                  window.location.href = res
-                }
-              });
-            } catch (error) {
-              console.error("Error during redirection:", error);
+      if (!router.currentRoute?.hash) {
+        await configService
+          .get_config()
+          .then((res) => {
+            store.commit("setZoConfig", res.data);
+            if (config.isEnterprise == "true" && res.data.dex_enabled) {
+              try {
+                authService.get_dex_login().then((res) => {
+                  if (res) {
+                    window.location.href = res;
+                    return;
+                  }
+                });
+              } catch (error) {
+                console.error("Error during redirection:", error);
+              }
             }
-          }
-        })
-        .catch((err) => {
-          console.error("Error while fetching config:", err);
-        });
+          })
+          .catch((err) => {
+            console.error("Error while fetching config:", err);
+          });
+      }
     });
 
-
-
     /**
-   * Get all organizations for the user
-   * check local storage for the default organization if user email is not same as local storage user email reset the local storage
-   * there is no organization in localstorage, check for default organization of that user by using user email and set the default organization
-   * if there is only one organization set that as default organization
-   * redirect user to the page where user was redirected from
-   */
+     * Get all organizations for the user
+     * check local storage for the default organization if user email is not same as local storage user email reset the local storage
+     * there is no organization in localstorage, check for default organization of that user by using user email and set the default organization
+     * if there is only one organization set that as default organization
+     * redirect user to the page where user was redirected from
+     */
     const getDefaultOrganization = () => {
-      organizationsService.list(0, 1000, "id", false, "")
-        .then((res: any) => {
-          const localOrg: any = useLocalOrganization();
-          if (
-            localOrg.value != null &&
-            localOrg.value.user_email !== store.state.userInfo.email
-          ) {
-            localOrg.value = null;
-            useLocalOrganization("");
-          }
+      organizationsService.list(0, 1000, "id", false, "").then((res: any) => {
+        const localOrg: any = useLocalOrganization();
+        if (
+          localOrg.value != null &&
+          localOrg.value.user_email !== store.state.userInfo.email
+        ) {
+          localOrg.value = null;
+          useLocalOrganization("");
+        }
 
-          store.dispatch("setOrganizations", res.data.data);
-          orgOptions.value = res.data.data.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-            }) => {
-              let optiondata: any = {
-                label: data.name,
-                id: data.id,
-                identifier: data.identifier,
-                user_email: store.state.userInfo.email,
-              };
+        store.dispatch("setOrganizations", res.data.data);
+        orgOptions.value = res.data.data.map(
+          (data: {
+            id: any;
+            name: any;
+            type: any;
+            identifier: any;
+            UserObj: any;
+          }) => {
+            let optiondata: any = {
+              label: data.name,
+              id: data.id,
+              identifier: data.identifier,
+              user_email: store.state.userInfo.email,
+            };
 
-              if (
-                (selectedOrg.value == "" &&
-                  (data.type == "default" || data.id == "1") &&
-                  store.state.userInfo.email == data.UserObj.email) ||
-                res.data.data.length == 1
-              ) {
-                selectedOrg.value = localOrg.value
-                  ? localOrg.value
-                  : optiondata;
-                useLocalOrganization(selectedOrg.value);
-                store.dispatch("setSelectedOrganization", selectedOrg.value);
-              }
-              return optiondata;
+            if (
+              (selectedOrg.value == "" &&
+                (data.type == "default" || data.id == "1") &&
+                store.state.userInfo.email == data.UserObj.email) ||
+              res.data.data.length == 1
+            ) {
+              selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
+              useLocalOrganization(selectedOrg.value);
+              store.dispatch("setSelectedOrganization", selectedOrg.value);
             }
-          );
+            return optiondata;
+          }
+        );
 
-          const redirectURI = window.sessionStorage.getItem("redirectURI");
-          window.sessionStorage.removeItem("redirectURI");
-          redirectUser(redirectURI || "");
-        });
+        const redirectURI = window.sessionStorage.getItem("redirectURI");
+        window.sessionStorage.removeItem("redirectURI");
+        redirectUser(redirectURI || "");
+      });
     };
 
     /**
@@ -141,12 +142,12 @@ export default defineComponent({
     };
 
     return {
+      q,
       store,
+      config,
       redirectUser,
       getDefaultOrganization,
-      q,
     };
-
   },
   data() {
     return {
@@ -171,29 +172,31 @@ export default defineComponent({
      * set the user info to the vuex store
      * else call the verify and create user method as user is not registered
      */
-    const token = getUserInfo(this.$route.hash);
-    if (token !== null && token.email != null) {
-      this.user.email = token.email;
-      this.user.cognito_sub = token.sub;
-      this.user.first_name = token.given_name ? token.given_name : "";
-      this.user.last_name = token.family_name ? token.family_name : "";
-    }
+    if (this.$route.hash) {
+      const token = getUserInfo(this.$route.hash);
+      if (token !== null && token.email != null) {
+        this.user.email = token.email;
+        this.user.cognito_sub = token.sub;
+        this.user.first_name = token.given_name ? token.given_name : "";
+        this.user.last_name = token.family_name ? token.family_name : "";
+      }
 
-    const sessionUserInfo = getDecodedUserInfo();
-    const d = new Date();
-    this.userInfo =
-      sessionUserInfo !== null ? JSON.parse(sessionUserInfo as string) : null;
-    if (
-      (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) ||
-      config.isEnterprise === "true"
-    ) {
-      this.store.dispatch("login", {
-        loginState: true,
-        userInfo: this.userInfo,
-      });
-      this.getDefaultOrganization();
-    } else {
-      this.VerifyAndCreateUser();
+      const sessionUserInfo = getDecodedUserInfo();
+      const d = new Date();
+      this.userInfo =
+        sessionUserInfo !== null ? JSON.parse(sessionUserInfo as string) : null;
+      if (
+        (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) ||
+        config.isEnterprise === "true"
+      ) {
+        this.store.dispatch("login", {
+          loginState: true,
+          userInfo: this.userInfo,
+        });
+        this.getDefaultOrganization();
+      } else {
+        this.VerifyAndCreateUser();
+      }
     }
   },
   methods: {
@@ -222,10 +225,8 @@ export default defineComponent({
             dismiss();
 
             this.getDefaultOrganization();
-
           });
         } else {
-
           this.store.dispatch("login", {
             loginState: true,
             userInfo: this.userInfo,
