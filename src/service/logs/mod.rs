@@ -270,7 +270,7 @@ fn estimate_bytes(val: &Value) -> usize {
         Value::String(s) => {
             size += s.len();
         },
-        // for convience, we treat all numbers/bool/null as 8 bytes
+        // for convenience, we treat all numbers/bool/null as 8 bytes
         _ => size += 8
     }
     size
