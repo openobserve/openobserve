@@ -93,6 +93,7 @@ describe("Logs testcases", () => {
   it.only("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
     cy.get('[data-test="logs-search-result-bar-chart"]').should("be.visible");
+    cy.get('[data-cy="search-bar-refresh-button"]').click({ force: true });
     logstests.clickHistogramToggle();
     cy.wait(3000)
     logstests.confirmLogsSearchHidden();
