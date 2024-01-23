@@ -14,17 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
-import type { AxiosInstance } from 'axios';
+import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
 
 const http = ({ headers } = {} as any) => {
-
   let instance: AxiosInstance;
   if (config.isEnterprise == "false") {
     headers = {
       Authorization:
-        (config.isCloud == "true")
+        config.isCloud == "true"
           ? "Bearer " + localStorage.getItem("token")
           : localStorage.getItem("token") || "",
       ...headers,
@@ -35,18 +34,15 @@ const http = ({ headers } = {} as any) => {
       headers,
     });
   } else {
-    if ((store.state as any).zoConfig.dex_enabled) {
-      headers = {
-        Authorization: "Bearer " + localStorage.getItem("access_token"),
-        ...headers,
-      };
-    } else {
-      headers = {
-        Authorization:
-          localStorage.getItem("token"),
-        ...headers,
-      };
-    }
+    headers = {
+      Authorization:
+        config.isEnterprise == "true" &&
+        (store.state as any).zoConfig.dex_enabled
+          ? "Bearer " + localStorage.getItem("access_token")
+          : localStorage.getItem("token") || "",
+      ...headers,
+    };
+
     instance = axios.create({
       // timeout: 10000,
       baseURL: store.state.API_ENDPOINT,
@@ -54,7 +50,6 @@ const http = ({ headers } = {} as any) => {
       headers,
     });
   }
-
 
   instance.interceptors.response.use(
     function (response) {
@@ -74,33 +69,48 @@ const http = ({ headers } = {} as any) => {
                 error.response.data["error"] || "Invalid credentials"
               )
             );
-            if ((config.isCloud == "true") && !error.request.responseURL.includes("/auth/login")) {
+            if (
+              config.isCloud == "true" &&
+              !error.request.responseURL.includes("/auth/login")
+            ) {
               store.dispatch("logout");
               localStorage.clear();
               sessionStorage.clear();
               window.location.reload();
             }
             // Check if the failing request is not the login or refresh token request
-            else if ((config.isEnterprise == "true") && !error.config.url.includes('/config/dex_login') && !error.config.url.includes('/config/dex_refresh')) {
+            else if (
+              config.isEnterprise == "true" &&
+              store.state.zoConfig.dex_enabled &&
+              !error.config.url.includes("/config/dex_login") &&
+              !error.config.url.includes("/config/dex_refresh")
+            ) {
               // Call refresh token API
-              const refreshToken = localStorage.getItem('refresh_token');
+              const refreshToken = localStorage.getItem("refresh_token");
 
               // Modify the request to include the refresh token
-              return instance.get('/config/dex_refresh', {
-                headers: { 'Authorization': `${refreshToken}` }
-              }).then(res => {
-                localStorage.setItem('access_token', res.data);
-                error.config.headers['Authorization'] = 'Bearer ' + res.data;
-                return instance(error.config);
-              }).catch(refreshError => {
-                store.dispatch('logout');
-                localStorage.clear();
-                sessionStorage.clear();
-                window.location.reload();
-                return Promise.reject(refreshError);
-              });
+              return instance
+                .get("/config/dex_refresh", {
+                  headers: { Authorization: `${refreshToken}` },
+                })
+                .then((res) => {
+                  localStorage.setItem("access_token", res.data);
+                  error.config.headers["Authorization"] = "Bearer " + res.data;
+                  return instance(error.config);
+                })
+                .catch((refreshError) => {
+                  store.dispatch("logout");
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  window.location.reload();
+                  return Promise.reject(refreshError);
+                });
             } else {
-              console.log(JSON.stringify(error.response.data["error"] || "Invalid credentials"));
+              console.log(
+                JSON.stringify(
+                  error.response.data["error"] || "Invalid credentials"
+                )
+              );
             }
             break;
           case 404:

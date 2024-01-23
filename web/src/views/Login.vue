@@ -15,14 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="store.state.zoConfig.dex_enabled !== true"></login>
-  <div v-else class="text-bold q-page">
+  <login
+    v-if="
+      config.isEnterprise !== 'true' ||
+      store.state.zoConfig.dex_enabled !== true
+    "
+  ></login>
+  <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
     Wait while redirecting to login page...
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, ref } from "vue";
+import { defineComponent, onBeforeMount, ref, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import config from "@/aws-exports";
@@ -48,11 +53,12 @@ export default defineComponent({
     const router: any = useRouter();
 
     onBeforeMount(async () => {
-      if (!router.currentRoute?.hash) {
+      if (!router?.currentRoute.value.hash) {
         await configService
           .get_config()
-          .then((res) => {
+          .then(async (res) => {
             store.commit("setZoConfig", res.data);
+            await nextTick();
             if (config.isEnterprise == "true" && res.data.dex_enabled == true) {
               try {
                 authService.get_dex_login().then((res) => {
@@ -119,10 +125,6 @@ export default defineComponent({
             return optiondata;
           }
         );
-
-        const redirectURI = window.sessionStorage.getItem("redirectURI");
-        window.sessionStorage.removeItem("redirectURI");
-        redirectUser(redirectURI || "");
       });
     };
 
@@ -130,11 +132,13 @@ export default defineComponent({
      * Redirect user to the page where user was redirected from
      * @param redirectURI
      */
-    const redirectUser = (redirectURI: string) => {
+    const redirectUser = () => {
       const path = getPath();
+      const redirectURI = window.sessionStorage.getItem("redirectURI");
+      window.sessionStorage.removeItem("redirectURI");
       if (redirectURI != null && redirectURI != "") {
         // router.push({ path: redirectURI });
-        window.location.replace(path);
+        window.location.replace(redirectURI);
       } else {
         // router.push({ path: "/" });
         window.location.replace(path);
@@ -145,6 +149,7 @@ export default defineComponent({
       q,
       store,
       config,
+      router,
       redirectUser,
       getDefaultOrganization,
     };
@@ -173,30 +178,42 @@ export default defineComponent({
      * else call the verify and create user method as user is not registered
      */
     if (this.$route.hash) {
-      const token = getUserInfo(this.$route.hash);
-      if (token !== null && token.email != null) {
-        this.user.email = token.email;
-        this.user.cognito_sub = token.sub;
-        this.user.first_name = token.given_name ? token.given_name : "";
-        this.user.last_name = token.family_name ? token.family_name : "";
-      }
+      configService
+        .get_config()
+        .then(async (res) => {
+          this.store.commit("setZoConfig", res.data);
+          const token = getUserInfo(this.$route.hash);
+          if (token !== null && token.email != null) {
+            this.user.email = token.email;
+            this.user.cognito_sub = token.sub;
+            this.user.first_name = token.given_name ? token.given_name : "";
+            this.user.last_name = token.family_name ? token.family_name : "";
+          }
 
-      const sessionUserInfo = getDecodedUserInfo();
-      const d = new Date();
-      this.userInfo =
-        sessionUserInfo !== null ? JSON.parse(sessionUserInfo as string) : null;
-      if (
-        (this.userInfo !== null && this.userInfo.hasOwnProperty("pgdata")) ||
-        config.isEnterprise === "true"
-      ) {
-        this.store.dispatch("login", {
-          loginState: true,
-          userInfo: this.userInfo,
+          const sessionUserInfo = getDecodedUserInfo();
+          const d = new Date();
+          this.userInfo =
+            sessionUserInfo !== null
+              ? JSON.parse(sessionUserInfo as string)
+              : null;
+          if (
+            (this.userInfo !== null &&
+              this.userInfo.hasOwnProperty("pgdata")) ||
+            config.isEnterprise === "true"
+          ) {
+            this.store.dispatch("login", {
+              loginState: true,
+              userInfo: this.userInfo,
+            });
+            // this.getDefaultOrganization();
+            this.redirectUser();
+          } else {
+            this.VerifyAndCreateUser();
+          }
+        })
+        .catch((err) => {
+          console.error("Error while fetching config:", err);
         });
-        this.getDefaultOrganization();
-      } else {
-        this.VerifyAndCreateUser();
-      }
     }
   },
   methods: {
@@ -224,7 +241,8 @@ export default defineComponent({
             });
             dismiss();
 
-            this.getDefaultOrganization();
+            // this.getDefaultOrganization();
+            this.redirectUser();
           });
         } else {
           this.store.dispatch("login", {
@@ -232,7 +250,8 @@ export default defineComponent({
             userInfo: this.userInfo,
           });
 
-          this.getDefaultOrganization();
+          // this.getDefaultOrganization();
+          this.redirectUser();
         }
       });
     },
