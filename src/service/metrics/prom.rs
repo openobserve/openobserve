@@ -320,13 +320,13 @@ pub async fn remote_write(
 
             // check for schema evolution
             if schema_evoluted.get(&metric_name).is_none() {
-                let record_val = json::Value::Object(val_map.to_owned());
+                let record_val = &val_map;
                 if check_for_schema(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    &record_val,
+                    record_val,
                     timestamp,
                 )
                 .await

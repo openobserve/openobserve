@@ -213,13 +213,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         }
 
         // check for schema evolution
-        let record_val = json::Value::Object(record.to_owned());
+        let record_val = &record;
         let _ = check_for_schema(
             org_id,
             &stream_name,
             StreamType::Metrics,
             &mut stream_schema_map,
-            &record_val,
+            record_val,
             timestamp,
         )
         .await;

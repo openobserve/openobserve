@@ -16,3 +16,43 @@
 pub use serde_json::{
     from_slice, from_str, from_value, json, to_string, to_value, to_vec, Error, Map, Number, Value,
 };
+
+pub fn estimate_json_bytes(val: &Value) -> usize {
+    let mut size = 0;
+    match val {
+        Value::Object(map) => {
+            // {?} extra 2
+            size += 2;
+            for (k, v) in map {
+                // "key":?, extra 4 bytes
+                size += k.len() + estimate_json_bytes(v) + 4;
+            }
+            // remove ',' for last item
+            if !map.is_empty() {
+                size -= 1;
+            }
+        }
+        Value::Array(arr) => {
+            // []=>2 [?]=>2 [?,?] extra 1+n
+            size += std::cmp::max(arr.len(), 1) + 1;
+            for v in arr {
+                size += estimate_json_bytes(v);
+            }
+        }
+        Value::String(s) => {
+            // "?"=>2
+            size += s.len() + 2;
+        }
+        Value::Number(n) => {
+            size += n.to_string().len();
+        }
+        Value::Bool(b) => {
+            // true for 4 bytes, false for 5 bytes
+            size += if *b { 4 } else { 5 };
+        }
+        Value::Null => {
+            size += 4;
+        }
+    }
+    size
+}
