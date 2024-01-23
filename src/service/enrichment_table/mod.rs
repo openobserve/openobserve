@@ -143,13 +143,13 @@ pub async fn save_enrichment_data(
 
                 // check for schema evolution
                 if !schema_evoluted {
-                    let record_val = json::Value::Object(json_record.to_owned());
+                    let record_val = &json_record;
                     if check_for_schema(
                         org_id,
                         stream_name,
                         StreamType::EnrichmentTables,
                         &mut stream_schema_map,
-                        &record_val,
+                        record_val,
                         timestamp,
                     )
                     .await

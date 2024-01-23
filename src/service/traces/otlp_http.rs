@@ -364,7 +364,7 @@ pub async fn traces_json(
                         traces_stream_name,
                         StreamType::Traces,
                         &mut traces_schema_map,
-                        &json::Value::Object(record_val.clone()),
+                        record_val,
                         timestamp.try_into().unwrap(),
                     )
                     .await;

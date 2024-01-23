@@ -43,6 +43,29 @@ pub fn infer_json_schema_from_seekable<R: BufRead + Seek>(
     Ok(fix_schema(schema, stream_type))
 }
 
+pub fn infer_json_schema_from_map<I, V>(
+    value_iter: I,
+    stream_type: impl Into<StreamType>,
+) -> Result<Schema, ArrowError>
+where I: Iterator<Item=V>, V: Borrow<Map<String, Value>> {
+    let mut fields = None;
+    for value in value_iter {
+        if fields.is_none() {
+            fields = Some(FxIndexMap::with_capacity_and_hasher(
+                value.borrow().len(),
+                Default::default(),
+            ));
+        }
+        infer_json_schema_from_object(fields.as_mut().unwrap(), value.borrow())?;
+    }
+    let fields = fields.unwrap_or_default();
+    let fields = fields
+        .into_iter()
+        .map(|(_, field)| field)
+        .collect::<Vec<_>>();
+    Ok(fix_schema(Schema::new(fields), stream_type.into()))
+}
+
 pub fn infer_json_schema_from_values<I, V>(
     value_iter: I,
     stream_type: impl Into<StreamType>,
