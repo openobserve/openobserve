@@ -65,6 +65,8 @@ const AppRoles = () => import("@/components/iam/roles/AppRoles.vue");
 
 const EditRole = () => import("@/components/iam/roles/EditRole.vue");
 
+const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
+
 const AppOrganizations = () =>
   import("@/components/iam/organizations/AppOrganizations.vue");
 
@@ -237,6 +239,14 @@ const useRoutes = () => {
           path: "groups",
           name: "groups",
           component: AppGroups,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "groups/edit/:group_name",
+          name: "editGroup",
+          component: EditGroup,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

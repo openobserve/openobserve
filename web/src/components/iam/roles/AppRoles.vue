@@ -21,13 +21,14 @@
       />
     </div>
     <app-table :rows="rows" :columns="columns" pagination :rows-per-page="20">
-      <template v-slot:actions>
+      <template v-slot:actions="slotProps">
         <div>
           <q-icon
             size="14px"
             name="edit"
             class="cursor-pointer q-mr-md"
             :title="t('common.edit')"
+            @click="() => editRole(slotProps.column.row)"
           />
           <q-icon
             size="14px"
@@ -50,12 +51,15 @@ import AddRole from "./AddRole.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
+import { useRouter } from "vue-router";
 
 const { t } = useI18n();
 
 const showAddGroup = ref(false);
 
 const rows: any = ref([]);
+
+const router = useRouter();
 
 const columns: any = [
   {
@@ -105,6 +109,16 @@ const updateTable = () => {
 
 const addRole = () => {
   showAddGroup.value = true;
+};
+
+const editRole = (role: any) => {
+  console.log(role);
+  router.push({
+    name: "editRole",
+    params: {
+      role_name: role.role_name,
+    },
+  });
 };
 
 updateTable();
