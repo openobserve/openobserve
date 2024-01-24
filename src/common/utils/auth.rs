@@ -163,6 +163,9 @@ impl FromRequest for AuthExtractor {
                 path_columns[0].to_string()
             }
         } else if url_len == 2 {
+            if method.eq("GET") {
+                method = "LIST".to_string();
+            }
             format!(
                 "{}:{}",
                 o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
@@ -183,8 +186,8 @@ impl FromRequest for AuthExtractor {
                 format!(
                     "{}:{}",
                     o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                        .get(path_columns[2])
-                        .unwrap_or(&path_columns[2]),
+                        .get(path_columns[1])
+                        .unwrap_or(&path_columns[1]),
                     path_columns[0]
                 )
             }

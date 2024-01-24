@@ -539,7 +539,6 @@ async fn handle_new_schema(
                 )
                 .await
                 .unwrap();
-
                 crate::common::utils::auth::set_ownership(
                     org_id,
                     "streams",
@@ -794,6 +793,7 @@ pub async fn set_schema_metadata(
             "created_at".to_string(),
             chrono::Utc::now().timestamp_micros().to_string(),
         );
+        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
     }
     db::schema::set(
         org_id,
