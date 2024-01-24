@@ -162,12 +162,21 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: DBUser = json::from_slice(&ev.value.unwrap()).unwrap();
                 let users = item_value.get_all_users();
+                #[cfg(not(feature = "enterprise"))]
                 for mut user in users {
                     if user.role.eq(&UserRole::Root) {
                         ROOT_USER.insert("root".to_string(), user.clone());
                     } else {
                         user.role = UserRole::Admin;
                     };
+                    USERS.insert(format!("{}/{}", user.org, item_key), user);
+                }
+
+                #[cfg(feature = "enterprise")]
+                for user in users {
+                    if user.role.eq(&UserRole::Root) {
+                        ROOT_USER.insert("root".to_string(), user.clone());
+                    }
                     USERS.insert(format!("{}/{}", user.org, item_key), user);
                 }
                 // Invalidate the entire RUM-TOKEN-CACHE
@@ -198,11 +207,25 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         // let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
         let users = json_val.get_all_users();
+        #[cfg(not(feature = "enterprise"))]
         for mut user in users {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
             } else {
                 user.role = UserRole::Admin;
+            }
+            USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
+            if let Some(rum_token) = &user.rum_token {
+                USERS_RUM_TOKEN
+                    .clone()
+                    .insert(format!("{}/{}", user.org, rum_token), user);
+            }
+        }
+
+        #[cfg(feature = "enterprise")]
+        for user in users {
+            if user.role.eq(&UserRole::Root) {
+                ROOT_USER.insert("root".to_string(), user.clone());
             }
             USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
@@ -222,6 +245,9 @@ pub async fn root_user_exists() -> bool {
     let mut ret = db.list_values(key).await.unwrap_or_default();
     ret.retain(|item| {
         let user: DBUser = json::from_slice(item).unwrap();
+        if user.organizations.is_empty() {
+            return false;
+        }
         user.organizations
             .first()
             .as_ref()
