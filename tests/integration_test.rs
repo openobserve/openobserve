@@ -70,8 +70,19 @@ mod tests {
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
         setup();
-        let _ = openobserve::common::infra::init().await;
-        let _ = openobserve::job::init().await;
+
+        // register node
+        _ = openobserve::common::infra::cluster::register_and_keepalive()
+            .await
+            .unwrap();
+        // init config
+        _ = config::init().await.unwrap();
+        // init infra
+        _ = openobserve::common::infra::init().await.unwrap();
+        // ingester init
+        _ = ingester::init().await.unwrap();
+        // init job
+        _ = openobserve::job::init().await.unwrap();
 
         for _i in 0..3 {
             e2e_1_post_bulk().await;
@@ -89,7 +100,6 @@ mod tests {
         e2e_get_stream_schema().await;
         e2e_get_org_summary().await;
         e2e_post_stream_settings().await;
-        e2e_delete_stream().await;
         e2e_get_org().await;
 
         // functions
@@ -163,6 +173,9 @@ mod tests {
         e2e_health_check().await;
         e2e_config().await;
         e2e_100_tear_down().await;
+
+        // clear
+        e2e_delete_stream().await;
     }
 
     async fn e2e_1_post_bulk() {
@@ -1012,10 +1025,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!(
-                "/api/{}/alerts/templates",
-                "e2e"
-            ))
+            .uri(&format!("/api/{}/alerts/templates", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -1178,6 +1188,9 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "name": "alertChk",
+                                "stream_type": "logs",
+                                "stream_name": "olympics_schema",
+                                "is_real_time": false,
                                 "query_condition": {
                                     "conditions": [{
                                         "column": "country",
@@ -1187,7 +1200,8 @@ mod tests {
                                 },
                                 "trigger_condition": {
                                     "period": 5,
-                                    "silence": 10,
+                                    "threshold": 1,
+                                    "silence": 10
                                 },
                                 "destinations": ["slack"],
                                 "context_attributes":{
@@ -1203,10 +1217,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!(
-                "/api/{}/{}/alerts",
-                "e2e", "olympics_schema" 
-            ))
+            .uri(&format!("/api/{}/{}/alerts", "e2e", "olympics_schema"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
