@@ -90,7 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           content-class="tab_content"
         />
         <q-route-tab
-          v-if="showCloudIngestionOptions"
           name="kinesisfirehose"
           :to="{
             name: 'kinesisfirehose',
@@ -103,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           content-class="tab_content"
         />
         <q-route-tab
-          v-if="showCloudIngestionOptions"
           name="gcpLogs"
           :to="{
             name: 'gcpLogs',
