@@ -56,3 +56,16 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
     }
     size
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_estimate_json_bytes() {
+        let json = r#"{"a":null,"b":true,"c":false,"d":{"a":"b","c":true,"d":false,"e":123456},"e":[""],"f":["a"],"g":["a","b"],"h":"bcdef","i":{},"j":{"ok":"yes"}}"#;
+        let val: Value = from_str(json).unwrap();
+        assert_eq!(estimate_json_bytes(&val), json.len());
+    }
+
+}

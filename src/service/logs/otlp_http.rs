@@ -265,7 +265,7 @@ pub async fn logs_json_handler(
                 let mut value: json::Value = json::to_value(log).unwrap();
 
                 // get json object
-                let mut local_val = value.as_object_mut().unwrap();
+                let local_val = value.as_object_mut().unwrap();
 
                 if log.get("attributes").is_some() {
                     let attributes = log.get("attributes").unwrap().as_array().unwrap();
@@ -351,7 +351,27 @@ pub async fn logs_json_handler(
                     .unwrap();
                 }
 
-                local_val = value.as_object_mut().unwrap();
+                let local_val = match value.take() {
+                    json::Value::Object(v) => v,
+                    _ => unreachable!(),
+                };
+
+                let mut to_add_distinct_values = vec![];
+                // get distinct_value item
+                for field in DISTINCT_FIELDS.iter() {
+                    if let Some(val) = local_val.get(field) {
+                        if !val.is_null() {
+                            to_add_distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Logs,
+                                stream_name: stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name: "".to_string(),
+                                filter_value: "".to_string(),
+                            });
+                        }
+                    }
+                }
 
                 let local_trigger = match super::add_valid_record(
                     &StreamMeta {
@@ -380,21 +400,7 @@ pub async fn logs_json_handler(
                     trigger = local_trigger;
                 }
 
-                // get distinct_value item
-                for field in DISTINCT_FIELDS.iter() {
-                    if let Some(val) = local_val.get(field) {
-                        if !val.is_null() {
-                            distinct_values.push(distinct_values::DvItem {
-                                stream_type: StreamType::Logs,
-                                stream_name: stream_name.to_string(),
-                                field_name: field.to_string(),
-                                field_value: val.as_str().unwrap().to_string(),
-                                filter_name: "".to_string(),
-                                filter_value: "".to_string(),
-                            });
-                        }
-                    }
-                }
+                distinct_values.extend(to_add_distinct_values);
             }
         }
     }
