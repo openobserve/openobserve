@@ -30,13 +30,12 @@ mod engine;
 mod exec;
 mod functions;
 
+pub mod name_visitor;
 pub mod search;
 pub mod value;
-pub mod name_visitor;
 
 pub use engine::Engine;
 pub use exec::Query;
-
 
 use crate::common::meta::stream::ScanStats;
 
