@@ -526,8 +526,8 @@ impl Sql {
                         );
                     }
                 }
-                println!("where_str: {}", where_str);
-                println!("sql: {}", sql);
+                // println!("where_str: {}", where_str);
+                // println!("sql: {}", sql);
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
@@ -1058,7 +1058,6 @@ mod tests {
             rpc_req.org_id = org_id.to_string();
 
             let resp = Sql::new(&rpc_req).await;
-            println!("{:?}", &resp);
             assert_eq!(resp.is_ok(), ok);
             if ok {
                 let resp = resp.unwrap();

@@ -42,14 +42,12 @@ pub async fn post_user(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+    println!("initiator_user: {:?}", initiator_user);
+    println!("is_root_user: {:?}", is_root_user(initiator_id));
     if is_root_user(initiator_id)
         || (initiator_user.is_ok()
             && initiator_user.as_ref().unwrap().is_some()
-            && initiator_user
-                .unwrap()
-                .unwrap()
-                .role
-                .eq(&UserRole::Admin))
+            && initiator_user.unwrap().unwrap().role.eq(&UserRole::Admin))
     {
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await
