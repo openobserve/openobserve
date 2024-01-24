@@ -202,7 +202,10 @@ pub async fn ingest(
             // End row based transform
 
             // get json object
-            let local_val = value.as_object_mut().unwrap();
+            let mut local_val = match value.take() {
+                json::Value::Object(v) => v,
+                _ => unreachable!(),
+            };
             // set _id
             if !doc_id.is_empty() {
                 local_val.insert("_id".to_string(), json::Value::String(doc_id.clone()));
@@ -260,6 +263,23 @@ pub async fn ingest(
             let mut status = RecordStatus::default();
             let need_trigger = !stream_trigger_map.contains_key(&stream_name);
 
+            let mut to_add_distinct_values = vec![];
+            // get distinct_value items
+            for field in DISTINCT_FIELDS.iter() {
+                if let Some(val) = local_val.get(field) {
+                    if !val.is_null() {
+                        to_add_distinct_values.push(distinct_values::DvItem {
+                            stream_type: StreamType::Logs,
+                            stream_name: stream_name.clone(),
+                            field_name: field.to_string(),
+                            field_value: val.as_str().unwrap().to_string(),
+                            filter_name: "".to_string(),
+                            filter_value: "".to_string(),
+                        });
+                    }
+                }
+            }
+
             let local_trigger = match super::add_valid_record(
                 &StreamMeta {
                     org_id: org_id.to_string(),
@@ -296,20 +316,7 @@ pub async fn ingest(
             }
 
             // get distinct_value item
-            for field in DISTINCT_FIELDS.iter() {
-                if let Some(val) = local_val.get(field) {
-                    if !val.is_null() {
-                        distinct_values.push(distinct_values::DvItem {
-                            stream_type: StreamType::Logs,
-                            stream_name: stream_name.clone(),
-                            field_name: field.to_string(),
-                            field_value: val.as_str().unwrap().to_string(),
-                            filter_name: "".to_string(),
-                            filter_value: "".to_string(),
-                        });
-                    }
-                }
-            }
+            distinct_values.extend(to_add_distinct_values);
 
             if status.failed > 0 {
                 bulk_res.errors = true;

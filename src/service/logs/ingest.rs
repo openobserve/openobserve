@@ -19,6 +19,7 @@ use std::{
 };
 
 use actix_web::http;
+use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -42,7 +43,7 @@ use crate::{
     },
     service::{
         distinct_values, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+        ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
         logs::StreamMeta,
         schema::get_upto_discard_error,
         usage::report_request_usage_stats,
@@ -54,15 +55,13 @@ pub async fn ingest(
     in_stream_name: &str,
     in_req: IngestionRequest<'_>,
     thread_id: usize,
-) -> Result<IngestionResponse, anyhow::Error> {
+) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     // check stream
     let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
-    if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
-        return Err(value);
-    }
+    check_ingestion_allowed(org_id, Some(stream_name))?;
 
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
@@ -129,7 +128,8 @@ pub async fn ingest(
             Ok(item) => item,
             Err(e) => {
                 log::error!("IngestionError: {:?}", e);
-                return Err(anyhow::anyhow!("Failed processing: {:?}", e));
+                continue;
+                // return Err(anyhow::anyhow!("Failed processing: {:?}", e));
             }
         };
 
@@ -148,11 +148,31 @@ pub async fn ingest(
             }
         };
 
-        let local_val = res.as_object_mut().unwrap();
-        if let Err(e) = handle_timestamp(local_val, min_ts) {
+        let mut local_val = match res.take() {
+            json::Value::Object(val) => val,
+            _ => unreachable!(),
+        };
+        if let Err(e) = handle_timestamp(&mut local_val, min_ts) {
             stream_status.status.failed += 1;
             stream_status.status.error = e.to_string();
             continue;
+        }
+
+        let mut to_add_distinct_values = vec![];
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = local_val.get(field) {
+                if !val.is_null() {
+                    to_add_distinct_values.push(distinct_values::DvItem {
+                        stream_type: StreamType::Logs,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.as_str().unwrap().to_string(),
+                        filter_name: "".to_string(),
+                        filter_value: "".to_string(),
+                    });
+                }
+            }
         }
 
         let local_trigger = match super::add_valid_record(
@@ -181,22 +201,7 @@ pub async fn ingest(
         if local_trigger.is_some() {
             trigger = local_trigger;
         }
-
-        // get distinct_value item
-        for field in DISTINCT_FIELDS.iter() {
-            if let Some(val) = local_val.get(field) {
-                if !val.is_null() {
-                    distinct_values.push(distinct_values::DvItem {
-                        stream_type: StreamType::Logs,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.as_str().unwrap().to_string(),
-                        filter_name: "".to_string(),
-                        filter_value: "".to_string(),
-                    });
-                }
-            }
-        }
+        distinct_values.extend(to_add_distinct_values);
     }
 
     // write data to wal
@@ -268,7 +273,7 @@ pub fn apply_functions<'a>(
     stream_vrl_map: &'a HashMap<String, VRLResultResolver>,
     stream_name: &'a str,
     runtime: &mut Runtime,
-) -> Result<json::Value, anyhow::Error> {
+) -> Result<json::Value> {
     let mut value = flatten::flatten(item)?;
 
     if !local_trans.is_empty() {

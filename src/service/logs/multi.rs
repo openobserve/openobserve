@@ -19,6 +19,7 @@ use std::{
 };
 
 use actix_web::{http, web};
+use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -35,7 +36,7 @@ use crate::{
     },
     service::{
         distinct_values, get_formatted_stream_name,
-        ingestion::{evaluate_trigger, is_ingestion_allowed, write_file, TriggerAlertData},
+        ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
         logs::StreamMeta,
         schema::get_upto_discard_error,
         usage::report_request_usage_stats,
@@ -66,7 +67,7 @@ async fn ingest_inner(
     body: web::Bytes,
     extend_json: &HashMap<String, serde_json::Value>,
     thread_id: usize,
-) -> Result<IngestionResponse, anyhow::Error> {
+) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
 
     let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
@@ -74,9 +75,7 @@ async fn ingest_inner(
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
 
-    if let Some(value) = is_ingestion_allowed(org_id, Some(stream_name)) {
-        return Err(value);
-    }
+    check_ingestion_allowed(org_id, Some(stream_name))?;
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let min_ts =
@@ -137,14 +136,11 @@ async fn ingest_inner(
             )?;
         }
 
-        if value.is_null() || !value.is_object() {
-            stream_status.status.failed += 1; // transform failed or dropped
-            continue;
-        }
+        let mut local_val = match value.take() {
+            json::Value::Object(v) => v,
+            _ => unreachable!(),
+        };
         // End row based transform
-
-        // get json object
-        let local_val = value.as_object_mut().unwrap();
 
         // handle timestamp
         let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
@@ -168,6 +164,23 @@ async fn ingest_inner(
             CONFIG.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
+
+        let mut to_add_distinct_values = vec![];
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = local_val.get(field) {
+                if !val.is_null() {
+                    to_add_distinct_values.push(distinct_values::DvItem {
+                        stream_type: StreamType::Logs,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.as_str().unwrap().to_string(),
+                        filter_name: "".to_string(),
+                        filter_value: "".to_string(),
+                    });
+                }
+            }
+        }
 
         // write data
         let local_trigger = match super::add_valid_record(
@@ -197,21 +210,8 @@ async fn ingest_inner(
             trigger = local_trigger;
         }
 
-        // get distinct_value item
-        for field in DISTINCT_FIELDS.iter() {
-            if let Some(val) = local_val.get(field) {
-                if !val.is_null() {
-                    distinct_values.push(distinct_values::DvItem {
-                        stream_type: StreamType::Logs,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.as_str().unwrap().to_string(),
-                        filter_name: "".to_string(),
-                        filter_value: "".to_string(),
-                    });
-                }
-            }
-        }
+        // add distinct values
+        distinct_values.extend(to_add_distinct_values);
     }
 
     // write data to wal
