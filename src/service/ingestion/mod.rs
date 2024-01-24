@@ -27,6 +27,8 @@ use vrl::{
     prelude::state,
 };
 
+use anyhow::{anyhow, Result};
+
 use crate::{
     common::{
         infra::{
@@ -271,7 +273,7 @@ pub fn apply_stream_transform(
     stream_vrl_map: &HashMap<String, VRLResultResolver>,
     stream_name: &str,
     runtime: &mut Runtime,
-) -> Result<Value, anyhow::Error> {
+) -> Result<Value> {
     for trans in local_trans {
         let func_key = format!("{stream_name}/{}", trans.transform.name);
         if stream_vrl_map.contains_key(&func_key) && !value.is_null() {
@@ -319,22 +321,22 @@ pub async fn write_file(
     req_stats
 }
 
-pub fn is_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Option<anyhow::Error> {
+pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Result<()> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Some(anyhow::anyhow!("not an ingester"));
+        return Err(anyhow!("not an ingester"));
     }
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Some(anyhow::anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow!("Quota exceeded for this organization"));
     }
 
     // check if we are allowed to ingest
     if let Some(stream_name) = stream_name {
         if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
-            return Some(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
+            return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
     };
 
-    None
+    Ok(())
 }
 
 pub fn get_float_value(val: &Value) -> f64 {
