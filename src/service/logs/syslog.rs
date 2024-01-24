@@ -16,6 +16,7 @@
 use std::{collections::HashMap, net::SocketAddr};
 
 use actix_web::{http, HttpResponse};
+use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -41,7 +42,7 @@ use crate::{
     },
 };
 
-pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow::Error> {
+pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let start = std::time::Instant::now();
     let ip = addr.ip();
     let matching_route = get_org_for_ip(ip).await;
@@ -129,13 +130,11 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
             &mut runtime,
         )?;
     }
-    if value.is_null() || !value.is_object() {
-        stream_status.status.failed += 1; // transform failed or dropped
-    }
-    // End row based transform
 
-    // get json object
-    let local_val = value.as_object_mut().unwrap();
+    let mut local_val = match value.take() {
+        json::Value::Object(v) => v,
+        _ => unreachable!(),
+    };
 
     // handle timestamp
     let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
@@ -156,6 +155,23 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
         CONFIG.common.column_timestamp.clone(),
         json::Value::Number(timestamp.into()),
     );
+
+    let mut to_add_distinct_values = vec![];
+    // get distinct_value item
+    for field in DISTINCT_FIELDS.iter() {
+        if let Some(val) = local_val.get(field) {
+            if !val.is_null() {
+                to_add_distinct_values.push(distinct_values::DvItem {
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_string(),
+                    field_name: field.to_string(),
+                    field_value: val.as_str().unwrap().to_string(),
+                    filter_name: "".to_string(),
+                    filter_value: "".to_string(),
+                });
+            }
+        }
+    }
 
     let local_trigger = match super::add_valid_record(
         &StreamMeta {
@@ -185,20 +201,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse, anyhow:
     }
 
     // get distinct_value item
-    for field in DISTINCT_FIELDS.iter() {
-        if let Some(val) = local_val.get(field) {
-            if !val.is_null() {
-                distinct_values.push(distinct_values::DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    field_name: field.to_string(),
-                    field_value: val.as_str().unwrap().to_string(),
-                    filter_name: "".to_string(),
-                    filter_value: "".to_string(),
-                });
-            }
-        }
-    }
+    distinct_values.extend(to_add_distinct_values);
 
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;

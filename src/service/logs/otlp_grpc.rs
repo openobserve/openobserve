@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use actix_web::{http, web, HttpResponse};
+use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
@@ -25,6 +26,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use prost::Message;
+use anyhow::Result;
 
 use super::StreamMeta;
 use crate::{
@@ -56,7 +58,7 @@ pub async fn usage_ingest(
     in_stream_name: &str,
     body: web::Bytes,
     thread_id: usize,
-) -> Result<IngestionResponse, anyhow::Error> {
+) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
@@ -108,7 +110,13 @@ pub async fn usage_ingest(
         let mut value = flatten::flatten(item)?;
 
         // get json object
-        let local_val = value.as_object_mut().unwrap();
+        let mut local_val = match value.take() {
+            json::Value::Object(v) => v,
+            _ => {
+                stream_status.status.failed += 1; // transform failed or dropped
+                continue;
+            }
+        };
 
         // handle timestamp
         let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {
@@ -132,6 +140,23 @@ pub async fn usage_ingest(
             CONFIG.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
+
+        let mut to_add_distinct_values = vec![];
+        // get distinct_value item
+        for field in DISTINCT_FIELDS.iter() {
+            if let Some(val) = local_val.get(field) {
+                if !val.is_null() {
+                    to_add_distinct_values.push(distinct_values::DvItem {
+                        stream_type: StreamType::Logs,
+                        stream_name: stream_name.to_string(),
+                        field_name: field.to_string(),
+                        field_value: val.as_str().unwrap().to_string(),
+                        filter_name: "".to_string(),
+                        filter_value: "".to_string(),
+                    });
+                }
+            }
+        }
 
         let local_trigger = match super::add_valid_record(
             &StreamMeta {
@@ -159,22 +184,7 @@ pub async fn usage_ingest(
         if local_trigger.is_some() {
             trigger = local_trigger;
         }
-
-        // get distinct_value item
-        for field in DISTINCT_FIELDS.iter() {
-            if let Some(val) = local_val.get(field) {
-                if !val.is_null() {
-                    distinct_values.push(distinct_values::DvItem {
-                        stream_type: StreamType::Logs,
-                        stream_name: stream_name.to_string(),
-                        field_name: field.to_string(),
-                        field_value: val.as_str().unwrap().to_string(),
-                        filter_name: "".to_string(),
-                        filter_value: "".to_string(),
-                    });
-                }
-            }
-        }
+        distinct_values.extend(to_add_distinct_values);
     }
 
     // write data to wal
@@ -226,7 +236,7 @@ pub async fn handle_grpc_request(
     request: ExportLogsServiceRequest,
     is_grpc: bool,
     in_stream_name: Option<&str>,
-) -> Result<HttpResponse, anyhow::Error> {
+) -> Result<HttpResponse> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -398,8 +408,29 @@ pub async fn handle_grpc_request(
                         &mut runtime,
                     )?;
                 }
+
                 // get json object
-                let local_val = rec.as_object_mut().unwrap();
+                let local_val = match rec.take() {
+                    json::Value::Object(v) => v,
+                    _ => unreachable!(),
+                };
+
+                let mut to_add_distinct_values = vec![];
+                // get distinct_value item
+                for field in DISTINCT_FIELDS.iter() {
+                    if let Some(val) = local_val.get(field) {
+                        if !val.is_null() {
+                            to_add_distinct_values.push(distinct_values::DvItem {
+                                stream_type: StreamType::Logs,
+                                stream_name: stream_name.to_string(),
+                                field_name: field.to_string(),
+                                field_value: val.as_str().unwrap().to_string(),
+                                filter_name: "".to_string(),
+                                filter_value: "".to_string(),
+                            });
+                        }
+                    }
+                }
 
                 let local_trigger = match super::add_valid_record(
                     &StreamMeta {
@@ -427,22 +458,7 @@ pub async fn handle_grpc_request(
                 if local_trigger.is_some() {
                     trigger = local_trigger;
                 }
-
-                // get distinct_value item
-                for field in DISTINCT_FIELDS.iter() {
-                    if let Some(val) = local_val.get(field) {
-                        if !val.is_null() {
-                            distinct_values.push(distinct_values::DvItem {
-                                stream_type: StreamType::Logs,
-                                stream_name: stream_name.to_string(),
-                                field_name: field.to_string(),
-                                field_value: val.as_str().unwrap().to_string(),
-                                filter_name: "".to_string(),
-                                filter_value: "".to_string(),
-                            });
-                        }
-                    }
-                }
+                distinct_values.extend(to_add_distinct_values);
             }
         }
     }
