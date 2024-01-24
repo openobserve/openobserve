@@ -26,6 +26,9 @@ use sqlparser::{
     parser::Parser,
 };
 
+const MAX_LIMIT: usize = 10000;
+const MAX_OFFSET: usize = 100000;
+
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -182,7 +185,13 @@ impl<'a> From<Offset<'a>> for usize {
             SqlOffset {
                 value: SqlExpr::Value(Value::Number(v, _b)),
                 ..
-            } => v.parse().unwrap_or(0),
+            } => {
+                let mut v: usize = v.parse().unwrap_or(0);
+                if v > MAX_OFFSET {
+                    v = MAX_OFFSET;
+                }
+                v
+            }
             _ => 0,
         }
     }
@@ -193,8 +202,8 @@ impl<'a> From<Limit<'a>> for usize {
         match l.0 {
             SqlExpr::Value(Value::Number(v, _b)) => {
                 let mut v: usize = v.parse().unwrap_or(0);
-                if v > 10000 {
-                    v = 10000;
+                if v > MAX_LIMIT {
+                    v = MAX_LIMIT;
                 }
                 v
             }

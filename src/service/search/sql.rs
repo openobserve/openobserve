@@ -280,17 +280,17 @@ impl Sql {
                 match RE_WHERE.captures(origin_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
-                        if !meta.order_by.is_empty() {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
-                                .to_string();
-                        } else if !meta.group_by.is_empty() {
+                        if !meta.group_by.is_empty() {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" group ").unwrap()]
                                 .to_string();
                         } else if meta.having {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" having ").unwrap()]
+                                .to_string();
+                        } else if !meta.order_by.is_empty() {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
                         } else if meta.limit > 0 {
                             where_str = where_str
@@ -915,6 +915,11 @@ mod tests {
                 false,
                 (0, 0),
             ),
+            (
+                "select abc, count(*) as cnt from table1 where match_all('abc') and str_match(log,'abc') group by abc having cnt > 1 order by _timestamp desc limit 10",
+                false,
+                (0, 0),
+            ),
         ];
 
         let org_id = "test_org";
@@ -1026,6 +1031,12 @@ mod tests {
                 "select DISTINCT field1, field2, field3 FROM table1",
                 true,
                 0,
+                (0, 0),
+            ),
+            (
+                "SELECT trace_id, MIN(start_time) AS start_time FROM table1 WHERE service_name ='APISIX-B' GROUP BY trace_id ORDER BY start_time DESC LIMIT 10",
+                true,
+                10,
                 (0, 0),
             ),
         ];
