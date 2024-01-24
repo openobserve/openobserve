@@ -15,14 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login
-    v-if="
-      config.isEnterprise !== 'true' ||
-      store.state.zoConfig.dex_enabled !== true
-    "
-  ></login>
+  <login v-if="store.state.zoConfig.dex_enabled == false"></login>
   <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
-    Wait while redirecting to login page...
+    Wait while redirection...
   </div>
 </template>
 
@@ -39,6 +34,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import { p } from "msw/lib/SetupApi-8ab693f7";
 
 export default defineComponent({
   name: "LoginPage",
@@ -125,6 +121,7 @@ export default defineComponent({
             return optiondata;
           }
         );
+        redirectUser();
       });
     };
 
@@ -133,15 +130,12 @@ export default defineComponent({
      * @param redirectURI
      */
     const redirectUser = () => {
-      const path = getPath();
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
       if (redirectURI != null && redirectURI != "") {
-        // router.push({ path: redirectURI });
-        window.location.replace(redirectURI);
+        router.push({ path: redirectURI });
       } else {
-        // router.push({ path: "/" });
-        window.location.replace(path);
+        router.push({ path: "/" });
       }
     };
 
@@ -205,8 +199,8 @@ export default defineComponent({
               loginState: true,
               userInfo: this.userInfo,
             });
-            // this.getDefaultOrganization();
-            this.redirectUser();
+            this.getDefaultOrganization();
+            // this.redirectUser();
           } else {
             this.VerifyAndCreateUser();
           }
@@ -241,8 +235,8 @@ export default defineComponent({
             });
             dismiss();
 
-            // this.getDefaultOrganization();
-            this.redirectUser();
+            this.getDefaultOrganization();
+            // this.redirectUser();
           });
         } else {
           this.store.dispatch("login", {
@@ -250,8 +244,8 @@ export default defineComponent({
             userInfo: this.userInfo,
           });
 
-          // this.getDefaultOrganization();
-          this.redirectUser();
+          this.getDefaultOrganization();
+          // this.redirectUser();
         }
       });
     },
