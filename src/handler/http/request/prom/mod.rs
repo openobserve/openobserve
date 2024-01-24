@@ -12,7 +12,8 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+#[cfg(feature = "enterprise")]
+use std::collections::HashSet;
 use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
@@ -118,8 +119,9 @@ pub async fn remote_write(
 pub async fn query_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestQuery>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query(&org_id.into_inner(), req.into_inner()).await
+    query(&org_id.into_inner(), req.into_inner(), in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query")]
@@ -127,16 +129,59 @@ pub async fn query_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestQuery>,
     web::Form(form): web::Form<meta::prom::RequestQuery>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
         form
     } else {
         req.into_inner()
     };
-    query(&org_id.into_inner(), req).await
+    query(&org_id.into_inner(), req, in_req).await
 }
 
-async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpResponse, Error> {
+async fn query(
+    org_id: &str,
+    req: meta::prom::RequestQuery,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
+        let mut visitor = promql::name_visitor::MetricNameVisitor {
+            name: HashSet::new(),
+        };
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let user_id = _in_req.headers().get("user_id").unwrap();
+        if !is_root_user(user_id.to_str().unwrap()) {
+            for name in visitor.name {
+                let user: meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                    .unwrap()
+                    .clone();
+                if user.is_external
+                    && !crate::handler::http::auth::validator::check_permissions(
+                        user_id.to_str().unwrap(),
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!("stream:{}", name),
+                            org_id: org_id.to_string(),
+                            bypass_check: false,
+                        },
+                    )
+                    .await
+                {
+                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                }
+            }
+        }
+    }
+
     let start = match req.time {
         None => chrono::Utc::now().timestamp_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {
@@ -222,8 +267,9 @@ async fn query(org_id: &str, req: meta::prom::RequestQuery) -> Result<HttpRespon
 pub async fn query_range_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestRangeQuery>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    query_range(&org_id.into_inner(), req.into_inner()).await
+    query_range(&org_id.into_inner(), req.into_inner(), in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/query_range")]
@@ -231,19 +277,59 @@ pub async fn query_range_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestRangeQuery>,
     web::Form(form): web::Form<meta::prom::RequestRangeQuery>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let req = if form.query.is_some() {
         form
     } else {
         req.into_inner()
     };
-    query_range(&org_id.into_inner(), req).await
+    query_range(&org_id.into_inner(), req, in_req).await
 }
 
 async fn query_range(
     org_id: &str,
     req: meta::prom::RequestRangeQuery,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
+        let mut visitor = promql::name_visitor::MetricNameVisitor {
+            name: HashSet::new(),
+        };
+        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let user_id = _in_req.headers().get("user_id").unwrap();
+        if !is_root_user(user_id.to_str().unwrap()) {
+            for name in visitor.name {
+                let user: meta::user::User = USERS
+                    .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                    .unwrap()
+                    .clone();
+                if user.is_external
+                    && !crate::handler::http::auth::validator::check_permissions(
+                        user_id.to_str().unwrap(),
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!("stream:{}", name),
+                            org_id: org_id.to_string(),
+                            bypass_check: false,
+                        },
+                    )
+                    .await
+                {
+                    return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+                }
+            }
+        }
+    }
+
     let start = match req.start {
         None => chrono::Utc::now().timestamp_micros(),
         Some(v) => match parse_str_to_timestamp_micros(&v) {

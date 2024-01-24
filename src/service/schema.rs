@@ -23,7 +23,7 @@ use std::{
 use config::{
     meta::stream::StreamType,
     utils::{
-        schema::{infer_json_schema, infer_json_schema_from_values},
+        schema::{infer_json_schema, infer_json_schema_from_map},
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -33,6 +33,7 @@ use datafusion::arrow::{
     error::ArrowError,
 };
 use itertools::Itertools;
+use serde_json::{Map, Value};
 
 use crate::{
     common::{
@@ -281,7 +282,7 @@ pub async fn check_for_schema(
     stream_name: &str,
     stream_type: StreamType,
     stream_schema_map: &mut HashMap<String, Schema>,
-    record_val: &json::Value,
+    record_val: &Map<String, Value>,
     record_ts: i64,
 ) -> Result<SchemaEvolution, anyhow::Error> {
     let mut schema = if stream_schema_map.contains_key(stream_name) {
@@ -303,7 +304,7 @@ pub async fn check_for_schema(
     }
 
     let value_iter = [record_val].into_iter();
-    let inferred_schema = infer_json_schema_from_values(value_iter, stream_type).unwrap();
+    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     if schema.fields.eq(&inferred_schema.fields) {
         // return (true, None, schema.fields().to_vec());
@@ -538,7 +539,6 @@ async fn handle_new_schema(
                 )
                 .await
                 .unwrap();
-
                 crate::common::utils::auth::set_ownership(
                     org_id,
                     "streams",
@@ -793,6 +793,7 @@ pub async fn set_schema_metadata(
             "created_at".to_string(),
             chrono::Utc::now().timestamp_micros().to_string(),
         );
+        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
     }
     db::schema::set(
         org_id,
@@ -860,7 +861,7 @@ mod tests {
             stream_name,
             StreamType::Logs,
             &mut map,
-            &record,
+            &record.as_object().unwrap(),
             1234234234234,
         )
         .await

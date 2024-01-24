@@ -239,10 +239,26 @@ pub struct SignInResponse {
 pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
+    pub is_internal_user: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RoleOrg {
     pub role: UserRole,
     pub org: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct UserGroup {
+    pub name: String,
+    pub users: Option<std::collections::HashSet<String>>,
+    pub roles: Option<std::collections::HashSet<String>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct UserGroupRequest {
+    pub add_users: Option<std::collections::HashSet<String>>,
+    pub remove_users: Option<std::collections::HashSet<String>>,
+    pub add_roles: Option<std::collections::HashSet<String>>,
+    pub remove_roles: Option<std::collections::HashSet<String>>,
 }
