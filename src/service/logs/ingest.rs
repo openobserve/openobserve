@@ -128,8 +128,7 @@ pub async fn ingest(
             Ok(item) => item,
             Err(e) => {
                 log::error!("IngestionError: {:?}", e);
-                continue;
-                // return Err(anyhow::anyhow!("Failed processing: {:?}", e));
+                return Err(anyhow::anyhow!("Failed processing: {:?}", e));
             }
         };
 
