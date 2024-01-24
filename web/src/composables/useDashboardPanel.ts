@@ -60,6 +60,10 @@ const getDefaultDashboardPanelData: any = () => ({
         lat: 0,
         lng: 0,
       },
+      map_symbol_style: {
+        min: 1,
+        max: 10,
+      },
       drilldown: [],
     },
     htmlContent: "",
