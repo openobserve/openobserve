@@ -136,11 +136,17 @@ async fn ingest_inner(
             )?;
         }
 
+        if value.is_null() || !value.is_object() {
+            stream_status.status.failed += 1; // transform failed or dropped
+            continue;
+        }
+        // End row based transform
+
+        // get json object
         let mut local_val = match value.take() {
             json::Value::Object(v) => v,
             _ => unreachable!(),
         };
-        // End row based transform
 
         // handle timestamp
         let timestamp = match local_val.get(&CONFIG.common.column_timestamp) {

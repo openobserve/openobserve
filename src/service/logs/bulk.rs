@@ -206,6 +206,7 @@ pub async fn ingest(
                 json::Value::Object(v) => v,
                 _ => unreachable!(),
             };
+
             // set _id
             if !doc_id.is_empty() {
                 local_val.insert("_id".to_string(), json::Value::String(doc_id.clone()));
