@@ -83,10 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
@@ -105,6 +104,14 @@ export default defineComponent({
     onBeforeMount(() => {
       redirectRoute();
     });
+
+    watch(
+      () => router.currentRoute.value.name,
+      (routeName) => {
+        // This is handled for browser back button, as it was redirecting to this app alerts page and not alert list page
+        if (routeName === "alerts") router.back();
+      }
+    );
 
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "alerts") {
