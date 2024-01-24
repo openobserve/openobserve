@@ -283,29 +283,38 @@ pub async fn logs_json_handler(
                 local_val.remove("body_stringvalue");
 
                 // process trace id
-                let trace_id = if log.get("trace_id").is_some() {
+                if log.get("trace_id").is_some() {
                     local_val.remove("trace_id");
-                    log.get("trace_id").unwrap()
-                } else {
-                    local_val.remove("traceIds");
-                    log.get("traceId").unwrap()
+                    let trace_id = log.get("trace_id").unwrap();
+                    let trace_id_str = trace_id.as_str().unwrap();
+                    let trace_id_bytes = hex::decode(trace_id_str).unwrap().try_into().unwrap();
+                    let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
+                    local_val.insert("trace_id".to_owned(), trace_id.into());
+                } else if log.get("traceId").is_some() {
+                    local_val.remove("traceId");
+                    let trace_id = log.get("traceId").unwrap();
+                    let trace_id_str = trace_id.as_str().unwrap();
+                    let trace_id_bytes = hex::decode(trace_id_str).unwrap().try_into().unwrap();
+                    let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
+                    local_val.insert("trace_id".to_owned(), trace_id.into());
                 };
-                let trace_id_str = trace_id.as_str().unwrap();
-                let trace_id_bytes = hex::decode(trace_id_str).unwrap().try_into().unwrap();
-                let trace_id = TraceId::from_bytes(trace_id_bytes).to_string();
-                local_val.insert("trace_id".to_owned(), trace_id.into());
 
                 // process span id
-
-                let span_id = if log.get("span_id").is_some() {
-                    log.get("span_id").unwrap()
-                } else {
-                    log.get("spanId").unwrap()
+                if log.get("span_id").is_some() {
+                    local_val.remove("span_id");
+                    let span_id = log.get("span_id").unwrap();
+                    let span_id_str = span_id.as_str().unwrap();
+                    let span_id_bytes = hex::decode(span_id_str).unwrap().try_into().unwrap();
+                    let span_id = SpanId::from_bytes(span_id_bytes).to_string();
+                    local_val.insert("span_id".to_owned(), span_id.into());
+                } else if log.get("spanId").is_some() {
+                    local_val.remove("spanId");
+                    let span_id = log.get("spanId").unwrap();
+                    let span_id_str = span_id.as_str().unwrap();
+                    let span_id_bytes = hex::decode(span_id_str).unwrap().try_into().unwrap();
+                    let span_id = SpanId::from_bytes(span_id_bytes).to_string();
+                    local_val.insert("span_id".to_owned(), span_id.into());
                 };
-                let span_id_str = span_id.as_str().unwrap();
-                let span_id_bytes = hex::decode(span_id_str).unwrap().try_into().unwrap();
-                let span_id = SpanId::from_bytes(span_id_bytes).to_string();
-                local_val.insert("span_id".to_owned(), span_id.into());
 
                 if log.get("body").is_some() {
                     let body = log.get("body").unwrap().get("stringValue").unwrap();
