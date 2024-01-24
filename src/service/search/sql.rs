@@ -53,7 +53,6 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
 static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-static RE_TIMESTAMP_EMPTY: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
@@ -220,7 +219,7 @@ impl Sql {
         };
         origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
-        // Hack _timestamp
+        // Hack select for _timestamp
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
@@ -232,7 +231,7 @@ impl Sql {
             }
         }
 
-        // check time_range
+        // check time_range values
         if req_time_range.0 > 0
             && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
         {
@@ -253,9 +252,8 @@ impl Sql {
             )));
         }
 
-        // Hack time_range
-        let meta_time_range_is_empty =
-            meta.time_range.is_none() || meta.time_range.unwrap() == (0, 0);
+        // Hack time_range for sql
+        let meta_time_range_is_empty = meta.time_range.is_none() || meta.time_range == Some((0, 0));
         if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
             if req_time_range.1 == 0 {
                 req_time_range.1 = chrono::Utc::now().timestamp_micros();
@@ -279,21 +277,28 @@ impl Sql {
                 "".to_string()
             };
             if !time_range_sql.is_empty() && meta_time_range_is_empty {
-                match RE_TIMESTAMP_EMPTY.captures(origin_sql.as_str()) {
+                match RE_WHERE.captures(origin_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
-                        if !meta.order_by.is_empty() {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
-                                .to_string();
-                        }
                         if !meta.group_by.is_empty() {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" group ").unwrap()]
                                 .to_string();
-                        } else if where_str.to_lowercase().contains(" having ") {
+                        } else if meta.having {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" having ").unwrap()]
+                                .to_string();
+                        } else if !meta.order_by.is_empty() {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" order ").unwrap()]
+                                .to_string();
+                        } else if meta.limit > 0 {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" limit ").unwrap()]
+                                .to_string();
+                        } else if meta.offset > 0 {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" offset ").unwrap()]
                                 .to_string();
                         }
                         let pos_start = origin_sql.find(where_str.as_str()).unwrap();
@@ -314,7 +319,7 @@ impl Sql {
             }
         }
 
-        // Hack offset limit
+        // Hack offset limit and sort by for sql
         if meta.limit == 0 {
             meta.offset = req_query.from as usize;
             meta.limit = req_query.size as usize;
@@ -910,6 +915,11 @@ mod tests {
                 false,
                 (0, 0),
             ),
+            (
+                "select abc, count(*) as cnt from table1 where match_all('abc') and str_match(log,'abc') group by abc having cnt > 1 order by _timestamp desc limit 10",
+                false,
+                (0, 0),
+            ),
         ];
 
         let org_id = "test_org";
@@ -1021,6 +1031,12 @@ mod tests {
                 "select DISTINCT field1, field2, field3 FROM table1",
                 true,
                 0,
+                (0, 0),
+            ),
+            (
+                "SELECT trace_id, MIN(start_time) AS start_time FROM table1 WHERE service_name ='APISIX-B' GROUP BY trace_id ORDER BY start_time DESC LIMIT 10",
+                true,
+                10,
                 (0, 0),
             ),
         ];

@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::http;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -201,6 +201,8 @@ pub async fn ingest(
         if local_trigger.is_some() {
             trigger = local_trigger;
         }
+
+        // add distinct values
         distinct_values.extend(to_add_distinct_values);
     }
 

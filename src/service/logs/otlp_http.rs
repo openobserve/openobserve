@@ -351,6 +351,7 @@ pub async fn logs_json_handler(
                     .unwrap();
                 }
 
+                // get json object
                 let local_val = match value.take() {
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
@@ -400,6 +401,7 @@ pub async fn logs_json_handler(
                     trigger = local_trigger;
                 }
 
+                // add distinct values
                 distinct_values.extend(to_add_distinct_values);
             }
         }

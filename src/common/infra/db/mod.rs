@@ -18,16 +18,10 @@ use std::sync::Arc;
 use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{
-    meta::stream::{FileKey, FileMeta},
-    CONFIG,
-};
+use config::CONFIG;
 use tokio::sync::{mpsc, OnceCell};
 
-use crate::common::{
-    infra::errors::Result,
-    meta::{meta_store::MetaStore, stream::StreamStats},
-};
+use crate::common::{infra::errors::Result, meta::meta_store::MetaStore};
 
 pub mod dynamo;
 pub mod etcd;
@@ -189,82 +183,6 @@ pub struct MetaRecord {
     pub key1: String,
     pub key2: String,
     pub value: String,
-}
-
-#[derive(Debug)]
-pub enum DbEvent {
-    Meta(DbEventMeta),
-    FileList(DbEventFileList),
-    FileListDeleted(DbEventFileListDeleted),
-    StreamStats(DbEventStreamStats),
-    CreateTableMeta,
-    CreateTableFileList,
-    CreateTableFileListIndex,
-    Shutdown,
-}
-
-pub enum DbEventMeta {
-    Put(String, Bytes, bool),
-    Delete(String, bool, bool),
-}
-
-impl std::fmt::Debug for DbEventMeta {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DbEventMeta::Put(key, ..) => write!(f, "Put({})", key),
-            DbEventMeta::Delete(key, ..) => write!(f, "Delete({})", key),
-        }
-    }
-}
-
-pub enum DbEventFileList {
-    Add(String, FileMeta),
-    BatchAdd(Vec<FileKey>),
-    BatchRemove(Vec<String>),
-    Initialized,
-}
-
-impl std::fmt::Debug for DbEventFileList {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DbEventFileList::Add(key, _) => write!(f, "Add({})", key),
-            DbEventFileList::BatchAdd(keys) => write!(f, "BatchAdd({})", keys.len()),
-            DbEventFileList::BatchRemove(keys) => write!(f, "BatchRemove({})", keys.len()),
-            DbEventFileList::Initialized => write!(f, "Initialized"),
-        }
-    }
-}
-
-pub enum DbEventFileListDeleted {
-    BatchAdd(String, i64, Vec<String>),
-    BatchRemove(Vec<String>),
-}
-
-impl std::fmt::Debug for DbEventFileListDeleted {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DbEventFileListDeleted::BatchAdd(org_id, created_at, keys) => {
-                write!(f, "BatchAdd({}, {}, {})", org_id, created_at, keys.len())
-            }
-            DbEventFileListDeleted::BatchRemove(keys) => write!(f, "BatchRemove({})", keys.len()),
-        }
-    }
-}
-
-pub enum DbEventStreamStats {
-    Set(String, Vec<(String, StreamStats)>),
-    ResetMinTS(String, i64),
-    ResetAll,
-}
-
-impl std::fmt::Debug for DbEventStreamStats {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DbEventStreamStats::Set(key, _) => write!(f, "Set({})", key),
-            DbEventStreamStats::ResetMinTS(key, _) => write!(f, "ResetMinTS({})", key),
-            DbEventStreamStats::ResetAll => write!(f, "ResetAll"),
-        }
-    }
 }
 
 #[cfg(test)]

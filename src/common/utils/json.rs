@@ -67,5 +67,4 @@ mod tests {
         let val: Value = from_str(json).unwrap();
         assert_eq!(estimate_json_bytes(&val), json.len());
     }
-
 }

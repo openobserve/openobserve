@@ -54,14 +54,6 @@ impl super::FileList for MysqlFileList {
         create_table_index().await
     }
 
-    async fn set_initialised(&self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn get_initialised(&self) -> Result<bool> {
-        Ok(true)
-    }
-
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =

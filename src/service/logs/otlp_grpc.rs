@@ -26,7 +26,6 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use prost::Message;
-use anyhow::Result;
 
 use super::StreamMeta;
 use crate::{
@@ -184,6 +183,8 @@ pub async fn usage_ingest(
         if local_trigger.is_some() {
             trigger = local_trigger;
         }
+
+        // add distinct values
         distinct_values.extend(to_add_distinct_values);
     }
 

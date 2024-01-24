@@ -69,14 +69,6 @@ impl super::FileList for DynamoFileList {
         create_table_index().await
     }
 
-    async fn set_initialised(&self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn get_initialised(&self) -> Result<bool> {
-        Ok(true)
-    }
-
     async fn add(&self, file: &str, meta: &FileMeta) -> Result<()> {
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;

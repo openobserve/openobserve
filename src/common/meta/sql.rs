@@ -26,6 +26,9 @@ use sqlparser::{
     parser::Parser,
 };
 
+const MAX_LIMIT: usize = 10000;
+const MAX_OFFSET: usize = 100000;
+
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -34,6 +37,7 @@ pub struct Sql {
     pub(crate) source: String,                // table
     pub(crate) order_by: Vec<(String, bool)>, // desc: true / false
     pub(crate) group_by: Vec<String>,         // field
+    pub(crate) having: bool,
     pub(crate) offset: usize,
     pub(crate) limit: usize,
     pub(crate) time_range: Option<(i64, i64)>,
@@ -109,6 +113,7 @@ impl TryFrom<&Statement> for Sql {
                     selection,
                     projection,
                     group_by: groups,
+                    having,
                     ..
                 } = match &q.body.as_ref() {
                     SetExpr::Select(statement) => statement.as_ref(),
@@ -152,6 +157,7 @@ impl TryFrom<&Statement> for Sql {
                     source,
                     order_by,
                     group_by,
+                    having: having.is_some(),
                     offset,
                     limit,
                     time_range,
@@ -179,7 +185,13 @@ impl<'a> From<Offset<'a>> for usize {
             SqlOffset {
                 value: SqlExpr::Value(Value::Number(v, _b)),
                 ..
-            } => v.parse().unwrap_or(0),
+            } => {
+                let mut v: usize = v.parse().unwrap_or(0);
+                if v > MAX_OFFSET {
+                    v = MAX_OFFSET;
+                }
+                v
+            }
             _ => 0,
         }
     }
@@ -190,8 +202,8 @@ impl<'a> From<Limit<'a>> for usize {
         match l.0 {
             SqlExpr::Value(Value::Number(v, _b)) => {
                 let mut v: usize = v.parse().unwrap_or(0);
-                if v > 10000 {
-                    v = 10000;
+                if v > MAX_LIMIT {
+                    v = MAX_LIMIT;
                 }
                 v
             }

@@ -321,7 +321,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
             session_id,
-            org_id = req.org_id
+            org_id = req.org_id,
+            node_id = node.id,
+            node_addr = node_addr.as_str(),
         );
         let task = tokio::task::spawn(
             async move {
@@ -338,6 +340,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                         &mut MetadataMap(request.metadata_mut()),
                     )
                 });
+
+                log::info!("[session_id {session_id}] search->grpc: request node: {}, is_querier: {}", &node_addr, is_querier);
 
                 let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                     .parse()
@@ -375,7 +379,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 };
 
                 log::info!(
-                    "[session_id {session_id}] search->grpc: result node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
+                    "[session_id {session_id}] search->grpc: response node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
                     &node.grpc_addr,
                     is_querier,
                     response.total,

@@ -18,6 +18,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::{anyhow, Result};
 use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
 use config::{meta::stream::StreamType, SIZE_IN_MB};
@@ -26,8 +27,6 @@ use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
     prelude::state,
 };
-
-use anyhow::{anyhow, Result};
 
 use crate::{
     common::{
