@@ -44,9 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 )
               )
             "
-            input
+            :input="false"
             direction-links
-            boundary-links
+            :boundary-numbers="false"
+            :max-pages="5"
+            :ellipses="false"
             icon-first="skip_previous"
             icon-last="skip_next"
             icon-prev="fast_rewind"
