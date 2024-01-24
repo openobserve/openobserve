@@ -211,6 +211,7 @@ export default defineComponent({
     onActivated(async () => {
       provider.value?.dispose();
       registerAutoCompleteProvider();
+      editorObj.layout();
     });
 
     onDeactivated(() => {
