@@ -1323,7 +1323,7 @@ export default defineComponent({
       // const filters = searchObj.data.stream.filters;
       const parser = new Parser();
 
-      const defaultQuery = `SELECT * FROM ${selectedStreamName.value} WHERE `;
+      const defaultQuery = `SELECT * FROM '${selectedStreamName.value}' WHERE `;
 
       const parsedQuery = parser.astify(defaultQuery + query);
 
@@ -1445,7 +1445,10 @@ export default defineComponent({
     changeStream: {
       handler(stream, oldStream) {
         if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-          if (oldStream.value) this.searchObj.data.query = "";
+          if (oldStream.value) {
+            this.searchObj.data.query = "";
+            this.searchObj.data.advanceFiltersQuery = "";
+          }
           if (oldStream.value) this.setQuery(this.searchObj.meta.sqlMode);
           setTimeout(() => {
             this.runQueryFn();

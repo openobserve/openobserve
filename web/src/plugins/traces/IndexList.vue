@@ -229,7 +229,6 @@ export default defineComponent({
       () => searchObj.data.stream.selectedStreamFields,
       () => {
         if (searchObj.data.stream.selectedStreamFields.length) {
-          console.log("selectedStreamFields updated watch called");
           searchObj.data.stream.selectedStreamFields.forEach(
             (field: { name: string; showValues: boolean; ftsKey: boolean }) => {
               if (field.showValues && !field.ftsKey) {
