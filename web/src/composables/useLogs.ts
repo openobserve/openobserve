@@ -204,6 +204,7 @@ const useLogs = () => {
     };
     searchObj.data.tempFunctionContent = "";
     searchObj.data.query = "";
+    searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
   };
