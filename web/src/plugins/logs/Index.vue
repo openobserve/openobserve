@@ -245,7 +245,6 @@ export default defineComponent({
     },
     async getMoreData() {
       if (
-        this.searchObj.meta.sqlMode == false &&
         this.searchObj.meta.refreshInterval == 0
       ) {
         // this.searchObj.data.resultGrid.currentPage =
@@ -362,10 +361,10 @@ export default defineComponent({
     //     console.log(e);
     //   }
     // }
-    onUnmounted(() => {
-      resetSearchObj();
-      resetStreamData();
-    });
+    // onUnmounted(() => {
+      // resetSearchObj();
+      // resetStreamData();
+    // });
 
     onActivated(async () => {
       const queryParams: any = router.currentRoute.value.query;
