@@ -703,7 +703,8 @@ const useLogs = () => {
                 if (
                   searchObj.meta.refreshInterval > 0 &&
                   router.currentRoute.value.name == "logs" &&
-                  searchObj.data.queryResults.hasOwnProperty("hits")
+                  searchObj.data.queryResults.hasOwnProperty("hits") &&
+                  searchObj.data.queryResults.hits.length > 0
                 ) {
                   searchObj.data.queryResults.from = res.data.from;
                   searchObj.data.queryResults.scan_size = res.data.scan_size;
