@@ -34,6 +34,7 @@ pub struct Sql {
     pub(crate) source: String,                // table
     pub(crate) order_by: Vec<(String, bool)>, // desc: true / false
     pub(crate) group_by: Vec<String>,         // field
+    pub(crate) having: bool,
     pub(crate) offset: usize,
     pub(crate) limit: usize,
     pub(crate) time_range: Option<(i64, i64)>,
@@ -109,6 +110,7 @@ impl TryFrom<&Statement> for Sql {
                     selection,
                     projection,
                     group_by: groups,
+                    having,
                     ..
                 } = match &q.body.as_ref() {
                     SetExpr::Select(statement) => statement.as_ref(),
@@ -152,6 +154,7 @@ impl TryFrom<&Statement> for Sql {
                     source,
                     order_by,
                     group_by,
+                    having: having.is_some(),
                     offset,
                     limit,
                     time_range,

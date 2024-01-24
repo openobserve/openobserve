@@ -53,7 +53,6 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
 static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-static RE_TIMESTAMP_EMPTY: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());
@@ -220,7 +219,7 @@ impl Sql {
         };
         origin_sql = origin_sql.replace(caps.get(0).unwrap().as_str(), " FROM tbl ");
 
-        // Hack _timestamp
+        // Hack select for _timestamp
         if !sql_mode.eq(&SqlMode::Full) && meta.order_by.is_empty() && !origin_sql.contains('*') {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
@@ -232,7 +231,7 @@ impl Sql {
             }
         }
 
-        // check time_range
+        // check time_range values
         if req_time_range.0 > 0
             && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
         {
@@ -253,9 +252,8 @@ impl Sql {
             )));
         }
 
-        // Hack time_range
-        let meta_time_range_is_empty =
-            meta.time_range.is_none() || meta.time_range.unwrap() == (0, 0);
+        // Hack time_range for sql
+        let meta_time_range_is_empty = meta.time_range.is_none() || meta.time_range == Some((0, 0));
         if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
             if req_time_range.1 == 0 {
                 req_time_range.1 = chrono::Utc::now().timestamp_micros();
@@ -279,28 +277,30 @@ impl Sql {
                 "".to_string()
             };
             if !time_range_sql.is_empty() && meta_time_range_is_empty {
-                match RE_TIMESTAMP_EMPTY.captures(origin_sql.as_str()) {
+                match RE_WHERE.captures(origin_sql.as_str()) {
                     Some(caps) => {
                         let mut where_str = caps.get(1).unwrap().as_str().to_string();
                         if !meta.order_by.is_empty() {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" order ").unwrap()]
                                 .to_string();
-                        }
-                        if !meta.group_by.is_empty() {
+                        } else if !meta.group_by.is_empty() {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" group ").unwrap()]
                                 .to_string();
+                        } else if meta.having {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" having ").unwrap()]
+                                .to_string();
+                        } else if meta.limit > 0 {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" limit ").unwrap()]
+                                .to_string();
+                        } else if meta.offset > 0 {
+                            where_str = where_str
+                                [0..where_str.to_lowercase().rfind(" offset ").unwrap()]
+                                .to_string();
                         }
-                        // } else if where_str.to_lowercase().contains(" having ") {
-                        //     where_str = where_str
-                        //         [0..where_str.to_lowercase().rfind(" having ").unwrap()]
-                        //         .to_string();
-                        // } else if where_str.to_lowercase().contains(" limit ") {
-                        //     where_str = where_str
-                        //         [0..where_str.to_lowercase().rfind(" limit ").unwrap()]
-                        //         .to_string();
-                        // }
                         let pos_start = origin_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
                         origin_sql = format!(
@@ -319,7 +319,7 @@ impl Sql {
             }
         }
 
-        // Hack offset limit
+        // Hack offset limit and sort by for sql
         if meta.limit == 0 {
             meta.offset = req_query.from as usize;
             meta.limit = req_query.size as usize;
@@ -526,8 +526,6 @@ impl Sql {
                         );
                     }
                 }
-                // println!("where_str: {}", where_str);
-                // println!("sql: {}", sql);
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
