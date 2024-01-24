@@ -42,8 +42,6 @@ pub async fn post_user(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
-    println!("initiator_user: {:?}", initiator_user);
-    println!("is_root_user: {:?}", is_root_user(initiator_id));
     if is_root_user(initiator_id)
         || (initiator_user.is_ok()
             && initiator_user.as_ref().unwrap().is_some()

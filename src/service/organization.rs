@@ -196,14 +196,10 @@ pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        common::{infra::db as infra_db, meta::user::UserRequest},
-        service::users,
-    };
+    use crate::{common::meta::user::UserRequest, service::users};
 
     #[actix_web::test]
     async fn test_organization() {
-        infra_db::create_table().await.unwrap();
         let org_id = "default";
         let user_id = "userone@example.com";
         let init_user = "root@example.com";
@@ -222,7 +218,6 @@ mod tests {
         )
         .await;
         assert!(resp.is_ok());
-        println!("resp: {:?}", resp);
         assert!(resp.unwrap().status().is_success());
 
         let resp = get_passcode(Some(org_id), user_id).await.unwrap();
