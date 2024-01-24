@@ -291,11 +291,16 @@ impl Sql {
                             where_str = where_str
                                 [0..where_str.to_lowercase().rfind(" group ").unwrap()]
                                 .to_string();
-                        } else if where_str.to_lowercase().contains(" having ") {
-                            where_str = where_str
-                                [0..where_str.to_lowercase().rfind(" having ").unwrap()]
-                                .to_string();
                         }
+                        // } else if where_str.to_lowercase().contains(" having ") {
+                        //     where_str = where_str
+                        //         [0..where_str.to_lowercase().rfind(" having ").unwrap()]
+                        //         .to_string();
+                        // } else if where_str.to_lowercase().contains(" limit ") {
+                        //     where_str = where_str
+                        //         [0..where_str.to_lowercase().rfind(" limit ").unwrap()]
+                        //         .to_string();
+                        // }
                         let pos_start = origin_sql.find(where_str.as_str()).unwrap();
                         let pos_end = pos_start + where_str.len();
                         origin_sql = format!(
@@ -521,6 +526,8 @@ impl Sql {
                         );
                     }
                 }
+                println!("where_str: {}", where_str);
+                println!("sql: {}", sql);
             }
             let sql_meta = MetaSql::new(sql.clone().as_str());
             if sql_meta.is_err() {
@@ -1051,6 +1058,7 @@ mod tests {
             rpc_req.org_id = org_id.to_string();
 
             let resp = Sql::new(&rpc_req).await;
+            println!("{:?}", &resp);
             assert_eq!(resp.is_ok(), ok);
             if ok {
                 let resp = resp.unwrap();

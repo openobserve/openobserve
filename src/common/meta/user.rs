@@ -125,7 +125,7 @@ impl DBUser {
         }
     }
 }
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct User {
     pub email: String,
     #[serde(default)]

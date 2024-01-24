@@ -15,10 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{
-    http::{self, StatusCode},
-    HttpResponse,
-};
+use actix_web::{http, HttpResponse};
 use config::ider;
 
 use crate::{
@@ -44,13 +41,15 @@ pub async fn post_user(
     usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
+    let initiator_user = db::user::get(Some(org_id), initiator_id).await;
     if is_root_user(initiator_id)
-        || db::user::get(Some(org_id), initiator_id)
-            .await
-            .unwrap()
-            .unwrap()
-            .role
-            .eq(&UserRole::Admin)
+        || (initiator_user.is_ok()
+            && initiator_user.as_ref().unwrap().is_some()
+            && initiator_user
+                .unwrap()
+                .unwrap()
+                .role
+                .eq(&UserRole::Admin))
     {
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await
@@ -83,7 +82,7 @@ pub async fn post_user(
         }
     } else {
         Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            StatusCode::UNAUTHORIZED.into(),
+            http::StatusCode::UNAUTHORIZED.into(),
             "Not Allowed".to_string(),
         )))
     }
@@ -238,7 +237,7 @@ pub async fn update_user(
                             )))
                         }
                         Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                            StatusCode::NOT_FOUND.into(),
+                            http::StatusCode::NOT_FOUND.into(),
                             "User not found".to_string(),
                         ))),
                     }
@@ -253,13 +252,13 @@ pub async fn update_user(
                 }
             }
             None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
+                http::StatusCode::NOT_FOUND.into(),
                 "User not found".to_string(),
             ))),
         }
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND.into(),
             "User not found".to_string(),
         )))
     }
@@ -315,13 +314,13 @@ pub async fn add_user_to_org(
             )))
         } else {
             Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                StatusCode::UNAUTHORIZED.into(),
+                http::StatusCode::UNAUTHORIZED.into(),
                 "Not Allowed".to_string(),
             )))
         }
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND.into(),
             "User not found".to_string(),
         )))
     }
@@ -419,19 +418,19 @@ pub async fn remove_user_from_org(
                     )))
                 } else {
                     Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                        StatusCode::NOT_FOUND.into(),
+                        http::StatusCode::NOT_FOUND.into(),
                         "User for the organization not found".to_string(),
                     )))
                 }
             }
             Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
+                http::StatusCode::NOT_FOUND.into(),
                 "User for the organization not found".to_string(),
             ))),
         }
     } else {
         Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            StatusCode::UNAUTHORIZED.into(),
+            http::StatusCode::UNAUTHORIZED.into(),
             "Not Allowed".to_string(),
         )))
     }
@@ -445,7 +444,7 @@ pub async fn delete_user(email_id: &str) -> Result<HttpResponse, Error> {
             "User deleted".to_string(),
         ))),
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
+            http::StatusCode::NOT_FOUND.into(),
             e.to_string(),
         ))),
     }

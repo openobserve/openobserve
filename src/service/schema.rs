@@ -846,8 +846,9 @@ mod tests {
     async fn test_check_for_schema() {
         let stream_name = "Sample";
         let org_name = "nexus";
-        let record =
-            json::json!(r#"{"Year": 1896, "City": "Athens", "_timestamp": 1234234234234}"#);
+        let record: json::Value =
+            json::from_str(r#"{"Year": 1896, "City": "Athens", "_timestamp": 1234234234234}"#)
+                .unwrap();
 
         let schema = Schema::new(vec![
             Field::new("Year", DataType::Int64, false),
@@ -861,7 +862,7 @@ mod tests {
             stream_name,
             StreamType::Logs,
             &mut map,
-            &record.as_object().unwrap(),
+            record.as_object().unwrap(),
             1234234234234,
         )
         .await

@@ -69,7 +69,16 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 
     let pattern = wal_dir.join("files/");
     let files = scan_files(&pattern, "parquet");
+    if files.is_empty() {
+        return Ok(());
+    }
     log::info!("[INGESTER:JOB] move files get: {}", files.len());
+    for (i, file) in files.iter().enumerate() {
+        if i >= 100 {
+            break;
+        }
+        log::info!("[INGESTER:JOB] move files {:3} {}", i, file);
+    }
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
@@ -88,6 +97,16 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let prefix = file[..file.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(&file, parquet_meta, false));
+    }
+    log::info!(
+        "[INGESTER:JOB] move file prefix get: {}",
+        partition_files_with_size.len()
+    );
+    for (i, file) in partition_files_with_size.iter().enumerate() {
+        if i >= 100 {
+            break;
+        }
+        log::info!("[INGESTER:JOB] move files prefix {:3} {}", i, file.0);
     }
 
     // use multiple threads to upload files
