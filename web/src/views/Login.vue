@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <login v-if="store.state.zoConfig.dex_enabled == false"></login>
   <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
-    Wait while redirecting to login page...
+    Wait while redirection...
   </div>
 </template>
 
