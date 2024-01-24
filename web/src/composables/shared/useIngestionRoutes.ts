@@ -274,12 +274,13 @@ const useIngestionRoutes = () => {
       .find((child: any) => child.name === "custom")
       .children.find((child: any) => child.name === "ingestLogs")
       ?.children.push(...[sysLog, sysLogNg]);
-  } else {
-    ingestionRoutes[0].children
-      .find((child: any) => child.name === "custom")
-      .children.find((child: any) => child.name === "ingestLogs")
-      ?.children.push(...[kinesisFirehose, gcpPubSub]);
   }
+
+  ingestionRoutes[0].children
+    .find((child: any) => child.name === "custom")
+    .children.find((child: any) => child.name === "ingestLogs")
+    ?.children.push(...[kinesisFirehose, gcpPubSub]);
+
   return ingestionRoutes;
 };
 

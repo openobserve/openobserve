@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="width: calc(100% - 401px)">
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <div
-              class="flex justify-start items-center q-pb-sm q-col-gutter-md"
+              class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
               <div
                 data-test="add-alert-name-input"
@@ -76,61 +76,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-bind:disable="beingUpdated"
                   :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                   tabindex="0"
-                  style="min-width: 220px"
+                  style="min-width: 480px"
                 />
               </div>
               <div
-                data-test="add-alert-stream-type-select"
-                class="alert-stream-type o2-input"
-                style="padding-top: 0"
+                class="flex justify-start items-center"
+                style="padding-top: 0px"
               >
-                <q-select
-                  v-model="formData.stream_type"
-                  :options="streamTypes"
-                  :label="t('alerts.streamType') + ' *'"
-                  :popup-content-style="{ textTransform: 'lowercase' }"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-py-sm showLabelOnTop no-case"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  @update:model-value="updateStreams()"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
-                  style="min-width: 120px"
-                />
-              </div>
-              <div
-                data-test="add-alert-stream-select"
-                class="o2-input"
-                style="padding-top: 0"
-              >
-                <q-select
-                  v-model="formData.stream_name"
-                  :options="filteredStreams"
-                  :label="t('alerts.stream_name') + ' *'"
-                  :loading="isFetchingStreams"
-                  :popup-content-style="{ textTransform: 'lowercase' }"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-py-sm showLabelOnTop no-case"
-                  filled
-                  dense
-                  use-input
-                  hide-selected
-                  fill-input
-                  :input-debounce="400"
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  @filter="filterStreams"
-                  @update:model-value="updateStreamFields(formData.stream_name)"
-                  behavior="menu"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
-                  style="min-width: 220px !important; width: 220px !important"
-                />
+                <div
+                  data-test="add-alert-stream-type-select"
+                  class="alert-stream-type o2-input q-mr-sm"
+                  style="padding-top: 0"
+                >
+                  <q-select
+                    v-model="formData.stream_type"
+                    :options="streamTypes"
+                    :label="t('alerts.streamType') + ' *'"
+                    :popup-content-style="{ textTransform: 'lowercase' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="q-py-sm showLabelOnTop no-case"
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    v-bind:readonly="beingUpdated"
+                    v-bind:disable="beingUpdated"
+                    @update:model-value="updateStreams()"
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    style="min-width: 220px"
+                  />
+                </div>
+                <div
+                  data-test="add-alert-stream-select"
+                  class="o2-input"
+                  style="padding-top: 0"
+                >
+                  <q-select
+                    v-model="formData.stream_name"
+                    :options="filteredStreams"
+                    :label="t('alerts.stream_name') + ' *'"
+                    :loading="isFetchingStreams"
+                    :popup-content-style="{ textTransform: 'lowercase' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="q-py-sm showLabelOnTop no-case"
+                    filled
+                    stack-label
+                    dense
+                    use-input
+                    hide-selected
+                    fill-input
+                    :input-debounce="400"
+                    v-bind:readonly="beingUpdated"
+                    v-bind:disable="beingUpdated"
+                    @filter="filterStreams"
+                    @update:model-value="
+                      updateStreamFields(formData.stream_name)
+                    "
+                    behavior="menu"
+                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    style="min-width: 250px !important; width: 250px !important"
+                  />
+                </div>
               </div>
             </div>
             <div class="q-gutter-sm">

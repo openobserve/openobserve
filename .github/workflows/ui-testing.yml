@@ -19,6 +19,7 @@ env:
   ZO_BASE_URL: http://localhost:5080
   # these are cypress related env vars
   CYPRESS_ORGNAME: default
+  CYPRESS_CLOUD_TOKEN: ${{ secrets.CYPRESS_CLOUD_TOKEN }}
 
 jobs:
   ui_integration_tests:
@@ -77,4 +78,4 @@ jobs:
       #       browser: ${{ matrix.browser }}
       #       spec: cypress/e2e/tests
       - name: Cypress run
-        run: cd tests/ui-testing && npm install && npx cypress run --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests/logs_tests.cy.js
+        run: cd tests/ui-testing && npm install && npx cypress run --record --key ${CYPRESS_CLOUD_TOKEN} --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests/logs_tests.cy.js

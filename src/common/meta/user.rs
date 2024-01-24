@@ -194,6 +194,9 @@ pub enum UserRole {
     Member,
     #[serde(rename = "root")]
     Root,
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "viewer")]
+    Viewer,
 }
 
 impl fmt::Display for UserRole {
@@ -202,6 +205,8 @@ impl fmt::Display for UserRole {
             UserRole::Admin => write!(f, "admin"),
             UserRole::Member => write!(f, "member"),
             UserRole::Root => write!(f, "root"),
+            #[cfg(feature = "enterprise")]
+            UserRole::Viewer => write!(f, "viewer"),
         }
     }
 }

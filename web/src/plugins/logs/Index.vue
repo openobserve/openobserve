@@ -85,110 +85,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #after>
                 <div
-                  class="full-height flex justify-center items-center"
-                  v-if="searchObj.loading == true"
+                  v-if="
+                    searchObj.data.errorMsg !== '' && searchObj.loading == false
+                  "
                 >
-                  <div class="q-pb-lg">
-                    <q-spinner-hourglass
-                      data-test="logs-search-loading-spinner"
-                      color="primary"
-                      size="40px"
-                      style="margin: 0 auto; display: block"
-                    />
-                    <span class="text-center">
-                      Hold on tight, we're fetching your logs.
-                    </span>
-                  </div>
+                  <h5 class="text-center">
+                    <div
+                      data-test="logs-search-result-not-found-text"
+                      v-if="searchObj.data.errorCode == 0"
+                    >
+                      Result not found.
+                    </div>
+                    <div
+                      data-test="logs-search-error-message"
+                      v-html="searchObj.data.errorMsg"
+                    ></div>
+                    <div
+                      data-test="logs-search-error-20003"
+                      v-if="parseInt(searchObj.data.errorCode) == 20003"
+                    >
+                      <q-btn
+                        no-caps
+                        unelevated
+                        size="sm"
+                        bg-secondary
+                        class="no-border bg-secondary text-white"
+                        :to="
+                          '/streams?dialog=' +
+                          searchObj.data.stream.selectedStream.label
+                        "
+                        >Click here</q-btn
+                      >
+                      to configure a full text search field to the stream.
+                    </div>
+                    <br />
+                    <q-item-label>{{
+                      searchObj.data.additionalErrorMsg
+                    }}</q-item-label>
+                  </h5>
                 </div>
                 <div
-                  v-else-if="!areStreamsPresent && searchObj.loading == false"
+                  v-else-if="
+                    searchObj.data.stream.selectedStream.label == '' &&
+                    searchObj.loading == false
+                  "
+                >
+                  <h5
+                    data-test="logs-search-no-stream-selected-text"
+                    class="text-center"
+                  >
+                  <q-icon
+                      name="warning"
+                      color="warning"
+                      size="10rem"
+                    /><br />No stream selected.
+                  </h5>
+                </div>
+                <div
+                  v-else-if="
+                    searchObj.data.queryResults.hasOwnProperty('hits') &&
+                    searchObj.data.queryResults.hits.length == 0 &&
+                    searchObj.loading == false
+                  "
                 >
                   <h5 data-test="logs-search-error-message" class="text-center">
                     <q-icon
                       name="warning"
                       color="warning"
                       size="10rem"
-                    /><br />{{ searchObj.data.errorMsg }}
+                    /><br />{{ t("search.noRecordFound") }}
                   </h5>
                 </div>
-                <template v-else>
-                  <div
-                    v-if="
-                      searchObj.data.errorMsg !== '' &&
-                      searchObj.loading == false
-                    "
-                  >
-                    <h5 class="text-center">
-                      <div
-                        data-test="logs-search-result-not-found-text"
-                        v-if="searchObj.data.errorCode == 0"
-                      >
-                        Result not found.
-                      </div>
-                      <div
-                        data-test="logs-search-error-message"
-                        v-html="searchObj.data.errorMsg"
-                      ></div>
-                      <div
-                        data-test="logs-search-error-20003"
-                        v-if="parseInt(searchObj.data.errorCode) == 20003"
-                      >
-                        <q-btn
-                          no-caps
-                          unelevated
-                          size="sm"
-                          bg-secondary
-                          class="no-border bg-secondary text-white"
-                          :to="
-                            '/streams?dialog=' +
-                            searchObj.data.stream.selectedStream.label
-                          "
-                          >Click here</q-btn
-                        >
-                        to configure a full text search field to the stream.
-                      </div>
-                      <br />
-                      <q-item-label>{{
-                        searchObj.data.additionalErrorMsg
-                      }}</q-item-label>
-                    </h5>
-                  </div>
-                  <div
-                    v-else-if="searchObj.data.stream.selectedStream.label == ''"
-                  >
-                    <h5
-                      data-test="logs-search-no-stream-selected-text"
-                      class="text-center"
-                    >
-                      No stream selected.
-                    </h5>
-                  </div>
-                  <div
-                    v-else-if="
-                      searchObj.data.queryResults.hasOwnProperty('total') &&
-                      searchObj.data.queryResults.hits.length == 0 &&
-                      searchObj.loading == false
-                    "
-                  >
-                    <h5 class="text-center">No result found.</h5>
-                  </div>
-                  <div
-                    data-test="logs-search-search-result"
-                    class="full-height"
-                    v-show="
-                      searchObj.data.queryResults.hasOwnProperty('total') &&
-                      searchObj.data.queryResults.hits.length !== 0
-                    "
-                  >
-                    <search-result
-                      ref="searchResultRef"
-                      :expandedLogs="expandedLogs"
-                      @update:datetime="setHistogramDate"
-                      @update:scroll="getMoreData"
-                      @expandlog="toggleExpandLog"
-                    />
-                  </div>
-                </template>
+                <div
+                  v-else
+                  data-test="logs-search-search-result"
+                  class="full-height"
+                >
+                  <search-result
+                    ref="searchResultRef"
+                    :expandedLogs="expandedLogs"
+                    @update:datetime="setHistogramDate"
+                    @update:scroll="getMoreData"
+                    @expandlog="toggleExpandLog"
+                  />
+                </div>
               </template>
             </q-splitter>
           </div>
@@ -216,6 +196,7 @@ import {
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 import SearchBar from "./SearchBar.vue";
 import IndexList from "./IndexList.vue";
@@ -264,15 +245,7 @@ export default defineComponent({
     },
     async getMoreData() {
       if (
-        this.searchObj.meta.sqlMode == false &&
-        this.searchObj.meta.refreshInterval == 0 &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.from &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size &&
-        this.searchObj.data.queryResults.total >
-          this.searchObj.data.queryResults.size +
-            this.searchObj.data.queryResults.from
+        this.searchObj.meta.refreshInterval == 0
       ) {
         // this.searchObj.data.resultGrid.currentPage =
         //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
@@ -281,7 +254,7 @@ export default defineComponent({
         //   1;
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
-
+        this.searchObj.loading = true;
         await this.getQueryData(true);
         this.refreshHistogramChart();
 
@@ -332,6 +305,7 @@ export default defineComponent({
     },
   },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
     const $q = useQuasar();
@@ -387,10 +361,10 @@ export default defineComponent({
     //     console.log(e);
     //   }
     // }
-    onUnmounted(() => {
-      resetSearchObj();
-      resetStreamData();
-    });
+    // onUnmounted(() => {
+      // resetSearchObj();
+      // resetStreamData();
+    // });
 
     onActivated(async () => {
       const queryParams: any = router.currentRoute.value.query;
@@ -416,6 +390,7 @@ export default defineComponent({
     });
 
     onBeforeMount(() => {
+      searchObj.loading = true;
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       restoreUrlQueryParams();
@@ -542,6 +517,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       router,
       parser,
