@@ -169,7 +169,7 @@ mod tests {
         let auth = setup();
         let path = "./tests/input.json";
         let body_str = fs::read_to_string(path).expect("Read file failed");
-        let thread_id: usize = 1;
+        let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -192,7 +192,7 @@ mod tests {
     async fn e2e_post_json() {
         let auth = setup();
         let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
-        let thread_id: usize = 1;
+        let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -215,7 +215,7 @@ mod tests {
     async fn e2e_post_multi() {
         let auth = setup();
         let body_str = "{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}";
-        let thread_id: usize = 1;
+        let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -267,7 +267,10 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/{}/schema", "e2e", "olympics_schema"))
+            .uri(&format!(
+                "/api/{}/streams/{}/schema",
+                "e2e", "olympics_schema"
+            ))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -277,9 +280,9 @@ mod tests {
 
     async fn e2e_post_stream_settings() {
         let auth = setup();
-        let body_str = r#"{  "partition_keys": ["test_key"], "full_text_search_keys": ["log"]}"#;
+        let body_str = r#"{"partition_keys": ["test_key"], "full_text_search_keys": ["log"]}"#;
         // app
-        let thread_id: usize = 1;
+        let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -289,8 +292,11 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
-        let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/{}/settings", "e2e", "olympics"))
+        let req = test::TestRequest::put()
+            .uri(&format!(
+                "/api/{}/streams/{}/settings",
+                "e2e", "olympics_schema"
+            ))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -310,7 +316,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::delete()
-            .uri(&format!("/api/{}/{}", "e2e", "olympics"))
+            .uri(&format!("/api/{}/streams/{}", "e2e", "olympics_schema"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -375,9 +381,9 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
-        let req = test::TestRequest::post()
+        let req = test::TestRequest::put()
             .uri(&format!(
-                "/api/{}/{}/functions/{}",
+                "/api/{}/streams/{}/functions/{}",
                 "e2e", "olympics_schema", "e2etestfn"
             ))
             .insert_header(ContentType::json())
@@ -418,7 +424,10 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/{}/functions", "e2e", "olympics_schema"))
+            .uri(&format!(
+                "/api/{}/streams/{}/functions",
+                "e2e", "olympics_schema"
+            ))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -457,7 +466,7 @@ mod tests {
         .await;
         let req = test::TestRequest::delete()
             .uri(&format!(
-                "/api/{}/{}/functions/{}",
+                "/api/{}/streams/{}/functions/{}",
                 "e2e", "olympics_schema", "e2etestfn"
             ))
             .insert_header(ContentType::json())
@@ -549,7 +558,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/organizations", "e2e",))
+            .uri("/api/organizations")
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -568,7 +577,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::get()
-            .uri(&format!("/api/{}/organizations/passcode", "e2e"))
+            .uri(&format!("/api/{}/passcode", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .to_request();
@@ -588,7 +597,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::put()
-            .uri(&format!("/api/{}/organizations/passcode", "e2e"))
+            .uri(&format!("/api/{}/passcode", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -867,7 +876,7 @@ mod tests {
         let body_str = fs::read_to_string(path).expect("Read file failed");
 
         // app
-        let thread_id: usize = 1;
+        let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -949,7 +958,7 @@ mod tests {
             .expect("Out of memory");
 
         // app
-        let thread_id: usize = 1;
+        let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -993,7 +1002,7 @@ mod tests {
 
     async fn e2e_post_alert_template() {
         let auth = setup();
-        let body_str = r#"{"body": {"text": "For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active app_name {app_name}"	}}"#;
+        let body_str = r#"{"name":"slackTemplate","body":"{\"text\":\"For stream {stream_name} of organization {org_name} alert {alert_name} of type {alert_type} is active app_name {app_name}\"}"}"#;
         let app = test::init_service(
             App::new()
                 .app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
@@ -1004,8 +1013,8 @@ mod tests {
         .await;
         let req = test::TestRequest::post()
             .uri(&format!(
-                "/api/{}/alerts/templates/{}",
-                "e2e", "slackTemplate"
+                "/api/{}/alerts/templates",
+                "e2e"
             ))
             .insert_header(ContentType::json())
             .append_header(auth)
@@ -1081,6 +1090,7 @@ mod tests {
     async fn e2e_post_alert_destination() {
         let auth = setup();
         let body_str = r#"{
+                "name": "slack",
                 "url": "https://dummy/alert",
                 "method": "post",
                 "template": "slackTemplate",
@@ -1097,7 +1107,7 @@ mod tests {
         )
         .await;
         let req = test::TestRequest::post()
-            .uri(&format!("/api/{}/alerts/destinations/{}", "e2e", "slack"))
+            .uri(&format!("/api/{}/alerts/destinations", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
@@ -1167,15 +1177,19 @@ mod tests {
     async fn e2e_post_alert() {
         let auth = setup();
         let body_str = r#"{
-                                "condition": {
-                                    "column": "country",
-                                    "operator": "=",
-                                    "value": "USA"
+                                "name": "alertChk",
+                                "query_condition": {
+                                    "conditions": [{
+                                        "column": "country",
+                                        "operator": "=",
+                                        "value": "USA"
+                                    }]
                                 },
-                                "duration": 5,
-                                "frequency": 1,
-                                "time_between_alerts": 10,
-                                "destination":"slack",
+                                "trigger_condition": {
+                                    "period": 5,
+                                    "silence": 10,
+                                },
+                                "destinations": ["slack"],
                                 "context_attributes":{
                                     "app_name":"App1"
                                 }
@@ -1190,8 +1204,8 @@ mod tests {
         .await;
         let req = test::TestRequest::post()
             .uri(&format!(
-                "/api/{}/{}/alerts/{}",
-                "e2e", "olympics_schema", "alertChk"
+                "/api/{}/{}/alerts",
+                "e2e", "olympics_schema" 
             ))
             .insert_header(ContentType::json())
             .append_header(auth)
