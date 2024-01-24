@@ -328,6 +328,28 @@ clickable v-close-popup>
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-dialog ref="confirmSavedViewDialog" v-model="confirmSavedViewDialogVisible">
+      <q-card>
+        <q-card-section>
+          {{ confirmMessageSavedView }}
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn
+            data-test="logs-search-bar-confirm-dialog-cancel-btn"
+            :label="t('confirmDialog.cancel')"
+            color="primary"
+            @click="cancelConfirmDialog"
+          />
+          <q-btn
+            data-test="logs-search-bar-confirm-dialog-ok-btn"
+            :label="t('confirmDialog.ok')"
+            color="positive"
+            @click="confirmDialogOK"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <q-dialog v-model="customDownloadDialog">
       <q-card>
         <q-card-section>
@@ -349,6 +371,7 @@ clickable v-close-popup>
             filled
             dense
             tabindex="0"
+            min="0"
           />
           <q-select
             data-test="custom-download-range-select"
@@ -376,7 +399,7 @@ clickable v-close-popup>
             v-close-popup
           />
           <q-btn
-          unelevated
+            unelevated
             no-caps
             class="q-mr-sm text-bold"
             data-test="logs-search-bar-confirm-dialog-ok-btn"
@@ -677,6 +700,15 @@ export default defineComponent({
       this.customDownloadDialog = true;
     },
     downloadRangeData() {
+      if (this.downloadCustomInitialNumber < 0) {
+        this.$q.notify({
+          message: "Initial number must be positive number.",
+          color: "negative",
+          position: "top",
+          timeout: 2000,
+        });
+        return;
+      }
       // const queryReq = this.buildSearch();
       // console.log(this.searchObj.data.customDownloadQueryObj)
       this.searchObj.data.customDownloadQueryObj.query.from = parseInt(
@@ -692,7 +724,16 @@ export default defineComponent({
         })
         .then((res) => {
           this.customDownloadDialog = false;
-          this.downloadLogs(res.data.hits);
+          if (res.data.hits.length > 0) {
+            this.downloadLogs(res.data.hits);
+          } else {
+            this.$q.notify({
+              message: "No data found to download.",
+              color: "positive",
+              position: "top",
+              timeout: 2000,
+            });
+          }
         })
         .catch((err) => {
           this.$q.notify({
@@ -742,6 +783,7 @@ export default defineComponent({
     const saveFunctionLoader = ref(false);
 
     const confirmDialogVisible: boolean = ref(false);
+    const confirmSavedViewDialogVisible: boolean = ref(false);
     let confirmCallback;
     let fnEditorobj: any = null;
     let streamName = "";
@@ -1225,7 +1267,13 @@ export default defineComponent({
       confirmCallback = callback;
     };
 
+    const showSavedViewConfirmDialog = (callback) => {
+      confirmSavedViewDialogVisible.value = true;
+      confirmCallback = callback;
+    };
+
     const cancelConfirmDialog = () => {
+      confirmSavedViewDialogVisible.value = false;
       confirmDialogVisible.value = false;
       confirmCallback = null;
     };
@@ -1400,11 +1448,15 @@ export default defineComponent({
         }
       } else {
         if (savedViewSelectedName.value.view_id) {
-          saveViewLoader.value = true;
-          updateSavedViews(
-            savedViewSelectedName.value.view_id,
-            savedViewSelectedName.value.view_name
-          );
+          saveViewLoader.value = false;
+          showSavedViewConfirmDialog(() => {
+            saveViewLoader.value = true;
+            updateSavedViews(
+              savedViewSelectedName.value.view_id,
+              savedViewSelectedName.value.view_name
+            );
+          });
+          
         } else {
           $q.notify({
             message: `Please select saved view to update.`,
@@ -1588,6 +1640,7 @@ export default defineComponent({
               isSavedViewAction.value = "create";
               savedViewSelectedName.value = "";
               saveViewLoader.value = false;
+              confirmSavedViewDialogVisible.value = false;
             } else {
               saveViewLoader.value = false;
               $q.notify({
@@ -1655,8 +1708,14 @@ export default defineComponent({
     };
 
     const resetFilters = () => {
-      searchObj.data.query = "";
+      if (searchObj.meta.sqlMode == true) {
+        searchObj.data.query = `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`;
+      } else {
+        searchObj.data.query = "";
+      }
       searchObj.data.editorValue = "";
+      queryEditorRef.value.setValue(searchObj.data.query);
+      handleRunQuery();
     };
 
     const customDownloadDialog = ref(false);
@@ -1679,6 +1738,7 @@ export default defineComponent({
       updateQueryValue,
       updateDateTime,
       showConfirmDialog,
+      showSavedViewConfirmDialog,
       cancelConfirmDialog,
       confirmDialogOK,
       udpateQuery,
@@ -1722,6 +1782,7 @@ export default defineComponent({
       downloadCustomRange,
       downloadCustomRangeOptions,
       buildSearch,
+      confirmSavedViewDialogVisible,
     };
   },
   computed: {
@@ -1733,6 +1794,9 @@ export default defineComponent({
     },
     confirmMessage() {
       return "Are you sure you want to update the function?";
+    },
+    confirmMessageSavedView() {
+      return "Are you sure you want to update the saved view?";
     },
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
