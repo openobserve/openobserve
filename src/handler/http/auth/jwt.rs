@@ -58,14 +58,22 @@ pub async fn process_token(
     let user_email = res.0.user_email.to_owned();
     let mut source_orgs: Vec<UserOrg> = vec![];
     let mut tuples_to_add = HashMap::new();
-    for group in groups {
-        let role_org = parse_dn(group.as_str().unwrap()).unwrap();
-
+    if groups.is_empty() {
         source_orgs.push(UserOrg {
-            role: role_org.role,
-            name: role_org.org,
+            role: crate::common::meta::user::UserRole::Viewer,
+            name: O2_CONFIG.dex.default_org.clone(),
             ..UserOrg::default()
         });
+    } else {
+        for group in groups {
+            let role_org = parse_dn(group.as_str().unwrap()).unwrap();
+
+            source_orgs.push(UserOrg {
+                role: role_org.role,
+                name: role_org.org,
+                ..UserOrg::default()
+            });
+        }
     }
 
     // Check if the user exists in the database
@@ -287,7 +295,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let role = if role.contains("admin") {
         crate::common::meta::user::UserRole::Admin
     } else {
-        crate::common::meta::user::UserRole::Member
+        crate::common::meta::user::UserRole::Viewer
     };
     if org.is_empty() {
         org = &O2_CONFIG.dex.default_org;
