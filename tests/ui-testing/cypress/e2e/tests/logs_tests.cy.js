@@ -93,13 +93,13 @@ describe("Logs testcases", () => {
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
   
   // This test checks that clicking on the histogram toggle button in SQL mode does not toggle the chart
-  it.only("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
+  it("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
     logstests.clickHistogramToggle();
     logstests.clickSearchBarSqlMode();
     logstests.confirmLogsSearchHidden();
     logstests.histogramToggleDisabled();
   });
-  it.only("should toggle chart when clicking on the histogram toggle", () => {
+  it.skip("should toggle chart when clicking on the histogram toggle", () => {
     cy.wait(3000)
     logstests.clickHistogramToggle(); 
     cy.wait(3000)
