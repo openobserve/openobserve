@@ -37,7 +37,7 @@ const http = ({ headers } = {} as any) => {
     headers = {
       Authorization:
         config.isEnterprise == "true" &&
-        (store.state as any).zoConfig.dex_enabled
+        store.state.zoConfig?.dex_enabled
           ? "Bearer " + localStorage.getItem("access_token")
           : localStorage.getItem("token") || "",
       ...headers,
@@ -46,7 +46,6 @@ const http = ({ headers } = {} as any) => {
     instance = axios.create({
       // timeout: 10000,
       baseURL: store.state.API_ENDPOINT,
-      withCredentials: config.isEnterprise,
       headers,
     });
   }
