@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
+              @chart-click="$emit('chartClick', $event)"
               @onMovePanel="onMovePanel"
               @refresh="refreshDashboard"
             >
@@ -131,6 +132,7 @@ export default defineComponent({
     "updated:data-zoom",
     "refresh",
     "onMovePanel",
+    "chartClick",
   ],
   props: {
     viewOnly: {},

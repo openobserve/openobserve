@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         :showTabs="true"
+        @chart-click="onChartClick"
       />
 
       <q-dialog
@@ -187,7 +188,7 @@ import { onUnmounted } from "vue";
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel"],
+  emits: ["onDeletePanel", "chartClick"],
   components: {
     DateTimePickerDashboard,
     AutoRefreshInterval,
@@ -544,6 +545,10 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
+    const onChartClick = () => {
+      window.open("https://google.com", "_blank");
+    };
+
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -573,6 +578,7 @@ export default defineComponent({
       shareLink,
       selectedTabId,
       onMovePanel,
+      onChartClick,
     };
   },
 });

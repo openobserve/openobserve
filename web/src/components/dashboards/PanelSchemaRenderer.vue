@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
         @error="errorDetail = $event"
+        @click="$emit('chartClick', $event)"
       />
     </div>
     <div v-if="!errorDetail" class="noData" data-test="no-data">
@@ -139,7 +140,7 @@ export default defineComponent({
       type: Object,
     },
   },
-  emits: ["updated:data-zoom", "error", "metadata-update"],
+  emits: ["updated:data-zoom", "error", "metadata-update", "chartClick"],
   setup(props, { emit }) {
     const store = useStore();
 
