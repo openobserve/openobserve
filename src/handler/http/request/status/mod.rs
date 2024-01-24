@@ -25,7 +25,7 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    actix_web::{http::header, web, HttpRequest},
+    actix_web::http::header,
     o2_enterprise::enterprise::{
         common::infra::config::O2_CONFIG,
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
