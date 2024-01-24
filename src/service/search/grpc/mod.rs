@@ -68,6 +68,14 @@ pub async fn search(
         ))));
     }
 
+    log::info!(
+        "[session_id {session_id}] grpc->search in: {}/{}/{}, time range: {:?}",
+        sql.org_id,
+        stream_type,
+        sql.stream_name,
+        sql.meta.time_range
+    );
+
     // search in WAL parquet
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();

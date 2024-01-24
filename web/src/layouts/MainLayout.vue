@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <menu-link v-for="nav in linksList" :key="nav.title" v-bind="{ ...nav, mini: miniMode }" />
       </q-list>
     </q-drawer>
-    <q-page-container :key="store.state.selectedOrganization?.identifier" v-if="isLoading">
+    <q-page-container :key="store.state.selectedOrganization?.identifier && store.state.zoConfig?.version" v-if="isLoading">
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive>

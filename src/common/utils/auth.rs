@@ -123,6 +123,8 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
         let path =
@@ -151,7 +153,6 @@ impl FromRequest for AuthExtractor {
                 "Unauthorized Access",
             )));
         }
-        println!("path {} & len {}", path, url_len);
         let object_type = if url_len == 1 {
             if method.eq("GET") && path_columns[0].eq("organizations") {
                 if method.eq("GET") {
@@ -163,9 +164,12 @@ impl FromRequest for AuthExtractor {
                 path_columns[0].to_string()
             }
         } else if url_len == 2 {
+            if method.eq("GET") {
+                method = "LIST".to_string();
+            }
             format!(
                 "{}:{}",
-                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+                OFGA_MODELS
                     .get(path_columns[url_len - 1])
                     .unwrap_or(&path_columns[url_len - 1]),
                 path_columns[url_len - 2]
@@ -174,17 +178,13 @@ impl FromRequest for AuthExtractor {
             if method.eq("PUT") || method.eq("DELETE") {
                 format!(
                     "{}:{}",
-                    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                        .get(path_columns[1])
-                        .unwrap_or(&path_columns[1]),
+                    OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
                     path_columns[2]
                 )
             } else {
                 format!(
                     "{}:{}",
-                    o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                        .get(path_columns[2])
-                        .unwrap_or(&path_columns[2]),
+                    OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
                     path_columns[0]
                 )
             }
@@ -194,17 +194,13 @@ impl FromRequest for AuthExtractor {
             }
             format!(
                 "{}:{}",
-                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[1])
-                    .unwrap_or(&path_columns[1]),
+                OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
                 path_columns[2]
             )
         } else {
             format!(
                 "{}:{}",
-                o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
-                    .get(path_columns[1])
-                    .unwrap_or(&path_columns[1]),
+                OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
                 path_columns[2]
             )
         };

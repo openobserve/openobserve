@@ -22,14 +22,12 @@ use actix_web::{
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::CONFIG;
 
-#[cfg(not(feature = "enterprise"))]
-use crate::common::meta::user::DBUser;
 use crate::{
     common::{
         meta::{
             ingestion::INGESTION_EP,
             proxy::QueryParamProxyURL,
-            user::{TokenValidationResponse, UserRole},
+            user::{DBUser, TokenValidationResponse, UserRole},
         },
         utils::{
             auth::{get_hash, is_root_user, AuthExtractor},
@@ -68,12 +66,14 @@ pub async fn validator(
                         header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                     );
                 }
-
                 req.headers_mut().insert(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                if auth_info.bypass_check || check_permissions(user_id, auth_info).await {
+                if res.is_internal_user
+                    || auth_info.bypass_check
+                    || check_permissions(user_id, auth_info).await
+                {
                     Ok(req)
                 } else {
                     Err((ErrorForbidden("Unauthorized Access"), req))
@@ -119,6 +119,7 @@ pub async fn validate_credentials(
             return Ok(TokenValidationResponse {
                 is_valid: false,
                 user_email: "".to_string(),
+                is_internal_user: false,
             });
         }
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -148,6 +149,7 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
+            is_internal_user: false,
         });
     }
     let user = user.unwrap();
@@ -158,6 +160,7 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
+            is_internal_user: !user.is_external,
         });
     }
 
@@ -166,6 +169,7 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
+            is_internal_user: false,
         });
     }
     if !path.contains("/user")
@@ -177,13 +181,13 @@ pub async fn validate_credentials(
         Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
+            is_internal_user: !user.is_external,
         })
     } else {
         Err(ErrorForbidden("Not allowed"))
     }
 }
 
-#[cfg(not(feature = "enterprise"))]
 async fn validate_user_from_db(
     db_user: Result<DBUser, anyhow::Error>,
     user_password: &str,
@@ -196,6 +200,7 @@ async fn validate_user_from_db(
                 Ok(TokenValidationResponse {
                     is_valid: true,
                     user_email: user.email,
+                    is_internal_user: !user.is_external,
                 })
             } else {
                 Err(ErrorForbidden("Not allowed"))
@@ -205,17 +210,6 @@ async fn validate_user_from_db(
     }
 }
 
-#[cfg(feature = "enterprise")]
-pub async fn validate_user(
-    _user_id: &str,
-    _user_password: &str,
-) -> Result<TokenValidationResponse, Error> {
-    use actix_web::error::ErrorNotFound;
-    log::warn!("Not supported in enterprise version");
-    Err(ErrorNotFound("Not supported in enterprise version"))
-}
-
-#[cfg(not(feature = "enterprise"))]
 pub async fn validate_user(
     user_id: &str,
     user_password: &str,
@@ -392,6 +386,12 @@ pub async fn oo_validator(
 }
 #[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
+    if !O2_CONFIG.openfga.enabled {
+        return true;
+    }
+
     let object_str = auth_info.o2_type;
     let obj_str = if object_str.contains("##user_id##") {
         object_str.replace("##user_id##", user_id)
@@ -423,7 +423,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_external: false,
+                is_external: true,
             },
             "root@example.com",
         )
@@ -436,7 +436,7 @@ mod tests {
                 role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_external: false,
+                is_external: true,
             },
             "root@example.com",
         )

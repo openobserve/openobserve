@@ -37,6 +37,11 @@ const useOSRoutes = () => {
         window.location.href = "/login";
       },
     },
+    {
+      path: "/cb",
+      name: "callback",
+      component: Login,
+    },
   ];
 
   const homeChildRoutes: any[] = [...useIngestionRoutes()];
