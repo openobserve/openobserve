@@ -36,8 +36,7 @@ const http = ({ headers } = {} as any) => {
   } else {
     headers = {
       Authorization:
-        config.isEnterprise == "true" &&
-        store.state.zoConfig?.dex_enabled
+        config.isEnterprise == "true" && (store.state as any).zoConfig.dex_enabled
           ? "Bearer " + localStorage.getItem("access_token")
           : localStorage.getItem("token") || "",
       ...headers,
