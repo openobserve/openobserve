@@ -131,6 +131,16 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         )?;
     }
 
+    if value.is_null() || !value.is_object() {
+        stream_status.status.failed += 1; // transform failed or dropped
+        return Ok(HttpResponse::Ok().json(IngestionResponse::new(
+            http::StatusCode::OK.into(),
+            vec![stream_status],
+        ))); // just return
+    }
+    // End row based transform
+
+    // get json object
     let mut local_val = match value.take() {
         json::Value::Object(v) => v,
         _ => unreachable!(),

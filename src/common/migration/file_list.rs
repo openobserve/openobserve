@@ -136,9 +136,6 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
         }
     }
 
-    infra_file_list::set_initialised()
-        .await
-        .expect("file list migration set initialised failed");
     // update stream stats
     update_stats_from_file_list()
         .await

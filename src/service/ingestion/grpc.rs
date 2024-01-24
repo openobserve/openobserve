@@ -217,6 +217,6 @@ mod tests {
             value: Some(in_byte),
         };
         let resp = get_val(&Some(&byte_val));
-        assert!(!resp.as_array().unwrap().is_empty());
+        assert!(!resp.as_str().unwrap().is_empty());
     }
 }

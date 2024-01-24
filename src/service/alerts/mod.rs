@@ -341,7 +341,12 @@ impl QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                 };
-                let resp = promql::search::search(&alert.org_id, &req, 0).await?;
+                let resp = match promql::search::search(&alert.org_id, &req, 0).await {
+                    Ok(v) => v,
+                    Err(_) => {
+                        return Ok(None);
+                    }
+                };
                 let promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: PromQL query {} returned unexpected response: {:?}",
@@ -404,8 +409,14 @@ impl QueryCondition {
             timeout: 0,
         };
         let session_id = ider::uuid();
-        let resp =
-            SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req).await?;
+        let resp = match SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req)
+            .await
+        {
+            Ok(v) => v,
+            Err(_) => {
+                return Ok(None);
+            }
+        };
         if resp.total < alert.trigger_condition.threshold as usize {
             Ok(None)
         } else {

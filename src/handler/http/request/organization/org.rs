@@ -15,14 +15,17 @@
 
 use std::{collections::HashSet, io::Error};
 
-use actix_web::{get, post, put, web, HttpResponse, Result};
+use actix_web::{get, http, post, put, web, HttpResponse, Result};
 
 use crate::{
     common::{
         infra::config::{STREAM_SCHEMAS, USERS},
-        meta::organization::{
-            OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
-            RumIngestionResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            organization::{
+                OrgDetails, OrgUser, Organization, OrganizationResponse, PasscodeResponse,
+                RumIngestionResponse, CUSTOM, DEFAULT_ORG, THRESHOLD,
+            },
         },
         utils::auth::{is_root_user, UserEmail},
     },
@@ -156,6 +159,7 @@ async fn org_summary(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/passcode")]
@@ -169,8 +173,13 @@ async fn get_user_passcode(
     if is_root_user(user_id) {
         org_id = None;
     }
-    let passcode = get_passcode(org_id, user_id).await;
-    Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
+    match get_passcode(org_id, user_id).await {
+        Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
 }
 
 /// UpdateIngestToken
@@ -186,6 +195,7 @@ async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = PasscodeResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/passcode")]
@@ -199,8 +209,13 @@ async fn update_user_passcode(
     if is_root_user(user_id) {
         org_id = None;
     }
-    let passcode = update_passcode(org_id, user_id).await;
-    Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode }))
+    match update_passcode(org_id, user_id).await {
+        Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
 }
 
 /// GetRumIngestToken
@@ -216,6 +231,7 @@ async fn update_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[get("/{org_id}/rumtoken")]
@@ -229,8 +245,13 @@ async fn get_user_rumtoken(
     if is_root_user(user_id) {
         org_id = None;
     }
-    let rumtoken = get_rum_token(org_id, user_id).await;
-    Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
+    match get_rum_token(org_id, user_id).await {
+        Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
 }
 
 /// UpdateRumIngestToken
@@ -246,6 +267,7 @@ async fn get_user_rumtoken(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/rumtoken")]
@@ -259,8 +281,13 @@ async fn update_user_rumtoken(
     if is_root_user(user_id) {
         org_id = None;
     }
-    let rumtoken = update_rum_token(org_id, user_id).await;
-    Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
+    match update_rum_token(org_id, user_id).await {
+        Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
 }
 
 /// CreateRumIngestToken
@@ -276,6 +303,7 @@ async fn update_user_rumtoken(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = RumIngestionResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/rumtoken")]
@@ -289,8 +317,13 @@ async fn create_user_rumtoken(
     if is_root_user(user_id) {
         org_id = None;
     }
-    let rumtoken = update_rum_token(org_id, user_id).await;
-    Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken }))
+    match update_rum_token(org_id, user_id).await {
+        Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
 }
 
 /// CreateOrganization
