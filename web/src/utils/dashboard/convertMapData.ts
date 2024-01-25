@@ -172,22 +172,20 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
           ];
         }
       }),
-      // symbolSize: function (val: any) {
-      //   return val[2];
-      // },
       symbolSize: function (val: any) {
         const normalizedSize = normalizeValue(val[2], minValue, maxValue);
         const minSymbolSize = panelSchema.config.map_symbol_style.min;
         const maxSymbolSize = panelSchema.config.map_symbol_style.max;
-        // console.log("normalizedSize", normalizedSize);
-        // console.log("minSymbolSize", minSymbolSize);
-        // console.log("maxSymbolSize", maxSymbolSize);
-        // console.log(
-        //   "minnnnnnn",
-        //   minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
-        // );
-        
-        return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
+        const mapSymbolStyleSelected =
+          panelSchema.config.map_symbol_style_selected;
+
+        if (mapSymbolStyleSelected === "symbolMinMax") {
+          return (
+            minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
+          );
+        } else if (mapSymbolStyleSelected === "fixed") {
+          return panelSchema.config.fixed_map_symbol_style;
+        }
       },
       itemStyle: {
         color: "#b02a02",
@@ -198,14 +196,12 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     };
   });
 
-  // let minValue = Number.MAX_VALUE;
-  // let maxValue = Number.MIN_VALUE;
-  // console.log("minValue", minValue, "maxValue", maxValue);
+  //min max for symbol size
   const seriesDataaa = options.series.flatMap((series: any) => series.data);
   const minValue = Math.min(...seriesDataaa.map((item: any) => item[2]));
   const maxValue = Math.max(...seriesDataaa.map((item: any) => item[2]));
-  console.log("minValue", minValue, "maxValue", maxValue);
 
+  //min max for visual map
   const seriesData = options.series.flatMap((series: any) => series.data);
   if (seriesData.length > 0) {
     const minValue = Math.min(...seriesData.map((item: any) => item[2]));
