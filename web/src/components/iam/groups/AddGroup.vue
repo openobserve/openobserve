@@ -104,7 +104,7 @@ const saveGroup = () => {
 };
 
 const _createGroup = (params: { name: string; org_identifier: string }) => {
-  createGroup(params)
+  createGroup(params.name, params.org_identifier)
     .then((res) => {
       console.log(res);
     })

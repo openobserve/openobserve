@@ -46,12 +46,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
+import { getRoles } from "@/services/iam";
+import { useStore } from "vuex";
 
 const { t } = useI18n();
 
@@ -60,6 +62,8 @@ const showAddGroup = ref(false);
 const rows: any = ref([]);
 
 const router = useRouter();
+
+const store = useStore();
 
 const columns: any = [
   {
@@ -86,24 +90,18 @@ const columns: any = [
   },
 ];
 
-const roles = ref([
-  {
-    role_name: "developers",
-    permissions: [],
-  },
-  {
-    role_name: "developers",
-    permissions: [],
-  },
-  {
-    role_name: "developers",
-    permissions: [],
-  },
-]);
+const roles = ref([]);
+
+onMounted(() => {
+  setupRoles();
+});
 
 const updateTable = () => {
   rows.value = cloneDeep(
-    roles.value.map((role, index) => ({ ...role, "#": index + 1 }))
+    roles.value.map((role: { role_name: string }, index) => ({
+      ...role,
+      "#": index + 1,
+    }))
   );
 };
 
@@ -121,7 +119,18 @@ const editRole = (role: any) => {
   });
 };
 
-updateTable();
+const setupRoles = async () => {
+  await getRoles(store.state.selectedOrganization.identifier)
+    .then((res) => {
+      roles.value = res.data.map((role: string) => ({
+        role_name: role,
+      }));
+      updateTable();
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
 </script>
 
 <style scoped></style>
