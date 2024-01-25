@@ -147,6 +147,7 @@ export default defineComponent({
       // else pass the selectedTabToMovePanels
       if (action.value === "delete") {
         emit("update:ok");
+        return;
       }
       emit("update:ok", selectedTabToMovePanels.value.value);
     };
