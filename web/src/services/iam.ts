@@ -12,7 +12,7 @@ export const getGroup = (group_name: string, org_identifier: string) => {
 };
 
 export const createGroup = (group_name: string, org_identifier: string) => {
-  const url = `/api/${org_identifier}/groups?group_id=${group_name}`;
+  const url = `/api/${org_identifier}/groups`;
   return http({}).post(url, {
     name: group_name,
   });
@@ -45,8 +45,8 @@ export const getRole = (role_id: string, org_identifier: string) => {
 };
 
 export const createRole = (role_id: string, org_identifier: string) => {
-  const url = `/api/${org_identifier}/roles?role_id=${role_id}`;
-  return http({}).post(url);
+  const url = `/api/${org_identifier}/roles`;
+  return http({}).post(url, `${role_id}`);
 };
 
 export const updateRole = (role: {

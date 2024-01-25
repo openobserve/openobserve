@@ -104,7 +104,7 @@ const saveRole = () => {
 };
 
 const _createRole = (params: { name: string; org_identifier: string }) => {
-  createRole(params)
+  createRole(params.name, params.org_identifier)
     .then((res) => {
       console.log(res);
     })
