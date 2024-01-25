@@ -65,25 +65,6 @@
       <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
         No users added
       </div>
-
-      <div class="flex justify-end q-mt-lg">
-        <q-btn
-          data-test="add-alert-cancel-btn"
-          class="text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-        />
-        <q-btn
-          data-test="add-alert-submit-btn"
-          :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
-        />
-      </div>
     </div>
   </div>
 </template>
@@ -105,6 +86,14 @@ const props = defineProps({
   activeTab: {
     type: String,
     default: "users",
+  },
+  addedUsers: {
+    type: Set,
+    default: () => new Set(),
+  },
+  removedUsers: {
+    type: Set,
+    default: () => new Set(),
   },
 });
 
@@ -220,13 +209,17 @@ const getchOrgUsers = async () => {
 
 const toggleUserSelection = (user: any) => {
   if (user.isInGroup && !groupUsersMap.value.has(user.email)) {
-    addedUsers.value.add(user.email);
+    props.addedUsers.add(user.email);
   } else if (!user.isInGroup && groupUsersMap.value.has(user.email)) {
-    removedUsers.value.add(user.email);
+    props.removedUsers.add(user.email);
   }
 
   if (!user.isInGroup && addedUsers.value.has(user.email)) {
-    addedUsers.value.delete(user.email);
+    props.addedUsers.delete(user.email);
+  }
+
+  if (!user.isInGroup && addedUsers.value.has(user.email)) {
+    props.removedUsers.delete(user.email);
   }
 };
 

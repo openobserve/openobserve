@@ -65,25 +65,6 @@
       <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
         No users added
       </div>
-
-      <div class="flex justify-end q-mt-lg">
-        <q-btn
-          data-test="add-alert-cancel-btn"
-          class="text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-        />
-        <q-btn
-          data-test="add-alert-submit-btn"
-          :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
-        />
-      </div>
     </div>
   </div>
 </template>
@@ -106,7 +87,17 @@ const props = defineProps({
     type: String,
     default: "users",
   },
+  addedRoles: {
+    type: Set,
+    default: () => new Set(),
+  },
+  removedRoles: {
+    type: Set,
+    default: () => new Set(),
+  },
 });
+
+const emits = defineEmits(["add", "remove"]);
 
 const users = ref([
   {
@@ -120,9 +111,6 @@ const users = ref([
 const rows: Ref<any[]> = ref([]);
 
 const usersDisplay = ref("selected");
-
-const removedUsers = ref(new Set());
-const addedUsers = ref(new Set());
 
 const usersDisplayOptions = [
   {
@@ -220,13 +208,17 @@ const getchOrgUsers = async () => {
 
 const toggleUserSelection = (user: any) => {
   if (user.isInGroup && !groupUsersMap.value.has(user.role_name)) {
-    addedUsers.value.add(user.role_name);
+    props.addedRoles.add(user.role_name);
   } else if (!user.isInGroup && groupUsersMap.value.has(user.role_name)) {
-    removedUsers.value.add(user.role_name);
+    props.removedRoles.add(user.role_name);
   }
 
-  if (!user.isInGroup && addedUsers.value.has(user.role_name)) {
-    addedUsers.value.delete(user.role_name);
+  if (!user.isInGroup && props.addedRoles.has(user.role_name)) {
+    props.addedRoles.delete(user.role_name);
+  }
+
+  if (user.isInGroup && props.removedRoles.has(user.role_name)) {
+    props.removedRoles.delete(user.role_name);
   }
 };
 
