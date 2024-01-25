@@ -60,12 +60,14 @@ const getDefaultDashboardPanelData: any = () => ({
         lat: 0,
         lng: 0,
       },
-      map_symbol_style_selected: "by Value",
       map_symbol_style: {
-        min: 1,
-        max: 100,
+        size: "by Value",
+        size_by_value: {
+          min: 1,
+          max: 100,
+        },
+        size_fixed: 2,
       },
-      fixed_map_symbol_style: 2,
       drilldown: [],
     },
     htmlContent: "",
