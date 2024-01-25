@@ -158,11 +158,7 @@ pub struct PanelConfig {
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    map_symbol_style_selected: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     map_symbol_style: Option<MapSymbolStyle>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    fixed_map_symbol_style: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -231,6 +227,13 @@ pub struct MapView {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct MapSymbolStyle {
+    pub size: String,
+    pub size_by_value: Option<SizeByValue>,
+    pub size_fixed: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SizeByValue {
     pub min: f64,
     pub max: f64,
 }
