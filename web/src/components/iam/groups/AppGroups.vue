@@ -19,13 +19,14 @@
         />
       </div>
       <app-table :rows="rows" :columns="columns" pagination :rows-per-page="20">
-        <template v-slot:actions>
+        <template v-slot:actions="slotProps">
           <div>
             <q-icon
               size="14px"
               name="edit"
               class="cursor-pointer q-mr-md"
               :title="t('common.edit')"
+              @click="editGroup(slotProps.column.row)"
             />
             <q-icon
               size="14px"
@@ -50,12 +51,15 @@ import AddGroup from "./AddGroup.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
+import { useRouter } from "vue-router";
 
 const showAddGroup = ref(false);
 
 const { t } = useI18n();
 
 const rows: any = ref([]);
+
+const router = useRouter();
 
 const columns: any = [
   {
@@ -132,6 +136,16 @@ const updateTable = () => {
 
 const addGroup = () => {
   showAddGroup.value = true;
+};
+
+const editGroup = (group: any) => {
+  console.log(group);
+  router.push({
+    name: "editGroup",
+    params: {
+      group_name: group.group_name,
+    },
+  });
 };
 
 updateTable();

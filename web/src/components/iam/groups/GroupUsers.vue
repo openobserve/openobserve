@@ -35,7 +35,7 @@
                 no-caps
                 size="11px"
                 class="q-px-md visual-selection-btn"
-                @click="usersDisplay = visual.value"
+                @click="updateUserTable(visual.value)"
               >
                 {{ visual.label }}</q-btn
               >
@@ -55,9 +55,9 @@
           <template v-slot:select="slotProps">
             <q-checkbox
               size="xs"
-              v-model="usersToRemove"
-              :val="slotProps.column.row.email"
+              v-model="slotProps.column.row.isInGroup"
               class="filter-check-box cursor-pointer"
+              @click="toggleUserSelection(slotProps.column.row)"
             />
           </template>
         </app-table>
@@ -90,44 +90,40 @@
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
+import { cloneDeep } from "lodash-es";
+import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-const rows = ref([
-  {
-    "#": 1,
-    email: "example@example.com",
+// show selected users in the table
+// Add is_selected to the user object
+
+const props = defineProps({
+  groupUsers: {
+    type: Array,
+    default: () => [],
   },
-  {
-    "#": 2,
-    email: "root@example.com",
+  activeTab: {
+    type: String,
+    default: "users",
   },
-]);
+});
 
 const users = ref([
   {
-    "#": 1,
     email: "example@example.com",
   },
   {
-    "#": 2,
     email: "root@example.com",
-  },
-  {
-    "#": 3,
-    email: "root@examplee.com",
-  },
-  {
-    "#": 4,
-    email: "root@exampleee.com",
-  },
-  {
-    "#": 5,
-    email: "root@exampleeee.com",
   },
 ]);
 
+const rows: Ref<any[]> = ref([]);
+
 const usersDisplay = ref("selected");
+
+const removedUsers = ref(new Set());
+const addedUsers = ref(new Set());
 
 const usersDisplayOptions = [
   {
@@ -144,9 +140,9 @@ const { t } = useI18n();
 
 const userSearchKey = ref("");
 
-const usersToRemove = ref([]);
+const hasFetchedOrgUsers = ref(false);
 
-const usersToAdd = ref([]);
+const groupUsersMap = ref(new Set());
 
 const columns = [
   {
@@ -166,6 +162,76 @@ const columns = [
     sortable: true,
   },
 ];
+
+const updateUserTable = async (value: string) => {
+  usersDisplay.value = value;
+
+  if (!hasFetchedOrgUsers.value && value === "all") {
+    await getchOrgUsers();
+  }
+
+  if (usersDisplay.value === "all") {
+    rows.value = users.value;
+  } else {
+    rows.value = users.value.filter((user: any) => user.isInGroup);
+  }
+};
+
+const updateGroupUsers = () => {
+  users.value = props.groupUsers.map((user: any, index: number) => {
+    groupUsersMap.value.add(user.email);
+    return {
+      ...user,
+      "#": index + 1,
+      isInGroup: true,
+    };
+  });
+
+  updateUserTable(usersDisplay.value);
+};
+
+const getchOrgUsers = async () => {
+  // fetch group users
+  hasFetchedOrgUsers.value = true;
+  return new Promise((resolve) => {
+    const _users = [
+      {
+        email: "example1@example.com",
+      },
+      {
+        email: "root1@example.com",
+      },
+      {
+        email: "example2@example.com",
+      },
+      {
+        email: "root2@example.com",
+      },
+    ];
+    users.value = _users.map((user: any, index: number) => {
+      return {
+        ...user,
+        "#": index + 1,
+        isInGroup: groupUsersMap.value.has(user.email),
+      };
+    });
+    resolve(true);
+  });
+};
+
+const toggleUserSelection = (user: any) => {
+  if (user.isInGroup && !groupUsersMap.value.has(user.email)) {
+    addedUsers.value.add(user.email);
+  } else if (!user.isInGroup && groupUsersMap.value.has(user.email)) {
+    removedUsers.value.add(user.email);
+  }
+
+  if (!user.isInGroup && addedUsers.value.has(user.email)) {
+    addedUsers.value.delete(user.email);
+  }
+};
+
+updateGroupUsers();
 </script>
 
 <style scoped></style>
