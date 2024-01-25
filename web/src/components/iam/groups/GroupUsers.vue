@@ -90,7 +90,6 @@
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
-import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";

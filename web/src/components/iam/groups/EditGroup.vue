@@ -18,7 +18,7 @@
       <GroupUsers :groupUsers="groupDetails.users" :activeTab="activeTab" />
     </template>
     <template v-if="activeTab === 'roles'">
-      <GroupRoles :roles="groupDetails.roles" :activeTab="activeTab" />
+      <GroupRoles :groupRoles="groupDetails.roles" :activeTab="activeTab" />
     </template>
   </div>
 </template>
