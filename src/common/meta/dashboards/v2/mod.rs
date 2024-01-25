@@ -158,6 +158,8 @@ pub struct PanelConfig {
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    map_symbol_style_selected: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     map_symbol_style: Option<MapSymbolStyle>,
     #[serde(skip_serializing_if = "Option::is_none")]
     fixed_map_symbol_style: Option<f64>,

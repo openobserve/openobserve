@@ -279,7 +279,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-zoom"
         >
         </q-input>
-        <q-input
+
+        <!-- symbol size -->
+        <q-select
+          v-model="dashboardPanelData.data.config.map_symbol_style_selected"
+          label="Symbol Type"
+          outlined
+          :options="symbolOptions"
+          dense
+          class="showLabelOnTop"
+          stack-label
+          emit-value
+          :display-value="`${dashboardPanelData.data.config.map_symbol_style_selected}`"
+          data-test="dashboard-config-symbol"
+        >
+        </q-select>
+        <div class="row">
+          <q-input
+            v-if="
+              dashboardPanelData.data.config.map_symbol_style_selected ===
+              'symbolMinMax'
+            "
             v-model.number="dashboardPanelData.data.config.map_symbol_style.min"
             label="Minimum"
             color="input-border"
@@ -291,10 +311,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             label-slot
             :type="'number'"
-            data-test="dashboard-config-lattitude"
+            data-test="dashboard-config-map-symbol-min"
           >
           </q-input>
+
           <q-input
+            v-if="
+              dashboardPanelData.data.config.map_symbol_style_selected ===
+              'symbolMinMax'
+            "
             v-model.number="dashboardPanelData.data.config.map_symbol_style.max"
             label="Maximum"
             color="input-border"
@@ -306,24 +331,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             label-slot
             :type="'number'"
-            data-test="dashboard-config-lattitude"
+            data-test="dashboard-config-map-symbol-max"
           >
           </q-input>
-          <q-input
-            v-model.number="dashboardPanelData.data.config.fixed_map_symbol_style"
-            label="Fixed Value"
-            color="input-border"
-            bg-color="input-bg"
-            class="col-6 q-py-md showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            label-slot
-            :type="'number'"
-            data-test="dashboard-config-lattitude"
-          >
-          </q-input>
+        </div>
+        <q-input
+          v-if="
+            dashboardPanelData.data.config.map_symbol_style_selected === 'fixed'
+          "
+          v-model.number="dashboardPanelData.data.config.fixed_map_symbol_style"
+          label="Fixed Value"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-6 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          data-test="dashboard-config-map-symbol-fixed"
+        >
+        </q-input>
       </div>
 
       <div class="space"></div>
@@ -701,6 +730,18 @@ export default defineComponent({
         value: "heatmap",
       },
     ];
+
+    //options for symbol
+    const symbolOptions = [
+      {
+        label: "Fixed",
+        value: "fixed",
+      },
+      {
+        label: "Symbol Min Max",
+        value: "symbolMinMax",
+      },
+    ];
     // options for legends position
     const legendsPositionOptions = [
       {
@@ -775,6 +816,7 @@ export default defineComponent({
       promqlMode,
       basemapTypeOptions,
       layerTypeOptions,
+      symbolOptions,
       legendsPositionOptions,
       unitOptions,
       isWeightFieldPresent,
