@@ -15,10 +15,10 @@
     <q-separator />
 
     <template v-if="activeTab === 'users'">
-      <GroupUsers />
+      <GroupUsers :groupUsers="groupDetails.users" :activeTab="activeTab" />
     </template>
     <template v-if="activeTab === 'roles'">
-      <GroupRoles />
+      <GroupRoles :roles="groupDetails.roles" :activeTab="activeTab" />
     </template>
   </div>
 </template>
@@ -42,6 +42,12 @@ const props = defineProps({
 });
 
 const activeTab = ref("users");
+
+const groupDetails = ref({
+  group_name: "dev",
+  roles: [],
+  users: [],
+});
 
 const tabs = [
   {
