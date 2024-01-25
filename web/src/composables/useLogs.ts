@@ -894,6 +894,7 @@ const useLogs = () => {
         const ignoreFields = [store.state.zoConfig.timestamp_column];
         let ftsKeys: Set<any>;
         let schemaFields: Set<any>;
+        const timestampField = store.state.zoConfig.timestamp_column;
 
         searchObj.data.streamResults.list.forEach((stream: any) => {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
@@ -945,6 +946,7 @@ const useLogs = () => {
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
               isSchemaField: schemaFields.has(row.name),
+              showValues: row.name !== timestampField,
             });
           }
           // }

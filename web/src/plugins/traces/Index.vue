@@ -372,7 +372,6 @@ export default defineComponent({
       try {
         const queryParams = router.currentRoute.value.query;
         searchObj.data.stream.streamLists = [];
-        searchObj.data.stream.selectedStream = {};
         if (searchObj.data.streamResults.list.length > 0) {
           let lastUpdatedStreamTime = 0;
           let selectedStreamItemObj = {};
@@ -397,6 +396,7 @@ export default defineComponent({
           if (selectedStreamItemObj.label != undefined) {
             searchObj.data.stream.selectedStream = selectedStreamItemObj;
           } else {
+            searchObj.data.stream.selectedStream = {};
             searchObj.loading = false;
             searchObj.data.queryResults = {};
             searchObj.data.sortedQueryResults = [];
@@ -873,21 +873,12 @@ export default defineComponent({
           const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
-          if (searchObj.data.stream.selectedStream.value === "default2") {
-            searchObj.data.streamResults.list.forEach((stream: any) => {
-              if (searchObj.data.stream.selectedStream.value == stream.name) {
-                schema.slice(0, 15).push(...stream.schema);
-                ftsKeys = new Set([...stream.settings.full_text_search_keys]);
-              }
-            });
-          } else {
-            searchObj.data.streamResults.list.forEach((stream: any) => {
-              if (searchObj.data.stream.selectedStream.value == stream.name) {
-                schema.push(...stream.schema);
-                ftsKeys = new Set([...stream.settings.full_text_search_keys]);
-              }
-            });
-          }
+          searchObj.data.streamResults.list.forEach((stream: any) => {
+            if (searchObj.data.stream.selectedStream.value == stream.name) {
+              schema.push(...stream.schema);
+              ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+            }
+          });
 
           const idFields = {
             trace_id: 1,
@@ -895,6 +886,7 @@ export default defineComponent({
             reference_parent_span_id: 1,
             reference_parent_trace_id: 1,
             start_time: 1,
+            end_time: 1,
           };
 
           const importantFields = {
@@ -1214,7 +1206,10 @@ export default defineComponent({
         searchObj.meta.filterType = queryParams.filter_type;
       }
 
-      if (queryParams.stream) {
+      if (
+        queryParams.stream &&
+        searchObj.data.stream.selectedStream.value !== queryParams.stream
+      ) {
         searchObj.data.stream.selectedStream = {
           label: queryParams.stream,
           value: queryParams.stream,
@@ -1444,6 +1439,7 @@ export default defineComponent({
     },
     changeStream: {
       handler(stream, oldStream) {
+        if (stream.value === oldStream.value) return;
         if (this.searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
           if (oldStream.value) {
             this.searchObj.data.query = "";
