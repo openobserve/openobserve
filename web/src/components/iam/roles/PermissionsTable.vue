@@ -61,7 +61,7 @@
           no-caps
           size="11px"
           class="q-px-md visual-selection-btn"
-          @click="filter.permissions = visual.value"
+          @click="updateTableData(visual.value)"
         >
           {{ visual.label }}</q-btn
         >
@@ -69,13 +69,20 @@
     </div>
     <span style="font-size: 14px"> Permissions </span>
   </div>
-  <div class="q-mb-md text-bold">{{ permissions.length }} Permissions</div>
+  <div class="q-mb-md text-bold">
+    {{ permissionsState.permissions.length }} Permissions
+  </div>
   <div class="iam-permissions-table">
     <AppTable :rows="rows" :columns="columns" :dense="true" class="q-mt-sm">
       <template v-slot:expand="slotProps">
         <q-icon
+          v-if="
+            (filter.permissions === 'selected' &&
+              slotProps.column.row.has_entities) ||
+            filter.permissions === 'all'
+          "
           :name="
-            expandedPermissions.has(slotProps.column.row.name)
+            slotProps.column.row.expand
               ? 'keyboard_arrow_up'
               : 'keyboard_arrow_down'
           "
@@ -88,14 +95,17 @@
       <template v-slot:permission="slotProps">
         <q-checkbox
           size="xs"
-          v-model="slotProps.column.row.permission"
+          v-model="slotProps.column.row.permission[slotProps.columnName]"
           :val="slotProps.columnName"
           class="filter-check-box cursor-pointer"
         />
       </template>
 
       <template v-slot:entity_table="slotProps">
-        <entity-permission-table :permissions="entities" />
+        <entity-permission-table
+          :entity="slotProps.row.row"
+          :show-selected="filter.permissions === 'selected'"
+        />
       </template>
     </AppTable>
   </div>
@@ -108,13 +118,9 @@ import { useI18n } from "vue-i18n";
 import { defineProps } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import EntityPermissionTable from "@/components/iam/roles/EntityPermissionTable.vue";
+import usePermissions from "@/composables/iam/usePermissions";
 
-const props = defineProps({
-  permissions: {
-    type: Array,
-    default: () => [],
-  },
-});
+const { permissionsState } = usePermissions();
 
 const permissionTypes = [
   {
@@ -127,10 +133,6 @@ const permissionTypes = [
   },
 ];
 
-const entities = [
-  { name: "default", permission: [], type: "Entity", resourceName: "stream" },
-  { name: "k8s", permission: [], type: "Entity", resourceName: "stream" },
-];
 const permissionDisplayOptions = [
   {
     label: "All",
@@ -267,15 +269,6 @@ const expandPermission = (permission: any) => {
   });
 };
 
-const setPermissionTable = () => {
-  rows.value = cloneDeep(
-    props.permissions.map((permission: any, index: number) => ({
-      ...permission,
-      "#": index + 1,
-    }))
-  );
-};
-
 const getResources = [
   {
     label: "Stream",
@@ -296,7 +289,31 @@ const getUpdatedPermissions = () => {
   );
 };
 
-setPermissionTable();
+const updateTableData = (value: string) => {
+  filter.value.permissions = value;
+
+  if (value === "all") {
+    rows.value = permissionsState.permissions;
+  } else {
+    rows.value = permissionsState.permissions.filter((permission: any) => {
+      const showResource = Object.values(permission.permission).some(
+        (permission: any) => permission
+      );
+
+      const showEntity = Object.values(permission.entities).some(
+        (entity: any) =>
+          Object.values(entity.permission).some((permission: any) => permission)
+      );
+
+      permission.has_entities = showEntity;
+      permission.expand = false;
+
+      return showResource || showEntity;
+    });
+  }
+};
+
+updateTableData(filter.value.permissions);
 </script>
 
 <style scoped></style>
