@@ -5,7 +5,7 @@
         <div class="o2-input q-mr-md" style="width: 400px">
           <q-input
             data-test="alert-list-search-input"
-            v-model="roleSearchKey"
+            v-model="userSearchKey"
             borderless
             filled
             dense
@@ -27,24 +27,24 @@
               border-radius: 2px;
             "
           >
-            <template v-for="visual in roleDisplayOptions" :key="visual.value">
+            <template v-for="visual in usersDisplayOptions" :key="visual.value">
               <q-btn
-                :color="visual.value === roleView ? 'primary' : ''"
-                :flat="visual.value === roleView ? false : true"
+                :color="visual.value === usersDisplay ? 'primary' : ''"
+                :flat="visual.value === usersDisplay ? false : true"
                 dense
                 no-caps
                 size="11px"
                 class="q-px-md visual-selection-btn"
-                @click="roleView = visual.value"
+                @click="updateUserTable(visual.value)"
               >
                 {{ visual.label }}</q-btn
               >
             </template>
           </div>
-          <span style="font-size: 14px"> Roles </span>
+          <span style="font-size: 14px"> Users </span>
         </div>
       </div>
-      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Roles</div>
+      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Permissions</div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -55,9 +55,9 @@
           <template v-slot:select="slotProps">
             <q-checkbox
               size="xs"
-              v-model="rolesToRemove"
-              :val="slotProps.column.row.role_name"
+              v-model="slotProps.column.row.isInGroup"
               class="filter-check-box cursor-pointer"
+              @click="toggleUserSelection(slotProps.column.row)"
             />
           </template>
         </app-table>
@@ -90,39 +90,41 @@
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
+import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-const { t } = useI18n();
+// show selected users in the table
+// Add is_selected to the user object
 
-const roleSearchKey = ref("");
+const props = defineProps({
+  groupRoles: {
+    type: Array,
+    default: () => [],
+  },
+  activeTab: {
+    type: String,
+    default: "users",
+  },
+});
 
-const columns = [
+const users = ref([
   {
-    name: "select",
-    field: "",
-    label: "",
-    align: "left",
-    slot: true,
-    slotName: "select",
+    role_name: "example@example.com",
   },
   {
-    name: "role_name",
-    field: "role_name",
-    label: "Role Name",
-    align: "left",
-    sortable: true,
+    role_name: "root@example.com",
   },
-];
-const rolesToRemove = ref([]);
+]);
 
-const showAddRoles = ref(false);
+const rows: Ref<any[]> = ref([]);
 
-const rolesToAdd = ref([]);
+const usersDisplay = ref("selected");
 
-const roleView = ref("selected");
+const removedUsers = ref(new Set());
+const addedUsers = ref(new Set());
 
-const roleDisplayOptions = [
+const usersDisplayOptions = [
   {
     label: "All",
     value: "all",
@@ -133,39 +135,102 @@ const roleDisplayOptions = [
   },
 ];
 
-const rows = ref([
-  {
-    "#": 1,
-    role_name: "explore_logs1",
-  },
-  {
-    "#": 2,
-    role_name: "explore_logs3",
-  },
-]);
+const { t } = useI18n();
 
-const roles = ref([
+const userSearchKey = ref("");
+
+const hasFetchedOrgUsers = ref(false);
+
+const groupUsersMap = ref(new Set());
+
+const columns = [
   {
-    "#": 1,
-    role_name: "explore_logs1",
+    name: "select",
+    field: "",
+    label: "",
+    align: "left",
+    sortable: true,
+    slot: true,
+    slotName: "select",
   },
   {
-    "#": 2,
-    role_name: "explore_logs3",
+    name: "role_name",
+    field: "role_name",
+    label: t("iam.roleName"),
+    align: "left",
+    sortable: true,
   },
-  {
-    "#": 3,
-    role_name: "view_dashboard1",
-  },
-  {
-    "#": 4,
-    role_name: "edit_dashboard",
-  },
-  {
-    "#": 5,
-    role_name: "edit_dashboard2",
-  },
-]);
+];
+
+const updateUserTable = async (value: string) => {
+  usersDisplay.value = value;
+
+  if (!hasFetchedOrgUsers.value && value === "all") {
+    await getchOrgUsers();
+  }
+
+  if (usersDisplay.value === "all") {
+    rows.value = users.value;
+  } else {
+    rows.value = users.value.filter((user: any) => user.isInGroup);
+  }
+};
+
+const updateGroupUsers = () => {
+  users.value = props.groupRoles.map((user: any, index: number) => {
+    groupUsersMap.value.add(user.role_name);
+    return {
+      ...user,
+      "#": index + 1,
+      isInGroup: true,
+    };
+  });
+
+  updateUserTable(usersDisplay.value);
+};
+
+const getchOrgUsers = async () => {
+  // fetch group users
+  hasFetchedOrgUsers.value = true;
+  return new Promise((resolve) => {
+    const _users = [
+      {
+        role_name: "developers1",
+      },
+      {
+        role_name: "developers2",
+      },
+      {
+        role_name: "developers3",
+      },
+      {
+        role_name: "developers4",
+      },
+    ];
+    users.value = _users.map((user: any, index: number) => {
+      return {
+        ...user,
+        "#": index + 1,
+        isInGroup: groupUsersMap.value.has(user.role_name),
+      };
+    });
+    resolve(true);
+  });
+};
+
+const toggleUserSelection = (user: any) => {
+  if (user.isInGroup && !groupUsersMap.value.has(user.role_name)) {
+    addedUsers.value.add(user.role_name);
+  } else if (!user.isInGroup && groupUsersMap.value.has(user.role_name)) {
+    removedUsers.value.add(user.role_name);
+  }
+
+  if (!user.isInGroup && addedUsers.value.has(user.role_name)) {
+    addedUsers.value.delete(user.role_name);
+  }
+};
+
+updateGroupUsers();
 </script>
 
 <style scoped></style>
