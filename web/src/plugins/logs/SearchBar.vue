@@ -1083,6 +1083,7 @@ export default defineComponent({
           fnEditorobj.layout();
         });
       }
+      fnEditorobj.layout();
     });
 
     onDeactivated(() => {
@@ -2108,5 +2109,10 @@ export default defineComponent({
   .btn-function {
     filter: brightness(100);
   }
+}
+
+.q-pagination__middle>.q-btn {
+  min-width: 30px !important;
+  max-width: 30px !important;
 }
 </style>
