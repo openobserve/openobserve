@@ -40,18 +40,23 @@
     </div>
 
     <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-      <AddGroup style="width: 30vw" />
+      <AddGroup
+        style="width: 30vw"
+        :org_identifier="store.state.selectedOrganization.identifier"
+      />
     </q-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import AddGroup from "./AddGroup.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+import { getGroups } from "@/services/iam";
 
 const showAddGroup = ref(false);
 
@@ -60,6 +65,8 @@ const { t } = useI18n();
 const rows: any = ref([]);
 
 const router = useRouter();
+
+const store = useStore();
 
 const columns: any = [
   {
@@ -86,51 +93,18 @@ const columns: any = [
   },
 ];
 
-const groups = ref([
-  {
-    group_name: "developers",
-    users: [],
-    roles: {
-      name: "devRole",
-      permissions: [
-        {
-          object: "stream:default",
-          permission: "create",
-        },
-      ],
-    },
-  },
-  {
-    group_name: "developers",
-    users: [],
-    roles: {
-      name: "devRole",
-      permissions: [
-        {
-          object: "stream:default",
-          permission: "create",
-        },
-      ],
-    },
-  },
-  {
-    group_name: "developers",
-    users: [],
-    roles: {
-      name: "devRole",
-      permissions: [
-        {
-          object: "stream:default",
-          permission: "create",
-        },
-      ],
-    },
-  },
-]);
+const groups = ref([]);
+
+onMounted(() => {
+  setupGroups();
+});
 
 const updateTable = () => {
   rows.value = cloneDeep(
-    groups.value.map((group, index) => ({ ...group, "#": index + 1 }))
+    groups.value.map((group: { group_name: string }, index) => ({
+      ...group,
+      "#": index + 1,
+    }))
   );
 };
 
@@ -148,7 +122,18 @@ const editGroup = (group: any) => {
   });
 };
 
-updateTable();
+const setupGroups = async () => {
+  await getGroups(store.state.selectedOrganization.identifier)
+    .then((res) => {
+      groups.value = res.data.map((group: string) => ({
+        group_name: group,
+      }));
+      updateTable();
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
 </script>
 
 <style scoped></style>
