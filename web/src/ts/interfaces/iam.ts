@@ -23,4 +23,33 @@ export interface Role {
   permissions?: Permission[];
 }
 
+export interface Resource {
+  name: string;
+  permission: {
+    AllowAll: boolean | null;
+    AllowList: boolean | null;
+    AllowGet: boolean | null;
+    AllowDelete: boolean | null;
+    AllowPost: boolean | null;
+    AllowPut: boolean | null;
+  };
+  type: "resource";
+  resourceName: string;
+  isSelected: boolean;
+  entities: Entity[];
+}
+
+export interface Entity {
+  name: string;
+  permission: {
+    AllowAll: boolean | null;
+    AllowGet: boolean | null;
+    AllowDelete: boolean | null;
+    AllowPut: boolean | null;
+  };
+  type: "entity";
+  resourceName: string;
+  isSelected: boolean;
+}
+
 interface User {}

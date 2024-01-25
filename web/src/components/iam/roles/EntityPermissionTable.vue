@@ -3,7 +3,7 @@
     <template v-slot:permission="slotProps">
       <q-checkbox
         size="xs"
-        v-model="slotProps.column.row.permission"
+        v-model="slotProps.column.row.permission[slotProps.columnName]"
         :val="slotProps.columnName"
         class="filter-check-box cursor-pointer"
       />
@@ -17,17 +17,26 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { defineProps } from "vue";
 import AppTable from "@/components/AppTable.vue";
+import usePermissions from "@/composables/iam/usePermissions";
+import type { Resource, Entity, Permission } from "@/ts/interfaces";
+import { watch } from "vue";
 
 const props = defineProps({
-  permissions: {
-    type: Array,
-    default: () => [],
+  entity: {
+    type: Object,
+    default: () => {},
+  },
+  showSelected: {
+    type: Boolean,
+    default: false,
   },
 });
 
 const { t } = useI18n();
 
 const rows: any = ref([]);
+
+const { permissionsState } = usePermissions();
 
 const expandedPermissions = ref(new Set());
 
@@ -125,24 +134,42 @@ const columns: any = [
 ];
 
 const setPermissionTable = () => {
-  rows.value = cloneDeep(
-    props.permissions.map((permission: any, index: number) => ({
-      ...permission,
-      permission: [],
-      "#": index + 1,
-    }))
+  rows.value =
+    permissionsState.permissions.find(
+      (r: any) => r.resourceName === props.entity.resourceName
+    )?.entities || [];
+};
+
+const getResourceEntities = () => {
+  return Object.values(
+    permissionsState.permissions.find(
+      (r: any) => r.resourceName === props.entity.resourceName
+    )?.entities || {}
   );
 };
 
-const getUpdatedPermissions = () => {
-  return cloneDeep(
-    rows.value.map((permission: any) => ({
-      entity: permission.object,
-      permission: permission.permission,
-    }))
-  );
+const updateTableData = () => {
+  if (!props.showSelected) {
+    rows.value = getResourceEntities();
+  } else {
+    rows.value = getResourceEntities().filter((entity: Entity) => {
+      const showEntity = Object.values(entity.permission).some(
+        (permission: any) => permission
+      );
+
+      return showEntity;
+    });
+  }
 };
-setPermissionTable();
+
+watch(
+  () => props.showSelected,
+  () => {
+    updateTableData();
+  }
+);
+
+updateTableData();
 </script>
 
 <style scoped></style>

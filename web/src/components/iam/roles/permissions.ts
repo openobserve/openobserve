@@ -1,4 +1,4 @@
-const permissionsResponse = [
+export const permissionsResponse = [
   {
     object: "streams:default",
     permission: "AllowAll",
@@ -13,10 +13,12 @@ const permissionsResponse = [
   },
   {
     object: "alerts:alert_1",
-    permission: "AllowGet",
+    permission: "AllowPut",
   },
   {
-    object: "alerts:default",
-    permission: "AllowGet",
+    object: "alerts:alert_1",
+    permission: "AllowAll",
   },
 ];
+
+const resources = [];
