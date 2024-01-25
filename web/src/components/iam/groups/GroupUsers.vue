@@ -1,11 +1,8 @@
 <template>
   <div class="q-px-md row">
     <div class="col q-pr-xs">
-      <div style="font-size: 16px" class="q-py-md q-pl-xs text-bold">
-        Users in this group ({{ rows.length }})
-      </div>
-      <div class="flex justify-between bordered q-pb-sm">
-        <div class="o2-input" style="width: 300px">
+      <div class="flex justify-start bordered q-mt-sm q-mb-md">
+        <div class="o2-input q-mr-md" style="width: 400px">
           <q-input
             data-test="alert-list-search-input"
             v-model="userSearchKey"
@@ -20,18 +17,41 @@
             </template>
           </q-input>
         </div>
-        <q-btn
-          data-test="add-alert-submit-btn"
-          label="Remove"
-          class="q-mb-md text-bold no-border q-mr-sm"
-          color="secondary"
-          size="md"
-          :disable="!usersToRemove.length"
-          no-caps
-        />
+        <div class="flex items-center" style="margin-bottom: 2px">
+          <span style="font-size: 14px"> Show </span>
+          <div
+            class="q-mx-sm"
+            style="
+              border: 1px solid #d7d7d7;
+              width: fit-content;
+              border-radius: 2px;
+            "
+          >
+            <template v-for="visual in usersDisplayOptions" :key="visual.value">
+              <q-btn
+                :color="visual.value === usersDisplay ? 'primary' : ''"
+                :flat="visual.value === usersDisplay ? false : true"
+                dense
+                no-caps
+                size="11px"
+                class="q-px-md visual-selection-btn"
+                @click="usersDisplay = visual.value"
+              >
+                {{ visual.label }}</q-btn
+              >
+            </template>
+          </div>
+          <span style="font-size: 14px"> Users </span>
+        </div>
       </div>
+      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Permissions</div>
       <template v-if="rows.length">
-        <app-table :rows="rows" :columns="columns">
+        <app-table
+          :rows="rows"
+          :columns="columns"
+          :dense="true"
+          style="height: fit-content"
+        >
           <template v-slot:select="slotProps">
             <q-checkbox
               size="xs"
@@ -45,49 +65,24 @@
       <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
         No users added
       </div>
-    </div>
-    <div class="col q-pl-xs">
-      <div style="font-size: 16px" class="q-py-md q-pl-xs text-bold">Users</div>
-      <div class="flex justify-between bordered q-pb-sm">
-        <div class="o2-input" style="width: 300px">
-          <q-input
-            data-test="alert-list-search-input"
-            v-model="userSearchKey"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            placeholder="Search"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-        </div>
+
+      <div class="flex justify-end q-mt-lg">
         <q-btn
-          data-test="add-alert-submit-btn"
-          label="Add"
-          class="q-mb-md text-bold no-border q-mr-sm"
-          color="secondary"
-          size="md"
-          :disable="!usersToAdd.length"
+          data-test="add-alert-cancel-btn"
+          class="text-bold"
+          :label="t('alerts.cancel')"
+          text-color="light-text"
+          padding="sm md"
           no-caps
         />
-      </div>
-      <template v-if="rows.length">
-        <app-table :rows="users" :columns="columns">
-          <template v-slot:select="slotProps">
-            <q-checkbox
-              size="xs"
-              v-model="usersToAdd"
-              :val="slotProps.column.row.email"
-              class="filter-check-box cursor-pointer"
-            />
-          </template>
-        </app-table>
-      </template>
-      <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
-        No users added
+        <q-btn
+          data-test="add-alert-submit-btn"
+          :label="t('alerts.save')"
+          class="text-bold no-border q-ml-md"
+          color="secondary"
+          padding="sm xl"
+          no-caps
+        />
       </div>
     </div>
   </div>
@@ -131,6 +126,19 @@ const users = ref([
     email: "root@exampleeee.com",
   },
 ]);
+
+const usersDisplay = ref("selected");
+
+const usersDisplayOptions = [
+  {
+    label: "All",
+    value: "all",
+  },
+  {
+    label: "Selected",
+    value: "selected",
+  },
+];
 
 const { t } = useI18n();
 

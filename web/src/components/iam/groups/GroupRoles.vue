@@ -1,60 +1,11 @@
 <template>
-  <div class="q-px-md">
-    <div class="flex justify-between q-pt-sm">
-      <div style="font-size: 16px" class="q-pl-xs q-py-md text-bold">
-        Roles {{ rows.length }}
-      </div>
-      <q-btn
-        data-test="add-alert-submit-btn"
-        label="Add Roles"
-        class="q-mb-md text-bold no-border q-mr-sm"
-        color="secondary"
-        size="md"
-        no-caps
-        @click="showAddRoles = true"
-      />
-    </div>
-    <div class="flex bordered q-mb-sm">
-      <div class="o2-input" style="width: 500px">
-        <q-input
-          data-test="alert-list-search-input"
-          v-model="roleSearchKey"
-          borderless
-          filled
-          dense
-          class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('alerts.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
-          </template>
-        </q-input>
-      </div>
-    </div>
-    <template v-if="rows.length">
-      <app-table :rows="rows" :columns="columns">
-        <template v-slot:select="slotProps">
-          <q-checkbox
-            size="xs"
-            v-model="rolesToRemove"
-            :val="slotProps.column.row.role_name"
-            class="filter-check-box cursor-pointer"
-          />
-        </template>
-      </app-table>
-    </template>
-    <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
-      No roles selected
-    </div>
-  </div>
-  <q-dialog v-model="showAddRoles" position="right" full-height maximized>
-    <div class="col q-pl-xs bg-white" style="width: 60vw">
-      <div style="font-size: 16px" class="q-py-md q-pl-xs text-bold">Roles</div>
-      <div class="flex justify-between bordered q-pb-sm">
-        <div class="o2-input" style="width: 300px">
+  <div class="q-px-md row">
+    <div class="col q-pr-xs">
+      <div class="flex justify-start bordered q-mt-sm q-mb-md">
+        <div class="o2-input q-mr-md" style="width: 400px">
           <q-input
             data-test="alert-list-search-input"
-            v-model="userSearchKey"
+            v-model="roleSearchKey"
             borderless
             filled
             dense
@@ -66,33 +17,75 @@
             </template>
           </q-input>
         </div>
-        <q-btn
-          data-test="add-alert-submit-btn"
-          label="Add"
-          class="q-mb-md text-bold no-border q-mr-sm"
-          color="secondary"
-          size="md"
-          :disable="!rolesToAdd.length"
-          no-caps
-        />
+        <div class="flex items-center" style="margin-bottom: 2px">
+          <span style="font-size: 14px"> Show </span>
+          <div
+            class="q-mx-sm"
+            style="
+              border: 1px solid #d7d7d7;
+              width: fit-content;
+              border-radius: 2px;
+            "
+          >
+            <template v-for="visual in roleDisplayOptions" :key="visual.value">
+              <q-btn
+                :color="visual.value === roleView ? 'primary' : ''"
+                :flat="visual.value === roleView ? false : true"
+                dense
+                no-caps
+                size="11px"
+                class="q-px-md visual-selection-btn"
+                @click="roleView = visual.value"
+              >
+                {{ visual.label }}</q-btn
+              >
+            </template>
+          </div>
+          <span style="font-size: 14px"> Roles </span>
+        </div>
       </div>
+      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Roles</div>
       <template v-if="rows.length">
-        <app-table :rows="roles" :columns="columns">
+        <app-table
+          :rows="rows"
+          :columns="columns"
+          :dense="true"
+          style="height: fit-content"
+        >
           <template v-slot:select="slotProps">
             <q-checkbox
               size="xs"
-              v-model="rolesToAdd"
-              :val="slotProps.column.row.email"
+              v-model="rolesToRemove"
+              :val="slotProps.column.row.role_name"
               class="filter-check-box cursor-pointer"
             />
           </template>
         </app-table>
       </template>
       <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
-        No roles added
+        No users added
+      </div>
+
+      <div class="flex justify-end q-mt-lg">
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          class="text-bold"
+          :label="t('alerts.cancel')"
+          text-color="light-text"
+          padding="sm md"
+          no-caps
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          :label="t('alerts.save')"
+          class="text-bold no-border q-ml-md"
+          color="secondary"
+          padding="sm xl"
+          no-caps
+        />
       </div>
     </div>
-  </q-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -126,6 +119,19 @@ const rolesToRemove = ref([]);
 const showAddRoles = ref(false);
 
 const rolesToAdd = ref([]);
+
+const roleView = ref("selected");
+
+const roleDisplayOptions = [
+  {
+    label: "All",
+    value: "all",
+  },
+  {
+    label: "Selected",
+    value: "selected",
+  },
+];
 
 const rows = ref([
   {
