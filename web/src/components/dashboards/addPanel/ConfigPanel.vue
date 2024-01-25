@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row">
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lat"
-            :label="t('dashboard.lattitudeLabel')"
+            :label="t('dashboard.latitudeLabel')"
             color="input-border"
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             label-slot
             :type="'number'"
-            data-test="dashboard-config-lattitude"
+            data-test="dashboard-config-latitude"
           >
           </q-input>
           <q-input
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- symbol size -->
         <q-select
           v-model="dashboardPanelData.data.config.map_symbol_style_selected"
-          label="Symbol Type"
+          :label="t('dashboard.symbolsize')"
           outlined
           :options="symbolOptions"
           dense
@@ -294,14 +294,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-symbol"
         >
         </q-select>
+
+        <div class="space"></div>
+
         <div class="row">
           <q-input
             v-if="
               dashboardPanelData.data.config.map_symbol_style_selected ===
-              'symbolMinMax'
+              'by Value'
             "
             v-model.number="dashboardPanelData.data.config.map_symbol_style.min"
-            label="Minimum"
+            :label="t('dashboard.minimum')"
             color="input-border"
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
@@ -318,10 +321,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-if="
               dashboardPanelData.data.config.map_symbol_style_selected ===
-              'symbolMinMax'
+              'by Value'
             "
             v-model.number="dashboardPanelData.data.config.map_symbol_style.max"
-            label="Maximum"
+            :label="t('dashboard.maximum')"
             color="input-border"
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
@@ -340,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.config.map_symbol_style_selected === 'fixed'
           "
           v-model.number="dashboardPanelData.data.config.fixed_map_symbol_style"
-          label="Fixed Value"
+          :label="t('dashboard.fixedValue')"
           color="input-border"
           bg-color="input-bg"
           class="col-6 q-py-md showLabelOnTop"
@@ -738,8 +741,8 @@ export default defineComponent({
         value: "fixed",
       },
       {
-        label: "Symbol Min Max",
-        value: "symbolMinMax",
+        label: "By Value",
+        value: "by Value",
       },
     ];
     // options for legends position

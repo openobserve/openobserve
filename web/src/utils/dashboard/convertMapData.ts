@@ -179,7 +179,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
         const mapSymbolStyleSelected =
           panelSchema.config.map_symbol_style_selected;
 
-        if (mapSymbolStyleSelected === "symbolMinMax") {
+        if (mapSymbolStyleSelected === "by Value") {
           return (
             minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
           );
