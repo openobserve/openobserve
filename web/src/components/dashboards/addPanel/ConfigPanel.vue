@@ -309,6 +309,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-lattitude"
           >
           </q-input>
+          <q-input
+            v-model.number="dashboardPanelData.data.config.fixed_map_symbol_style"
+            label="Fixed Value"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-6 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            label-slot
+            :type="'number'"
+            data-test="dashboard-config-lattitude"
+          >
+          </q-input>
       </div>
 
       <div class="space"></div>

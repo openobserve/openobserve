@@ -62,8 +62,9 @@ const getDefaultDashboardPanelData: any = () => ({
       },
       map_symbol_style: {
         min: 1,
-        max: 10,
+        max: 100,
       },
+      fixed_map_symbol_style: 2,
       drilldown: [],
     },
     htmlContent: "",
