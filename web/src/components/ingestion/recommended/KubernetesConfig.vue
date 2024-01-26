@@ -61,6 +61,8 @@ align="left" no-caps>
       >
         <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
           <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
+          <pre>Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local 
+Make changes accordingly to the above URL.</pre>
         </q-tab-panel>
 
         <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">
@@ -186,7 +188,8 @@ const collectorCmdThisCluster = computed(() => {
   --set exporters."otlphttp/openobserve".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}/  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}/  \\
-  --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]"`;
+  --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]" \\
+  --create-namespace`;
 });
 </script>
 
