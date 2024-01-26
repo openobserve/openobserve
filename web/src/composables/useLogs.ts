@@ -642,6 +642,7 @@ const useLogs = () => {
         //   searchObj.data.searchAround.histogramHide = false;
         //   searchObj.meta.showHistogram = true;
         // }
+
         const queryReq = buildSearch();
 
         if (queryReq != null) {
@@ -1452,6 +1453,7 @@ const useLogs = () => {
     onStreamChange,
     generateURLQuery,
     buildSearch,
+    loadStreamLists,
   };
 };
 
