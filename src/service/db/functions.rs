@@ -105,7 +105,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         if group.list.contains(&stream_fn) {
                             let stream_name =
                                 group.list.iter().position(|x| x.eq(&stream_fn)).unwrap();
-                            let _ = std::mem::replace(&mut group.list[stream_name], stream_fn);
+                            if stream_fn.is_removed {
+                                group.list.remove(stream_name);
+                            } else {
+                                let _ = std::mem::replace(&mut group.list[stream_name], stream_fn);
+                            }
                         } else {
                             group.list.push(stream_fn);
                         }
