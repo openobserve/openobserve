@@ -90,13 +90,13 @@ pub async fn update_role_permissions(
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/{org_id}/roles/{role_id}/permissions")]
+#[get("/{org_id}/roles/{role_id}/permissions/{resource}")]
 pub async fn get_role_permissions(
-    path: web::Path<(String, String)>,
+    path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, role_id) = path.into_inner();
+    let (org_id, role_id, resource) = path.into_inner();
     match o2_enterprise::enterprise::openfga::authorizer::get_all_role_permissions(
-        &org_id, &role_id,
+        &org_id, &role_id, &resource,
     )
     .await
     {
@@ -106,7 +106,7 @@ pub async fn get_role_permissions(
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[get("/{org_id}/roles/{role_id}/permissions")]
+#[get("/{org_id}/roles/{role_id}/permissions/{resource}")]
 pub async fn get_role_permissions(
     _path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
