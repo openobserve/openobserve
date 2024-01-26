@@ -18,18 +18,19 @@ use actix_web::{get, post, put, web, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::RolePermissionRequest;
 
-use crate::common::meta::user::{UserGroup, UserGroupRequest};
+use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles")]
 pub async fn create_role(
     org_id: web::Path<String>,
-    role_id: web::Json<String>,
+    user_req: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let role_id = role_id.into_inner();
+    let user_req = user_req.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::create_role(&role_id, &org_id).await {
+    match o2_enterprise::enterprise::openfga::authorizer::create_role(&user_req.name, &org_id).await
+    {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }

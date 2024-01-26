@@ -15,6 +15,8 @@ export const createGroup = (group_name: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/groups`;
   return http({}).post(url, {
     name: group_name,
+    users: [],
+    roles: [],
   });
 };
 
@@ -46,7 +48,9 @@ export const getRole = (role_id: string, org_identifier: string) => {
 
 export const createRole = (role_id: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/roles`;
-  return http({}).post(url, `${role_id}`);
+  return http({}).post(url, {
+    name: role_id,
+  });
 };
 
 export const updateRole = (role: {
@@ -54,13 +58,13 @@ export const updateRole = (role: {
   org_identifier: string;
   payload: any;
 }) => {
-  const url = `/api/${role.org_identifier}/roles/${role.role_id}/permissions`;
+  const url = `/ api / ${role.org_identifier} / roles / ${role.role_id} / permissions`;
   return http().put(url, role.payload);
 };
 
 // ----------- Permissions -------------
 
 export const getPermissions = (role_id: string, org_identifier: string) => {
-  const url = `/api/${org_identifier}/roles/`;
+  const url = `/ api / ${org_identifier} / roles / `;
   return http().get(url);
 };
