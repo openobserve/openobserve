@@ -47,9 +47,6 @@ import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
-import { start } from "repl";
-import search from "@/services/search";
-import { AlertList } from "@/components/alerts";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -834,22 +831,6 @@ const useLogs = () => {
               }
             }
           }
-
-          const partitionQueryReq: any = {
-            sql: queryReq.query.sql,
-            start_time: queryReq.query.start_time,
-            end_time: queryReq.query.end_time,
-          };
-
-          searchService
-            .partition({
-              org_identifier: searchObj.organizationIdetifier,
-              query: partitionQueryReq,
-              page_type: searchObj.data.stream.streamType,
-            })
-            .then((res) => {
-              console.log(res);
-            });
 
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
@@ -1689,6 +1670,7 @@ const useLogs = () => {
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
+      await getQueryPartitions();
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
