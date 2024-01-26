@@ -19,7 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="font-size: 18px">
         {{ t("iam.addGroup") }}
       </div>
-      <q-icon name="cancel" class="cursor-pointer" size="20px"></q-icon>
+      <q-btn
+        round
+        dense
+        flat
+        icon="cancel"
+        size="12px"
+        @click="emits('cancel:hideform')"
+      />
     </div>
 
     <div class="full-width bg-grey-4" style="height: 1px" />
@@ -65,6 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { createGroup, updateGroup } from "@/services/iam";
+import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -84,9 +92,11 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["cancel:hideform"]);
+const emits = defineEmits(["cancel:hideform", "added:group"]);
 
 const name = ref(props.group?.name || "");
+
+const q = useQuasar();
 
 const isUpdating = computed(() => !!props.group);
 
@@ -106,9 +116,23 @@ const saveGroup = () => {
 const _createGroup = (params: { name: string; org_identifier: string }) => {
   createGroup(params.name, params.org_identifier)
     .then((res) => {
-      console.log(res);
+      emits("added:group", res.data);
+      emits("cancel:hideform");
+
+      q.notify({
+        message: `User Group "${params.name}" Created Successfully!`,
+        color: "positive",
+        position: "bottom",
+        timeout: 3000,
+      });
     })
     .catch((err) => {
+      q.notify({
+        message: "Error while creating group",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
       console.log(err);
     });
 };

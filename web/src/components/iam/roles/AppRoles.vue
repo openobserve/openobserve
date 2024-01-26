@@ -54,6 +54,7 @@ import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
+import usePermissions from "@/composables/iam/usePermissions";
 
 const { t } = useI18n();
 
@@ -90,7 +91,7 @@ const columns: any = [
   },
 ];
 
-const roles = ref([]);
+const { rolesState } = usePermissions();
 
 onMounted(() => {
   setupRoles();
@@ -98,7 +99,7 @@ onMounted(() => {
 
 const updateTable = () => {
   rows.value = cloneDeep(
-    roles.value.map((role: { role_name: string }, index) => ({
+    rolesState.roles.map((role: { role_name: string }, index) => ({
       ...role,
       "#": index + 1,
     }))
@@ -122,7 +123,7 @@ const editRole = (role: any) => {
 const setupRoles = async () => {
   await getRoles(store.state.selectedOrganization.identifier)
     .then((res) => {
-      roles.value = res.data.map((role: string) => ({
+      rolesState.roles = res.data.map((role: string) => ({
         role_name: role,
       }));
       updateTable();

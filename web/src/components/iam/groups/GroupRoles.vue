@@ -71,6 +71,8 @@
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
+import usePermissions from "@/composables/iam/usePermissions";
+import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -107,6 +109,8 @@ const users = ref([
     role_name: "root@example.com",
   },
 ]);
+
+const { rolesState } = usePermissions();
 
 const rows: Ref<any[]> = ref([]);
 
@@ -181,27 +185,15 @@ const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
   return new Promise((resolve) => {
-    const _users = [
-      {
-        role_name: "developers1",
-      },
-      {
-        role_name: "developers2",
-      },
-      {
-        role_name: "developers3",
-      },
-      {
-        role_name: "developers4",
-      },
-    ];
-    users.value = _users.map((user: any, index: number) => {
-      return {
-        ...user,
-        "#": index + 1,
-        isInGroup: groupUsersMap.value.has(user.role_name),
-      };
-    });
+    users.value = cloneDeep(rolesState.roles).map(
+      (role: any, index: number) => {
+        return {
+          ...role,
+          "#": index + 1,
+          isInGroup: groupUsersMap.value.has(role.role_name),
+        };
+      }
+    );
     resolve(true);
   });
 };
