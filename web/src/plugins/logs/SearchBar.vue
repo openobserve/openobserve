@@ -79,7 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey" size="xs" />
+                    <q-icon name="delete"
+color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -191,7 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item"
+clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -701,7 +703,11 @@ export default defineComponent({
       this.customDownloadDialog = true;
     },
     downloadRangeData() {
-      if (this.downloadCustomInitialNumber < 0) {
+      alert(this.downloadCustomInitialNumber);
+      if (
+        this.downloadCustomInitialNumber < 0 ||
+        this.downloadCustomInitialNumber == ""
+      ) {
         this.$q.notify({
           message: "Initial number must be positive number.",
           color: "negative",
@@ -769,6 +775,7 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       buildSearch,
+      resetStreamData,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -1341,51 +1348,69 @@ export default defineComponent({
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
 
-            extractedObj.data.stream.streamLists =
-              searchObj.data.stream.streamLists;
-            extractedObj.data.transforms = searchObj.data.transforms;
-            extractedObj.data.stream.functions =
-              searchObj.data.stream.functions;
-            extractedObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {},
-            };
-            extractedObj.data.savedViews = searchObj.data.savedViews;
-            extractedObj.data.queryResults = [];
-            extractedObj.meta.scrollInfo = {};
-            searchObj.value = mergeDeep(searchObj, extractedObj);
-            await nextTick();
-            if (extractedObj.data.tempFunctionContent != "") {
-              populateFunctionImplementation(
-                {
-                  name: "",
-                  function: searchObj.data.tempFunctionContent,
-                },
-                false
-              );
-              searchObj.data.tempFunctionContent =
-                extractedObj.data.tempFunctionContent;
-              searchObj.meta.functionEditorPlaceholderFlag = false;
-            } else {
-              populateFunctionImplementation(
-                {
-                  name: "",
-                  function: "",
-                },
-                false
-              );
-              searchObj.data.tempFunctionContent = "";
-              searchObj.meta.functionEditorPlaceholderFlag = true;
+            if (!extractedObj.data.stream.hasOwnProperty("streamType")) {
+              extractedObj.data.stream.streamType = "logs";
             }
-            dateTimeRef.value.setSavedDate(searchObj.data.datetime);
-            if (searchObj.meta.refreshInterval != "0") {
-              onRefreshIntervalUpdate();
+
+            if (
+              searchObj.data.stream.streamType ==
+              extractedObj.data.stream.streamType
+            ) {
+              extractedObj.data.stream.selectedStream.value !=
+                searchObj.data.stream.selectedStream.value;
+              extractedObj.data.stream.streamLists =
+                searchObj.data.stream.streamLists;
+              extractedObj.data.transforms = searchObj.data.transforms;
+              extractedObj.data.stream.functions =
+                searchObj.data.stream.functions;
+              extractedObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {},
+              };
+              extractedObj.data.savedViews = searchObj.data.savedViews;
+              extractedObj.data.queryResults = [];
+              extractedObj.meta.scrollInfo = {};
+              delete extractedObj.data.stream.selectedStream;
+              searchObj.value = mergeDeep(searchObj, extractedObj);
+              alert(JSON.stringify(searchObj.data.stream.streamLists));
+              await nextTick();
+              if (extractedObj.data.tempFunctionContent != "") {
+                populateFunctionImplementation(
+                  {
+                    name: "",
+                    function: searchObj.data.tempFunctionContent,
+                  },
+                  false
+                );
+                searchObj.data.tempFunctionContent =
+                  extractedObj.data.tempFunctionContent;
+                searchObj.meta.functionEditorPlaceholderFlag = false;
+              } else {
+                populateFunctionImplementation(
+                  {
+                    name: "",
+                    function: "",
+                  },
+                  false
+                );
+                searchObj.data.tempFunctionContent = "";
+                searchObj.meta.functionEditorPlaceholderFlag = true;
+              }
+              dateTimeRef.value.setSavedDate(searchObj.data.datetime);
+              if (searchObj.meta.refreshInterval != "0") {
+                onRefreshIntervalUpdate();
+              } else {
+                clearInterval(store.state.refreshIntervalID);
+              }
+              alert(JSON.stringify(searchObj.data.stream.streamLists));
+              await updatedLocalLogFilterField();
+              alert(JSON.stringify(searchObj.data.stream.streamLists));
+              await getStreams("logs", true);
+              alert(JSON.stringify(searchObj.data.stream.streamLists));
             } else {
-              clearInterval(store.state.refreshIntervalID);
+              resetStreamData();
             }
-            await updatedLocalLogFilterField();
-            await getStreams("logs", true);
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
               color: "positive",
@@ -1802,6 +1827,9 @@ export default defineComponent({
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
     },
+    resetFunctionDefination() {
+      return this.searchObj.data.tempFunctionContent;
+    },
   },
   watch: {
     addSearchTerm() {
@@ -1863,6 +1891,9 @@ export default defineComponent({
       if (newVal == "" && store.state.savedViewFlag == false) {
         this.resetFunctionContent();
       }
+    },
+    resetFunctionDefination(newVal) {
+      if (newVal == "") this.resetFunctionContent();
     },
   },
 });

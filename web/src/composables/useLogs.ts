@@ -1421,6 +1421,7 @@ const useLogs = () => {
 
     searchObj.data.editorValue = query;
     searchObj.data.query = query;
+    searchObj.data.tempFunctionContent = "";
 
     handleQueryData();
   };
