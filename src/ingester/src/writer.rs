@@ -204,10 +204,10 @@ impl Writer {
                     &key.stream_type,
                     wal_id
                 );
-                IMMUTABLES
-                    .write()
-                    .await
-                    .insert(path, immutable::Immutable::new(thread_id, key.clone(), old_mem));
+                IMMUTABLES.write().await.insert(
+                    path,
+                    immutable::Immutable::new(thread_id, key.clone(), old_mem),
+                );
                 log::info!(
                     "[INGESTER:WAL] done add to IMMUTABLES, file: {}/{}/{}/{}.wal",
                     thread_id,

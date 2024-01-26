@@ -109,6 +109,7 @@ pub async fn search_partition(
 
     let mut resp = search::SearchPartitionResponse {
         file_num: files.len(),
+        records: files.iter().map(|f| f.meta.records).sum::<i64>() as usize,
         original_size: files.iter().map(|f| f.meta.original_size).sum::<i64>() as usize,
         compressed_size: files.iter().map(|f| f.meta.compressed_size).sum::<i64>() as usize,
         partitions: vec![],
