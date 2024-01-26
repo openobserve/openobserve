@@ -267,6 +267,7 @@ pub struct SearchPartitionRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionResponse {
     pub file_num: usize,
+    pub records: usize,
     pub original_size: usize,
     pub compressed_size: usize,
     pub partitions: Vec<[i64; 2]>,
