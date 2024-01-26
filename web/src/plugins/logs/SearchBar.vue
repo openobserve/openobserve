@@ -955,7 +955,6 @@ export default defineComponent({
     };
 
     const downloadLogs = (data) => {
-      console.log(data);
       const filename = "logs-data.csv";
       const dataobj = jsonToCsv(data);
       const file = new File([dataobj], filename, {
@@ -1431,7 +1430,6 @@ export default defineComponent({
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
-              console.log(" check search obj", cloneDeep(searchObj));
               const streamData = await getStreams(
                 searchObj.data.stream.streamType,
                 true
@@ -1478,7 +1476,6 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log("query data");
             setTimeout(async () => {
               try {
                 searchObj.loading = true;

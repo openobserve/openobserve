@@ -344,7 +344,6 @@ const useLogs = () => {
       const streamData = await getStreams(streamType, true);
       searchObj.data.streamResults = streamData;
       await loadStreamLists();
-      console.log("load streams");
       return;
     } catch (e: any) {
       console.log("Error while getting stream list");
@@ -628,20 +627,15 @@ const useLogs = () => {
 
   const getQueryData = (isPagination = false) => {
     return new Promise((resolve, reject) => {
-      console.log("get query data");
-
       const dismiss = () => {};
       try {
         searchObj.meta.showDetailTab = false;
 
-        console.log(searchObj.data.stream.streamLists);
         if (!searchObj.data.stream.streamLists?.length) {
           searchObj.loading = false;
           reject(false);
           return;
         }
-
-        console.log("reset query data");
 
         if (!isPagination) resetQueryData();
 
@@ -649,13 +643,8 @@ const useLogs = () => {
         //   searchObj.data.searchAround.histogramHide = false;
         //   searchObj.meta.showHistogram = true;
         // }
-        console.log("buildSearch");
-
-        console.log(cloneDeep(searchObj));
 
         const queryReq = buildSearch();
-
-        console.log(queryReq);
 
         if (queryReq != null) {
           if (
