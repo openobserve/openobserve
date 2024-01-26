@@ -107,11 +107,21 @@ pub async fn search_partition(
     let nodes = cluster::get_cached_online_querier_nodes().unwrap_or_default();
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
+    let (records, original_size, compressed_size) =
+        files
+            .iter()
+            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
+                (
+                    records + f.meta.records,
+                    original_size + f.meta.original_size,
+                    compressed_size + f.meta.compressed_size,
+                )
+            });
     let mut resp = search::SearchPartitionResponse {
         file_num: files.len(),
-        records: files.iter().map(|f| f.meta.records).sum::<i64>() as usize,
-        original_size: files.iter().map(|f| f.meta.original_size).sum::<i64>() as usize,
-        compressed_size: files.iter().map(|f| f.meta.compressed_size).sum::<i64>() as usize,
+        records: records as usize,
+        original_size: original_size as usize,
+        compressed_size: compressed_size as usize,
         partitions: vec![],
     };
     let mut total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
