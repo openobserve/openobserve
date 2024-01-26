@@ -703,7 +703,6 @@ export default defineComponent({
       this.customDownloadDialog = true;
     },
     downloadRangeData() {
-      alert(this.downloadCustomInitialNumber);
       if (
         this.downloadCustomInitialNumber < 0 ||
         this.downloadCustomInitialNumber == ""
