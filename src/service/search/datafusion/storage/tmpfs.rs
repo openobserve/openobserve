@@ -26,6 +26,7 @@ use object_store::{
 use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
 
+use super::GetRangeExt;
 use crate::common::{infra::cache::tmpfs, utils::time::BASE_TIME};
 
 /// A specialized `Error` for in-memory object store-related errors
@@ -93,8 +94,14 @@ impl ObjectStore for Tmpfs {
             e_tag: None,
             version: None,
         };
+        println!("tmpfs: get_opts: {:?}", options);
         let (range, data) = match options.range {
-            Some(range) => (range.clone(), data.slice(range)),
+            Some(range) => {
+                let r = range
+                    .as_range(data.len())
+                    .map_err(|e| super::Error::BadRange(e.to_string()))?;
+                (r.clone(), data.slice(r))
+            }
             None => (0..data.len(), data),
         };
         Ok(GetResult {

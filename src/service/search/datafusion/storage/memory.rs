@@ -24,6 +24,7 @@ use object_store::{
 };
 use tokio::io::AsyncWrite;
 
+use super::GetRangeExt;
 use crate::common::{
     infra::{cache::file_data, storage},
     utils::time::BASE_TIME,
@@ -104,8 +105,14 @@ impl ObjectStore for FS {
                     e_tag: None,
                     version: None,
                 };
+                println!("memory: get_opts: {:?}", options);
                 let (range, data) = match options.range {
-                    Some(range) => (range.clone(), data.slice(range)),
+                    Some(range) => {
+                        let r = range
+                            .as_range(data.len())
+                            .map_err(|e| super::Error::BadRange(e.to_string()))?;
+                        (r.clone(), data.slice(r))
+                    }
                     None => (0..data.len(), data),
                 };
                 Ok(GetResult {

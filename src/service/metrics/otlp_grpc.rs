@@ -302,7 +302,11 @@ pub async fn handle_grpc_request(
                     let buf = metric_data_map
                         .entry(local_metric_name.to_owned())
                         .or_default();
-                    let schema = metric_schema_map.get(local_metric_name).unwrap().clone();
+                    let schema = metric_schema_map
+                        .get(local_metric_name)
+                        .unwrap()
+                        .clone()
+                        .with_metadata(HashMap::new());
                     let schema_key = schema.hash_key();
                     // get hour key
                     let hour_key = crate::service::ingestion::get_wal_time_key(
