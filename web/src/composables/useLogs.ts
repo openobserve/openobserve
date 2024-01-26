@@ -767,7 +767,6 @@ const useLogs = () => {
         }
       });
 
-      console.log(partitionDetail);
       searchObj.data.queryResults.partitionDetail = partitionDetail;
     }
   };
@@ -851,124 +850,6 @@ const useLogs = () => {
           searchObj.data.queryResults.subpage = 1;
 
           await getPaginatedData(queryReq, histogramQueryReq);
-
-          // searchService
-          //   .search({
-          //     org_identifier: searchObj.organizationIdetifier,
-          //     query: queryReq,
-          //     page_type: searchObj.data.stream.streamType,
-          //   })
-          //   .then(async (res) => {
-          //     dismiss();
-
-          //     if (res.data.from > 0) {
-          //       searchObj.data.queryResults.from = res.data.from;
-          //       searchObj.data.queryResults.scan_size = res.data.scan_size;
-          //       searchObj.data.queryResults.took = res.data.took;
-          //       // searchObj.data.queryResults.hits.push(...res.data.hits);
-          //       searchObj.data.queryResults.hits = res.data.hits;
-          //       if (searchObj.data.queryResults.total < res.data.total) {
-          //         searchObj.data.queryResults.total = res.data.total;
-          //       }
-          //     } else {
-          //       resetFieldValues();
-          //       if (
-          //         searchObj.meta.refreshInterval > 0 &&
-          //         router.currentRoute.value.name == "logs" &&
-          //         searchObj.data.queryResults.hasOwnProperty("hits") &&
-          //         searchObj.data.queryResults.hits.length > 0
-          //       ) {
-          //         searchObj.data.queryResults.from = res.data.from;
-          //         searchObj.data.queryResults.scan_size = res.data.scan_size;
-          //         searchObj.data.queryResults.took = res.data.took;
-          //         searchObj.data.queryResults.aggs = res.data.aggs;
-          //         const lastRecordTimeStamp = parseInt(
-          //           searchObj.data.queryResults.hits[0]._timestamp
-          //         );
-          //         searchObj.data.queryResults.hits = res.data.hits;
-          //         // for (let i = 0; i < res.data.hits.length; i++) {
-          //         //   if (
-          //         //     lastRecordTimeStamp <
-          //         //     parseInt(res.data.hits[i]._timestamp)
-          //         //   ) {
-          //         //     searchObj.data.queryResults.hits.unshift(
-          //         //       res.data.hits[i]
-          //         //     );
-          //         //   }
-          //         // }
-
-          //         // searchObj.data.queryResults.hits =
-          //         //   searchObj.data.queryResults.hits.splice(0, 150);
-          //       } else {
-          //         searchObj.data.queryResults = res.data;
-          //       }
-          //     }
-
-          //     if (
-          //       res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage
-          //     ) {
-          //       searchObj.data.resultGrid.currentPage =
-          //         searchObj.data.resultGrid.currentPage + 1;
-          //       await getQueryData(true);
-          //     }
-
-          //     updateFieldValues();
-
-          //     //extract fields from query response
-          //     extractFields();
-
-          //     if (isPagination) {
-          //       searchObj.data.histogram.chartParams.title =
-          //         getHistogramTitle();
-          //     }
-
-          //     //update grid columns
-          //     updateGridColumns();
-          //     if (
-          //       res.data.hits.length > 0 &&
-          //       histogramQueryReq.hasOwnProperty("aggs")
-          //     ) {
-          //       getHistogramQueryData(histogramQueryReq);
-          //     }
-
-          //     // disabled histogram case, generate histogram histogram title
-          //     if (
-          //       searchObj.data.resultGrid.currentPage == 1 &&
-          //       (searchObj.meta.showHistogram === false ||
-          //         searchObj.meta.sqlMode)
-          //     ) {
-          //       searchObj.data.histogram.chartParams.title =
-          //         getHistogramTitle();
-          //     }
-
-          //     searchObj.data.functionError = "";
-          //     if (
-          //       res.data.hasOwnProperty("function_error") &&
-          //       res.data.function_error
-          //     ) {
-          //       searchObj.data.functionError = res.data.function_error;
-          //     }
-
-          //     searchObj.loading = false;
-          //     resolve(true);
-          //   })
-          //   .catch((err) => {
-          //     searchObj.loading = false;
-          //     if (err.response != undefined) {
-          //       searchObj.data.errorMsg = err.response.data.error;
-          //     } else {
-          //       searchObj.data.errorMsg = err.message;
-          //     }
-
-          //     const customMessage = logsErrorMessage(err?.response?.data.code);
-          //     searchObj.data.errorCode = err?.response?.data.code;
-
-          //     if (customMessage != "") {
-          //       searchObj.data.errorMsg = t(customMessage);
-          //     }
-
-          //     reject(false);
-          //   });
         } else {
           dismiss();
           searchObj.loading = false;
