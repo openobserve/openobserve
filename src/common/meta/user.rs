@@ -267,3 +267,8 @@ pub struct UserGroupRequest {
     pub add_roles: Option<std::collections::HashSet<String>>,
     pub remove_roles: Option<std::collections::HashSet<String>>,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct UserRoleRequest {
+    pub name: String,
+}
