@@ -144,7 +144,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         org_id, stream_fn.stream_type, stream_fn.stream
                     ))
                     .or_insert_with(|| StreamFunctionsList { list: vec![] });
-                group.list.push(stream_fn);
+                if !stream_fn.is_removed {
+                    group.list.push(stream_fn);
+                }
             }
             let mut func = json_val.clone();
             func.streams = None;
