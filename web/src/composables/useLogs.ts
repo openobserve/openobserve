@@ -674,6 +674,7 @@ const useLogs = () => {
             data[key];
         });
 
+        // refreshPartitionPagination();
         console.log(searchObj.data.queryResults.partitionDetail.pagination);
       });
   };
@@ -709,6 +710,19 @@ const useLogs = () => {
         combineCount++;
       }
     );
+
+    // Convert keys to array and sort them
+    const sortedKeys = Object.keys(
+      searchObj.data.queryResults.partitionDetail.pagination
+    ).sort();
+
+    // Create a new object using the sorted keys
+    const data = searchObj.data.queryResults.partitionDetail.pagination;
+    searchObj.data.queryResults.partitionDetail.pagination = {};
+    sortedKeys.forEach((key, index) => {
+      data[key].from = index * searchObj.meta.resultGrid.rowsPerPage;
+      searchObj.data.queryResults.partitionDetail.pagination[key] = data[key];
+    });
   };
 
   const getQueryData = (isPagination = false) => {
@@ -774,6 +788,19 @@ const useLogs = () => {
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
           searchObj.data.customDownloadQueryObj = queryReq;
+
+          queryReq.query.start_time =
+            searchObj.data.queryResults.partitionDetail.pagination[
+              searchObj.data.resultGrid.currentPage
+            ].startTime;
+          queryReq.query.end_time =
+            searchObj.data.queryResults.partitionDetail.pagination[
+              searchObj.data.resultGrid.currentPage
+            ].endTime;
+          queryReq.query.from =
+            searchObj.data.queryResults.partitionDetail.pagination[
+              searchObj.data.resultGrid.currentPage
+            ].from;
           searchService
             .search({
               org_identifier: searchObj.organizationIdetifier,
@@ -782,6 +809,7 @@ const useLogs = () => {
             })
             .then((res) => {
               dismiss();
+
               if (res.data.from > 0) {
                 searchObj.data.queryResults.from = res.data.from;
                 searchObj.data.queryResults.scan_size = res.data.scan_size;
