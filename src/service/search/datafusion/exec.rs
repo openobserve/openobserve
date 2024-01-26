@@ -1002,6 +1002,10 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
         .with_information_schema(true);
+    config = config.set_bool(
+        "datafusion.execution.listing_table_ignore_subdirectory",
+        false,
+    );
     if search_type == &SearchType::Normal {
         config = config.set_bool("datafusion.execution.parquet.pushdown_filters", true);
         config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);

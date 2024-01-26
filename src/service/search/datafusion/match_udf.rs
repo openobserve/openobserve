@@ -60,9 +60,10 @@ pub(crate) static MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
     let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
         if args.len() != 2 {
-            return Err(DataFusionError::SQL(ParserError::ParserError(
-                "match UDF expects two string".to_string(),
-            )));
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError("match UDF expects two string".to_string()),
+                None,
+            ));
         }
 
         // 1. cast both arguments to string. These casts MUST be aligned with the signature or this
