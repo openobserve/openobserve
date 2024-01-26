@@ -43,6 +43,8 @@
       <AddGroup
         style="width: 30vw"
         :org_identifier="store.state.selectedOrganization.identifier"
+        @cancel:hideform="hideAddGroup"
+        @added:group="setupGroups"
       />
     </q-dialog>
   </div>
@@ -57,6 +59,7 @@ import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getGroups } from "@/services/iam";
+import usePermissions from "@/composables/iam/usePermissions";
 
 const showAddGroup = ref(false);
 
@@ -67,6 +70,8 @@ const rows: any = ref([]);
 const router = useRouter();
 
 const store = useStore();
+
+const { groupsState } = usePermissions();
 
 const columns: any = [
   {
@@ -101,7 +106,7 @@ onMounted(() => {
 
 const updateTable = () => {
   rows.value = cloneDeep(
-    groups.value.map((group: { group_name: string }, index) => ({
+    groupsState.groups.map((group: { group_name: string }, index) => ({
       ...group,
       "#": index + 1,
     }))
@@ -113,7 +118,6 @@ const addGroup = () => {
 };
 
 const editGroup = (group: any) => {
-  console.log(group);
   router.push({
     name: "editGroup",
     params: {
@@ -125,7 +129,7 @@ const editGroup = (group: any) => {
 const setupGroups = async () => {
   await getGroups(store.state.selectedOrganization.identifier)
     .then((res) => {
-      groups.value = res.data.map((group: string) => ({
+      groupsState.groups = res.data.map((group: string) => ({
         group_name: group,
       }));
       updateTable();
@@ -133,6 +137,10 @@ const setupGroups = async () => {
     .catch((err) => {
       console.log(err);
     });
+};
+
+const hideAddGroup = () => {
+  showAddGroup.value = false;
 };
 </script>
 

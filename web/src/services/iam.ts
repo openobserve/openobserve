@@ -30,7 +30,7 @@ export const updateGroup = (group: {
     remove_users: string[];
   };
 }) => {
-  const url = `/api/${group.org_identifier}/groups/${group.group_name}/`;
+  const url = `/api/${group.org_identifier}/groups/${group.group_name}`;
   return http().post(url, group.payload);
 };
 

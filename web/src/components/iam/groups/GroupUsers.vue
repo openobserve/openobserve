@@ -71,6 +71,8 @@
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
+import usePermissions from "@/composables/iam/usePermissions";
+import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -110,9 +112,6 @@ const rows: Ref<any[]> = ref([]);
 
 const usersDisplay = ref("selected");
 
-const removedUsers = ref(new Set());
-const addedUsers = ref(new Set());
-
 const usersDisplayOptions = [
   {
     label: "All",
@@ -131,6 +130,8 @@ const userSearchKey = ref("");
 const hasFetchedOrgUsers = ref(false);
 
 const groupUsersMap = ref(new Set());
+
+const { usersState } = usePermissions();
 
 const columns = [
   {
@@ -182,27 +183,16 @@ const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
   return new Promise((resolve) => {
-    const _users = [
-      {
-        email: "example1@example.com",
-      },
-      {
-        email: "root1@example.com",
-      },
-      {
-        email: "example2@example.com",
-      },
-      {
-        email: "root2@example.com",
-      },
-    ];
-    users.value = _users.map((user: any, index: number) => {
-      return {
-        ...user,
-        "#": index + 1,
-        isInGroup: groupUsersMap.value.has(user.email),
-      };
-    });
+    // TODO OK : Add code to fetch org users if not fetched
+    users.value = cloneDeep(usersState.users).map(
+      (user: any, index: number) => {
+        return {
+          email: user.email,
+          "#": index + 1,
+          isInGroup: groupUsersMap.value.has(user.email),
+        };
+      }
+    );
     resolve(true);
   });
 };
@@ -214,11 +204,11 @@ const toggleUserSelection = (user: any) => {
     props.removedUsers.add(user.email);
   }
 
-  if (!user.isInGroup && addedUsers.value.has(user.email)) {
+  if (!user.isInGroup && props.addedUsers.has(user.email)) {
     props.addedUsers.delete(user.email);
   }
 
-  if (!user.isInGroup && addedUsers.value.has(user.email)) {
+  if (!user.isInGroup && props.addedUsers.has(user.email)) {
     props.removedUsers.delete(user.email);
   }
 };
