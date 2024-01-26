@@ -105,7 +105,6 @@ impl ObjectStore for FS {
                     e_tag: None,
                     version: None,
                 };
-                println!("memory: get_opts: {:?}", options);
                 let (range, data) = match options.range {
                     Some(range) => {
                         let r = range

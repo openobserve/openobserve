@@ -94,7 +94,6 @@ impl ObjectStore for Tmpfs {
             e_tag: None,
             version: None,
         };
-        println!("tmpfs: get_opts: {:?}", options);
         let (range, data) = match options.range {
             Some(range) => {
                 let r = range
