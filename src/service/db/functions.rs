@@ -105,7 +105,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         if group.list.contains(&stream_fn) {
                             let stream_name =
                                 group.list.iter().position(|x| x.eq(&stream_fn)).unwrap();
-                            let _ = std::mem::replace(&mut group.list[stream_name], stream_fn);
+                            if stream_fn.is_removed {
+                                group.list.remove(stream_name);
+                            } else {
+                                let _ = std::mem::replace(&mut group.list[stream_name], stream_fn);
+                            }
                         } else {
                             group.list.push(stream_fn);
                         }
@@ -140,7 +144,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         org_id, stream_fn.stream_type, stream_fn.stream
                     ))
                     .or_insert_with(|| StreamFunctionsList { list: vec![] });
-                group.list.push(stream_fn);
+                if !stream_fn.is_removed {
+                    group.list.push(stream_fn);
+                }
             }
             let mut func = json_val.clone();
             func.streams = None;
