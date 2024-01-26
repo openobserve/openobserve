@@ -209,3 +209,18 @@ pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<Http
 pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
+
+#[cfg(feature = "enterprise")]
+#[get("/{org_id}/resources")]
+pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let resources = o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+        .values()
+        .collect::<Vec<&&str>>();
+    Ok(HttpResponse::Ok().json(resources))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/resources")]
+pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
