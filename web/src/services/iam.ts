@@ -31,7 +31,7 @@ export const updateGroup = (group: {
   };
 }) => {
   const url = `/api/${group.org_identifier}/groups/${group.group_name}`;
-  return http().post(url, group.payload);
+  return http().put(url, group.payload);
 };
 
 // ----------- Roles -------------
