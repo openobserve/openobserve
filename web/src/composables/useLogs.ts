@@ -911,30 +911,7 @@ const useLogs = () => {
             }
           }
         );
-        // if (
-        //   searchObj.data.queryResults.partitionDetail.partitionTotal[
-        //     searchObj.data.resultGrid.currentPage - 1
-        //   ] == -1
-        // ) {
-        //   if (searchObj.data.resultGrid.currentPage - 1 > 0) {
-        //     searchObj.data.queryResults.partitionDetail.partitionTotal[
-        //       searchObj.data.resultGrid.currentPage - 1
-        //     ] = res.data.total;
-        //   } else {
-        //     searchObj.data.queryResults.partitionDetail.partitionTotal[
-        //       searchObj.data.resultGrid.currentPage - 1
-        //     ] = 267;
-        //   }
-
-        //   refreshPartitionPagination();
-        // }
-
-        // searchObj.data.queryResults.originalHits = res.data.hits.splice(
-        //   100,
-        //   res.data.hits.length
-        // );
-        // res.data.hits = res.data.hits.splice(0, 100);
-
+        
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
           searchObj.data.queryResults.scan_size = res.data.scan_size;
