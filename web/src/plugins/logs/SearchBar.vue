@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey"
-size="xs" />
+                    <q-icon name="delete" color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -192,8 +191,7 @@ size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -328,7 +326,10 @@ clickable v-close-popup>
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog ref="confirmSavedViewDialog" v-model="confirmSavedViewDialogVisible">
+    <q-dialog
+      ref="confirmSavedViewDialog"
+      v-model="confirmSavedViewDialogVisible"
+    >
       <q-card>
         <q-card-section>
           {{ confirmMessageSavedView }}
@@ -802,7 +803,7 @@ export default defineComponent({
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
-      searchObj.meta.refreshInterval = item.value;
+      searchObj.meta.refreshInterval = Number(item.value);
     };
 
     const isSavedViewAction = ref("create");
@@ -1457,7 +1458,6 @@ export default defineComponent({
               savedViewSelectedName.value.view_name
             );
           });
-          
         } else {
           $q.notify({
             message: `Please select saved view to update.`,
@@ -2111,7 +2111,7 @@ export default defineComponent({
   }
 }
 
-.q-pagination__middle>.q-btn {
+.q-pagination__middle > .q-btn {
   min-width: 30px !important;
   max-width: 30px !important;
 }

@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center"
                   >
-                  <q-icon
+                    <q-icon
                       name="warning"
                       color="warning"
                       size="10rem"
@@ -244,9 +244,7 @@ export default defineComponent({
       }
     },
     async getMoreData() {
-      if (
-        this.searchObj.meta.refreshInterval == 0
-      ) {
+      if (this.searchObj.meta.refreshInterval == 0) {
         // this.searchObj.data.resultGrid.currentPage =
         //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
         //     ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
@@ -362,8 +360,8 @@ export default defineComponent({
     //   }
     // }
     // onUnmounted(() => {
-      // resetSearchObj();
-      // resetStreamData();
+    // resetSearchObj();
+    // resetStreamData();
     // });
 
     onActivated(async () => {
@@ -374,6 +372,8 @@ export default defineComponent({
         queryParams.stream !== searchObj.data.stream.selectedStream.value;
 
       if (isStreamChanged && queryParams.type === "stream_explorer") {
+        resetSearchObj();
+        resetStreamData();
         restoreUrlQueryParams();
         loadLogsData();
         return;
@@ -390,6 +390,10 @@ export default defineComponent({
     });
 
     onBeforeMount(() => {
+      // TODO OK : need to revisit this 394 line, this is hotfixfor 0.8.0v
+      searchObj.meta.pageType = "logs";
+      resetSearchObj();
+      resetStreamData();
       searchObj.loading = true;
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
@@ -408,7 +412,11 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.type,
       (type, prev) => {
-        if (prev === "stream_explorer" && !type) {
+        if (
+          router.currentRoute.name === "logs" &&
+          prev === "stream_explorer" &&
+          !type
+        ) {
           searchObj.meta.pageType = "logs";
           loadLogsData();
         }
