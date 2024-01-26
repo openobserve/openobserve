@@ -110,7 +110,7 @@ const defaultObject = {
     },
     scrollInfo: {},
     flagWrapContent: false,
-    pageType: "logs",
+    pageType: "logs", // 'logs' or 'stream
   },
   data: {
     query: <any>"",
@@ -390,6 +390,7 @@ const useLogs = () => {
       );
     }
 
+    // TODO : Add type in query params for all types
     if (searchObj.meta.pageType !== "logs") {
       query["type"] = searchObj.meta.pageType;
     }
@@ -1304,7 +1305,7 @@ const useLogs = () => {
     }
 
     if (queryParams.stream_type) {
-      searchObj.data.stream.streamType = queryParams.type;
+      searchObj.data.stream.streamType = queryParams.streamType;
     } else {
       searchObj.data.stream.streamType = "logs";
     }
@@ -1420,6 +1421,7 @@ const useLogs = () => {
 
     searchObj.data.editorValue = query;
     searchObj.data.query = query;
+    searchObj.data.tempFunctionContent = "";
 
     handleQueryData();
   };

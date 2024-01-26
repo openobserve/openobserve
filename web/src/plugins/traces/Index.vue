@@ -1150,37 +1150,6 @@ export default defineComponent({
       getQueryData();
     };
 
-    const setQuery = (sqlMode: boolean) => {
-      if (sqlMode) {
-        let selectFields = "";
-        let whereClause = "";
-        let currentQuery = searchObj.data.query;
-        currentQuery = currentQuery.split("|");
-        if (currentQuery.length > 1) {
-          selectFields = "," + currentQuery[0].trim();
-          if (currentQuery[1].trim() != "") {
-            whereClause = "WHERE " + currentQuery[1].trim();
-          }
-        } else if (currentQuery[0].trim() != "") {
-          if (currentQuery[0].trim() != "") {
-            whereClause = "WHERE " + currentQuery[0].trim();
-          }
-        }
-        searchObj.data.query =
-          `SELECT *${selectFields} FROM "` +
-          searchObj.data.stream.selectedStream.value +
-          `" ` +
-          whereClause;
-
-        searchBarRef.value.udpateQuery();
-
-        searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
-      } else {
-        searchObj.data.query = "";
-        searchBarRef.value.udpateQuery();
-      }
-    };
-
     function restoreUrlQueryParams() {
       const queryParams = router.currentRoute.value.query;
 
@@ -1359,7 +1328,6 @@ export default defineComponent({
       updateGridColumns,
       getConsumableDateTime,
       runQueryFn,
-      setQuery,
       getTraceDetails,
       verifyOrganizationStatus,
       fieldValues,
@@ -1397,9 +1365,6 @@ export default defineComponent({
     },
     runQuery() {
       return this.searchObj.runQuery;
-    },
-    fullSQLMode() {
-      return this.searchObj.meta.sqlMode;
     },
   },
   watch: {
@@ -1445,7 +1410,6 @@ export default defineComponent({
             this.searchObj.data.query = "";
             this.searchObj.data.advanceFiltersQuery = "";
           }
-          if (oldStream.value) this.setQuery(this.searchObj.meta.sqlMode);
           setTimeout(() => {
             this.runQueryFn();
             this.extractFields();
@@ -1464,9 +1428,6 @@ export default defineComponent({
       if (this.searchObj.runQuery == true) {
         this.runQueryFn();
       }
-    },
-    fullSQLMode(newVal) {
-      this.setQuery(newVal);
     },
   },
 });
