@@ -666,12 +666,6 @@ const useLogs = () => {
           );
           searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
         });
-        console.log(
-          "Original:",
-          JSON.parse(
-            JSON.stringify(searchObj.data.queryResults.partitionDetail)
-          )
-        );
       });
   };
 
