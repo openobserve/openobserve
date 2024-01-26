@@ -16,7 +16,15 @@
 import { reactive } from "vue";
 import type { Resource } from "@/ts/interfaces";
 
-const defaultObject = {
+const groups = {
+  groups: [],
+};
+
+const roles = {
+  roles: [],
+};
+
+const permissions = {
   permissions: [
     {
       name: "streams",
@@ -67,15 +75,41 @@ const defaultObject = {
   selectedResources: {},
 };
 
-let permissionsState = reactive(Object.assign({}, defaultObject));
+const users = {
+  users: [],
+};
+
+const permissionsState = reactive(Object.assign({}, permissions));
+
+const rolesState = reactive(Object.assign({}, roles));
+
+const groupsState = reactive(Object.assign({}, groups));
+
+const usersState = reactive(Object.assign({}, users));
 
 const usePermissions = () => {
   const resetPermissionsState = () => {
     // delete searchObj.data;
-    permissionsState = reactive(Object.assign({}, defaultObject));
+    permissionsState.permissions = [];
+    permissionsState.selectedResources = {};
   };
 
-  return { permissionsState, resetPermissionsState };
+  const resetGroupsState = () => {};
+
+  const resetRolesState = () => {};
+
+  const resetUsersState = () => {};
+
+  return {
+    permissionsState,
+    rolesState,
+    groupsState,
+    usersState,
+    resetPermissionsState,
+    resetGroupsState,
+    resetRolesState,
+    resetUsersState,
+  };
 };
 
 export default usePermissions;

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div style="font-size: 18px" class="q-py-sm q-px-md">
-      {{ editingGroup.group_name }}
+      {{ groupDetails.group_name }}
     </div>
 
     <div class="full-width bg-grey-4" style="height: 1px" />
@@ -61,6 +61,9 @@ import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { onBeforeMount } from "vue";
+import { getGroup, updateGroup } from "@/services/iam";
+import { useStore } from "vuex";
 
 const props = defineProps({
   group: {
@@ -73,7 +76,13 @@ const props = defineProps({
   },
 });
 
+onBeforeMount(() => {
+  getGroupDetails();
+});
+
 const activeTab = ref("users");
+
+const store = useStore();
 
 const router = useRouter();
 
@@ -102,21 +111,47 @@ const tabs = [
   },
 ];
 
-const editingGroup = ref(cloneDeep(props.group));
+const getGroupDetails = () => {
+  const groupName: string = router.currentRoute.value.params
+    .group_name as string;
+
+  getGroup(groupName, store.state.selectedOrganization.identifier)
+    .then((res) => {
+      groupDetails.value = {
+        ...res.data,
+        group_name: res.data.name,
+      };
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+};
 
 const updateActiveTab = (tab: string) => {
+  if (!tab) return;
   activeTab.value = tab;
 };
 
 const saveGroupChanges = () => {
-  console.log("save group changes");
   const payload = {
-    added_users: Array.from(addedUsers.value),
-    removed_users: Array.from(removedUsers.value),
-    added_roles: Array.from(addedRoles.value),
-    removed_roles: Array.from(removedRoles.value),
+    add_users: Array.from(addedUsers.value) as string[],
+    remove_users: Array.from(removedUsers.value) as string[],
+    add_roles: Array.from(addedRoles.value) as string[],
+    remove_roles: Array.from(removedRoles.value) as string[],
   };
-  console.log(payload);
+
+  updateGroup({
+    group_name: groupDetails.value.group_name,
+    org_identifier: store.state.selectedOrganization.identifier,
+    payload,
+  })
+    .then((res) => {
+      console.log(res);
+      router.push({ name: "groups" });
+    })
+    .catch((err) => {
+      console.log(err);
+    });
 };
 
 const cancelEditGroup = () => {
