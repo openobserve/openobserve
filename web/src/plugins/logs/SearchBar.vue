@@ -1372,7 +1372,6 @@ export default defineComponent({
               extractedObj.meta.scrollInfo = {};
               delete extractedObj.data.stream.selectedStream;
               searchObj.value = mergeDeep(searchObj, extractedObj);
-              alert(JSON.stringify(searchObj.data.stream.streamLists));
               await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -1402,11 +1401,8 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
-              alert(JSON.stringify(searchObj.data.stream.streamLists));
               await updatedLocalLogFilterField();
-              alert(JSON.stringify(searchObj.data.stream.streamLists));
               await getStreams("logs", true);
-              alert(JSON.stringify(searchObj.data.stream.streamLists));
             } else {
               resetStreamData();
             }
