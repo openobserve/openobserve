@@ -48,6 +48,7 @@ import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import { start } from "repl";
+import search from "@/services/search";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -624,8 +625,94 @@ const useLogs = () => {
     }
   }
 
+  const getQueryPartitions = async () => {
+    const queryReq = buildSearch();
+
+    const partitionQueryReq: any = {
+      sql: queryReq.query.sql,
+      start_time: queryReq.query.start_time,
+      end_time: queryReq.query.end_time,
+    };
+
+    await searchService
+      .partition({
+        org_identifier: searchObj.organizationIdetifier,
+        query: partitionQueryReq,
+        page_type: searchObj.data.stream.streamType,
+      })
+      .then((res) => {
+        searchObj.data.queryResults.partitionDetail = {
+          partitions: [],
+          totalRecords: [],
+          pagination: [],
+        };
+        searchObj.data.queryResults.partitionDetail.partitions =
+          res.data.partitions;
+
+        res.data.partitions.forEach((item: any, index: number) => {
+          searchObj.data.queryResults.partitionDetail.totalRecords.push(0);
+          searchObj.data.queryResults.partitionDetail.pagination[
+            item[0] + "0"
+          ] = {
+            startTime: item[0],
+            endTime: item[1],
+            from: 0,
+          };
+        });
+
+        // Convert keys to array and sort them
+        const sortedKeys = Object.keys(
+          searchObj.data.queryResults.partitionDetail.pagination
+        ).sort();
+
+        // Create a new object using the sorted keys
+        const data = searchObj.data.queryResults.partitionDetail.pagination;
+        searchObj.data.queryResults.partitionDetail.pagination = {};
+        sortedKeys.forEach((key, index) => {
+          data[key].from = index * searchObj.meta.resultGrid.rowsPerPage;
+          searchObj.data.queryResults.partitionDetail.pagination[key] =
+            data[key];
+        });
+
+        console.log(searchObj.data.queryResults.partitionDetail.pagination);
+      });
+  };
+
+  const refreshPartitionPagination = () => {
+    searchObj.data.queryResults.partitionDetail.partitions.forEach(
+      (item: any, index: number) => {
+        let combineCount = 0;
+        if (
+          searchObj.data.queryResults.partitionDetail.totalRecords[index] > 0
+        ) {
+          const totalPages =
+            searchObj.data.queryResults.partitionDetail.totalRecords[index] /
+            searchObj.meta.resultGrid.rowsPerPage;
+          for (let i = 0; i < totalPages; i++) {
+            searchObj.data.queryResults.partitionDetail.pagination[
+              item[0] + i
+            ] = {
+              startTime: item[0],
+              endTime: item[1],
+              from: combineCount * searchObj.meta.resultGrid.rowsPerPage,
+            };
+          }
+        } else {
+          searchObj.data.queryResults.partitionDetail.pagination[
+            item[0] + "0"
+          ] = {
+            startTime: item[0],
+            endTime: item[1],
+            from: combineCount * searchObj.meta.resultGrid.rowsPerPage,
+          };
+        }
+        combineCount++;
+      }
+    );
+  };
+
   const getQueryData = (isPagination = false) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       const dismiss = () => {};
       try {
         searchObj.meta.showDetailTab = false;
@@ -636,7 +723,10 @@ const useLogs = () => {
           return;
         }
 
-        if (!isPagination) resetQueryData();
+        if (!isPagination) {
+          resetQueryData();
+          await getQueryPartitions();
+        }
 
         // if (searchObj.data.searchAround.histogramHide) {
         //   searchObj.data.searchAround.histogramHide = false;
@@ -679,22 +769,6 @@ const useLogs = () => {
               }
             }
           }
-
-          const partitionQueryReq: any = {
-            sql: queryReq.query.sql,
-            start_time: queryReq.query.start_time,
-            end_time: queryReq.query.end_time,
-          };
-
-          searchService
-            .partition({
-              org_identifier: searchObj.organizationIdetifier,
-              query: partitionQueryReq,
-              page_type: searchObj.data.stream.streamType,
-            })
-            .then((res) => {
-              console.log(res);
-            });
 
           searchObj.data.errorCode = 0;
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
@@ -1284,6 +1358,7 @@ const useLogs = () => {
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
+      await getQueryPartitions();
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
