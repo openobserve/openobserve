@@ -15,6 +15,7 @@
 
 import { reactive } from "vue";
 import { useLocalTraceFilterField } from "@/utils/zincutils";
+import { cloneDeep } from "lodash-es";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -132,12 +133,30 @@ const defaultObject = {
   },
 };
 
-let searchObj = reactive(Object.assign({}, defaultObject));
+const searchObj = reactive(Object.assign({}, defaultObject));
 
-const useLogs = () => {
+const useTraces = () => {
   const resetSearchObj = () => {
     // delete searchObj.data;
-    searchObj = reactive(Object.assign({}, defaultObject));
+    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.stream.streamLists = [];
+    searchObj.data.stream.selectedStream = { label: "", value: "" };
+    searchObj.data.stream.selectedStreamFields = [];
+    searchObj.data.queryResults = {};
+    searchObj.data.sortedQueryResults = [];
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "",
+      },
+    };
+    searchObj.data.query = "";
+    searchObj.data.editorValue = "";
+    searchObj.meta.sqlMode = false;
+    searchObj.runQuery = false;
   };
   const updatedLocalLogFilterField = (): void => {
     const identifier: string = searchObj.organizationIdetifier || "default";
@@ -154,4 +173,4 @@ const useLogs = () => {
   return { searchObj, resetSearchObj, updatedLocalLogFilterField };
 };
 
-export default useLogs;
+export default useTraces;
