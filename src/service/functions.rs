@@ -161,13 +161,21 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
         if !val.is_empty() {
             let names = val
                 .iter()
-                .map(|stream| stream.stream.clone())
+                .filter_map(|stream| {
+                    if !stream.is_removed {
+                        Some(stream.stream.to_owned())
+                    } else {
+                        None
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                format!("{} {}", FN_IN_USE, names),
-            )));
+            if !names.is_empty() {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST.into(),
+                    format!("{} {}", FN_IN_USE, fn_name),
+                )));
+            }
         }
     }
     let result = db::functions::delete(&org_id, &fn_name).await;
@@ -218,15 +226,12 @@ pub async fn delete_stream_function(
         }
     };
 
-    if let Some(val) = existing_fn.streams {
-        if val.len() == 1 && val.first().unwrap().stream == stream_name {
-            existing_fn.streams = None;
-        } else {
-            existing_fn.streams = Some(
-                val.into_iter()
-                    .filter(|x| x.stream != stream_name)
-                    .collect::<Vec<StreamOrder>>(),
-            );
+    if let Some(ref mut val) = existing_fn.streams {
+        for stream in val.iter_mut() {
+            if stream.stream == stream_name {
+                stream.is_removed = true;
+                break;
+            }
         }
         if let Err(error) = db::functions::set(org_id, fn_name, &existing_fn).await {
             Ok(
@@ -362,6 +367,7 @@ mod tests {
                 stream: "test".to_owned(),
                 stream_type: StreamType::Logs,
                 order: 0,
+                is_removed: false,
             }]),
         };
 
