@@ -1355,10 +1355,15 @@ export default defineComponent({
               searchObj.data.stream.streamType ==
               extractedObj.data.stream.streamType
             ) {
-              extractedObj.data.stream.selectedStream.value !=
-                searchObj.data.stream.selectedStream.value;
-              extractedObj.data.stream.streamLists =
-                searchObj.data.stream.streamLists;
+              // if (
+              //   extractedObj.data.stream.selectedStream.value !=
+              //   searchObj.data.stream.selectedStream.value
+              // ) {
+              //   extractedObj.data.stream.streamLists =
+              //     searchObj.data.stream.streamLists;
+              // }
+              delete extractedObj.data.stream.streamLists;
+              delete searchObj.data.stream.selectedStream;
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
                 searchObj.data.stream.functions;
@@ -1370,7 +1375,6 @@ export default defineComponent({
               extractedObj.data.savedViews = searchObj.data.savedViews;
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
-              delete extractedObj.data.stream.selectedStream;
               searchObj.value = mergeDeep(searchObj, extractedObj);
               await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
