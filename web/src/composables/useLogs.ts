@@ -336,11 +336,10 @@ const useLogs = () => {
     }
   }
 
-  const getStreamList = async (_streamType = null) => {
+  const getStreamList = async () => {
     try {
       resetStreamData();
-      const streamType =
-        _streamType || searchObj.data.stream.streamType || "logs";
+      const streamType = searchObj.data.stream.streamType || "logs";
       const streamData = await getStreams(streamType, true);
       searchObj.data.streamResults = streamData;
       await loadStreamLists();
