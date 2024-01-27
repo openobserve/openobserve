@@ -34,7 +34,6 @@ use crate::common::{
         errors::{Error, Result},
     },
     meta::stream::{PartitionTimeLevel, StreamStats},
-    utils::time::BASE_TIME,
 };
 
 pub struct DynamoFileList {
@@ -275,12 +274,9 @@ impl super::FileList for DynamoFileList {
         time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>> {
-        let (mut time_start, mut time_end) = time_range;
-        if time_start == 0 {
-            time_start = BASE_TIME.timestamp_micros();
-        }
-        if time_end == 0 {
-            time_end = Utc::now().timestamp_micros();
+        let (time_start, time_end) = time_range;
+        if time_start == 0 && time_end == 0 {
+            return Ok(Vec::new());
         }
 
         let t1: DateTime<Utc> = Utc.timestamp_nanos(time_start * 1000);
