@@ -549,6 +549,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </q-input>
 
+      <Drilldown/>
+
       <div class="space"></div>
 
       <q-toggle
@@ -573,8 +575,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
+import Drilldown from "./Drilldown.vue";
 
 export default defineComponent({
+  components: { Drilldown },
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
