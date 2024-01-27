@@ -677,11 +677,11 @@ async fn values_v1(
     if start_time == 0 {
         return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
-    let mut end_time = query
+    let end_time = query
         .get("end_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
-        end_time = chrono::Utc::now().timestamp_micros();
+        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
     let timeout = query
@@ -861,11 +861,11 @@ async fn values_v2(
     if start_time == 0 {
         return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
-    let mut end_time = query
+    let end_time = query
         .get("end_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
-        end_time = chrono::Utc::now().timestamp_micros();
+        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
     let timeout = query
@@ -981,7 +981,7 @@ async fn values_v2(
     Ok(HttpResponse::Ok().json(resp))
 }
 
-/// SearchStreamData
+/// SearchStreamPartition
 #[utoipa::path(
     context_path = "/api",
     tag = "Search",

@@ -158,7 +158,7 @@ pub async fn get_latest_traces(
         .get("end_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
-        end_time = chrono::Utc::now().timestamp_micros();
+        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
     let timeout = query

@@ -212,12 +212,9 @@ async fn process_file(file: &str) -> Result<Vec<FileKey>, anyhow::Error> {
     Ok(records)
 }
 
-pub async fn cache_time_range(time_min: i64, mut time_max: i64) -> Result<(), anyhow::Error> {
-    if time_min == 0 {
+pub async fn cache_time_range(time_min: i64, time_max: i64) -> Result<(), anyhow::Error> {
+    if time_min == 0 || time_max == 0 {
         return Ok(());
-    }
-    if time_max == 0 {
-        time_max = Utc::now().timestamp_micros();
     }
     let mut cur_time = time_min;
     while cur_time <= time_max {
