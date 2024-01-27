@@ -111,10 +111,9 @@ pub(crate) async fn persist() -> Result<()> {
     let mut tasks = Vec::with_capacity(paths.len());
     let semaphore = Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for path in paths {
-        let semaphore = semaphore.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<Option<(PathBuf, i64, usize)>>> =
             task::spawn(async move {
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let r = IMMUTABLES.read().await;
                 let Some(immutable) = r.get(&path) else {
                     drop(permit);

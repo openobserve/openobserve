@@ -123,14 +123,6 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             }
         }
     }
-    // set cache expiry
-    //  let expiry_ts = chrono::Utc::now()
-    // + chrono::Duration::minutes(
-    // (CONFIG.limit.calculate_stats_interval - 2)
-    // .try_into()
-    // .unwrap(),
-    // );
-    // set_cache_expiry(expiry_ts.timestamp_micros()).await;
     Ok(())
 }
 

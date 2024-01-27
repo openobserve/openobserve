@@ -15,7 +15,6 @@
 
 use ahash::HashMap;
 use async_trait::async_trait;
-use chrono::Utc;
 use config::{
     meta::stream::{FileKey, FileMeta, StreamType},
     utils::parquet::parse_file_key_columns,
@@ -349,9 +348,9 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         _time_level: PartitionTimeLevel,
         time_range: (i64, i64),
     ) -> Result<Vec<(String, FileMeta)>> {
-        let (time_start, mut time_end) = time_range;
-        if time_end == 0 {
-            time_end = Utc::now().timestamp_micros();
+        let (time_start, time_end) = time_range;
+        if time_start == 0 && time_end == 0 {
+            return Ok(Vec::new());
         }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");

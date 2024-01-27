@@ -142,7 +142,7 @@ impl ObjectStore for Tmpfs {
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        log::info!("head: {}", location);
+        // log::info!("head: {}", location);
         let last_modified = Utc::now();
         let bytes = self.get_bytes(location).await?;
         Ok(ObjectMeta {
