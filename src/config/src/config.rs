@@ -522,7 +522,7 @@ pub struct Etcd {
     pub prefix: String,
     #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
+    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
@@ -542,7 +542,7 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 10)]
+    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
     pub node_heartbeat_ttl: i64,
 }
 

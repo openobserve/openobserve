@@ -71,6 +71,7 @@ impl Stream {
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
+            tokio::task::yield_now().await;
         }
         Ok((schema_size, paths))
     }
