@@ -345,17 +345,13 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
                 0
             }
         };
-        let mut time_max = {
+        let time_max = {
             if !time_max.is_empty() {
                 time_max.iter().max().unwrap().to_owned()
             } else {
                 0
             }
         };
-        if time_min > 0 && time_max == 0 {
-            time_max = chrono::Utc::now().timestamp_micros();
-        }
-
         Ok(Some((time_min, time_max)))
     }
 }
