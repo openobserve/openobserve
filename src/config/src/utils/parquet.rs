@@ -17,7 +17,7 @@ use std::{io::Cursor, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use parquet::{
-    arrow::{arrow_reader::ArrowReaderMetadata, ArrowWriter, ParquetRecordBatchStreamBuilder},
+    arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
@@ -31,7 +31,7 @@ pub fn new_parquet_writer<'a>(
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
     metadata: &'a FileMeta,
-) -> ArrowWriter<&'a mut Vec<u8>> {
+) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
         .index_of(&CONFIG.common.column_timestamp)
         .expect("Not found timestamp field");
@@ -96,7 +96,13 @@ pub fn new_parquet_writer<'a>(
         }
     }
     let writer_props = writer_props.build();
-    ArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
+    AsyncArrowWriter::try_new(
+        buf,
+        schema.clone(),
+        PARQUET_WRITE_BUFFER_SIZE,
+        Some(writer_props),
+    )
+    .unwrap()
 }
 
 /// parse file key to get stream_key, date_key, file_name

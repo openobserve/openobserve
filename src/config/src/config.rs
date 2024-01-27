@@ -46,6 +46,7 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+pub const PARQUET_WRITE_BUFFER_SIZE: usize = 4096;
 
 pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
