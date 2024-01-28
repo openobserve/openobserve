@@ -231,8 +231,8 @@ const playerState = ref({
   time: "00.00",
   duration: "00.00", // in ms
   speed: {
-    label: "1x",
-    value: 1,
+    label: "4x",
+    value: 4,
   },
   progressWidth: 0,
   playBackEvents: {
@@ -386,6 +386,8 @@ const setupSession = async () => {
       width: playerWidth,
       height: playerHeight,
       mutateChildNodes: true,
+      speed: playerState.value.speed.value,
+      skipInactive: playerState.value.skipInactivity,
     },
   });
 
@@ -459,8 +461,13 @@ const updateProgressBar = (time: { payload: number }) => {
 };
 
 const handlePlaybackBarClick = (event: any) => {
+  if (!playbackBarRef.value) return;
+  const playbackBarEl = playbackBarRef.value.getBoundingClientRect();
+
   let time =
-    (event.offsetX / playerState.value.width) * playerState.value.totalTime;
+    ((event.clientX - playbackBarEl.left) / playerState.value.width) *
+    playerState.value.totalTime;
+
   goto(time, playerState.value.isPlaying);
 };
 

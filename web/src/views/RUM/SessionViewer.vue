@@ -31,16 +31,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div
-          class="text-caption ellipsis row items-center q-mr-md"
-          style="font-size: 20px"
-        >
-          <q-icon name="language" size="20px" class="q-pr-xs" />
+        <div class="text-caption ellipsis row items-center q-mr-md">
+          <q-icon name="language" size="14px" class="q-pr-xs" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="text-caption ellipsis q-pr-xs row items-center q-mr-md">
-          <q-icon name="calendar_month" size="16px" class="q-pr-xs" />
+        <div class="text-caption ellipsis row items-center q-mr-md">
+          <q-icon name="calendar_month" size="14px" class="q-pr-xs" />
           {{ sessionDetails.date }}
+        </div>
+        <div class="text-caption ellipsis row items-center q-mr-md">
+          <q-icon name="person" size="14px" class="q-pr-xs" />
+          {{ sessionDetails.user_email || "Unknown User" }}
+        </div>
+        <div class="text-caption ellipsis row items-center q-mr-md">
+          <q-icon name="location_on" size="14px" class="q-pr-xs" />
+          {{ sessionDetails.city }}, {{ sessionDetails.country }}
+        </div>
+        <div class="text-caption ellipsis row items-center q-mr-md">
+          <q-icon name="settings" size="14x" class="q-pr-xs" />
+          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
       </div>
       <q-separator class="full-width q-mt-sm" />

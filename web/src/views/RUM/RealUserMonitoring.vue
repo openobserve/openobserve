@@ -346,6 +346,7 @@ const getRumDataFields = () => {
 
 <style scoped lang="scss">
 .rum-tabs {
+  border-bottom: 1px solid #e0e0e0;
   .rum-tab {
     border-bottom: 2px solid transparent;
     width: 140px;

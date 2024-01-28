@@ -1,4 +1,157 @@
 {
+  "version": 2,
+  "dashboardId": "",
+  "title": "Rum - Copy",
+  "description": "",
+  "role": "",
+  "owner": "",
+  "created": "2023-10-24T07:44:23.588Z",
+  "panels": [
+    {
+      "id": "Panel_ID646411",
+      "type": "table",
+      "title": "Top Slowest Resources",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(resource_duration/1000000) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_duration>=0 and resource_method is not null and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Resource URL",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null
+              }
+            ],
+            "y": [
+              {
+                "label": "Duration (ms)",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": "#5960b2",
+                "aggregationFunction": "avg"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 0, "y": 0, "w": 6, "h": 8, "i": 1 }
+    },
+    {
+      "id": "Panel_ID646412",
+      "type": "table",
+      "title": "Top Heaviest Resources",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT avg(resource_size/1024) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_size>=0 and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Resource URL",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null
+              }
+            ],
+            "y": [
+              {
+                "label": "Size (kb)",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": "#5960b2",
+                "aggregationFunction": "avg"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 6, "y": 0, "w": 6, "h": 8, "i": 2 }
+    },
+    {
+      "id": "Panel_ID646413",
+      "type": "table",
+      "title": "Top Error Resources",
+      "description": "",
+      "config": {
+        "show_legends": true,
+        "legends_position": null,
+        "base_map": { "type": "osm" },
+        "map_view": { "zoom": 1, "lat": 0, "lng": 0 }
+      },
+      "queryType": "sql",
+      "queries": [
+        {
+          "query": "SELECT count(*) as \"y_axis_1\", SPLIT_PART(resource_url, '?', 1) as \"x_axis_1\"  FROM \"_rumdata\" where resource_status_code>400 and service='$service' and env='$env' and version='$version' GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
+          "customQuery": true,
+          "fields": {
+            "stream": "_rumdata",
+            "stream_type": "logs",
+            "x": [
+              {
+                "label": "Resource URL",
+                "alias": "x_axis_1",
+                "column": "x_axis_1",
+                "color": null
+              }
+            ],
+            "y": [
+              {
+                "label": "Error Count",
+                "alias": "y_axis_1",
+                "column": "y_axis_1",
+                "color": "#5960b2",
+                "aggregationFunction": "avg"
+              }
+            ],
+            "z": [],
+            "filter": []
+          },
+          "config": {
+            "promql_legend": "",
+            "layer_type": "scatter",
+            "weight_fixed": 1
+          }
+        }
+      ],
+      "layout": { "x": 0, "y": 6, "w": 6, "h": 8, "i": 3 }
+    }
+  ],
   "variables": {
     "list": [
       {
