@@ -185,7 +185,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
 
         immutable::IMMUTABLES.write().await.insert(
             wal_file.to_owned(),
-            immutable::Immutable::new(thread_id, key, memtable),
+            Arc::new(immutable::Immutable::new(thread_id, key, memtable)),
         );
     }
 

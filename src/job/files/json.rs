@@ -329,9 +329,9 @@ async fn upload_file(
         &file_meta,
     );
     for batch in batches {
-        writer.write(&batch)?;
+        writer.write(&batch).await?;
     }
-    writer.close()?;
+    writer.close().await?;
     file_meta.compressed_size = buf_parquet.len() as i64;
 
     schema_evolution(
