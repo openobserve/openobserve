@@ -424,6 +424,8 @@ pub struct Limit {
     pub request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
     pub keep_alive: u64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
+    pub alert_schedule_interval: i64,
 }
 
 #[derive(EnvConfig)]
