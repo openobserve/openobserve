@@ -206,7 +206,7 @@ impl Writer {
                 );
                 IMMUTABLES.write().await.insert(
                     path,
-                    immutable::Immutable::new(thread_id, key.clone(), old_mem),
+                    Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
                 log::info!(
                     "[INGESTER:WAL] done add to IMMUTABLES, file: {}/{}/{}/{}.wal",
@@ -241,10 +241,10 @@ impl Writer {
 
         let thread_id = self.thread_id;
         let key = self.key.clone();
-        IMMUTABLES
-            .write()
-            .await
-            .insert(path, immutable::Immutable::new(thread_id, key, old_mem));
+        IMMUTABLES.write().await.insert(
+            path,
+            Arc::new(immutable::Immutable::new(thread_id, key, old_mem)),
+        );
         Ok(())
     }
 

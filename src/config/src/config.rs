@@ -46,6 +46,7 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024;
+pub const PARQUET_WRITE_BUFFER_SIZE: usize = 4096;
 
 pub const HAS_FUNCTIONS: bool = true;
 pub const FILE_EXT_JSON: &str = ".json";
@@ -423,6 +424,8 @@ pub struct Limit {
     pub request_timeout: u64,
     #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
     pub keep_alive: u64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
+    pub alert_schedule_interval: i64,
 }
 
 #[derive(EnvConfig)]
@@ -522,7 +525,7 @@ pub struct Etcd {
     pub prefix: String,
     #[env_config(name = "ZO_ETCD_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 5)]
+    #[env_config(name = "ZO_ETCD_COMMAND_TIMEOUT", default = 10)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_ETCD_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
@@ -542,7 +545,7 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 10)]
+    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
     pub node_heartbeat_ttl: i64,
 }
 

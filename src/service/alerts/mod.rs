@@ -129,10 +129,11 @@ pub async fn save(
     _ = &alert.evaluate(None).await?;
 
     // calulate the trigger frequency
-    alert.trigger_condition.frequency = std::cmp::max(
-        1,
-        alert.trigger_condition.period / alert.trigger_condition.threshold,
-    );
+    // alert.trigger_condition.frequency = std::cmp::max(
+    //     1,
+    //     alert.trigger_condition.period / alert.trigger_condition.threshold,
+    // );
+    alert.trigger_condition.frequency = std::cmp::max(10, CONFIG.limit.alert_schedule_interval);
 
     // save the alert
     match db::alerts::set(org_id, stream_type, stream_name, &alert).await {

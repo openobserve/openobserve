@@ -136,7 +136,7 @@ pub async fn handle_triggers(
             .unwrap();
         new_trigger.is_silenced = true;
     } else {
-        new_trigger.next_run_at += Duration::minutes(alert.trigger_condition.frequency)
+        new_trigger.next_run_at += Duration::seconds(alert.trigger_condition.frequency)
             .num_microseconds()
             .unwrap();
     }
