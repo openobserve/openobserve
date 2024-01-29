@@ -7,10 +7,20 @@
     <div class="full-width bg-grey-4" style="height: 1px" />
 
     <div class="q-mt-sm q-px-md">
-      <div class="q-mb-sm row items-center">
-        <div class="col q-pl-sm text-bold" style="font-size: 15px">
-          {{ rows.length }} {{ t("iam.groups") }}
-        </div>
+      <div class="q-mb-sm row items-center justify-between">
+        <q-input
+          v-model="filterQuery"
+          filled
+          dense
+          class="q-pr-sm"
+          style="width: 500px"
+          :placeholder="t('iam.searchGroup')"
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+
         <q-btn
           data-test="alert-list-add-alert-btn"
           class="q-ml-md q-mb-xs text-bold no-border q-mr-sm"
@@ -21,7 +31,19 @@
           @click="addGroup"
         />
       </div>
-      <app-table :rows="rows" :columns="columns" pagination :rows-per-page="20">
+      <div class="q-py-sm q-pl-xs text-bold" style="font-size: 15px">
+        {{ rows.length }} {{ t("iam.groups") }}
+      </div>
+      <app-table
+        :rows="rows"
+        :columns="columns"
+        pagination
+        :rows-per-page="20"
+        :filter="{
+          value: filterQuery,
+          method: filterGroups,
+        }"
+      >
         <template v-slot:actions="slotProps: any">
           <div>
             <q-icon
@@ -76,6 +98,8 @@ const router = useRouter();
 const store = useStore();
 
 const { groupsState } = usePermissions();
+
+const filterQuery = ref("");
 
 const columns: any = [
   {
@@ -148,6 +172,17 @@ const hideAddGroup = () => {
 };
 
 const deleteGroup = (row: any) => {};
+
+const filterGroups = (rows: any, terms: any) => {
+  var filtered = [];
+  terms = terms.toLowerCase();
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i]["group_name"].toLowerCase().includes(terms)) {
+      filtered.push(rows[i]);
+    }
+  }
+  return filtered;
+};
 </script>
 
 <style scoped></style>

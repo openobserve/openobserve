@@ -254,7 +254,9 @@
     "delete": "Delete",
     "entityName": "Entity Name",
     "userName": "User Name",
-    "resourceName": "Resource Name"
+    "resourceName": "Resource Name",
+    "searchRole": "Search Role",
+    "searchGroup": "Search Group"
   },
   "ticket": {
     "header": "Support Tickets",
