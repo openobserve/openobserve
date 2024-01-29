@@ -118,7 +118,7 @@
 import { cloneDeep } from "lodash-es";
 import { ref, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
-import { defineProps } from "vue";
+import { watch } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import EntityPermissionTable from "@/components/iam/roles/EntityPermissionTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -297,7 +297,7 @@ const getUpdatedPermissions = () => {
   );
 };
 
-const updateTableData = (value: string) => {
+const updateTableData = (value: string = filter.value.permissions) => {
   filter.value.permissions = value;
 
   if (value === "all") {
@@ -319,12 +319,16 @@ const updateTableData = (value: string) => {
       return showResource || showEntity;
     });
   }
+  console.log(rows.value);
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
   emits("updated:permission", row, permission);
 };
-updateTableData(filter.value.permissions);
+
+defineExpose({
+  updateTableData,
+});
 </script>
 
 <style scoped></style>

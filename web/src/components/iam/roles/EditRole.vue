@@ -11,7 +11,10 @@
       class="q-px-md q-py-md"
       style="height: calc(100vh - 101px); overflow-y: auto"
     >
-      <permissions-table @updated:permission="handlePermissionChange" />
+      <permissions-table
+        ref="permissionTableRef"
+        @updated:permission="handlePermissionChange"
+      />
       <div class="flex justify-end q-mt-lg">
         <q-btn
           data-test="add-alert-cancel-btn"
@@ -56,9 +59,12 @@ import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 
 onBeforeMount(() => {
+  permissionsState.permissions = [];
   editingRole.value = router.currentRoute.value.params.role_name as string;
   getRoleDetails();
 });
+
+const permissionTableRef: any = ref(null);
 
 const { t } = useI18n();
 
@@ -201,6 +207,7 @@ const updateRolePermissions = () => {
     }
   });
 
+  permissionTableRef.value.updateTableData();
   resourceMapper = {};
 };
 
