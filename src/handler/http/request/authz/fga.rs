@@ -95,7 +95,7 @@ pub async fn get_role_permissions(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, role_id, resource) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::get_all_role_permissions(
+    match o2_enterprise::enterprise::openfga::authorizer::get_role_permissions(
         &org_id, &role_id, &resource,
     )
     .await

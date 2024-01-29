@@ -542,7 +542,7 @@ async fn handle_new_schema(
                 crate::common::utils::auth::set_ownership(
                     org_id,
                     "streams",
-                    Authz::new(stream_name),
+                    Authz::new(&format!("{stream_type}_{stream_name}")),
                 )
                 .await;
                 lock.unlock().await.map_err(server_internal_error).unwrap();
@@ -607,7 +607,7 @@ async fn handle_new_schema(
                     crate::common::utils::auth::set_ownership(
                         org_id,
                         "streams",
-                        Authz::new(stream_name),
+                        Authz::new(&format!("{stream_type}_{stream_name}")),
                     )
                     .await;
                     drop(lock_acquired); // release lock
@@ -793,7 +793,12 @@ pub async fn set_schema_metadata(
             "created_at".to_string(),
             chrono::Utc::now().timestamp_micros().to_string(),
         );
-        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            "streams",
+            Authz::new(&format!("{stream_type}_{stream_name}")),
+        )
+        .await;
     }
     db::schema::set(
         org_id,
