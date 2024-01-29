@@ -587,6 +587,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
+    result.set_scan_records(scan_stats.records as usize);
 
     if query_type == "table" {
         result.response_type = "table".to_string();
