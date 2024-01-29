@@ -5,13 +5,14 @@
   <div class="full-width bg-grey-4" style="height: 1px" />
 
   <div class="q-mt-sm q-px-md">
-    <div class="q-mb-sm row items-center">
+    <div class="q-mb-sm row items-center justify-between">
       <q-input
         v-model="filterQuery"
         filled
         dense
-        class="col-6 q-pr-sm"
-        :placeholder="t('user.search')"
+        class="q-pr-sm"
+        style="width: 500px"
+        :placeholder="t('iam.searchRole')"
       >
         <template #prepend>
           <q-icon name="search" />
