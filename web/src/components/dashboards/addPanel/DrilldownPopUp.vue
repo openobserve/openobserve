@@ -136,6 +136,8 @@
             <q-btn
               icon="add"
               color="primary"
+              size="sm"
+              padding="sm"
               @click="
                 () => drilldownData.data.variables.push({ name: '', value: '' })
               "
