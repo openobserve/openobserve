@@ -28,6 +28,9 @@
         @click="addRole"
       />
     </div>
+    <div class="q-py-sm q-ml-xs text-bold" style="font-size: 16px">
+      {{ rows.length }} {{ t("iam.roles") }}
+    </div>
     <app-table
       :rows="rows"
       :columns="columns"
@@ -58,7 +61,11 @@
     </app-table>
   </div>
   <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-    <AddRole style="width: 30vw" />
+    <AddRole
+      style="width: 30vw"
+      @cancel:hideform="hideForm"
+      @added:role="setupRoles"
+    />
   </q-dialog>
 </template>
 
@@ -161,6 +168,10 @@ const filterRoles = (rows: any, terms: any) => {
     }
   }
   return filtered;
+};
+
+const hideForm = () => {
+  showAddGroup.value = false;
 };
 </script>
 

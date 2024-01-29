@@ -191,7 +191,7 @@ const selectedPerPage = ref<number>(20);
 const qTableRef: Ref<InstanceType<typeof QTable> | null> = ref(null);
 
 const showPagination = computed(() => {
-  return props.pagination && props.rows.length > _pagination.value.rowsPerPage;
+  return props.pagination;
 });
 
 const _pagination: any = ref({

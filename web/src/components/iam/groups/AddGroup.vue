@@ -75,6 +75,7 @@ import { createGroup, updateGroup } from "@/services/iam";
 import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -98,29 +99,16 @@ const name = ref(props.group?.name || "");
 
 const q = useQuasar();
 
-const isUpdating = computed(() => !!props.group);
+const store = useStore();
 
 const saveGroup = () => {
-  const params = {
-    name: name.value,
-    org_identifier: props.org_identifier,
-  };
-
-  if (isUpdating.value) {
-    _updateGroup(params);
-  } else {
-    _createGroup(params);
-  }
-};
-
-const _createGroup = (params: { name: string; org_identifier: string }) => {
-  createGroup(params.name, params.org_identifier)
+  createGroup(name.value, store.state.selectedOrganization.identifier)
     .then((res) => {
       emits("added:group", res.data);
       emits("cancel:hideform");
 
       q.notify({
-        message: `User Group "${params.name}" Created Successfully!`,
+        message: `User Group "${name.value}" Created Successfully!`,
         color: "positive",
         position: "bottom",
         timeout: 3000,
@@ -133,25 +121,6 @@ const _createGroup = (params: { name: string; org_identifier: string }) => {
         position: "bottom",
         timeout: 3000,
       });
-      console.log(err);
-    });
-};
-
-const _updateGroup = (params: { name: string; org_identifier: string }) => {
-  updateGroup({
-    group_name: name,
-    org_identifier: params.org_identifier,
-    payload: {
-      add_roles: [],
-      remove_roles: [],
-      add_users: [],
-      remove_users: [],
-    },
-  })
-    .then((res) => {
-      console.log(res);
-    })
-    .catch((err) => {
       console.log(err);
     });
 };

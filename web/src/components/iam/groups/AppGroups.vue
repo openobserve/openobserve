@@ -17,7 +17,7 @@
           padding="sm lg"
           color="secondary"
           no-caps
-          :label="t(`iam.addRole`)"
+          :label="t(`iam.addGroup`)"
           @click="addGroup"
         />
       </div>
