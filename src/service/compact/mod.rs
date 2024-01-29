@@ -255,10 +255,6 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     // after compact, compact file list from storage
     if !CONFIG.common.meta_store_external {
         let last_file_list_offset = db::compact::file_list::get_offset().await?;
-        log::debug!(
-            "[COMPACTOR] start merge file list: {}",
-            last_file_list_offset
-        );
         if let Err(e) = file_list::run(last_file_list_offset).await {
             log::error!("[COMPACTOR] merge file list error: {}", e);
         }
