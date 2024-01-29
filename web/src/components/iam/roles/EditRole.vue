@@ -13,6 +13,7 @@
     >
       <permissions-table
         ref="permissionTableRef"
+        :selectedPermissionsHash="aggregatedPermissionHash"
         @updated:permission="handlePermissionChange"
       />
       <div class="flex justify-end q-mt-lg">
@@ -80,7 +81,9 @@ const editingRole = ref("");
 
 const permissions: Ref<Permission[]> = ref([]);
 
-const permissionsHash = ref(new Set());
+const permissionsHash = ref(new Set()); // Saved permissions of role
+
+const aggregatedPermissionHash = ref(new Set()); // Saved + new added permission hash
 
 const addedPermissions: any = ref({});
 
@@ -148,7 +151,7 @@ const getDefaultResource = () => {
     type: "resource",
     resourceName: "",
     isSelected: false,
-    entities: {},
+    entities: [],
   };
 };
 
@@ -157,6 +160,7 @@ const getOrgId = () => {
 };
 
 const updateRolePermissions = () => {
+  console.log("updateRolePermissions");
   let resourceMapper: { [key: string]: any } = {};
 
   permissionsState.permissions.forEach(
@@ -172,12 +176,17 @@ const updateRolePermissions = () => {
       // Creating permissions hash to check if permission is selected at the time of save as we need to send only added and removed permissions
       const permissionHash = `${resource}:${entity}:${permission.permission}`;
       permissionsHash.value.add(permissionHash);
+      aggregatedPermissionHash.value.add(permissionHash);
 
       // Check if entity is org_id
       if (entity === getOrgId()) {
         resourceMapper[resource].permission[permission.permission] = true;
       } else {
-        let _entity: Entity | null = resourceMapper[resource].entities[entity];
+        let _entity: Entity | null = resourceMapper[resource].entities.find(
+          (e: Entity) => e.name === entity
+        );
+
+        const isEntityPresent = !!_entity;
 
         if (!_entity) {
           _entity = {
@@ -201,7 +210,9 @@ const updateRolePermissions = () => {
             | "AllowDelete"
             | "AllowPut"
         ] = true;
-        resourceMapper[resource].entities[entity] = cloneDeep(_entity);
+
+        if (!isEntityPresent)
+          resourceMapper[resource].entities.push(cloneDeep(_entity));
         _entity = null;
       }
     }
@@ -233,20 +244,11 @@ const handlePermissionChange = (row: any, permission: string) => {
     !addedPermissions.value[permissionHash] &&
     !permissionsHash.value.has(permissionHash)
   ) {
+    aggregatedPermissionHash.value.add(permissionHash);
     addedPermissions.value[permissionHash] = {
       object,
       permission: permission,
     };
-    return;
-  }
-
-  // Remove permission from addedPermissions if present
-  if (permissionsHash.value.has(permissionHash)) {
-    removedPermissions.value[permissionHash] = {
-      object,
-      permission: permission,
-    };
-
     return;
   }
 
@@ -257,7 +259,19 @@ const handlePermissionChange = (row: any, permission: string) => {
   }
 
   // Remove permission from addedPermissions if present
+  if (permissionsHash.value.has(permissionHash)) {
+    aggregatedPermissionHash.value.delete(permissionHash);
+    removedPermissions.value[permissionHash] = {
+      object,
+      permission: permission,
+    };
+
+    return;
+  }
+
+  // Remove permission from addedPermissions if present
   if (addedPermissions.value[permissionHash]) {
+    aggregatedPermissionHash.value.delete(permissionHash);
     delete addedPermissions.value[permissionHash];
     return;
   }

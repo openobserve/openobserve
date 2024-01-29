@@ -88,8 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr
             v-show="props.row.expand"
             :props="props"
-            :key="`e_${props.row.index}`"
+            :key="`e_${props.row.index + 'entity'}`"
             class="q-virtual-scroll--with-prev"
+            style="transition: display 2s ease-in"
           >
             <q-td colspan="100%" style="padding: 0; border-bottom: none">
               <slot :name="props.row.slotName" :row="props" />

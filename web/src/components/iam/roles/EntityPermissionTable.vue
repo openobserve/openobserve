@@ -1,24 +1,39 @@
 <template>
-  <AppTable :rows="rows" :columns="columns" :hide-header="true" class="q-mt-sm">
+  <AppTable
+    :rows="rows"
+    :columns="columns"
+    :hide-header="true"
+    class="q-mt-sm"
+    :style="{
+      height: entity.expand ? '100%' : '0px',
+      transition: 'height 0.3s ease-in',
+    }"
+    :filter="{
+      value: searchKey,
+      method: filterEntities,
+    }"
+  >
     <template v-slot:permission="slotProps">
       <q-checkbox
         size="xs"
         v-model="slotProps.column.row.permission[slotProps.columnName]"
         :val="slotProps.columnName"
         class="filter-check-box cursor-pointer"
+        @click="
+          handlePermissionChange(slotProps.column.row, slotProps.columnName)
+        "
       />
     </template>
   </AppTable>
 </template>
 
 <script setup lang="ts">
-import { cloneDeep } from "lodash-es";
-import { ref } from "vue";
+import { ref, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import { defineProps } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
-import type { Resource, Entity, Permission } from "@/ts/interfaces";
+import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";
 
 const props = defineProps({
@@ -30,25 +45,19 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  searchKey: {
+    type: String,
+    default: "",
+  },
 });
+
+const emits = defineEmits(["updated:permission"]);
 
 const { t } = useI18n();
 
 const rows: any = ref([]);
 
 const { permissionsState } = usePermissions();
-
-const expandedPermissions = ref(new Set());
-
-const rolePermissions = [
-  "AllowAll",
-  "AllowDelete",
-  "AllowGet",
-  "AllowList",
-  "AllowPost",
-  "AllowPut",
-  "None",
-];
 
 const columns: any = [
   {
@@ -141,10 +150,10 @@ const setPermissionTable = () => {
 };
 
 const getResourceEntities = () => {
-  return Object.values(
+  return (
     permissionsState.permissions.find(
       (r: any) => r.resourceName === props.entity.resourceName
-    )?.entities || {}
+    )?.entities || []
   );
 };
 
@@ -162,14 +171,32 @@ const updateTableData = () => {
   }
 };
 
+const handlePermissionChange = (row: Entity, permission: string) => {
+  emits("updated:permission", row, permission);
+};
+
 watch(
-  () => props.showSelected,
-  () => {
-    updateTableData();
+  () => props.entity.expand,
+  (val) => {
+    console.log(props.entity.name, " Expanded");
+    if (val) updateTableData();
+  },
+  {
+    immediate: true,
   }
 );
 
-updateTableData();
+const filterEntities = (rows, terms) => {
+  var filtered = [];
+  console.log("entity", rows, terms);
+  terms = terms.toLowerCase();
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i]["name"].toLowerCase().includes(terms)) {
+      filtered.push(rows[i]);
+    }
+  }
+  return filtered;
+};
 </script>
 
 <style scoped></style>

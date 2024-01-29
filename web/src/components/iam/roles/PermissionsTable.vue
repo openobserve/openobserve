@@ -14,7 +14,7 @@
         <q-icon name="search" class="cursor-pointer" />
       </template>
     </q-input>
-    <q-select
+    <!-- <q-select
       v-model="filter.type"
       :options="permissionTypes"
       color="input-border"
@@ -28,8 +28,9 @@
       filled
       dense
       emit-value
+      clearable
       style="width: 200px"
-    />
+    /> -->
     <q-select
       v-model="filter.resource"
       :options="getResources"
@@ -43,8 +44,9 @@
       outlined
       filled
       dense
-      emit-value
+      clearable
       style="width: 200px"
+      @update:model-value="onResourceChange"
     />
   </div>
   <div class="flex items-center q-mb-md">
@@ -73,7 +75,16 @@
     {{ permissionsState.permissions.length }} Permissions
   </div>
   <div class="iam-permissions-table">
-    <AppTable :rows="rows" :columns="columns" :dense="true" class="q-mt-sm">
+    <AppTable
+      :rows="rows"
+      :columns="columns"
+      :dense="true"
+      class="q-mt-sm"
+      :filter="{
+        value: filter.searchKey,
+        method: filterResources,
+      }"
+    >
       <template v-slot:expand="slotProps">
         <q-icon
           v-if="
@@ -108,6 +119,8 @@
         <entity-permission-table
           :entity="slotProps.row.row"
           :show-selected="filter.permissions === 'selected'"
+          :searchKey="filter.searchKey"
+          @updated:permission="handlePermissionChange"
         />
       </template>
     </AppTable>
@@ -116,13 +129,23 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { ref, defineEmits } from "vue";
+import { ref, defineEmits, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { watch } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import EntityPermissionTable from "@/components/iam/roles/EntityPermissionTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useStore } from "vuex";
+import streamService from "@/services/stream";
+import { nextTick } from "vue";
+import { watch } from "vue";
+import type { Entity, Resource } from "@/ts/interfaces";
+
+const props = defineProps({
+  selectedPermissionsHash: {
+    type: Set,
+    default: () => new Set(),
+  },
+});
 
 const emits = defineEmits(["updated:permission"]);
 
@@ -261,32 +284,26 @@ const columns: any = [
   },
 ];
 
-const expandPermission = (permission: any) => {
-  if (expandedPermissions.value.has(permission.name)) {
-    expandedPermissions.value.delete(permission.name);
+const expandPermission = async (resource: any) => {
+  const resourceIndex = rows.value.findIndex(
+    (row: any) => row.name === resource.name
+  );
+
+  if (filter.value.permissions === "all" && !rows.value[resourceIndex].expand)
+    await getResourceEntities(resource.name);
+
+  if (expandedPermissions.value.has(resource.name)) {
+    expandedPermissions.value.delete(resource.name);
   } else {
-    expandedPermissions.value.add(permission.name);
+    expandedPermissions.value.add(resource.name);
   }
 
   // Updating expand key in table
-  rows.value.forEach((row: any) => {
-    if (row.name === permission.name) {
-      row.expand = !row.expand;
-      row.slotName = "entity_table";
-    }
-  });
+  rows.value[resourceIndex].expand = !rows.value[resourceIndex].expand;
+  rows.value[resourceIndex].slotName = "entity_table";
 };
 
-const getResources = [
-  {
-    label: "Stream",
-    value: "stream",
-  },
-  {
-    label: "Functions",
-    value: "functions",
-  },
-];
+const getResources = computed(() => permissionsState.resources);
 
 const getUpdatedPermissions = () => {
   return cloneDeep(
@@ -324,6 +341,172 @@ const updateTableData = (value: string = filter.value.permissions) => {
 
 const handlePermissionChange = (row: any, permission: string) => {
   emits("updated:permission", row, permission);
+};
+
+const getResourceEntities = (resource: string) => {
+  const listEntitiesFnMap: {
+    [key: string]: () => Promise<any>;
+  } = {
+    stream: getStreams,
+  };
+
+  return new Promise(async (resolve, reject) => {
+    console.log("2");
+    await listEntitiesFnMap[resource]();
+    console.log("6");
+    resolve(true);
+  });
+};
+
+const getStreams = async () => {
+  console.log("3");
+
+  const logs = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "logs",
+    false
+  );
+  const traces = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "traces",
+    false
+  );
+  const metrics = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "metrics",
+    false
+  );
+
+  // const entrichmentTables = await streamService.nameList(
+  //   store.state.selectedOrganization.identifier,
+  //   "enrichment_table",
+  //   false
+  // );
+
+  permissionsState.permissions.forEach(async (resource) => {
+    if (resource.name !== "stream") return;
+
+    resource.entities.length = 0;
+    resource.entities = [];
+
+    await nextTick();
+
+    logs.data.list.forEach((stream: any) => {
+      const entity = stream.stream_type + "_" + stream.name;
+      resource.entities.push({
+        name: stream.stream_type + "_" + stream.name,
+        permission: {
+          AllowAll: props.selectedPermissionsHash.has(
+            getPermissionHash(resource.resourceName, "AllowAll", entity)
+          ),
+          AllowGet: props.selectedPermissionsHash.has(
+            getPermissionHash(resource.resourceName, "AllowGet", entity)
+          ),
+          AllowDelete: props.selectedPermissionsHash.has(
+            getPermissionHash(resource.resourceName, "AllowDelete", entity)
+          ),
+          AllowPut: props.selectedPermissionsHash.has(
+            getPermissionHash(resource.resourceName, "AllowPut", entity)
+          ),
+        },
+        type: "entity",
+        resourceName: "stream",
+        isSelected: false,
+      });
+    });
+
+    traces.data.list.forEach((stream: any) => {
+      resource.entities.push({
+        name: stream.stream_type + "_" + stream.name,
+        permission: {
+          AllowAll: false,
+          AllowGet: false,
+          AllowDelete: false,
+          AllowPut: false,
+        },
+        type: "entity",
+        resourceName: "stream",
+        isSelected: false,
+      });
+    });
+
+    metrics.data.list.forEach((stream: any) => {
+      resource.entities.push({
+        name: stream.stream_type + "_" + stream.name,
+        permission: {
+          AllowAll: false,
+          AllowGet: false,
+          AllowDelete: false,
+          AllowPut: false,
+        },
+        type: "entity",
+        resourceName: "stream",
+        isSelected: false,
+      });
+    });
+
+    console.log("4");
+
+    // entrichmentTables.data.list.forEach((stream: any) => {
+    //   resource.entities.push({
+    //     name: stream.stream_type + "_" + stream.name,
+    //     permission: {
+    //       AllowAll: false,
+    //       AllowGet: false,
+    //       AllowDelete: false,
+    //       AllowPut: false,
+    //     },
+    //     type: "entity",
+    //     resourceName: "stream",
+    //     isSelected: false,
+    //   });
+    // });
+  });
+
+  return new Promise((resolve, reject) => {
+    console.log("5");
+    resolve(true);
+  });
+};
+
+const onResourceChange = () => {
+  if (!filter.value.resource) return updateTableData();
+  rows.value = rows.value.filter(
+    (row: any) => row.name === filter.value.resource
+  );
+};
+
+const filterResources = (rows: any, terms: any) => {
+  var filtered = [];
+  terms = terms.toLowerCase();
+  for (var i = 0; i < rows.length; i++) {
+    let isAdded = false;
+    if (rows[i]["name"].toLowerCase().includes(terms)) {
+      filtered.push(rows[i]);
+      isAdded = true;
+      continue;
+    }
+    for (var j = 0; j < rows[i].entities.length; j++) {
+      if (
+        !isAdded &&
+        rows[i].entities[j]["name"].toLowerCase().includes(terms)
+      ) {
+        filtered.push(rows[i]);
+        break;
+      }
+    }
+  }
+  return filtered;
+};
+
+const getPermissionHash = (
+  resourceName: string,
+  permission: string,
+  entity?: string
+) => {
+  if (!entity) entity = store.state.selectedOrganization.identifier;
+
+  return `${resourceName}:${entity}:${permission}`;
 };
 
 defineExpose({
