@@ -119,7 +119,13 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             .unwrap_or_default();
         let key = WriterKey::new(org_id, stream_type);
         let mut memtable = memtable::MemTable::new();
-        let mut reader = wal::Reader::from_path(wal_file).context(WalSnafu)?;
+        let mut reader = match wal::Reader::from_path(wal_file) {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Unable to open the wal file err: {}, skip", e);
+                continue;
+            }
+        };
         let mut total = 0;
         let mut i = 0;
         loop {
