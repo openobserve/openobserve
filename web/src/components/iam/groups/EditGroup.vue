@@ -57,28 +57,19 @@
 import { ref } from "vue";
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
-import { cloneDeep } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
-
-const props = defineProps({
-  group: {
-    type: Object,
-    default: () => ({
-      group_name: "dev",
-      roles: [],
-      users: [],
-    }),
-  },
-});
+import usePermissions from "@/composables/iam/usePermissions";
 
 onBeforeMount(() => {
   getGroupDetails();
 });
+
+const { groupsState } = usePermissions();
 
 const activeTab = ref("users");
 
@@ -121,6 +112,7 @@ const getGroupDetails = () => {
         ...res.data,
         group_name: res.data.name,
       };
+      groupsState.groups[groupName] = groupDetails.value;
     })
     .catch((err) => {
       console.log(err);

@@ -58,13 +58,26 @@ export const updateRole = (role: {
   org_identifier: string;
   payload: any;
 }) => {
-  const url = `/ api / ${role.org_identifier} / roles / ${role.role_id} / permissions`;
+  const url = `/api/${role.org_identifier}/roles/${role.role_id}/permissions`;
   return http().put(url, role.payload);
+};
+
+export const getResources = (org_identifier: string) => {
+  const url = `/api/${org_identifier}/resources`;
+  return http().get(url);
 };
 
 // ----------- Permissions -------------
 
-export const getPermissions = (role_id: string, org_identifier: string) => {
-  const url = `/ api / ${org_identifier} / roles / `;
+export const getResourcePermission = ({
+  role_name,
+  org_identifier,
+  resource,
+}: {
+  role_name: string;
+  org_identifier: string;
+  resource: string;
+}) => {
+  const url = `/api/${org_identifier}/roles/${role_name}/permissions/${resource}`;
   return http().get(url);
 };

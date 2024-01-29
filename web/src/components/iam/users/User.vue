@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -255,6 +255,10 @@ export default defineComponent({
           }
         });
       }
+    });
+
+    onBeforeMount(() => {
+      getOrgMembers();
     });
 
     const columns: any = ref<QTableProps["columns"]>([
