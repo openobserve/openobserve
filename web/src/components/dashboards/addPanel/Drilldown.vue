@@ -16,8 +16,8 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div style="font-size: 14px; padding-bottom: 5px;">Data Link :</div>
-    <div v-for="data in dataLink" :key="JSON.stringify(data)">
+    <div style="font-size: 14px; padding-bottom: 5px">Data Link :</div>
+    <div v-for="(data, index) in dataLink" :key="JSON.stringify(data)">
       <div
         style="
           display: flex;
@@ -44,9 +44,16 @@
           size="20px"
           name="close"
           style="cursor: pointer"
+          @click="removeDataLink(index)"
         />
       </div>
     </div>
+    <q-btn
+      @click="onDataLinkClick"
+      style="cursor: pointer; padding: 0px 5px"
+      label="+ Add link"
+      no-caps
+    />
     <q-dialog v-model="showDrilldownPopUp">
       <drilldown-pop-up
         @close="() => (showDrilldownPopUp = false)"
@@ -85,11 +92,17 @@ export default defineComponent({
 
       showDrilldownPopUp.value = true;
     };
+
+    const removeDataLink = (index: any) => {
+      dataLink.value.splice(index, 1);
+    };
+
     return {
       store,
       dataLink,
       onDataLinkClick,
       showDrilldownPopUp,
+      removeDataLink,
     };
   },
 });

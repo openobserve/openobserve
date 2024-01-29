@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="padding: 10px; min-width: 40%" class="scroll o2-input">
+  <div style="padding: 0px 10px; min-width: 30%" class="scroll o2-input">
     <div
       class="flex justify-between items-center q-pa-md"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
@@ -47,10 +47,11 @@
       dense
       :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
       :lazy-rules="true"
-      style="width: 400px"
     />
-    Action:
-    <div style="display: flex; flex-direction: row; gap: 10px">
+    <div
+      style="display: flex; flex-direction: row; gap: 10px; align-items: center"
+    >
+      Action:
       <q-btn
         :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
         size="sm"
@@ -59,12 +60,11 @@
             drilldownData.type = 'byDashboard';
           }
         "
-        style="max-width: 100px; height: 80px"
         ><q-icon
           class="q-mr-xs"
           size="20px"
           :name="outlinedDashboard"
-          style="cursor: pointer; height: 40px"
+          style="cursor: pointer; height: 25px"
         />Go to Dashboard</q-btn
       >
       <q-btn
@@ -75,24 +75,99 @@
             drilldownData.type = 'byUrl';
           }
         "
-        style="max-width: 100px; height: 80px"
         ><q-icon
           class="q-mr-xs"
           size="20px"
           name="link"
-          style="cursor: pointer"
+          style="cursor: pointer; height: 25px; display: flex !important"
         />Go to URL</q-btn
       >
     </div>
 
     <div v-if="drilldownData.type == 'byUrl'">
-      <q-input
-        outlined
-        v-model="drilldownData.data.url"
-        filled
-        autogrow
-        class="showLabelOnTop"
-        label="Enter URL:"
+      <div style="margin-top: 10px; display: flex; flex-direction: column">
+        Enter URL:
+        <textarea
+          style="min-width: 100%; max-width: 100%"
+          v-model="drilldownData.data.url"
+        ></textarea>
+      </div>
+    </div>
+
+    <div v-if="drilldownData.type == 'byDashboard'">
+      <div style="margin-top: 10px">
+        <div class="dropdownDiv">
+          <div class="dropdownLabel">Select Folder:</div>
+          <q-select
+            v-model="drilldownData.data.folder"
+            :options="folderList"
+            class="dropdown"
+            emit-value
+          />
+        </div>
+        <div class="dropdownDiv" v-if="drilldownData.data.folder">
+          <div class="dropdownLabel">Select Dashboard:</div>
+          <q-select
+            v-model="drilldownData.data.dashboard"
+            :options="dashboardList"
+            class="dropdown"
+          />
+        </div>
+        <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
+          <div class="dropdownLabel">Select Tab:</div>
+          <q-select
+            v-model="drilldownData.data.tab"
+            :options="[]"
+            class="dropdown"
+          />
+        </div>
+
+        <!-- array of variables name and its values -->
+        <div style="margin-top: 30px">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 10px;
+              align-items: center;
+            "
+          >
+            <div>Query Params:</div>
+            <q-btn
+              icon="add"
+              color="primary"
+              @click="
+                () => drilldownData.data.variables.push({ name: '', value: '' })
+              "
+              >Add Query</q-btn
+            >
+          </div>
+          <div
+            v-for="(variable, index) in drilldownData.data.variables"
+            :key="index"
+          >
+            <div style="display: flex; gap: 10px; margin-bottom: 10px">
+              <q-input v-model="variable.name" placeholder="Name" />
+              <q-input v-model="variable.value" placeholder="Value" />
+              <q-icon
+                class="q-mr-xs"
+                size="20px"
+                :name="outlinedDelete"
+                style="cursor: pointer; height: 35px; display: flex !important"
+                @click="() => drilldownData.data.variables.splice(index, 1)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- radio button for new tab -->
+    <div style="margin-top: 10px">
+      <q-toggle
+        :label="`New Tab: `"
+        left-label
+        v-model="drilldownData.targetBlank"
       />
     </div>
 
@@ -127,7 +202,18 @@
 import { ref } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
-import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedDashboard,
+  outlinedDelete,
+} from "@quasar/extras/material-icons-outlined";
+import { watch } from "vue";
+import { useStore } from "vuex";
+import { computed } from "vue";
+import {
+  getAllDashboardsByFolderId,
+  getFoldersList,
+} from "../../../utils/commons";
+import { onMounted } from "vue";
 
 export default defineComponent({
   name: "DrilldownPopUp",
@@ -135,20 +221,100 @@ export default defineComponent({
   props: {},
   setup(props, { emit }) {
     const { t } = useI18n();
+    const store = useStore();
     const drilldownData: any = ref({
       name: "",
       type: "",
+      targetBlank: false,
       data: {
         url: "",
+        folder: "",
+        dashboard: "",
+        tab: "",
+        variables: [
+          {
+            label: "",
+            value: "",
+          },
+        ],
       },
     });
+
+    onMounted(async () => {
+      if (store.state.organizationData.folders) {
+        await getFoldersList(store);
+      }
+    });
+
+    const folderList = computed(() => {
+      if (!store.state.organizationData.folders) {
+        return [];
+      }
+
+      return (
+        store.state.organizationData.folders?.map((folder: any) => {
+          return {
+            label: folder.name,
+            value: folder.name,
+          };
+        }) ?? []
+      );
+    });
+
+    const dashboardList = ref([]);
+
+    watch(
+      () => drilldownData.value.data.folder,
+      async () => {
+        const folderData = store.state.organizationData.folders?.find(
+          (folder: any) => folder.name === drilldownData.value.data.folder
+        );
+
+        if (!folderData) {
+          dashboardList.value = [];
+          return;
+        }
+
+        const allDashboardList = await getAllDashboardsByFolderId(
+          store,
+          folderData?.folderId
+        );
+
+        dashboardList.value =
+          allDashboardList?.map((dashboard: any) => {
+            return {
+              label: dashboard.title,
+              value: dashboard.title,
+            };
+          }) ?? [];
+      }
+    );
+
     return {
       t,
       drilldownData,
       outlinedDashboard,
+      outlinedDelete,
+      store,
+      folderList,
+      dashboardList,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.dropdownDiv {
+  display: flex;
+  align-items: center;
+  margin: 10px 0px;
+}
+
+.dropdownLabel {
+  width: 120px;
+}
+
+.dropdown {
+  min-width: 250px;
+}
+</style>
