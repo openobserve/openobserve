@@ -165,10 +165,18 @@ export default defineComponent({
     };
 
     const getVariablesData = async () => {
+      console.log(
+        "getVariablesData",
+        props.selectedTimeDate?.start_time,
+        props.selectedTimeDate?.end_time
+      );
+
       if (
         isInvalidDate(props.selectedTimeDate?.start_time) ||
         isInvalidDate(props.selectedTimeDate?.end_time)
       ) {
+        console.log("invalid");
+
         return;
       }
 
@@ -232,10 +240,11 @@ export default defineComponent({
 
         switch (it.type) {
           case "query_values": {
+            console.log("it.type", it);
             obj.isLoading = true;
             console.log("query_data", it.query_data.filter);
             const filterConditions = it.query_data.filter || [];
-            let dummyQuery = "select * from " + it.query_data.stream ;
+            let dummyQuery = `SELECT * FROM '${it.query_data.stream}'`;
             const constructedFilter = filterConditions.map(
               (condition: any) => ({
                 name: condition.name,
