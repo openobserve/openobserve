@@ -138,7 +138,16 @@ const _createGroup = (params: { name: string; org_identifier: string }) => {
 };
 
 const _updateGroup = (params: { name: string; org_identifier: string }) => {
-  updateGroup(params)
+  updateGroup({
+    group_name: name,
+    org_identifier: params.org_identifier,
+    payload: {
+      add_roles: [],
+      remove_roles: [],
+      add_users: [],
+      remove_users: [],
+    },
+  })
     .then((res) => {
       console.log(res);
     })

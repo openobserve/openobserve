@@ -217,7 +217,8 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import { computed } from "vue";
+
+// @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 
 export default defineComponent({

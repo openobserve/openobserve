@@ -6,20 +6,23 @@
 
     <div class="full-width bg-grey-4" style="height: 1px" />
 
-    <div class="q-mt-lg q-px-md">
-      <div class="flex justify-end q-mb-sm">
+    <div class="q-mt-sm q-px-md">
+      <div class="q-mb-sm row items-center">
+        <div class="col q-pl-sm text-bold" style="font-size: 15px">
+          {{ rows.length }} {{ t("iam.groups") }}
+        </div>
         <q-btn
           data-test="alert-list-add-alert-btn"
-          class="q-ml-md q-mb-xs text-bold no-border"
+          class="q-ml-md q-mb-xs text-bold no-border q-mr-sm"
           padding="sm lg"
           color="secondary"
           no-caps
-          :label="t(`iam.addGroup`)"
+          :label="t(`iam.addRole`)"
           @click="addGroup"
         />
       </div>
       <app-table :rows="rows" :columns="columns" pagination :rows-per-page="20">
-        <template v-slot:actions="slotProps">
+        <template v-slot:actions="slotProps: any">
           <div>
             <q-icon
               size="14px"
@@ -107,7 +110,7 @@ onMounted(() => {
 
 const updateTable = () => {
   rows.value = cloneDeep(
-    groupsState.groups.map((group: { group_name: string }, index) => ({
+    groupsState.groups.map((group: { group_name: string }, index: number) => ({
       ...group,
       "#": index + 1,
     }))
@@ -144,7 +147,7 @@ const hideAddGroup = () => {
   showAddGroup.value = false;
 };
 
-const deleteGroup = () => {};
+const deleteGroup = (row: any) => {};
 </script>
 
 <style scoped></style>

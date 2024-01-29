@@ -32,7 +32,7 @@ const permissions = {
 };
 
 const users = {
-  users: [],
+  users: [] as any[],
   getOrgUsers: (org_identifier: string) => {
     return new Promise((resolve, reject) => {
       usersService
