@@ -174,17 +174,17 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       }),
       symbolSize: function (val: any) {
         const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-        const minSymbolSize = panelSchema.config.map_symbol_style.size_by_value.min;
-        const maxSymbolSize = panelSchema.config.map_symbol_style.size_by_value.max;
+        const minSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.min;
+        const maxSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.max;
         const mapSymbolStyleSelected =
-          panelSchema.config.map_symbol_style.size;
+          panelSchema.config?.map_symbol_style?.size;
 
         if (mapSymbolStyleSelected === "by Value") {
           return (
             minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
           );
         } else if (mapSymbolStyleSelected === "fixed") {
-          return panelSchema.config.map_symbol_style.size_fixed;
+          return panelSchema.config?.map_symbol_style?.size_fixed;
         }
       },
       itemStyle: {
