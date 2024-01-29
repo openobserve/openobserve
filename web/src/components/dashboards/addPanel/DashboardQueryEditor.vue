@@ -404,7 +404,7 @@ export default defineComponent({
 
       const whereClause = filterItems.filter((it) => it).join(" AND ");
       if (whereClause) {
-        query += ` WHERE ${whereClause}`;
+        query += ` WHERE ${whereClause} `;
       }
 
       // Group By clause
