@@ -114,7 +114,11 @@ const _createRole = (params: { name: string; org_identifier: string }) => {
 };
 
 const _updateRole = (params: { name: string; org_identifier: string }) => {
-  updateRole(params)
+  updateRole({
+    role_id: name,
+    org_identifier: params.org_identifier,
+    payload: {},
+  })
     .then((res) => {
       console.log(res);
     })

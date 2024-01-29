@@ -2,14 +2,22 @@
   <div style="font-size: 18px" class="q-py-sm q-px-md">
     {{ t("iam.roles") }}
   </div>
-
   <div class="full-width bg-grey-4" style="height: 1px" />
 
   <div class="q-mt-sm q-px-md">
     <div class="q-mb-sm row items-center">
-      <div class="col q-pl-sm text-bold" style="font-size: 15px">
-        {{ rows.length }} {{ t("iam.roles") }}
-      </div>
+      <q-input
+        v-model="filterQuery"
+        filled
+        dense
+        class="col-6 q-pr-sm"
+        :placeholder="t('user.search')"
+      >
+        <template #prepend>
+          <q-icon name="search" />
+        </template>
+      </q-input>
+
       <q-btn
         data-test="alert-list-add-alert-btn"
         class="q-ml-md q-mb-xs text-bold no-border q-mr-sm"
@@ -20,7 +28,16 @@
         @click="addRole"
       />
     </div>
-    <app-table :rows="rows" :columns="columns" pagination :rows-per-page="20">
+    <app-table
+      :rows="rows"
+      :columns="columns"
+      pagination
+      :rows-per-page="20"
+      :filter="{
+        value: filterQuery,
+        method: filterRoles,
+      }"
+    >
       <template v-slot:actions="slotProps">
         <div>
           <q-icon
@@ -97,6 +114,8 @@ onMounted(() => {
   setupRoles();
 });
 
+const filterQuery = ref("");
+
 const updateTable = () => {
   rows.value = cloneDeep(
     rolesState.roles.map((role: { role_name: string }, index) => ({
@@ -131,6 +150,17 @@ const setupRoles = async () => {
     .catch((err) => {
       console.log(err);
     });
+};
+
+const filterRoles = (rows: any, terms: any) => {
+  var filtered = [];
+  terms = terms.toLowerCase();
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i]["role_name"].toLowerCase().includes(terms)) {
+      filtered.push(rows[i]);
+    }
+  }
+  return filtered;
 };
 </script>
 

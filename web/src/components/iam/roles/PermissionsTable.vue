@@ -73,8 +73,7 @@
     {{ permissionsState.permissions.length }} Permissions
   </div>
   <div class="iam-permissions-table">
-    <AppTable :rows="rows" :columns="columns"
-:dense="true" class="q-mt-sm">
+    <AppTable :rows="rows" :columns="columns" :dense="true" class="q-mt-sm">
       <template v-slot:expand="slotProps">
         <q-icon
           v-if="

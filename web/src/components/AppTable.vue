@@ -44,6 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="_pagination"
         :dense="dense"
         :hide-header="hideHeader"
+        :filter="filter && filter.value"
+        :filter-method="filter && filter.method"
         @virtual-scroll="onScroll"
         class="full-height"
         :hide-bottom="!showPagination"
@@ -165,6 +167,10 @@ const props = defineProps({
   hideHeader: {
     type: Boolean,
     default: false,
+  },
+  filter: {
+    type: Object,
+    default: () => null,
   },
 });
 
