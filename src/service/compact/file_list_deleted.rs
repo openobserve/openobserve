@@ -156,10 +156,10 @@ pub async fn load_prefix_from_s3(
     let prefix = format!("file_list_deleted/{prefix}/");
     let files = storage::list(&prefix).await?;
     let files_num = files.len();
-    log::info!("Load file_list_deleted gets {} files", files_num);
     if files.is_empty() {
         return Ok(HashMap::default());
     }
+    log::info!("Load file_list_deleted gets {} files", files_num);
 
     let mut tasks = Vec::with_capacity(CONFIG.limit.query_thread_num + 1);
     let chunk_size = std::cmp::max(1, files_num / CONFIG.limit.query_thread_num);

@@ -245,6 +245,9 @@ impl super::Db for SqliteDb {
             return Err(e.into());
         }
 
+        // release lock
+        drop(client);
+
         // event watch
         if need_watch {
             if let Err(e) = CHANNEL

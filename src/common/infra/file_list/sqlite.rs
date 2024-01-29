@@ -96,9 +96,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let chunks = files.chunks(100);
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         for files in chunks {
+            let client = CLIENT_RW.clone();
+            let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
                 "INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size)",
@@ -142,6 +142,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
                     log::error!("[SQLITE] rollback file_list batch add error: {}", e);
                     return Err(e.into());
                 }
+                // release lock
+                drop(client);
+                // add file one by one
                 for item in files {
                     if let Err(e) = self.add(&item.key, &item.meta).await {
                         log::error!("[SQLITE] single insert file_list add error: {}", e);
@@ -161,10 +164,10 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let chunks = files.chunks(100);
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         for files in chunks {
             // get ids of the files
+            let client = CLIENT_RW.clone();
+            let client = client.lock().await;
             let pool = client.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
@@ -211,9 +214,9 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let chunks = files.chunks(100);
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         for files in chunks {
+            let client = CLIENT_RW.clone();
+            let client = client.lock().await;
             let mut tx = client.begin().await?;
             let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
                 "INSERT INTO file_list_deleted (org, stream, date, file, created_at)",
@@ -246,10 +249,10 @@ INSERT INTO file_list (org, stream, date, file, deleted, min_ts, max_ts, records
             return Ok(());
         }
         let chunks = files.chunks(100);
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         for files in chunks {
             // get ids of the files
+            let client = CLIENT_RW.clone();
+            let client = client.lock().await;
             let pool = client.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
