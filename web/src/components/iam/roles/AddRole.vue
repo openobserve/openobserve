@@ -65,8 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { createRole, updateRole } from "@/services/iam";
+import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -84,45 +86,33 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["cancel:hideform"]);
+const emits = defineEmits(["cancel:hideform", "added:role"]);
 
 const name = ref(props.role?.name || "");
 
-const isUpdating = computed(() => !!props.role);
+const store = useStore();
+
+const q = useQuasar();
 
 const saveRole = () => {
-  const params = {
-    name: name.value,
-    org_identifier: props.org_identifier,
-  };
-
-  if (isUpdating.value) {
-    _updateRole(params);
-  } else {
-    _createRole(params);
-  }
-};
-
-const _createRole = (params: { name: string; org_identifier: string }) => {
-  createRole(params.name, params.org_identifier)
-    .then((res) => {
-      console.log(res);
+  createRole(name.value, store.state.selectedOrganization.identifier)
+    .then(() => {
+      emits("cancel:hideform");
+      emits("added:role");
+      q.notify({
+        message: `Role "${name.value}" Created Successfully!`,
+        color: "positive",
+        position: "bottom",
+        timeout: 3000,
+      });
     })
     .catch((err) => {
-      console.log(err);
-    });
-};
-
-const _updateRole = (params: { name: string; org_identifier: string }) => {
-  updateRole({
-    role_id: name,
-    org_identifier: params.org_identifier,
-    payload: {},
-  })
-    .then((res) => {
-      console.log(res);
-    })
-    .catch((err) => {
+      q.notify({
+        message: "Error while creating role",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
       console.log(err);
     });
 };
