@@ -123,7 +123,15 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(feature = "enterprise")]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        let start = std::time::Instant::now();
+
+        use std::collections::HashMap;
+
+        use actix_web::web;
+        use config::meta::stream::StreamType;
         use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
+        use crate::common::utils::http::get_stream_type_from_request;
 
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
@@ -205,10 +213,17 @@ impl FromRequest for AuthExtractor {
             )
         };
 
+        let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+        let stream_type = match get_stream_type_from_request(&query) {
+            Ok(v) => v,
+            Err(_) => Some(StreamType::Logs),
+        };
+
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 if (method.eq("POST") && path_columns[1].eq("_search"))
                     || path.contains("/prometheus/api/v1/query")
+                    || path.contains("/resources")
                 {
                     return ready(Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
@@ -217,7 +232,21 @@ impl FromRequest for AuthExtractor {
                         org_id: "".to_string(),
                         bypass_check: true, // bypass check permissions
                     }));
+                } else if object_type.starts_with("stream") {
+                    let object_type = match stream_type {
+                        Some(stream_type) => object_type
+                            .replace("stream:", format!("stream:{}_", stream_type).as_str()),
+                        None => object_type,
+                    };
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method,
+                        o2_type: object_type,
+                        org_id,
+                        bypass_check: false,
+                    }));
                 }
+
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method,
@@ -227,6 +256,7 @@ impl FromRequest for AuthExtractor {
                 }));
             }
         }
+        log::info!("AuthExtractor::from_request took {:?}", start.elapsed());
         ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
         )))

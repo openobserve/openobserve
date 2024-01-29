@@ -265,7 +265,12 @@ pub async fn delete_stream(
         );
     };
 
-    crate::common::utils::auth::remove_ownership(org_id, "streams", Authz::new(stream_name)).await;
+    crate::common::utils::auth::remove_ownership(
+        org_id,
+        "streams",
+        Authz::new(&format!("{stream_type}_{stream_name}")),
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),
