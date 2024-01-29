@@ -50,7 +50,8 @@
     "delete": "Delete",
     "actions": "Actions",
     "type": "Type",
-    "search": "Search"
+    "search": "Search",
+    "expand": "Expand"
   },
   "search": {
     "selectIndex": "Select Stream First",
