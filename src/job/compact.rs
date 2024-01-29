@@ -90,14 +90,8 @@ async fn run_sync_to_db() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        let ret = service::db::compact::files::sync_cache_to_db().await;
-        if ret.is_err() {
-            log::error!(
-                "[COMPACTOR] run offset sync cache to db error: {}",
-                ret.err().unwrap()
-            );
-        } else {
-            log::info!("[COMPACTOR] run offset sync cache to db done");
+        if let Err(e) = service::db::compact::files::sync_cache_to_db().await {
+            log::error!("[COMPACTOR] run offset sync cache to db error: {}", e);
         }
     }
 }

@@ -40,7 +40,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
     let query = meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
         start_time: BASE_TIME.timestamp_micros(),
-        end_time: Utc::now().timestamp(),
+        end_time: Utc::now().timestamp_micros(),
         sql_mode: "full".to_owned(),
         ..Default::default()
     };
