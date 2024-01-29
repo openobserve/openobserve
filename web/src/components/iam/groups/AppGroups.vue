@@ -33,6 +33,7 @@
               name="delete"
               class="cursor-pointer"
               :title="t('common.delete')"
+              @click="deleteGroup(slotProps.column.row)"
             />
           </div>
         </template>
@@ -142,6 +143,8 @@ const setupGroups = async () => {
 const hideAddGroup = () => {
   showAddGroup.value = false;
 };
+
+const deleteGroup = () => {};
 </script>
 
 <style scoped></style>

@@ -73,7 +73,8 @@
     {{ permissionsState.permissions.length }} Permissions
   </div>
   <div class="iam-permissions-table">
-    <AppTable :rows="rows" :columns="columns" :dense="true" class="q-mt-sm">
+    <AppTable :rows="rows" :columns="columns"
+:dense="true" class="q-mt-sm">
       <template v-slot:expand="slotProps">
         <q-icon
           v-if="
@@ -98,6 +99,9 @@
           v-model="slotProps.column.row.permission[slotProps.columnName]"
           :val="slotProps.columnName"
           class="filter-check-box cursor-pointer"
+          @update:model-value="
+            handlePermissionChange(slotProps.column.row, slotProps.columnName)
+          "
         />
       </template>
 
@@ -113,14 +117,19 @@
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { ref } from "vue";
+import { ref, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import { defineProps } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import EntityPermissionTable from "@/components/iam/roles/EntityPermissionTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
+import { useStore } from "vuex";
+
+const emits = defineEmits(["updated:permission"]);
 
 const { permissionsState } = usePermissions();
+
+const store = useStore();
 
 const permissionTypes = [
   {
@@ -313,6 +322,9 @@ const updateTableData = (value: string) => {
   }
 };
 
+const handlePermissionChange = (row: any, permission: string) => {
+  emits("updated:permission", row, permission);
+};
 updateTableData(filter.value.permissions);
 </script>
 

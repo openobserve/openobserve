@@ -15,9 +15,10 @@
 
 import { reactive } from "vue";
 import type { Resource } from "@/ts/interfaces";
+import usersService from "@/services/users";
 
 const groups = {
-  groups: [],
+  groups: {} as { [key: string]: any },
 };
 
 const roles = {
@@ -25,58 +26,23 @@ const roles = {
 };
 
 const permissions = {
-  permissions: [
-    {
-      name: "streams",
-      permission: {
-        AllowAll: false,
-        AllowList: false,
-        AllowGet: false,
-        AllowDelete: false,
-        AllowPost: false,
-        AllowPut: false,
-      },
-      type: "resource",
-      resourceName: "streams",
-      isSelected: false,
-      entities: {},
-    },
-    {
-      name: "functions",
-      permission: {
-        AllowAll: false,
-        AllowList: false,
-        AllowGet: false,
-        AllowDelete: false,
-        AllowPost: false,
-        AllowPut: false,
-      },
-      type: "resource",
-      resourceName: "functions",
-      isSelected: false,
-      entities: {},
-    },
-    {
-      name: "alerts",
-      permission: {
-        AllowAll: false,
-        AllowList: false,
-        AllowGet: false,
-        AllowDelete: false,
-        AllowPost: false,
-        AllowPut: false,
-      },
-      type: "resource",
-      resourceName: "alerts",
-      isSelected: false,
-      entities: {},
-    },
-  ] as Resource[],
+  permissions: [] as Resource[],
   selectedResources: {},
+  resources: [],
 };
 
 const users = {
   users: [],
+  getOrgUsers: (org_identifier: string) => {
+    return new Promise((resolve, reject) => {
+      usersService
+        .orgUsers(0, 1000, "email", false, "", org_identifier)
+        .then((res) => {
+          resolve(res.data.data);
+        })
+        .catch((err) => reject(err));
+    });
+  },
 };
 
 const permissionsState = reactive(Object.assign({}, permissions));
