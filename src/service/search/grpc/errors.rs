@@ -36,10 +36,13 @@ fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
 
 impl From<DataFusionError> for Error {
     fn from(err: DataFusionError) -> Self {
-        if let DataFusionError::SchemaError(SchemaError::FieldNotFound {
-            field,
-            valid_fields: _,
-        }) = err
+        if let DataFusionError::SchemaError(
+            SchemaError::FieldNotFound {
+                field,
+                valid_fields: _,
+            },
+            _,
+        ) = err
         {
             return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field.name));
         }

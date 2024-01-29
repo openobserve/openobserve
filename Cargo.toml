@@ -76,14 +76,12 @@ clap = { version = "4.1", default-features = false, features = [
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 csv = "1.2.1"
 dashmap = { version = "5.4", features = ["serde"] }
-datafusion = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34", features = [
-  "simd",
-] }
-datafusion-expr = { git = "https://github.com/openobserve/arrow-datafusion.git", rev = "45e5537ca43d2c2a6e55b9804073b191b337b9e5", version = "34" }
-arrow = { version = "49", features = ["simd", "ipc_compression"] }
-arrow-schema = { version = "49", features = ["serde"] }
-parquet = { version = "49", features = ["arrow", "async"] }
-object_store = { version = "0.8", features = ["aws", "azure", "gcp"] }
+datafusion = "35"
+datafusion-expr = "35"
+arrow = { version = "50.0.0", features = ["ipc_compression"] }
+arrow-schema = { version = "50.0.0", features = ["serde"] }
+parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.9", features = ["aws", "azure", "gcp"] }
 dotenv_config = "0.1.7"
 dotenvy = "0.15"
 env_logger = "0.10"
@@ -141,9 +139,10 @@ segment = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha256 = "1.4.0"
+snafu = "0.7.5"
 sled = "0.34"
 snap = "1"
-sqlparser = { version = "0.40", features = ["serde", "visitor"] }
+sqlparser = { version = "0.41", features = ["serde", "visitor"] }
 sqlx = { version = "0.7", features = [
   "runtime-tokio-rustls",
   "postgres",
@@ -214,10 +213,10 @@ bytes = "1.4"
 byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dashmap = { version = "5.4", features = ["serde"] }
-arrow = { version = "49", features = ["simd", "ipc_compression"] }
-arrow-json = "49"
-arrow-schema = { version = "49", features = ["serde"] }
-parquet = { version = "49", features = ["arrow", "async"] }
+arrow = { version = "50.0.0", features = ["ipc_compression"] }
+arrow-json = "50.0.0"
+arrow-schema = { version = "50.0.0", features = ["serde"] }
+parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
 dotenv_config = "0.1.7"
 dotenvy = "0.15"
 faststr = "0.2"

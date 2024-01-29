@@ -24,7 +24,7 @@ use config::{
 use once_cell::sync::Lazy;
 
 use crate::common::{
-    infra::errors::Result,
+    infra::errors::{Error, Result},
     meta::{
         meta_store::MetaStore,
         stream::{PartitionTimeLevel, StreamStats},
@@ -171,6 +171,9 @@ pub async fn query(
     time_level: PartitionTimeLevel,
     time_range: (i64, i64),
 ) -> Result<Vec<(String, FileMeta)>> {
+    if time_range.0 > time_range.1 || time_range.0 == 0 || time_range.1 == 0 {
+        return Err(Error::Message("[file_list] invalid time range".to_string()));
+    }
     CLIENT
         .query(org_id, stream_type, stream_name, time_level, time_range)
         .await

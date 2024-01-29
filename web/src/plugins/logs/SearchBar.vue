@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey"
-size="xs" />
+                    <q-icon name="delete" color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -192,8 +191,7 @@ size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -328,7 +326,10 @@ clickable v-close-popup>
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <q-dialog ref="confirmSavedViewDialog" v-model="confirmSavedViewDialogVisible">
+    <q-dialog
+      ref="confirmSavedViewDialog"
+      v-model="confirmSavedViewDialogVisible"
+    >
       <q-card>
         <q-card-section>
           {{ confirmMessageSavedView }}
@@ -644,6 +645,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { mergeDeep, b64DecodeUnicode, getImageURL } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { cloneDeep } from "lodash-es";
 
 const defaultValue: any = () => {
   return {
@@ -700,7 +702,10 @@ export default defineComponent({
       this.customDownloadDialog = true;
     },
     downloadRangeData() {
-      if (this.downloadCustomInitialNumber < 0) {
+      if (
+        this.downloadCustomInitialNumber < 0 ||
+        this.downloadCustomInitialNumber == ""
+      ) {
         this.$q.notify({
           message: "Initial number must be positive number.",
           color: "negative",
@@ -768,6 +773,8 @@ export default defineComponent({
       updateUrlQueryParams,
       generateURLQuery,
       buildSearch,
+      resetStreamData,
+      loadStreamLists,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -802,7 +809,7 @@ export default defineComponent({
     } = useSqlSuggestions();
 
     const refreshTimeChange = (item) => {
-      searchObj.meta.refreshInterval = item.value;
+      searchObj.meta.refreshInterval = Number(item.value);
     };
 
     const isSavedViewAction = ref("create");
@@ -948,7 +955,6 @@ export default defineComponent({
     };
 
     const downloadLogs = (data) => {
-      console.log(data);
       const filename = "logs-data.csv";
       const dataobj = jsonToCsv(data);
       const file = new File([dataobj], filename, {
@@ -1340,51 +1346,130 @@ export default defineComponent({
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
 
-            extractedObj.data.stream.streamLists =
-              searchObj.data.stream.streamLists;
-            extractedObj.data.transforms = searchObj.data.transforms;
-            extractedObj.data.stream.functions =
-              searchObj.data.stream.functions;
-            extractedObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {},
-            };
-            extractedObj.data.savedViews = searchObj.data.savedViews;
-            extractedObj.data.queryResults = [];
-            extractedObj.meta.scrollInfo = {};
-            searchObj.value = mergeDeep(searchObj, extractedObj);
-            await nextTick();
-            if (extractedObj.data.tempFunctionContent != "") {
-              populateFunctionImplementation(
-                {
-                  name: "",
-                  function: searchObj.data.tempFunctionContent,
-                },
-                false
-              );
-              searchObj.data.tempFunctionContent =
-                extractedObj.data.tempFunctionContent;
-              searchObj.meta.functionEditorPlaceholderFlag = false;
-            } else {
-              populateFunctionImplementation(
-                {
-                  name: "",
-                  function: "",
-                },
-                false
-              );
-              searchObj.data.tempFunctionContent = "";
-              searchObj.meta.functionEditorPlaceholderFlag = true;
+            if (!extractedObj.data.stream.hasOwnProperty("streamType")) {
+              extractedObj.data.stream.streamType = "logs";
             }
-            dateTimeRef.value.setSavedDate(searchObj.data.datetime);
-            if (searchObj.meta.refreshInterval != "0") {
-              onRefreshIntervalUpdate();
+
+            if (
+              searchObj.data.stream.streamType ==
+              extractedObj.data.stream.streamType
+            ) {
+              // if (
+              //   extractedObj.data.stream.selectedStream.value !=
+              //   searchObj.data.stream.selectedStream.value
+              // ) {
+              //   extractedObj.data.stream.streamLists =
+              //     searchObj.data.stream.streamLists;
+              // }
+              delete extractedObj.data.stream.streamLists;
+              delete searchObj.data.stream.selectedStream;
+              extractedObj.data.transforms = searchObj.data.transforms;
+              extractedObj.data.stream.functions =
+                searchObj.data.stream.functions;
+              extractedObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {},
+              };
+              extractedObj.data.savedViews = searchObj.data.savedViews;
+              extractedObj.data.queryResults = [];
+              extractedObj.meta.scrollInfo = {};
+              searchObj.value = mergeDeep(searchObj, extractedObj);
+              await nextTick();
+              if (extractedObj.data.tempFunctionContent != "") {
+                populateFunctionImplementation(
+                  {
+                    name: "",
+                    function: searchObj.data.tempFunctionContent,
+                  },
+                  false
+                );
+                searchObj.data.tempFunctionContent =
+                  extractedObj.data.tempFunctionContent;
+                searchObj.meta.functionEditorPlaceholderFlag = false;
+              } else {
+                populateFunctionImplementation(
+                  {
+                    name: "",
+                    function: "",
+                  },
+                  false
+                );
+                searchObj.data.tempFunctionContent = "";
+                searchObj.meta.functionEditorPlaceholderFlag = true;
+              }
+              dateTimeRef.value.setSavedDate(searchObj.data.datetime);
+              if (searchObj.meta.refreshInterval != "0") {
+                onRefreshIntervalUpdate();
+              } else {
+                clearInterval(store.state.refreshIntervalID);
+              }
+              await updatedLocalLogFilterField();
+              await getStreams("logs", true);
             } else {
-              clearInterval(store.state.refreshIntervalID);
+              // ----- Here we are explicitly handling stream change -----
+              resetStreamData();
+              searchObj.data.stream.streamType =
+                extractedObj.data.stream.streamType;
+              // Here copying selected stream object, as in loadStreamLists() we are setting selected stream object to empty object
+              // After loading stream list, we are setting selected stream object to copied object
+              const selectedStream = cloneDeep(
+                extractedObj.data.stream.selectedStream
+              );
+
+              extractedObj.data.transforms = searchObj.data.transforms;
+              extractedObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {},
+              };
+              extractedObj.data.savedViews = searchObj.data.savedViews;
+              extractedObj.data.queryResults = [];
+              extractedObj.meta.scrollInfo = {};
+
+              searchObj.value = mergeDeep(searchObj, extractedObj);
+              searchObj.data.streamResults = {};
+
+              const streamData = await getStreams(
+                searchObj.data.stream.streamType,
+                true
+              );
+              searchObj.data.streamResults = streamData;
+              await loadStreamLists();
+              searchObj.data.stream.selectedStream = selectedStream;
+              // searchObj.value = mergeDeep(searchObj, extractedObj);
+
+              await nextTick();
+              if (extractedObj.data.tempFunctionContent != "") {
+                populateFunctionImplementation(
+                  {
+                    name: "",
+                    function: searchObj.data.tempFunctionContent,
+                  },
+                  false
+                );
+                searchObj.data.tempFunctionContent =
+                  extractedObj.data.tempFunctionContent;
+                searchObj.meta.functionEditorPlaceholderFlag = false;
+              } else {
+                populateFunctionImplementation(
+                  {
+                    name: "",
+                    function: "",
+                  },
+                  false
+                );
+                searchObj.data.tempFunctionContent = "";
+                searchObj.meta.functionEditorPlaceholderFlag = true;
+              }
+              dateTimeRef.value.setSavedDate(searchObj.data.datetime);
+              if (searchObj.meta.refreshInterval != "0") {
+                onRefreshIntervalUpdate();
+              } else {
+                clearInterval(store.state.refreshIntervalID);
+              }
+              await updatedLocalLogFilterField();
             }
-            await updatedLocalLogFilterField();
-            await getStreams("logs", true);
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
               color: "positive",
@@ -1392,10 +1477,14 @@ export default defineComponent({
               timeout: 1000,
             });
             setTimeout(async () => {
-              searchObj.loading = true;
-              await getQueryData();
-              store.dispatch("setSavedViewFlag", false);
-              updateUrlQueryParams();
+              try {
+                searchObj.loading = true;
+                await getQueryData();
+                store.dispatch("setSavedViewFlag", false);
+                updateUrlQueryParams();
+              } catch (e) {
+                console.log(e);
+              }
             }, 1000);
 
             // } else {
@@ -1457,7 +1546,6 @@ export default defineComponent({
               savedViewSelectedName.value.view_name
             );
           });
-          
         } else {
           $q.notify({
             message: `Please select saved view to update.`,
@@ -1802,6 +1890,9 @@ export default defineComponent({
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
     },
+    resetFunctionDefination() {
+      return this.searchObj.data.tempFunctionContent;
+    },
   },
   watch: {
     addSearchTerm() {
@@ -1863,6 +1954,9 @@ export default defineComponent({
       if (newVal == "" && store.state.savedViewFlag == false) {
         this.resetFunctionContent();
       }
+    },
+    resetFunctionDefination(newVal) {
+      if (newVal == "") this.resetFunctionContent();
     },
   },
 });
@@ -2111,7 +2205,7 @@ export default defineComponent({
   }
 }
 
-.q-pagination__middle>.q-btn {
+.q-pagination__middle > .q-btn {
   min-width: 30px !important;
   max-width: 30px !important;
 }

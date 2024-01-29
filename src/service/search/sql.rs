@@ -110,7 +110,7 @@ impl Display for SqlMode {
 impl Sql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
         let req_query = req.query.as_ref().unwrap();
-        let mut req_time_range = (req_query.start_time, req_query.end_time);
+        let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
         let stream_type = StreamType::from(req.stream_type.as_str());
 
@@ -255,9 +255,6 @@ impl Sql {
         // Hack time_range for sql
         let meta_time_range_is_empty = meta.time_range.is_none() || meta.time_range == Some((0, 0));
         if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-            if req_time_range.1 == 0 {
-                req_time_range.1 = chrono::Utc::now().timestamp_micros();
-            }
             meta.time_range = Some(req_time_range); // update meta
         };
         if let Some(time_range) = meta.time_range {

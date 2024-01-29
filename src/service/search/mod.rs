@@ -48,7 +48,7 @@ use crate::{
         utils::{flatten, json, str::find},
     },
     handler::grpc::cluster_rpc,
-    service::{db, file_list, format_partition_key, stream},
+    service::{file_list, format_partition_key, stream},
 };
 
 pub(crate) mod datafusion;
@@ -107,10 +107,21 @@ pub async fn search_partition(
     let nodes = cluster::get_cached_online_querier_nodes().unwrap_or_default();
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
+    let (records, original_size, compressed_size) =
+        files
+            .iter()
+            .fold((0, 0, 0), |(records, original_size, compressed_size), f| {
+                (
+                    records + f.meta.records,
+                    original_size + f.meta.original_size,
+                    compressed_size + f.meta.compressed_size,
+                )
+            });
     let mut resp = search::SearchPartitionResponse {
         file_num: files.len(),
-        original_size: files.iter().map(|f| f.meta.original_size).sum::<i64>() as usize,
-        compressed_size: files.iter().map(|f| f.meta.compressed_size).sum::<i64>() as usize,
+        records: records as usize,
+        original_size: original_size as usize,
+        compressed_size: compressed_size as usize,
         partitions: vec![],
     };
     let mut total_secs = resp.original_size / CONFIG.limit.query_group_base_speed / cpu_cores;
@@ -142,26 +153,6 @@ pub async fn search_partition(
     Ok(resp)
 }
 
-async fn get_times(sql: &sql::Sql, stream_type: StreamType) -> (i64, i64) {
-    let (mut time_min, mut time_max) = sql.meta.time_range.unwrap();
-    if time_min == 0 {
-        // get created_at from schema
-        let schema = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-            .await
-            .unwrap_or_else(|_| Schema::empty());
-        if schema != Schema::empty() {
-            time_min = schema
-                .metadata
-                .get("created_at")
-                .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-        }
-    }
-    if time_max == 0 {
-        time_max = chrono::Utc::now().timestamp_micros();
-    }
-    (time_min, time_max)
-}
-
 #[tracing::instrument(skip(sql), fields(session_id = ?_session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
     _session_id: &str,
@@ -174,7 +165,7 @@ async fn get_file_list(
             .unwrap_or_default()
             .len()
             <= 1;
-    let (time_min, time_max) = get_times(sql, stream_type).await;
+    let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = match file_list::query(
         &sql.org_id,
         &sql.stream_name,
