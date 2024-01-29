@@ -186,7 +186,7 @@ watch(
   }
 );
 
-const filterEntities = (rows, terms) => {
+const filterEntities = (rows: Entity[], terms: string) => {
   var filtered = [];
   console.log("entity", rows, terms);
   terms = terms.toLowerCase();
