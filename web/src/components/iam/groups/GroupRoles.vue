@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
@@ -110,7 +111,17 @@ const users = ref([
   },
 ]);
 
-const { rolesState } = usePermissions();
+watch(
+  () => props.groupRoles,
+  () => {
+    updateGroupUsers();
+  },
+  {
+    deep: true,
+  }
+);
+
+const { rolesState, groupsState } = usePermissions();
 
 const rows: Ref<any[]> = ref([]);
 
@@ -154,6 +165,16 @@ const columns = [
   },
 ];
 
+watch(
+  () => props.groupRoles,
+  () => {
+    updateGroupUsers();
+  },
+  {
+    deep: true,
+  }
+);
+
 const updateUserTable = async (value: string) => {
   usersDisplay.value = value;
 
@@ -169,10 +190,10 @@ const updateUserTable = async (value: string) => {
 };
 
 const updateGroupUsers = () => {
-  users.value = props.groupRoles.map((user: any, index: number) => {
-    groupUsersMap.value.add(user.role_name);
+  users.value = props.groupRoles.map((role: any, index: number) => {
+    groupUsersMap.value.add(role);
     return {
-      ...user,
+      role_name: role,
       "#": index + 1,
       isInGroup: true,
     };
@@ -213,8 +234,6 @@ const toggleUserSelection = (user: any) => {
     props.removedRoles.delete(user.role_name);
   }
 };
-
-updateGroupUsers();
 </script>
 
 <style scoped></style>

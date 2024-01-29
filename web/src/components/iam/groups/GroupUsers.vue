@@ -73,9 +73,11 @@
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
+import { watch } from "vue";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -111,6 +113,8 @@ const users = ref([
 const rows: Ref<any[]> = ref([]);
 
 const usersDisplay = ref("selected");
+
+const store = useStore();
 
 const usersDisplayOptions = [
   {
@@ -152,6 +156,16 @@ const columns = [
   },
 ];
 
+watch(
+  () => props.groupUsers,
+  () => {
+    updateGroupUsers();
+  },
+  {
+    deep: true,
+  }
+);
+
 const updateUserTable = async (value: string) => {
   usersDisplay.value = value;
 
@@ -167,14 +181,16 @@ const updateUserTable = async (value: string) => {
 };
 
 const updateGroupUsers = () => {
-  users.value = props.groupUsers.map((user: any, index: number) => {
-    groupUsersMap.value.add(user.email);
-    return {
-      ...user,
-      "#": index + 1,
-      isInGroup: true,
-    };
-  });
+  users.value = cloneDeep(props.groupUsers as string[]).map(
+    (userEmail: string, index: number) => {
+      groupUsersMap.value.add(userEmail);
+      return {
+        email: userEmail,
+        "#": index + 1,
+        isInGroup: true,
+      };
+    }
+  );
 
   updateUserTable(usersDisplay.value);
 };
@@ -182,13 +198,27 @@ const updateGroupUsers = () => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     // TODO OK : Add code to fetch org users if not fetched
-    users.value = cloneDeep(usersState.users).map(
-      (user: any, index: number) => {
+    const data: any = await usersState.getOrgUsers(
+      store.state.selectedOrganization.identifier
+    );
+
+    usersState.users = cloneDeep(
+      data.map((user: any, index: number) => {
         return {
           email: user.email,
           "#": index + 1,
+          isInGroup: groupUsersMap.value.has(user.email),
+        };
+      })
+    );
+
+    users.value = cloneDeep(usersState.users).map(
+      (user: any, index: number) => {
+        return {
+          "#": index + 1,
+          email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
         };
       }

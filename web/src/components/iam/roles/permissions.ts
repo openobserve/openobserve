@@ -1,24 +1,22 @@
 export const permissionsResponse = [
   {
-    object: "streams:default",
+    object: "stream:default",
     permission: "AllowAll",
   },
   {
-    object: "streams:default",
+    object: "stream:default",
     permission: "AllowGet",
   },
   {
-    object: "streams:k8s",
+    object: "stream:k8s",
     permission: "AllowPut",
   },
   {
-    object: "alerts:alert_1",
+    object: "alert:alert_1",
     permission: "AllowPut",
   },
   {
-    object: "alerts:alert_1",
+    object: "alert:alert_1",
     permission: "AllowAll",
   },
 ];
-
-const resources = [];
