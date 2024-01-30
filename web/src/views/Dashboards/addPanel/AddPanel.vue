@@ -242,8 +242,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
-      <div v-if="dashboardPanelData.data.type == 'html'" class="col">
-        <CustomHTMLEditor v-model="dashboardPanelData.data.html" />
+      <div
+        v-if="dashboardPanelData.data.type == 'html'"
+        class="col"
+        style="width: 100%; height: 100%"
+      >
+        <CustomHTMLEditor
+          v-model="dashboardPanelData.data.html"
+          :editMode="true"
+          style="width: 100%; height: 100%"
+        />
       </div>
     </div>
   </div>
