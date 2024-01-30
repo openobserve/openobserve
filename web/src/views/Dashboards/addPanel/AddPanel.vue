@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%; height: 100%"
       >
         <CustomHTMLEditor
-          v-model="dashboardPanelData.data.html"
+          v-model="dashboardPanelData.data.htmlContent"
           :editMode="true"
           style="width: 100%; height: 100%"
         />

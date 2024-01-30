@@ -34,6 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         ref="tableRendererRef"
       />
+      <div v-else-if="panelSchema.type == 'html'">
+        <custom-html-editor
+          v-model="panelSchema.htmlContent"
+          :editMode="false"
+        ></custom-html-editor>
+      </div>
       <ChartRenderer
         v-else
         :data="
@@ -89,9 +95,15 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
+import CustomHTMLEditor from "./addPanel/CustomHTMLEditor.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
-  components: { ChartRenderer, TableRenderer, GeoMapRenderer },
+  components: {
+    ChartRenderer,
+    TableRenderer,
+    GeoMapRenderer,
+    CustomHTMLEditor,
+  },
   props: {
     selectedTimeObj: {
       required: true,

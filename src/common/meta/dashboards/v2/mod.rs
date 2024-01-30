@@ -68,6 +68,8 @@ pub struct Panel {
     pub query_type: String,
     pub queries: Vec<Query>,
     pub layout: Layout,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub html_content: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
