@@ -144,6 +144,8 @@ async fn query(
     req: meta::prom::RequestQuery,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let user_id = _in_req.headers().get("user_id").unwrap();
+    let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
         use crate::common::{
@@ -156,16 +158,16 @@ async fn query(
             name: HashSet::new(),
         };
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-        let user_id = _in_req.headers().get("user_id").unwrap();
-        if !is_root_user(user_id.to_str().unwrap()) {
+
+        if !is_root_user(user_email) {
             for name in visitor.name {
                 let user: meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                    .get(&format!("{org_id}/{}", user_email))
                     .unwrap()
                     .clone();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
-                        user_id.to_str().unwrap(),
+                        user_email,
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
@@ -207,7 +209,7 @@ async fn query(
         step: 300_000_000, // 5m
     };
 
-    search(org_id, timeout, &req).await
+    search(org_id, timeout, &req, user_email).await
 }
 
 /// prometheus range queries
@@ -292,6 +294,8 @@ async fn query_range(
     req: meta::prom::RequestRangeQuery,
     _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let user_id = _in_req.headers().get("user_id").unwrap();
+    let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
         use crate::common::{
@@ -304,16 +308,16 @@ async fn query_range(
             name: HashSet::new(),
         };
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-        let user_id = _in_req.headers().get("user_id").unwrap();
-        if !is_root_user(user_id.to_str().unwrap()) {
+
+        if !is_root_user(user_email) {
             for name in visitor.name {
                 let user: meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                    .get(&format!("{org_id}/{}", user_email))
                     .unwrap()
                     .clone();
                 if user.is_external
                     && !crate::handler::http::auth::validator::check_permissions(
-                        user_id.to_str().unwrap(),
+                        user_email,
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
@@ -391,7 +395,7 @@ async fn query_range(
         end,
         step,
     };
-    search(org_id, timeout, &req).await
+    search(org_id, timeout, &req, user_id.to_str().unwrap()).await
 }
 
 /// prometheus query metric metadata
@@ -816,8 +820,9 @@ async fn search(
     org_id: &str,
     timeout: i64,
     req: &MetricsQueryRequest,
+    user_email: &str,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(org_id, req, timeout).await {
+    match promql::search::search(org_id, req, timeout, user_email).await {
         Ok(data) => Ok(HttpResponse::Ok().json(promql::QueryResponse {
             status: promql::Status::Success,
             data: Some(promql::QueryResult {

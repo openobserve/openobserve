@@ -49,12 +49,19 @@ impl LogsService for LogsServer {
             in_stream_name = Some(stream_name.to_str().unwrap());
         };
 
+        let user_id = metadata.get("user_id");
+        let mut user_email: &str = "";
+        if let Some(user_id) = user_id {
+            user_email = user_id.to_str().unwrap();
+        };
+
         match crate::service::logs::otlp_grpc::handle_grpc_request(
             org_id.unwrap().to_str().unwrap(),
             0,
             in_req,
             true,
             in_stream_name,
+            user_email,
         )
         .await
         {
