@@ -40,7 +40,7 @@ pub async fn create_role(
 #[post("/{org_id}/roles")]
 pub async fn create_role(
     _org_id: web::Path<String>,
-    _role_id: web::Json<String>,
+    _role_id: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

@@ -232,7 +232,7 @@ impl FromRequest for AuthExtractor {
                         org_id: "".to_string(),
                         bypass_check: true, // bypass check permissions
                     }));
-                } else if object_type.starts_with("stream") {
+                } else if object_type.starts_with("stream") && !method.eq("LIST") {
                     let object_type = match stream_type {
                         Some(stream_type) => object_type
                             .replace("stream:", format!("stream:{}_", stream_type).as_str()),
