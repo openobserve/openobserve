@@ -39,7 +39,6 @@ fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow::Error
             let path = entry.path();
             if path.is_file() {
                 let content = fs::read(&path)?;
-
                 if let Err(e) = logs::ingest::ingest(
                     &c.org,
                     &c.stream_name,
