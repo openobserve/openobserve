@@ -72,7 +72,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     if files.is_empty() {
         return Ok(());
     }
-    log::info!("[INGESTER:JOB] move files get: {}", files.len());
+    // log::info!("[INGESTER:JOB] move files get: {}", files.len());
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
