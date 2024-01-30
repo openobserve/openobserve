@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
           :editMode="true"
-          style="width: 100%; height: 100%"
+          style="width: 100%; height: calc(100vh - 115px);"
         />
       </div>
     </div>
@@ -275,7 +275,7 @@ import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.v
 import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
-import CustomHTMLEditor from "../../../components/dashboards/addPanel/customHTMLEditor.vue";
+import CustomHTMLEditor from "@/components/dashboards/addPanel/CustomHTMLEditor.vue";
 import { useQuasar, date } from "quasar";
 
 import { useI18n } from "vue-i18n";
