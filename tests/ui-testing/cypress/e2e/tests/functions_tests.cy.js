@@ -211,8 +211,23 @@ describe("Functions testcases", () => {
       cy.get(".q-input > .q-field__inner > .q-field__control").type(fileName);
       cy.contains("Save").click({ force: true });
       cy.wait(200);
-      cy.get('[title="Delete Function"]').click({ force: true });
-      cy.get('[data-test="confirm-button"]').click({ force: true });
+      // cy.get('[title="Delete Function"]').click({ force: true });
+      // cy.get('[data-test="confirm-button"]').click({ force: true });
+      cy.get('tbody tr').each(($row)  => {
+        const functionName = $row.find('td.text-left:eq(1)').text();
+
+        // Check if the function name contains "enrichment_info"
+        if (functionName.includes("enrichment_info")) {
+          // Click the "Delete Function" button
+          cy.wrap($row)
+            .find('[title="Delete Function"]') // finds the delete function button and clicks on it
+            .click();
+
+          // You may need to handle any confirmation dialog that appears
+          cy.get('[data-test="confirm-button"]').click();
+        }
+
+        })
     });
   });
 });
