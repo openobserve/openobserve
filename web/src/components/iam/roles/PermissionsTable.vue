@@ -136,9 +136,13 @@ import EntityPermissionTable from "@/components/iam/roles/EntityPermissionTable.
 import usePermissions from "@/composables/iam/usePermissions";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
-import { nextTick } from "vue";
-import { watch } from "vue";
-import type { Entity, Resource } from "@/ts/interfaces";
+import alertService from "@/services/alerts";
+import templateService from "@/services/alert_templates";
+import destinationService from "@/services/alert_destination";
+import jsTransformService from "@/services/jstransform";
+import organizationsService from "@/services/organizations";
+import savedviewsService from "@/services/saved_views";
+import { getGroups, getRoles } from "@/services/iam";
 
 const props = defineProps({
   selectedPermissionsHash: {
@@ -343,132 +347,6 @@ const handlePermissionChange = (row: any, permission: string) => {
   emits("updated:permission", row, permission);
 };
 
-const getResourceEntities = (resource: string) => {
-  const listEntitiesFnMap: {
-    [key: string]: () => Promise<any>;
-  } = {
-    stream: getStreams,
-  };
-
-  return new Promise(async (resolve, reject) => {
-    console.log("2");
-    await listEntitiesFnMap[resource]();
-    console.log("6");
-    resolve(true);
-  });
-};
-
-const getStreams = async () => {
-  console.log("3");
-
-  const logs = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "logs",
-    false
-  );
-  const traces = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "traces",
-    false
-  );
-  const metrics = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "metrics",
-    false
-  );
-
-  // const entrichmentTables = await streamService.nameList(
-  //   store.state.selectedOrganization.identifier,
-  //   "enrichment_table",
-  //   false
-  // );
-
-  permissionsState.permissions.forEach(async (resource) => {
-    if (resource.name !== "stream") return;
-
-    resource.entities.length = 0;
-    resource.entities = [];
-
-    await nextTick();
-
-    logs.data.list.forEach((stream: any) => {
-      const entity = stream.stream_type + "_" + stream.name;
-      resource.entities.push({
-        name: stream.stream_type + "_" + stream.name,
-        permission: {
-          AllowAll: props.selectedPermissionsHash.has(
-            getPermissionHash(resource.resourceName, "AllowAll", entity)
-          ),
-          AllowGet: props.selectedPermissionsHash.has(
-            getPermissionHash(resource.resourceName, "AllowGet", entity)
-          ),
-          AllowDelete: props.selectedPermissionsHash.has(
-            getPermissionHash(resource.resourceName, "AllowDelete", entity)
-          ),
-          AllowPut: props.selectedPermissionsHash.has(
-            getPermissionHash(resource.resourceName, "AllowPut", entity)
-          ),
-        },
-        type: "entity",
-        resourceName: "stream",
-        isSelected: false,
-      });
-    });
-
-    traces.data.list.forEach((stream: any) => {
-      resource.entities.push({
-        name: stream.stream_type + "_" + stream.name,
-        permission: {
-          AllowAll: false,
-          AllowGet: false,
-          AllowDelete: false,
-          AllowPut: false,
-        },
-        type: "entity",
-        resourceName: "stream",
-        isSelected: false,
-      });
-    });
-
-    metrics.data.list.forEach((stream: any) => {
-      resource.entities.push({
-        name: stream.stream_type + "_" + stream.name,
-        permission: {
-          AllowAll: false,
-          AllowGet: false,
-          AllowDelete: false,
-          AllowPut: false,
-        },
-        type: "entity",
-        resourceName: "stream",
-        isSelected: false,
-      });
-    });
-
-    console.log("4");
-
-    // entrichmentTables.data.list.forEach((stream: any) => {
-    //   resource.entities.push({
-    //     name: stream.stream_type + "_" + stream.name,
-    //     permission: {
-    //       AllowAll: false,
-    //       AllowGet: false,
-    //       AllowDelete: false,
-    //       AllowPut: false,
-    //     },
-    //     type: "entity",
-    //     resourceName: "stream",
-    //     isSelected: false,
-    //   });
-    // });
-  });
-
-  return new Promise((resolve, reject) => {
-    console.log("5");
-    resolve(true);
-  });
-};
-
 const onResourceChange = () => {
   if (!filter.value.resource) return updateTableData();
   rows.value = rows.value.filter(
@@ -507,6 +385,213 @@ const getPermissionHash = (
   if (!entity) entity = store.state.selectedOrganization.identifier;
 
   return `${resourceName}:${entity}:${permission}`;
+};
+
+const getResourceEntities = (resource: string) => {
+  const listEntitiesFnMap: {
+    [key: string]: () => Promise<any>;
+  } = {
+    stream: getStreams,
+    alert: getAlerts,
+    template: getTemplates,
+    destination: getDestinations,
+    enrichment_table: getEnrichmentTables,
+    function: getFunctions,
+    org: getOrgs,
+    savedviews: getSavedViews,
+    group: _getGroups,
+    role: _getRoles,
+    dashboard: getDashboards,
+  };
+
+  return new Promise(async (resolve, reject) => {
+    console.log("2");
+    await listEntitiesFnMap[resource]();
+    console.log("6");
+    resolve(true);
+  });
+};
+
+const getEnrichmentTables = () => {
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getOrgs = async () => {
+  const orgs = await organizationsService.list(0, 10000, "name", false, "");
+
+  updateResourceEntities("org", ["identifier"], [...orgs.data.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getSavedViews = async () => {
+  const savedViews = await savedviewsService.get(
+    store.state.selectedOrganization.identifier
+  );
+  updateResourceEntities("savedviews", ["name"], [...savedViews.data.views]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDashboards = () => {};
+
+const _getGroups = async () => {
+  const groups = await getGroups(store.state.selectedOrganization.identifier);
+  updateResourceEntities("group", [], [...groups.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const _getRoles = async () => {
+  const roles = await getRoles(store.state.selectedOrganization.identifier);
+  updateResourceEntities("role", [], [...roles.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getFunctions = async () => {
+  const functions = await jsTransformService.list(
+    1,
+    100000,
+    "name",
+    false,
+    "",
+    store.state.selectedOrganization.identifier
+  );
+
+  updateResourceEntities("function", ["name"], [...functions.data.list]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDestinations = async () => {
+  const destinations = await destinationService.list({
+    sort_by: "name",
+    org_identifier: store.state.selectedOrganization.identifier,
+  });
+
+  updateResourceEntities("destination", ["name"], [...destinations.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getTemplates = async () => {
+  const templates = await templateService.list({
+    org_identifier: store.state.selectedOrganization.identifier,
+  });
+
+  updateResourceEntities("template", ["name"], [...templates.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getAlerts = async () => {
+  const alerts = await alertService.list(
+    1,
+    10000,
+    "name",
+    false,
+    "",
+    store.state.selectedOrganization.identifier
+  );
+
+  updateResourceEntities("alert", ["name"], [...alerts.data.list]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getStreams = async () => {
+  console.log("3");
+
+  const logs = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "logs",
+    false
+  );
+  const traces = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "traces",
+    false
+  );
+  const metrics = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "metrics",
+    false
+  );
+
+  updateResourceEntities(
+    "stream",
+    ["stream_type", "name"],
+    [...logs.data.list, ...metrics.data.list, ...traces.data.list]
+  );
+
+  return new Promise((resolve, reject) => {
+    console.log("5");
+    resolve(true);
+  });
+};
+
+const updateResourceEntities = (
+  resourceName: string,
+  entityNameKeys: string[],
+  data: any[]
+) => {
+  const resourceIndex = permissionsState.permissions.findIndex(
+    (row: any) => row.name === resourceName
+  );
+
+  permissionsState.permissions[resourceIndex].entities.length = 0;
+  permissionsState.permissions[resourceIndex].entities = [];
+
+  data.forEach((_entity: any) => {
+    let entityName = "";
+    if (typeof _entity === "string") entityName = _entity;
+
+    if (typeof _entity === "object") {
+      entityName = entityNameKeys.reduce((acc, curr) => {
+        return acc ? acc + "_" + (_entity[curr] || curr) : _entity[curr];
+      }, "");
+    }
+
+    permissionsState.permissions[resourceIndex].entities.push({
+      name: entityName,
+      permission: {
+        AllowAll: props.selectedPermissionsHash.has(
+          getPermissionHash(resourceName, "AllowAll", entityName)
+        ),
+        AllowGet: props.selectedPermissionsHash.has(
+          getPermissionHash(resourceName, "AllowGet", entityName)
+        ),
+        AllowDelete: props.selectedPermissionsHash.has(
+          getPermissionHash(resourceName, "AllowDelete", entityName)
+        ),
+        AllowPut: props.selectedPermissionsHash.has(
+          getPermissionHash(resourceName, "AllowPut", entityName)
+        ),
+      },
+      type: "entity",
+      resourceName: resourceName,
+      isSelected: false,
+    });
+  });
 };
 
 defineExpose({
