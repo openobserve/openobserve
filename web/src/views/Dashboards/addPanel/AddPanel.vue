@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
           :editMode="true"
-          style="width: 100%; height: calc(100vh - 115px);"
+          style="width: 100%; height: calc(100vh - 115px)"
         />
       </div>
     </div>
@@ -1023,6 +1023,9 @@ export default defineComponent({
       //     timeout: 5000,
       //   });
       // }
+
+      console.log(errors, "errors");
+      
 
       if (errors.length) {
         $q.notify({

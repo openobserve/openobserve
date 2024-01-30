@@ -1,15 +1,31 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
-  <div class="html-editor">
+  <div class="html-editor" style="width: 100%; height: 100%">
     <div v-if="editMode" style="width: 100%; height: 100%">
       <q-splitter v-model="splitterModel" style="width: 100%; height: 100%">
         <template #before>
-          <div style="min-height: 500px">
+          <div style="height: 100% !important">
             <q-input
               v-model="htmlContent"
               filled
               type="textarea"
               class="editor"
-              style="min-height: 500px"
+              style="height: 100%"
             />
           </div>
         </template>
@@ -28,7 +44,7 @@
         </template>
       </q-splitter>
     </div>
-    <div v-if="!editMode">
+    <div v-if="!editMode" >
       <div v-html="htmlContent" class="preview"></div>
     </div>
   </div>
@@ -67,6 +83,7 @@ export default defineComponent({
 <style scoped>
 .html-editor {
   display: flex;
+  height: 100%;
 }
 
 .splitter {
@@ -89,5 +106,9 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
+}
+.editor {
+  flex: 1;
+  min-height: 0;
 }
 </style>

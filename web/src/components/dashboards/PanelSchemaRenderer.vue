@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
       />
     </div>
-    <div v-if="!errorDetail" class="noData">{{ noData }}</div>
+    <div v-if="!errorDetail && panelSchema.type != 'html'" class="noData">{{ noData }}</div>
     <div
       v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
       class="errorMessage"

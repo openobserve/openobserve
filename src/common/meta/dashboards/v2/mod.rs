@@ -74,7 +74,7 @@ pub struct Panel {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Query {
-    pub query: String,
+    pub query: Option<String>,
     pub custom_query: bool,
     pub fields: PanelFields,
     pub config: QueryConfig,
