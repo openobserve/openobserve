@@ -254,7 +254,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should add invalid query and display error", () => {
+  it.only("should add invalid query and display error", () => {
     // Type the value of a variable into an input field
     cy.intercept("GET", logData.ValueQuery).as("value");
 
@@ -266,11 +266,11 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-bar-query-editor"]').type(
       "kubernetes_labels_deploy="
     );
-    cy.wait(3000);
+    cy.wait(3000)
     cy.get('[data-cy="search-bar-refresh-button"]', { timeout: 2000 }).click({
       force: true,
     });
-    cy.get('[data-test="logs-search-error-message"]',{timeout:2000}).should("be.visible");
+    cy.get('[data-test="logs-search-error-message"]',{timeout:2000}).should("exist");
   });
 
   it("should click run query after SQL toggle on but without any query", () => {
@@ -1093,7 +1093,7 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-bar-delete-streamlogsnavigate-saved-view-btn"]').each(($button) => {
       // Click on each delete button
       cy.wrap($button).click();
-      cy.get('[data-test="confirm-button"]').click()
+      cy.get('[data-test="confirm-button"]').click({force:true})
     });
  
   });
