@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="tableRendererRef"
       />
       <div v-else-if="panelSchema.type == 'html'">
-        <custom-html-editor
+        <CustomHTMLEditor
           v-model="panelSchema.htmlContent"
           :editMode="false"
-        ></custom-html-editor>
+        ></CustomHTMLEditor>
       </div>
       <ChartRenderer
         v-else
@@ -95,7 +95,7 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
-import CustomHTMLEditor from "./addPanel/CustomHTMLEditor.vue";
+import CustomHTMLEditor from "@/components/dashboards/addPanel/CustomHTMLEditor.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
