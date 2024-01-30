@@ -270,7 +270,7 @@ describe("Logs testcases", () => {
     cy.get('[data-cy="search-bar-refresh-button"]', { timeout: 2000 }).click({
       force: true,
     });
-    cy.get('[data-test="logs-search-error-message"]').should("be.visible");
+    cy.get('[data-test="logs-search-error-message"]',{timeout:2000}).should("be.visible");
   });
 
   it("should click run query after SQL toggle on but without any query", () => {
@@ -1004,19 +1004,98 @@ describe("Logs testcases", () => {
     cy.get('.q-spinner').should('not.exist')
   });
 
-  // it.only("should enter function, edit and then delete the function", () => {
-  //   cy.intercept("GET", logData.ValueQuery).as("value");
-  //   logstests.clickVrlQueryToggle()
-  //   cy.wait(2000)
-  //   logstests.enterTextVrlQueryEditor("a=1")
-  //   logstests.clickSaveFunctionButton();
-  //   logstests.enterFunctionName("e2e_function")
-  //   logstests.clickSavedOkButton()
-  //   logstests.enterTextVrlQueryEditor("a=133")
-  //   cy.get('[data-test="logs-search-bar-function-dropdown"] > .q-btn-dropdown--current > .q-btn__content').click({force:true})
-  //   cy.get('[data-test="saved-function-action-toggle"]').click({force:true})
-  //   cy.get('[data-test="saved-function-name-select"]').click({force:true})
-  //   cy.wait(2000)
-  //   cy.contains('Test1').click({force:true})
-  // })
+
+  it("should  display ingested logs - search logs, navigate on another tab, revisit logs page", () => {
+    // cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[data-cy="date-time-button"]').click({ force: true });
+    cy.get('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
+      force: true,
+    });
+    applyQueryButton();
+    cy.get('[data-test="menu-link-/traces-item"]').click({ force: true });
+    cy.wait(100)
+    cy.get('[data-test="menu-link-/logs-item"]').click({ force: true });
+    cy.get('[data-test="logs-search-result-bar-chart"]').should("exist")
+ 
+  });
+
+  it("should redirect to logs after clicking on stream explorer via stream page", () => {
+    // cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[data-cy="date-time-button"]').click({ force: true });
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[title="Explore"]:last').click({ force: true });
+    cy.url().should('include', 'logs');
+ 
+  });
+
+  it("should reset the editor on clicking reset filter button", () => {
+    // Wait for 2 seconds
+    cy.wait(2000);
+    // Type the value of a variable into an input field
+    cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[data-cy="date-time-button"]').click({ force: true });
+    cy.get('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
+      force: true,
+    });
+    logstests.addFeildandSubValue();
+    logstests.addsubFeildValue();
+    //click on the field
+    // get the data from the value variable
+    cy.wait("@value", { timeout: 5000 })
+      .its("response.statusCode")
+      .should("eq", 200);
+    logstests.addsubFeildValue();
+    cy.get("@value").its("response.body.hits").should("be.an", "array");
+    logstests.clickFeildSubvalue();
+    cy.wait(2000);
+    cy.intercept("GET", logData.ValueQuery).as("value");
+    logstests.clickOnFirstField();
+    cy.contains('Reset Filters').click({force:true})
+    cy.get('[data-test="logs-search-bar-query-editor"]').should('have.value', '');
+  });
+
+
+  it("should enter query, reset and then again click the field from LHS", () => {
+    // cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[aria-label="SQL Mode"]').click({ force: true });
+    cy.get('[data-test="log-search-expand-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-btn"]').click({ force: true });
+    cy.contains('Reset Filters').click({force:true})
+    cy.get('[data-test="log-search-expand-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-btn"]').click({ force: true });
+    cy.get(".q-notification__message").should('not.exist')
+  });
+
+  it("should redirect to logs after clicking on stream explorer via stream page", () => {
+    // cy.intercept("GET", logData.ValueQuery).as("value");
+    cy.get('[data-cy="index-field-search-input"]').type('code')
+    cy.get('[data-test="log-search-expand-code-field-btn"]').click()
+    cy.get('[data-test="logs-search-subfield-add-code-200"]').click()
+    cy.get('[data-cy="date-time-button"] > .q-btn__content').click()
+    cy.get('[data-test="date-time-relative-15-m-btn"]').click()
+    cy.get('[data-cy="search-bar-refresh-button"]').click()
+    cy.get('[data-test="logs-search-saved-views-btn"]').click()
+    cy.get('[data-test="add-alert-name-input"]').type('streamlogsnavigate')
+    cy.get('[data-test="saved-view-dialog-save-btn"]').click()
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[title="Explore"]:first').click({ force: true });
+    cy.url().should('include', 'logs');
+    cy.get('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon').click()
+    cy.contains('streamlogsnavigate').click()
+    cy.wait(200)
+    cy.get('[data-test="logs-search-bar-query-editor"]').then((editor) => {
+      let text = editor.text();
+      text = removeUTFCharacters(text);
+      const cleanedText = removeUTFCharacters(text);
+      expect(cleanedText).to.include(
+        "code='200'"
+      );
+    });
+    cy.get('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon').click()
+    cy.get('[data-test="logs-search-bar-delete-streamlogsnavigate-saved-view-btn"]').each(($button) => {
+      // Click on each delete button
+      cy.wrap($button).click();
+      cy.get('[data-test="confirm-button"]').click()
+    });
+ 
+  });
+
 });
