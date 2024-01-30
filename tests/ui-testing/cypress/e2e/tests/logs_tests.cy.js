@@ -254,7 +254,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.only("should add invalid query and display error", () => {
+  it("should add invalid query and display error", () => {
     // Type the value of a variable into an input field
     cy.intercept("GET", logData.ValueQuery).as("value");
 
@@ -1005,7 +1005,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it.only("should  display ingested logs - search logs, navigate on another tab, revisit logs page", () => {
+  it("should  display ingested logs - search logs, navigate on another tab, revisit logs page", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
@@ -1019,7 +1019,7 @@ describe("Logs testcases", () => {
  
   });
 
-  it.only("should redirect to logs after clicking on stream explorer via stream page", () => {
+  it("should redirect to logs after clicking on stream explorer via stream page", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -1028,7 +1028,7 @@ describe("Logs testcases", () => {
  
   });
 
-  it.only("should reset the editor on clicking reset filter button", () => {
+  it("should reset the editor on clicking reset filter button", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -1055,7 +1055,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it.only("should enter query, reset and then again click the field from LHS", () => {
+  it("should enter query, reset and then again click the field from LHS", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[aria-label="SQL Mode"]').click({ force: true });
     cy.get('[data-test="log-search-expand-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-btn"]').click({ force: true });
@@ -1064,7 +1064,7 @@ describe("Logs testcases", () => {
     cy.get(".q-notification__message").should('not.exist')
   });
 
-  it.only("should redirect to logs after clicking on stream explorer via stream page", () => {
+  it("should redirect to logs after clicking on stream explorer via stream page", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="index-field-search-input"]').type('code')
     cy.get('[data-test="log-search-expand-code-field-btn"]').click()
