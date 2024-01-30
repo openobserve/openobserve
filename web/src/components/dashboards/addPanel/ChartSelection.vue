@@ -159,6 +159,11 @@ export default defineComponent({
         title: "Gauge",
         id: "gauge",
       },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
+        title: "HTML",
+        id: "html",
+      },
     ]);
 
     const { promqlMode, dashboardPanelData } = useDashboardPanelData();

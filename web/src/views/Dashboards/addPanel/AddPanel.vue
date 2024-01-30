@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex q-gutter-sm">
         <q-btn
+          v-if="dashboardPanelData.data.type != 'html'"
           outline
           padding="sm"
           class="q-mr-sm"
@@ -72,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="savePanelData.isLoading.value"
         />
         <q-btn
+          v-if="dashboardPanelData.data.type != 'html'"
           class="q-ml-md text-bold no-border"
           data-test="dashboard-apply"
           padding="sm lg"
@@ -94,7 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <q-separator vertical />
-      <div class="col" style="width: 100%; height: 100%">
+      <!-- for query related chart only -->
+      <div
+        v-if="dashboardPanelData.data.type != 'html'"
+        class="col"
+        style="width: 100%; height: 100%"
+      >
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
           @update:model-value="layoutSplitterUpdated"
@@ -235,6 +242,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
       </div>
+      <div v-if="dashboardPanelData.data.type == 'html'" class="col">
+        <CustomHTMLEditor />
+      </div>
     </div>
   </div>
 </template>
@@ -257,6 +267,7 @@ import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.v
 import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
+import CustomHTMLEditor from "../../../components/dashboards/addPanel/customHTMLEditor.vue";
 import { useQuasar, date } from "quasar";
 
 import { useI18n } from "vue-i18n";
@@ -297,6 +308,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     DashboardQueryEditor,
     QueryInspector,
+    CustomHTMLEditor,
   },
   setup(props) {
     // This will be used to copy the chart data to the chart renderer component
