@@ -395,7 +395,7 @@ async fn query_range(
         end,
         step,
     };
-    search(org_id, timeout, &req, user_id.to_str().unwrap()).await
+    search(org_id, timeout, &req, user_email).await
 }
 
 /// prometheus query metric metadata
