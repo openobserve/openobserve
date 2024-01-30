@@ -24,22 +24,22 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
+    cluster,
     meta::stream::{FileKey, FileMeta, StreamType},
     metrics,
-    utils::parquet::{read_metadata_from_bytes, read_metadata_from_file},
+    utils::{
+        asynchronism::file::{get_file_contents, get_file_meta},
+        file::scan_files,
+        parquet::{read_metadata_from_bytes, read_metadata_from_file},
+    },
     FxIndexMap, CONFIG,
 };
+use infra::{cache, storage};
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
-    common::{
-        infra::{cache, cluster, storage, wal},
-        utils::{
-            asynchronism::file::{get_file_contents, get_file_meta},
-            file::scan_files,
-        },
-    },
+    common::infra::wal,
     service::{
         db, schema::schema_evolution, search::datafusion::exec::merge_parquet_files, stream,
     },

@@ -18,10 +18,7 @@ use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 
-use crate::{
-    common,
-    common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
-};
+use crate::common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL};
 
 pub mod json;
 pub mod otlp_grpc;
@@ -34,7 +31,7 @@ static RE_CORRECT_LABEL_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;
-    let metadata: Metadata = common::utils::json::from_str(metadata).unwrap();
+    let metadata: Metadata = config::utils::json::from_str(metadata).unwrap();
     Some(metadata)
 }
 
@@ -51,7 +48,7 @@ impl From<Signature> for String {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(
-    labels: &common::utils::json::Map<String, common::utils::json::Value>,
+    labels: &config::utils::json::Map<String, config::utils::json::Value>,
     exclude_names: &[&str],
 ) -> Signature {
     let mut labels: Vec<(&str, String)> = labels

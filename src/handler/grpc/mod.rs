@@ -16,12 +16,10 @@
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta},
+    utils::json,
 };
 
-use crate::{
-    common::{meta, utils::json},
-    service::promql,
-};
+use crate::{common::meta, service::promql};
 
 pub mod auth;
 pub mod request;

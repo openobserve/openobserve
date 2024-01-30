@@ -19,7 +19,7 @@ use ahash::AHashMap as HashMap;
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
-    utils::{parquet::new_parquet_writer, schema::infer_json_schema_from_values},
+    utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
     CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
@@ -45,6 +45,7 @@ use datafusion::{
     prelude::{cast, col, lit, Expr, SessionContext},
     scalar::ScalarValue,
 };
+use infra::cache::tmpfs;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
@@ -54,14 +55,10 @@ use super::{
     transform_udf::get_all_transform,
 };
 use crate::{
-    common::{
-        infra::cache::tmpfs,
-        meta::{
-            functions::VRLResultResolver,
-            search::{SearchType, Session as SearchSession},
-            sql,
-        },
-        utils::{flatten, json},
+    common::meta::{
+        functions::VRLResultResolver,
+        search::{SearchType, Session as SearchSession},
+        sql,
     },
     service::search::sql::Sql,
 };

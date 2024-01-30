@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::Utc;
-
-use crate::common::infra::db as infra_db;
+use infra::db as infra_db;
 
 const ITEM_PREFIXES: [&str; 13] = [
     "/user",

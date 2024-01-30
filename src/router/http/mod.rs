@@ -15,10 +15,10 @@
 
 use std::time::Duration;
 
-use ::config::{meta::cluster::Role, CONFIG};
+use ::config::{meta::cluster::Role, utils::rand::get_rand_element, CONFIG};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
-use crate::common::{infra::cluster, utils::rand::get_rand_element};
+use crate::common::infra::cluster;
 
 const QUERIER_ROUTES: [&str; 13] = [
     "/summary",

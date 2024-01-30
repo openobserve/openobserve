@@ -16,27 +16,25 @@
 use std::io::Write;
 
 use config::{
+    cluster::LOCAL_NODE_UUID,
     ider,
     meta::{
         cluster::Node,
-        stream::{FileKey, FileMeta, StreamType},
+        stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
+    utils::{file::get_file_meta as util_get_file_meta, json},
     CONFIG,
 };
 use futures::future::try_join_all;
+use infra::{
+    errors::{Error, ErrorCodes},
+    file_list, storage,
+};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::{
-            cluster,
-            errors::{Error, ErrorCodes},
-            file_list, storage,
-        },
-        meta::stream::{PartitionTimeLevel, ScanStats},
-        utils::{file::get_file_meta as util_get_file_meta, json},
-    },
+    common::{infra::cluster, meta::stream::ScanStats},
     handler::grpc::cluster_rpc,
     service::{db, search::MetadataMap},
 };
@@ -150,7 +148,7 @@ pub async fn query(
         return Ok(Vec::new());
     }
     let node = max_id_node.unwrap();
-    if node.uuid.eq(cluster::LOCAL_NODE_UUID.as_str()) {
+    if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
         // local node, no need grpc call
         let files = query_inner(
             org_id,

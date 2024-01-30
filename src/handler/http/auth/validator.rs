@@ -20,7 +20,7 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use config::CONFIG;
+use config::{utils::base64, CONFIG};
 
 use crate::{
     common::{
@@ -29,10 +29,7 @@ use crate::{
             proxy::QueryParamProxyURL,
             user::{DBUser, TokenValidationResponse, UserRole},
         },
-        utils::{
-            auth::{get_hash, is_root_user, AuthExtractor},
-            base64,
-        },
+        utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
     service::{db, users},
 };
@@ -409,8 +406,10 @@ pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor)
 
 #[cfg(test)]
 mod tests {
+    use infra::db as infra_db;
+
     use super::*;
-    use crate::common::{infra::db as infra_db, meta::user::UserRequest};
+    use crate::common::meta::user::UserRequest;
 
     #[actix_web::test]
     async fn test_validate() {

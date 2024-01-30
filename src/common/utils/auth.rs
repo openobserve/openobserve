@@ -253,11 +253,10 @@ impl FromRequest for AuthExtractor {
 
 #[cfg(test)]
 mod tests {
+    use infra::db as infra_db;
+
     use super::*;
-    use crate::{
-        common::{infra::db as infra_db, meta::user::UserRequest},
-        service::users,
-    };
+    use crate::{common::meta::user::UserRequest, service::users};
 
     #[actix_web::test]
     async fn test_is_root_user() {

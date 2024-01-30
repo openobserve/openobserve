@@ -16,6 +16,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use ahash::AHashMap;
+use config::utils::json;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringArray, StructArray},
@@ -29,7 +30,7 @@ use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
 
 use crate::{
-    common::{infra::config::QUERY_FUNCTIONS, utils::json},
+    common::infra::config::QUERY_FUNCTIONS,
     service::ingestion::{compile_vrl_function, get_string_value},
 };
 

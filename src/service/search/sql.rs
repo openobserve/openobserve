@@ -22,21 +22,19 @@ use ahash::AHashMap;
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
+    utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
+use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        infra::errors::{Error, ErrorCodes},
-        meta::{
-            sql::{Sql as MetaSql, SqlOperator},
-            stream::StreamParams,
-        },
-        utils::str::find,
+    common::meta::{
+        sql::{Sql as MetaSql, SqlOperator},
+        stream::StreamParams,
     },
     handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},

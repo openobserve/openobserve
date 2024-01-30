@@ -19,23 +19,22 @@ use std::{
 };
 
 use ahash::AHashMap as HashMap;
-use config::{ider, meta::stream::StreamType, CONFIG};
+use config::{
+    ider,
+    meta::{
+        stream::StreamType,
+        usage::{RequestStats, UsageType},
+    },
+    CONFIG,
+};
 use futures::future::try_join_all;
+use infra::errors::{Error, ErrorCodes, Result};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::{
-            cluster,
-            errors::{Error, ErrorCodes, Result},
-        },
-        meta::{
-            stream::ScanStats,
-            usage::{RequestStats, UsageType},
-        },
-    },
+    common::{infra::cluster, meta::stream::ScanStats},
     handler::grpc::cluster_rpc,
     service::{
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},

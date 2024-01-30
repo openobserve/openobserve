@@ -18,14 +18,20 @@ use std::{collections::HashMap, net::SocketAddr};
 use actix_web::{http, HttpResponse};
 use anyhow::Result;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    cluster,
+    meta::stream::StreamType,
+    metrics,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
 use crate::{
     common::{
-        infra::{cluster, config::SYSLOG_ROUTES},
+        infra::config::SYSLOG_ROUTES,
         meta::{
             alerts::Alert,
             http::HttpResponse as MetaHttpResponse,
@@ -33,7 +39,6 @@ use crate::{
             stream::{SchemaRecords, StreamParams},
             syslog::SyslogRoute,
         },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
     },
     service::{
         db, distinct_values, get_formatted_stream_name,

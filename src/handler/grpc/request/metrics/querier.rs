@@ -19,20 +19,19 @@ use config::{
     meta::stream::StreamType,
     metrics,
     utils::{
+        file::{get_file_contents, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
         schema_ext::SchemaExt,
     },
     CONFIG,
 };
+use infra::errors;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::{errors, wal},
-        utils::file::{get_file_contents, scan_files},
-    },
+    common::infra::wal,
     handler::grpc::{
         cluster_rpc::{
             metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,

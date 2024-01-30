@@ -16,7 +16,7 @@
 use sysinfo::SystemExt;
 
 /// Get cpu limit by cgroup or return the node cpu cores
-pub(crate) fn get_cpu_limit() -> usize {
+pub fn get_cpu_limit() -> usize {
     let mut cpu_num = read_cpu_cgroup_v1();
     if cpu_num == 0 {
         cpu_num = read_cpu_cgroup_v2();
@@ -35,7 +35,7 @@ pub(crate) fn get_cpu_limit() -> usize {
 }
 
 /// Get memory limit by cgroup or return the node memory size
-pub(crate) fn get_memory_limit() -> usize {
+pub fn get_memory_limit() -> usize {
     let mut mem_size = read_memory_cgroup_v1();
     if mem_size == 0 {
         mem_size = read_memory_cgroup_v2();

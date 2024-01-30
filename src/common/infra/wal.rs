@@ -17,7 +17,13 @@ use std::{path::Path, sync::Arc};
 
 use ahash::HashMap;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
-use config::{ider, meta::stream::StreamType, metrics, CONFIG, FILE_EXT_JSON};
+use config::{
+    ider,
+    meta::stream::{PartitionTimeLevel, StreamType},
+    metrics,
+    utils::asynchronism::file::get_file_contents,
+    CONFIG, FILE_EXT_JSON,
+};
 use once_cell::sync::Lazy;
 use tokio::{
     fs::{create_dir_all, File, OpenOptions},
@@ -25,11 +31,7 @@ use tokio::{
     sync::RwLock,
 };
 
-use crate::common::{
-    infra::config::SEARCHING_FILES,
-    meta::stream::{PartitionTimeLevel, StreamParams},
-    utils::asynchronism::file::get_file_contents,
-};
+use crate::common::{infra::config::SEARCHING_FILES, meta::stream::StreamParams};
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);

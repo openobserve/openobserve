@@ -15,6 +15,8 @@
 
 use std::io::{Error, ErrorKind};
 
+use config::utils::rand::generate_random_string;
+
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
@@ -25,7 +27,7 @@ use crate::{
             },
             user::UserOrg,
         },
-        utils::{auth::is_root_user, rand::generate_random_string},
+        utils::auth::is_root_user,
     },
     service::{db, stream::get_streams},
 };

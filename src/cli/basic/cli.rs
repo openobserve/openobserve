@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{utils::file::set_permission, CONFIG};
+use infra::file_list as infra_file_list;
 
 use crate::{
     cli::data::{
         cli::{args as dataArgs, Cli as dataCli},
         export, import, Context,
     },
-    common::{infra, infra::config::USERS, meta, migration, utils::file::set_permission},
+    common::{infra::config::USERS, meta, migration},
     service::{compact, db, file_list, users},
 };
 
@@ -167,7 +168,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     // reset stream stats update offset
                     db::compact::stats::set_offset(0, None).await?;
                     // reset stream stats table data
-                    infra::file_list::reset_stream_stats().await?;
+                    infra_file_list::reset_stream_stats().await?;
                     // load stream list
                     db::schema::cache().await?;
                     // update stats from file list

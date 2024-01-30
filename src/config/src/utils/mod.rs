@@ -13,10 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub(crate) mod cgroup;
-pub(crate) mod file;
+pub mod asynchronism;
+pub mod base64;
+pub mod cgroup;
+pub mod file;
+pub mod flatten;
+pub mod json;
 pub mod parquet;
 pub mod rand;
 pub mod record_batch_ext;
 pub mod schema;
 pub mod schema_ext;
+pub mod str;
+pub mod time;

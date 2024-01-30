@@ -22,23 +22,23 @@ use std::{
 
 use arrow_schema::Schema;
 use config::{
+    cluster,
     meta::stream::{FileMeta, StreamType},
     metrics,
     utils::{
+        file::scan_files,
+        json,
         parquet::new_parquet_writer,
         schema::{infer_json_schema_from_seekable, infer_json_schema_from_values},
     },
     CONFIG,
 };
 use datafusion::arrow::json::ReaderBuilder;
+use infra::storage;
 use tokio::{sync::Semaphore, task, time};
 
 use crate::{
-    common::{
-        infra::{cluster, storage, wal},
-        meta::stream::StreamParams,
-        utils::{file::scan_files, json, stream::populate_file_meta},
-    },
+    common::{infra::wal, meta::stream::StreamParams, utils::stream::populate_file_meta},
     service::{
         db, schema::schema_evolution, stream::get_stream_setting_bloom_filter_fields,
         usage::report_compression_stats,

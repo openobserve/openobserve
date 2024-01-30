@@ -17,14 +17,12 @@ use std::collections::HashSet;
 use std::io::Error;
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
+use config::utils::time::{parse_milliseconds, parse_str_to_timestamp_micros};
+use infra::errors;
 use promql_parser::parser;
 
 use crate::{
-    common::{
-        infra::errors,
-        meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::time::{parse_milliseconds, parse_str_to_timestamp_micros},
-    },
+    common::meta::{self, http::HttpResponse as MetaHttpResponse},
     service::{metrics, promql, promql::MetricsQueryRequest},
 };
 

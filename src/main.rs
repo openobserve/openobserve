@@ -26,12 +26,15 @@ use std::{
 
 use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use config::CONFIG;
+use config::{
+    cluster::{is_router, LOCAL_NODE_ROLE},
+    CONFIG,
+};
 use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{self, cluster, config::VERSION},
+        infra::{self as common_infra, cluster, config::VERSION},
         meta, migration,
         utils::zo_logger,
     },
@@ -142,7 +145,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // init config
     config::init().await.expect("config init failed");
     // init infra
-    infra::init().await.expect("infra init failed");
+    infra::init().await.expect("config init failed");
+    common_infra::init().await.expect("infra init failed");
 
     // check version upgrade
     let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
@@ -159,7 +163,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+    if is_router(&LOCAL_NODE_ROLE) {
         init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     } else {
         init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
@@ -195,7 +199,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("gRPC server stopped");
 
     // flush WAL cache to disk
-    infra::wal::flush_all_to_disk().await;
+    common_infra::wal::flush_all_to_disk().await;
     // flush compact offset cache to disk disk
     _ = db::compact::files::sync_cache_to_db().await;
     // flush db
@@ -338,7 +342,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             local_id
         );
         let mut app = App::new().wrap(prometheus.clone());
-        if cluster::is_router(&cluster::LOCAL_NODE_ROLE) {
+        if is_router(&LOCAL_NODE_ROLE) {
             app = app.service(
                 // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
                 web::scope(&CONFIG.common.base_uri)

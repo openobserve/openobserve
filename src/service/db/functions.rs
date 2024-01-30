@@ -15,13 +15,12 @@
 
 use std::sync::Arc;
 
+use config::utils::json;
+use infra::db as infra_db;
+
 use crate::common::{
-    infra::{
-        config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS},
-        db as infra_db,
-    },
+    infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS},
     meta::functions::{StreamFunctionsList, Transform},
-    utils::json,
 };
 
 pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {

@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::json;
 use opentelemetry_proto::tonic::{
     common::v1::{any_value::Value, AnyValue},
     metrics::v1::{exemplar, number_data_point},
 };
-
-use crate::common::utils::json;
 
 pub fn get_val(attr_val: &Option<&AnyValue>) -> json::Value {
     match attr_val {

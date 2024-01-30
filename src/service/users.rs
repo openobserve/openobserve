@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::ider;
+use config::{ider, utils::rand::generate_random_string};
 
 use crate::{
     common::{
@@ -28,10 +28,7 @@ use crate::{
                 DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
             },
         },
-        utils::{
-            auth::{get_hash, is_root_user},
-            rand::generate_random_string,
-        },
+        utils::auth::{get_hash, is_root_user},
     },
     service::db,
 };
@@ -488,8 +485,9 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
 
 #[cfg(test)]
 mod tests {
+    use infra::db as infra_db;
+
     use super::*;
-    use crate::common::infra::db as infra_db;
 
     async fn set_up() {
         USERS.insert(

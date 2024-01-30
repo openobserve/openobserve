@@ -24,6 +24,7 @@ use anyhow::Result;
 use config::{
     meta::stream::StreamType,
     utils::{
+        json,
         schema::{infer_json_schema, infer_json_schema_from_map},
         schema_ext::SchemaExt,
     },
@@ -33,16 +34,16 @@ use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
 };
+use infra::db::etcd;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 
 use crate::{
     common::{
-        infra::{config::LOCAL_SCHEMA_LOCKER, db::etcd},
+        infra::config::LOCAL_SCHEMA_LOCKER,
         meta::{
             authz::Authz, ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution,
         },
-        utils::json,
     },
     service::{db, search::server_internal_error},
 };

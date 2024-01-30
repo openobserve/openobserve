@@ -142,8 +142,9 @@ pub struct VRLResultResolver {
 
 #[cfg(test)]
 mod tests {
+    use config::utils::json;
+
     use super::*;
-    use crate::common::utils::json;
 
     #[test]
     fn test_functions() {

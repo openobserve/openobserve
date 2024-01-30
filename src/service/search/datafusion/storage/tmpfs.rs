@@ -18,7 +18,9 @@ use std::ops::Range;
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
+use config::utils::time::BASE_TIME;
 use futures::{stream::BoxStream, StreamExt};
+use infra::cache::tmpfs;
 use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
     ObjectStore, PutOptions, PutResult, Result,
@@ -27,7 +29,6 @@ use thiserror::Error as ThisError;
 use tokio::io::AsyncWrite;
 
 use super::GetRangeExt;
-use crate::common::{infra::cache::tmpfs, utils::time::BASE_TIME};
 
 /// A specialized `Error` for in-memory object store-related errors
 #[derive(ThisError, Debug)]

@@ -19,7 +19,14 @@ use actix_web::{http, HttpResponse};
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
-    meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG, DISTINCT_FIELDS,
+    cluster,
+    meta::{
+        stream::{PartitionTimeLevel, StreamType},
+        usage::UsageType,
+    },
+    metrics,
+    utils::{flatten, json, schema_ext::SchemaExt},
+    CONFIG, DISTINCT_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -32,16 +39,11 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, SchemaRecords},
-            traces::{Event, Span, SpanRefType},
-            usage::UsageType,
-        },
-        utils::{flatten, json},
+    common::meta::{
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        stream::SchemaRecords,
+        traces::{Event, Span, SpanRefType},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,

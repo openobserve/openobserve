@@ -17,16 +17,17 @@ use std::path::Path;
 
 use ahash::HashMap;
 use config::{
+    cluster,
     meta::{cluster::Role, stream::StreamType},
-    metrics, CONFIG,
+    metrics,
+    utils::file::scan_files,
+    CONFIG,
 };
+use infra::{cache, db::get_db};
 use tokio::time;
 
 use crate::{
-    common::{
-        infra::{cache, cluster, config::USERS},
-        utils::file::scan_files,
-    },
+    common::infra::{cluster::get_cached_online_nodes, config::USERS},
     service::db,
 };
 
@@ -99,7 +100,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
 }
 
 async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
-    let db = crate::common::infra::db::get_db().await;
+    let db = get_db().await;
     let stats = db.stats().await?;
     metrics::META_STORAGE_BYTES
         .with_label_values(&[])
@@ -112,7 +113,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         metrics::META_NUM_NODES.with_label_values(&["all"]).set(1);
     } else {
         metrics::META_NUM_NODES.reset();
-        let nodes = cluster::get_cached_online_nodes();
+        let nodes = get_cached_online_nodes();
         if nodes.is_some() {
             for node in nodes.unwrap() {
                 if cluster::is_ingester(&node.role) {

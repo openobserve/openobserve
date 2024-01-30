@@ -21,12 +21,9 @@ mod tests {
     use actix_web::{http::header::ContentType, test, web, App};
     use bytes::{Bytes, BytesMut};
     use chrono::Utc;
-    use config::CONFIG;
+    use config::{utils::json, CONFIG};
     use openobserve::{
-        common::{
-            meta::dashboards::{v1, Dashboard, Dashboards},
-            utils::json,
-        },
+        common::meta::dashboards::{v1, Dashboard, Dashboards},
         handler::http::router::*,
     };
     use prost::Message;

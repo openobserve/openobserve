@@ -21,6 +21,7 @@ use std::{
 use actix_web::HttpResponse;
 use config::{
     meta::stream::{FileMeta, StreamType},
+    utils::json,
     CONFIG, FILE_EXT_JSON,
 };
 use datafusion::{
@@ -28,8 +29,6 @@ use datafusion::{
     datasource::MemTable,
     prelude::SessionContext,
 };
-
-use crate::common::utils::json;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {

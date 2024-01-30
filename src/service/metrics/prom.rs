@@ -17,28 +17,31 @@ use std::{collections::HashMap, sync::Arc};
 
 use actix_web::web;
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
+use config::{
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
+    FxIndexMap, CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
+use infra::{
+    cache::stats,
+    errors::{Error, Result},
+};
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 
 use crate::{
     common::{
-        infra::{
-            cache::stats,
-            cluster::{self, LOCAL_NODE_UUID},
-            config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-            errors::{Error, Result},
-        },
+        infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::{
             alerts,
             functions::StreamTransform,
             prom::*,
             search,
             stream::{PartitioningDetails, SchemaRecords},
-            usage::UsageType,
         },
-        utils::{json, time::parse_i64_to_timestamp_micros},
     },
     service::{
         db, format_stream_name,
@@ -316,7 +319,7 @@ pub async fn remote_write(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
-            let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
+            let value_str = config::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
             if schema_evolved.get(&metric_name).is_none()
@@ -804,7 +807,7 @@ async fn prom_ha_handler(
             ClusterLeader {
                 name: replica_label.to_owned(),
                 last_received: curr_ts,
-                updated_by: LOCAL_NODE_UUID.to_string(),
+                updated_by: cluster::LOCAL_NODE_UUID.to_string(),
             },
         );
         _accept_record = true;

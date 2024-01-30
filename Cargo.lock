@@ -2057,12 +2057,14 @@ dependencies = [
  "arrow-json",
  "arrow-schema",
  "aws-sdk-dynamodb",
+ "base64 0.21.7",
  "byteorder",
  "bytes",
  "chrono",
  "dashmap",
  "dotenv_config",
  "dotenvy",
+ "get_if_addrs",
  "getrandom",
  "hashbrown 0.14.3",
  "hex",
@@ -2085,6 +2087,7 @@ dependencies = [
  "tracing-log 0.2.0",
  "tracing-subscriber",
  "utoipa",
+ "walkdir",
  "xxhash-rust",
 ]
 
@@ -3740,6 +3743,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e186cfbae8084e513daff4240b4797e342f988cecda4fb6c939150f96315fd8"
 
 [[package]]
+name = "infra"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.7",
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "bytes",
+ "chrono",
+ "config",
+ "datafusion",
+ "etcd-client",
+ "futures",
+ "hashlink",
+ "log",
+ "object_store",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "serde",
+ "serde_json",
+ "sled",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "ingester"
 version = "0.1.0"
 dependencies = [
@@ -4111,9 +4143,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.14"
+version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "295c17e837573c8c821dbaeb3cceb3d745ad082f7572191409e69cbc1b3fd050"
+checksum = "037731f5d3aaa87a5675e895b63ddff1a87624bc29f77004ea829809654e48f6"
 dependencies = [
  "cc",
  "pkg-config",
@@ -4771,11 +4803,7 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "awc",
- "aws-config",
- "aws-sdk-dynamodb",
- "base64 0.21.7",
  "blake3",
- "byteorder",
  "bytes",
  "chrono",
  "clap 4.4.18",
@@ -4785,8 +4813,6 @@ dependencies = [
  "dashmap",
  "datafusion",
  "datafusion-expr",
- "dotenv_config",
- "dotenvy",
  "enrichment",
  "env_logger",
  "etcd-client",
@@ -4795,21 +4821,17 @@ dependencies = [
  "flate2",
  "float-cmp",
  "futures",
- "get_if_addrs",
  "getrandom",
- "glob",
  "hashbrown 0.14.3",
- "hashlink",
  "hex",
  "http-auth-basic",
- "indexmap 2.1.0",
+ "infra",
  "ingester",
  "ipnetwork 0.20.0",
  "itertools 0.12.0",
  "jsonwebtoken",
  "log",
  "maxminddb",
- "memchr",
  "memory-stats",
  "mimalloc",
  "object_store",
@@ -4836,15 +4858,12 @@ dependencies = [
  "serde",
  "serde_json",
  "sha256",
- "sled",
  "snafu 0.7.5",
  "snap",
  "sqlparser",
- "sqlx",
  "strum",
  "sysinfo",
  "syslog_loose 0.18.0",
- "tempfile",
  "thiserror",
  "tikv-jemallocator",
  "time",
@@ -4861,8 +4880,6 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "vrl",
- "walkdir",
- "xxhash-rust",
  "zstd",
 ]
 
