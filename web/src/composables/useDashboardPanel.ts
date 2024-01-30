@@ -61,6 +61,7 @@ const getDefaultDashboardPanelData: any = () => ({
         lng: 0,
       },
     },
+    html: "<h1>html</h1>",
     queryType: "sql",
     queries: [
       {

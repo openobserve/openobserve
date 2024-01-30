@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
       <div v-if="dashboardPanelData.data.type == 'html'" class="col">
-        <CustomHTMLEditor />
+        <CustomHTMLEditor v-model="dashboardPanelData.data.html" />
       </div>
     </div>
   </div>

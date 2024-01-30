@@ -6,12 +6,22 @@
 </template>
 
 <script>
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
 
 export default defineComponent({
   name: "CustomHTMLEditor",
-  setup() {
-    const htmlContent = ref("");
+  props: {
+    modelValue: {
+      type: String,
+      default: "",
+    },
+  },
+  setup(props, { emit }) {
+    const htmlContent = ref(props.modelValue);
+
+    watch(htmlContent, (newVal) => {
+      emit("update:modelValue", newVal);
+    });
 
     return {
       htmlContent,
