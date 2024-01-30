@@ -439,7 +439,11 @@ const getSavedViews = async () => {
   });
 };
 
-const getDashboards = () => {};
+const getDashboards = () => {
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
 
 const _getGroups = async () => {
   const groups = await getGroups(store.state.selectedOrganization.identifier);
