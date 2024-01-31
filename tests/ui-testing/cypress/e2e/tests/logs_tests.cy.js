@@ -1109,10 +1109,10 @@ describe("Logs testcases", () => {
     cy.get('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
       force: true,
     });
-    cy.get('[data-test="logs-search-bar-query-editor"]').type(
+    cy.get('[data-test="logs-search-bar-query-editor"]', {timeout:2000}).type(
       "kubernetes_labels_deploy="
     );
-    cy.wait(3000)
+    cy.wait(5000)
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({force:true})
     cy.get('[data-test="logs-search-error-message"]',{timeout:2000}).should("exist");
   });
