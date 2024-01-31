@@ -68,9 +68,9 @@ pub async fn post_user(
                 "User saved successfully".to_string(),
             )))
         } else {
-            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Unable to process your request".to_string(),
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "User exists successfully".to_string(),
             )))
         }
     } else {
@@ -507,25 +507,25 @@ mod tests {
         );
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_list_users() {
         set_up().await;
         assert!(list_users("dummy").await.is_ok())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_root_user_exists() {
         set_up().await;
         assert!(!root_user_exists().await);
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_user() {
         set_up().await;
         assert!(get_user(Some("dummy"), "admin@zo.dev").await.is_some())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_post_user() {
         infra_db::create_table().await.unwrap();
         set_up().await;
@@ -547,7 +547,7 @@ mod tests {
         assert!(resp.is_ok());
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_user() {
         infra_db::create_table().await.unwrap();
         set_up().await;

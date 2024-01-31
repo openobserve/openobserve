@@ -284,7 +284,7 @@ mod tests {
     use super::*;
     use crate::common::meta::user::UserOrg;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_user() {
         let org_id = "dummy".to_string();
         let email = "user3@example.com";

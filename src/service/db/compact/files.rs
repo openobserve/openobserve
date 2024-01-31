@@ -106,7 +106,7 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_compact_files() {
         const OFFSET: i64 = 100;
         set_offset("default", "compact_file", "logs".into(), OFFSET)

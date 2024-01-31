@@ -807,7 +807,7 @@ fn split_sql_token(text: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_sql_works() {
         let org_id = "test_org";
         let col = "_timestamp";
@@ -843,7 +843,7 @@ mod tests {
         assert!(check_field_in_use(&resp, col));
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_sql_contexts() {
         let sqls = [
             ("select * from table1", true, (0, 0)),
@@ -961,7 +961,7 @@ mod tests {
         }
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_sql_full() {
         let sqls = [
             ("select * from table1", true, 0, (0, 0)),

@@ -223,7 +223,7 @@ mod tests {
 
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_create_view_post() {
         let payload = CreateViewRequest {
             data: "base64-encoded-data".into(),

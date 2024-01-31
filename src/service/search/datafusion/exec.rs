@@ -1227,14 +1227,14 @@ mod tests {
 
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_register_udf() {
         let mut ctx = SessionContext::new();
         let _ = register_udf(&mut ctx, "nexus").await;
         // assert!(res)
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_merge_write_recordbatch() {
         // define a schema.
         let schema1 = Arc::new(Schema::new(vec![
@@ -1269,7 +1269,7 @@ mod tests {
         assert!(!res.1.is_empty())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_merge() {
         // define a schema.
         let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Int32, false)]));

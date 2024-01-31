@@ -258,12 +258,12 @@ mod tests {
     use super::*;
     use crate::{common::meta::user::UserRequest, service::users};
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_is_root_user() {
         assert!(!is_root_user("dummy"));
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
         let _ = users::create_root_user(
@@ -282,7 +282,7 @@ mod tests {
         assert!(!is_root_user("root2@example.com"));
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_hash() {
         let hash =
             "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk";

@@ -724,7 +724,7 @@ mod tests {
         );
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_for_schema() {
         let stream_name = "Sample";
         let org_name = "nexus";

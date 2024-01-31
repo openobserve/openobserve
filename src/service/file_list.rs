@@ -362,7 +362,7 @@ async fn delete_parquet_file_s3(key: &str, file_list_only: bool) -> Result<(), a
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_file_meta() {
         let res = get_file_meta(
             "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet",

@@ -287,7 +287,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
 mod test_telemetry {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_telemetry_new() {
         let tel = Telemetry::new();
         let props = tel.base_info.clone();

@@ -94,7 +94,7 @@ mod tests {
     use super::*;
     use crate::common::meta::user::User;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_no_auth() {
         INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
@@ -123,7 +123,7 @@ mod tests {
         assert!(res.is_err())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_auth() {
         INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
@@ -150,7 +150,7 @@ mod tests {
         assert!(check_auth(request).is_ok())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_err_auth() {
         INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(

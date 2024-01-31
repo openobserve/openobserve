@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(file_key, 2);
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_populate_file_meta() {
         // define a schema.
         let val: i64 = 1666093521151350;

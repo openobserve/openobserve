@@ -510,7 +510,7 @@ mod tests {
             "1970/01/01/00/default"
         );
     }
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_stream_partition_keys() {
         let mut stream_schema_map = HashMap::new();
         let mut meta = HashMap::new();
@@ -527,7 +527,7 @@ mod tests {
         );
     }
 
-    #[actix_web::test]
+    #[tokio::test]
 
     async fn test_compile_vrl_function() {
         let result = compile_vrl_function(

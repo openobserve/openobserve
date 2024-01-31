@@ -411,39 +411,44 @@ mod tests {
     use super::*;
     use crate::common::meta::user::UserRequest;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_validate() {
+        let org_id = "default";
+        let user_id = "user1@example.com";
+        let init_user = "root@example.com";
+        let pwd = "Complexpass#123";
+
         infra_db::create_table().await.unwrap();
-        let _ = users::post_user(
-            "default",
+        users::create_root_user(
+            org_id,
             UserRequest {
-                email: "root@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
+                email: init_user.to_string(),
+                password: pwd.to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_external: true,
+                is_external: false,
             },
-            "root@example.com",
         )
-        .await;
-        let _ = users::post_user(
-            "default",
+        .await
+        .unwrap();
+        users::post_user(
+            org_id,
             UserRequest {
-                email: "user1@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
+                email: user_id.to_string(),
+                password: pwd.to_string(),
                 role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: true,
             },
-            "root@example.com",
+            init_user,
         )
-        .await;
+        .await
+        .unwrap();
 
-        let pwd = "Complexpass#123";
         assert!(
-            validate_credentials("root@example.com", pwd, "default/_bulk")
+            validate_credentials(init_user, pwd, "default/_bulk")
                 .await
                 .unwrap()
                 .is_valid
@@ -456,28 +461,23 @@ mod tests {
         );
         assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
         assert!(
-            !validate_credentials("user1@example.com", pwd, "/")
+            !validate_credentials(user_id, pwd, "/")
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            validate_credentials("user1@example.com", pwd, "default/user")
+            validate_credentials(user_id, pwd, "default/user")
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("user1@example.com", "x", "default/user")
+            !validate_credentials(user_id, "x", "default/user")
                 .await
                 .unwrap()
                 .is_valid
         );
-        assert!(
-            validate_user("root@example.com", pwd)
-                .await
-                .unwrap()
-                .is_valid
-        );
+        assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
     }
 }

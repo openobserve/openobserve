@@ -75,6 +75,7 @@ mod tests {
         // init config
         _ = config::init().await.unwrap();
         // init infra
+        _ = infra::init().await.unwrap();
         _ = openobserve::common::infra::init().await.unwrap();
         // ingester init
         _ = ingester::init().await.unwrap();
