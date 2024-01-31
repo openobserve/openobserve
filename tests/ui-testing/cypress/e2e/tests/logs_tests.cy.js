@@ -1110,11 +1110,11 @@ describe("Logs testcases", () => {
       force: true,
     });
     cy.get('[data-test="logs-search-bar-query-editor"]', {timeout:2000}).type(
-      "kubernetes_labels_deploy="
+      "kubernetes"
     );
     cy.wait(2000)
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({force:true})
-    cy.wait(5000)
+    cy.wait("@allsearch")
     cy.get('[data-test="logs-search-error-message"]',{timeout:2000}).should("exist");
   });
 
