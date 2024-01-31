@@ -323,7 +323,7 @@ pub async fn check_for_schema(
     let is_new = schema.fields().is_empty();
     if !is_new {
         let (is_schema_changed, field_datatype_delta, _) =
-            get_schema_changes(&schema, &inferred_schema);
+            get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
             return Ok(SchemaEvolution {
                 schema_compatible: true,
