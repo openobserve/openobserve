@@ -1522,7 +1522,6 @@ const useLogs = () => {
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
-      await getQueryPartitions();
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
