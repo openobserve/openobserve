@@ -173,7 +173,7 @@ pub struct Auth {
     pub proxy_auth_header_key: String,
     #[env_config(name = "ZO_AUTH_PROXY_AUTH_ORG", default = "default")]
     pub proxy_auth_org: String,
-    #[env_config(name = "ZO_AUTH_PROXY_ROLE", default = "admin")]
+    #[env_config(name = "ZO_AUTH_PROXY_AUTH_ROLE", default = "admin")]
     pub proxy_auth_role: String,
 }
 
