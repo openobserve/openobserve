@@ -4,14 +4,13 @@ export interface Group {
   roles: Role[];
 }
 
-type PermissionType =
+export type PermissionType =
   | "AllowAll"
   | "AllowDelete"
   | "AllowGet"
   | "AllowList"
   | "AllowPost"
-  | "AllowPut"
-  | "None";
+  | "AllowPut";
 
 export interface Permission {
   object: string; // stream:geo or stream:org_id
@@ -26,13 +25,32 @@ export interface Role {
 export interface Resource {
   name: string;
   permission: {
-    AllowAll: boolean | null;
-    AllowList: boolean | null;
-    AllowGet: boolean | null;
-    AllowDelete: boolean | null;
-    AllowPost: boolean | null;
-    AllowPut: boolean | null;
+    AllowAll: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowList: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowGet: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowDelete: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowPost: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowPut: {
+      show: boolean;
+      value: boolean | null;
+    };
   };
+  display_name: string;
   type: "resource";
   resourceName: string;
   isSelected: boolean;
@@ -41,19 +59,40 @@ export interface Resource {
   entities: Entity[];
   expand?: boolean;
   slotName?: string;
+  has_entities?: boolean;
 }
 
 export interface Entity {
   name: string;
   permission: {
-    AllowAll: boolean | null;
-    AllowGet: boolean | null;
-    AllowDelete: boolean | null;
-    AllowPut: boolean | null;
+    AllowAll: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowGet: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowDelete: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowPut: {
+      show: boolean;
+      value: boolean | null;
+    };
+    AllowList: {
+      show: boolean;
+      value: boolean | null;
+    };
   };
+  display_name: string;
+  entities?: Entity[];
+  has_entities?: boolean;
   type: "entity";
   resourceName: string;
   isSelected: boolean;
+  expand?: boolean;
 }
 
 interface User {}

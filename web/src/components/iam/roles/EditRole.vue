@@ -14,7 +14,7 @@
       <div class="o2-input flex items-end q-mb-sm justify-start">
         <q-input
           data-test="alert-list-search-input"
-          v-model="filter.searchKey"
+          v-model="filter.value"
           borderless
           filled
           dense
@@ -33,7 +33,9 @@
           bg-color="input-bg"
           class="q-py-xs q-mr-sm"
           placeholder="Select Resource"
+          map-options
           use-input
+          emit-value
           fill-input
           hide-selected
           outlined
@@ -76,6 +78,7 @@
       <permissions-table
         ref="permissionTableRef"
         :rows="permissionTableRows"
+        :filter="filter"
         @updated:permission="handlePermissionChange"
         @expand:row="expandPermission"
       />
@@ -107,7 +110,12 @@
 import { cloneDeep } from "lodash-es";
 import { ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { Resource, Entity, Permission } from "@/ts/interfaces";
+import type {
+  Resource,
+  Entity,
+  Permission,
+  PermissionType,
+} from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -128,6 +136,8 @@ import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
+import dashboardService from "@/services/dashboards";
+
 import { getGroups, getRoles } from "@/services/iam";
 
 onBeforeMount(() => {
@@ -175,155 +185,70 @@ const permissionDisplayOptions = [
 
 const filter = ref({
   resource: "",
-  searchKey: "",
+  value: "",
   permissions: "selected",
+  method: filterResources,
 });
 
-const resources = computed(() => permissionsState.resources);
+const resources = computed(() =>
+  permissionsState.resources.map((r) => {
+    return {
+      label: r.display_name,
+      value: r.key,
+    };
+  })
+);
 
 const getRoleDetails = () => {
   getResources(store.state.selectedOrganization.identifier).then(
     async (res) => {
-      const resources = [
-        {
-          key: "stream",
-          display_value: "Stream",
-          has_entities: false,
-          order: 1,
-          parent: null,
-        },
-        {
-          key: "dashboard",
-          display_value: "Dashboard",
-          has_entities: false,
-          order: 3,
-          parent: null,
-        },
-        {
-          key: "folder",
-          display_value: "Folder",
-          has_entities: false,
-          order: 6,
-          parent: "dashboard",
-        },
-        {
-          key: "syslog-route",
-          display_value: "Syslog-route",
-          has_entities: false,
-          order: 7,
-          parent: null,
-        },
-        {
-          key: "org",
-          display_value: "Org",
-          has_entities: false,
-          order: 8,
-          parent: null,
-        },
-        {
-          key: "rumtoken",
-          display_value: "Rumtoken",
-          has_entities: false,
-          order: 9,
-          parent: null,
-        },
-        {
-          key: "role",
-          display_value: "Role",
-          has_entities: false,
-          order: 10,
-          parent: null,
-        },
-        {
-          key: "enrichment_table",
-          display_value: "Enrichment table",
-          has_entities: false,
-          order: 11,
-          parent: null,
-        },
-        {
-          key: "group",
-          display_value: "Group",
-          has_entities: false,
-          order: 12,
-          parent: null,
-        },
-        {
-          key: "template",
-          display_value: "Template",
-          has_entities: false,
-          order: 13,
-          parent: null,
-        },
-        {
-          key: "function",
-          display_value: "Function",
-          has_entities: false,
-          order: 14,
-          parent: null,
-        },
-        {
-          key: "destination",
-          display_value: "Destination",
-          has_entities: false,
-          order: 15,
-          parent: null,
-        },
-        {
-          key: "user",
-          display_value: "User",
-          has_entities: false,
-          order: 16,
-          parent: null,
-        },
-        {
-          key: "settings",
-          display_value: "Settings",
-          has_entities: false,
-          order: 17,
-          parent: null,
-        },
-        {
-          key: "savedviews",
-          display_value: "Savedviews",
-          has_entities: false,
-          order: 18,
-          parent: null,
-        },
-        {
-          key: "alert",
-          display_value: "Alert",
-          has_entities: false,
-          order: 19,
-          parent: null,
-        },
-      ];
-
-      permissionsState.resources = resources.sort((a, b) => a.order - b.order);
+      permissionsState.resources = res.data
+        .sort((a: any, b: any) => a.order - b.order)
+        .filter((resource: any) => resource.visible);
       setDefaultPermissions();
       await getResourcePermissions();
       updateRolePermissions();
+      updateTableData();
     }
   );
 };
 
-const getResourceByName = (resourceName: string) => {
-  return permissionsState.permissions.find(
-    (resource: Resource) => resource.resourceName === resourceName
-  );
+const getResourceByName = (
+  resources: Resource[],
+  resourceName: string,
+  level: number = 0
+): Resource | null | undefined => {
+  for (let i = 0; i < resources.length; i++) {
+    if (resources[i].resourceName === resourceName) return resources[i];
+    else if (resources[i].childs.length) {
+      const isFound = getResourceByName(
+        resources[i].childs,
+        resourceName,
+        level + 1
+      );
+      if (isFound) return isFound;
+    }
+  }
+
+  if (!level) return null;
 };
 
 const setDefaultPermissions = () => {
   //TODO: Need to make it recursive to support multi level nested resources
   permissionsState.resources.forEach((resource: any) => {
     const resourcePermission = getDefaultResource();
-    resourcePermission.name = resource.display_value;
+    resourcePermission.name = resource.display_name;
     resourcePermission.resourceName = resource.key;
+    resourcePermission.display_name = resource.display_name;
+    if (resource.has_entities) resourcePermission.has_entities = true;
 
     resourcePermission.parent = resource.parent;
 
     if (resource.parent) {
-      const parentResource = getResourceByName(resource.parent);
+      const parentResource = getResourceByName(
+        permissionsState.permissions,
+        resource.parent
+      );
       if (parentResource) {
         parentResource.childs.push(resourcePermission as Resource);
         return;
@@ -340,12 +265,12 @@ const setDefaultPermissions = () => {
 
 const getResourcePermissions = () => {
   const promises: AxiosPromise<any>[] = [];
-  permissionsState.resources.forEach((resourceName) => {
+  permissionsState.resources.forEach((resource) => {
     promises.push(
       getResourcePermission({
         role_name: editingRole.value,
         org_identifier: store.state.selectedOrganization.identifier,
-        resource: resourceName,
+        resource: resource.key,
       })
     );
   });
@@ -365,23 +290,75 @@ const getResourcePermissions = () => {
   });
 };
 
+const getDefaultEntity = (): Entity => {
+  return {
+    name: "",
+    permission: {
+      AllowAll: {
+        show: true,
+        value: false,
+      },
+      AllowGet: {
+        show: true,
+        value: false,
+      },
+      AllowDelete: {
+        show: true,
+        value: false,
+      },
+      AllowPut: {
+        show: true,
+        value: false,
+      },
+      AllowList: {
+        show: false,
+        value: false,
+      },
+    },
+    display_name: "",
+    type: "entity",
+    resourceName: "",
+    isSelected: false,
+  };
+};
+
 const getDefaultResource = (): Resource => {
   return {
     name: "",
     permission: {
-      AllowAll: false,
-      AllowList: false,
-      AllowGet: false,
-      AllowDelete: false,
-      AllowPost: false,
-      AllowPut: false,
+      AllowAll: {
+        show: true,
+        value: false,
+      },
+      AllowList: {
+        show: true,
+        value: false,
+      },
+      AllowGet: {
+        show: true,
+        value: false,
+      },
+      AllowDelete: {
+        show: true,
+        value: false,
+      },
+      AllowPost: {
+        show: true,
+        value: false,
+      },
+      AllowPut: {
+        show: true,
+        value: false,
+      },
     },
+    display_name: "",
     parent: "",
     childs: [],
     type: "resource",
     resourceName: "",
     isSelected: false,
     entities: [],
+    has_entities: false,
   };
 };
 
@@ -389,62 +366,78 @@ const getOrgId = () => {
   return store.state.selectedOrganization.identifier;
 };
 
-const updateRolePermissions = () => {
-  console.log("updateRolePermissions");
-  let resourceMapper: { [key: string]: any } = {};
-
-  permissionsState.permissions.forEach(
-    (resource: Resource, index) =>
-      (resourceMapper[resource.resourceName] =
-        permissionsState.permissions[index])
-  );
-
+const savePermissionHash = () => {
   permissions.value.forEach((permission: Permission) => {
     const { resource, entity } = decodePermission(permission.object);
 
-    if (resourceMapper[resource]) {
-      // Creating permissions hash to check if permission is selected at the time of save as we need to send only added and removed permissions
-      const permissionHash = `${resource}:${entity}:${permission.permission}`;
-      permissionsHash.value.add(permissionHash);
-      selectedPermissionsHash.value.add(permissionHash);
+    // Creating permissions hash to check if permission is selected at the time of save as we need to send only added and removed permissions
+    const permissionHash = `${resource}:${entity}:${permission.permission}`;
+    permissionsHash.value.add(permissionHash);
+    selectedPermissionsHash.value.add(permissionHash);
+  });
+};
 
-      // Check if entity is org_id
-      if (entity === getOrgId()) {
-        resourceMapper[resource].permission[permission.permission] = true;
-      } else {
-        let _entity: Entity | null = resourceMapper[resource].entities.find(
-          (e: Entity) => e.name === entity
-        );
+const updateRolePermissions = () => {
+  savePermissionHash();
 
-        const isEntityPresent = !!_entity;
+  let resourceMapper: { [key: string]: Resource } = {};
 
-        if (!_entity) {
-          _entity = {
-            name: entity,
-            permission: {
-              AllowAll: false,
-              AllowGet: false,
-              AllowDelete: false,
-              AllowPut: false,
-            },
-            type: "entity",
-            resourceName: resource,
-            isSelected: true,
-          };
-        }
+  permissions.value.forEach((permission: Permission) => {
+    const {
+      resource,
+      entity,
+    }: {
+      resource: string;
+      entity: string;
+    } = decodePermission(permission.object);
 
-        _entity.permission[
-          permission.permission as
-            | "AllowAll"
-            | "AllowGet"
-            | "AllowDelete"
-            | "AllowPut"
-        ] = true;
+    if (!resourceMapper[resource]) {
+      resourceMapper[resource] = getResourceByName(
+        permissionsState.permissions,
+        resource
+      ) as Resource;
+    }
 
-        if (!isEntityPresent)
-          resourceMapper[resource].entities.push(cloneDeep(_entity));
-        _entity = null;
+    if (!resourceMapper[resource]) return;
+
+    if (
+      resourceMapper[resource].parent &&
+      !resourceMapper[resourceMapper[resource].parent]
+    ) {
+      resourceMapper[resourceMapper[resource].parent] = getResourceByName(
+        permissionsState.permissions,
+        resourceMapper[resource].parent
+      ) as Resource;
+    }
+
+    // Check if entity is org_id
+    if (entity === getOrgId()) {
+      resourceMapper[resource].permission[permission.permission].value = true;
+    } else {
+      let _entity: Entity | undefined = resourceMapper[resource].entities.find(
+        (e: Entity) => e.name === entity
+      );
+
+      const isEntityPresent = !!_entity;
+
+      if (!_entity) {
+        _entity = getDefaultEntity();
+        _entity.name = entity;
+        _entity.resourceName = resource;
+        _entity.isSelected = true;
       }
+
+      _entity.permission[
+        permission.permission as
+          | "AllowAll"
+          | "AllowGet"
+          | "AllowDelete"
+          | "AllowPut"
+      ].value = true;
+
+      if (!isEntityPresent)
+        resourceMapper[resource].entities.push(cloneDeep(_entity));
+      _entity = undefined;
     }
   });
 
@@ -512,51 +505,108 @@ const updateTableData = (value: string = filter.value.permissions) => {
   if (value === "all") {
     permissionTableRows.value = permissionsState.permissions;
   } else {
-    permissionTableRows.value = permissionsState.permissions.filter(
-      (permission: any) => {
-        const showResource = Object.values(permission.permission).some(
-          (permission: any) => permission
-        );
-
-        const showEntity = Object.values(permission.entities).some(
-          (entity: any) =>
-            Object.values(entity.permission).some(
-              (permission: any) => permission
-            )
-        );
-
-        permission.has_entities = showEntity;
-        permission.expand = false;
-
-        return showResource || showEntity;
-      }
-    );
+    permissionTableRows.value = filterSelectedPermissions(
+      permissionsState.permissions
+    ) as Resource[];
   }
+};
+
+const filterSelectedPermissions = (
+  permissions: (Resource | Entity)[]
+): (Resource | Entity)[] => {
+  return permissions.filter((permission: Entity | Resource) => {
+    // Check if any permission value is true
+    const showResource = Object.values(permission.permission).some(
+      (permDetail) => permDetail.value
+    );
+
+    // Check if any entity should be shown by recursively filtering
+    const filteredEntities = permission.entities?.length
+      ? filterSelectedPermissions(permission.entities)
+      : [];
+    const showEntity = filteredEntities.length > 0;
+
+    // Modify the permission object to add `has_entities` and `expand` properties
+    // permission.has_entities = showEntity;
+    permission.expand = false;
+
+    // Return true if either the permission should be shown or it has entities to be shown
+    return showResource || showEntity;
+  });
+};
+
+const filterRowsByResourceName = (
+  rows: (Resource | Entity)[],
+  resourceName: string
+) => {
+  return rows.reduce(
+    (filteredRows: (Resource | Entity)[], row: Resource | Entity) => {
+      // Check if the current row matches the filter
+      if (row.resourceName === resourceName) {
+        // If the row has nested rows, filter those as well
+        if (row.entities && row.entities.length) {
+          row.entities = filterRowsByResourceName(
+            row.entities,
+            resourceName
+          ) as Entity[];
+        }
+        // Add the row to the filtered list
+        filteredRows.push(row);
+      } else if (row.entities && row.entities.length) {
+        // Even if the current row doesn't match, there might be nested rows that do
+        const filteredEntities = filterRowsByResourceName(
+          row.entities,
+          resourceName
+        );
+        // Only add the row if it has matching nested rows
+        if (filteredEntities.length) {
+          // Optionally, you might want to clone the row here to avoid mutating the original
+          const newRow = { ...row, entities: filteredEntities };
+          filteredRows.push(newRow as Resource);
+        }
+      }
+      return filteredRows;
+    },
+    []
+  );
 };
 
 const onResourceChange = () => {
   if (!filter.value.resource) return updateTableData();
-  permissionTableRows.value = permissionTableRows.value.filter(
-    (row: any) => row.resourceName === filter.value.resource
-  );
+  updateTableData();
+  permissionTableRows.value = filterRowsByResourceName(
+    permissionTableRows.value,
+    filter.value.resource
+  ) as Resource[];
 };
 
+function filterResources(rows: any, terms: any) {
+  var filtered = [];
+  terms = terms.toLowerCase();
+  for (var i = 0; i < rows.length; i++) {
+    let isAdded = false;
+    if (rows[i]["name"].toLowerCase().includes(terms)) {
+      filtered.push(rows[i]);
+      isAdded = true;
+      continue;
+    }
+    for (var j = 0; j < rows[i].entities.length; j++) {
+      if (
+        !isAdded &&
+        rows[i].entities[j]["name"].toLowerCase().includes(terms)
+      ) {
+        filtered.push(rows[i]);
+        break;
+      }
+    }
+  }
+  return filtered;
+}
+
 const expandPermission = async (resource: any) => {
-  if (
-    filter.value.permissions === "all" &&
-    resource.type === "resource" &&
-    !resource.parent &&
-    !resource.expand
-  )
-    await getResourceEntities(resource.resourceName);
+  if (!resource.expand) await getResourceEntities(resource);
 
   resource.expand = !resource.expand;
-
-  if (resource.childs.length) {
-    resource.slotName = "resource_table";
-  } else {
-    resource.slotName = "entity_table";
-  }
 };
 
 const getPermissionHash = (
@@ -569,9 +619,14 @@ const getPermissionHash = (
   return `${resourceName}:${entity}:${permission}`;
 };
 
-const getResourceEntities = (resource: string) => {
+/**
+ *
+ * @param resource
+ * @param typeOf - Type to assign the new entities that we get from the server
+ */
+const getResourceEntities = (resource: Resource) => {
   const listEntitiesFnMap: {
-    [key: string]: () => Promise<any>;
+    [key: string]: (resource: Resource | Entity) => Promise<any>;
   } = {
     stream: getStreams,
     alert: getAlerts,
@@ -583,18 +638,45 @@ const getResourceEntities = (resource: string) => {
     savedviews: getSavedViews,
     group: _getGroups,
     role: _getRoles,
+    folder: getFolders,
     dashboard: getDashboards,
   };
 
   return new Promise(async (resolve, reject) => {
-    console.log("2");
-    await listEntitiesFnMap[resource]();
-    console.log("6");
+    await listEntitiesFnMap[resource.resourceName](resource);
     resolve(true);
   });
 };
 
 const getEnrichmentTables = () => {
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDashboards = async (resource: Entity | Resource) => {
+  const dashboards = await dashboardService.list(
+    0,
+    10000,
+    "name",
+    false,
+    "",
+    store.state.selectedOrganization.identifier,
+    resource.name
+  );
+
+  updateEntityEntities(
+    resource,
+    ["dashboardId"],
+    [
+      ...dashboards.data.dashboards.map(
+        (dash: any) => Object.values(dash).filter((dash) => dash)[0]
+      ),
+    ],
+    false,
+    "title"
+  );
+
   return new Promise((resolve) => {
     resolve(true);
   });
@@ -621,7 +703,17 @@ const getSavedViews = async () => {
   });
 };
 
-const getDashboards = () => {
+const getFolders = async () => {
+  const folders = await dashboardService.list_Folders(
+    store.state.selectedOrganization.identifier
+  );
+  updateResourceEntities(
+    "folder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name"
+  );
   return new Promise((resolve) => {
     resolve(true);
   });
@@ -705,8 +797,6 @@ const getAlerts = async () => {
 };
 
 const getStreams = async () => {
-  console.log("3");
-
   const logs = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "logs",
@@ -730,22 +820,21 @@ const getStreams = async () => {
   );
 
   return new Promise((resolve, reject) => {
-    console.log("5");
     resolve(true);
   });
 };
 
-const updateResourceEntities = (
-  resourceName: string,
+const updateEntityEntities = (
+  entity: Entity | Resource,
   entityNameKeys: string[],
-  data: any[]
+  data: any[],
+  hasEntities: boolean = false,
+  displayNameKey?: string
 ) => {
-  const resourceIndex = permissionsState.permissions.findIndex(
-    (row: any) => row.resourceName === resourceName
-  );
+  if (!entity) return;
 
-  permissionsState.permissions[resourceIndex].entities.length = 0;
-  permissionsState.permissions[resourceIndex].entities = [];
+  if (entity.entities) entity.entities.length = 0;
+  entity.entities = [];
 
   data.forEach((_entity: any) => {
     let entityName = "";
@@ -757,27 +846,134 @@ const updateResourceEntities = (
       }, "");
     }
 
-    permissionsState.permissions[resourceIndex].entities.push({
+    if (entity.entities)
+      entity.entities.push({
+        name: entityName,
+        permission: {
+          AllowAll: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(entity.resourceName, "AllowAll", entityName)
+            ),
+            show: true,
+          },
+          AllowGet: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(entity.resourceName, "AllowGet", entityName)
+            ),
+            show: true,
+          },
+          AllowDelete: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(entity.resourceName, "AllowDelete", entityName)
+            ),
+            show: true,
+          },
+          AllowPut: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(entity.resourceName, "AllowPut", entityName)
+            ),
+            show: true,
+          },
+          AllowList: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(entity.resourceName, "AllowList", entityName)
+            ),
+            show: hasEntities,
+          },
+        },
+        entities: [],
+        type: "entity",
+        resourceName: hasEntities
+          ? entity.entities[0].resourceName
+          : entity.resourceName,
+        isSelected: false,
+        has_entities: hasEntities,
+        display_name: displayNameKey ? _entity[displayNameKey] : entityName,
+      });
+  });
+
+  if (filter.value.permissions === "selected") {
+    entity.entities = filterSelectedPermissions(entity.entities) as Entity[];
+  }
+};
+
+const updateResourceEntities = (
+  resourceName: string,
+  entityNameKeys: string[],
+  data: any[],
+  hasEntities: boolean = false,
+  displayNameKey?: string
+) => {
+  const resource: Resource | null | undefined = getResourceByName(
+    permissionsState.permissions,
+    resourceName
+  );
+
+  if (!resource) return;
+
+  resource.entities.length = 0;
+  resource.entities = [];
+
+  data.forEach((_entity: any) => {
+    let entityName = "";
+    if (typeof _entity === "string") entityName = _entity;
+
+    if (typeof _entity === "object") {
+      entityName = entityNameKeys.reduce((acc, curr) => {
+        return acc ? acc + "_" + (_entity[curr] || curr) : _entity[curr];
+      }, "");
+    }
+
+    resource.entities.push({
       name: entityName,
       permission: {
-        AllowAll: selectedPermissionsHash.value.has(
-          getPermissionHash(resourceName, "AllowAll", entityName)
-        ),
-        AllowGet: selectedPermissionsHash.value.has(
-          getPermissionHash(resourceName, "AllowGet", entityName)
-        ),
-        AllowDelete: selectedPermissionsHash.value.has(
-          getPermissionHash(resourceName, "AllowDelete", entityName)
-        ),
-        AllowPut: selectedPermissionsHash.value.has(
-          getPermissionHash(resourceName, "AllowPut", entityName)
-        ),
+        AllowAll: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowAll", entityName)
+          ),
+          show: true,
+        },
+        AllowGet: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowGet", entityName)
+          ),
+          show: true,
+        },
+        AllowDelete: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowDelete", entityName)
+          ),
+          show: true,
+        },
+        AllowPut: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowPut", entityName)
+          ),
+          show: true,
+        },
+        AllowList: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowList", entityName)
+          ),
+          show: hasEntities,
+        },
       },
+      entities: [],
       type: "entity",
-      resourceName: resourceName,
+      resourceName: hasEntities
+        ? resource.childs[0].resourceName
+        : resourceName,
       isSelected: false,
+      has_entities: hasEntities,
+      display_name: displayNameKey ? _entity[displayNameKey] : entityName,
     });
   });
+
+  if (filter.value.permissions === "selected") {
+    resource.entities = filterSelectedPermissions(
+      resource.entities
+    ) as Entity[];
+  }
 };
 
 const saveRolePermissions = () => {
