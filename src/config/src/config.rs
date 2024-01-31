@@ -167,6 +167,14 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+    #[env_config(name = "ZO_AUTH_PROXY_AUTH_ENABLED", default = false)]
+    pub proxy_auth_enabled: bool,
+    #[env_config(name = "ZO_AUTH_PROXY_AUTH_HEADER_KEY", default = "ProxyAuthUser")]
+    pub proxy_auth_header_key: String,
+    #[env_config(name = "ZO_AUTH_PROXY_AUTH_ORG", default = "default")]
+    pub proxy_auth_org: String,
+    #[env_config(name = "ZO_AUTH_PROXY_ROLE", default = "admin")]
+    pub proxy_auth_role: String,
 }
 
 #[derive(EnvConfig)]

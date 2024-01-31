@@ -15,12 +15,13 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpResponse, HttpRequest};
+use config::CONFIG;
 
 use crate::{
     common::{
         meta,
-        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest},
+        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest, UserResponse, UserRole},
         utils::auth::UserEmail,
     },
     service::users,
@@ -214,5 +215,62 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
         Ok(HttpResponse::Ok().json(resp))
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
+    }
+}
+
+#[utoipa::path(
+    context_path = "/auth",
+    tag = "Users",
+    operation_id = "ProxyAuthUser",
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserResponse),
+        (status = 401, description = "Unauthoried", content_type = "application/json", body = UserResponse),
+    )
+)]
+#[get("/proxy_auth_user")]
+pub async fn proxy_auth_user(req: HttpRequest) -> Result<HttpResponse, Error> {
+    if !CONFIG.auth.proxy_auth_enabled {
+        return Ok(HttpResponse::Unauthorized().json("proxy auth not set!"));
+    }
+    if let Some(value) = req.headers().get(&CONFIG.auth.proxy_auth_header_key) {
+        let user = value.to_str().unwrap();
+        let org_id = &CONFIG.auth.proxy_auth_org;
+        let role: UserRole = CONFIG.auth.proxy_auth_role.clone().try_into().unwrap();
+
+        let user_info = match users::get_user(Some(org_id), user).await {
+            Some(user_info) => {
+                user_info
+            },
+            None => {
+                users::post_user(
+                    org_id,
+                    UserRequest {
+                        email: user.to_string(),
+                        first_name: "".to_string(),
+                        last_name: "".to_string(),
+                        password: "".to_string(),
+                        role,
+                        is_external: false,
+                    },
+                    &CONFIG.auth.root_user_email,
+                )
+                .await?;
+                if let Some(user_info) = users::get_user(Some(org_id), user).await {
+                    user_info
+                } else {
+                    return Ok(HttpResponse::Unauthorized().json("proxy auth not set!"));
+                }
+            }
+        };
+        let resp = UserResponse {
+            email: user_info.email,
+            first_name: user_info.first_name,
+            last_name: user_info.last_name,
+            role: user_info.role,
+            is_external: user_info.is_external,
+        };
+        Ok(HttpResponse::Ok().json(resp))
+    } else {
+        return Ok(HttpResponse::Unauthorized().json("proxy auth not set!"));
     }
 }

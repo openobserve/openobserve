@@ -70,6 +70,9 @@ const users = {
   getRefreshToken: () => {
     return http().get(`/api/auth/refresh_token`);
   },
+  getProxyAuthUser: () => {
+    return http().get(`/auth/proxy_auth_user`);
+  },
 };
 
 export default users;

@@ -27,7 +27,7 @@ use crate::{
         meta::{
             ingestion::INGESTION_EP,
             proxy::QueryParamProxyURL,
-            user::{DBUser, TokenValidationResponse, UserRole},
+            user::{DBUser, TokenValidationResponse, UserRequest, UserRole},
         },
         utils::{
             auth::{get_hash, is_root_user, AuthExtractor},
@@ -84,6 +84,49 @@ pub async fn validator(
         }
         Err(err) => Err((err, req)),
     }
+}
+
+pub async fn validate_proxy_auth(
+    mut req: ServiceRequest,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let header_key = &CONFIG.auth.proxy_auth_header_key;
+    let header_value = req.headers().get(header_key);
+    if header_value.is_none() {
+        return Err((ErrorUnauthorized("Unauthorized Access"), req));
+    }
+    let user_id = header_value.unwrap().to_str().unwrap().to_string();
+    let org_id = &CONFIG.auth.proxy_auth_org;
+    let role: UserRole = CONFIG
+        .auth
+        .proxy_auth_role
+        .clone()
+        .try_into()
+        .unwrap_or(UserRole::Admin);
+    let user = users::get_user(Some(org_id), &user_id).await;
+    if user.is_none() {
+        let ret = users::post_user(
+            org_id,
+            UserRequest {
+                email: user_id.clone(),
+                password: "".to_string(),
+                role,
+                first_name: "".to_owned(),
+                last_name: "".to_owned(),
+                is_external: true,
+            },
+            &CONFIG.auth.root_user_email,
+        )
+        .await;
+        if ret.is_err() {
+            log::error!("Failed to create user: {}", ret.err().unwrap());
+            return Err((ErrorUnauthorized("Unauthorized Access"), req));
+        }
+    }
+    req.headers_mut().insert(
+        header::HeaderName::from_static("user_id"),
+        header::HeaderValue::from_str(&user_id).unwrap(),
+    );
+    Ok(req)
 }
 
 /// `validate_token` validates the endpoints which are token only.
@@ -380,10 +423,13 @@ pub async fn oo_validator(
         validator(req, &username, &password, auth_info).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
+    } else if CONFIG.auth.proxy_auth_enabled {
+        validate_proxy_auth(req).await
     } else {
         Err((ErrorUnauthorized("Unauthorized Access"), req))
     }
 }
+
 #[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;

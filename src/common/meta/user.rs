@@ -199,6 +199,21 @@ pub enum UserRole {
     Viewer,
 }
 
+impl TryFrom<String> for UserRole {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "admin" => Ok(UserRole::Admin),
+            "member" => Ok(UserRole::Member),
+            "root" => Ok(UserRole::Root),
+            #[cfg(feature = "enterprise")]
+            "viewer" => Ok(UserRole::Viewer),
+            _ => Err(format!("Invalid user role: {}", value)),
+        }
+    }
+}
+
 impl fmt::Display for UserRole {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
