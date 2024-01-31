@@ -16,13 +16,13 @@
 use std::io::Error;
 
 use actix_web::{get, put, web, HttpRequest, HttpResponse};
-use ahash::AHashMap as HashMap;
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     utils::json,
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
+use hashbrown::HashMap;
 use infra::{cache, file_list};
 use serde::Serialize;
 use utoipa::ToSchema;

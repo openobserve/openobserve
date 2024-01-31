@@ -15,7 +15,6 @@
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use ahash::AHashMap;
 use config::utils::json;
 use datafusion::{
     arrow::{
@@ -26,6 +25,7 @@ use datafusion::{
     physical_plan::functions::make_scalar_function,
     prelude::create_udf,
 };
+use hashbrown::HashMap;
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
 
@@ -120,7 +120,7 @@ fn get_udf_vrl(
         let mut is_multi_value = false;
         let mut res_data_vec = vec![];
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-        let mut col_val_map: AHashMap<String, Vec<String>> = AHashMap::new();
+        let mut col_val_map: HashMap<String, Vec<String>> = HashMap::new();
 
         for i in 0..len {
             let mut obj_str = String::from("");

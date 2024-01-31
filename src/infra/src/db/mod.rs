@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{meta::meta_store::MetaStore, CONFIG};
+use hashbrown::HashMap;
 use tokio::sync::{mpsc, OnceCell};
 
 use crate::errors::{DbError, Error, Result};

@@ -15,7 +15,6 @@
 
 use std::path::Path;
 
-use ahash::HashMap;
 use config::{
     cluster,
     meta::{cluster::Role, stream::StreamType},
@@ -23,6 +22,7 @@ use config::{
     utils::file::scan_files,
     CONFIG,
 };
+use hashbrown::HashMap;
 use infra::{cache, db::get_db};
 use tokio::time;
 
@@ -71,7 +71,7 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
     let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
     let mut files = scan_files(&pattern, "parquet");
     files.extend(scan_files(&pattern, "json"));
-    let mut sizes = HashMap::default();
+    let mut sizes = HashMap::new();
     for file in files {
         let local_file = file.to_owned();
         let local_path = Path::new(&file).canonicalize().unwrap();

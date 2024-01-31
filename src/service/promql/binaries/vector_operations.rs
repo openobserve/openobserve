@@ -1,6 +1,8 @@
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
-use ahash::{HashMap, HashSet};
 use datafusion::error::{DataFusionError, Result};
 use once_cell::sync::Lazy;
 use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};

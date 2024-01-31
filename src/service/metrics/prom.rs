@@ -455,7 +455,7 @@ pub async fn remote_write(
 
 pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
     if req.limit == Some(0) {
-        return Ok(ahash::HashMap::default());
+        return Ok(hashbrown::HashMap::new());
     }
 
     let stream_type = StreamType::Metrics;
@@ -465,7 +465,7 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
             .await
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
-        let mut resp = ahash::HashMap::default();
+        let mut resp = hashbrown::HashMap::new();
         if schema != Schema::empty() {
             resp.insert(
                 metric_name,
@@ -642,7 +642,7 @@ pub(crate) async fn get_labels(
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
     };
-    let mut label_names = ahash::HashSet::default();
+    let mut label_names = hashbrown::HashSet::new();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {

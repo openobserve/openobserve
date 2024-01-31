@@ -18,7 +18,6 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use ahash::AHashMap;
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
@@ -69,7 +68,7 @@ pub struct Sql {
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
-    pub aggs: AHashMap<String, (String, MetaSql)>,
+    pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
     pub fields: Vec<String>,
     pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
@@ -502,7 +501,7 @@ impl Sql {
                 String::from("SELECT COUNT(*) as num from query"),
             );
         }
-        let mut aggs = AHashMap::new();
+        let mut aggs = hashbrown::HashMap::new();
         for (key, sql) in &req_aggs {
             let mut sql = sql.to_string();
             if let Some(caps) = RE_ONLY_FROM.captures(&sql) {

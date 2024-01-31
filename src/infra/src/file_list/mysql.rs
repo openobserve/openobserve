@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::HashMap;
 use async_trait::async_trait;
 use config::{
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     utils::parquet::parse_file_key_columns,
 };
+use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::{

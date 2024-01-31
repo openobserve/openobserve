@@ -20,7 +20,6 @@ use std::{
 };
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
-use ahash::AHashMap as HashMap;
 use chrono::Duration;
 use config::{
     cluster::{is_ingester, is_querier},
@@ -29,6 +28,7 @@ use config::{
     utils::{flatten, json, str::find},
     CONFIG,
 };
+use hashbrown::HashMap;
 use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},

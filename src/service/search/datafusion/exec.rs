@@ -15,7 +15,6 @@
 
 use std::{str::FromStr, sync::Arc};
 
-use ahash::AHashMap as HashMap;
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
@@ -45,6 +44,7 @@ use datafusion::{
     prelude::{cast, col, lit, Expr, SessionContext},
     scalar::ScalarValue,
 };
+use hashbrown::HashMap;
 use infra::cache::tmpfs;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;

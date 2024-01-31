@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use ahash::AHashMap as HashMap;
 use config::{
     is_local_disk_storage,
     meta::stream::{FileKey, PartitionTimeLevel, StreamType},
@@ -23,6 +22,7 @@ use config::{
 };
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
+use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},

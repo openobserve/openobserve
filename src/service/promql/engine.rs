@@ -15,7 +15,6 @@
 
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
-use ahash::AHashMap as HashMap;
 use async_recursion::async_recursion;
 use config::CONFIG;
 use datafusion::{
@@ -27,6 +26,7 @@ use datafusion::{
     prelude::{col, lit, SessionContext},
 };
 use futures::future::try_join_all;
+use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{

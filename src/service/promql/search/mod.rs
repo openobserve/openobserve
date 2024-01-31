@@ -18,7 +18,6 @@ use std::{
     sync::Arc,
 };
 
-use ahash::AHashMap as HashMap;
 use config::{
     ider,
     meta::{
@@ -28,6 +27,7 @@ use config::{
     CONFIG,
 };
 use futures::future::try_join_all;
+use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -279,8 +279,8 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 }
 
 fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = HashMap::default();
-    let mut merged_metrics = HashMap::default();
+    let mut merged_data = HashMap::new();
+    let mut merged_metrics = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric
@@ -289,7 +289,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
             .collect();
         let entry = merged_data
             .entry(signature(&labels))
-            .or_insert_with(HashMap::default);
+            .or_insert_with(HashMap::new);
         ser.samples.iter().for_each(|v| {
             entry.insert(v.time, v.value);
         });
@@ -316,8 +316,8 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
 }
 
 fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = HashMap::default();
-    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::default();
+    let mut merged_data = HashMap::new();
+    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric

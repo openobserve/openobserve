@@ -16,7 +16,6 @@
 use std::{collections::HashMap, io::Write, sync::Arc};
 
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
-use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     ider,
@@ -402,7 +401,7 @@ async fn merge_files(
             let schema = schema_versions[schema_ver_id]
                 .clone()
                 .with_metadata(HashMap::new());
-            let mut diff_fields = AHashMap::default();
+            let mut diff_fields = hashbrown::HashMap::new();
             let cur_fields = schema.fields();
             for field in cur_fields {
                 if let Ok(v) = schema_latest.field_with_name(field.name()) {

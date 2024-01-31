@@ -15,7 +15,6 @@
 
 use std::{io::Cursor, path::Path, sync::Arc};
 
-use ahash::AHashMap as HashMap;
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
     meta::stream::{FileKey, PartitionTimeLevel, StreamType},
@@ -30,6 +29,7 @@ use datafusion::{
     common::FileType,
 };
 use futures::future::try_join_all;
+use hashbrown::HashMap;
 use infra::{
     cache::tmpfs,
     errors::{Error, ErrorCodes},

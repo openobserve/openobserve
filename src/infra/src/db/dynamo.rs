@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use ahash::HashMap;
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
     config::Region,
@@ -27,6 +26,7 @@ use aws_sdk_dynamodb::{
 };
 use bytes::Bytes;
 use config::CONFIG;
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, OnceCell};
 

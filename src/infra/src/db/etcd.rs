@@ -21,13 +21,13 @@ use std::{
     },
 };
 
-use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{cluster, CONFIG};
 use etcd_client::{
     Certificate, DeleteOptions, EventType, GetOptions, Identity, SortOrder, SortTarget, TlsOptions,
 };
+use hashbrown::HashMap;
 use tokio::{
     sync::{mpsc, OnceCell},
     task::JoinHandle,

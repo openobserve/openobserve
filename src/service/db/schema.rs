@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use ahash::AHashSet;
 use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use datafusion::arrow::datatypes::Schema;
+use hashbrown::HashSet;
 use infra::{cache, db as infra_db};
 
 use crate::{
@@ -449,7 +449,7 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
 }
 
 pub fn list_organizations_from_cache() -> Vec<String> {
-    let mut names = AHashSet::new();
+    let mut names = HashSet::new();
     for schema in STREAM_SCHEMAS.iter() {
         if !schema.key().contains('/') {
             continue;
@@ -463,7 +463,7 @@ pub fn list_organizations_from_cache() -> Vec<String> {
 }
 
 pub fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
-    let mut names = AHashSet::new();
+    let mut names = HashSet::new();
     for schema in STREAM_SCHEMAS.iter() {
         if !schema.key().contains('/') {
             continue;

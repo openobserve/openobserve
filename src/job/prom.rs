@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap;
 use config::{cluster, CONFIG};
+use hashbrown::HashMap;
 use tokio::time::{self, Duration};
 
 use crate::{
@@ -36,7 +36,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     ));
     interval.tick().await; // trigger the first run
 
-    let mut last_leaders: AHashMap<String, ClusterLeader> = AHashMap::new(); // maintain the last state
+    let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new(); // maintain the last state
 
     loop {
         interval.tick().await;

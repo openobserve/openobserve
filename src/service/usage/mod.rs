@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use ahash::AHashMap;
 use chrono::{Datelike, Timelike, Utc};
 use config::{
     meta::{
@@ -29,6 +28,7 @@ use config::{
     utils::json,
     CONFIG, SIZE_IN_MB,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
@@ -190,7 +190,7 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     // release the write lock
     drop(usages);
 
-    let mut groups: AHashMap<GroupKey, AggregatedData> = AHashMap::new();
+    let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
     for usage_data in &curr_usages {
         let key = GroupKey {
             stream_name: usage_data.stream_name.clone(),

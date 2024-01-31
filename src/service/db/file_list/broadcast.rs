@@ -23,14 +23,15 @@ use config::{
     },
     CONFIG,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
 use crate::{common::infra::cluster, handler::grpc::cluster_rpc};
 
-static EVENTS: Lazy<RwLock<ahash::AHashMap<String, EventChannel>>> =
-    Lazy::new(|| RwLock::new(ahash::AHashMap::new()));
+static EVENTS: Lazy<RwLock<HashMap<String, EventChannel>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 type EventChannel = Arc<mpsc::UnboundedSender<Vec<FileKey>>>;
 

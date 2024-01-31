@@ -18,10 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use ahash::AHashMap;
 use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{cluster::LOCAL_NODE_UUID, ider, meta::stream::FileKey, utils::json, CONFIG};
+use hashbrown::HashMap;
 use infra::{dist_lock, storage};
 use tokio::sync::{RwLock, Semaphore};
 
@@ -222,8 +222,8 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     );
 
     // filter deleted file keys
-    let filter_file_keys: Arc<RwLock<AHashMap<String, FileKey>>> =
-        Arc::new(RwLock::new(AHashMap::default()));
+    let filter_file_keys: Arc<RwLock<HashMap<String, FileKey>>> =
+        Arc::new(RwLock::new(HashMap::new()));
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     let mut tasks = Vec::new();
     for file in file_list.clone() {

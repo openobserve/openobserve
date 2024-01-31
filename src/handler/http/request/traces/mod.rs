@@ -16,7 +16,6 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use ahash::AHashMap;
 use config::{ider, meta::stream::StreamType, metrics, utils::json, CONFIG};
 use infra::errors;
 use serde::Serialize;
@@ -133,7 +132,7 @@ pub async fn get_latest_traces(
     let session_id = ider::uuid();
 
     let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<AHashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     let filter = match query.get("filter") {
         Some(v) => v.to_string(),

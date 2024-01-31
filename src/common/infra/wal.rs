@@ -15,7 +15,6 @@
 
 use std::{path::Path, sync::Arc};
 
-use ahash::HashMap;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     ider,
@@ -24,6 +23,7 @@ use config::{
     utils::asynchronism::file::get_file_contents,
     CONFIG, FILE_EXT_JSON,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{
     fs::{create_dir_all, File, OpenOptions},

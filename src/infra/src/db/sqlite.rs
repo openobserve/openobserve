@@ -15,10 +15,10 @@
 
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use ahash::HashMap;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{cluster, FxIndexMap, CONFIG};
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
     sqlite::{

@@ -3757,6 +3757,7 @@ dependencies = [
  "datafusion",
  "etcd-client",
  "futures",
+ "hashbrown 0.14.3",
  "hashlink",
  "log",
  "object_store",

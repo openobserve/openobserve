@@ -16,13 +16,13 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
-use ahash::AHashMap as HashMap;
 use config::{
     cluster,
     meta::stream::{FileKey, StreamType},
     CONFIG,
 };
 use futures::future::try_join_all;
+use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use tracing::{info_span, Instrument};
 
