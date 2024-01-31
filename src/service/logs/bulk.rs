@@ -53,7 +53,12 @@ pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
-pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<BulkResponse> {
+pub async fn ingest(
+    org_id: &str,
+    body: web::Bytes,
+    thread_id: usize,
+    user_email: &str,
+) -> Result<BulkResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Err(anyhow!("not an ingester"));
@@ -353,6 +358,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // write to file
         let mut req_stats = write_file(&writer, &stream_name, stream_data.data).await;
         req_stats.response_time += time;
+        req_stats.user_email = Some(user_email.to_string());
         // metric + data usage
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         report_request_usage_stats(

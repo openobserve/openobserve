@@ -56,6 +56,7 @@ pub struct GroupKey {
     pub day: u32,
     pub hour: u32,
     pub event: UsageEvent,
+    pub email: String,
 }
 
 pub struct AggregatedData {
@@ -179,6 +180,8 @@ pub struct RequestStats {
     pub min_ts: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_ts: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_email: Option<String>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -190,6 +193,7 @@ impl Default for RequestStats {
             compressed_size: None,
             min_ts: None,
             max_ts: None,
+            user_email: None,
         }
     }
 }
@@ -204,6 +208,7 @@ impl From<FileMeta> for RequestStats {
             compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),
+            user_email: None,
         }
     }
 }

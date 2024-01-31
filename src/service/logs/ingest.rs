@@ -56,6 +56,7 @@ pub async fn ingest(
     in_stream_name: &str,
     in_req: IngestionRequest<'_>,
     thread_id: usize,
+    user_email: &str,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     // check stream
@@ -244,6 +245,7 @@ pub async fn ingest(
         ])
         .inc();
     req_stats.response_time = start.elapsed().as_secs_f64();
+    req_stats.user_email = Some(user_email.to_string());
 
     // report data usage
     report_request_usage_stats(

@@ -15,7 +15,7 @@
 
 use config::CONFIG;
 use http_auth_basic::Credentials;
-use tonic::{Request, Status};
+use tonic::{metadata::MetadataValue, Request, Status};
 
 use crate::common::{
     infra::{
@@ -79,6 +79,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         if user_id.eq(&user.email)
             && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
         {
+            let mut req = req;
+            let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
+            req.metadata_mut().append("user_id", user_id_metadata);
+
             Ok(req)
         } else {
             Err(Status::unauthenticated("No valid auth token"))

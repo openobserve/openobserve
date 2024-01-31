@@ -130,6 +130,12 @@ pub async fn search(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
+    let user_id = in_req.headers().get("user_id").unwrap();
+    let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
+    let resp: SearchService::sql::Sql = crate::service::search::sql::Sql::new(&rpc_req)
+        .await
+        .unwrap();
+
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
@@ -137,14 +143,6 @@ pub async fn search(
             infra::config::USERS,
             utils::auth::{is_root_user, AuthExtractor},
         };
-
-        // println!("Checking permissions on stream");
-        // For getting stream name from query to check permission
-        let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
-        let resp = crate::service::search::sql::Sql::new(&rpc_req)
-            .await
-            .unwrap();
-        let user_id = in_req.headers().get("user_id").unwrap();
 
         if !is_root_user(user_id.to_str().unwrap()) {
             let user: meta::user::User = USERS
@@ -226,18 +224,24 @@ pub async fn search(
             res.set_session_id(session_id);
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
+            println!(
+                "user {} query {}",
+                user_id.to_str().unwrap(),
+                resp.origin_sql
+            );
             let req_stats = RequestStats {
                 records: res.hits.len() as i64,
                 response_time: time,
                 size: res.scan_size as f64,
                 request_body: Some(req.query.sql),
+                user_email: Some(user_id.to_str().unwrap().to_string()),
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
             report_request_usage_stats(
                 req_stats,
                 &org_id,
-                "", // TODO see if we can steam name
+                &resp.stream_name,
                 StreamType::Logs,
                 UsageType::Search,
                 num_fn,

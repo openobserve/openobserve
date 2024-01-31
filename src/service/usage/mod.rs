@@ -65,7 +65,8 @@ pub async fn report_request_usage_stats(
         return;
     }
 
-    let request_body = usage_type.to_string();
+    let request_body = stats.request_body.unwrap_or(usage_type.to_string());
+    let user_email = stats.user_email.unwrap_or("".to_owned());
     let now = Utc::now();
 
     let mut usage = vec![];
@@ -88,7 +89,7 @@ pub async fn report_request_usage_stats(
             request_body: request_body.to_owned(),
             size: stats.size,
             unit: "MB".to_owned(),
-            user_email: "".to_owned(),
+            user_email: user_email.to_owned(),
             response_time: stats.response_time,
             num_records: stats.records * num_functions as i64,
             stream_type,
@@ -117,7 +118,7 @@ pub async fn report_request_usage_stats(
             request_body: request_body.to_owned(),
             size: stats.size,
             unit: "MB".to_owned(),
-            user_email: "".to_owned(),
+            user_email,
             response_time: stats.response_time,
             num_records: stats.records,
             stream_type,
@@ -127,6 +128,7 @@ pub async fn report_request_usage_stats(
             compressed_size: None,
         });
     };
+    println!("usage: {:?}", usage);
     if !usage.is_empty() {
         publish_usage(usage).await;
     }
@@ -192,6 +194,25 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
 
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
     for usage_data in &curr_usages {
+        // Skip aggregation for usage_data with event "Search"
+        if usage_data.event == UsageEvent::Search {
+            let key = GroupKey {
+                stream_name: usage_data.stream_name.clone(),
+                org_id: usage_data.org_id.clone(),
+                stream_type: usage_data.stream_type,
+                day: usage_data.day,
+                hour: usage_data.hour,
+                event: usage_data.event,
+                email: usage_data.user_email.clone(),
+            };
+
+            groups.entry(key).or_insert_with(|| AggregatedData {
+                count: 1,
+                usage_data: usage_data.clone(),
+            });
+            continue;
+        }
+
         let key = GroupKey {
             stream_name: usage_data.stream_name.clone(),
             org_id: usage_data.org_id.clone(),
@@ -199,6 +220,7 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
             day: usage_data.day,
             hour: usage_data.hour,
             event: usage_data.event,
+            email: usage_data.user_email.clone(),
         };
 
         let is_new = groups.contains_key(&key);

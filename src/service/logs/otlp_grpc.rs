@@ -238,6 +238,7 @@ pub async fn handle_grpc_request(
     request: ExportLogsServiceRequest,
     is_grpc: bool,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -509,6 +510,7 @@ pub async fn handle_grpc_request(
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
+    req_stats.user_email = Some(user_email.to_string());
     // metric + data usage
     report_request_usage_stats(
         req_stats,
@@ -598,8 +600,15 @@ mod tests {
             resource_logs: vec![res_logs],
         };
 
-        let result =
-            handle_grpc_request(org_id, thread_id, request, true, Some("test_stream")).await;
+        let result = handle_grpc_request(
+            org_id,
+            thread_id,
+            request,
+            true,
+            Some("test_stream"),
+            "a@a.com",
+        )
+        .await;
         assert!(result.is_ok());
     }
 }
