@@ -461,7 +461,12 @@ async fn handle_diff_schema_local_mode(
     .await
     .expect("Failed to update schema");
     if is_new {
-        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            "streams",
+            Authz::new(&format!("{stream_type}_{stream_name}")),
+        )
+        .await;
     }
     // release lock
     drop(lock_acquired);
@@ -494,125 +499,27 @@ async fn handle_diff_schema_cluster_mode(
         return None;
     };
 
-            // try getting schema
-
-            let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
-                .await
-                .unwrap();
-
-            if chk_schema.fields().is_empty() {
-                log::info!(
-                    "Setting schema for stream {} as schema is empty",
-                    stream_name
-                );
-                db::schema::set(
-                    org_id,
-                    stream_name,
-                    stream_type,
-                    &final_schema,
-                    Some(*record_ts),
-                    false,
-                )
-                .await
-                .unwrap();
-                crate::common::utils::auth::set_ownership(
-                    org_id,
-                    "streams",
-                    Authz::new(&format!("{stream_type}_{stream_name}")),
-                )
-                .await;
-                lock.unlock().await.map_err(server_internal_error).unwrap();
-                log::info!(
-                    "Releasing lock for stream {} after schema is set",
-                    stream_name
-                );
-
-                // return (true, None, final_schema.fields().to_vec());
-                return Some(SchemaEvolution {
-                    schema_compatible: true,
-                    types_delta: None,
-                    is_schema_changed: true,
-                });
-            } else {
-                stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
-                *schema = chk_schema;
-
-                lock.unlock().await.map_err(server_internal_error).unwrap();
-                log::info!(
-                    "Releasing lock for stream {} after schema is set",
-                    stream_name
-                );
-            }
-        } else {
-            let key = format!(
-                "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
-                &CONFIG.sled.prefix
-            );
-
-            let map = LOCAL_SCHEMA_LOCKER.clone(); // get a copy to read the value
-
-            let mut schema_locker = map.write().await; // lock it for writing a key for stream
-            let value = schema_locker
-                .entry(key)
-                .or_insert_with(|| tokio::sync::RwLock::new(false)); // if stream schema doesn't exist, create a new key set value as false or for existing key get the value
-
-            let lock_acquired = value.write().await; //  acquire lock for writing
-            if !*lock_acquired {
-                log::info!(
-                    "Acquired lock for stream {} as schema is empty",
-                    stream_name
-                );
-                let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
-                    .await
-                    .unwrap();
-                if chk_schema.fields().is_empty() {
-                    log::info!(
-                        "Setting schema for stream {} as schema is empty",
-                        stream_name
-                    );
-                    db::schema::set(
-                        org_id,
-                        stream_name,
-                        stream_type,
-                        &final_schema,
-                        Some(*record_ts),
-                        false,
-                    )
-                    .await
-                    .unwrap();
-                    crate::common::utils::auth::set_ownership(
-                        org_id,
-                        "streams",
-                        Authz::new(&format!("{stream_type}_{stream_name}")),
-                    )
-                    .await;
-                    drop(lock_acquired); // release lock
-                    return Some(SchemaEvolution {
-                        schema_compatible: true,
-                        types_delta: None,
-                        is_schema_changed: true,
-                    });
-                } else {
-                    // No schema change
-                    stream_schema_map.insert(stream_name.to_string(), chk_schema.clone());
-                    drop(lock_acquired); // release lock
-                    *schema = chk_schema;
-                    log::info!(
-                        "Schema exists for stream {} and No schema change",
-                        stream_name
-                    );
-                }
-            } else {
-                // Some other request has already acquired the lock.
-                //*lock_acquired = false;
-                drop(lock_acquired); // release lock
-                let chk_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
-                    .await
-                    .unwrap();
-                *schema = chk_schema;
-                log::info!("Schema exists for stream {} ,already locked", stream_name);
-            }
-        }
+    log::info!(
+        "Acquired lock for cluster stream {} to update schema",
+        stream_name
+    );
+    db::schema::set(
+        org_id,
+        stream_name,
+        stream_type,
+        &final_schema,
+        Some(record_ts),
+        !field_datatype_delta.is_empty(),
+    )
+    .await
+    .expect("Failed to update schema");
+    if is_new {
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            "streams",
+            Authz::new(&format!("{stream_type}_{stream_name}")),
+        )
+        .await;
     }
     // release lock
     lock.unlock().await.map_err(server_internal_error).unwrap();
