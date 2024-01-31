@@ -298,8 +298,8 @@ pub async fn check_for_schema(
     if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
         return Ok(SchemaEvolution {
             schema_compatible: true,
-            types_delta: None,
             is_schema_changed: false,
+            types_delta: None,
         });
     }
 
@@ -311,8 +311,8 @@ pub async fn check_for_schema(
         // return (true, None, schema.fields().to_vec());
         return Ok(SchemaEvolution {
             schema_compatible: true,
-            types_delta: None,
             is_schema_changed: false,
+            types_delta: None,
         });
     }
 
@@ -320,11 +320,25 @@ pub async fn check_for_schema(
         return Err(get_request_columns_limit_error());
     }
 
+    let is_new = schema.fields().is_empty();
+    if !is_new {
+        let (is_schema_changed, field_datatype_delta, _) =
+            get_schema_changes(&schema, &inferred_schema);
+        if !is_schema_changed {
+            return Ok(SchemaEvolution {
+                schema_compatible: true,
+                is_schema_changed: false,
+                types_delta: Some(field_datatype_delta),
+            });
+        }
+    }
+
     // slow path
     Ok(handle_diff_schema(
         org_id,
         stream_name,
         stream_type,
+        is_new,
         inferred_schema,
         record_ts,
         stream_schema_map,
@@ -332,8 +346,8 @@ pub async fn check_for_schema(
     .await
     .unwrap_or(SchemaEvolution {
         schema_compatible: true,
-        types_delta: None,
         is_schema_changed: false,
+        types_delta: None,
     }))
 }
 
@@ -342,12 +356,10 @@ async fn get_merged_schema(
     stream_name: &str,
     stream_type: StreamType,
     inferred_schema: &Schema,
-) -> Option<(bool, Vec<Field>, Schema)> {
+) -> Option<(Vec<Field>, Schema)> {
     let mut db_schema = db::schema::get_from_db(org_id, stream_name, stream_type)
         .await
         .unwrap();
-
-    let is_new = db_schema == Schema::empty();
 
     let (is_schema_changed, field_datatype_delta, merged_fields) =
         get_schema_changes(&db_schema, inferred_schema);
@@ -365,7 +377,6 @@ async fn get_merged_schema(
         );
     }
     Some((
-        is_new,
         field_datatype_delta,
         Schema::new(merged_fields).with_metadata(metadata),
     ))
@@ -375,7 +386,7 @@ async fn get_merged_schema(
 // steps:
 // 1. get schema from db, if schema is empty, set schema and return
 // 2. acquire locks
-// 3. get schema from db, 
+// 3. get schema from db,
 // 4. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 5. if db_schema is not identical to inferred_schema, merge schema and update db
 // 6. release locks
@@ -383,103 +394,139 @@ async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    is_new: bool,
     inferred_schema: Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
-    if get_merged_schema(org_id, stream_name, stream_type, &inferred_schema)
+    if CONFIG.common.local_mode {
+        handle_diff_schema_local_mode(
+            org_id,
+            stream_name,
+            stream_type,
+            is_new,
+            inferred_schema,
+            record_ts,
+            stream_schema_map,
+        )
         .await
-        .is_none()
-    {
+    } else {
+        handle_diff_schema_cluster_mode(
+            org_id,
+            stream_name,
+            stream_type,
+            is_new,
+            inferred_schema,
+            record_ts,
+            stream_schema_map,
+        )
+        .await
+    }
+}
+
+async fn handle_diff_schema_local_mode(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    is_new: bool,
+    inferred_schema: Schema,
+    record_ts: i64,
+    stream_schema_map: &mut HashMap<String, Schema>,
+) -> Option<SchemaEvolution> {
+    let key = format!(
+        "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
+        &CONFIG.sled.prefix
+    );
+    let local_map = LOCAL_SCHEMA_LOCKER.clone();
+    let mut schema_locker = local_map.write().await;
+    let locker = schema_locker
+        .entry(key)
+        .or_insert_with(|| Arc::new(tokio::sync::RwLock::new(false)));
+    let locker = locker.clone();
+    drop(schema_locker);
+    // lock acquired
+    let lock_acquired = locker.write().await;
+
+    let Some((field_datatype_delta, final_schema)) =
+        get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
+    else {
+        drop(lock_acquired);
+        return None;
+    };
+    log::info!(
+        "Acquired lock for local stream {} to update schema",
+        stream_name
+    );
+    db::schema::set(
+        org_id,
+        stream_name,
+        stream_type,
+        &final_schema,
+        Some(record_ts),
+        !field_datatype_delta.is_empty(),
+    )
+    .await
+    .expect("Failed to update schema");
+    if is_new {
+        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
+    }
+    // release lock
+    drop(lock_acquired);
+
+    stream_schema_map.insert(stream_name.to_string(), final_schema);
+    Some(SchemaEvolution {
+        schema_compatible: true,
+        is_schema_changed: true,
+        types_delta: Some(field_datatype_delta),
+    })
+}
+
+async fn handle_diff_schema_cluster_mode(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    is_new: bool,
+    inferred_schema: Schema,
+    record_ts: i64,
+    stream_schema_map: &mut HashMap<String, Schema>,
+) -> Option<SchemaEvolution> {
+    let key = format!("schema/{org_id}/{stream_type}/{stream_name}",);
+    let mut lock = etcd::Locker::new(&key);
+    lock.lock(0).await.map_err(server_internal_error).unwrap();
+
+    let Some((field_datatype_delta, final_schema)) =
+        get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
+    else {
+        lock.unlock().await.map_err(server_internal_error).unwrap();
         return None;
     };
 
-    if CONFIG.common.local_mode {
-        let key = format!(
-            "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
-            &CONFIG.sled.prefix
-        );
-        let local_map = LOCAL_SCHEMA_LOCKER.clone();
-        let mut schema_locker = local_map.write().await;
-        let lock = schema_locker
-            .entry(key)
-            .or_insert_with(|| tokio::sync::RwLock::new(false));
-
-        let lock_acquired = lock.write().await; // lock acquired
-        if let Some((is_new, field_datatype_delta, final_schema)) =
-            get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
-        {
-            log::info!(
-                "Acquired lock for local stream {} to update schema",
-                stream_name
-            );
-            let _ = db::schema::set(
-                org_id,
-                stream_name,
-                stream_type,
-                &final_schema,
-                Some(record_ts),
-                !field_datatype_delta.is_empty(),
-            )
-            .await;
-            if is_new {
-                crate::common::utils::auth::set_ownership(
-                    org_id,
-                    "streams",
-                    Authz::new(stream_name),
-                )
-                .await;
-            }
-            drop(lock_acquired); // release lock
-            stream_schema_map.insert(stream_name.to_string(), final_schema);
-            Some(SchemaEvolution {
-                schema_compatible: true,
-                types_delta: Some(field_datatype_delta),
-                is_schema_changed: true,
-            })
-        } else {
-            drop(lock_acquired);
-            None
-        }
-    } else {
-        let mut lock = etcd::Locker::new(&format!("schema/{org_id}/{stream_type}/{stream_name}"));
-        lock.lock(0).await.map_err(server_internal_error).unwrap();
-        if let Some((is_new, field_datatype_delta, final_schema)) =
-            get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
-        {
-            log::info!(
-                "Acquired lock for cluster stream {} to update schema",
-                stream_name
-            );
-            let _ = db::schema::set(
-                org_id,
-                stream_name,
-                stream_type,
-                &final_schema,
-                Some(record_ts),
-                !field_datatype_delta.is_empty(),
-            )
-            .await;
-            if is_new {
-                crate::common::utils::auth::set_ownership(
-                    org_id,
-                    "streams",
-                    Authz::new(stream_name),
-                )
-                .await;
-            }
-            lock.unlock().await.map_err(server_internal_error).unwrap();
-            stream_schema_map.insert(stream_name.to_string(), final_schema);
-            Some(SchemaEvolution {
-                schema_compatible: true,
-                types_delta: Some(field_datatype_delta),
-                is_schema_changed: true,
-            })
-        } else {
-            lock.unlock().await.map_err(server_internal_error).unwrap();
-            None
-        }
+    log::info!(
+        "Acquired lock for cluster stream {} to update schema",
+        stream_name
+    );
+    db::schema::set(
+        org_id,
+        stream_name,
+        stream_type,
+        &final_schema,
+        Some(record_ts),
+        !field_datatype_delta.is_empty(),
+    )
+    .await
+    .expect("Failed to update schema");
+    if is_new {
+        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
     }
+    // release lock
+    lock.unlock().await.map_err(server_internal_error).unwrap();
+
+    stream_schema_map.insert(stream_name.to_string(), final_schema);
+    Some(SchemaEvolution {
+        schema_compatible: true,
+        is_schema_changed: true,
+        types_delta: Some(field_datatype_delta),
+    })
 }
 
 fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>, Vec<Field>) {
