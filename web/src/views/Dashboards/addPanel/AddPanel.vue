@@ -1023,8 +1023,6 @@ export default defineComponent({
       //   });
       // }
 
-      console.log(errors, "errors");
-
       if (errors.length) {
         $q.notify({
           type: "negative",

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="html-editor" style="width: 100%; height: 100%">
+  <div class="html-editor" style="width: 100%; height: 100%; overflow: auto">
     <div v-if="editMode" style="width: 100%; height: 100%">
       <q-splitter v-model="splitterModel" style="width: 100%; height: 100%">
         <template #before>
@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               type="text"
               class="editor"
+              placeholder="Enter HTML here"
               autogrow
               :input-style="{ minHeight: 'calc(100vh - 119px)' }"
             />
@@ -45,11 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div
-      v-if="!editMode"
-      style="width: 100%; height: 100%"
-      v-html="htmlContent"
-    ></div>
+    <div v-if="!editMode" class="preview" v-html="htmlContent"></div>
   </div>
 </template>
 
@@ -109,5 +106,10 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
+}
+
+.preview {
+  height: 98%;
+  width: 100%;
 }
 </style>
