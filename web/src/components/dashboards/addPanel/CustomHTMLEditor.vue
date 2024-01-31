@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-input
               v-model="htmlContent"
               filled
-              type="textarea"
+              type="text"
               class="editor"
-              style="height: 100%"
+              autogrow
+              :input-style="{ minHeight: 'calc(100vh - 119px)' }"
             />
           </div>
         </template>
@@ -44,9 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-if="!editMode" >
-      <div v-html="htmlContent" class="preview"></div>
-    </div>
+    <div
+      v-if="!editMode"
+      style="width: 100%; height: 100%"
+      v-html="htmlContent"
+    ></div>
   </div>
 </template>
 
@@ -106,9 +109,5 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
-}
-.editor {
-  flex: 1;
-  min-height: 0;
 }
 </style>

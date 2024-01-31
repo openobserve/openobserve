@@ -163,7 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-separator />
                       <VariablesValueSelector
                         :variablesConfig="currentDashboardData.data?.variables"
-                        :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
+                        :showDynamicFilters="
+                          currentDashboardData.data?.variables
+                            ?.showDynamicFilters
+                        "
                         :selectedTimeDate="dashboardPanelData.meta.dateTime"
                         @variablesData="variablesDataUpdated"
                       />
@@ -244,14 +247,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="dashboardPanelData.data.type == 'html'"
-        class="col"
-        style="width: 100%; height: 100%"
+        class="col column"
+        style="width: 100%; height: 100%; flex: 1"
       >
         <CustomHTMLEditor
           v-model="dashboardPanelData.data.htmlContent"
           :editMode="true"
-          style="width: 100%; height: calc(100vh - 115px)"
+          style="width: 100%; height: 100%"
+          class="col"
         />
+        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
     </div>
   </div>
@@ -678,9 +683,7 @@ export default defineComponent({
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
                 .fields.y.length == 0
             ) {
-              errors.push(
-                "Add one value field for donut and pie charts"
-              );
+              errors.push("Add one value field for donut and pie charts");
             }
 
             if (
@@ -689,9 +692,7 @@ export default defineComponent({
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
                 .fields.x.length == 0
             ) {
-              errors.push(
-                "Add one label field for donut and pie charts"
-              );
+              errors.push("Add one label field for donut and pie charts");
             }
 
             break;
@@ -703,9 +704,7 @@ export default defineComponent({
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
                 .fields.y.length == 0
             ) {
-              errors.push(
-                "Add one value field for metric charts"
-              );
+              errors.push("Add one value field for metric charts");
             }
 
             if (
@@ -1025,7 +1024,6 @@ export default defineComponent({
       // }
 
       console.log(errors, "errors");
-      
 
       if (errors.length) {
         $q.notify({
