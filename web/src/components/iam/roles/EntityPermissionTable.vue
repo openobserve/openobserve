@@ -5,7 +5,7 @@
     :hide-header="true"
     class="q-mt-sm"
     :style="{
-      height: entity.expand ? '100%' : '0px',
+      height: resource.expand ? '100%' : '0px',
       transition: 'height 0.3s ease-in',
     }"
     :filter="{
@@ -15,8 +15,9 @@
   >
     <template v-slot:permission="slotProps">
       <q-checkbox
+        v-show="slotProps.column.row.permission[slotProps.columnName].show"
         size="xs"
-        v-model="slotProps.column.row.permission[slotProps.columnName]"
+        v-model="slotProps.column.row.permission[slotProps.columnName].value"
         :val="slotProps.columnName"
         class="filter-check-box cursor-pointer"
         @click="
@@ -37,7 +38,7 @@ import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";
 
 const props = defineProps({
-  entity: {
+  resource: {
     type: Object,
     default: () => {},
   },
@@ -65,7 +66,7 @@ const columns: any = [
     label: "",
     field: "expand",
     align: "center",
-    style: "width: 45px",
+    style: "width: 57px",
   },
   {
     name: "name",
@@ -82,13 +83,6 @@ const columns: any = [
     style: "width: 100px",
   },
   {
-    name: "resourceName",
-    field: "resourceName",
-    label: t("iam.resourceName"),
-    align: "left",
-    style: "width: 200px",
-  },
-  {
     name: "AllowAll",
     field: "permission",
     label: t("iam.all"),
@@ -103,6 +97,7 @@ const columns: any = [
     label: t("iam.list"),
     align: "center",
     slot: true,
+    slotName: "permission",
     style: "width: 80px",
   },
   {
@@ -142,19 +137,8 @@ const columns: any = [
   },
 ];
 
-const setPermissionTable = () => {
-  rows.value =
-    permissionsState.permissions.find(
-      (r: any) => r.resourceName === props.entity.resourceName
-    )?.entities || [];
-};
-
 const getResourceEntities = () => {
-  return (
-    permissionsState.permissions.find(
-      (r: any) => r.resourceName === props.entity.resourceName
-    )?.entities || []
-  );
+  return props.resource.entities;
 };
 
 const updateTableData = () => {
@@ -176,9 +160,8 @@ const handlePermissionChange = (row: Entity, permission: string) => {
 };
 
 watch(
-  () => props.entity.expand,
+  () => props.resource.expand,
   (val) => {
-    console.log(props.entity.name, " Expanded");
     if (val) updateTableData();
   },
   {
