@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               type="text"
               class="editor"
-              placeholder="Enter HTML here"
+              placeholder="Enter here"
               autogrow
               :input-style="{ minHeight: 'calc(100vh - 119px)' }"
             />

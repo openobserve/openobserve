@@ -635,6 +635,7 @@ export default defineComponent({
           "area-stacked",
           "metric",
           "gauge",
+          "html",
         ];
         if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
           errors.push(
@@ -1042,6 +1043,37 @@ export default defineComponent({
       if (!isValid()) {
         return;
       }
+
+      // if chart type is html, no need to save query else it will call an api call
+      if (dashboardPanelData.data.type == "html") {
+        dashboardPanelData.data.queries = [
+          {
+            query: "",
+            customQuery: false,
+            fields: {
+              stream: "",
+              stream_type: "logs",
+              x: [],
+              y: [],
+              z: [],
+              filter: [],
+              latitude: null,
+              longitude: null,
+              weight: null,
+            },
+            config: {
+              promql_legend: "",
+              layer_type: "scatter",
+              weight_fixed: 1,
+              limit: 0,
+              // gauge min and max values
+              min: 0,
+              max: 100,
+            },
+          },
+        ];
+      }
+
       if (editMode.value) {
         const errorMessageOnSave = await updatePanel(
           store,

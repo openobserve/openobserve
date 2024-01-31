@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             item.id != 'scatter' &&
             item.id != 'area-stacked' &&
             item.id != 'metric' &&
-            item.id != 'gauge'
+            item.id != 'gauge' &&
+            item.id != 'html'
           "
           :key="index"
           clickable
