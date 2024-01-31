@@ -739,7 +739,7 @@ const useLogs = () => {
 
             if (
               partitionDetail.paginations.length >
-              parseInt(searchObj.data.resultGrid.currentPage + 10)
+              searchObj.data.resultGrid.currentPage + 10
             ) {
               return true;
             }
@@ -770,7 +770,7 @@ const useLogs = () => {
 
         if (
           partitionDetail.paginations.length >
-          parseInt(searchObj.data.resultGrid.currentPage + 10)
+          searchObj.data.resultGrid.currentPage + 10
         ) {
           return true;
         }
@@ -779,182 +779,6 @@ const useLogs = () => {
       console.log(partitionDetail);
       searchObj.data.queryResults.partitionDetail = partitionDetail;
     }
-  };
-
-  // const refreshPartitionPagination = () => {
-  //   const { rowsPerPage } = searchObj.meta.resultGrid;
-  //   const { currentPage } = searchObj.data.resultGrid;
-  //   const partitionDetail = searchObj.data.queryResults.partitionDetail;
-
-  //   if (partitionDetail.paginations.length <= currentPage + 3) {
-  //     partitionDetail.paginations = [];
-
-  //     partitionDetail.partitions.some((item: any, index: number) => {
-  //       const total = partitionDetail.partitionTotal[index];
-  //       const totalPages = Math.ceil(total / rowsPerPage);
-
-  //       for (let i = 0; i < totalPages; i++) {
-  //         const recordSize =
-  //           i === totalPages - 1
-  //             ? total % rowsPerPage || rowsPerPage
-  //             : rowsPerPage;
-  //         const from = i * rowsPerPage;
-
-  //         if (!partitionDetail.paginations[i]) {
-  //           partitionDetail.paginations[i] = [];
-  //         }
-
-  //         partitionDetail.paginations[i].push({
-  //           startTime: item[0],
-  //           endTime: item[1],
-  //           from,
-  //           size: recordSize,
-  //         });
-
-  //         if (partitionDetail.paginations.length > currentPage + 10) {
-  //           return true;
-  //         }
-  //       }
-  //     });
-
-  //     // Sorting based on 'from' property
-  //     partitionDetail.paginations = partitionDetail.paginations
-  //       .flat()
-  //       .sort((a, b) => a.from - b.from);
-
-  //     console.log(partitionDetail);
-  //   }
-  // };
-
-  const refreshPartitionPaginationOld = () => {
-    let recordSize = searchObj.meta.resultGrid.rowsPerPage;
-    let nextRecordSize = searchObj.meta.resultGrid.rowsPerPage;
-    if (
-      searchObj.data.queryResults.partitionDetail.paginations.length <=
-      searchObj.data.resultGrid.currentPage + 3
-    ) {
-      searchObj.data.queryResults.partitionDetail.paginations = [];
-      let pageCount = 0;
-      searchObj.data.queryResults.partitionDetail.partitions.some(
-        (item: any, index: number) => {
-          let partitionPageNumber = 0;
-          if (
-            searchObj.data.queryResults.partitionDetail.paginations[
-              pageCount
-            ] == undefined
-          ) {
-            searchObj.data.queryResults.partitionDetail.paginations[pageCount] =
-              [];
-          }
-          if (
-            searchObj.data.queryResults.partitionDetail.partitionTotal[index] >
-            0
-          ) {
-            const totalPages = Math.ceil(
-              searchObj.data.queryResults.partitionDetail.partitionTotal[
-                searchObj.data.resultGrid.currentPage - 1
-              ] / searchObj.meta.resultGrid.rowsPerPage
-            );
-            for (let i = 0; i < totalPages; i++) {
-              if (
-                searchObj.data.queryResults.partitionDetail.paginations[
-                  pageCount
-                ] == undefined
-              ) {
-                searchObj.data.queryResults.partitionDetail.paginations[
-                  pageCount
-                ] = [];
-              }
-              if (
-                i == totalPages - 1 &&
-                pageCount > 0 &&
-                pageCount * searchObj.meta.resultGrid.rowsPerPage +
-                  searchObj.meta.resultGrid.rowsPerPage >
-                  searchObj.data.queryResults.partitionDetail.partitionTotal[
-                    index
-                  ]
-              ) {
-                recordSize =
-                  searchObj.data.queryResults.partitionDetail.partitionTotal[
-                    index
-                  ] -
-                  pageCount * searchObj.meta.resultGrid.rowsPerPage;
-                nextRecordSize = nextRecordSize - recordSize;
-              } else {
-                recordSize = Math.min(
-                  searchObj.meta.resultGrid.rowsPerPage,
-                  nextRecordSize
-                );
-                nextRecordSize = searchObj.meta.resultGrid.rowsPerPage;
-              }
-
-              searchObj.data.queryResults.partitionDetail.paginations[
-                pageCount
-              ].push({
-                startTime: item[0],
-                endTime: item[1],
-                from:
-                  partitionPageNumber * searchObj.meta.resultGrid.rowsPerPage,
-                size: recordSize,
-              });
-
-              if (nextRecordSize == searchObj.meta.resultGrid.rowsPerPage) {
-                pageCount++;
-              }
-              partitionPageNumber++;
-
-              if (
-                searchObj.data.queryResults.partitionDetail.paginations.length >
-                parseInt(searchObj.data.resultGrid.currentPage + 10)
-              ) {
-                return true;
-              }
-            }
-          } else {
-            recordSize = Math.min(
-              searchObj.meta.resultGrid.rowsPerPage,
-              nextRecordSize
-            );
-            nextRecordSize = searchObj.meta.resultGrid.rowsPerPage;
-
-            searchObj.data.queryResults.partitionDetail.paginations[
-              pageCount
-            ].push({
-              startTime: item[0],
-              endTime: item[1],
-              from: partitionPageNumber * searchObj.meta.resultGrid.rowsPerPage,
-              size: recordSize,
-            });
-
-            pageCount++;
-            partitionPageNumber++;
-          }
-
-          if (
-            searchObj.data.queryResults.partitionDetail.paginations.length >
-            parseInt(searchObj.data.resultGrid.currentPage + 10)
-          ) {
-            return true;
-          }
-          return false;
-        }
-      );
-
-      // // Convert keys to array and sort them
-      // const sortedKeys = Object.keys(
-      //   searchObj.data.queryResults.partitionDetail.paginations
-      // ).sort();
-
-      // // Create a new object using the sorted keys
-      // const data = searchObj.data.queryResults.partitionDetail.paginations;
-      // searchObj.data.queryResults.partitionDetail.paginations = {};
-      // sortedKeys.forEach((key, index) => {
-      //   data[key].from = index * searchObj.meta.resultGrid.rowsPerPage;
-      //   searchObj.data.queryResults.partitionDetail.paginations[index] =
-      //     data[key];
-      // });
-    }
-    console.log(searchObj.data.queryResults.partitionDetail);
   };
 
   const getQueryData = (isPagination = false) => {
