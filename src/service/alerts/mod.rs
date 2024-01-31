@@ -342,7 +342,7 @@ impl QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                 };
-                let resp = match promql::search::search(&alert.org_id, &req, 0).await {
+                let resp = match promql::search::search(&alert.org_id, &req, 0, "").await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok(None);

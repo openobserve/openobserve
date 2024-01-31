@@ -54,18 +54,22 @@ pub async fn bulk(
     org_id: web::Path<String>,
     body: web::Bytes,
     thread_id: web::Data<usize>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    Ok(match logs::bulk::ingest(&org_id, body, **thread_id).await {
-        Ok(v) => MetaHttpResponse::json(v),
-        Err(e) => {
-            log::error!("Error processing request: {:?}", e);
-            HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            ))
-        }
-    })
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    Ok(
+        match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
+            Ok(v) => MetaHttpResponse::json(v),
+            Err(e) => {
+                log::error!("Error processing request: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        },
+    )
 }
 
 /// _multi ingestion API
@@ -91,14 +95,17 @@ pub async fn multi(
     path: web::Path<(String, String)>,
     body: web::Bytes,
     thread_id: web::Data<usize>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
             IngestionRequest::Multi(&body),
             **thread_id,
+            user_email,
         )
         .await
         {
@@ -140,14 +147,17 @@ pub async fn json(
     path: web::Path<(String, String)>,
     body: web::Bytes,
     thread_id: web::Data<usize>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
             IngestionRequest::JSON(&body),
             **thread_id,
+            user_email,
         )
         .await
         {
@@ -189,8 +199,10 @@ pub async fn handle_kinesis_request(
     path: web::Path<(String, String)>,
     thread_id: web::Data<usize>,
     post_data: web::Json<KinesisFHRequest>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     let request_id = post_data.request_id.clone();
     let request_time = post_data
         .timestamp
@@ -201,6 +213,7 @@ pub async fn handle_kinesis_request(
             &stream_name,
             IngestionRequest::KinesisFH(&post_data.into_inner()),
             **thread_id,
+            user_email,
         )
         .await
         {
@@ -226,14 +239,17 @@ pub async fn handle_gcp_request(
     path: web::Path<(String, String)>,
     thread_id: web::Data<usize>,
     post_data: web::Json<GCPIngestionRequest>,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
+    let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     Ok(
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
             IngestionRequest::GCP(&post_data.into_inner()),
             **thread_id,
+            user_email,
         )
         .await
         {
@@ -269,16 +285,17 @@ pub async fn otlp_logs_write(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
+    let user_email = req.headers().get("user_id").unwrap().to_str().unwrap();
     let in_stream_name = req
         .headers()
         .get(&CONFIG.grpc.stream_header_key)
         .map(|header| header.to_str().unwrap());
     if content_type.eq(CONTENT_TYPE_PROTO) {
         // log::info!("otlp::logs_proto_handler");
-        logs_proto_handler(&org_id, **thread_id, body, in_stream_name).await
+        logs_proto_handler(&org_id, **thread_id, body, in_stream_name, user_email).await
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         // log::info!("otlp::logs_json_handler");
-        logs_json_handler(&org_id, **thread_id, body, in_stream_name).await
+        logs_json_handler(&org_id, **thread_id, body, in_stream_name, user_email).await
     } else {
         Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),

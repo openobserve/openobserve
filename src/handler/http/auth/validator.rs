@@ -243,6 +243,11 @@ pub async fn validator_aws(
                 match validate_credentials(&creds[0], &creds[1], path).await {
                     Ok(res) => {
                         if res.is_valid {
+                            let mut req = req;
+                            req.headers_mut().insert(
+                                header::HeaderName::from_static("user_id"),
+                                header::HeaderValue::from_str(&res.user_email).unwrap(),
+                            );
                             Ok(req)
                         } else {
                             Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -281,6 +286,11 @@ pub async fn validator_gcp(
             match validate_credentials(&creds[0], &creds[1], path).await {
                 Ok(res) => {
                     if res.is_valid {
+                        let mut req = req;
+                        req.headers_mut().insert(
+                            header::HeaderName::from_static("user_id"),
+                            header::HeaderValue::from_str(&res.user_email).unwrap(),
+                        );
                         Ok(req)
                     } else {
                         Err((ErrorUnauthorized("Unauthorized Access"), req))
