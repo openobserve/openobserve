@@ -28,7 +28,7 @@ const roles = {
 const permissions = {
   permissions: [] as Resource[],
   selectedResources: {},
-  resources: [],
+  resources: [] as any[],
 };
 
 const users = {
