@@ -19,6 +19,7 @@ use std::{
 };
 
 use actix_web::web;
+use anyhow::{anyhow, Error, Result};
 use chrono::{Duration, Utc};
 use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
 use datafusion::arrow::datatypes::Schema;
@@ -51,24 +52,18 @@ pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
-pub async fn ingest(
-    org_id: &str,
-    body: web::Bytes,
-    thread_id: usize,
-) -> Result<BulkResponse, anyhow::Error> {
+pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Err(anyhow::anyhow!("not an ingester"));
+        return Err(anyhow!("not an ingester"));
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow!("Quota exceeded for this organization"));
     }
 
     // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Err(anyhow::Error::msg(e.to_string()));
-    }
+    ingester::check_memtable_size().map_err(|e| Error::msg(e.to_string()))?;
 
     // let mut errors = false;
     let mut bulk_res = BulkResponse {
