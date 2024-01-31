@@ -651,7 +651,7 @@ const useLogs = () => {
         );
 
         searchObj.data.queryResults.partitionDetail.partitions = partitions;
-        // await refreshPartitionPagination();
+
         partitions.forEach((item: any, index: number) => {
           const pageObject = [
             {
@@ -669,14 +669,14 @@ const useLogs = () => {
       });
   };
 
-  const refreshPartitionPagination = () => {
+  const refreshPartitionPagination = (forceFlag: boolean = false) => {
     const { rowsPerPage } = searchObj.meta.resultGrid;
     const { currentPage } = searchObj.data.resultGrid;
     const partitionDetail = searchObj.data.queryResults.partitionDetail;
     let remainingRecords = rowsPerPage;
     let lastPartitionSize = 0;
 
-    if (partitionDetail.paginations.length <= currentPage + 3) {
+    if (partitionDetail.paginations.length <= currentPage + 3 || forceFlag) {
       partitionDetail.paginations = [];
 
       let pageNumber = 0;
@@ -784,13 +784,15 @@ const useLogs = () => {
         }
 
         const queryReq = buildSearch();
+
+        // reset query data and get partition detail for given query.
         if (!isPagination) {
           resetQueryData();
           await getQueryPartitions(queryReq);
-          // await refreshPartitionPagination();
         }
 
         if (queryReq != null) {
+          // in case of live refresh, reset from to 0
           if (
             searchObj.meta.refreshInterval > 0 &&
             router.currentRoute.value.name == "logs"
@@ -798,6 +800,7 @@ const useLogs = () => {
             queryReq.query.from = 0;
           }
 
+          // get funtion definition
           if (
             searchObj.data.tempFunctionContent != "" &&
             searchObj.meta.toggleFunction
@@ -807,8 +810,8 @@ const useLogs = () => {
             );
           }
 
-          // if (isPagination) dismiss = showNotification();
-
+          // in case of relative time, set start_time and end_time to query
+          // it will be used in pagination request
           if (searchObj.data.datetime.type === "relative") {
             if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
             else {
@@ -825,11 +828,15 @@ const useLogs = () => {
             }
           }
 
+          // reset errorCode
           searchObj.data.errorCode = 0;
+
+          // copy query request for histogram query and same for customDownload
           const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
           delete queryReq.aggs;
           searchObj.data.customDownloadQueryObj = queryReq;
 
+          // get the current page detail and set it into query request
           queryReq.query.start_time =
             searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
@@ -847,8 +854,36 @@ const useLogs = () => {
               searchObj.data.resultGrid.currentPage - 1
             ][0].size;
 
+          // setting subpage for pagination to handle below scenario
+          // for one particular page, if we have to fetch data from multiple partitions in that case we need to set subpage
+          // in below example we have 2 partitions and we need to fetch data from both partitions for page 2 to match recordsPerPage
+          /*
+           [
+              {
+                  "startTime": 1704869331795000,
+                  "endTime": 1705474131795000,
+                  "from": 500,
+                  "size": 34
+              },
+              {
+                  "startTime": 1705474131795000,
+                  "endTime": 1706078931795000,
+                  "from": 0,
+                  "size": 216
+              }
+            ],
+            [
+              {
+                  "startTime": 1706078931795000,
+                  "endTime": 1706683731795000,
+                  "from": 0,
+                  "size": 250
+              }
+            ]
+          */
           searchObj.data.queryResults.subpage = 1;
 
+          // based on pagination request, get the data
           await getPaginatedData(queryReq, histogramQueryReq);
         } else {
           dismiss();
@@ -886,7 +921,6 @@ const useLogs = () => {
       delete queryReq.query.track_total_hits;
     }
 
-    // queryReq.query.size = 50;
     searchService
       .search({
         org_identifier: searchObj.organizationIdetifier,
@@ -903,11 +937,13 @@ const useLogs = () => {
               ] == -1 &&
               queryReq.query.start_time == item[0]
             ) {
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] = res.data.total;
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] = res.data.total;
 
-              refreshPartitionPagination();
+              // if total records in partition is greate than recordsPerPage then we need to update pagination
+              // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+              refreshPartitionPagination(true);
             }
           }
         );
@@ -922,10 +958,6 @@ const useLogs = () => {
           } else {
             searchObj.data.queryResults.hits = res.data.hits;
           }
-
-          // if (searchObj.data.queryResults.total < res.data.total) {
-          //   searchObj.data.queryResults.total = res.data.total;
-          // }
         } else {
           resetFieldValues();
           if (
@@ -942,19 +974,6 @@ const useLogs = () => {
               searchObj.data.queryResults.hits[0]._timestamp
             );
             searchObj.data.queryResults.hits = res.data.hits;
-            // for (let i = 0; i < res.data.hits.length; i++) {
-            //   if (
-            //     lastRecordTimeStamp <
-            //     parseInt(res.data.hits[i]._timestamp)
-            //   ) {
-            //     searchObj.data.queryResults.hits.unshift(
-            //       res.data.hits[i]
-            //     );
-            //   }
-            // }
-
-            // searchObj.data.queryResults.hits =
-            //   searchObj.data.queryResults.hits.splice(0, 150);
           } else {
             if (!queryReq.query.hasOwnProperty("track_total_hits")) {
               delete res.data.total;
@@ -966,6 +985,8 @@ const useLogs = () => {
           }
         }
 
+        // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
+        // it will check for subpage and if subpage is present then it will send pagination request for next partition
         if (
           searchObj.data.queryResults.partitionDetail.paginations[
             searchObj.data.resultGrid.currentPage - 1
@@ -1041,16 +1062,6 @@ const useLogs = () => {
         }
       });
   };
-
-  // const getOfflineData = () => {
-  //   if (searchObj.data.queryResults.originalHits.length > 0) {
-  //     searchObj.data.queryResults.hits.push(
-  //       ...searchObj.data.queryResults.originalHits
-  //     );
-  //     searchObj.data.queryResults.originalHits = [];
-  //   }
-  //   return true;
-  // };
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
