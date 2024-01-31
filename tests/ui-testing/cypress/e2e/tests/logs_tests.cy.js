@@ -254,25 +254,6 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.skip("should add invalid query and display error", () => {
-    // Type the value of a variable into an input field
-    cy.intercept("GET", logData.ValueQuery).as("value");
-
-    applyQueryButton();
-    cy.get('[data-cy="date-time-button"]').click({ force: true });
-    cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
-      force: true,
-    });
-    cy.get('[data-test="logs-search-bar-query-editor"]').type(
-      "kubernetes_labels_deploy="
-    );
-    cy.wait(3000)
-    cy.get('[data-cy="search-bar-refresh-button"]', { timeout: 2000 }).click({
-      force: true,
-    });
-    cy.get('[data-test="logs-search-error-message"]',{timeout:2000}).should("exist");
-  });
-
   it("should click run query after SQL toggle on but without any query", () => {
     // Wait for 2 seconds
     cy.wait(3000);
@@ -1100,7 +1081,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it.only("should add invalid query and display error", () => {
+  it("should add invalid query and display error", () => {
     // Type the value of a variable into an input field
     cy.intercept("GET", logData.ValueQuery).as("value");
 
