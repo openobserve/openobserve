@@ -60,15 +60,15 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
-    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap(), obj.obj_id);
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
-    authorizer::set_ownership(
-        org_id,
-        &obj_str,
-        &obj.parent,
-        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap_or(&""),
-    )
-    .await;
+    let parent_type = if obj.parent_type.is_empty() {
+        ""
+    } else {
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+    };
+
+    authorizer::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
 }
 #[cfg(not(feature = "enterprise"))]
 pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
@@ -76,14 +76,15 @@ pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
-    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap(), obj.obj_id);
-    authorizer::remove_ownership(
-        org_id,
-        &obj_str,
-        &obj.parent,
-        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap_or(&""),
-    )
-    .await;
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
+
+    let parent_type = if obj.parent_type.is_empty() {
+        ""
+    } else {
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+    };
+
+    authorizer::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
 }
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
@@ -178,21 +179,25 @@ impl FromRequest for AuthExtractor {
             format!(
                 "{}:{}",
                 OFGA_MODELS
-                    .get(path_columns[url_len - 1])
-                    .unwrap_or(&path_columns[url_len - 1]),
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
                 path_columns[url_len - 2]
             )
         } else if url_len == 3 {
             if method.eq("PUT") || method.eq("DELETE") {
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
                     path_columns[2]
                 )
             } else {
                 format!(
                     "{}:{}",
-                    OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
                     path_columns[0]
                 )
             }
@@ -202,13 +207,17 @@ impl FromRequest for AuthExtractor {
             }
             format!(
                 "{}:{}",
-                OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
                 path_columns[2]
             )
         } else {
             format!(
                 "{}:{}",
-                OFGA_MODELS.get(path_columns[1]).unwrap_or(&path_columns[1]),
+                OFGA_MODELS
+                    .get(path_columns[1])
+                    .map_or(path_columns[1], |model| model.key),
                 path_columns[2]
             )
         };

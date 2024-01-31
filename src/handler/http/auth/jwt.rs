@@ -96,7 +96,7 @@ pub async fn process_token(
                     &mut tuples,
                     OFGA_MODELS
                         .iter()
-                        .map(|(_, fga_entity)| *fga_entity)
+                        .map(|(_, fga_entity)| fga_entity.key)
                         .collect(),
                     NON_OWNING_ORG.to_vec(),
                 )
