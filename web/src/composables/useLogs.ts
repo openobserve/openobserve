@@ -49,6 +49,7 @@ import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import { start } from "repl";
 import search from "@/services/search";
+import { AlertList } from "@/components/alerts";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -625,8 +626,8 @@ const useLogs = () => {
     }
   }
 
-  const getQueryPartitions = async () => {
-    const queryReq = buildSearch();
+  const getQueryPartitions = async (queryReq: any) => {
+    // const queryReq = buildSearch();
 
     const partitionQueryReq: any = {
       sql: queryReq.query.sql,
@@ -640,89 +641,320 @@ const useLogs = () => {
         query: partitionQueryReq,
         page_type: searchObj.data.stream.streamType,
       })
-      .then((res) => {
+      .then(async (res) => {
         searchObj.data.queryResults.partitionDetail = {
           partitions: [],
-          totalRecords: [],
-          pagination: [],
+          partitionTotal: [],
+          paginations: [],
         };
-        searchObj.data.queryResults.partitionDetail.partitions =
-          res.data.partitions;
 
-        res.data.partitions.forEach((item: any, index: number) => {
-          searchObj.data.queryResults.partitionDetail.totalRecords.push(0);
-          searchObj.data.queryResults.partitionDetail.pagination[
-            item[0] + "0"
-          ] = {
-            startTime: item[0],
-            endTime: item[1],
-            from: 0,
-          };
+        searchObj.data.queryResults.total = res.data.records;
+        const partitions = res.data.partitions.sort(
+          (a: number[], b: number[]) => a[0] - b[0]
+        );
+
+        searchObj.data.queryResults.partitionDetail.partitions = partitions;
+        // await refreshPartitionPagination();
+        partitions.forEach((item: any, index: number) => {
+          const pageObject = [
+            {
+              startTime: item[0],
+              endTime: item[1],
+              from: 0,
+              size: searchObj.meta.resultGrid.rowsPerPage,
+            },
+          ];
+          searchObj.data.queryResults.partitionDetail.paginations.push(
+            pageObject
+          );
+          searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
         });
-
-        // Convert keys to array and sort them
-        const sortedKeys = Object.keys(
-          searchObj.data.queryResults.partitionDetail.pagination
-        ).sort();
-
-        // Create a new object using the sorted keys
-        const data = searchObj.data.queryResults.partitionDetail.pagination;
-        searchObj.data.queryResults.partitionDetail.pagination = {};
-        sortedKeys.forEach((key, index) => {
-          data[key].from = index * searchObj.meta.resultGrid.rowsPerPage;
-          searchObj.data.queryResults.partitionDetail.pagination[index] =
-            data[key];
-        });
-
-        // refreshPartitionPagination();
-        console.log(searchObj.data.queryResults.partitionDetail.pagination);
+        console.log(
+          "Original:",
+          JSON.parse(
+            JSON.stringify(searchObj.data.queryResults.partitionDetail)
+          )
+        );
       });
   };
 
   const refreshPartitionPagination = () => {
-    searchObj.data.queryResults.partitionDetail.partitions.forEach(
-      (item: any, index: number) => {
-        let combineCount = 0;
-        if (
-          searchObj.data.queryResults.partitionDetail.totalRecords[index] > 0
-        ) {
-          const totalPages =
-            searchObj.data.queryResults.partitionDetail.totalRecords[index] /
-            searchObj.meta.resultGrid.rowsPerPage;
+    const { rowsPerPage } = searchObj.meta.resultGrid;
+    const { currentPage } = searchObj.data.resultGrid;
+    const partitionDetail = searchObj.data.queryResults.partitionDetail;
+    let remainingRecords = rowsPerPage;
+    let lastPartitionSize = 0;
+
+    if (partitionDetail.paginations.length <= currentPage + 3) {
+      partitionDetail.paginations = [];
+
+      let pageNumber = 0;
+      partitionDetail.partitions.forEach((item: any, index: number) => {
+        const total = partitionDetail.partitionTotal[index];
+        const totalPages = Math.ceil(total / rowsPerPage);
+        if (!partitionDetail.paginations[pageNumber]) {
+          partitionDetail.paginations[pageNumber] = [];
+        }
+        if (totalPages > 0) {
+          let partitionFrom = 0;
           for (let i = 0; i < totalPages; i++) {
-            searchObj.data.queryResults.partitionDetail.pagination[
-              item[0] + i
-            ] = {
+            remainingRecords = rowsPerPage;
+            let recordSize =
+              i === totalPages - 1
+                ? total - partitionFrom || rowsPerPage
+                : rowsPerPage;
+            const from = partitionFrom;
+
+            // if (i === 0 && partitionDetail.paginations.length > 0) {
+            lastPartitionSize = 0;
+            if (pageNumber > 0) {
+              const lastPage = partitionDetail.paginations.length - 1;
+
+              partitionDetail.paginations[lastPage].forEach((item: any) => {
+                lastPartitionSize += item.size;
+              });
+              if (lastPartitionSize != rowsPerPage) {
+                recordSize = rowsPerPage - lastPartitionSize;
+              }
+            }
+            if (!partitionDetail.paginations[pageNumber]) {
+              partitionDetail.paginations[pageNumber] = [];
+            }
+
+            partitionDetail.paginations[pageNumber].push({
               startTime: item[0],
               endTime: item[1],
-              from: combineCount * searchObj.meta.resultGrid.rowsPerPage,
-            };
+              from,
+              size: Math.min(recordSize, rowsPerPage),
+            });
+
+            partitionFrom += recordSize;
+
+            if (
+              recordSize == rowsPerPage ||
+              lastPartitionSize + recordSize == rowsPerPage
+            ) {
+              pageNumber++;
+            }
+
+            if (
+              partitionDetail.paginations.length >
+              parseInt(searchObj.data.resultGrid.currentPage + 10)
+            ) {
+              return true;
+            }
           }
         } else {
-          searchObj.data.queryResults.partitionDetail.pagination[
-            item[0] + "0"
-          ] = {
+          lastPartitionSize = 0;
+          let recordSize = rowsPerPage;
+          const lastPage = partitionDetail.paginations.length - 1;
+
+          partitionDetail.paginations[lastPage].forEach((item: any) => {
+            lastPartitionSize += item.size;
+          });
+          if (lastPartitionSize != rowsPerPage) {
+            recordSize = rowsPerPage - lastPartitionSize;
+          }
+          const from = 0;
+
+          partitionDetail.paginations[pageNumber].push({
             startTime: item[0],
             endTime: item[1],
-            from: combineCount * searchObj.meta.resultGrid.rowsPerPage,
-          };
+            from,
+            size: recordSize,
+          });
+
+          pageNumber++;
+          remainingRecords = rowsPerPage;
         }
-        combineCount++;
-      }
-    );
 
-    // Convert keys to array and sort them
-    const sortedKeys = Object.keys(
-      searchObj.data.queryResults.partitionDetail.pagination
-    ).sort();
+        if (
+          partitionDetail.paginations.length >
+          parseInt(searchObj.data.resultGrid.currentPage + 10)
+        ) {
+          return true;
+        }
+      });
 
-    // Create a new object using the sorted keys
-    const data = searchObj.data.queryResults.partitionDetail.pagination;
-    searchObj.data.queryResults.partitionDetail.pagination = {};
-    sortedKeys.forEach((key, index) => {
-      data[key].from = index * searchObj.meta.resultGrid.rowsPerPage;
-      searchObj.data.queryResults.partitionDetail.pagination[index] = data[key];
-    });
+      console.log(partitionDetail);
+      searchObj.data.queryResults.partitionDetail = partitionDetail;
+    }
+  };
+
+  // const refreshPartitionPagination = () => {
+  //   const { rowsPerPage } = searchObj.meta.resultGrid;
+  //   const { currentPage } = searchObj.data.resultGrid;
+  //   const partitionDetail = searchObj.data.queryResults.partitionDetail;
+
+  //   if (partitionDetail.paginations.length <= currentPage + 3) {
+  //     partitionDetail.paginations = [];
+
+  //     partitionDetail.partitions.some((item: any, index: number) => {
+  //       const total = partitionDetail.partitionTotal[index];
+  //       const totalPages = Math.ceil(total / rowsPerPage);
+
+  //       for (let i = 0; i < totalPages; i++) {
+  //         const recordSize =
+  //           i === totalPages - 1
+  //             ? total % rowsPerPage || rowsPerPage
+  //             : rowsPerPage;
+  //         const from = i * rowsPerPage;
+
+  //         if (!partitionDetail.paginations[i]) {
+  //           partitionDetail.paginations[i] = [];
+  //         }
+
+  //         partitionDetail.paginations[i].push({
+  //           startTime: item[0],
+  //           endTime: item[1],
+  //           from,
+  //           size: recordSize,
+  //         });
+
+  //         if (partitionDetail.paginations.length > currentPage + 10) {
+  //           return true;
+  //         }
+  //       }
+  //     });
+
+  //     // Sorting based on 'from' property
+  //     partitionDetail.paginations = partitionDetail.paginations
+  //       .flat()
+  //       .sort((a, b) => a.from - b.from);
+
+  //     console.log(partitionDetail);
+  //   }
+  // };
+
+  const refreshPartitionPaginationOld = () => {
+    let recordSize = searchObj.meta.resultGrid.rowsPerPage;
+    let nextRecordSize = searchObj.meta.resultGrid.rowsPerPage;
+    if (
+      searchObj.data.queryResults.partitionDetail.paginations.length <=
+      searchObj.data.resultGrid.currentPage + 3
+    ) {
+      searchObj.data.queryResults.partitionDetail.paginations = [];
+      let pageCount = 0;
+      searchObj.data.queryResults.partitionDetail.partitions.some(
+        (item: any, index: number) => {
+          let partitionPageNumber = 0;
+          if (
+            searchObj.data.queryResults.partitionDetail.paginations[
+              pageCount
+            ] == undefined
+          ) {
+            searchObj.data.queryResults.partitionDetail.paginations[pageCount] =
+              [];
+          }
+          if (
+            searchObj.data.queryResults.partitionDetail.partitionTotal[index] >
+            0
+          ) {
+            const totalPages = Math.ceil(
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                searchObj.data.resultGrid.currentPage - 1
+              ] / searchObj.meta.resultGrid.rowsPerPage
+            );
+            for (let i = 0; i < totalPages; i++) {
+              if (
+                searchObj.data.queryResults.partitionDetail.paginations[
+                  pageCount
+                ] == undefined
+              ) {
+                searchObj.data.queryResults.partitionDetail.paginations[
+                  pageCount
+                ] = [];
+              }
+              if (
+                i == totalPages - 1 &&
+                pageCount > 0 &&
+                pageCount * searchObj.meta.resultGrid.rowsPerPage +
+                  searchObj.meta.resultGrid.rowsPerPage >
+                  searchObj.data.queryResults.partitionDetail.partitionTotal[
+                    index
+                  ]
+              ) {
+                recordSize =
+                  searchObj.data.queryResults.partitionDetail.partitionTotal[
+                    index
+                  ] -
+                  pageCount * searchObj.meta.resultGrid.rowsPerPage;
+                nextRecordSize = nextRecordSize - recordSize;
+              } else {
+                recordSize = Math.min(
+                  searchObj.meta.resultGrid.rowsPerPage,
+                  nextRecordSize
+                );
+                nextRecordSize = searchObj.meta.resultGrid.rowsPerPage;
+              }
+
+              searchObj.data.queryResults.partitionDetail.paginations[
+                pageCount
+              ].push({
+                startTime: item[0],
+                endTime: item[1],
+                from:
+                  partitionPageNumber * searchObj.meta.resultGrid.rowsPerPage,
+                size: recordSize,
+              });
+
+              if (nextRecordSize == searchObj.meta.resultGrid.rowsPerPage) {
+                pageCount++;
+              }
+              partitionPageNumber++;
+
+              if (
+                searchObj.data.queryResults.partitionDetail.paginations.length >
+                parseInt(searchObj.data.resultGrid.currentPage + 10)
+              ) {
+                return true;
+              }
+            }
+          } else {
+            recordSize = Math.min(
+              searchObj.meta.resultGrid.rowsPerPage,
+              nextRecordSize
+            );
+            nextRecordSize = searchObj.meta.resultGrid.rowsPerPage;
+
+            searchObj.data.queryResults.partitionDetail.paginations[
+              pageCount
+            ].push({
+              startTime: item[0],
+              endTime: item[1],
+              from: partitionPageNumber * searchObj.meta.resultGrid.rowsPerPage,
+              size: recordSize,
+            });
+
+            pageCount++;
+            partitionPageNumber++;
+          }
+
+          if (
+            searchObj.data.queryResults.partitionDetail.paginations.length >
+            parseInt(searchObj.data.resultGrid.currentPage + 10)
+          ) {
+            return true;
+          }
+          return false;
+        }
+      );
+
+      // // Convert keys to array and sort them
+      // const sortedKeys = Object.keys(
+      //   searchObj.data.queryResults.partitionDetail.paginations
+      // ).sort();
+
+      // // Create a new object using the sorted keys
+      // const data = searchObj.data.queryResults.partitionDetail.paginations;
+      // searchObj.data.queryResults.partitionDetail.paginations = {};
+      // sortedKeys.forEach((key, index) => {
+      //   data[key].from = index * searchObj.meta.resultGrid.rowsPerPage;
+      //   searchObj.data.queryResults.partitionDetail.paginations[index] =
+      //     data[key];
+      // });
+    }
+    console.log(searchObj.data.queryResults.partitionDetail);
   };
 
   const getQueryData = (isPagination = false) => {
@@ -737,17 +969,12 @@ const useLogs = () => {
           return;
         }
 
+        const queryReq = buildSearch();
         if (!isPagination) {
           resetQueryData();
-          await getQueryPartitions();
+          await getQueryPartitions(queryReq);
+          // await refreshPartitionPagination();
         }
-
-        // if (searchObj.data.searchAround.histogramHide) {
-        //   searchObj.data.searchAround.histogramHide = false;
-        //   searchObj.meta.showHistogram = true;
-        // }
-
-        const queryReq = buildSearch();
 
         if (queryReq != null) {
           if (
@@ -790,19 +1017,25 @@ const useLogs = () => {
           searchObj.data.customDownloadQueryObj = queryReq;
 
           queryReq.query.start_time =
-            searchObj.data.queryResults.partitionDetail.pagination[
+            searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].startTime;
+            ][0].startTime;
           queryReq.query.end_time =
-            searchObj.data.queryResults.partitionDetail.pagination[
+            searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].endTime;
+            ][0].endTime;
           queryReq.query.from =
-            searchObj.data.queryResults.partitionDetail.pagination[
+            searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].from;
+            ][0].from;
+          queryReq.query.size =
+            searchObj.data.queryResults.partitionDetail.paginations[
+              searchObj.data.resultGrid.currentPage - 1
+            ][0].size;
 
-            getPaginatedData(queryReq, histogramQueryReq);
+          searchObj.data.queryResults.subpage = 1;
+
+          await getPaginatedData(queryReq, histogramQueryReq);
 
           // searchService
           //   .search({
@@ -859,8 +1092,8 @@ const useLogs = () => {
           //     if (
           //       res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage
           //     ) {
-          //       searchObj.data.queryResults.currentPage =
-          //         searchObj.data.queryResults.currentPage + 1;
+          //       searchObj.data.resultGrid.currentPage =
+          //         searchObj.data.resultGrid.currentPage + 1;
           //       await getQueryData(true);
           //     }
 
@@ -935,7 +1168,29 @@ const useLogs = () => {
     });
   };
 
-  const getPaginatedData = async (queryReq: any, histogramQueryReq: any) => {
+  const getPaginatedData = async (
+    queryReq: any,
+    histogramQueryReq: any,
+    appendResult: boolean = false
+  ) => {
+    // set track_total_hits true for first request of partition to get total records in partition
+    // it will be used to send pagination request
+    if (
+      searchObj.data.queryResults.partitionDetail.partitionTotal[
+        searchObj.data.resultGrid.currentPage - 1
+      ] == -1
+    ) {
+      queryReq.query.track_total_hits = true;
+    } else if (
+      searchObj.data.queryResults.partitionDetail.partitionTotal[
+        searchObj.data.resultGrid.currentPage - 1
+      ] > -1 &&
+      queryReq.query.hasOwnProperty("track_total_hits")
+    ) {
+      delete queryReq.query.track_total_hits;
+    }
+
+    // queryReq.query.size = 50;
     searchService
       .search({
         org_identifier: searchObj.organizationIdetifier,
@@ -943,15 +1198,61 @@ const useLogs = () => {
         page_type: searchObj.data.stream.streamType,
       })
       .then(async (res) => {
+        // check for total records update for the partition and update pagination accordingly
+        searchObj.data.queryResults.partitionDetail.partitions.forEach(
+          (item: any, index: number) => {
+            if (
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] == -1 &&
+              queryReq.query.start_time == item[0]
+            ) {
+                searchObj.data.queryResults.partitionDetail.partitionTotal[
+                  index
+                ] = res.data.total;
+
+              refreshPartitionPagination();
+            }
+          }
+        );
+        // if (
+        //   searchObj.data.queryResults.partitionDetail.partitionTotal[
+        //     searchObj.data.resultGrid.currentPage - 1
+        //   ] == -1
+        // ) {
+        //   if (searchObj.data.resultGrid.currentPage - 1 > 0) {
+        //     searchObj.data.queryResults.partitionDetail.partitionTotal[
+        //       searchObj.data.resultGrid.currentPage - 1
+        //     ] = res.data.total;
+        //   } else {
+        //     searchObj.data.queryResults.partitionDetail.partitionTotal[
+        //       searchObj.data.resultGrid.currentPage - 1
+        //     ] = 267;
+        //   }
+
+        //   refreshPartitionPagination();
+        // }
+
+        // searchObj.data.queryResults.originalHits = res.data.hits.splice(
+        //   100,
+        //   res.data.hits.length
+        // );
+        // res.data.hits = res.data.hits.splice(0, 100);
+
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
           searchObj.data.queryResults.scan_size = res.data.scan_size;
           searchObj.data.queryResults.took = res.data.took;
-          // searchObj.data.queryResults.hits.push(...res.data.hits);
-          searchObj.data.queryResults.hits = res.data.hits;
-          if (searchObj.data.queryResults.total < res.data.total) {
-            searchObj.data.queryResults.total = res.data.total;
+
+          if (appendResult) {
+            searchObj.data.queryResults.hits.push(...res.data.hits);
+          } else {
+            searchObj.data.queryResults.hits = res.data.hits;
           }
+
+          // if (searchObj.data.queryResults.total < res.data.total) {
+          //   searchObj.data.queryResults.total = res.data.total;
+          // }
         } else {
           resetFieldValues();
           if (
@@ -982,26 +1283,41 @@ const useLogs = () => {
             // searchObj.data.queryResults.hits =
             //   searchObj.data.queryResults.hits.splice(0, 150);
           } else {
-            searchObj.data.queryResults = res.data;
+            if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+              delete res.data.total;
+            }
+            searchObj.data.queryResults = {
+              ...searchObj.data.queryResults,
+              ...res.data,
+            };
           }
         }
 
-        if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
-          searchObj.data.queryResults.currentPage =
-            searchObj.data.queryResults.currentPage + 1;
+        if (
+          searchObj.data.queryResults.partitionDetail.paginations[
+            searchObj.data.resultGrid.currentPage - 1
+          ].length > searchObj.data.queryResults.subpage
+        ) {
           queryReq.query.start_time =
-            searchObj.data.queryResults.partitionDetail.pagination[
+            searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].startTime;
+            ][searchObj.data.queryResults.subpage].startTime;
           queryReq.query.end_time =
-            searchObj.data.queryResults.partitionDetail.pagination[
+            searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].endTime;
+            ][searchObj.data.queryResults.subpage].endTime;
           queryReq.query.from =
-            searchObj.data.queryResults.partitionDetail.pagination[
+            searchObj.data.queryResults.partitionDetail.paginations[
               searchObj.data.resultGrid.currentPage - 1
-            ].from;
-          await getPaginatedData(queryReq, histogramQueryReq);
+            ][searchObj.data.queryResults.subpage].from;
+          queryReq.query.size =
+            searchObj.data.queryResults.partitionDetail.paginations[
+              searchObj.data.resultGrid.currentPage - 1
+            ][searchObj.data.queryResults.subpage].size;
+
+          searchObj.data.queryResults.subpage++;
+
+          await getPaginatedData(queryReq, histogramQueryReq, true);
         }
 
         updateFieldValues();
@@ -1009,29 +1325,11 @@ const useLogs = () => {
         //extract fields from query response
         extractFields();
 
-        // if (isPagination) {
-        //   searchObj.data.histogram.chartParams.title =
-        //     getHistogramTitle();
-        // }
-
         //update grid columns
         updateGridColumns();
-        if (
-          res.data.hits.length > 0 &&
-          histogramQueryReq.hasOwnProperty("aggs")
-        ) {
-          getHistogramQueryData(histogramQueryReq);
-        }
 
         // disabled histogram case, generate histogram histogram title
-        if (
-          searchObj.data.resultGrid.currentPage == 1 &&
-          (searchObj.meta.showHistogram === false ||
-            searchObj.meta.sqlMode)
-        ) {
-          searchObj.data.histogram.chartParams.title =
-            getHistogramTitle();
-        }
+        searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
         searchObj.data.functionError = "";
         if (
@@ -1041,7 +1339,18 @@ const useLogs = () => {
           searchObj.data.functionError = res.data.function_error;
         }
 
+        if (
+          (searchObj.data.queryResults.aggs == undefined ||
+            searchObj.data.resultGrid.currentPage == 1) &&
+          searchObj.loadingHistogram == false &&
+          searchObj.meta.showHistogram == true &&
+          searchObj.meta.sqlMode == false
+        ) {
+          getHistogramQueryData(histogramQueryReq);
+        }
+
         searchObj.loading = false;
+        return;
       })
       .catch((err) => {
         searchObj.loading = false;
@@ -1059,6 +1368,16 @@ const useLogs = () => {
         }
       });
   };
+
+  // const getOfflineData = () => {
+  //   if (searchObj.data.queryResults.originalHits.length > 0) {
+  //     searchObj.data.queryResults.hits.push(
+  //       ...searchObj.data.queryResults.originalHits
+  //     );
+  //     searchObj.data.queryResults.originalHits = [];
+  //   }
+  //   return true;
+  // };
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
@@ -1111,27 +1430,31 @@ const useLogs = () => {
   };
 
   const updateFieldValues = () => {
-    const excludedFields = [
-      store.state.zoConfig.timestamp_column,
-      "log",
-      "msg",
-    ];
-    searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
-      // Create set for each field values and add values to corresponding set
-      Object.keys(item).forEach((key) => {
-        if (excludedFields.includes(key)) {
-          return;
-        }
+    try {
+      const excludedFields = [
+        store.state.zoConfig.timestamp_column,
+        "log",
+        "msg",
+      ];
+      searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
+        // Create set for each field values and add values to corresponding set
+        Object.keys(item).forEach((key) => {
+          if (excludedFields.includes(key)) {
+            return;
+          }
 
-        if (fieldValues.value[key] == undefined) {
-          fieldValues.value[key] = new Set();
-        }
+          if (fieldValues.value[key] == undefined) {
+            fieldValues.value[key] = new Set();
+          }
 
-        if (!fieldValues.value[key].has(item[key])) {
-          fieldValues.value[key].add(item[key]);
-        }
+          if (!fieldValues.value[key].has(item[key])) {
+            fieldValues.value[key].add(item[key]);
+          }
+        });
       });
-    });
+    } catch (e: any) {
+      console.log("Error while updating field values", e);
+    }
   };
 
   const resetFieldValues = () => {
@@ -1291,7 +1614,10 @@ const useLogs = () => {
   function getHistogramTitle() {
     const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
-    const endCount = startCount + searchObj.data.queryResults.hits.length - 1;
+    const endCount = Math.min(
+      startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+      searchObj.data.queryResults.total
+    );
     const title =
       "Showing " +
       startCount +
@@ -1334,7 +1660,8 @@ const useLogs = () => {
       }
 
       const chartParams = {
-        title: getHistogramTitle(),
+        title:
+          searchObj.data.histogram.chartParams.title || getHistogramTitle(),
         unparsed_x_data: unparsed_x_data,
         timezone: store.state.timezone,
       };
@@ -1522,7 +1849,6 @@ const useLogs = () => {
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
-      await getQueryPartitions();
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -1709,6 +2035,7 @@ const useLogs = () => {
     generateURLQuery,
     buildSearch,
     loadStreamLists,
+    refreshPartitionPagination,
   };
 };
 
