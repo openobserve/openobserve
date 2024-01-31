@@ -68,9 +68,9 @@ pub async fn post_user(
                 "User saved successfully".to_string(),
             )))
         } else {
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "User exists successfully".to_string(),
+            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                "User already exists".to_string(),
             )))
         }
     } else {
