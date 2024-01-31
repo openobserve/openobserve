@@ -368,14 +368,7 @@ async fn get_merged_schema(
         return None;
     }
 
-    let mut metadata = std::mem::take(&mut db_schema.metadata);
-    metadata.extend(inferred_schema.metadata().to_owned());
-    if !metadata.contains_key("created_at") {
-        metadata.insert(
-            "created_at".to_string(),
-            chrono::Utc::now().timestamp_micros().to_string(),
-        );
-    }
+    let metadata = std::mem::take(&mut db_schema.metadata);
     Some((
         field_datatype_delta,
         Schema::new(merged_fields).with_metadata(metadata),
