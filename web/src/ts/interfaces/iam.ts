@@ -36,7 +36,11 @@ export interface Resource {
   type: "resource";
   resourceName: string;
   isSelected: boolean;
+  parent: string;
+  childs: Resource[];
   entities: Entity[];
+  expand?: boolean;
+  slotName?: string;
 }
 
 export interface Entity {
