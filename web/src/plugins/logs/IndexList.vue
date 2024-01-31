@@ -79,7 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- TODO OK : Repeated code make seperate component to display field  -->
               <div
-                v-if="props.row.ftsKey || !props.row.isSchemaField"
+                v-if="
+                  props.row.ftsKey ||
+                  !props.row.isSchemaField ||
+                  !props.row.showValues
+                "
                 class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
                 :title="props.row.name"
               >

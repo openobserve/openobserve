@@ -30,7 +30,8 @@ use crate::{
     writer::WriterKey,
 };
 
-pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Immutable>> = Lazy::new(RwIndexMap::default);
+pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
+    Lazy::new(RwIndexMap::default);
 
 #[warn(dead_code)]
 pub(crate) struct Immutable {
@@ -111,18 +112,22 @@ pub(crate) async fn persist() -> Result<()> {
     let mut tasks = Vec::with_capacity(paths.len());
     let semaphore = Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for path in paths {
-        let semaphore = semaphore.clone();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: task::JoinHandle<Result<Option<(PathBuf, i64, usize)>>> =
             task::spawn(async move {
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let r = IMMUTABLES.read().await;
                 let Some(immutable) = r.get(&path) else {
                     drop(permit);
                     return Ok(None);
                 };
+                log::info!(
+                    "[INGESTER:WAL] start persist file: {}",
+                    path.to_string_lossy(),
+                );
                 // persist entry to local disk
-                let ret = immutable.persist(&path).await;
+                let immutable = immutable.clone();
                 drop(r);
+                let ret = immutable.persist(&path).await;
                 drop(permit);
                 ret.map(|size| Some((path, size.0, size.1)))
             });
@@ -131,17 +136,18 @@ pub(crate) async fn persist() -> Result<()> {
 
     // remove entry from IMMUTABLES
     let tasks = try_join_all(tasks).await.context(TokioJoinSnafu)?;
-    let mut rw = IMMUTABLES.write().await;
     for task in tasks {
         if let Some((path, json_size, arrow_size)) = task? {
             log::info!(
-                "[INGESTER:WAL] persist file: {}, json_size: {}, arrow_size: {}",
+                "[INGESTER:WAL] done persist file: {}, json_size: {}, arrow_size: {}",
                 path.to_string_lossy(),
                 json_size,
                 arrow_size
             );
             // remove entry
+            let mut rw = IMMUTABLES.write().await;
             rw.remove(&path);
+            drop(rw);
             // update metrics
             metrics::INGEST_MEMTABLE_BYTES
                 .with_label_values(&[])
@@ -152,6 +158,7 @@ pub(crate) async fn persist() -> Result<()> {
             metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
         }
     }
+    let mut rw = IMMUTABLES.write().await;
     rw.shrink_to_fit();
 
     Ok(())

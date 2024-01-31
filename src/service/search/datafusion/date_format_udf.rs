@@ -51,9 +51,12 @@ pub(crate) static DATE_FORMAT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
     let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
         if args.len() != 3 {
-            return Err(DataFusionError::SQL(ParserError::ParserError(
-                "UDF params should be: date_format(field, format, zone)".to_string(),
-            )));
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "UDF params should be: date_format(field, format, zone)".to_string(),
+                ),
+                None,
+            ));
         }
 
         // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this

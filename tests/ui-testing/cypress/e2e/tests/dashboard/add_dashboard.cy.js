@@ -73,7 +73,7 @@ describe("Create a new dashboard", () => {
         cy.wait('@dashboards')
         cy.contains("New Dashboard").click()
         cy.wait(1000)
-        cy.get('[data-test="dashboard-name"]').type(dashboardName);
+        cy.get('[data-test="add-dashboard-name"]').type(dashboardName);
         cy.get('[data-test="dashboard-add-submit"]').click();
         cy.url().should("include", dashboardData.ViewDashboardUrl);
     });
@@ -86,7 +86,7 @@ describe("Create a new dashboard", () => {
         cy.wait('@dashboards')
         cy.contains("New Dashboard").click()
         cy.wait(1000)
-        cy.get('[data-test="dashboard-name"]').type(dashboardName);
+        cy.get('[data-test="add-dashboard-name"]').type(dashboardName);
         cy.get('[data-test="dashboard-add-submit"]').click({force:true});
         cy.url().should("include", dashboardData.ViewDashboardUrl);
         cy.wait(300)
@@ -152,7 +152,7 @@ describe("Create a new dashboard", () => {
         cy.wait('@dashboards')
         cy.contains("New Dashboard").click({force:true})
         cy.wait(2000)
-        cy.get('[data-test="dashboard-name"]').type('     ');
+        cy.get('[data-test="add-dashboard-name"]').type('     ');
         cy.get('[data-test="dashboard-add-submit"]').should('be.disabled');
     });
         

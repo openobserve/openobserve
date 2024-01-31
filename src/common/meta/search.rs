@@ -176,6 +176,7 @@ pub struct Response {
     #[serde(skip_serializing)]
     pub file_count: usize,
     pub scan_size: usize,
+    pub scan_records: usize,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub response_type: String,
@@ -204,6 +205,7 @@ impl Response {
             size,
             file_count: 0,
             scan_size: 0,
+            scan_records: 0,
             columns: Vec::new(),
             hits: Vec::new(),
             aggs: HashMap::new(),
@@ -252,6 +254,10 @@ impl Response {
         self.scan_size = val;
     }
 
+    pub fn set_scan_records(&mut self, val: usize) {
+        self.scan_records = val;
+    }
+
     pub fn set_session_id(&mut self, session_id: String) {
         self.session_id = session_id;
     }
@@ -267,6 +273,7 @@ pub struct SearchPartitionRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionResponse {
     pub file_num: usize,
+    pub records: usize,
     pub original_size: usize,
     pub compressed_size: usize,
     pub partitions: Vec<[i64; 2]>,

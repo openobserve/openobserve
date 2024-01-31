@@ -93,6 +93,7 @@ pub async fn search_parquet(
                 let parquet_meta = read_metadata_from_bytes(&file_data)
                     .await
                     .unwrap_or_default();
+                scan_stats.records += parquet_meta.records;
                 scan_stats.original_size += parquet_meta.original_size;
                 if let Some((min_ts, max_ts)) = sql.meta.time_range {
                     if parquet_meta.min_ts <= max_ts && parquet_meta.max_ts >= min_ts {
@@ -334,7 +335,10 @@ pub async fn search_memtable(
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
     for (schema, batch) in batches {
         let entry = batch_groups.entry(schema).or_default();
-        scan_stats.original_size += batch.iter().map(|r| r.data_json_size).sum::<usize>() as i64;
+        for r in batch.iter() {
+            scan_stats.records += r.data.num_rows() as i64;
+            scan_stats.original_size += r.data_json_size as i64;
+        }
         entry.extend(batch.into_iter().map(|r| r.data.clone()));
     }
 

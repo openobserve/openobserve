@@ -229,7 +229,6 @@ export default defineComponent({
       () => searchObj.data.stream.selectedStreamFields,
       () => {
         if (searchObj.data.stream.selectedStreamFields.length) {
-          console.log("selectedStreamFields updated watch called");
           searchObj.data.stream.selectedStreamFields.forEach(
             (field: { name: string; showValues: boolean; ftsKey: boolean }) => {
               if (field.showValues && !field.ftsKey) {
@@ -695,7 +694,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .traces-field-table {
-  height: calc(100vh - 144px) !important;
+  height: calc(100vh - 184px) !important;
 }
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);

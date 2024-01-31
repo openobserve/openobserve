@@ -110,7 +110,7 @@ const defaultObject = {
     },
     scrollInfo: {},
     flagWrapContent: false,
-    pageType: "logs",
+    pageType: "logs", // 'logs' or 'stream
   },
   data: {
     query: <any>"",
@@ -390,6 +390,7 @@ const useLogs = () => {
       );
     }
 
+    // TODO : Add type in query params for all types
     if (searchObj.meta.pageType !== "logs") {
       query["type"] = searchObj.meta.pageType;
     }
@@ -641,6 +642,7 @@ const useLogs = () => {
         //   searchObj.data.searchAround.histogramHide = false;
         //   searchObj.meta.showHistogram = true;
         // }
+
         const queryReq = buildSearch();
 
         if (queryReq != null) {
@@ -894,6 +896,7 @@ const useLogs = () => {
         const ignoreFields = [store.state.zoConfig.timestamp_column];
         let ftsKeys: Set<any>;
         let schemaFields: Set<any>;
+        const timestampField = store.state.zoConfig.timestamp_column;
 
         searchObj.data.streamResults.list.forEach((stream: any) => {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
@@ -945,6 +948,7 @@ const useLogs = () => {
               name: row.name,
               ftsKey: ftsKeys.has(row.name),
               isSchemaField: schemaFields.has(row.name),
+              showValues: row.name !== timestampField,
             });
           }
           // }
@@ -1302,7 +1306,7 @@ const useLogs = () => {
     }
 
     if (queryParams.stream_type) {
-      searchObj.data.stream.streamType = queryParams.type;
+      searchObj.data.stream.streamType = queryParams.streamType;
     } else {
       searchObj.data.stream.streamType = "logs";
     }
@@ -1418,6 +1422,7 @@ const useLogs = () => {
 
     searchObj.data.editorValue = query;
     searchObj.data.query = query;
+    searchObj.data.tempFunctionContent = "";
 
     handleQueryData();
   };
@@ -1448,6 +1453,7 @@ const useLogs = () => {
     onStreamChange,
     generateURLQuery,
     buildSearch,
+    loadStreamLists,
   };
 };
 
