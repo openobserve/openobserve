@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #top="scope">
-          <div s class="q-table__title" data-test="alerts-list-title">
+          <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
           <q-input
