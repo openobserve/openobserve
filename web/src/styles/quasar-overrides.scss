@@ -155,9 +155,14 @@ body {
 
       .q-field__control-container {
         height: calc(100% - 1px) !important;
+        padding-top: 0px;
 
         .q-field__native {
           min-height: calc(100% - 1px) !important;
+        }
+
+        .q-field__label {
+          top: 8px;
         }
       }
 
