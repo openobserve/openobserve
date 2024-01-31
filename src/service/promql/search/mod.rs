@@ -47,16 +47,24 @@ use crate::{
 pub mod grpc;
 
 #[tracing::instrument(skip_all, fields(org_id = org_id))]
-pub async fn search(org_id: &str, req: &MetricsQueryRequest, timeout: i64) -> Result<Value> {
+pub async fn search(
+    org_id: &str,
+    req: &MetricsQueryRequest,
+    timeout: i64,
+    user_email: &str,
+) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as _;
     req.timeout = timeout;
-    search_in_cluster(req).await
+    search_in_cluster(req, user_email).await
 }
 
 #[tracing::instrument(name = "promql:search:cluster", skip_all, fields(org_id = req.org_id))]
-async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
+async fn search_in_cluster(
+    req: cluster_rpc::MetricsQueryRequest,
+    user_email: &str,
+) -> Result<Value> {
     let op_start = std::time::Instant::now();
 
     // get querier nodes from cluster
@@ -264,6 +272,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         size: scan_stats.original_size as f64,
         response_time: op_start.elapsed().as_secs_f64(),
         request_body: Some(req.query.unwrap().query),
+        user_email: Some(user_email.to_string()),
         ..Default::default()
     };
 

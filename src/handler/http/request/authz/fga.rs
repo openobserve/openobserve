@@ -28,7 +28,6 @@ pub async fn create_role(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let role_id = role_id.into_inner();
-
     match o2_enterprise::enterprise::openfga::authorizer::create_role(&role_id, &org_id).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
@@ -94,7 +93,7 @@ pub async fn get_role_permissions(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, role_id, resource) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::get_all_role_permissions(
+    match o2_enterprise::enterprise::openfga::authorizer::get_role_permissions(
         &org_id, &role_id, &resource,
     )
     .await
