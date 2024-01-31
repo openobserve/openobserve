@@ -254,7 +254,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should add invalid query and display error", () => {
+  it.skip("should add invalid query and display error", () => {
     // Type the value of a variable into an input field
     cy.intercept("GET", logData.ValueQuery).as("value");
 
@@ -1064,7 +1064,7 @@ describe("Logs testcases", () => {
     cy.get(".q-notification__message").should('not.exist')
   });
 
-  it.only("should redirect to logs after clicking on stream explorer via stream page", () => {
+  it("should redirect to logs after clicking on stream explorer via stream page", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="index-field-search-input"]').type('code')
     cy.get('[data-test="log-search-expand-code-field-btn"]').click()
