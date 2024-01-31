@@ -782,7 +782,11 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
             // `match[]` argument does not contain a metric name.
             // Check if there is `__name__` among the matchers,
             // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector.matchers.find_matcher_value(NAME_LABEL)
+            selector
+                .matchers
+                .find_matchers(NAME_LABEL)
+                .first()
+                .map(|m| m.value.clone())
         }
     }
 }

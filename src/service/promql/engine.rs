@@ -31,8 +31,7 @@ use promql_parser::{
     label::MatchOp,
     parser::{
         token, AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier,
-        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, TokenType, UnaryExpr,
-        VectorSelector,
+        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr, VectorSelector,
     },
 };
 use rayon::prelude::*;
@@ -245,8 +244,11 @@ impl Engine {
         if selector.name.is_none() {
             let name = selector
                 .matchers
-                .find_matcher_value(NAME_LABEL)
-                .expect("Missing selector name");
+                .find_matchers(NAME_LABEL)
+                .first()
+                .unwrap()
+                .value
+                .clone();
 
             selector.name = Some(name);
         }
@@ -323,8 +325,11 @@ impl Engine {
         if selector.name.is_none() {
             let name = selector
                 .matchers
-                .find_matcher_value(NAME_LABEL)
-                .expect("Missing selector name");
+                .find_matchers(NAME_LABEL)
+                .first()
+                .unwrap()
+                .value
+                .clone();
 
             selector.name = Some(name);
         }
@@ -480,7 +485,7 @@ impl Engine {
 
     async fn aggregate_exprs(
         &mut self,
-        op: &TokenType,
+        op: &token::TokenType,
         expr: &PromExpr,
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
