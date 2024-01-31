@@ -37,7 +37,7 @@ pub async fn process_token(
     use o2_enterprise::enterprise::openfga::{
         authorizer::{
             get_org_creation_tuples, get_user_creation_tuples, get_user_org_tuple,
-            get_user_role_tuple, update_tuples,
+            get_user_role_creation_tuple, get_user_role_deletion_tuple, update_tuples,
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     };
@@ -189,7 +189,7 @@ pub async fn process_token(
             {
                 Ok(_) => {
                     log::info!("User added to the organization {}", org.name);
-                    write_tuples.push(get_user_role_tuple(
+                    write_tuples.push(get_user_role_creation_tuple(
                         &org.role.to_string(),
                         &user_email,
                         &org.name,
@@ -207,7 +207,7 @@ pub async fn process_token(
             {
                 Ok(_) => {
                     log::info!("User removed from the organization {}", org.name);
-                    delete_tuples.push(get_user_role_tuple(
+                    delete_tuples.push(get_user_role_deletion_tuple(
                         &org.role.to_string(),
                         &user_email,
                         &org.name,
@@ -237,8 +237,12 @@ pub async fn process_token(
             {
                 Ok(_) => {
                     log::info!("User update for the organization {}", org.name);
-                    delete_tuples.push(get_user_role_tuple(&existing_role, &user_email, &org.name));
-                    write_tuples.push(get_user_role_tuple(
+                    delete_tuples.push(get_user_role_deletion_tuple(
+                        &existing_role,
+                        &user_email,
+                        &org.name,
+                    ));
+                    write_tuples.push(get_user_role_creation_tuple(
                         &org.role.to_string(),
                         &user_email,
                         &org.name,
