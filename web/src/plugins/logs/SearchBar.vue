@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             split
             class="no-outline saved-views-dropdown no-border"
           >
-            <q-list>
+            <q-list data-test="logs-search-saved-view-list">
               <q-item-label header class="q-pa-sm">{{
                 t("search.savedViewDropdownLabel")
               }}</q-item-label>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="no-outline saved-views-dropdown no-border btn-function"
             @click="fnSavedFunctionDialog"
           >
-            <q-list>
+            <q-list data-test="logs-search-saved-function-list">
               <q-item-label header class="q-pa-sm">{{
                 t("search.functionPlaceholder")
               }}</q-item-label>
