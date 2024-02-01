@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <div class="row">
-        <div class="col-6 text-left q-pl-md q-mt-xs">
+        <div class="col-6 text-left q-pl-lg q-mt-xs">
           {{ noOfRecordsTitle }}
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-item-size="25"
         :virtual-scroll-sticky-size-start="0"
         :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="3000"
-        :virtual-scroll-slice-ratio-before="1000"
+        :virtual-scroll-slice-size="100"
+        :virtual-scroll-slice-ratio-before="100"
         :items="searchObj.data.queryResults.hits"
         :wrap-cells="
           searchObj.meta.toggleSourceWrap && searchObj.meta.flagWrapContent
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onMounted, onUpdated } from "vue";
+import { computed, defineComponent, ref, onMounted, onUpdated, onRenderTracked } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -422,6 +422,7 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
+        this.refreshPartitionPagination();
         this.$emit("update:scroll");
         this.searchTableRef.scrollTo(0);
       } else if (actionType == "pageChange") {
@@ -480,7 +481,7 @@ export default defineComponent({
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
     const scrollPosition = ref(0);
-    const rowsPerPageOptions = [10, 25, 50, 100, 250, 500, 1000];
+    const rowsPerPageOptions = [10, 25, 50, 100, 250, 500];
 
     const {
       searchObj,
@@ -488,6 +489,7 @@ export default defineComponent({
       searchAroundData,
       extractFTSFields,
       evaluateWrapContentFlag,
+      refreshPartitionPagination,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -619,6 +621,7 @@ export default defineComponent({
       scrollPosition,
       rowsPerPageOptions,
       pageNumberInput,
+      refreshPartitionPagination,
     };
   },
   computed: {
