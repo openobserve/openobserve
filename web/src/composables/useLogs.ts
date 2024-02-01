@@ -940,13 +940,13 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.partitionTotal[
                 index
               ] = res.data.total;
-
-              // if total records in partition is greate than recordsPerPage then we need to update pagination
-              // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-              refreshPartitionPagination(true);
             }
           }
         );
+
+        // if total records in partition is greate than recordsPerPage then we need to update pagination
+        // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+        refreshPartitionPagination(true);
         
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
