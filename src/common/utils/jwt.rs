@@ -10,7 +10,7 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
-use crate::common::{infra::errors::JwtError, meta::user::TokenValidationResponse};
+use crate::common::meta::user::TokenValidationResponse;
 
 #[cfg(feature = "enterprise")]
 pub(crate) async fn verify_decode_token(
@@ -25,6 +25,8 @@ pub(crate) async fn verify_decode_token(
     ),
     anyhow::Error,
 > {
+    use infra::errors::JwtError;
+
     let jwks: jwk::JwkSet = serde_json::from_str(jwks).unwrap();
     let header = decode_header(token)?;
     let kid = match header.kid {

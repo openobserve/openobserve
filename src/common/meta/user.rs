@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -207,6 +207,22 @@ impl fmt::Display for UserRole {
             UserRole::Root => write!(f, "root"),
             #[cfg(feature = "enterprise")]
             UserRole::Viewer => write!(f, "viewer"),
+        }
+    }
+}
+
+// Implementing FromStr for UserRole
+impl FromStr for UserRole {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<UserRole, Self::Err> {
+        match input {
+            "admin" => Ok(UserRole::Admin),
+            "member" => Ok(UserRole::Member),
+            "root" => Ok(UserRole::Root),
+            #[cfg(feature = "enterprise")]
+            "viewer" => Ok(UserRole::Viewer),
+            _ => Err(()),
         }
     }
 }

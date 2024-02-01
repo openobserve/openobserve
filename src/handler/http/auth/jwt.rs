@@ -282,6 +282,10 @@ pub async fn process_token(
 
 #[cfg(feature = "enterprise")]
 fn parse_dn(dn: &str) -> Option<RoleOrg> {
+    use std::str::FromStr;
+
+    use crate::common::meta::user::UserRole;
+
     let mut org = "";
     let mut role = "";
 
@@ -299,7 +303,7 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let role = if role.contains("admin") {
         crate::common::meta::user::UserRole::Admin
     } else {
-        crate::common::meta::user::UserRole::Viewer
+        UserRole::from_str(&O2_CONFIG.dex.default_role).unwrap()
     };
     if org.is_empty() {
         org = &O2_CONFIG.dex.default_org;
