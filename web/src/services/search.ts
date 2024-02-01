@@ -114,6 +114,18 @@ const search = {
     const url = `/api/${org_identifier}/${stream_name}/traces/latest?filter=${filter}&start_time=${start_time}&end_time=${end_time}&from=${from}&size=${size}`;
     return http().get(url);
   },
+  partition: ({
+    org_identifier,
+    query,
+    page_type = "logs",
+  }: {
+    org_identifier: string;
+    query: any;
+    page_type: string;
+  }) => {
+    const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    return http().post(url, query);
+  },
 };
 
 export default search;
