@@ -9,10 +9,13 @@
             </div>
           </div>
           <div class="col-auto">
-            <q-btn v-close-popup="true"
+            <q-btn
+              v-close-popup="true"
               data-test="metrics-schema-cancel"
-              round flat
-              icon="cancel" />
+              round
+              flat
+              icon="cancel"
+            />
           </div>
         </div>
       </q-card-section>
@@ -254,8 +257,14 @@ export default defineComponent({
           role: "",
           owner: store.state.userInfo.name,
           created: new Date().toISOString(),
-          panels: [],
-          version: 2,
+          tabs: [
+            {
+              panels: [],
+              name: "Default",
+              tabId: "default",
+            },
+          ],
+          version: 3,
         };
 
         // create dashboard

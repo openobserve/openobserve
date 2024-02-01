@@ -107,12 +107,15 @@ export function getConsumableDateTime(dateObj: any) {
 //get all dashboards by folderId
 //api call
 //save to store
+//get all dashboards by folderId
+//api call
+//save to store
 export const getAllDashboards = async (store: any, folderId: any) => {
   //call only if we have folderId
   if (!folderId) return;
-  // api call
-  return await dashboardService
-    .list(
+  try {
+    // api call
+    const res = await dashboardService.list(
       0,
       1000,
       "name",
@@ -120,21 +123,21 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       "",
       store.state.selectedOrganization.identifier,
       folderId
-    )
-    .then((res) => {
-      //dashboard version migration
-      res.data.dashboards = res.data.dashboards.map((dashboard: any) =>
-        convertDashboardSchemaVersion(dashboard["v" + dashboard.version])
-      );
-      // save to store
-      store.dispatch("setAllDashboardList", {
-        ...store.state.organizationData.allDashboardList,
-        [folderId]: res.data.dashboards.sort((a: any, b: any) =>
-          b.created.localeCompare(a.created)
-        ),
-      });
-    })
-    .catch((error) => {});
+    );
+    //dashboard version migration
+    res.data.dashboards = res.data.dashboards.map((dashboard: any) =>
+      convertDashboardSchemaVersion(dashboard["v" + dashboard.version])
+    );
+    // save to store
+    store.dispatch("setAllDashboardList", {
+      ...store.state.organizationData.allDashboardList,
+      [folderId]: res.data.dashboards.sort((a: any, b: any) =>
+        b.created.localeCompare(a.created)
+      ),
+    });
+  } catch (error) {
+    // handle error
+  }
 };
 
 //get all dashboards by folderId if not there then call api else return from store
@@ -156,11 +159,32 @@ function findDashboard(dashboardId: string, store: any, folderId: any) {
     : {};
 }
 
+export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
+  // find tab from tabId
+  return dashboardData.tabs.find((tab: any) => tab.tabId == tabId);
+};
+
+const getMaxIAndMaxYFromTab = (tab: any) => {
+  let maxI = 0;
+  let maxY = 0;
+  let lastPanel = tab.panels[tab.panels.length - 1];
+  tab.panels.map((it: any) => {
+    maxI = Math.max(it.layout?.i || 0, maxI);
+    maxY = Math.max(it.layout?.y || 0, maxY);
+     // last panel will have max y
+     if (maxY == it.layout?.y) {
+      lastPanel = it;
+    }
+  });
+  return { maxI, maxY, lastPanel };
+};
+
 export const addPanel = async (
   store: any,
   dashboardId: any,
   panelData: any,
-  folderId: any
+  folderId: any,
+  tabId: any
 ) => {
   // get the object of panel data
   // find the dashboard and add the panel data to dashboard object
@@ -173,37 +197,19 @@ export const addPanel = async (
     await getAllDashboards(store, folderId);
   }
   const currentDashboard = findDashboard(dashboardId, store, folderId);
-  if (!currentDashboard.panels) {
-    currentDashboard.panels = [];
+
+  // find tab from tabId
+  const tab = getTabDataFromTabId(currentDashboard, tabId);
+
+  if (!tab.panels) {
+    tab.panels = [];
   }
 
-  let maxI = 0;
-  let maxY = 0;
-
-  let lastPanel = currentDashboard.panels[currentDashboard.panels.length - 1];
-
-  currentDashboard.panels.map((it: any) => {
-    maxI = Math.max(it.layout?.i || 0, maxI);
-    maxY = Math.max(it.layout?.y || 0, maxY);
-
-    // last panel will have max y
-    if (maxY == it.layout?.y) {
-      lastPanel = it;
-    }
-  });
-
-  // maxI =
-  //   currentDashboard.layouts?.length > 0
-  //     ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.i))
-  //     : 0;
-  // maxY =
-  //   currentDashboard.layouts?.length > 0
-  //     ? Math.max(...currentDashboard.layouts?.map((obj: any) => obj.y))
-  //     : 0;
+  const { maxI, maxY, lastPanel } = getMaxIAndMaxYFromTab(tab);
 
   const newLayoutObj = {
     x: 0,
-    y: currentDashboard.panels?.length > 0 ? maxY + 10 : 0,
+    y: tab.panels?.length > 0 ? maxY + 10 : 0,
     w: 6,
     h: 9,
     i: maxI + 1,
@@ -212,7 +218,7 @@ export const addPanel = async (
   };
 
   // check if last panel has enthough space to add new panel
-  if (currentDashboard.panels.length > 0) {
+  if (tab.panels.length > 0) {
     //check if new panel can be added
     if (12 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
       newLayoutObj.y = lastPanel.layout.y;
@@ -227,7 +233,7 @@ export const addPanel = async (
 
   //set layout of new panel
   panelData.layout = newLayoutObj;
-  currentDashboard.panels.push(panelData);
+  tab.panels.push(panelData);
 
   return await updateDashboard(
     store,
@@ -308,19 +314,21 @@ export const deletePanel = async (
   store: any,
   dashboardId: any,
   panelId: any,
-  folderId: any
+  folderId: any,
+  tabId: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
+  // find tab from tabId
+  const tab = getTabDataFromTabId(currentDashboard, tabId);
+
   //remove panel from current dashboard
-  const panelIndex = currentDashboard.panels.findIndex(
-    (panel: any) => panel.id == panelId
-  );
-  currentDashboard.panels.splice(panelIndex, 1);
-  currentDashboard.panels = currentDashboard.panels;
+  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelId);
+  tab.panels.splice(panelIndex, 1);
+  // currentDashboard.panels = currentDashboard.panels;
 
   //remove layout from current dashboard
   // const layoutIndex = currentDashboard.layouts.findIndex(
@@ -379,18 +387,21 @@ export const updatePanel = async (
   store: any,
   dashboardId: any,
   panelData: any,
-  folderId: any
+  folderId: any,
+  tabId: any
 ) => {
   // get the object of panel id
   // find the dashboard and remove the panel data to dashboard object
   // call the update dashboard function
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  const panelIndex = currentDashboard.panels.findIndex(
+  // find tab from tabId
+  const tab = getTabDataFromTabId(currentDashboard, tabId);
+
+  const panelIndex = tab.panels.findIndex(
     (panel: any) => panel.id == panelData.id
   );
-  currentDashboard.panels[panelIndex] = panelData;
-  currentDashboard.panels = currentDashboard.panels;
+  tab.panels[panelIndex] = panelData;
 
   return await updateDashboard(
     store,
@@ -408,16 +419,18 @@ export const updateDashboard = async (
   currentDashboardData: any,
   folderId: any
 ) => {
-  // make an api call to update the dashboard
-  return await dashboardService
-    .save(org, dashboardId, currentDashboardData, folderId)
-    .then(async (res) => {
-      // update dashboardList
-      await getAllDashboards(store, folderId);
-    })
-    .catch((error) => {
-      return error;
-    });
+  try {
+    const res = await dashboardService.save(
+      org,
+      dashboardId,
+      currentDashboardData,
+      folderId
+    );
+    await getAllDashboards(store, folderId);
+    return res;
+  } catch (error) {
+    return error;
+  }
 };
 
 export const getDashboard = async (
@@ -465,7 +478,8 @@ export const getPanel = async (
   store: any,
   dashboardId: any,
   panelId: any,
-  folderId: any
+  folderId: any,
+  tabId: any
 ) => {
   if (
     !store.state.organizationData.allDashboardList[folderId] ||
@@ -475,14 +489,159 @@ export const getPanel = async (
   }
   const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  const paneldata = currentDashboard.panels?.find(
-    (it: any) => it.id == panelId
-  );
+  // find tab from tabId
+  const tab = getTabDataFromTabId(currentDashboard, tabId);
+
+  const paneldata = tab.panels?.find((it: any) => it.id == panelId);
   return paneldata;
 };
 
 export const getPanelId = () => {
   return "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+};
+
+export const getTabId = () => {
+  return (Math.floor(Math.random() * (99999 - 10 + 1)) + 10).toString();
+};
+
+// delete tabs
+// have two option to delete tab
+// 1. delete the tab with moving panels to other tab
+// 2. delete the tab without moving panels to other tab
+
+// it will take one arg called moveToTabName
+// if moveToTabName is not provided, it will delete the tab without moving panels
+// if moveToTabName is provided, it will delete the tab and move panels to other tab
+export const deleteTab = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  deleteTabId: any,
+  moveToTabId?: any
+) => {
+  const currentDashboard = findDashboard(dashboardId, store, folderId);
+
+  if (moveToTabId) {
+    const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
+    // move panels to other tab
+    const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
+
+    let { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
+
+    // for each panel, need to recalculate layout object
+    deleteTabData.panels.forEach((panel: any) => {
+      maxY += 10;
+      panel.layout.i = ++maxI;
+      panel.layout.y = maxY;
+    });
+
+    moveToTabData.panels.push(...deleteTabData.panels);
+  }
+  // delete the tab
+  currentDashboard.tabs = currentDashboard.tabs.filter(
+    (tab: any) => tab.tabId != deleteTabId
+  );
+
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard,
+    folderId ?? "default"
+  );
+};
+
+export const editTab = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  tabId: any,
+  tabData: any
+) => {
+  const currentDashboardData = findDashboard(dashboardId, store, folderId);
+  const tab = getTabDataFromTabId(currentDashboardData, tabId);
+
+  // only name will change
+  tab.name = tabData.name;
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboardData,
+    folderId ?? "default"
+  );
+
+  // return updated tab
+  return tab;
+};
+
+export const addTab = async (
+  store: any,
+  dashboardId: any,
+  folderId: any,
+  newTabData: any
+) => {
+  // genereate tab id
+  newTabData.tabId = getTabId();
+
+  const currentDashboardData = findDashboard(dashboardId, store, folderId);
+  currentDashboardData.tabs.push(newTabData);
+
+  await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboardData,
+    folderId ?? "default"
+  );
+
+  // return new tab data with new tab id
+  return newTabData;
+};
+
+// move panel to another tab
+export const movePanelToAnotherTab = async (
+  store: any,
+  dashboardId: any,
+  panelId: any,
+  folderId: any,
+  currentTabId: any,
+  moveToTabId?: any
+) => {
+  const currentDashboard = findDashboard(dashboardId, store, folderId);
+
+  const currentTabData = getTabDataFromTabId(currentDashboard, currentTabId);
+  const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
+
+  // panel data
+  const panelData = currentTabData.panels.find((it: any) => it.id == panelId);
+
+  // delete panel in currentTab
+  currentTabData.panels = currentTabData.panels.filter(
+    (panel: any) => panel.id != panelId
+  );
+
+  // Now, add panel to moveToTab
+  if (!moveToTabData.panels) {
+    moveToTabData.panels = [];
+  }
+
+  // need to change layout object
+  const { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
+
+  //set layout of new panel
+  panelData.layout.i = maxI + 1;
+  panelData.layout.y = maxY + 10;
+  moveToTabData.panels.push(panelData);
+
+  return await updateDashboard(
+    store,
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    currentDashboard,
+    folderId ?? "default"
+  );
 };
 
 export const getFoldersList = async (store: any) => {

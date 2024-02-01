@@ -76,6 +76,7 @@ import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
 import { cloneDeep } from "lodash-es";
+import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "PerformanceSummary",
@@ -123,7 +124,8 @@ export default defineComponent({
     };
 
     const loadDashboard = async () => {
-      currentDashboardData.value.data = overviewDashboard;
+      // schema migration
+      currentDashboardData.value.data = convertDashboardSchemaVersion(overviewDashboard);
 
       // if variables data is null, set it to empty list
 

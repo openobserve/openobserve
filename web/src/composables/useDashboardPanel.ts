@@ -35,7 +35,7 @@ const colors = [
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
-    version: 2,
+    version: 3,
     id: "",
     type: "bar",
     title: "",

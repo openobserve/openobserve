@@ -152,6 +152,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </q-item-section>
             </q-item>
+            <q-item
+              clickable
+              v-close-popup="true"
+              @click="onPanelModifyClick('MovePanel')"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-move-to-another-panel"
+                  class="q-pa-sm"
+                  >Move To Another Tab</q-item-label
+                >
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
       </q-bar>
@@ -177,6 +190,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
     />
+
+    <SinglePanelMove
+      title="Move Panel to Another Tab"
+      message="Select destination tab"
+      @update:ok="movePanelDialog"
+      :key="confirmMovePanelDialog"
+      @update:cancel="confirmMovePanelDialog = false"
+      v-model="confirmMovePanelDialog"
+      @refresh="$emit('refresh')"
+    />
   </div>
 </template>
 
@@ -190,10 +213,17 @@ import { useQuasar } from "quasar";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 
 export default defineComponent({
   name: "PanelContainer",
-  emits: ["onDeletePanel", "onViewPanel", "updated:data-zoom"],
+  emits: [
+    "onDeletePanel",
+    "onViewPanel",
+    "updated:data-zoom",
+    "onMovePanel",
+    "refresh",
+  ],
   props: [
     "data",
     "selectedTimeDate",
@@ -208,6 +238,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     QueryInspector,
     ConfirmDialog,
+    SinglePanelMove,
   },
   setup(props, { emit }) {
     const store = useStore();
@@ -217,6 +248,7 @@ export default defineComponent({
     const metaData = ref();
     const showViewPanel = ref(false);
     const confirmDeletePanelDialog = ref(false);
+    const confirmMovePanelDialog: any = ref(false);
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -255,6 +287,7 @@ export default defineComponent({
           dashboard: String(route.query.dashboard),
           panelId: data.id,
           folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };
@@ -281,7 +314,8 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelData,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
         );
 
         // Show a success notification.
@@ -297,6 +331,7 @@ export default defineComponent({
             dashboard: String(route.query.dashboard),
             panelId: panelId,
             folder: route.query.folder ?? "default",
+            tab: route.query.tab ?? "default",
           },
         });
         return;
@@ -316,6 +351,11 @@ export default defineComponent({
     const deletePanelDialog = async (data: any) => {
       emit("onDeletePanel", props.data.id);
     };
+
+    const movePanelDialog = async (selectedTabId: any) => {
+      emit("onMovePanel", props.data.id, selectedTabId);
+    };
+
     return {
       props,
       onEditPanel,
@@ -331,6 +371,8 @@ export default defineComponent({
       confirmDeletePanelDialog,
       showText,
       PanleSchemaRendererRef,
+      confirmMovePanelDialog,
+      movePanelDialog,
     };
   },
   methods: {
@@ -343,6 +385,8 @@ export default defineComponent({
         this.confirmDeletePanelDialog = true;
       } else if (evt == "DuplicatePanel") {
         this.onDuplicatePanel(this.props.data);
+      } else if (evt == "MovePanel") {
+        this.confirmMovePanelDialog = true;
       } else {
       }
     },
