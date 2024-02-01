@@ -125,8 +125,8 @@ pub async fn delete_all(
             stream_name,
             stream_type,
             PartitionTimeLevel::Unset,
-            0,
-            0,
+            BASE_TIME.timestamp_micros(),
+            Utc::now().timestamp_micros(),
             true,
         )
         .await?;
