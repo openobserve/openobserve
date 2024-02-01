@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="q-pa-md" style="height: calc(100vh - 101px); overflow-y: auto">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div style="font-size: 18px" class="q-py-sm q-px-md">
       {{ editingRole }}
@@ -24,11 +24,7 @@
       :removed-users="removedUsers"
     />
 
-    <div
-      v-show="activeTab === 'permissions'"
-      class="q-px-md q-py-md"
-      style="height: calc(100vh - 101px); overflow-y: auto"
-    >
+    <div v-show="activeTab === 'permissions'">
       <div class="o2-input flex items-end q-mb-md justify-start">
         <div class="flex items-center q-mb-sm q-mr-md">
           <span style="font-size: 14px"> Show </span>
@@ -99,26 +95,26 @@
         @updated:permission="handlePermissionChange"
         @expand:row="expandPermission"
       />
-      <div class="flex justify-end q-mt-lg">
-        <q-btn
-          data-test="add-alert-cancel-btn"
-          class="text-bold"
-          :label="t('alerts.cancel')"
-          text-color="light-text"
-          padding="sm md"
-          no-caps
-          @click="cancelPermissionsUpdate"
-        />
-        <q-btn
-          data-test="add-alert-submit-btn"
-          :label="t('alerts.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
-          @click="saveRolePermissions"
-        />
-      </div>
+    </div>
+    <div class="flex justify-end q-mt-lg">
+      <q-btn
+        data-test="add-alert-cancel-btn"
+        class="text-bold"
+        :label="t('alerts.cancel')"
+        text-color="light-text"
+        padding="sm md"
+        no-caps
+        @click="cancelPermissionsUpdate"
+      />
+      <q-btn
+        data-test="add-alert-submit-btn"
+        :label="t('alerts.save')"
+        class="text-bold no-border q-ml-md"
+        color="secondary"
+        padding="sm xl"
+        no-caps
+        @click="saveRole"
+      />
     </div>
   </div>
 </template>
@@ -1013,10 +1009,12 @@ const updateResourceEntities = (
   }
 };
 
-const saveRolePermissions = () => {
+const saveRole = () => {
   const payload = {
     add: Object.values(addedPermissions.value),
     remove: Object.values(removedPermissions.value),
+    add_users: Array.from(addedUsers.value) as string[],
+    remove_users: Array.from(removedUsers.value) as string[],
   };
 
   updateRole({

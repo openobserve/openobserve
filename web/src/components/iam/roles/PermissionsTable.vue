@@ -6,12 +6,20 @@
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <template v-if="!rows.length">
         <div
-          class="q-py-md text-left text-subtitle"
+          v-if="level"
+          class="q-py-sm text-left text-subtitle text-grey-9"
           :style="{
             paddingLeft: level ? level * 40 + 'px' : '',
           }"
         >
           No Resources Present
+        </div>
+        <div
+          v-if="!level"
+          class="w-full text-center q-mt-lg text-bold text-grey-9"
+          style="margin-top: 64px; font-size: 18px"
+        >
+          <span> No Permissions Selected </span>
         </div>
       </template>
       <template v-else>
