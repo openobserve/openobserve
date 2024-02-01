@@ -1,5 +1,5 @@
 <template>
-  <div class="q-pa-md" style="height: calc(100vh - 101px); overflow-y: auto">
+  <div>
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div style="font-size: 18px" class="q-py-sm q-px-md">
       {{ editingRole }}
@@ -14,7 +14,6 @@
     />
 
     <q-separator />
-
     <GroupUsers
       v-show="activeTab === 'users'"
       :groupUsers="roleUsers"
@@ -24,7 +23,7 @@
       :removed-users="removedUsers"
     />
 
-    <div v-show="activeTab === 'permissions'">
+    <div v-show="activeTab === 'permissions'" class="q-pa-md">
       <div class="o2-input flex items-end q-mb-md justify-start">
         <div class="flex items-center q-mb-sm q-mr-md">
           <span style="font-size: 14px"> Show </span>
@@ -90,13 +89,13 @@
       </div>
       <permissions-table
         ref="permissionTableRef"
-        :rows="permissionTableRows"
+        :rows="permissionsState.permissions"
         :filter="filter"
         @updated:permission="handlePermissionChange"
         @expand:row="expandPermission"
       />
     </div>
-    <div class="flex justify-end q-mt-lg">
+    <div class="flex justify-end q-mt-lg q-px-md">
       <q-btn
         data-test="add-alert-cancel-btn"
         class="text-bold"
@@ -133,6 +132,7 @@ import {
   updateRole,
   getResources,
   getResourcePermission,
+  getRoleUsers,
 } from "@/services/iam";
 import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
@@ -149,6 +149,7 @@ import dashboardService from "@/services/dashboards";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
+import { nextTick } from "vue";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -240,10 +241,24 @@ const getRoleDetails = () => {
         .filter((resource: any) => resource.visible);
       setDefaultPermissions();
       await getResourcePermissions();
+      await getUsers();
       updateRolePermissions();
       updateTableData();
     }
   );
+};
+
+const getUsers = () => {
+  return new Promise((resolve, reject) => {
+    getRoleUsers(editingRole.value, store.state.selectedOrganization.identifier)
+      .then((res) => {
+        roleUsers.value = res.data;
+        resolve(true);
+      })
+      .catch((err) => {
+        reject(err);
+      });
+  });
 };
 
 const getResourceByName = (
@@ -532,39 +547,51 @@ const handlePermissionChange = (row: any, permission: string) => {
   }
 };
 
-const updateTableData = (value: string = filter.value.permissions) => {
+const updateTableData = async (value: string = filter.value.permissions) => {
   filter.value.permissions = value;
 
-  if (value === "all") {
-    permissionTableRows.value = permissionsState.permissions;
-  } else {
-    permissionTableRows.value = filterSelectedPermissions(
-      permissionsState.permissions
-    ) as Resource[];
-  }
+  await nextTick();
+
+  updatePermissionVisibility(permissionsState.permissions);
 };
 
-const filterSelectedPermissions = (
+const updateExpandedResources = (resources: (Resource | Entity)[]) => {
+  resources.forEach((resource) => {
+    // Check if the current item is an object and has the 'expand' key
+    if (
+      typeof resource === "object" &&
+      resource.expand &&
+      resource.has_entities
+    ) {
+      getResourceEntities(resource);
+      // Perform additional actions as needed
+    }
+
+    // If the item itself contains a nested array, call the function recursively
+    if (Array.isArray(resource.entities)) {
+      updateExpandedResources(resource.entities);
+    }
+  });
+};
+
+const updatePermissionVisibility = (
   permissions: (Resource | Entity)[]
-): (Resource | Entity)[] => {
-  return permissions.filter((permission: Entity | Resource) => {
+): void => {
+  permissions.forEach((permission: Entity | Resource) => {
     // Check if any permission value is true
     const showResource = Object.values(permission.permission).some(
       (permDetail) => permDetail.value
     );
 
-    // Check if any entity should be shown by recursively filtering
-    const filteredEntities = permission.entities?.length
-      ? filterSelectedPermissions(permission.entities)
-      : [];
-    const showEntity = filteredEntities.length > 0;
+    // Recursively update the show property for entities
+    if (permission.entities?.length) {
+      updatePermissionVisibility(permission.entities);
+    }
+    const showEntity = permission.entities?.some((entity) => entity.show);
 
-    // Modify the permission object to add `has_entities` and `expand` properties
-    // permission.has_entities = showEntity;
-    permission.expand = false;
-
-    // Return true if either the permission should be shown or it has entities to be shown
-    return showResource || showEntity;
+    // Update the permission object to add `show` property
+    permission.show =
+      filter.value.permissions === "all" ? true : showResource || showEntity;
   });
 };
 
@@ -605,12 +632,7 @@ const filterRowsByResourceName = (
 };
 
 const onResourceChange = () => {
-  if (!filter.value.resource) return updateTableData();
-  updateTableData();
-  permissionTableRows.value = filterRowsByResourceName(
-    permissionTableRows.value,
-    filter.value.resource
-  ) as Resource[];
+  updatePermissionVisibility(permissionsState.permissions);
 };
 
 function filterResources(rows: any, terms: any) {
@@ -657,7 +679,7 @@ const getPermissionHash = (
  * @param resource
  * @param typeOf - Type to assign the new entities that we get from the server
  */
-const getResourceEntities = (resource: Resource) => {
+const getResourceEntities = (resource: Resource | Entity) => {
   const listEntitiesFnMap: {
     [key: string]: (resource: Resource | Entity) => Promise<any>;
   } = {
@@ -671,12 +693,14 @@ const getResourceEntities = (resource: Resource) => {
     savedviews: getSavedViews,
     group: _getGroups,
     role: _getRoles,
-    folder: getFolders,
+    dfolder: getFolders,
     dashboard: getDashboards,
   };
 
   return new Promise(async (resolve, reject) => {
-    await listEntitiesFnMap[resource.resourceName](resource);
+    if (!resource.entities?.length)
+      await listEntitiesFnMap[resource.resourceName](resource);
+
     resolve(true);
   });
 };
@@ -741,7 +765,7 @@ const getFolders = async () => {
     store.state.selectedOrganization.identifier
   );
   updateResourceEntities(
-    "folder",
+    "dfolder",
     ["folderId"],
     [...folders.data.list],
     true,
@@ -922,12 +946,11 @@ const updateEntityEntities = (
         isSelected: false,
         has_entities: hasEntities,
         display_name: displayNameKey ? _entity[displayNameKey] : entityName,
+        show: true,
       });
   });
 
-  if (filter.value.permissions === "selected") {
-    entity.entities = filterSelectedPermissions(entity.entities) as Entity[];
-  }
+  updatePermissionVisibility(permissionsState.permissions);
 };
 
 const updateResourceEntities = (
@@ -999,14 +1022,11 @@ const updateResourceEntities = (
       isSelected: false,
       has_entities: hasEntities,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
+      show: true,
     });
   });
 
-  if (filter.value.permissions === "selected") {
-    resource.entities = filterSelectedPermissions(
-      resource.entities
-    ) as Entity[];
-  }
+  updatePermissionVisibility(permissionsState.permissions);
 };
 
 const saveRole = () => {

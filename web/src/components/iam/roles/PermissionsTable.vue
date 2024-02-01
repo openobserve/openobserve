@@ -54,7 +54,11 @@
             </q-tr>
           </template>
           <template v-slot:body="props">
-            <q-tr :props="props" :key="`m_${props.row.index}`">
+            <q-tr
+              v-show="props.row.show"
+              :props="props"
+              :key="`m_${props.row.index}`"
+            >
               <q-td
                 v-for="(col, index) in props.cols"
                 :key="col.name"
@@ -113,7 +117,7 @@
               </q-td>
             </q-tr>
             <q-tr
-              v-show="props.row.expand"
+              v-show="props.row.expand && props.row.show"
               :props="props"
               :key="`e_${props.row.index + 'entity'}`"
               class="q-virtual-scroll--with-prev"

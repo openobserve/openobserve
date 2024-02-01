@@ -60,6 +60,8 @@ export interface Resource {
   expand?: boolean;
   slotName?: string;
   has_entities?: boolean;
+  is_loading?: boolean;
+  show?: boolean;
 }
 
 export interface Entity {
@@ -93,6 +95,8 @@ export interface Entity {
   resourceName: string;
   isSelected: boolean;
   expand?: boolean;
+  show?: boolean;
+  is_loading?: boolean;
 }
 
 interface User {}

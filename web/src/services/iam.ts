@@ -67,6 +67,11 @@ export const getResources = (org_identifier: string) => {
   return http().get(url);
 };
 
+export const getRoleUsers = (role_name: string, org_identifier: string) => {
+  const url = `/api/${org_identifier}/roles/${role_name}/users`;
+  return http().get(url);
+};
+
 // ----------- Permissions -------------
 
 export const getResourcePermission = ({
