@@ -222,6 +222,9 @@ pub async fn is_empty() -> bool {
 
 pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error> {
     let data = storage::get(file).await?;
+    if data.is_empty() {
+        return Err(anyhow::anyhow!("file {} data size is zero", file));
+    }
     if let Err(e) = set(session_id, file, data).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",

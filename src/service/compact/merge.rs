@@ -418,6 +418,18 @@ async fn merge_files(
             let mut buf = Vec::new();
             let file_tmp_dir = cache::tmpfs::Directory::default();
             let file_data = storage::get(&file.key).await?;
+            if file_data.is_empty() {
+                // delete file from file list
+                log::warn!("found invalid file: {}", file.key);
+                if let Err(err) = file_list::delete_parquet_file(&file.key, true).await {
+                    log::error!(
+                        "[COMPACT] delete file: {}, from file_list err: {}",
+                        &file.key,
+                        err
+                    );
+                }
+                return Err(anyhow::anyhow!("merge_files error: file data is empty"));
+            }
             file_tmp_dir.set(&file.key, file_data)?;
             datafusion::exec::convert_parquet_file(
                 file_tmp_dir.name(),
@@ -450,6 +462,11 @@ async fn merge_files(
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
+    if new_file_meta.compressed_size == 0 {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: compressed_size is 0"
+        ));
     }
 
     let id = ider::generate();
