@@ -227,8 +227,12 @@ impl FromStr for UserRole {
             "root" => Ok(UserRole::Root),
             #[cfg(feature = "enterprise")]
             "viewer" => Ok(UserRole::Viewer),
+            #[cfg(feature = "enterprise")]
             "user" => Ok(UserRole::User),
+            #[cfg(feature = "enterprise")]
             _ => Ok(UserRole::User),
+            #[cfg(not(feature = "enterprise"))]
+            _ => Ok(UserRole::Admin),
         }
     }
 }
