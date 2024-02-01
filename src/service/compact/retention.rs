@@ -477,3 +477,27 @@ async fn write_file_list_s3(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_delete_by_stream() {
+        let org_id = "test";
+        let stream_name = "test";
+        let stream_type = config::meta::stream::StreamType::Logs;
+        let lifecycle_end = "2023-01-01";
+        delete_by_stream(lifecycle_end, org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_delete_all() {
+        let org_id = "test";
+        let stream_name = "test";
+        let stream_type = config::meta::stream::StreamType::Logs;
+        delete_all(org_id, stream_name, stream_type).await.unwrap();
+    }
+}
