@@ -109,8 +109,8 @@ export default defineComponent({
     const showAddTabDialog = ref(false);
     const isHovered = ref(false);
 
-    // inject selected tab
-    const selectedTabId: any = inject("selectedTabId");
+    // inject selected tab, default will be default tab
+    const selectedTabId: any = inject("selectedTabId", ref("default"));
 
     const tabs: any = computed(() => {
       return props.dashboardData?.tabs ?? [];

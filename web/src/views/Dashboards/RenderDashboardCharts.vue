@@ -165,8 +165,8 @@ export default defineComponent({
     // holds the view panel id
     const viewPanelId = ref("");
 
-    // inject selected tab
-    const selectedTabId = inject("selectedTabId");
+    // inject selected tab, default will be default tab
+    const selectedTabId = inject("selectedTabId", ref("default"));
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
