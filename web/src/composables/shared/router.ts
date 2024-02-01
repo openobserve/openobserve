@@ -56,6 +56,20 @@ const ErrorsDashboard = () =>
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
 
+const IdentityAccessManagement = () =>
+  import("@/views/IdentityAccessManagement.vue");
+
+const AppGroups = () => import("@/components/iam/groups/AppGroups.vue");
+
+const AppRoles = () => import("@/components/iam/roles/AppRoles.vue");
+
+const EditRole = () => import("@/components/iam/roles/EditRole.vue");
+
+const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
+
+const AppOrganizations = () =>
+  import("@/components/iam/organizations/AppOrganizations.vue");
+
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 const useRoutes = () => {
@@ -196,6 +210,64 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    },
+    {
+      path: "iam",
+      name: "iam",
+      component: IdentityAccessManagement,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "users",
+          name: "users",
+          component: Users,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "organizations",
+          name: "organizations",
+          component: AppOrganizations,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "groups",
+          name: "groups",
+          component: AppGroups,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "groups/edit/:group_name",
+          name: "editGroup",
+          component: EditGroup,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "roles",
+          name: "roles",
+          component: AppRoles,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "roles/edit/:role_name",
+          name: "editRole",
+          component: EditRole,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+      ],
     },
     {
       path: "member_subscription",

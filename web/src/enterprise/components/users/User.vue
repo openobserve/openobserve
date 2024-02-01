@@ -151,12 +151,15 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import usersService from "@/services/users";
-import UpdateUserRole from "@/components/users/UpdateRole.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { validateEmail } from "@/utils/zincutils";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
+import {
+  getImageURL,
+  verifyOrganizationStatus,
+  maskText,
+} from "@/utils/zincutils";
 
 export default defineComponent({
   name: "UserPageCloud",

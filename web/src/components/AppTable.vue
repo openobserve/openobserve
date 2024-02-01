@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     5. Component should have highlight property to highlight search text
     6. Rows should have boolean property to expand row. expandable: true
    -->
-  <div :style="{ height: height }" class="app-table-container">
+  <div :style="{ height: height, marginTop: 0 }" class="app-table-container">
     <template v-if="!rows.length">
       <div class="q-pt-md text-center text-subtitle">No Data Found</div>
     </template>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         flat
         bordered
-        ref="tableRef"
+        ref="qTableRef"
         :title="title"
         :rows="rows"
         :columns="(columns as [])"
@@ -41,9 +41,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll="virtualScroll"
         :virtual-scroll-item-size="48"
         :rows-per-page-options="[0]"
+        :pagination="_pagination"
+        :dense="dense"
+        :hide-header="hideHeader"
+        :filter="filter && filter.value"
+        :filter-method="filter && filter.method"
         @virtual-scroll="onScroll"
         class="full-height"
-        hide-bottom
+        :hide-bottom="!showPagination"
       >
         <template v-slot:header="props">
           <q-tr :props="props" class="thead-sticky">
@@ -66,7 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleDataClick(col.name, props.row)"
             >
               <template v-if="col.slot">
-                <slot :name="col.slotName" :column="props" />
+                <slot
+                  :name="col.slotName"
+                  :column="{ ...props }"
+                  :columnName="col.name"
+                />
               </template>
               <template v-else-if="col.type === 'action'">
                 <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
@@ -77,18 +86,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-td>
           </q-tr>
           <q-tr
-            v-show="props.expand"
+            v-show="props.row.expand"
             :props="props"
-            :key="`e_${props.row.index}`"
+            :key="`e_${props.row.index + 'entity'}`"
             class="q-virtual-scroll--with-prev"
+            style="transition: display 2s ease-in"
           >
-            <q-td colspan="100%">
-              <div class="text-left">
-                This is expand slot for row above: {{ props.row.name }} (Index:
-                {{ props.row.index }}).
-              </div>
+            <q-td colspan="100%" style="padding: 0; border-bottom: none">
+              <slot :name="props.row.slotName" :row="props" />
             </q-td>
           </q-tr>
+        </template>
+        <template v-if="showPagination" #bottom="scope">
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </template>
       </q-table>
     </template>
@@ -96,7 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-defineProps({
+import type { QTable } from "quasar";
+import type { Ref } from "vue";
+import { ref } from "vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { computed } from "vue";
+
+const props = defineProps({
   columns: {
     type: Array,
     required: true,
@@ -131,10 +153,56 @@ defineProps({
     type: String,
     default: "100%",
   },
+  pagination: {
+    type: Boolean,
+    default: false,
+  },
+  rowsPerPage: {
+    type: Number,
+    default: 20,
+  },
+  dense: {
+    type: Boolean,
+    default: false,
+  },
+  hideHeader: {
+    type: Boolean,
+    default: false,
+  },
+  filter: {
+    type: Object,
+    default: () => null,
+  },
 });
 
 const emit = defineEmits(["event-emitted"]);
 
+const perPageOptions: any = [
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+  { label: "All", value: 0 },
+];
+
+const resultTotal = ref<number>(0);
+const selectedPerPage = ref<number>(20);
+
+const qTableRef: Ref<InstanceType<typeof QTable> | null> = ref(null);
+
+const showPagination = computed(() => {
+  return props.pagination;
+});
+
+const _pagination: any = ref({
+  rowsPerPage: props.rowsPerPage,
+});
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  _pagination.value.rowsPerPage = val.value;
+  qTableRef.value?.setPagination(_pagination.value);
+};
 const handleDataClick = (columnName: string, row: any) => {
   emit("event-emitted", "cell-click", { columnName, row });
 };
@@ -162,6 +230,13 @@ const onScroll = (e: any) => {
   .q-table--dark .thead-sticky,
   .q-table--dark .tfoot-sticky {
     background: #565656 !important;
+  }
+
+  .q-table__bottom {
+    .q-table__control {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
   }
 }
 </style>

@@ -33,7 +33,6 @@ import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue"
 import Usage from "@/enterprise/components/billings/usage.vue";
 import { routeGuard } from "@/utils/zincutils";
 
-
 const useEnvRoutes = () => {
   const parentRoutes = [
     {
@@ -55,7 +54,6 @@ const useEnvRoutes = () => {
         } else {
           window.location.href = getLoginURL();
         }
-
       },
     },
     {

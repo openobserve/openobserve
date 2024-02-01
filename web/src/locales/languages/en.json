@@ -44,7 +44,14 @@
     "process": "Process",
     "axisWidth": "Axis Width",
     "legendWidth": "Legend Width",
-    "exceptions": "Exceptions"
+    "exceptions": "Exceptions",
+    "nameRequired": "Name is required",
+    "edit": "Edit",
+    "delete": "Delete",
+    "actions": "Actions",
+    "type": "Type",
+    "search": "Search",
+    "expand": "Expand"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -121,7 +128,8 @@
     "docs": "Docs",
     "billings": "Billing",
     "rum": "Real User Monitoring",
-    "settings": "Settings"
+    "settings": "Settings",
+    "iam": "IAM"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -227,6 +235,29 @@
     "deleteAPIKeyMessage": "Are you sure you want to delete this User API Key? This action cannot be undone. Click OK to confirm.",
     "apiKeyNotFound": "User API Key Not Found.",
     "allowedOrg": "Allowed Organization"
+  },
+  "iam": {
+    "users": "Users",
+    "groups": "User Groups",
+    "roles": "Roles",
+    "organizations": "Organizations",
+    "addGroup": "Add Group",
+    "addRole": "Add Role",
+    "roleName": "Role Name",
+    "groupName": "Group Name",
+    "permissionName": "Permission Name",
+    "permission": "Permission",
+    "all": "All",
+    "list": "List",
+    "get": "Get",
+    "create": "Create",
+    "update": "Update",
+    "delete": "Delete",
+    "entityName": "Entity Name",
+    "userName": "User Name",
+    "resourceName": "Resource Name",
+    "searchRole": "Search Role",
+    "searchGroup": "Search Group"
   },
   "ticket": {
     "header": "Support Tickets",
