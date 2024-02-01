@@ -51,7 +51,7 @@
     <div
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
-      Action:
+      Action*:
       <q-btn
         :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
         size="sm"
@@ -97,7 +97,7 @@
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
         <div class="dropdownDiv">
-          <div class="dropdownLabel">Select Folder:</div>
+          <div class="dropdownLabel">Select Folder*:</div>
           <q-select
             v-model="drilldownData.data.folder"
             :options="folderList"
@@ -106,19 +106,21 @@
           />
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.folder">
-          <div class="dropdownLabel">Select Dashboard:</div>
+          <div class="dropdownLabel">Select Dashboard*:</div>
           <q-select
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
             class="dropdown"
+            emit-value
           />
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
-          <div class="dropdownLabel">Select Tab:</div>
+          <div class="dropdownLabel">Select Tab*:</div>
           <q-select
             v-model="drilldownData.data.tab"
-            :options="[]"
+            :options="tabList"
             class="dropdown"
+            emit-value
           />
         </div>
 
@@ -139,13 +141,14 @@
               size="sm"
               padding="sm"
               @click="
-                () => drilldownData.data.variables.push({ name: '', value: '' })
+                () =>
+                  drilldownData.data.queryParams.push({ name: '', value: '' })
               "
               >Add Query</q-btn
             >
           </div>
           <div
-            v-for="(variable, index) in drilldownData.data.variables"
+            v-for="(variable, index) in drilldownData.data.queryParams"
             :key="index"
           >
             <div style="display: flex; gap: 10px; margin-bottom: 10px">
@@ -156,7 +159,7 @@
                 size="20px"
                 :name="outlinedDelete"
                 style="cursor: pointer; height: 35px; display: flex !important"
-                @click="() => drilldownData.data.variables.splice(index, 1)"
+                @click="() => drilldownData.data.queryParams.splice(index, 1)"
               />
             </div>
           </div>
@@ -193,6 +196,7 @@
         @click="() => {}"
         style="min-width: 60px"
         data-test="confirm-button"
+        :disable="isFormValid"
       >
         {{ t("confirmDialog.ok") }}
       </q-btn>
@@ -224,6 +228,8 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const dashboardList = ref([]);
+    const tabList = ref([]);
     const drilldownData: any = ref({
       name: "",
       type: "",
@@ -233,7 +239,7 @@ export default defineComponent({
         folder: "",
         dashboard: "",
         tab: "",
-        variables: [
+        queryParams: [
           {
             label: "",
             value: "",
@@ -284,11 +290,40 @@ export default defineComponent({
       );
     });
 
-    const dashboardList = ref([]);
-
     watch(
       () => drilldownData.value.data.folder,
       async () => {
+        // get folder data
+        const folderData = store.state.organizationData.folders?.find(
+          (folder: any) => folder.name === drilldownData.value.data.folder
+        );
+
+        if (!folderData) {
+          dashboardList.value = [];
+          return;
+        }
+
+        // get all dashboards from folder
+        const allDashboardList = await getAllDashboardsByFolderId(
+          store,
+          folderData?.folderId
+        );
+
+        // make list of dashboards
+        dashboardList.value =
+          allDashboardList?.map((dashboard: any) => {
+            return {
+              label: dashboard.title,
+              value: dashboard.title,
+            };
+          }) ?? [];
+      }
+    );
+
+    watch(
+      () => drilldownData.value.data.dashboard,
+      async () => {
+        // get folder data
         const folderData = store.state.organizationData.folders?.find(
           (folder: any) => folder.name === drilldownData.value.data.folder
         );
@@ -303,15 +338,55 @@ export default defineComponent({
           folderData?.folderId
         );
 
-        dashboardList.value =
-          allDashboardList?.map((dashboard: any) => {
+        // get dashboard data
+        const dashboardData = allDashboardList?.find(
+          (dashboard: any) =>
+            dashboard.title === drilldownData.value.data.dashboard
+        );
+
+        if (!dashboardData) {
+          dashboardList.value = [];
+          return;
+        }
+
+        // make list of tabs
+        tabList.value =
+          dashboardData?.tabs?.map((tab: any) => {
             return {
-              label: dashboard.title,
-              value: dashboard.title,
+              label: tab.name,
+              value: tab.name,
             };
           }) ?? [];
       }
     );
+
+    const isFormValid = computed(() => {
+      // if name is empty
+      if (!drilldownData.value.name.trim()) {
+        return true;
+      }
+
+      // if action is not selected
+      if (!drilldownData.value.type) {
+        return true;
+      }
+
+      // if action is by url
+      if (drilldownData.value.type == "byUrl") {
+        if (drilldownData.value.data.url.trim()) {
+          return false;
+        }
+      } else {
+        if (
+          drilldownData.value.data.folder &&
+          drilldownData.value.data.dashboard &&
+          drilldownData.value.data.tab
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
 
     return {
       t,
@@ -321,6 +396,8 @@ export default defineComponent({
       store,
       folderList,
       dashboardList,
+      tabList,
+      isFormValid,
     };
   },
 });
