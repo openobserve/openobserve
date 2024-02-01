@@ -248,6 +248,27 @@ export default defineComponent({
       }
     });
 
+    // on folder change, reset dashboard and tab values
+    watch(
+      () => drilldownData.value.data.folder,
+      (newVal, oldVal) => {
+        if (newVal !== oldVal) {
+          drilldownData.value.data.dashboard = "";
+          drilldownData.value.data.tab = "";
+        }
+      }
+    );
+
+    // on dashboard change, reset tab value
+    watch(
+      () => drilldownData.value.data.dashboard,
+      (newVal, oldVal) => {
+        if (newVal !== oldVal) {
+          drilldownData.value.data.tab = "";
+        }
+      }
+    );
+
     const folderList = computed(() => {
       if (!store.state.organizationData.folders) {
         return [];
