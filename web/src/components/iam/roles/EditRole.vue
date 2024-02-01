@@ -91,6 +91,7 @@
         ref="permissionTableRef"
         :rows="permissionsState.permissions"
         :filter="filter"
+        :visibleResourceCount="countOfVisibleResources"
         @updated:permission="handlePermissionChange"
         @expand:row="expandPermission"
       />
@@ -183,7 +184,7 @@ const addedPermissions: any = ref({});
 
 const removedPermissions: any = ref({});
 
-const permissionTableRows: Ref<Resource[]> = ref([]);
+const countOfVisibleResources = ref(0);
 
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
@@ -555,6 +556,7 @@ const updateTableData = async (value: string = filter.value.permissions) => {
   await nextTick();
 
   updatePermissionVisibility(permissionsState.permissions);
+  countVisibleResources(permissionsState.permissions);
 };
 
 const updateExpandedResources = (resources: (Resource | Entity)[]) => {
@@ -576,6 +578,24 @@ const updateExpandedResources = (resources: (Resource | Entity)[]) => {
       updateExpandedResources(resource.entities);
     }
   });
+};
+
+const countVisibleResources = (permissions: (Resource | Entity)[]): number => {
+  let count = 0;
+
+  permissions.forEach((permission: Entity | Resource) => {
+    if (permission.show) {
+      count += 1;
+    }
+
+    // Recursively count in nested entities
+    if (permission.entities?.length) {
+      count += countVisibleResources(permission.entities);
+    }
+  });
+
+  countOfVisibleResources.value = count;
+  return count;
 };
 
 const updatePermissionVisibility = (
@@ -644,6 +664,7 @@ const filterRowsByResourceName = (
 
 const onResourceChange = () => {
   updatePermissionVisibility(permissionsState.permissions);
+  countVisibleResources(permissionsState.permissions);
 };
 
 function filterResources(rows: any, terms: any) {
@@ -672,13 +693,16 @@ function filterResources(rows: any, terms: any) {
 const expandPermission = async (resource: any) => {
   const expand = !resource.expand;
 
-  if (expand) {
-    resource.is_loading = true;
-    await getResourceEntities(resource);
-    resource.is_loading;
-  }
-
   resource.expand = expand;
+  if (expand) {
+    try {
+      resource.is_loading = true;
+      await getResourceEntities(resource);
+      resource.is_loading = false;
+    } catch (err) {
+      console.log(err);
+    }
+  }
 };
 
 const getPermissionHash = (
@@ -717,6 +741,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
   return new Promise(async (resolve, reject) => {
     if (!resource.entities?.length)
       await listEntitiesFnMap[resource.resourceName](resource);
+
     resolve(true);
   });
 };
@@ -957,7 +982,7 @@ const updateEntityEntities = (
         entities: [],
         type: "Resource",
         resourceName: hasEntities
-          ? entity.entities[0].resourceName
+          ? entity?.entities[0]?.resourceName
           : entity.resourceName,
         isSelected: false,
         has_entities: hasEntities,
@@ -1033,7 +1058,7 @@ const updateResourceEntities = (
       entities: [],
       type: "Resource",
       resourceName: hasEntities
-        ? resource.childs[0].resourceName
+        ? resource?.childs[0]?.resourceName
         : resourceName,
       isSelected: false,
       has_entities: hasEntities,
