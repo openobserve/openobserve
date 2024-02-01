@@ -1040,12 +1040,10 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
-      if (!isValid()) {
-        return;
-      }
-
       // if chart type is html, no need to save query else it will call an api call
       if (dashboardPanelData.data.type == "html") {
+        // for promql we have validation that query should not be empty. that's why we are giving type as sql
+        dashboardPanelData.data.queryType = "sql";
         dashboardPanelData.data.queries = [
           {
             query: "",
@@ -1072,6 +1070,9 @@ export default defineComponent({
             },
           },
         ];
+      }
+      if (!isValid()) {
+        return;
       }
 
       if (editMode.value) {
