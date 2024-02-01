@@ -18,18 +18,19 @@ use actix_web::{get, post, put, web, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::RolePermissionRequest;
 
-use crate::common::meta::user::{UserGroup, UserGroupRequest};
+use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/roles")]
 pub async fn create_role(
     org_id: web::Path<String>,
-    role_id: web::Json<String>,
+    user_req: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    let role_id = role_id.into_inner();
+    let user_req = user_req.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::create_role(&role_id, &org_id).await {
+    match o2_enterprise::enterprise::openfga::authorizer::create_role(&user_req.name, &org_id).await
+    {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
@@ -39,7 +40,7 @@ pub async fn create_role(
 #[post("/{org_id}/roles")]
 pub async fn create_role(
     _org_id: web::Path<String>,
-    _role_id: web::Json<String>,
+    _role_id: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
@@ -94,7 +95,7 @@ pub async fn get_role_permissions(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, role_id, resource) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::get_all_role_permissions(
+    match o2_enterprise::enterprise::openfga::authorizer::get_role_permissions(
         &org_id, &role_id, &resource,
     )
     .await
@@ -105,7 +106,7 @@ pub async fn get_role_permissions(
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[get("/{org_id}/roles/{role_id}/permissions")]
+#[get("/{org_id}/roles/{role_id}/permissions/{resource}")]
 pub async fn get_role_permissions(
     _path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
@@ -206,5 +207,21 @@ pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<Http
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/groups/{group_name}")]
 pub async fn get_group_details(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/{org_id}/resources")]
+pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    use o2_enterprise::enterprise::openfga::meta::mapping::Resource;
+    let resources = o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS
+        .values()
+        .collect::<Vec<&Resource>>();
+    Ok(HttpResponse::Ok().json(resources))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/resources")]
+pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

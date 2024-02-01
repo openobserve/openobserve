@@ -17,17 +17,23 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
-use config::{ider, meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    ider,
+    meta::{
+        stream::StreamType,
+        usage::{RequestStats, UsageType},
+    },
+    metrics,
+    utils::{base64, json},
+    CONFIG, DISTINCT_FIELDS,
+};
+use infra::errors;
 
 use crate::{
     common::{
-        infra::{config::STREAM_SCHEMAS, errors},
-        meta::{
-            self,
-            http::HttpResponse as MetaHttpResponse,
-            usage::{RequestStats, UsageType},
-        },
-        utils::{base64, functions, http::get_stream_type_from_request, json},
+        infra::config::STREAM_SCHEMAS,
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::{functions, http::get_stream_type_from_request},
     },
     service::{search as SearchService, usage::report_request_usage_stats},
 };
@@ -124,6 +130,12 @@ pub async fn search(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
+    let user_id = in_req.headers().get("user_id").unwrap();
+    let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
+    let resp: SearchService::sql::Sql = crate::service::search::sql::Sql::new(&rpc_req)
+        .await
+        .unwrap();
+
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
@@ -131,14 +143,6 @@ pub async fn search(
             infra::config::USERS,
             utils::auth::{is_root_user, AuthExtractor},
         };
-
-        // println!("Checking permissions on stream");
-        // For getting stream name from query to check permission
-        let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
-        let resp = crate::service::search::sql::Sql::new(&rpc_req)
-            .await
-            .unwrap();
-        let user_id = in_req.headers().get("user_id").unwrap();
 
         if !is_root_user(user_id.to_str().unwrap()) {
             let user: meta::user::User = USERS
@@ -152,7 +156,7 @@ pub async fn search(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("stream:{}", resp.stream_name),
+                        o2_type: format!("stream:{}_{}", stream_type, resp.stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
                     },
@@ -182,12 +186,18 @@ pub async fn search(
     }
 
     // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
     if !CONFIG.common.feature_query_queue_enabled {
         drop(locker);
     }
+    #[cfg(not(feature = "enterprise"))]
     let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
 
     // do search
     match SearchService::search(&session_id, &org_id, stream_type, &req).await {
@@ -214,18 +224,24 @@ pub async fn search(
             res.set_session_id(session_id);
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
+            println!(
+                "user {} query {}",
+                user_id.to_str().unwrap(),
+                resp.origin_sql
+            );
             let req_stats = RequestStats {
                 records: res.hits.len() as i64,
                 response_time: time,
                 size: res.scan_size as f64,
                 request_body: Some(req.query.sql),
+                user_email: Some(user_id.to_str().unwrap().to_string()),
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
             report_request_usage_stats(
                 req_stats,
                 &org_id,
-                "", // TODO see if we can steam name
+                &resp.stream_name,
                 StreamType::Logs,
                 UsageType::Search,
                 num_fn,

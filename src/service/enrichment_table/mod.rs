@@ -22,20 +22,23 @@ use actix_web::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
+use config::{
+    cluster,
+    meta::{
+        stream::{PartitionTimeLevel, StreamType},
+        usage::UsageType,
+    },
+    utils::{json, schema_ext::SchemaExt},
+    CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
+use infra::cache::stats;
 
 use crate::{
     common::{
-        infra::{cache::stats, cluster, config::STREAM_SCHEMAS},
-        meta::{
-            self,
-            http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, SchemaRecords},
-            usage::UsageType,
-        },
-        utils::json,
+        infra::config::STREAM_SCHEMAS,
+        meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     },
     service::{
         compact::retention,

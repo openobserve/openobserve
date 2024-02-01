@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::{infra::db as infra_db, utils::json};
+use config::utils::json;
+use infra::db as infra_db;
+
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel;
 
 pub mod alerts;
 pub mod compact;
@@ -53,4 +57,72 @@ pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow::anyhow!(e)),
     }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::openfga::model::{
+        create_open_fga_store, read_ofga_model, write_auth_models,
+    };
+
+    let meta = read_ofga_model().await;
+    if let Some(existig_model) = existing_meta {
+        if meta.version == existig_model.version {
+            Ok(())
+        } else {
+            let store_id = if existig_model.store_id.is_empty() {
+                create_open_fga_store().await.unwrap()
+            } else {
+                existig_model.store_id
+            };
+
+            match write_auth_models(&meta, &store_id).await {
+                Ok(_) => {
+                    let db = infra_db::get_db().await;
+                    let key = "/ofga/model";
+                    match db
+                        .put(
+                            key,
+                            json::to_vec(&meta).unwrap().into(),
+                            infra_db::NO_NEED_WATCH,
+                        )
+                        .await
+                    {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(anyhow::anyhow!(e)),
+                    }
+                }
+                Err(e) => Err(anyhow::anyhow!(e)),
+            }
+        }
+    } else {
+        let store_id = create_open_fga_store().await.unwrap();
+        match write_auth_models(&meta, &store_id).await {
+            Ok(_) => {
+                let db = infra_db::get_db().await;
+                let key = "/ofga/model";
+                match db
+                    .put(
+                        key,
+                        json::to_vec(&meta).unwrap().into(),
+                        infra_db::NO_NEED_WATCH,
+                    )
+                    .await
+                {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(anyhow::anyhow!(e)),
+                }
+            }
+            Err(e) => Err(anyhow::anyhow!(e)),
+        }
+    }
+}
+#[cfg(feature = "enterprise")]
+pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
+    let db = infra_db::get_db().await;
+    let key = "/ofga/model";
+    let ret = db.get(key).await?;
+    let loc_value = json::from_slice(&ret).unwrap();
+    let value = Some(loc_value);
+    Ok(value)
 }

@@ -13,13 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{
+    cluster::{is_compactor, LOCAL_NODE_ROLE},
+    CONFIG,
+};
 use tokio::time;
 
-use crate::{common::infra::cluster::is_compactor, service};
+use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !is_compactor(&super::cluster::LOCAL_NODE_ROLE) {
+    if !is_compactor(&LOCAL_NODE_ROLE) {
         return Ok(());
     }
 

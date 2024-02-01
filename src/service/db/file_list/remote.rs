@@ -21,18 +21,13 @@ use std::{
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use config::{meta::stream::FileKey, CONFIG};
+use config::{meta::stream::FileKey, utils::json, CONFIG};
 use futures::future::try_join_all;
+use infra::{cache::stats, file_list as infra_file_list, storage};
 use once_cell::sync::Lazy;
 use tokio::{sync::RwLock, time};
 
-use crate::{
-    common::{
-        infra::{cache::stats, file_list as infra_file_list, storage},
-        utils::json,
-    },
-    service::db,
-};
+use crate::service::db;
 
 pub static LOADED_FILES: Lazy<RwLock<HashSet<String>>> =
     Lazy::new(|| RwLock::new(HashSet::with_capacity(24)));

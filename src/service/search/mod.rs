@@ -20,12 +20,18 @@ use std::{
 };
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
-use ahash::AHashMap as HashMap;
 use chrono::Duration;
 use config::{
+    cluster::{is_ingester, is_querier},
     ider,
-    meta::stream::{FileKey, QueryPartitionStrategy, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+    utils::{flatten, json, str::find},
     CONFIG,
+};
+use hashbrown::HashMap;
+use infra::{
+    dist_lock,
+    errors::{Error, ErrorCodes},
 };
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
@@ -36,16 +42,12 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
-        infra::{
-            cluster, dist_lock,
-            errors::{Error, ErrorCodes},
-        },
+        infra::cluster,
         meta::{
             functions::VRLResultResolver,
             search,
-            stream::{PartitionTimeLevel, ScanStats, StreamParams},
+            stream::{ScanStats, StreamParams},
         },
-        utils::{flatten, json, str::find},
     },
     handler::grpc::cluster_rpc,
     service::{file_list, format_partition_key, stream},
@@ -204,21 +206,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let stream_type = StreamType::from(req.stream_type.as_str());
     let meta = sql::Sql::new(&req).await?;
 
-    // get a cluster search queue lock
-    let locker = dist_lock::lock("search/cluster_queue", 0).await?;
-    let took_wait = start.elapsed().as_millis() as usize;
-
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
-    let querier_num = match nodes
-        .iter()
-        .filter(|node| cluster::is_querier(&node.role))
-        .count()
-    {
+    let querier_num = match nodes.iter().filter(|node| is_querier(&node.role)).count() {
         0 => 1,
         n => n,
     };
@@ -237,6 +231,37 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let file_list = get_file_list(&session_id, &meta, stream_type, partition_time_level).await;
+    #[cfg(not(feature = "enterprise"))]
+    let work_group: Option<String> = None;
+    // 1. get work group
+    #[cfg(feature = "enterprise")]
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
+        Some(o2_enterprise::enterprise::search::queue::predict_work_group(&nodes, &file_list));
+    // 2. check concurrency
+    let locker_key = if work_group.is_none() {
+        "search/cluster_queue/global".to_string()
+    } else {
+        format!("search/cluster_queue/{}", work_group.as_ref().unwrap())
+    };
+    // get a cluster search queue lock
+    let locker = dist_lock::lock(&locker_key, 0).await?;
+    #[cfg(feature = "enterprise")]
+    while o2_enterprise::enterprise::search::queue::need_wait(work_group.as_ref().unwrap())
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?
+    {
+        // wait in the queue
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+    // 3. process the search in the work group
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::search::queue::process(work_group.as_ref().unwrap(), &session_id)
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    #[cfg(feature = "enterprise")]
+    dist_lock::unlock(&locker).await?;
+    let took_wait = start.elapsed().as_millis() as usize;
+
     let mut partition_files = None;
     let mut file_num = file_list.len();
     let offset = match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
@@ -276,7 +301,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         job.partition = partition_no as i32;
         req.job = Some(job);
         req.stype = cluster_rpc::SearchType::WalOnly as i32;
-        let is_querier = cluster::is_querier(&node.role);
+        let is_querier = is_querier(&node.role);
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as i32;
@@ -303,7 +328,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                         offset_start += offset;
                     }
                 };
-            } else if !cluster::is_ingester(&node.role) {
+            } else if !is_ingester(&node.role) {
                 continue; // no need more querier
             }
         }
@@ -392,22 +417,35 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 Ok(res) => results.push(res),
                 Err(err) => {
                     // search done, release lock
+                    #[cfg(not(feature = "enterprise"))]
                     dist_lock::unlock(&locker).await?;
+                    #[cfg(feature = "enterprise")]
+                    o2_enterprise::enterprise::search::queue::done(
+                        work_group.as_ref().unwrap(),
+                        &session_id,
+                    )
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
                     return Err(err);
                 }
             },
             Err(e) => {
                 // search done, release lock
+                #[cfg(not(feature = "enterprise"))]
                 dist_lock::unlock(&locker).await?;
+                #[cfg(feature = "enterprise")]
+                o2_enterprise::enterprise::search::queue::done(
+                    work_group.as_ref().unwrap(),
+                    &session_id,
+                )
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     e.to_string(),
                 )));
             }
         }
     }
-
-    // search done, release lock
-    dist_lock::unlock(&locker).await?;
 
     // merge multiple instances data
     let mut scan_stats = ScanStats::new();
@@ -458,6 +496,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         {
             Ok(res) => res,
             Err(err) => {
+                // search done, release lock
+                #[cfg(not(feature = "enterprise"))]
+                dist_lock::unlock(&locker).await?;
+                #[cfg(feature = "enterprise")]
+                o2_enterprise::enterprise::search::queue::done(
+                    work_group.as_ref().unwrap(),
+                    &session_id,
+                )
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     err.to_string(),
                 )));
@@ -465,6 +513,14 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         };
         merge_batches.insert(name, batch);
     }
+
+    // search done, release lock
+    #[cfg(not(feature = "enterprise"))]
+    dist_lock::unlock(&locker).await?;
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::search::queue::done(work_group.as_ref().unwrap(), &session_id)
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

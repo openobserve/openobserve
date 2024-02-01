@@ -17,23 +17,27 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{http, http::StatusCode, HttpResponse};
 use config::{
-    is_local_disk_storage, meta::stream::StreamType, CONFIG, SIZE_IN_MB,
-    SQL_FULL_TEXT_SEARCH_FIELDS,
+    is_local_disk_storage,
+    meta::{
+        stream::{PartitionTimeLevel, StreamStats, StreamType},
+        usage::Stats,
+    },
+    utils::json,
+    CONFIG, SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
+use infra::cache::stats;
 
 use crate::{
     common::{
-        infra::{cache::stats, config::STREAM_SCHEMAS},
+        infra::config::STREAM_SCHEMAS,
         meta::{
             self,
             authz::Authz,
             http::HttpResponse as MetaHttpResponse,
             prom,
-            stream::{PartitionTimeLevel, Stream, StreamProperty, StreamSettings, StreamStats},
-            usage::Stats,
+            stream::{Stream, StreamProperty, StreamSettings},
         },
-        utils::json,
     },
     service::{db, metrics::get_prom_metadata_from_schema, search as SearchService},
 };
@@ -265,7 +269,12 @@ pub async fn delete_stream(
         );
     };
 
-    crate::common::utils::auth::remove_ownership(org_id, "streams", Authz::new(stream_name)).await;
+    crate::common::utils::auth::remove_ownership(
+        org_id,
+        "streams",
+        Authz::new(&format!("{stream_type}_{stream_name}")),
+    )
+    .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         StatusCode::OK.into(),

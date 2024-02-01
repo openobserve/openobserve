@@ -16,15 +16,15 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
-use config::meta::stream::StreamType;
+use config::{
+    meta::stream::StreamType,
+    utils::{json, time::BASE_TIME},
+};
+use infra::cache::stats;
 use vrl::prelude::NotNan;
 
 use crate::{
-    common::{
-        infra::cache::stats,
-        meta::{self, search::Request},
-        utils::{json, time::BASE_TIME},
-    },
+    common::meta::{self, search::Request},
     service::search as SearchService,
 };
 

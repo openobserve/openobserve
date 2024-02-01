@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::{infra::db as infra_db, meta::dashboards::Folder, utils::json};
+use config::utils::json;
+use infra::db as infra_db;
+
+use crate::common::meta::dashboards::Folder;
 
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow::Error> {

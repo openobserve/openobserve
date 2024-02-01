@@ -17,28 +17,31 @@ use std::{collections::HashMap, sync::Arc};
 
 use actix_web::web;
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
+use config::{
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
+    FxIndexMap, CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
+use infra::{
+    cache::stats,
+    errors::{Error, Result},
+};
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 
 use crate::{
     common::{
-        infra::{
-            cache::stats,
-            cluster::{self, LOCAL_NODE_UUID},
-            config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-            errors::{Error, Result},
-        },
+        infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
         meta::{
             alerts,
             functions::StreamTransform,
             prom::*,
             search,
             stream::{PartitioningDetails, SchemaRecords},
-            usage::UsageType,
         },
-        utils::{json, time::parse_i64_to_timestamp_micros},
     },
     service::{
         db, format_stream_name,
@@ -316,7 +319,7 @@ pub async fn remote_write(
                 CONFIG.common.column_timestamp.clone(),
                 json::Value::Number(timestamp.into()),
             );
-            let value_str = crate::common::utils::json::to_string(&val_map).unwrap();
+            let value_str = config::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
             if schema_evolved.get(&metric_name).is_none()
@@ -452,7 +455,7 @@ pub async fn remote_write(
 
 pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<ResponseMetadata> {
     if req.limit == Some(0) {
-        return Ok(ahash::HashMap::default());
+        return Ok(hashbrown::HashMap::new());
     }
 
     let stream_type = StreamType::Metrics;
@@ -462,7 +465,7 @@ pub(crate) async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<R
             .await
             // `db::schema::get` never fails, so it's safe to unwrap
             .unwrap();
-        let mut resp = ahash::HashMap::default();
+        let mut resp = hashbrown::HashMap::new();
         if schema != Schema::empty() {
             resp.insert(
                 metric_name,
@@ -639,7 +642,7 @@ pub(crate) async fn get_labels(
         Err(_) => return Ok(vec![]),
         Ok(schemas) => schemas,
     };
-    let mut label_names = ahash::HashSet::default();
+    let mut label_names = hashbrown::HashSet::new();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name {
             if *metric_name != schema.stream_name {
@@ -779,7 +782,11 @@ fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
             // `match[]` argument does not contain a metric name.
             // Check if there is `__name__` among the matchers,
             // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector.matchers.find_matcher_value(NAME_LABEL)
+            selector
+                .matchers
+                .find_matchers(NAME_LABEL)
+                .first()
+                .map(|m| m.value.clone())
         }
     }
 }
@@ -804,7 +811,7 @@ async fn prom_ha_handler(
             ClusterLeader {
                 name: replica_label.to_owned(),
                 last_received: curr_ts,
-                updated_by: LOCAL_NODE_UUID.to_string(),
+                updated_by: cluster::LOCAL_NODE_UUID.to_string(),
             },
         );
         _accept_record = true;

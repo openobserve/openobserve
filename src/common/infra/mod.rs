@@ -13,22 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cache;
 pub mod cluster;
 pub mod config;
-pub mod db;
-pub mod dist_lock;
-pub mod errors;
-pub mod file_list;
-pub mod storage;
 pub mod wal;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     wal::init().await?;
-    cache::init().await?;
-    db::init().await?;
-    db::create_table().await?;
-    file_list::create_table().await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())

@@ -13,33 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{net::IpAddr, sync::Arc};
+use std::sync::Arc;
 
 use config::{
-    cluster::LOCAL_NODE_ID,
-    ider,
+    cluster::*,
     meta::cluster::{Node, NodeStatus, Role},
+    utils::json,
     RwHashMap, CONFIG, INSTANCE_ID,
 };
 use etcd_client::PutOptions;
+use infra::{
+    db::{etcd, get_coordinator, Event},
+    errors::{Error, Result},
+};
 use once_cell::sync::Lazy;
 
-use crate::{
-    common::{
-        infra::{
-            db::{etcd, Event},
-            errors::{Error, Result},
-        },
-        utils::json,
-    },
-    service::db,
-};
+use crate::service::db;
 
-static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
-static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
-
-pub static LOCAL_NODE_UUID: Lazy<String> = Lazy::new(load_local_node_uuid);
-pub static LOCAL_NODE_ROLE: Lazy<Vec<Role>> = Lazy::new(load_local_node_role);
 static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
 
 /// Register and keepalive the node to cluster
@@ -329,7 +319,7 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
 }
 
 async fn watch_node_list() -> Result<()> {
-    let cluster_coordinator = super::db::get_coordinator().await;
+    let cluster_coordinator = get_coordinator().await;
     let key = "/nodes/";
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
@@ -410,167 +400,23 @@ pub fn load_local_mode_node() -> Node {
 }
 
 #[inline(always)]
-fn load_local_node_uuid() -> String {
-    ider::uuid()
-}
-
-#[inline(always)]
-pub fn get_local_http_ip() -> String {
-    if !CONFIG.http.addr.is_empty() {
-        CONFIG.http.addr.clone()
-    } else {
-        get_local_node_ip()
-    }
-}
-
-#[inline(always)]
-pub fn get_local_grpc_ip() -> String {
-    if !CONFIG.grpc.addr.is_empty() {
-        CONFIG.grpc.addr.clone()
-    } else {
-        get_local_node_ip()
-    }
-}
-
-#[inline(always)]
-pub fn get_local_node_ip() -> String {
-    for adapter in get_if_addrs::get_if_addrs().unwrap() {
-        if !adapter.is_loopback() && matches!(adapter.ip(), IpAddr::V4(_)) {
-            return adapter.ip().to_string();
-        }
-    }
-    String::new()
-}
-
-#[inline(always)]
-pub fn load_local_node_role() -> Vec<Role> {
-    CONFIG
-        .common
-        .node_role
-        .clone()
-        .split(',')
-        .map(|s| s.parse().unwrap())
-        .collect()
-}
-
-#[inline(always)]
-pub fn is_ingester(role: &[Role]) -> bool {
-    role.contains(&Role::Ingester) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_querier(role: &[Role]) -> bool {
-    role.contains(&Role::Querier) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_compactor(role: &[Role]) -> bool {
-    role.contains(&Role::Compactor) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_router(role: &[Role]) -> bool {
-    role.contains(&Role::Router)
-}
-
-#[inline(always)]
-pub fn is_alert_manager(role: &[Role]) -> bool {
-    role.contains(&Role::AlertManager) || role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_single_node(role: &[Role]) -> bool {
-    role.contains(&Role::All)
-}
-
-#[inline(always)]
-pub fn is_offline() -> bool {
-    unsafe { LOCAL_NODE_STATUS == NodeStatus::Offline }
-}
-
-#[inline(always)]
 pub fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.get(uuid).map(|node| node.clone())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[tokio::test]
+#[ignore]
+async fn test_list_nodes() {
+    assert!(list_nodes().await.unwrap().is_empty());
+}
 
-    #[test]
-    fn test_convert_role() {
-        let parse = |s: &str| s.parse::<Role>().unwrap();
-
-        assert_eq!(parse("all"), Role::All);
-        assert_eq!(parse("ingester"), Role::Ingester);
-        assert_eq!(parse("querier"), Role::Querier);
-        assert_eq!(parse("compactor"), Role::Compactor);
-        assert_eq!(parse("router"), Role::Router);
-        assert_eq!(parse("alertmanager"), Role::AlertManager);
-        assert_eq!(parse("alertManager"), Role::AlertManager);
-        assert_eq!(parse("AlertManager"), Role::AlertManager);
-        assert!("alert_manager".parse::<Role>().is_err());
-    }
-
-    #[test]
-    fn test_is_querier() {
-        assert!(is_querier(&[Role::Querier]));
-        assert!(is_querier(&[Role::All]));
-        assert!(!is_querier(&[Role::Ingester]));
-    }
-
-    #[test]
-    fn test_is_ingester() {
-        assert!(is_ingester(&[Role::Ingester]));
-        assert!(is_ingester(&[Role::All]));
-        assert!(!is_ingester(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_is_compactor() {
-        assert!(is_compactor(&[Role::Compactor]));
-        assert!(is_compactor(&[Role::All]));
-        assert!(!is_compactor(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_is_router() {
-        assert!(is_router(&[Role::Router]));
-        assert!(!is_router(&[Role::All]));
-        assert!(!is_router(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_is_alert_manager() {
-        assert!(is_alert_manager(&[Role::AlertManager]));
-        assert!(is_alert_manager(&[Role::All]));
-        assert!(!is_alert_manager(&[Role::Querier]));
-    }
-
-    #[test]
-    fn test_load_local_node_uuid() {
-        assert!(!load_local_node_uuid().is_empty());
-    }
-
-    #[actix_web::test]
-    #[ignore]
-    async fn test_list_nodes() {
-        assert!(list_nodes().await.unwrap().is_empty());
-    }
-
-    #[actix_web::test]
-    async fn test_cluster() {
-        register_and_keepalive().await.unwrap();
-        set_online().await.unwrap();
-        leave().await.unwrap();
-        assert!(get_cached_online_nodes().is_some());
-        assert!(get_cached_online_query_nodes().is_some());
-        assert!(get_cached_online_ingester_nodes().is_some());
-        assert!(get_cached_online_querier_nodes().is_some());
-    }
-
-    #[test]
-    fn test_get_node_ip() {
-        assert!(!get_local_node_ip().is_empty());
-    }
+#[tokio::test]
+async fn test_cluster() {
+    register_and_keepalive().await.unwrap();
+    set_online().await.unwrap();
+    leave().await.unwrap();
+    assert!(get_cached_online_nodes().is_some());
+    assert!(get_cached_online_query_nodes().is_some());
+    assert!(get_cached_online_ingester_nodes().is_some());
+    assert!(get_cached_online_querier_nodes().is_some());
 }

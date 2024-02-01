@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::cluster;
 use tokio::time;
 
-use crate::{
-    common::infra::cluster,
-    service::db::file_list::{broadcast, local::BROADCAST_QUEUE},
-};
+use crate::service::db::file_list::{broadcast, local::BROADCAST_QUEUE};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {

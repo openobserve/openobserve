@@ -17,7 +17,9 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use config::utils::time::BASE_TIME;
 use futures::{stream::BoxStream, StreamExt};
+use infra::{cache::file_data, storage};
 use object_store::{
     path::Path, GetOptions, GetResult, GetResultPayload, ListResult, MultipartId, ObjectMeta,
     ObjectStore, PutOptions, PutResult, Result,
@@ -25,10 +27,6 @@ use object_store::{
 use tokio::io::AsyncWrite;
 
 use super::GetRangeExt;
-use crate::common::{
-    infra::{cache::file_data, storage},
-    utils::time::BASE_TIME,
-};
 
 /// File system with memory cache
 #[derive(Debug, Default)]

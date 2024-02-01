@@ -15,29 +15,23 @@
 
 use std::sync::Arc;
 
-use ahash::AHashMap as HashMap;
 use config::{
     is_local_disk_storage,
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     CONFIG,
 };
 use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
 use futures::future::try_join_all;
+use hashbrown::HashMap;
+use infra::{
+    cache::file_data,
+    errors::{Error, ErrorCodes},
+};
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::{
-        infra::{
-            cache::file_data,
-            errors::{Error, ErrorCodes},
-        },
-        meta::{
-            self,
-            search::SearchType,
-            stream::{PartitionTimeLevel, ScanStats},
-        },
-    },
+    common::meta::{self, search::SearchType, stream::ScanStats},
     service::{
         db, file_list,
         search::{

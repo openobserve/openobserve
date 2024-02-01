@@ -15,7 +15,7 @@
 
 use config::CONFIG;
 use http_auth_basic::Credentials;
-use tonic::{Request, Status};
+use tonic::{metadata::MetadataValue, Request, Status};
 
 use crate::common::{
     infra::{
@@ -79,6 +79,10 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         if user_id.eq(&user.email)
             && (credentials.password.eq(&user.password) || in_pass.eq(&user.password))
         {
+            let mut req = req;
+            let user_id_metadata = MetadataValue::try_from(&user_id).unwrap();
+            req.metadata_mut().append("user_id", user_id_metadata);
+
             Ok(req)
         } else {
             Err(Status::unauthenticated("No valid auth token"))
@@ -94,7 +98,7 @@ mod tests {
     use super::*;
     use crate::common::meta::user::User;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_no_auth() {
         INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
@@ -123,7 +127,7 @@ mod tests {
         assert!(res.is_err())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_auth() {
         INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(
@@ -150,7 +154,7 @@ mod tests {
         assert!(check_auth(request).is_ok())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_check_err_auth() {
         INSTANCE_ID.insert("instance_id".to_owned(), "instance".to_string());
         ROOT_USER.insert(

@@ -19,7 +19,13 @@ use actix_web::{http, web, HttpResponse};
 use arrow_schema::Schema;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{flatten, json},
+    CONFIG, DISTINCT_FIELDS,
+};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -28,16 +34,11 @@ use prost::Message;
 
 use super::StreamMeta;
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            ingestion::StreamStatus,
-            stream::{SchemaRecords, StreamParams},
-            usage::UsageType,
-        },
-        utils::{flatten, json},
+    common::meta::{
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        ingestion::StreamStatus,
+        stream::{SchemaRecords, StreamParams},
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
@@ -58,10 +59,18 @@ pub async fn logs_proto_handler(
     thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = ExportLogsServiceRequest::decode(body).expect("Invalid protobuf");
-    match super::otlp_grpc::handle_grpc_request(org_id, thread_id, request, false, in_stream_name)
-        .await
+    match super::otlp_grpc::handle_grpc_request(
+        org_id,
+        thread_id,
+        request,
+        false,
+        in_stream_name,
+        user_email,
+    )
+    .await
     {
         Ok(res) => Ok(res),
         Err(e) => {
@@ -83,6 +92,7 @@ pub async fn logs_json_handler(
     thread_id: usize,
     body: web::Bytes,
     in_stream_name: Option<&str>,
+    user_email: &str,
 ) -> Result<HttpResponse, std::io::Error> {
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
@@ -445,6 +455,7 @@ pub async fn logs_json_handler(
         .inc();
 
     req_stats.response_time = start.elapsed().as_secs_f64();
+    req_stats.user_email = Some(user_email.to_string());
     // metric + data usage
     report_request_usage_stats(
         req_stats,

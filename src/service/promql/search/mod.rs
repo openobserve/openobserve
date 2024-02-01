@@ -18,24 +18,23 @@ use std::{
     sync::Arc,
 };
 
-use ahash::AHashMap as HashMap;
-use config::{ider, meta::stream::StreamType, CONFIG};
+use config::{
+    ider,
+    meta::{
+        stream::StreamType,
+        usage::{RequestStats, UsageType},
+    },
+    CONFIG,
+};
 use futures::future::try_join_all;
+use hashbrown::HashMap;
+use infra::errors::{Error, ErrorCodes, Result};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::{
-            cluster,
-            errors::{Error, ErrorCodes, Result},
-        },
-        meta::{
-            stream::ScanStats,
-            usage::{RequestStats, UsageType},
-        },
-    },
+    common::{infra::cluster, meta::stream::ScanStats},
     handler::grpc::cluster_rpc,
     service::{
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
@@ -47,16 +46,24 @@ use crate::{
 pub mod grpc;
 
 #[tracing::instrument(skip_all, fields(org_id = org_id))]
-pub async fn search(org_id: &str, req: &MetricsQueryRequest, timeout: i64) -> Result<Value> {
+pub async fn search(
+    org_id: &str,
+    req: &MetricsQueryRequest,
+    timeout: i64,
+    user_email: &str,
+) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as _;
     req.timeout = timeout;
-    search_in_cluster(req).await
+    search_in_cluster(req, user_email).await
 }
 
 #[tracing::instrument(name = "promql:search:cluster", skip_all, fields(org_id = req.org_id))]
-async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Value> {
+async fn search_in_cluster(
+    req: cluster_rpc::MetricsQueryRequest,
+    user_email: &str,
+) -> Result<Value> {
     let op_start = std::time::Instant::now();
 
     // get querier nodes from cluster
@@ -264,6 +271,7 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
         size: scan_stats.original_size as f64,
         response_time: op_start.elapsed().as_secs_f64(),
         request_body: Some(req.query.unwrap().query),
+        user_email: Some(user_email.to_string()),
         ..Default::default()
     };
 
@@ -280,8 +288,8 @@ async fn search_in_cluster(req: cluster_rpc::MetricsQueryRequest) -> Result<Valu
 }
 
 fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = HashMap::default();
-    let mut merged_metrics = HashMap::default();
+    let mut merged_data = HashMap::new();
+    let mut merged_metrics = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric
@@ -290,7 +298,7 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
             .collect();
         let entry = merged_data
             .entry(signature(&labels))
-            .or_insert_with(HashMap::default);
+            .or_insert_with(HashMap::new);
         ser.samples.iter().for_each(|v| {
             entry.insert(v.time, v.value);
         });
@@ -317,8 +325,8 @@ fn merge_matrix_query(series: &[cluster_rpc::Series]) -> Value {
 }
 
 fn merge_vector_query(series: &[cluster_rpc::Series]) -> Value {
-    let mut merged_data = HashMap::default();
-    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::default();
+    let mut merged_data = HashMap::new();
+    let mut merged_metrics: HashMap<Signature, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
         let labels: Labels = ser
             .metric

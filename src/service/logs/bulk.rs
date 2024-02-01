@@ -19,25 +19,27 @@ use std::{
 };
 
 use actix_web::web;
+use anyhow::{anyhow, Error, Result};
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            alerts::Alert,
-            functions::{StreamTransform, VRLResultResolver},
-            ingestion::{
-                BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-                StreamSchemaChk,
-            },
-            stream::PartitioningDetails,
-            usage::UsageType,
+    common::meta::{
+        alerts::Alert,
+        functions::{StreamTransform, VRLResultResolver},
+        ingestion::{
+            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+            StreamSchemaChk,
         },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+        stream::PartitioningDetails,
     },
     service::{
         db, distinct_values,
@@ -55,20 +57,19 @@ pub async fn ingest(
     org_id: &str,
     body: web::Bytes,
     thread_id: usize,
+    user_email: &str,
 ) -> Result<BulkResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Err(anyhow::anyhow!("not an ingester"));
+        return Err(anyhow!("not an ingester"));
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow!("Quota exceeded for this organization"));
     }
 
     // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
-        return Err(anyhow::Error::msg(e.to_string()));
-    }
+    ingester::check_memtable_size().map_err(|e| Error::msg(e.to_string()))?;
 
     // let mut errors = false;
     let mut bulk_res = BulkResponse {
@@ -357,6 +358,7 @@ pub async fn ingest(
         // write to file
         let mut req_stats = write_file(&writer, &stream_name, stream_data.data).await;
         req_stats.response_time += time;
+        req_stats.user_email = Some(user_email.to_string());
         // metric + data usage
         let fns_length: usize = stream_transform_map.values().map(|v| v.len()).sum();
         report_request_usage_stats(

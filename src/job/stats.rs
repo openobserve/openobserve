@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
+use config::{
+    cluster::{is_compactor, is_querier},
+    CONFIG,
+};
 use tokio::time;
 
-use crate::{
-    common::infra::cluster::{is_compactor, is_querier},
-    service::{compact::stats::update_stats_from_file_list, db, usage},
-};
+use crate::service::{compact::stats::update_stats_from_file_list, db, usage};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // tokio::task::spawn(async move { usage_report_stats().await });

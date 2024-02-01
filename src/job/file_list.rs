@@ -15,15 +15,17 @@
 
 use std::{fs, path::Path};
 
-use config::{meta::stream::StreamType, CONFIG};
+use config::{
+    cluster::{is_compactor, is_ingester, is_querier, LOCAL_NODE_ROLE},
+    meta::stream::StreamType,
+    utils::file::scan_files,
+    CONFIG,
+};
+use infra::storage;
 use tokio::time;
 
 use crate::{
-    common::{
-        infra::{cluster, storage, wal},
-        meta::stream::StreamParams,
-        utils::file::scan_files,
-    },
+    common::{infra::wal, meta::stream::StreamParams},
     service::db,
 };
 
@@ -39,7 +41,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 }
 
 pub async fn run_move_file_to_s3() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
+    if !is_ingester(&LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
         return Ok(()); // not an ingester, no need to init job
     }
 
@@ -141,9 +143,7 @@ async fn upload_file(path_str: &str, file_key: &str) -> Result<(), anyhow::Error
 }
 
 async fn _run_sync_s3_to_cache() -> Result<(), anyhow::Error> {
-    if !cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-        && !cluster::is_compactor(&cluster::LOCAL_NODE_ROLE)
-    {
+    if !is_querier(&LOCAL_NODE_ROLE) && !is_compactor(&LOCAL_NODE_ROLE) {
         return Ok(()); // only querier or compactor need to sync
     }
 

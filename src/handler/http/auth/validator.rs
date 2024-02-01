@@ -20,7 +20,7 @@ use actix_web::{
     web, Error,
 };
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use config::CONFIG;
+use config::{utils::base64, CONFIG};
 
 use crate::{
     common::{
@@ -29,10 +29,7 @@ use crate::{
             proxy::QueryParamProxyURL,
             user::{DBUser, TokenValidationResponse, UserRole},
         },
-        utils::{
-            auth::{get_hash, is_root_user, AuthExtractor},
-            base64,
-        },
+        utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
     service::{db, users},
 };
@@ -243,6 +240,11 @@ pub async fn validator_aws(
                 match validate_credentials(&creds[0], &creds[1], path).await {
                     Ok(res) => {
                         if res.is_valid {
+                            let mut req = req;
+                            req.headers_mut().insert(
+                                header::HeaderName::from_static("user_id"),
+                                header::HeaderValue::from_str(&res.user_email).unwrap(),
+                            );
                             Ok(req)
                         } else {
                             Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -281,6 +283,11 @@ pub async fn validator_gcp(
             match validate_credentials(&creds[0], &creds[1], path).await {
                 Ok(res) => {
                     if res.is_valid {
+                        let mut req = req;
+                        req.headers_mut().insert(
+                            header::HeaderName::from_static("user_id"),
+                            header::HeaderValue::from_str(&res.user_email).unwrap(),
+                        );
                         Ok(req)
                     } else {
                         Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -409,42 +416,49 @@ pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor)
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::common::{infra::db as infra_db, meta::user::UserRequest};
+    use infra::db as infra_db;
 
-    #[actix_web::test]
+    use super::*;
+    use crate::common::meta::user::UserRequest;
+
+    #[tokio::test]
     async fn test_validate() {
+        let org_id = "default";
+        let user_id = "user1@example.com";
+        let init_user = "root@example.com";
+        let pwd = "Complexpass#123";
+
         infra_db::create_table().await.unwrap();
-        let _ = users::post_user(
-            "default",
+        users::create_root_user(
+            org_id,
             UserRequest {
-                email: "root@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
+                email: init_user.to_string(),
+                password: pwd.to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
-                is_external: true,
+                is_external: false,
             },
-            "root@example.com",
         )
-        .await;
-        let _ = users::post_user(
-            "default",
+        .await
+        .unwrap();
+        users::post_user(
+            org_id,
             UserRequest {
-                email: "user1@example.com".to_string(),
-                password: "Complexpass#123".to_string(),
+                email: user_id.to_string(),
+                password: pwd.to_string(),
                 role: crate::common::meta::user::UserRole::Member,
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
                 is_external: true,
             },
-            "root@example.com",
+            init_user,
         )
-        .await;
+        .await
+        .unwrap();
 
-        let pwd = "Complexpass#123";
         assert!(
-            validate_credentials("root@example.com", pwd, "default/_bulk")
+            validate_credentials(init_user, pwd, "default/_bulk")
                 .await
                 .unwrap()
                 .is_valid
@@ -457,28 +471,23 @@ mod tests {
         );
         assert!(!validate_credentials("", pwd, "/").await.unwrap().is_valid);
         assert!(
-            !validate_credentials("user1@example.com", pwd, "/")
+            !validate_credentials(user_id, pwd, "/")
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            validate_credentials("user1@example.com", pwd, "default/user")
+            validate_credentials(user_id, pwd, "default/user")
                 .await
                 .unwrap()
                 .is_valid
         );
         assert!(
-            !validate_credentials("user1@example.com", "x", "default/user")
+            !validate_credentials(user_id, "x", "default/user")
                 .await
                 .unwrap()
                 .is_valid
         );
-        assert!(
-            validate_user("root@example.com", pwd)
-                .await
-                .unwrap()
-                .is_valid
-        );
+        assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
     }
 }

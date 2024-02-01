@@ -21,25 +21,26 @@ use std::{
 use actix_web::http;
 use anyhow::Result;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
 use crate::{
-    common::{
-        meta::{
-            alerts::Alert,
-            functions::{StreamTransform, VRLResultResolver},
-            ingestion::{
-                AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter,
-                IngestionError, IngestionRequest, IngestionResponse, KinesisFHData,
-                KinesisFHIngestionResponse, StreamStatus,
-            },
-            stream::{SchemaRecords, StreamParams},
-            usage::UsageType,
+    common::meta::{
+        alerts::Alert,
+        functions::{StreamTransform, VRLResultResolver},
+        ingestion::{
+            AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
+            IngestionRequest, IngestionResponse, KinesisFHData, KinesisFHIngestionResponse,
+            StreamStatus,
         },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+        stream::{SchemaRecords, StreamParams},
     },
     service::{
         distinct_values, get_formatted_stream_name,
@@ -55,6 +56,7 @@ pub async fn ingest(
     in_stream_name: &str,
     in_req: IngestionRequest<'_>,
     thread_id: usize,
+    user_email: &str,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     // check stream
@@ -243,6 +245,7 @@ pub async fn ingest(
         ])
         .inc();
     req_stats.response_time = start.elapsed().as_secs_f64();
+    req_stats.user_email = Some(user_email.to_string());
 
     // report data usage
     report_request_usage_stats(
@@ -481,7 +484,7 @@ impl<'a> IngestionData<'a> {
 pub fn decode_and_decompress(
     encoded_data: &str,
 ) -> Result<(String, AWSRecordType), Box<dyn std::error::Error>> {
-    let decoded_data = crate::common::utils::base64::decode_raw(encoded_data)?;
+    let decoded_data = config::utils::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(&decoded_data[..]);
     let mut decompressed_data = String::new();
     match gz.read_to_string(&mut decompressed_data) {

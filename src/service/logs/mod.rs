@@ -17,19 +17,19 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field};
-use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, CONFIG};
+use config::{
+    meta::stream::{PartitionTimeLevel, StreamType},
+    utils::{
+        json::{estimate_json_bytes, Map, Value},
+        schema_ext::SchemaExt,
+    },
+    CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
 
 use super::ingestion::{get_string_value, TriggerAlertData};
 use crate::{
-    common::{
-        meta::{
-            alerts::Alert,
-            ingestion::RecordStatus,
-            stream::{PartitionTimeLevel, SchemaRecords},
-        },
-        utils::json::{estimate_json_bytes, Map, Value},
-    },
+    common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
     service::{
         ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
     },

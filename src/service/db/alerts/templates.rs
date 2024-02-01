@@ -15,12 +15,13 @@
 
 use std::sync::Arc;
 
+use config::utils::json;
+use infra::db as infra_db;
 use itertools::Itertools;
 
 use crate::common::{
-    infra::{config::ALERTS_TEMPLATES, db as infra_db},
+    infra::config::ALERTS_TEMPLATES,
     meta::{alerts::templates::Template, organization::DEFAULT_ORG},
-    utils::json,
 };
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
