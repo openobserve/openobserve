@@ -58,7 +58,7 @@ export const updateRole = (role: {
   org_identifier: string;
   payload: any;
 }) => {
-  const url = `/api/${role.org_identifier}/roles/${role.role_id}/permissions`;
+  const url = `/api/${role.org_identifier}/roles/${role.role_id}`;
   return http().put(url, role.payload);
 };
 

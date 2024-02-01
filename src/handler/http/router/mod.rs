@@ -330,7 +330,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(authz::fga::update_group)
             .service(authz::fga::get_groups)
             .service(authz::fga::get_group_details)
-            .service(authz::fga::get_resources),
+            .service(authz::fga::get_resources)
+            .service(authz::fga::get_users_with_role),
     );
 }
 
