@@ -288,7 +288,8 @@ export default defineComponent({
           store,
           route.query.dashboard,
           props.panelId,
-          route.query.folder
+          route.query.folder,
+          route.query.tab ?? "default"
         );
         Object.assign(
           dashboardPanelData.data,

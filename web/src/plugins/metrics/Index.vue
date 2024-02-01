@@ -723,7 +723,7 @@ export default defineComponent({
       // panel name will come from add to dashboard component
       dashboardPanelData.data.title = panelTitle;
       // to create panel dashboard id, paneldata and folderId is required
-      addPanel(store, dashboardId, dashboardPanelData.data, folderId)
+      addPanel(store, dashboardId, dashboardPanelData.data, folderId, "default")
         .then(() => {
           showAddToDashboardDialog.value = false;
           $q.notify({

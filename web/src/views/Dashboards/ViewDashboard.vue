@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-    <div ref="fullscreenDiv" :class="`${isFullscreen ? 'fullscreen' : ''}  ${store.state.theme === 'light' ? 'bg-white' : 'dark-mode'}`">
+    <div
+      ref="fullscreenDiv"
+      :class="`${isFullscreen ? 'fullscreen' : ''}  ${
+        store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
+      }`"
+    >
       <div
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
@@ -116,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
-              ><q-tooltip>{{isFullscreen ? t("dashboard.exitFullscreen") : t("dashboard.fullscreen") }}</q-tooltip></q-btn
+              ><q-tooltip>{{
+                isFullscreen
+                  ? t("dashboard.exitFullscreen")
+                  : t("dashboard.fullscreen")
+              }}</q-tooltip></q-btn
             >
           </div>
         </div>
@@ -131,7 +140,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
         @onDeletePanel="onDeletePanel"
+        @onMovePanel="onMovePanel"
         @updated:data-zoom="onDataZoom"
+        @refresh="loadDashboard"
+        :showTabs="true"
       />
 
       <q-dialog
@@ -148,13 +160,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onActivated, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onActivated,
+  nextTick,
+  provide,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import DateTimePicker from "../../components/DateTimePicker.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "../../utils/commons.ts";
+import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -190,6 +208,11 @@ export default defineComponent({
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
+    // selected tab
+    const selectedTabId: any = ref(null);
+    // provide it to child components
+    provide("selectedTabId", selectedTabId);
+
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
@@ -217,6 +240,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
+          tab: route.query.tab,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
@@ -245,7 +269,16 @@ export default defineComponent({
         route.query.dashboard,
         route.query.folder ?? "default"
       );
-      
+
+      // set selected tab from query params
+      const selectedTab = currentDashboardData?.data?.tabs?.find(
+        (tab: any) => tab.tabId === (route.query.tab ?? "default")
+      );
+
+      selectedTabId.value = selectedTab
+        ? selectedTab.tabId ?? "default"
+        : "default";
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -330,6 +363,7 @@ export default defineComponent({
         query: {
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };
@@ -378,12 +412,13 @@ export default defineComponent({
     });
 
     // whenever the refreshInterval is changed, update the query params
-    watch([refreshInterval, selectedDate], () => {
+    watch([refreshInterval, selectedDate, selectedTabId], () => {
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
+          tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
         },
@@ -395,9 +430,28 @@ export default defineComponent({
         store,
         route.query.dashboard,
         panelId,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
+        route.query.tab ?? "default"
       );
       await loadDashboard();
+    };
+
+    // move single panel to another tab
+    const onMovePanel = async (panelId: any, newTabId: any) => {
+      await movePanelToAnotherTab(
+        store,
+        route.query.dashboard,
+        panelId,
+        route.query.folder ?? "default",
+        route.query.tab ?? "default",
+        newTabId
+      );
+      await loadDashboard();
+      $q.notify({
+        type: "positive",
+        message: "Panel Moved Successfully!",
+        timeout: 2000,
+      });
     };
 
     const shareLink = () => {
@@ -496,6 +550,8 @@ export default defineComponent({
       getQueryParamsForDuration,
       onDataZoom,
       shareLink,
+      selectedTabId,
+      onMovePanel,
     };
   },
 });

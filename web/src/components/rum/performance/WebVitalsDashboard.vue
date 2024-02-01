@@ -90,6 +90,7 @@ import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/web_vitals.json";
+import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "WebVitalsDashboard",
@@ -157,7 +158,9 @@ export default defineComponent({
     };
 
     const loadDashboard = async () => {
-      currentDashboardData.data = overviewDashboard;
+      // schema migration
+      currentDashboardData.data =
+        convertDashboardSchemaVersion(overviewDashboard);
 
       // if variables data is null, set it to empty list
 

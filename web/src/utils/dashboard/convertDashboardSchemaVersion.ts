@@ -86,6 +86,22 @@ export function convertDashboardSchemaVersion(data: any) {
       delete data.layouts;
       break;
     }
+    case 2: {
+      // convert array of panels to array of tabs
+      data.tabs = [
+        {
+          panels: data.panels,
+          name: "Default",
+          tabId: "default",
+        },
+      ];
+      // remove panels key from data
+      delete data.panels;
+
+      // update the version
+      data.version = 3;
+      break;
+    }
   }
 
   // return converted data

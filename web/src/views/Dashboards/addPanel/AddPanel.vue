@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           :label="t('panel.save')"
           data-test="dashboard-panel-save"
-          @click="savePanelData.execute()"
+          @click.stop="savePanelData.execute()"
           :loading="savePanelData.isLoading.value"
         />
         <q-btn
@@ -360,7 +360,8 @@ export default defineComponent({
           store,
           route.query.dashboard,
           route.query.panelId,
-          route.query.folder
+          route.query.folder,
+          route.query.tab
         );
         Object.assign(
           dashboardPanelData.data,
@@ -519,6 +520,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
+          tab: route.query.tab ?? "default",
         },
       });
     };
@@ -1026,7 +1028,8 @@ export default defineComponent({
           store,
           dashId,
           dashboardPanelData.data,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
         );
         if (errorMessageOnSave instanceof Error) {
           errorData.errors.push(
@@ -1045,7 +1048,8 @@ export default defineComponent({
           store,
           dashId,
           dashboardPanelData.data,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
         );
         if (errorMessageOnSave instanceof Error) {
           errorData.errors.push(
@@ -1065,6 +1069,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: dashId,
           folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? "default",
         },
       });
     };
