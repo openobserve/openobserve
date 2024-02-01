@@ -18,7 +18,15 @@ use std::collections::{HashMap, HashSet};
 use actix_web::http;
 use arrow_schema::DataType;
 use chrono::{Duration, Local, TimeZone, Utc};
-use config::{ider, meta::stream::StreamType, CONFIG};
+use config::{
+    ider,
+    meta::stream::StreamType,
+    utils::{
+        base64,
+        json::{Map, Value},
+    },
+    CONFIG,
+};
 
 use super::promql;
 use crate::{
@@ -31,11 +39,7 @@ use crate::{
             authz::Authz,
             search,
         },
-        utils::{
-            auth::{remove_ownership, set_ownership},
-            base64,
-            json::{Map, Value},
-        },
+        utils::auth::{remove_ownership, set_ownership},
     },
     service::{db, search as SearchService},
 };

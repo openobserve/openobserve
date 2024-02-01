@@ -14,12 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::metrics;
+use infra::errors;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::errors,
     handler::grpc::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse},
     service::search as SearchService,
 };

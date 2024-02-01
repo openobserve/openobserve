@@ -15,10 +15,9 @@
 
 use std::collections::HashMap;
 
+use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::common::utils::json;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Span {

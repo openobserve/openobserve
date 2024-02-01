@@ -18,7 +18,13 @@ use std::{collections::HashMap, sync::Arc};
 use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
 use chrono::Utc;
-use config::{meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG};
+use config::{
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{flatten, json, schema_ext::SchemaExt},
+    CONFIG,
+};
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -28,17 +34,12 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            self,
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, SchemaRecords},
-            usage::UsageType,
-        },
-        utils::{flatten, json},
+    common::meta::{
+        self,
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+        stream::{PartitioningDetails, SchemaRecords},
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{

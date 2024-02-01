@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use config::{
     is_local_disk_storage,
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     CONFIG,
 };
 use datafusion::{
@@ -26,15 +26,13 @@ use datafusion::{
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
+use infra::cache::file_data;
 use tokio::sync::Semaphore;
 
 use crate::{
-    common::{
-        infra::cache::file_data,
-        meta::{
-            search::{SearchType, Session as SearchSession},
-            stream::{PartitionTimeLevel, ScanStats, StreamParams},
-        },
+    common::meta::{
+        search::{SearchType, Session as SearchSession},
+        stream::{ScanStats, StreamParams},
     },
     service::{
         db, file_list,

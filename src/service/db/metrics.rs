@@ -16,12 +16,10 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use config::{cluster::LOCAL_NODE_UUID, utils::json};
+use infra::db as infra_db;
 
-use crate::common::{
-    infra::{cluster::LOCAL_NODE_UUID, config::METRIC_CLUSTER_LEADER, db as infra_db},
-    meta::prom::ClusterLeader,
-    utils::json,
-};
+use crate::common::{infra::config::METRIC_CLUSTER_LEADER, meta::prom::ClusterLeader};
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;

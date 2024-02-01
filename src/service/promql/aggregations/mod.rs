@@ -13,9 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use ahash::AHashMap as HashMap;
 use config::FxIndexMap;
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;

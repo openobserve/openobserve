@@ -15,11 +15,13 @@
 
 use std::{io::Cursor, path::Path, sync::Arc};
 
-use ahash::AHashMap as HashMap;
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
-    meta::stream::{FileKey, StreamType},
-    utils::parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    utils::{
+        file::{get_file_contents, scan_files},
+        parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
+    },
     CONFIG,
 };
 use datafusion::{
@@ -27,23 +29,19 @@ use datafusion::{
     common::FileType,
 };
 use futures::future::try_join_all;
+use hashbrown::HashMap;
+use infra::{
+    cache::tmpfs,
+    errors::{Error, ErrorCodes},
+};
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
 use crate::{
     common::{
-        infra::{
-            cache::tmpfs,
-            errors::{Error, ErrorCodes},
-            wal,
-        },
-        meta::{
-            self,
-            search::SearchType,
-            stream::{PartitionTimeLevel, ScanStats},
-        },
-        utils::file::{get_file_contents, scan_files},
+        infra::wal,
+        meta::{self, search::SearchType, stream::ScanStats},
     },
     service::{
         db,

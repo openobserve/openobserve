@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use ahash::AHashMap;
 use config::{RwAHashMap, RwAHashSet, RwHashMap};
 use dashmap::DashMap;
 use datafusion::arrow::datatypes::Schema;
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use vector_enrichment::TableRegistry;
@@ -52,12 +52,12 @@ pub static USERS_RUM_TOKEN: Lazy<Arc<RwHashMap<String, User>>> =
     Lazy::new(|| Arc::new(DashMap::default()));
 pub static ROOT_USER: Lazy<RwHashMap<String, User>> = Lazy::new(DashMap::default);
 pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
-    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(AHashMap::new())));
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
     Lazy::new(Default::default);
 pub static TRIGGERS: Lazy<RwAHashMap<String, alerts::triggers::Trigger>> =

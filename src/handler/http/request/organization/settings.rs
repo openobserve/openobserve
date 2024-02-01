@@ -16,15 +16,13 @@
 use std::io::Error as StdErr;
 
 use actix_web::{get, post, web, HttpResponse};
+use config::utils::json;
+use infra::errors::{DbError, Error};
 
 use crate::{
-    common::{
-        infra::errors::{DbError, Error},
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            organization::{OrganizationSetting, OrganizationSettingResponse},
-        },
-        utils::json,
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        organization::{OrganizationSetting, OrganizationSettingResponse},
     },
     service::db::organization::{get_org_setting, set_org_setting},
 };

@@ -14,12 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::web;
+use config::utils::json;
+use infra::db as infra_db;
 
-use crate::common::{
-    infra::db as infra_db,
-    meta::dashboards::{v1, v2, Dashboard, DashboardVersion},
-    utils::json,
-};
+use crate::common::meta::dashboards::{v1, v2, Dashboard, DashboardVersion};
 
 pub mod folders;
 

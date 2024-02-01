@@ -25,16 +25,14 @@ use datafusion::{
     prelude::SessionContext,
 };
 use futures::future::try_join_all;
+use infra::cache::tmpfs;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        infra::{
-            cache::tmpfs,
-            cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-        },
+        infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
         meta::{
             search::{SearchType, Session as SearchSession},
             stream::ScanStats,

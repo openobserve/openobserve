@@ -16,12 +16,10 @@
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta},
+    utils::json,
 };
 
-use crate::{
-    common::{meta, utils::json},
-    service::promql,
-};
+use crate::{common::meta, service::promql};
 
 pub mod auth;
 pub mod request;
@@ -214,7 +212,7 @@ mod tests {
 
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_file_meta() {
         let file_meta = FileMeta {
             min_ts: 1667978841110,
@@ -229,7 +227,7 @@ mod tests {
         assert_eq!(file_meta, resp);
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_search_convert() {
         let mut req = meta::search::Request {
             query: meta::search::Query {

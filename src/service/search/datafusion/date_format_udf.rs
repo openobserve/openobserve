@@ -16,6 +16,7 @@
 use std::{iter::zip, sync::Arc};
 
 use chrono::{FixedOffset, TimeZone, Utc};
+use config::utils::time;
 use datafusion::{
     arrow::{
         array::{ArrayRef, Int64Array, StringArray},
@@ -28,8 +29,6 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
-
-use crate::common::utils::time;
 
 /// The name of the date_format UDF given to DataFusion.
 pub const DATE_FORMAT_UDF_NAME: &str = "date_format";

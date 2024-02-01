@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::cluster;
 use tokio::time;
 
-use crate::{common::infra::cluster::is_alert_manager, service};
+use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !is_alert_manager(&super::cluster::LOCAL_NODE_ROLE) {
+    if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
     // should run it every 10 seconds

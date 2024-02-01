@@ -18,25 +18,25 @@ use std::{collections::HashMap, io::Error, sync::Arc};
 use actix_web::{http, web, HttpResponse};
 use chrono::{Duration, Utc};
 use config::{
-    meta::stream::StreamType, metrics, utils::schema_ext::SchemaExt, CONFIG, DISTINCT_FIELDS,
+    cluster,
+    meta::{
+        stream::{PartitionTimeLevel, StreamType},
+        usage::UsageType,
+    },
+    metrics,
+    utils::{flatten, json, schema_ext::SchemaExt},
+    CONFIG, DISTINCT_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            alerts::Alert,
-            http::HttpResponse as MetaHttpResponse,
-            stream::{PartitionTimeLevel, SchemaRecords},
-            traces::{
-                Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType,
-            },
-            usage::UsageType,
-        },
-        utils::{flatten, json},
+    common::meta::{
+        alerts::Alert,
+        http::HttpResponse as MetaHttpResponse,
+        stream::SchemaRecords,
+        traces::{Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType},
     },
     service::{
         db, distinct_values, format_partition_key, format_stream_name,

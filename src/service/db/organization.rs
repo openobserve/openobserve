@@ -16,15 +16,15 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use config::utils::json;
+use infra::{
+    db as infra_db,
+    errors::{self, Error},
+};
 
 use crate::common::{
-    infra::{
-        config::ORGANIZATION_SETTING,
-        db as infra_db,
-        errors::{self, Error},
-    },
+    infra::config::ORGANIZATION_SETTING,
     meta::organization::{Organization, OrganizationSetting},
-    utils::json,
 };
 
 // DBKey to set settings for an org

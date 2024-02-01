@@ -16,9 +16,14 @@
 use std::io::Error;
 
 use actix_web::{get, put, web, HttpRequest, HttpResponse};
-use ahash::AHashMap as HashMap;
-use config::{CONFIG, HAS_FUNCTIONS, INSTANCE_ID, SQL_FULL_TEXT_SEARCH_FIELDS};
+use config::{
+    cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    utils::json,
+    CONFIG, HAS_FUNCTIONS, INSTANCE_ID, SQL_FULL_TEXT_SEARCH_FIELDS,
+};
 use datafusion::arrow::datatypes::{Field, Schema};
+use hashbrown::HashMap;
+use infra::{cache, file_list};
 use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
@@ -35,9 +40,8 @@ use {
 
 use crate::{
     common::{
-        infra::{cache, cluster, config::*, file_list},
+        infra::{cluster, config::*},
         meta::{functions::ZoFunction, http::HttpResponse as MetaHttpResponse},
-        utils::json,
     },
     service::{db, search::datafusion::DEFAULT_FUNCTIONS},
 };
@@ -113,10 +117,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
 #[get("/cache/status")]
 pub async fn cache_status() -> Result<HttpResponse, Error> {
     let mut stats: HashMap<&str, json::Value> = HashMap::default();
-    stats.insert(
-        "LOCAL_NODE_UUID",
-        json::json!(cluster::LOCAL_NODE_UUID.clone()),
-    );
+    stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&CONFIG.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&CONFIG.common.node_role));
     let nodes = cluster::get_cached_online_nodes();
@@ -267,7 +268,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 
 #[put("/node/enable")]
 async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
-    let node_id = cluster::LOCAL_NODE_UUID.clone();
+    let node_id = LOCAL_NODE_UUID.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id) else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
@@ -286,7 +287,7 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
 
 #[put("/node/flush")]
 async fn flush_node() -> Result<HttpResponse, Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+    if !is_ingester(&LOCAL_NODE_ROLE) {
         return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
     };
 

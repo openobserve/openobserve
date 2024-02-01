@@ -21,24 +21,25 @@ use std::{
 use actix_web::web;
 use anyhow::{anyhow, Error, Result};
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            alerts::Alert,
-            functions::{StreamTransform, VRLResultResolver},
-            ingestion::{
-                BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
-                StreamSchemaChk,
-            },
-            stream::PartitioningDetails,
-            usage::UsageType,
+    common::meta::{
+        alerts::Alert,
+        functions::{StreamTransform, VRLResultResolver},
+        ingestion::{
+            BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
+            StreamSchemaChk,
         },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+        stream::PartitioningDetails,
     },
     service::{
         db, distinct_values,

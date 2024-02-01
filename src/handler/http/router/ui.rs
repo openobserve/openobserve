@@ -46,7 +46,7 @@ mod tests {
 
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_index_ok() {
         let app = test::init_service(App::new().service(serve)).await;
         let req = test::TestRequest::get().uri("/index.html").to_request();
@@ -55,7 +55,7 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_index_not_ok() {
         let app = test::init_service(App::new().service(serve)).await;
         let req = test::TestRequest::get().uri("/abc.html").to_request();

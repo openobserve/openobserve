@@ -15,4 +15,6 @@
 
 pub mod cluster;
 pub mod logger;
+pub mod meta_store;
 pub mod stream;
+pub mod usage;

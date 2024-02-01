@@ -14,14 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::stream::FileKey, metrics};
+use infra::file_list as infra_file_list;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::file_list as infra_file_list,
-    handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList},
-};
+use crate::handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 
 pub struct Eventer;
 

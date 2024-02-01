@@ -19,11 +19,11 @@ use std::{
 };
 
 use actix_web::web;
+use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::stream::SchemaRecords;
-use crate::common::utils::json;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct RecordStatus {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::common::infra::db as infra_db;
+use infra::db as infra_db;
 
 pub async fn get_mark(org_id: &str) -> String {
     let db = infra_db::get_db().await;

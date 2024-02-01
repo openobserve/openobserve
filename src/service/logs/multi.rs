@@ -21,18 +21,19 @@ use std::{
 use actix_web::{http, web};
 use anyhow::Result;
 use chrono::{Duration, Utc};
-use config::{meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    meta::{stream::StreamType, usage::UsageType},
+    metrics,
+    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    CONFIG, DISTINCT_FIELDS,
+};
 use datafusion::arrow::datatypes::Schema;
 
 use crate::{
-    common::{
-        meta::{
-            alerts::Alert,
-            ingestion::{IngestionResponse, StreamStatus},
-            stream::{SchemaRecords, StreamParams},
-            usage::UsageType,
-        },
-        utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    common::meta::{
+        alerts::Alert,
+        ingestion::{IngestionResponse, StreamStatus},
+        stream::{SchemaRecords, StreamParams},
     },
     service::{
         distinct_values, get_formatted_stream_name,

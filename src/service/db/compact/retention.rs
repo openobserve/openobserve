@@ -16,9 +16,8 @@
 use std::sync::Arc;
 
 use config::{meta::stream::StreamType, RwHashSet};
+use infra::db as infra_db;
 use once_cell::sync::Lazy;
-
-use crate::common::infra::db as infra_db;
 
 static CACHE: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 

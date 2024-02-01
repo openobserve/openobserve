@@ -17,17 +17,23 @@ use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
-use config::{ider, meta::stream::StreamType, metrics, CONFIG, DISTINCT_FIELDS};
+use config::{
+    ider,
+    meta::{
+        stream::StreamType,
+        usage::{RequestStats, UsageType},
+    },
+    metrics,
+    utils::{base64, json},
+    CONFIG, DISTINCT_FIELDS,
+};
+use infra::errors;
 
 use crate::{
     common::{
-        infra::{config::STREAM_SCHEMAS, errors},
-        meta::{
-            self,
-            http::HttpResponse as MetaHttpResponse,
-            usage::{RequestStats, UsageType},
-        },
-        utils::{base64, functions, http::get_stream_type_from_request, json},
+        infra::config::STREAM_SCHEMAS,
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::{functions, http::get_stream_type_from_request},
     },
     service::{search as SearchService, usage::report_request_usage_stats},
 };
@@ -180,12 +186,18 @@ pub async fn search(
     }
 
     // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
     let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
     if !CONFIG.common.feature_query_queue_enabled {
         drop(locker);
     }
+    #[cfg(not(feature = "enterprise"))]
     let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
 
     // do search
     match SearchService::search(&session_id, &org_id, stream_type, &req).await {

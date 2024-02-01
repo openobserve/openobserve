@@ -1,10 +1,9 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
+use config::utils::time::parse_str_to_time;
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::Value;
-
-use crate::common::utils::time::parse_str_to_time;
 
 #[derive(Clone)]
 pub struct StreamTableConfig {}

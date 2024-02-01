@@ -15,8 +15,8 @@
 
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
-use ahash::HashSet;
 use config::FxIndexMap;
+use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 use serde::{
@@ -505,7 +505,7 @@ impl Value {
                 0 | 1 => false,
                 2 => v[0].labels.signature() == v[1].labels.signature(),
                 _ => {
-                    let mut signatures = HashSet::default();
+                    let mut signatures = HashSet::new();
                     for instant in v.iter() {
                         // If the set already contained this value, false is returned.
                         let new = signatures.insert(instant.labels.signature());
@@ -520,7 +520,7 @@ impl Value {
                 0 | 1 => false,
                 2 => v[0].labels.signature() == v[1].labels.signature(),
                 _ => {
-                    let mut signatures = HashSet::default();
+                    let mut signatures = HashSet::new();
                     for instant in v.iter() {
                         // If the set already contained this value, false is returned.
                         let new = signatures.insert(instant.labels.signature());
