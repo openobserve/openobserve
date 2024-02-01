@@ -107,6 +107,9 @@ pub async fn delete_all(
     dist_lock::unlock(&locker).await?;
     drop(locker);
 
+    let start_time = BASE_TIME.timestamp_micros();
+    let end_time = Utc::now().timestamp_micros();
+
     if is_local_disk_storage() {
         let data_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}",
@@ -125,8 +128,8 @@ pub async fn delete_all(
             stream_name,
             stream_type,
             PartitionTimeLevel::Unset,
-            BASE_TIME.timestamp_micros(),
-            Utc::now().timestamp_micros(),
+            start_time,
+            end_time,
             true,
         )
         .await?;
@@ -155,7 +158,7 @@ pub async fn delete_all(
     }
 
     // delete from file list
-    delete_from_file_list(org_id, stream_name, stream_type, (0, 0)).await?;
+    delete_from_file_list(org_id, stream_name, stream_type, (start_time, end_time)).await?;
     log::info!(
         "deleted file list for: {}/{}/{}/all",
         org_id,
