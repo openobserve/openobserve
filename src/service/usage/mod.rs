@@ -128,7 +128,6 @@ pub async fn report_request_usage_stats(
             compressed_size: None,
         });
     };
-    println!("usage: {:?}", usage);
     if !usage.is_empty() {
         publish_usage(usage).await;
     }
