@@ -1132,3 +1132,23 @@ impl<'a> VarValue<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_alert_save() {
+        let org_id = "default";
+        let stream_type = StreamType::Logs;
+        let stream_name = "default";
+        let alert_name = "abc/alert";
+        let alert = Alert {
+            name: alert_name.to_string(),
+            ..Default::default()
+        };
+        let ret = save(org_id, stream_type, stream_name, alert_name, alert).await;
+        // alert name should not contain /
+        assert!(ret.is_err());
+    }
+}
