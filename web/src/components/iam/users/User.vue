@@ -18,18 +18,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table ref="qTable" :rows="orgMembers" :columns="columns" row-key="id" :pagination="pagination"
-      :filter="filterQuery" :filter-method="filterData">
+    <q-table
+      ref="qTable"
+      :rows="usersState.users"
+      :columns="columns"
+      row-key="id"
+      :pagination="pagination"
+      :filter="filterQuery"
+      :filter-method="filterData"
+    >
       <template #no-data>
         <NoData></NoData>
       </template>
       <template #body-cell-role="props">
-        <q-td :props="props" v-if="((currentUserRole == 'admin' && props.row.role !== 'root') ||
-          currentUserRole == 'root') &&
-          !props.row.isLoggedinUser
-          ">
-          <q-select dense borderless v-model="props.row.role" :options="options" style="width: 70px"
-            @update:model-value="updateUserRole(props.row)" />
+        <q-td
+          :props="props"
+          v-if="
+            ((currentUserRole == 'admin' && props.row.role !== 'root') ||
+              currentUserRole == 'root') &&
+            !props.row.isLoggedinUser
+          "
+        >
+          <q-select
+            dense
+            borderless
+            v-model="props.row.role"
+            :options="options"
+            style="width: 70px"
+            @update:model-value="updateUserRole(props.row)"
+          />
         </q-td>
         <q-td :props="props" v-else>
           {{ props.row.role }}
@@ -37,51 +54,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
-          <q-btn v-if="(currentUserRole == 'admin' || currentUserRole == 'root') &&
-            !props.row.isLoggedinUser &&
-            props.row.role !== 'root'
-            " :icon="outlinedDelete" :title="t('user.delete')" class="q-ml-xs" padding="sm" unelevated size="sm" round
-            flat @click="confirmDeleteAction(props)" style="cursor: pointer !important" />
-          <q-btn v-if="props.row.isLoggedinUser ||
-            currentUserRole == 'root' ||
-            (currentUserRole == 'admin' && props.row.role !== 'root')
-            " icon="edit" :title="t('user.update')" class="q-ml-xs" padding="sm" unelevated size="sm" round flat
-            @click="addRoutePush(props)" style="cursor: pointer !important" />
+          <q-btn
+            v-if="
+              (currentUserRole == 'admin' || currentUserRole == 'root') &&
+              !props.row.isLoggedinUser &&
+              props.row.role !== 'root'
+            "
+            :icon="outlinedDelete"
+            :title="t('user.delete')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="confirmDeleteAction(props)"
+            style="cursor: pointer !important"
+          />
+          <q-btn
+            v-if="
+              props.row.isLoggedinUser ||
+              currentUserRole == 'root' ||
+              (currentUserRole == 'admin' && props.row.role !== 'root')
+            "
+            icon="edit"
+            :title="t('user.update')"
+            class="q-ml-xs"
+            padding="sm"
+            unelevated
+            size="sm"
+            round
+            flat
+            @click="addRoutePush(props)"
+            style="cursor: pointer !important"
+          />
         </q-td>
       </template>
       <template #top="scope">
-        <div class="q-table__title full-width q-mb-md" data-test="user-title-text">
+        <div
+          class="q-table__title full-width q-mb-md"
+          data-test="user-title-text"
+        >
           {{ t("user.header") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
-          <q-input v-model="filterQuery" filled dense class="col-6 q-pr-sm" :placeholder="t('user.search')">
+          <q-input
+            v-model="filterQuery"
+            filled
+            dense
+            class="col-6 q-pr-sm"
+            :placeholder="t('user.search')"
+          >
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
 
           <div class="col-6">
-            <q-btn v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
-              class="q-ml-md q-mb-xs text-bold no-border" style="float: right; cursor: pointer !important" padding="sm lg"
-              color="secondary" no-caps icon="add" dense :label="t(`user.add`)" @click="addRoutePush({})" />
+            <q-btn
+              v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
+              class="q-ml-md q-mb-xs text-bold no-border"
+              style="float: right; cursor: pointer !important"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              icon="add"
+              dense
+              :label="t(`user.add`)"
+              @click="addRoutePush({})"
+            />
           </div>
         </div>
-        <QTablePagination :scope="scope" :pageTitle="t('user.header')" :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions" position="top" @update:changeRecordPerPage="changePagination" />
+        <QTablePagination
+          :scope="scope"
+          :pageTitle="t('user.header')"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="top"
+          @update:changeRecordPerPage="changePagination"
+        />
       </template>
 
       <template #bottom="scope">
-        <QTablePagination :scope="scope" :resultTotal="resultTotal" :perPageOptions="perPageOptions" position="bottom"
-          @update:changeRecordPerPage="changePagination" />
+        <QTablePagination
+          :scope="scope"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="bottom"
+          @update:changeRecordPerPage="changePagination"
+        />
       </template>
     </q-table>
-    <q-dialog v-model="showUpdateUserDialog" position="right" full-height maximized>
+    <q-dialog
+      v-model="showUpdateUserDialog"
+      position="right"
+      full-height
+      maximized
+    >
       <update-user-role v-model="selectedUser" @updated="updateMember" />
     </q-dialog>
 
-    <q-dialog v-model="showAddUserDialog" position="right" full-height maximized>
-      <add-user style="width: 35vw" v-model="selectedUser" :isUpdated="isUpdated" :userRole="currentUserRole"
-        @updated="addMember" @cancel:hideform="hideForm" />
+    <q-dialog
+      v-model="showAddUserDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <add-user
+        style="width: 35vw"
+        v-model="selectedUser"
+        :isUpdated="isUpdated"
+        :userRole="currentUserRole"
+        @updated="addMember"
+        @cancel:hideform="hideForm"
+      />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -95,7 +181,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
-          <q-btn v-close-popup="true" unelevated no-caps class="no-border" color="primary" @click="deleteUser">
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="no-border"
+            color="primary"
+            @click="deleteUser"
+          >
             {{ t("user.ok") }}
           </q-btn>
         </q-card-actions>
@@ -105,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -113,13 +206,20 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import usersService from "@/services/users";
-import UpdateUserRole from "@/components/users/UpdateRole.vue";
-import AddUser from "@/components/users/add.vue";
+import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
+import AddUser from "@/components/iam/users/AddUser.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
+import {
+  getImageURL,
+  verifyOrganizationStatus,
+  maskText,
+} from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+
+// @ts-ignore
+import usePermissions from "@/composables/iam/usePermissions";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -136,7 +236,6 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const orgMembers: any = ref([]);
     const resultTotal = ref<number>(0);
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
@@ -145,17 +244,22 @@ export default defineComponent({
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
     const qTable: any = ref(null);
+    const { usersState } = usePermissions();
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
         addUser({}, false);
       } else {
-        orgMembers.value.map((member: any) => {
+        usersState.users.map((member: any) => {
           if (member.email == router.currentRoute.value.query.email) {
             addUser({ row: member }, true);
           }
         });
       }
+    });
+
+    onBeforeMount(() => {
+      getOrgMembers();
     });
 
     const columns: any = ref<QTableProps["columns"]>([
@@ -225,7 +329,7 @@ export default defineComponent({
           resultTotal.value = res.data.data.length;
           let counter = 1;
           currentUserRole.value = "";
-          orgMembers.value = res.data.data.map((data: any) => {
+          usersState.users = res.data.data.map((data: any) => {
             if (store.state.userInfo.email == data.email) {
               currentUserRole.value = data.role;
             }
@@ -257,7 +361,7 @@ export default defineComponent({
         });
     };
 
-    if (orgMembers.value.length == 0) {
+    if (usersState.users.length == 0) {
       getOrgMembers();
     }
 
@@ -344,9 +448,9 @@ export default defineComponent({
 
     const updateMember = (data: any) => {
       if (data.data != undefined) {
-        orgMembers.value.forEach((member: any, key: number) => {
+        usersState.users.forEach((member: any, key: number) => {
           if (member.org_member_id == data.data.id) {
-            orgMembers.value[key].role = data.data.role;
+            usersState.users[key].role = data.data.role;
           }
         });
         showUpdateUserDialog.value = false;
@@ -375,11 +479,11 @@ export default defineComponent({
           if (
             store.state.selectedOrganization.identifier == data.organization
           ) {
-            orgMembers.value.push({
+            usersState.users.push({
               "#":
-                orgMembers.value.length + 1 <= 9
-                  ? `0${orgMembers.value.length + 1}`
-                  : orgMembers.value.length + 1,
+                usersState.users.length + 1 <= 9
+                  ? `0${usersState.users.length + 1}`
+                  : usersState.users.length + 1,
               email: data.email,
               first_name: data.first_name,
               last_name: data.last_name,
@@ -387,10 +491,10 @@ export default defineComponent({
             });
           }
         } else {
-          orgMembers.value.forEach((member: any, key: number) => {
+          usersState.users.forEach((member: any, key: number) => {
             if (member.email == data.email) {
-              orgMembers.value[key] = {
-                ...orgMembers.value[key],
+              usersState.users[key] = {
+                ...usersState.users[key],
                 ...data,
               };
             }
@@ -483,7 +587,7 @@ export default defineComponent({
       router,
       store,
       config,
-      orgMembers,
+      usersState,
       columns,
       orgData,
       confirmDelete,

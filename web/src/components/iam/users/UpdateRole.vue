@@ -69,9 +69,9 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
-import { getImageURL } from "../../utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
 
-import organizationsService from "../../services/organizations";
+import organizationsService from "@/services/organizations";
 
 const defaultValue: any = () => {
   return {

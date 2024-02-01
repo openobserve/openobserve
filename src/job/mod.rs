@@ -191,6 +191,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::openfga::authorizer::init_open_fga().await;
 
+    // RBAC model
+    // #[cfg(feature = "enterprise")]
+    // let existing_meta = match db::get_ofga_model().await {
+    //     Ok(Some(model)) => Some(model),
+    //     Ok(None) | Err(_) => None,
+    // };
+    // #[cfg(feature = "enterprise")]
+    // let _ = db::set_ofga_model(existing_meta).await;
+
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");
 

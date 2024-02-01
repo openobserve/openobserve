@@ -462,7 +462,12 @@ async fn handle_diff_schema_local_mode(
     .await
     .expect("Failed to update schema");
     if is_new {
-        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            "streams",
+            Authz::new(&format!("{stream_type}_{stream_name}")),
+        )
+        .await;
     }
     // release lock
     drop(lock_acquired);
@@ -510,7 +515,12 @@ async fn handle_diff_schema_cluster_mode(
     .await
     .expect("Failed to update schema");
     if is_new {
-        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            "streams",
+            Authz::new(&format!("{stream_type}_{stream_name}")),
+        )
+        .await;
     }
     // release lock
     lock.unlock().await.map_err(server_internal_error).unwrap();
@@ -675,7 +685,12 @@ pub async fn set_schema_metadata(
             "created_at".to_string(),
             chrono::Utc::now().timestamp_micros().to_string(),
         );
-        crate::common::utils::auth::set_ownership(org_id, "streams", Authz::new(stream_name)).await;
+        crate::common::utils::auth::set_ownership(
+            org_id,
+            "streams",
+            Authz::new(&format!("{stream_type}_{stream_name}")),
+        )
+        .await;
     }
     db::schema::set(
         org_id,
