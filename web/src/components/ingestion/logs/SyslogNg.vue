@@ -75,7 +75,7 @@ export default defineComponent({
 
 
 log {
-    source(src);
+    source(s_src);
     destination(d_openobserve_http);
     flags(flow-control);
 };`;
