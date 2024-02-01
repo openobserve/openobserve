@@ -67,6 +67,9 @@ pub async fn save(
     if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));
     }
+    if alert.name.contains('/') {
+        return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
+    }
 
     // before saving alert check alert destination
     if alert.destinations.is_empty() {
@@ -1127,5 +1130,25 @@ impl<'a> VarValue<'a> {
             VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
             VarValue::Vector(v) => v[0..n].join("\\n"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_alert_save() {
+        let org_id = "default";
+        let stream_type = StreamType::Logs;
+        let stream_name = "default";
+        let alert_name = "abc/alert";
+        let alert = Alert {
+            name: alert_name.to_string(),
+            ..Default::default()
+        };
+        let ret = save(org_id, stream_type, stream_name, alert_name, alert).await;
+        // alert name should not contain /
+        assert!(ret.is_err());
     }
 }

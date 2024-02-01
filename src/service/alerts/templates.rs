@@ -34,6 +34,9 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
     if template.name.is_empty() {
         return Err(anyhow::anyhow!("Alert template name is required"));
     }
+    if template.name.contains('/') {
+        return Err(anyhow::anyhow!("Alert template name cannot contain '/'"));
+    }
 
     match db::alerts::templates::set(org_id, &mut template).await {
         Ok(_) => {
