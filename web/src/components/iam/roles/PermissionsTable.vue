@@ -5,7 +5,14 @@
   <div class="iam-permissions-table">
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <template v-if="!rows.length">
-        <div class="q-py-md text-center text-subtitle">No Data Found</div>
+        <div
+          class="q-py-md text-left text-subtitle"
+          :style="{
+            paddingLeft: level ? level * 40 + 'px' : '',
+          }"
+        >
+          No Resources Present
+        </div>
       </template>
       <template v-else>
         <q-table
@@ -45,7 +52,12 @@
                 :key="col.name"
                 :props="props"
                 :style="{
-                  paddingLeft: level && index === 0 ? level * 36 + 'px' : '',
+                  paddingLeft:
+                    level && index === 0
+                      ? props.row.has_entities
+                        ? level * 40 + 'px'
+                        : (level - 0.65) * 40 + 'px'
+                      : '',
                 }"
               >
                 <template

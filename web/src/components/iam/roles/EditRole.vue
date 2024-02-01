@@ -7,18 +7,64 @@
 
     <div class="full-width bg-grey-4" style="height: 1px" />
 
+    <AppTabs
+      :tabs="tabs"
+      :active-tab="activeTab"
+      @update:active-tab="updateActiveTab"
+    />
+
+    <q-separator />
+
+    <GroupUsers
+      v-show="activeTab === 'users'"
+      :groupUsers="roleUsers"
+      :activeTab="activeTab"
+      :added-users="addedUsers"
+      class="q-mt-xs"
+      :removed-users="removedUsers"
+    />
+
     <div
+      v-show="activeTab === 'permissions'"
       class="q-px-md q-py-md"
       style="height: calc(100vh - 101px); overflow-y: auto"
     >
-      <div class="o2-input flex items-end q-mb-sm justify-start">
+      <div class="o2-input flex items-end q-mb-md justify-start">
+        <div class="flex items-center q-mb-sm q-mr-md">
+          <span style="font-size: 14px"> Show </span>
+          <div
+            class="q-ml-xs"
+            style="
+              border: 1px solid #d7d7d7;
+              width: fit-content;
+              border-radius: 2px;
+            "
+          >
+            <template
+              v-for="visual in permissionDisplayOptions"
+              :key="visual.value"
+            >
+              <q-btn
+                :color="visual.value === filter.permissions ? 'primary' : ''"
+                :flat="visual.value === filter.permissions ? false : true"
+                dense
+                no-caps
+                size="11px"
+                class="q-px-md visual-selection-btn"
+                @click="updateTableData(visual.value)"
+              >
+                {{ visual.label }}</q-btn
+              >
+            </template>
+          </div>
+        </div>
         <q-input
           data-test="alert-list-search-input"
           v-model="filter.value"
           borderless
           filled
           dense
-          class="q-mb-xs no-border q-mr-sm"
+          class="q-mb-xs no-border q-mr-md"
           :placeholder="t('common.search')"
           style="width: 300px"
         >
@@ -45,35 +91,6 @@
           style="width: 200px"
           @update:model-value="onResourceChange"
         />
-      </div>
-      <div class="flex items-center q-mb-md">
-        <span style="font-size: 14px"> Show </span>
-        <div
-          class="q-mx-sm"
-          style="
-            border: 1px solid #d7d7d7;
-            width: fit-content;
-            border-radius: 2px;
-          "
-        >
-          <template
-            v-for="visual in permissionDisplayOptions"
-            :key="visual.value"
-          >
-            <q-btn
-              :color="visual.value === filter.permissions ? 'primary' : ''"
-              :flat="visual.value === filter.permissions ? false : true"
-              dense
-              no-caps
-              size="11px"
-              class="q-px-md visual-selection-btn"
-              @click="updateTableData(visual.value)"
-            >
-              {{ visual.label }}</q-btn
-            >
-          </template>
-        </div>
-        <span style="font-size: 14px"> Permissions </span>
       </div>
       <permissions-table
         ref="permissionTableRef"
@@ -110,12 +127,7 @@
 import { cloneDeep } from "lodash-es";
 import { ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type {
-  Resource,
-  Entity,
-  Permission,
-  PermissionType,
-} from "@/ts/interfaces";
+import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -139,6 +151,8 @@ import savedviewsService from "@/services/saved_views";
 import dashboardService from "@/services/dashboards";
 
 import { getGroups, getRoles } from "@/services/iam";
+import AppTabs from "@/components/common/AppTabs.vue";
+import GroupUsers from "../groups/GroupUsers.vue";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -158,6 +172,8 @@ const q = useQuasar();
 
 const store = useStore();
 
+const activeTab = ref("permissions");
+
 const editingRole = ref("");
 
 const permissions: Ref<Permission[]> = ref([]);
@@ -171,6 +187,22 @@ const addedPermissions: any = ref({});
 const removedPermissions: any = ref({});
 
 const permissionTableRows: Ref<Resource[]> = ref([]);
+
+const addedUsers = ref(new Set());
+const removedUsers = ref(new Set());
+
+const roleUsers = ref([]);
+
+const tabs = [
+  {
+    value: "permissions",
+    label: "Permissions",
+  },
+  {
+    value: "users",
+    label: "Users",
+  },
+];
 
 const permissionDisplayOptions = [
   {
@@ -198,6 +230,11 @@ const resources = computed(() =>
     };
   })
 );
+
+const updateActiveTab = (tab: string) => {
+  if (!tab) return;
+  activeTab.value = tab;
+};
 
 const getRoleDetails = () => {
   getResources(store.state.selectedOrganization.identifier).then(
