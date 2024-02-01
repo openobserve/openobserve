@@ -18,25 +18,22 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use ahash::AHashMap;
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
+    utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
+use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        infra::errors::{Error, ErrorCodes},
-        meta::{
-            sql::{Sql as MetaSql, SqlOperator},
-            stream::StreamParams,
-        },
-        utils::str::find,
+    common::meta::{
+        sql::{Sql as MetaSql, SqlOperator},
+        stream::StreamParams,
     },
     handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
@@ -71,7 +68,7 @@ pub struct Sql {
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
-    pub aggs: AHashMap<String, (String, MetaSql)>,
+    pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
     pub fields: Vec<String>,
     pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
@@ -504,7 +501,7 @@ impl Sql {
                 String::from("SELECT COUNT(*) as num from query"),
             );
         }
-        let mut aggs = AHashMap::new();
+        let mut aggs = hashbrown::HashMap::new();
         for (key, sql) in &req_aggs {
             let mut sql = sql.to_string();
             if let Some(caps) = RE_ONLY_FROM.captures(&sql) {
@@ -809,7 +806,7 @@ fn split_sql_token(text: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_sql_works() {
         let org_id = "test_org";
         let col = "_timestamp";
@@ -845,7 +842,7 @@ mod tests {
         assert!(check_field_in_use(&resp, col));
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_sql_contexts() {
         let sqls = [
             ("select * from table1", true, (0, 0)),
@@ -963,7 +960,7 @@ mod tests {
         }
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_sql_full() {
         let sqls = [
             ("select * from table1", true, 0, (0, 0)),

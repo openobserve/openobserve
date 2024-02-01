@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::ider;
+use config::{ider, utils::rand::generate_random_string};
 
 use crate::{
     common::{
@@ -28,10 +28,7 @@ use crate::{
                 DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
             },
         },
-        utils::{
-            auth::{get_hash, is_root_user},
-            rand::generate_random_string,
-        },
+        utils::auth::{get_hash, is_root_user},
     },
     service::db,
 };
@@ -73,7 +70,7 @@ pub async fn post_user(
         } else {
             Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
-                "Unable to process your request".to_string(),
+                "User already exists".to_string(),
             )))
         }
     } else {
@@ -488,8 +485,9 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
 
 #[cfg(test)]
 mod tests {
+    use infra::db as infra_db;
+
     use super::*;
-    use crate::common::infra::db as infra_db;
 
     async fn set_up() {
         USERS.insert(
@@ -509,25 +507,25 @@ mod tests {
         );
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_list_users() {
         set_up().await;
         assert!(list_users("dummy").await.is_ok())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_root_user_exists() {
         set_up().await;
         assert!(!root_user_exists().await);
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_user() {
         set_up().await;
         assert!(get_user(Some("dummy"), "admin@zo.dev").await.is_some())
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_post_user() {
         infra_db::create_table().await.unwrap();
         set_up().await;
@@ -549,7 +547,7 @@ mod tests {
         assert!(resp.is_ok());
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_user() {
         infra_db::create_table().await.unwrap();
         set_up().await;

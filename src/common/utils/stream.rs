@@ -21,6 +21,7 @@ use std::{
 use actix_web::HttpResponse;
 use config::{
     meta::stream::{FileMeta, StreamType},
+    utils::json,
     CONFIG, FILE_EXT_JSON,
 };
 use datafusion::{
@@ -28,8 +29,6 @@ use datafusion::{
     datasource::MemTable,
     prelude::SessionContext,
 };
-
-use crate::common::utils::json;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
@@ -156,7 +155,7 @@ mod tests {
         assert_eq!(file_key, 2);
     }
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_populate_file_meta() {
         // define a schema.
         let val: i64 = 1666093521151350;

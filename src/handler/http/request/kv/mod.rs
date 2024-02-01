@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http::header::ContentType, post, web, HttpRequest, HttpResponse};
-use ahash::HashMap;
+use hashbrown::HashMap;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::kv};
 

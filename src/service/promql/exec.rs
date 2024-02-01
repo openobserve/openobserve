@@ -18,8 +18,8 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use ahash::AHashMap as HashMap;
 use datafusion::error::Result;
+use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
 use tokio::sync::RwLock;
 
@@ -152,8 +152,8 @@ impl Query {
         }
 
         // merge data
-        let mut merged_data = HashMap::default();
-        let mut merged_metrics = HashMap::default();
+        let mut merged_data = HashMap::new();
+        let mut merged_metrics = HashMap::new();
         for value in instant_vectors {
             merged_data
                 .entry(signature(&value.labels))

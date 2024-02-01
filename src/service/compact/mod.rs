@@ -16,17 +16,12 @@
 use std::sync::Arc;
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
-use config::{meta::stream::StreamType, CONFIG};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
+use infra::dist_lock;
 use once_cell::sync::Lazy;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::{
-    common::infra::{
-        cluster::{get_node_by_uuid, LOCAL_NODE_UUID},
-        dist_lock,
-    },
-    service::db,
-};
+use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 mod file_list;
 pub mod file_list_deleted;

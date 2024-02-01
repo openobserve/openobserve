@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::FileMeta, RwHashMap, RwHashSet, CONFIG};
+use config::{
+    cluster::{is_querier, LOCAL_NODE_ROLE},
+    meta::stream::FileMeta,
+    RwHashMap, RwHashSet, CONFIG,
+};
 use dashmap::{DashMap, DashSet};
+use infra::{cache, file_list};
 use once_cell::sync::Lazy;
-
-use crate::common::infra::{cache, cluster, file_list};
 
 pub mod broadcast;
 pub mod local;
@@ -64,10 +67,7 @@ pub async fn progress(
                 );
             }
         }
-        if download
-            && CONFIG.memory_cache.cache_latest_files
-            && cluster::is_querier(&cluster::LOCAL_NODE_ROLE)
-        {
+        if download && CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
             // maybe load already merged file, no need report error
             _ = cache::file_data::memory::download("", key).await;
         }

@@ -16,14 +16,12 @@
 use std::sync::Arc;
 
 use anyhow::bail;
+use config::utils::json;
+use infra::db as infra_db;
 
 use crate::common::{
-    infra::{
-        config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
-        db as infra_db,
-    },
+    infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
     meta::user::{DBUser, User, UserOrg, UserRole},
-    utils::json,
 };
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
@@ -286,7 +284,7 @@ mod tests {
     use super::*;
     use crate::common::meta::user::UserOrg;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_user() {
         let org_id = "dummy".to_string();
         let email = "user3@example.com";

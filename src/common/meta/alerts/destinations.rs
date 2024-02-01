@@ -15,7 +15,7 @@
 
 use std::fmt;
 
-use ahash::HashMap;
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

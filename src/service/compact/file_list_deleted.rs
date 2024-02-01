@@ -15,13 +15,12 @@
 
 use std::io::{BufRead, BufReader};
 
-use ahash::AHashMap as HashMap;
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::CONFIG;
 use futures::future::try_join_all;
-
-use crate::common::infra::{file_list as infra_file_list, storage};
+use hashbrown::HashMap;
+use infra::{file_list as infra_file_list, storage};
 
 pub async fn delete(
     org_id: &str,

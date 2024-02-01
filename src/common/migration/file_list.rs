@@ -14,16 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    utils::{file::get_file_meta, time::BASE_TIME},
     CONFIG,
 };
+use infra::file_list as infra_file_list;
 
 use crate::{
-    common::{
-        infra::file_list as infra_file_list,
-        meta::stream::PartitionTimeLevel,
-        utils::{file::get_file_meta, time::BASE_TIME},
-    },
     job::{file_list, files},
     service::{compact::stats::update_stats_from_file_list, db},
 };

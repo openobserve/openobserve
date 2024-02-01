@@ -17,17 +17,17 @@ use std::io::{BufRead, BufReader};
 
 use config::{
     meta::stream::{FileKey, FileMeta, StreamType},
-    utils::parquet::parse_file_key_columns,
+    utils::{
+        asynchronism::file::get_file_contents, file::scan_files, json,
+        parquet::parse_file_key_columns,
+    },
     CONFIG,
 };
+use infra::file_list as infra_file_list;
 use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
-use crate::common::{
-    infra::{file_list as infra_file_list, wal},
-    meta::stream::StreamParams,
-    utils::{asynchronism::file::get_file_contents, file::scan_files, json},
-};
+use crate::common::{infra::wal, meta::stream::StreamParams};
 
 /// use queue to batch send broadcast to other nodes
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =

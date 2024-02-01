@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{http::StatusCode, HttpResponse as ActixHttpResponse};
+use infra::errors;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::common::infra::errors;
 
 /// HTTP response
 /// code 200 is success

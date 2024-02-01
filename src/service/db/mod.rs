@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::utils::json;
+use infra::db as infra_db;
+
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel;
-
-use crate::common::{infra::db as infra_db, utils::json};
 
 pub mod alerts;
 pub mod compact;

@@ -17,8 +17,8 @@ use std::io::Error;
 
 use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse};
-use ahash::AHashMap;
 use config::{CONFIG, SIZE_IN_MB};
+use hashbrown::HashMap;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -76,7 +76,7 @@ pub async fn save_enrichment_table(
                 .starts_with("multipart/form-data")
             {
                 let query =
-                    web::Query::<AHashMap<String, String>>::from_query(req.query_string()).unwrap();
+                    web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
                 let append_data = match query.get("append") {
                     Some(append_data) => append_data.parse::<bool>().unwrap_or(false),
                     None => false,

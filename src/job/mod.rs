@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{ider, CONFIG, INSTANCE_ID};
+use config::{cluster, ider, utils::file::clean_empty_dirs, CONFIG, INSTANCE_ID};
+use infra::file_list as infra_file_list;
 use regex::Regex;
 
 use crate::{
     common::{
-        infra::{cluster, config::SYSLOG_ENABLED, file_list as infra_file_list},
+        infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
-        utils::file::clean_empty_dirs,
     },
     service::{compact::stats::update_stats_from_file_list, db, users},
 };

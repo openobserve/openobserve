@@ -16,7 +16,7 @@
 use std::io;
 
 use actix_web::{http, web, HttpResponse};
-use config::ider;
+use config::{ider, utils::json};
 
 use crate::{
     common::{
@@ -25,10 +25,7 @@ use crate::{
             dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
             http::HttpResponse as MetaHttpResponse,
         },
-        utils::{
-            auth::{remove_ownership, set_ownership},
-            json,
-        },
+        utils::auth::{remove_ownership, set_ownership},
     },
     service::db::dashboards,
 };

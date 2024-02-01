@@ -15,15 +15,17 @@
 
 use std::collections::HashMap;
 
-use config::{CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT};
+use config::{
+    cluster::{is_single_node, load_local_node_role},
+    utils::json,
+    CONFIG, INSTANCE_ID, SIZE_IN_MB, TELEMETRY_CLIENT,
+};
 use hashbrown::HashSet;
+use infra::{cache::stats, db as infra_db};
 use segment::{message::Track, Client, Message};
 use sysinfo::SystemExt;
 
-use crate::common::{
-    infra::{cache::stats, config::*, db},
-    utils::json,
-};
+use crate::common::infra::{cluster::get_cached_online_nodes, config::*};
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
@@ -151,7 +153,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             CONFIG.common.local_mode_storage.clone().into(),
         );
     }
-    let db = db::get_db().await;
+    let db = infra_db::get_db().await;
     match db.list_keys("/dashboard/").await {
         Ok(keys) => {
             data.insert("num_dashboards".to_string(), keys.len().into());
@@ -161,9 +163,9 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
         }
     }
 
-    let roles = crate::common::infra::cluster::load_local_node_role();
-    if !crate::common::infra::cluster::is_single_node(&roles) {
-        match crate::common::infra::cluster::get_cached_online_nodes() {
+    let roles = load_local_node_role();
+    if !is_single_node(&roles) {
+        match get_cached_online_nodes() {
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
@@ -285,7 +287,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
 mod test_telemetry {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_telemetry_new() {
         let tel = Telemetry::new();
         let props = tel.base_info.clone();

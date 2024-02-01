@@ -15,6 +15,8 @@
 
 use std::io::{Error, ErrorKind};
 
+use config::utils::rand::generate_random_string;
+
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
@@ -25,7 +27,7 @@ use crate::{
             },
             user::UserOrg,
         },
-        utils::{auth::is_root_user, rand::generate_random_string},
+        utils::auth::is_root_user,
     },
     service::{db, stream::get_streams},
 };
@@ -195,15 +197,33 @@ pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
 
 #[cfg(test)]
 mod tests {
+    use infra::db as infra_db;
+
     use super::*;
     use crate::{common::meta::user::UserRequest, service::users};
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_organization() {
         let org_id = "default";
-        let user_id = "userone@example.com";
+        let user_id = "user1@example.com";
         let init_user = "root@example.com";
-        // let passcode = "samplePassCode";
+        let pwd = "Complexpass#123";
+
+        infra_db::create_table().await.unwrap();
+        users::create_root_user(
+            org_id,
+            UserRequest {
+                email: init_user.to_string(),
+                password: pwd.to_string(),
+                role: crate::common::meta::user::UserRole::Root,
+                first_name: "root".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+            },
+        )
+        .await
+        .unwrap();
+
         let resp = users::post_user(
             org_id,
             UserRequest {

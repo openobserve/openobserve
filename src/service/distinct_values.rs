@@ -22,7 +22,12 @@ use std::{
 };
 
 use arrow_schema::{DataType, Field, Schema};
-use config::{meta::stream::StreamType, utils::schema_ext::SchemaExt, FxIndexMap, CONFIG};
+use config::{
+    meta::stream::StreamType,
+    utils::{json, schema_ext::SchemaExt},
+    FxIndexMap, CONFIG,
+};
+use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -31,11 +36,7 @@ use tokio::{
 };
 
 use crate::{
-    common::{
-        infra::errors::{Error, Result},
-        meta::stream::SchemaRecords,
-        utils::json,
-    },
+    common::meta::stream::SchemaRecords,
     service::{ingestion, stream::unwrap_partition_time_level},
 };
 
