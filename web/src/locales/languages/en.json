@@ -234,7 +234,9 @@
     "isExistingUser": "Existing User?",
     "deleteAPIKeyMessage": "Are you sure you want to delete this User API Key? This action cannot be undone. Click OK to confirm.",
     "apiKeyNotFound": "User API Key Not Found.",
-    "allowedOrg": "Allowed Organization"
+    "allowedOrg": "Allowed Organization",
+    "roles": "Roles",
+    "groups": "Groups"
   },
   "iam": {
     "users": "Users",
@@ -253,11 +255,12 @@
     "create": "Create",
     "update": "Update",
     "delete": "Delete",
-    "entityName": "Entity Name",
+    "entityName": "Entity Name",  
     "userName": "User Name",
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
-    "searchGroup": "Search Group"
+    "searchGroup": "Search Group",
+    "object": "Object"
   },
   "ticket": {
     "header": "Support Tickets",

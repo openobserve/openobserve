@@ -197,6 +197,9 @@ pub enum UserRole {
     #[cfg(feature = "enterprise")]
     #[serde(rename = "viewer")]
     Viewer,
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "user")]
+    User,
 }
 
 impl fmt::Display for UserRole {
@@ -207,6 +210,8 @@ impl fmt::Display for UserRole {
             UserRole::Root => write!(f, "root"),
             #[cfg(feature = "enterprise")]
             UserRole::Viewer => write!(f, "viewer"),
+            #[cfg(feature = "enterprise")]
+            UserRole::User => write!(f, "user"),
         }
     }
 }
@@ -222,7 +227,12 @@ impl FromStr for UserRole {
             "root" => Ok(UserRole::Root),
             #[cfg(feature = "enterprise")]
             "viewer" => Ok(UserRole::Viewer),
-            _ => Err(()),
+            #[cfg(feature = "enterprise")]
+            "user" => Ok(UserRole::User),
+            #[cfg(feature = "enterprise")]
+            _ => Ok(UserRole::User),
+            #[cfg(not(feature = "enterprise"))]
+            _ => Ok(UserRole::Admin),
         }
     }
 }
