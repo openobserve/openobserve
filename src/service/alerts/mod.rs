@@ -67,6 +67,9 @@ pub async fn save(
     if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));
     }
+    if alert.name.contains('/') {
+        return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
+    }
 
     // before saving alert check alert destination
     if alert.destinations.is_empty() {

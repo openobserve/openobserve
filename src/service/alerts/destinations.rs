@@ -47,6 +47,10 @@ pub async fn save(
     if destination.name.is_empty() {
         return Err(anyhow::anyhow!("Alert destination name is required"));
     }
+    if destination.name.contains('/') {
+        return Err(anyhow::anyhow!("Alert destination name cannot contain '/'"));
+    }
+
     match db::alerts::destinations::set(org_id, &destination).await {
         Ok(_) => {
             if name.is_empty() {
