@@ -15,6 +15,7 @@
 
 use config::{cluster, ider, utils::file::clean_empty_dirs, CONFIG, INSTANCE_ID};
 use infra::file_list as infra_file_list;
+use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use regex::Regex;
 
 use crate::{
@@ -192,13 +193,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::openfga::authorizer::init_open_fga().await;
 
     // RBAC model
-    // #[cfg(feature = "enterprise")]
-    // let existing_meta = match db::get_ofga_model().await {
-    //     Ok(Some(model)) => Some(model),
-    //     Ok(None) | Err(_) => None,
-    // };
-    // #[cfg(feature = "enterprise")]
-    // let _ = db::set_ofga_model(existing_meta).await;
+ /*    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.openfga.enabled {
+        let existing_meta = match db::get_ofga_model().await {
+            Ok(Some(model)) => Some(model),
+            Ok(None) | Err(_) => None,
+        };
+        let _ = db::set_ofga_model(existing_meta).await;
+    } */
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");

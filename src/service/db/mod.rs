@@ -79,10 +79,14 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<(), anyh
                 Ok(_) => {
                     let db = infra_db::get_db().await;
                     let key = "/ofga/model";
+
+                    let mut loc_meta = meta.clone();
+
+                    loc_meta.model = None;
                     match db
                         .put(
                             key,
-                            json::to_vec(&meta).unwrap().into(),
+                            json::to_vec(&loc_meta).unwrap().into(),
                             infra_db::NO_NEED_WATCH,
                         )
                         .await
