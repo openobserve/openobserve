@@ -102,6 +102,9 @@ pub async fn delete_all(
     dist_lock::unlock(&locker).await?;
     drop(locker);
 
+    let start_time = BASE_TIME.timestamp_micros();
+    let end_time = Utc::now().timestamp_micros();
+
     if is_local_disk_storage() {
         let data_dir = format!(
             "{}files/{org_id}/{stream_type}/{stream_name}",
@@ -120,8 +123,8 @@ pub async fn delete_all(
             stream_name,
             stream_type,
             PartitionTimeLevel::Unset,
-            0,
-            0,
+            start_time,
+            end_time,
             true,
         )
         .await?;
@@ -150,7 +153,7 @@ pub async fn delete_all(
     }
 
     // delete from file list
-    delete_from_file_list(org_id, stream_name, stream_type, (0, 0)).await?;
+    delete_from_file_list(org_id, stream_name, stream_type, (start_time, end_time)).await?;
     log::info!(
         "deleted file list for: {}/{}/{}/all",
         org_id,
@@ -468,4 +471,28 @@ async fn write_file_list_s3(
         db::compact::file_list::set_delete(&key).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_delete_by_stream() {
+        let org_id = "test";
+        let stream_name = "test";
+        let stream_type = config::meta::stream::StreamType::Logs;
+        let lifecycle_end = "2023-01-01";
+        delete_by_stream(lifecycle_end, org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_delete_all() {
+        let org_id = "test";
+        let stream_name = "test";
+        let stream_type = config::meta::stream::StreamType::Logs;
+        delete_all(org_id, stream_name, stream_type).await.unwrap();
+    }
 }
