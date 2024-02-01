@@ -15,7 +15,6 @@
 
 use config::utils::json;
 use infra::db as infra_db;
-
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel;
 
