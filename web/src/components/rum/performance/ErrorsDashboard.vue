@@ -86,6 +86,7 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import errorDashboard from "@/utils/rum/errors.json";
 import AppTable from "@/components/AppTable.vue";
 import searchService from "@/services/search";
+import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "ErrorsDashboard",
@@ -212,7 +213,9 @@ export default defineComponent({
     ];
 
     const loadDashboard = async () => {
-      currentDashboardData.data = errorDashboard;
+      // schema migration
+      currentDashboardData.data = convertDashboardSchemaVersion(errorDashboard);
+
 
       // if variables data is null, set it to empty list
       if (
