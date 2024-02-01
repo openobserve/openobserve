@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           no-caps
           :label="t('panel.save')"
           data-test="dashboard-panel-save"
-          @click="savePanelData.execute()"
+          @click.stop="savePanelData.execute()"
           :loading="savePanelData.isLoading.value"
         />
         <q-btn
