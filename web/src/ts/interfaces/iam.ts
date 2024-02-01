@@ -62,6 +62,7 @@ export interface Resource {
   has_entities?: boolean;
   is_loading?: boolean;
   show?: boolean;
+  childName?: string;
 }
 
 export interface Entity {
@@ -97,6 +98,7 @@ export interface Entity {
   expand?: boolean;
   show?: boolean;
   is_loading?: boolean;
+  childName?: string;
 }
 
 interface User {}
