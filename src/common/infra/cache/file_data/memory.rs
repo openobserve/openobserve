@@ -83,8 +83,8 @@ impl FileData {
             );
             // cache is full, need release some space
             let need_release_size = min(
-                CONFIG.disk_cache.max_size,
-                max(CONFIG.disk_cache.release_size, data_size * 100),
+                CONFIG.memory_cache.max_size,
+                max(CONFIG.memory_cache.release_size, data_size * 100),
             );
             let mut release_size = 0;
             loop {
