@@ -18,9 +18,10 @@ use std::{collections::HashMap, io::BufReader, sync::Arc};
 use actix_web::{http, web};
 use anyhow::{anyhow, Result};
 use config::{
-    meta::stream::StreamType,
+    cluster,
+    meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{schema::infer_json_schema, schema_ext::SchemaExt},
+    utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
     CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -28,15 +29,10 @@ use vrl::compiler::runtime::Runtime;
 
 use super::get_exclude_labels;
 use crate::{
-    common::{
-        infra::cluster,
-        meta::{
-            ingestion::{IngestionResponse, StreamStatus},
-            prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
-            stream::{PartitioningDetails, SchemaRecords},
-            usage::UsageType,
-        },
-        utils::{flatten, json, time},
+    common::meta::{
+        ingestion::{IngestionResponse, StreamStatus},
+        prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        stream::{PartitioningDetails, SchemaRecords},
     },
     service::{
         db, format_stream_name,

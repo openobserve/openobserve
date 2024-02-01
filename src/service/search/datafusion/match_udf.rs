@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::utils::str;
 use datafusion::{
     arrow::{
         array::{ArrayRef, BooleanArray, StringArray},
@@ -27,8 +28,6 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
-
-use crate::common::utils::str;
 
 /// Implementation of match_range
 pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {

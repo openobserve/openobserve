@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::AHashMap as HashMap;
 use datafusion::error::{DataFusionError, Result};
+use hashbrown::HashMap;
 
 use crate::{
     common::meta::prom::{HASH_LABEL, LE_LABEL, NAME_LABEL},

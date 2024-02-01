@@ -20,14 +20,12 @@ use std::{
 
 use actix_multipart::form::{bytes::Bytes, MultipartForm};
 use actix_web::{post, web, HttpResponse};
+use config::utils::json;
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
-        utils::json,
-    },
+    common::meta::{http::HttpResponse as MetaHttpResponse, middleware_data::RumExtraData},
     service::logs,
 };
 

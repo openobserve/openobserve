@@ -15,13 +15,11 @@
 
 use std::collections::HashMap;
 
+use config::utils::{base64, json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    common::utils::{base64, json},
-    service::search::datafusion::storage::StorageType,
-};
+use crate::service::search::datafusion::storage::StorageType;
 
 #[derive(Clone, Debug)]
 pub struct Session {
@@ -238,7 +236,9 @@ impl Response {
     pub fn set_local_took(&mut self, val: usize, wait: usize) {
         if self.took_detail.is_some() {
             self.took_detail.as_mut().unwrap().total = val;
-            self.took_detail.as_mut().unwrap().wait_queue = wait;
+            if wait > 0 {
+                self.took_detail.as_mut().unwrap().wait_queue = wait;
+            }
         }
     }
 

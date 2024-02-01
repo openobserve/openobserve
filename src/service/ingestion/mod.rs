@@ -21,7 +21,18 @@ use std::{
 use anyhow::{anyhow, Result};
 use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::StreamType, SIZE_IN_MB};
+use config::{
+    cluster,
+    meta::{
+        stream::{PartitionTimeLevel, StreamType},
+        usage::RequestStats,
+    },
+    utils::{
+        flatten,
+        json::{self, Map, Value},
+    },
+    SIZE_IN_MB,
+};
 use vector_enrichment::TableRegistry;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
@@ -30,21 +41,13 @@ use vrl::{
 
 use crate::{
     common::{
-        infra::{
-            cluster,
-            config::{STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
-        },
+        infra::config::{STREAM_ALERTS, STREAM_FUNCTIONS, TRIGGERS},
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::{PartitionTimeLevel, PartitioningDetails, SchemaRecords},
-            usage::RequestStats,
+            stream::{PartitioningDetails, SchemaRecords},
         },
-        utils::{
-            flatten,
-            functions::get_vrl_compiler_config,
-            json::{self, Map, Value},
-        },
+        utils::functions::get_vrl_compiler_config,
     },
     service::{db, format_partition_key, stream::stream_settings},
 };
@@ -507,7 +510,7 @@ mod tests {
             "1970/01/01/00/default"
         );
     }
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_get_stream_partition_keys() {
         let mut stream_schema_map = HashMap::new();
         let mut meta = HashMap::new();
@@ -524,7 +527,7 @@ mod tests {
         );
     }
 
-    #[actix_web::test]
+    #[tokio::test]
 
     async fn test_compile_vrl_function() {
         let result = compile_vrl_function(

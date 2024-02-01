@@ -16,25 +16,18 @@
 use std::{collections::HashMap, io::Write, sync::Arc};
 
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
-use ahash::AHashMap;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     ider,
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
-    utils::parquet::parse_file_key_columns,
+    utils::{json, parquet::parse_file_key_columns},
     CONFIG, FILE_EXT_PARQUET,
 };
+use infra::{cache, file_list as infra_file_list, storage};
 use tokio::{sync::Semaphore, task::JoinHandle};
 
-use crate::{
-    common::{
-        infra::{cache, file_list as infra_file_list, storage},
-        meta::stream::{PartitionTimeLevel, StreamStats},
-        utils::json,
-    },
-    service::{db, file_list, search::datafusion, stream},
-};
+use crate::service::{db, file_list, search::datafusion, stream};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -408,7 +401,7 @@ async fn merge_files(
             let schema = schema_versions[schema_ver_id]
                 .clone()
                 .with_metadata(HashMap::new());
-            let mut diff_fields = AHashMap::default();
+            let mut diff_fields = hashbrown::HashMap::new();
             let cur_fields = schema.fields();
             for field in cur_fields {
                 if let Ok(v) = schema_latest.field_with_name(field.name()) {
@@ -607,8 +600,9 @@ async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyh
 
 #[cfg(test)]
 mod tests {
+    use infra::db as infra_db;
+
     use super::*;
-    use crate::common::infra::db as infra_db;
 
     #[tokio::test]
     async fn test_compact() {

@@ -345,7 +345,7 @@ fn remove_stream_fn_from_cache(key: &str, fn_name: &str) {
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_functions() {
         let mut trans = Transform {
             function: "function(row)  row.square = row[\"Year\"]*row[\"Year\"]  return row end"

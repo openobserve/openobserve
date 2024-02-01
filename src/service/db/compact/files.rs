@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::stream::StreamType, RwHashMap};
+use infra::db as infra_db;
 use once_cell::sync::Lazy;
-
-use crate::common::infra::db as infra_db;
 
 static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
@@ -107,7 +106,7 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_compact_files() {
         const OFFSET: i64 = 100;
         set_offset("default", "compact_file", "logs".into(), OFFSET)

@@ -15,13 +15,12 @@
 
 use std::sync::Arc;
 
+use config::utils::json;
+use infra::db as infra_db;
+
 use crate::common::{
-    infra::{
-        config::{SYSLOG_ENABLED, SYSLOG_ROUTES},
-        db as infra_db,
-    },
+    infra::config::{SYSLOG_ENABLED, SYSLOG_ROUTES},
     meta::syslog::SyslogRoute,
-    utils::json,
 };
 
 #[tracing::instrument(name = "service:db:syslog:toggle_syslog_setting")]

@@ -75,7 +75,7 @@ pub async fn run(start_srv: bool, is_init: bool) -> Result<(), anyhow::Error> {
 mod tests {
     use super::run;
 
-    #[actix_web::test]
+    #[tokio::test]
     async fn test_run() {
         run(false, true).await.unwrap();
     }

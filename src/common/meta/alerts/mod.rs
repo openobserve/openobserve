@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ahash::HashMap;
-use config::meta::stream::StreamType;
+use config::{meta::stream::StreamType, utils::json::Value};
+use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::common::utils::json::Value;
 
 pub mod destinations;
 pub mod templates;

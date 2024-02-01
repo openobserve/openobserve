@@ -15,10 +15,9 @@
 
 use std::{path::Path, time::Duration};
 
-use ahash::{AHashMap, AHashSet};
-use dashmap::{DashMap, DashSet};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
+use hashbrown::{HashMap, HashSet};
 use itertools::chain;
 use once_cell::sync::Lazy;
 use reqwest::Client;
@@ -31,10 +30,10 @@ use crate::{
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
 pub type FxIndexSet<K> = indexmap::IndexSet<K, ahash::RandomState>;
-pub type RwHashMap<K, V> = DashMap<K, V, ahash::RandomState>;
-pub type RwHashSet<K> = DashSet<K, ahash::RandomState>;
-pub type RwAHashMap<K, V> = tokio::sync::RwLock<AHashMap<K, V>>;
-pub type RwAHashSet<K> = tokio::sync::RwLock<AHashSet<K>>;
+pub type RwHashMap<K, V> = dashmap::DashMap<K, V, ahash::RandomState>;
+pub type RwHashSet<K> = dashmap::DashSet<K, ahash::RandomState>;
+pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
+pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
 pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";

@@ -15,6 +15,7 @@
 
 use std::{iter::zip, sync::Arc};
 
+use config::utils::{str, time};
 use datafusion::{
     arrow::{
         array::{ArrayRef, BooleanArray, Int64Array, StringArray},
@@ -27,8 +28,6 @@ use datafusion::{
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
-
-use crate::common::utils::{str, time};
 
 /// The name of the time_range UDF given to DataFusion.
 pub const TIME_RANGE_UDF_NAME: &str = "time_range";
