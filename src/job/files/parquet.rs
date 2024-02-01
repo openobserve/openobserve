@@ -368,6 +368,11 @@ async fn merge_files(
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }
+    if new_file_meta.compressed_size == 0 {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: compressed_size is 0"
+        ));
+    }
 
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);

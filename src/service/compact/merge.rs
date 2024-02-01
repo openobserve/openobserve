@@ -451,6 +451,11 @@ async fn merge_files(
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
     }
+    if new_file_meta.compressed_size == 0 {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: compressed_size is 0"
+        ));
+    }
 
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
