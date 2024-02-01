@@ -364,9 +364,10 @@ const getDefaultEntity = (): Entity => {
       },
     },
     display_name: "",
-    type: "entity",
+    type: "Resource",
     resourceName: "",
     isSelected: false,
+    is_loading: false,
   };
 };
 
@@ -402,11 +403,12 @@ const getDefaultResource = (): Resource => {
     display_name: "",
     parent: "",
     childs: [],
-    type: "resource",
+    type: "Type",
     resourceName: "",
     isSelected: false,
     entities: [],
     has_entities: false,
+    is_loading: false,
   };
 };
 
@@ -556,14 +558,16 @@ const updateTableData = async (value: string = filter.value.permissions) => {
 };
 
 const updateExpandedResources = (resources: (Resource | Entity)[]) => {
-  resources.forEach((resource) => {
+  resources.forEach(async (resource) => {
     // Check if the current item is an object and has the 'expand' key
     if (
       typeof resource === "object" &&
       resource.expand &&
       resource.has_entities
     ) {
-      getResourceEntities(resource);
+      resource.is_loading = true;
+      await getResourceEntities(resource);
+      resource.is_loading;
       // Perform additional actions as needed
     }
 
@@ -590,8 +594,15 @@ const updatePermissionVisibility = (
     const showEntity = permission.entities?.some((entity) => entity.show);
 
     // Update the permission object to add `show` property
+
+    let appliedFilter = true;
+    if (filter.value.resource)
+      appliedFilter = filter.value.resource === permission.resourceName;
+
     permission.show =
-      filter.value.permissions === "all" ? true : showResource || showEntity;
+      filter.value.permissions === "all"
+        ? true && appliedFilter
+        : (showResource || showEntity) && appliedFilter;
   });
 };
 
@@ -659,9 +670,15 @@ function filterResources(rows: any, terms: any) {
 }
 
 const expandPermission = async (resource: any) => {
-  if (!resource.expand) await getResourceEntities(resource);
+  const expand = !resource.expand;
 
-  resource.expand = !resource.expand;
+  if (expand) {
+    resource.is_loading = true;
+    await getResourceEntities(resource);
+    resource.is_loading;
+  }
+
+  resource.expand = expand;
 };
 
 const getPermissionHash = (
@@ -700,7 +717,6 @@ const getResourceEntities = (resource: Resource | Entity) => {
   return new Promise(async (resolve, reject) => {
     if (!resource.entities?.length)
       await listEntitiesFnMap[resource.resourceName](resource);
-
     resolve(true);
   });
 };
@@ -939,7 +955,7 @@ const updateEntityEntities = (
           },
         },
         entities: [],
-        type: "entity",
+        type: "Resource",
         resourceName: hasEntities
           ? entity.entities[0].resourceName
           : entity.resourceName,
@@ -1015,7 +1031,7 @@ const updateResourceEntities = (
         },
       },
       entities: [],
-      type: "entity",
+      type: "Resource",
       resourceName: hasEntities
         ? resource.childs[0].resourceName
         : resourceName,

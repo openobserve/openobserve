@@ -188,7 +188,7 @@ const columns: any = [
   {
     name: "type",
     field: "type",
-    label: t("common.type"),
+    label: t("iam.object"),
     align: "left",
     style: "width: 100px",
   },

@@ -51,7 +51,7 @@ export interface Resource {
     };
   };
   display_name: string;
-  type: "resource";
+  type: "Type";
   resourceName: string;
   isSelected: boolean;
   parent: string;
@@ -91,7 +91,7 @@ export interface Entity {
   display_name: string;
   entities?: Entity[];
   has_entities?: boolean;
-  type: "entity";
+  type: "Resource";
   resourceName: string;
   isSelected: boolean;
   expand?: boolean;
