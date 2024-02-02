@@ -1041,7 +1041,7 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
             if let Ok(wg) = WorkGroup::from_str(&wg) {
                 let (_cpu, mem) = wg.get_resource();
                 memory_size = memory_size * mem as usize / 100;
-                log::debug!("[DATAFUSION] group:{} memory size: {}", wg, memory_size);
+                log::debug!("group:{} memory pool size: {}", wg, memory_size);
             }
         }
         let mem_pool = super::MemoryPoolType::from_str(&CONFIG.memory_cache.datafusion_memory_pool)
