@@ -15,8 +15,8 @@ FROM public.ecr.aws/zinclabs/rust:bookworm-sccache as builder
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --version && sccache --version
 
-WORKDIR /app
-COPY . /app
+WORKDIR /openobserve
+COPY . /openobserve
 COPY --from=webBuilder /web/dist web/dist
 
 RUN cargo build --release
@@ -26,6 +26,6 @@ FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
 RUN update-ca-certificates
-COPY --from=builder /app/target/release/openobserve /
+COPY --from=builder /openobserve/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]

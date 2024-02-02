@@ -238,15 +238,19 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
         Some(o2_enterprise::enterprise::search::queue::predict_work_group(&nodes, &file_list));
     // 2. check concurrency
-    let locker_key = if work_group.is_none() {
-        "search/cluster_queue/global".to_string()
+    let work_group_str = if work_group.is_none() {
+        "global".to_string()
     } else {
-        format!("search/cluster_queue/{}", work_group.as_ref().unwrap())
+        work_group.as_ref().unwrap().to_string()
     };
+    let locker_key = "search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
     let locker = dist_lock::lock(&locker_key, 0).await?;
     #[cfg(feature = "enterprise")]
-    while o2_enterprise::enterprise::search::queue::need_wait(work_group.as_ref().unwrap())
+    while work_group
+        .as_ref()
+        .unwrap()
+        .need_wait()
         .await
         .map_err(|e| Error::Message(e.to_string()))?
     {
@@ -255,12 +259,18 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     }
     // 3. process the search in the work group
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::search::queue::process(work_group.as_ref().unwrap(), &session_id)
+    work_group
+        .as_ref()
+        .unwrap()
+        .process(&session_id)
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
     #[cfg(feature = "enterprise")]
     dist_lock::unlock(&locker).await?;
     let took_wait = start.elapsed().as_millis() as usize;
+
+    // set work_group
+    req.work_group = work_group_str;
 
     let mut partition_files = None;
     let mut file_num = file_list.len();
@@ -420,12 +430,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     #[cfg(not(feature = "enterprise"))]
                     dist_lock::unlock(&locker).await?;
                     #[cfg(feature = "enterprise")]
-                    o2_enterprise::enterprise::search::queue::done(
-                        work_group.as_ref().unwrap(),
-                        &session_id,
-                    )
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
+                    work_group
+                        .as_ref()
+                        .unwrap()
+                        .done(&session_id)
+                        .await
+                        .map_err(|e| Error::Message(e.to_string()))?;
                     return Err(err);
                 }
             },
@@ -434,12 +444,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 #[cfg(not(feature = "enterprise"))]
                 dist_lock::unlock(&locker).await?;
                 #[cfg(feature = "enterprise")]
-                o2_enterprise::enterprise::search::queue::done(
-                    work_group.as_ref().unwrap(),
-                    &session_id,
-                )
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(&session_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     e.to_string(),
                 )));
@@ -500,12 +510,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 #[cfg(not(feature = "enterprise"))]
                 dist_lock::unlock(&locker).await?;
                 #[cfg(feature = "enterprise")]
-                o2_enterprise::enterprise::search::queue::done(
-                    work_group.as_ref().unwrap(),
-                    &session_id,
-                )
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(&session_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     err.to_string(),
                 )));
@@ -518,7 +528,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     #[cfg(not(feature = "enterprise"))]
     dist_lock::unlock(&locker).await?;
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::search::queue::done(work_group.as_ref().unwrap(), &session_id)
+    work_group
+        .as_ref()
+        .unwrap()
+        .done(&session_id)
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 

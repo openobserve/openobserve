@@ -59,6 +59,7 @@ pub async fn search_parquet(
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
+    work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
     let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
@@ -206,6 +207,7 @@ pub async fn search_parquet(
                 } else {
                     SearchType::Normal
                 },
+                work_group: Some(work_group.to_string()),
             }
         } else {
             let id = format!("{session_id}-parquet-{ver}");
@@ -227,6 +229,7 @@ pub async fn search_parquet(
                 } else {
                     SearchType::Normal
                 },
+                work_group: Some(work_group.to_string()),
             }
         };
         let datafusion_span = info_span!(
@@ -295,6 +298,7 @@ pub async fn search_memtable(
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
+    work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
     let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
@@ -398,6 +402,7 @@ pub async fn search_memtable(
             } else {
                 SearchType::Normal
             },
+            work_group: Some(work_group.to_string()),
         };
 
         let datafusion_span = info_span!(

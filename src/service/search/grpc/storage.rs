@@ -49,6 +49,7 @@ pub async fn search(
     sql: Arc<Sql>,
     file_list: &[FileKey],
     stream_type: StreamType,
+    work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
     // fetch all schema versions, group files by version
@@ -182,6 +183,7 @@ pub async fn search(
             } else {
                 SearchType::Normal
             },
+            work_group: Some(work_group.to_string()),
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
