@@ -19,16 +19,36 @@
 
 <script setup lang="ts">
 import RouteTabs from "@/components/RouteTabs.vue";
+import { onBeforeMount } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 
 const store = useStore();
 const { t } = useI18n();
 
 const activeTab = ref("users");
 
-const tabs = [
+onBeforeMount(() => {
+  setTabs();
+});
+
+const setTabs = () => {
+  const enterprise = ["users", "groups", "roles", "organizations"];
+  const os = ["users"];
+
+  const isEnterprise =
+    config.isEnterprise == "true" || config.isCloud == "true";
+
+  if (isEnterprise) {
+    tabs.value = tabs.value.filter((tab) => enterprise.includes(tab.name));
+  } else {
+    tabs.value = tabs.value.filter((tab) => os.includes(tab.name));
+  }
+};
+
+const tabs = ref([
   {
     dataTest: "iam-users-tab",
     name: "users",
@@ -77,7 +97,7 @@ const tabs = [
     label: t("iam.organizations"),
     class: "tab_content",
   },
-];
+]);
 
 const updateActiveTab = (tab: string) => {
   activeTab.value = tab;
