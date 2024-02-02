@@ -66,6 +66,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             file_list: vec![],
             stream_type: "".to_string(),
             timeout: req.timeout,
+            work_group: "".to_string(),
         }
     }
 }

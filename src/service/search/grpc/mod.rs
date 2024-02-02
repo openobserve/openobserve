@@ -41,6 +41,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let sql = Arc::new(super::sql::Sql::new(req).await?);
     let stream_type = StreamType::from(req.stream_type.as_str());
+    let work_group = req.work_group.clone();
 
     let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
     let timeout = if req.timeout > 0 {
@@ -67,6 +68,7 @@ pub async fn search(
     );
 
     // search in WAL parquet
+    let work_group1 = work_group.clone();
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
     let wal_parquet_span = info_span!(
@@ -79,7 +81,7 @@ pub async fn search(
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_parquet(&session_id1, sql1, stream_type, timeout).await
+                wal::search_parquet(&session_id1, sql1, stream_type, &work_group1, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -88,6 +90,7 @@ pub async fn search(
     );
 
     // search in WAL memory
+    let work_group2 = work_group.clone();
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
     let wal_mem_span = info_span!(
@@ -100,7 +103,7 @@ pub async fn search(
     let task2 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_memtable(&session_id2, sql2, stream_type, timeout).await
+                wal::search_memtable(&session_id2, sql2, stream_type, &work_group2, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -110,6 +113,7 @@ pub async fn search(
 
     // search in object storage
     let req_stype = req.stype;
+    let work_group3 = work_group.clone();
     let session_id3 = session_id.clone();
     let sql3 = sql.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
@@ -125,7 +129,15 @@ pub async fn search(
             if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
-                storage::search(&session_id3, sql3, &file_list, stream_type, timeout).await
+                storage::search(
+                    &session_id3,
+                    sql3,
+                    &file_list,
+                    stream_type,
+                    &work_group3,
+                    timeout,
+                )
+                .await
             }
         }
         .instrument(storage_span),
