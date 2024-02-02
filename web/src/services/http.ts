@@ -17,9 +17,7 @@ import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
-import { useQuasar } from "quasar";
-
-const q = useQuasar();
+import { Notify } from "quasar";
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
@@ -59,6 +57,20 @@ const http = ({ headers } = {} as any) => {
     },
     function (error) {
       if (error && error.response && error.response.status) {
+        Notify.create({
+          message:
+            "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
+          timeout: 0, // This ensures the notification does not close automatically
+          color: "negative", // Customize color as needed
+          position: "top",
+          actions: [
+            {
+              color: "white",
+              icon: "close",
+              size: "sm",
+            },
+          ],
+        });
         switch (error.response.status) {
           case 400:
             console.log(
@@ -117,7 +129,7 @@ const http = ({ headers } = {} as any) => {
             break;
           case 403:
             if (config.isEnterprise == "true" || config.isCloud == "true") {
-              q.notify({
+              Notify.create({
                 message:
                   "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
                 timeout: 0, // This ensures the notification does not close automatically
