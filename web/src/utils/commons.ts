@@ -210,7 +210,7 @@ export const addPanel = async (
   const newLayoutObj = {
     x: 0,
     y: tab.panels?.length > 0 ? maxY + 10 : 0,
-    w: 6,
+    w: 24,
     h: 9,
     i: maxI + 1,
     panelId: panelData.id,
@@ -220,7 +220,7 @@ export const addPanel = async (
   // check if last panel has enthough space to add new panel
   if (tab.panels.length > 0) {
     //check if new panel can be added
-    if (12 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
+    if (48 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
       newLayoutObj.y = lastPanel.layout.y;
       newLayoutObj.x = lastPanel.layout.x + lastPanel.layout.w;
     }
