@@ -337,6 +337,7 @@ export default defineComponent({
       promqlMode,
       resetDashboardPanelData,
       resetAggregationFunction,
+      getDefaultQueries,
     } = useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref();
@@ -1042,34 +1043,10 @@ export default defineComponent({
     const savePanelChangesToDashboard = async (dashId: string) => {
       // if chart type is html, no need to save query else it will call an api call
       if (dashboardPanelData.data.type == "html") {
-        // for promql we have validation that query should not be empty. that's why we are giving type as sql
-        dashboardPanelData.data.queryType = "sql";
-        dashboardPanelData.data.queries = [
-          {
-            query: "",
-            customQuery: false,
-            fields: {
-              stream: "",
-              stream_type: "logs",
-              x: [],
-              y: [],
-              z: [],
-              filter: [],
-              latitude: null,
-              longitude: null,
-              weight: null,
-            },
-            config: {
-              promql_legend: "",
-              layer_type: "scatter",
-              weight_fixed: 1,
-              limit: 0,
-              // gauge min and max values
-              min: 0,
-              max: 100,
-            },
-          },
-        ];
+        // remove query type
+        dashboardPanelData.data.queryType = "";
+        // reset queries array
+        dashboardPanelData.data.queries = getDefaultQueries();
       }
       if (!isValid()) {
         return;

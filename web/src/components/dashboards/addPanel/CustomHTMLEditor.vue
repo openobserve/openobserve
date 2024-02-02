@@ -17,17 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="html-editor" style="width: 100%; height: 100%; overflow: auto">
     <div v-if="editMode" style="width: 100%; height: 100%">
-      <q-splitter v-model="splitterModel" style="width: 100%; height: 100%">
+      <q-splitter
+        v-model="splitterModel"
+        style="width: 100%; height: 100% !important"
+        @update:modelValue="layoutSplitterUpdated"
+      >
         <template #before>
-          <div style="height: 100% !important">
-            <q-input
+          <div class="col" style="height: 100%;">
+            <HTMLEditor
               v-model="htmlContent"
-              filled
-              type="text"
-              class="editor"
-              placeholder="Enter here"
-              autogrow
-              :input-style="{ minHeight: 'calc(100vh - 119px)' }"
+              :debounceTime="500"
             />
           </div>
         </template>
@@ -52,8 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
+import HTMLEditor from "./HTMLEditor.vue";
 
 export default defineComponent({
+  components: { HTMLEditor },
   name: "CustomHTMLEditor",
   props: {
     modelValue: {
@@ -73,9 +74,14 @@ export default defineComponent({
       emit("update:modelValue", newVal);
     });
 
+    const layoutSplitterUpdated = () => {
+      window.dispatchEvent(new Event("resize"));
+    };
+
     return {
       htmlContent,
       splitterModel,
+      layoutSplitterUpdated,
     };
   },
 });

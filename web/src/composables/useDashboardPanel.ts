@@ -138,6 +138,11 @@ const useDashboardPanelData = () => {
     dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
   };
 
+  // get default queries
+  const getDefaultQueries = () => {
+    return getDefaultDashboardPanelData().data.queries;
+  };
+
   const addQuery = () => {
     const queryType =
       dashboardPanelData.data.queryType === "sql" ? "sql" : "promql";
@@ -1079,6 +1084,7 @@ const useDashboardPanelData = () => {
     removeQuery,
     resetAggregationFunction,
     cleanupDraggingFields,
+    getDefaultQueries,
   };
 };
 export default useDashboardPanelData;
