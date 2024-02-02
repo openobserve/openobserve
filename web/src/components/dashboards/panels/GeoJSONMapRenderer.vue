@@ -53,7 +53,7 @@ export default defineComponent({
 
             if (chartRef.value) {
                 chart = echarts.init(chartRef.value);
-                echarts.registerMap('world', map);
+                echarts.registerMap('world', (map) as any);
                 console.log("onMounted props.data.options", props.data.options);
                 
                 chart?.setOption(props?.data?.options || {}, true);
