@@ -224,11 +224,6 @@ pub async fn search(
             res.set_session_id(session_id);
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
-            println!(
-                "user {} query {}",
-                user_id.to_str().unwrap(),
-                resp.origin_sql
-            );
             let req_stats = RequestStats {
                 records: res.hits.len() as i64,
                 response_time: time,
