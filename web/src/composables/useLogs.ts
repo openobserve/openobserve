@@ -669,14 +669,17 @@ const useLogs = () => {
       });
   };
 
-  const refreshPartitionPagination = (forceFlag: boolean = false) => {
+  const refreshPartitionPagination = (regenrateFlag: boolean = false) => {
     const { rowsPerPage } = searchObj.meta.resultGrid;
     const { currentPage } = searchObj.data.resultGrid;
     const partitionDetail = searchObj.data.queryResults.partitionDetail;
     let remainingRecords = rowsPerPage;
     let lastPartitionSize = 0;
 
-    if (partitionDetail.paginations.length <= currentPage + 3 || forceFlag) {
+    if (
+      partitionDetail.paginations.length <= currentPage + 3 ||
+      regenrateFlag
+    ) {
       partitionDetail.paginations = [];
 
       let pageNumber = 0;
@@ -748,6 +751,10 @@ const useLogs = () => {
           }
           const from = 0;
 
+          if (total == 0) {
+            recordSize = 0;
+          }
+
           partitionDetail.paginations[pageNumber].push({
             startTime: item[0],
             endTime: item[1],
@@ -755,8 +762,13 @@ const useLogs = () => {
             size: recordSize,
           });
 
-          pageNumber++;
-          remainingRecords = rowsPerPage;
+          if (partitionDetail.paginations[pageNumber].size > 0) {
+            pageNumber++;
+            remainingRecords =
+              rowsPerPage - partitionDetail.paginations[pageNumber].size;
+          } else {
+            remainingRecords = rowsPerPage;
+          }
         }
 
         if (
@@ -906,11 +918,7 @@ const useLogs = () => {
   ) => {
     // set track_total_hits true for first request of partition to get total records in partition
     // it will be used to send pagination request
-    if (
-      searchObj.data.queryResults.partitionDetail.partitionTotal[
-        searchObj.data.resultGrid.currentPage - 1
-      ] == -1
-    ) {
+    if (queryReq.query.from == 0) {
       queryReq.query.track_total_hits = true;
     } else if (
       searchObj.data.queryResults.partitionDetail.partitionTotal[
@@ -944,10 +952,14 @@ const useLogs = () => {
           }
         );
 
+        let regeratePaginationFlag = false;
+        if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
+          regeratePaginationFlag = true;
+        }
         // if total records in partition is greate than recordsPerPage then we need to update pagination
         // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-        refreshPartitionPagination(true);
-        
+        refreshPartitionPagination(regeratePaginationFlag);
+
         if (res.data.from > 0) {
           searchObj.data.queryResults.from = res.data.from;
           searchObj.data.queryResults.scan_size = res.data.scan_size;
@@ -1035,7 +1047,8 @@ const useLogs = () => {
 
         if (
           (searchObj.data.queryResults.aggs == undefined ||
-            searchObj.data.resultGrid.currentPage == 1) &&
+            (searchObj.data.resultGrid.currentPage == 1 &&
+              searchObj.data.queryResults.subpage == 1)) &&
           searchObj.loadingHistogram == false &&
           searchObj.meta.showHistogram == true &&
           searchObj.meta.sqlMode == false
