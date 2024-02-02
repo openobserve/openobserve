@@ -58,6 +58,7 @@
       <drilldown-pop-up
         @close="() => (showDrilldownPopUp = false)"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :drilldown-data="drilldownData"
       />
     </q-dialog>
   </div>
@@ -86,6 +87,25 @@ export default defineComponent({
         name: "Drill down 3",
       },
     ]);
+    const drilldownData: any = ref({
+      name: "",
+      type: "",
+      targetBlank: false,
+      findBy: "name",
+      data: {
+        url: "",
+        folder: "",
+        dashboard: "",
+        tab: "",
+        queryParams: [
+          {
+            name: "",
+            value: "",
+          },
+        ],
+      },
+    });
+
 
     const onDataLinkClick = () => {
       console.log("onDataLinkClick");
@@ -103,6 +123,7 @@ export default defineComponent({
       onDataLinkClick,
       showDrilldownPopUp,
       removeDataLink,
+      drilldownData,
     };
   },
 });

@@ -88,8 +88,9 @@
       <div style="margin-top: 10px; display: flex; flex-direction: column">
         Enter URL:
         <textarea
-          style="min-width: 100%; max-width: 100%"
+          style="min-width: 100%; max-width: 100%; resize: vertical"
           v-model="drilldownData.data.url"
+          :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
         ></textarea>
       </div>
     </div>
@@ -103,7 +104,16 @@
             :options="folderList"
             class="dropdown"
             emit-value
-          />
+          >
+            <!-- template when on options -->
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-italic text-grey">
+                  No folders available
+                </q-item-section>
+              </q-item>
+            </template></q-select
+          >
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.folder">
           <div class="dropdownLabel">Select Dashboard*:</div>
@@ -112,7 +122,16 @@
             :options="dashboardList"
             class="dropdown"
             emit-value
-          />
+          >
+            <!-- template when on options -->
+            <template v-slot:no-option>
+              <q-item data-test="dashboard-tab-move-select-no-option">
+                <q-item-section class="text-italic text-grey">
+                  No dashboards available
+                </q-item-section>
+              </q-item>
+            </template></q-select
+          >
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
           <div class="dropdownLabel">Select Tab*:</div>
@@ -121,7 +140,16 @@
             :options="tabList"
             class="dropdown"
             emit-value
-          />
+          >
+            <!-- template when on options -->
+            <template v-slot:no-option>
+              <q-item data-test="dashboard-tab-move-select-no-option">
+                <q-item-section class="text-italic text-grey">
+                  No tab Available
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
         </div>
 
         <!-- array of variables name and its values -->
@@ -142,7 +170,10 @@
               padding="sm"
               @click="
                 () =>
-                  drilldownData.data.queryParams.push({ name: '', value: '' })
+                  drilldownData.data.queryParams.push({
+                    name: '',
+                    value: '',
+                  })
               "
               >Add Query</q-btn
             >
@@ -193,7 +224,8 @@
         no-caps
         class="no-border"
         color="primary"
-        @click="() => {}"
+        @click="saveDrilldown.execute()"
+        :loading="saveDrilldown.isLoading.value"
         style="min-width: 60px"
         data-test="confirm-button"
         :disable="isFormValid"
@@ -220,33 +252,22 @@ import {
   getFoldersList,
 } from "../../../utils/commons";
 import { onMounted } from "vue";
+import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {},
-  props: {},
+  props: {
+    drilldownData: {
+      type: Object,
+      required: true,
+    },
+  },
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const dashboardList = ref([]);
     const tabList = ref([]);
-    const drilldownData: any = ref({
-      name: "",
-      type: "",
-      targetBlank: false,
-      data: {
-        url: "",
-        folder: "",
-        dashboard: "",
-        tab: "",
-        queryParams: [
-          {
-            label: "",
-            value: "",
-          },
-        ],
-      },
-    });
 
     onMounted(async () => {
       if (store.state.organizationData.folders) {
@@ -256,21 +277,21 @@ export default defineComponent({
 
     // on folder change, reset dashboard and tab values
     watch(
-      () => drilldownData.value.data.folder,
+      () => props.drilldownData.data.folder,
       (newVal, oldVal) => {
         if (newVal !== oldVal) {
-          drilldownData.value.data.dashboard = "";
-          drilldownData.value.data.tab = "";
+          props.drilldownData.data.dashboard = "";
+          props.drilldownData.data.tab = "";
         }
       }
     );
 
     // on dashboard change, reset tab value
     watch(
-      () => drilldownData.value.data.dashboard,
+      () => props.drilldownData.data.dashboard,
       (newVal, oldVal) => {
         if (newVal !== oldVal) {
-          drilldownData.value.data.tab = "";
+          props.drilldownData.data.tab = "";
         }
       }
     );
@@ -291,11 +312,11 @@ export default defineComponent({
     });
 
     watch(
-      () => drilldownData.value.data.folder,
+      () => props.drilldownData.data.folder,
       async () => {
         // get folder data
         const folderData = store.state.organizationData.folders?.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder
+          (folder: any) => folder.name === props.drilldownData.data.folder
         );
 
         if (!folderData) {
@@ -321,11 +342,11 @@ export default defineComponent({
     );
 
     watch(
-      () => drilldownData.value.data.dashboard,
+      () => props.drilldownData.data.dashboard,
       async () => {
         // get folder data
         const folderData = store.state.organizationData.folders?.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder
+          (folder: any) => folder.name === props.drilldownData.data.folder
         );
 
         if (!folderData) {
@@ -341,7 +362,7 @@ export default defineComponent({
         // get dashboard data
         const dashboardData = allDashboardList?.find(
           (dashboard: any) =>
-            dashboard.title === drilldownData.value.data.dashboard
+            dashboard.title === props.drilldownData.data.dashboard
         );
 
         if (!dashboardData) {
@@ -362,25 +383,25 @@ export default defineComponent({
 
     const isFormValid = computed(() => {
       // if name is empty
-      if (!drilldownData.value.name.trim()) {
+      if (!props.drilldownData.name.trim()) {
         return true;
       }
 
       // if action is not selected
-      if (!drilldownData.value.type) {
+      if (!props.drilldownData.type) {
         return true;
       }
 
       // if action is by url
-      if (drilldownData.value.type == "byUrl") {
-        if (drilldownData.value.data.url.trim()) {
+      if (props.drilldownData.type == "byUrl") {
+        if (props.drilldownData.data.url.trim()) {
           return false;
         }
       } else {
         if (
-          drilldownData.value.data.folder &&
-          drilldownData.value.data.dashboard &&
-          drilldownData.value.data.tab
+          props.drilldownData.data.folder &&
+          props.drilldownData.data.dashboard &&
+          props.drilldownData.data.tab
         ) {
           return false;
         }
@@ -388,9 +409,12 @@ export default defineComponent({
       return true;
     });
 
+    const saveDrilldown = useLoading(async () => {
+      emit("save", props.drilldownData);
+    });
+
     return {
       t,
-      drilldownData,
       outlinedDashboard,
       outlinedDelete,
       store,
@@ -398,6 +422,7 @@ export default defineComponent({
       dashboardList,
       tabList,
       isFormValid,
+      saveDrilldown,
     };
   },
 });
@@ -411,7 +436,7 @@ export default defineComponent({
 }
 
 .dropdownLabel {
-  width: 120px;
+  width: 150px;
 }
 
 .dropdown {
