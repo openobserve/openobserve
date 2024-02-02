@@ -202,6 +202,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         };
         match db::set_ofga_model(existing_meta).await {
             Ok(store_id) => {
+                if store_id.is_empty() {
+                    log::error!("OFGA store id is empty");
+                }
                 o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
                     .insert("store_id".to_owned(), store_id);
             }
