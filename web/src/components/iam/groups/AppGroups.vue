@@ -4,8 +4,6 @@
       {{ t("iam.groups") }}
     </div>
 
-    <div class="full-width bg-grey-4" style="height: 1px" />
-
     <div class="q-mt-sm q-px-md">
       <div class="q-mb-sm row items-center justify-between">
         <q-input
@@ -58,7 +56,7 @@
               name="delete"
               class="cursor-pointer"
               :title="t('common.delete')"
-              @click="deleteGroup(slotProps.column.row)"
+              @click="deleteUserGroup(slotProps.column.row)"
             />
           </div>
         </template>
@@ -84,8 +82,9 @@ import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups } from "@/services/iam";
+import { getGroups, deleteGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
+import { useQuasar } from "quasar";
 
 const showAddGroup = ref(false);
 
@@ -100,6 +99,8 @@ const store = useStore();
 const { groupsState } = usePermissions();
 
 const filterQuery = ref("");
+
+const q = useQuasar();
 
 const columns: any = [
   {
@@ -171,8 +172,6 @@ const hideAddGroup = () => {
   showAddGroup.value = false;
 };
 
-const deleteGroup = (row: any) => {};
-
 const filterGroups = (rows: any, terms: any) => {
   var filtered = [];
   terms = terms.toLowerCase();
@@ -182,6 +181,25 @@ const filterGroups = (rows: any, terms: any) => {
     }
   }
   return filtered;
+};
+
+const deleteUserGroup = (group: any) => {
+  deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
+    .then(() => {
+      q.notify({
+        message: "Role deleted successfully!",
+        color: "positive",
+        position: "bottom",
+      });
+      setupGroups();
+    })
+    .catch(() => {
+      q.notify({
+        message: "Error while deleting group!",
+        color: "negative",
+        position: "bottom",
+      });
+    });
 };
 </script>
 
