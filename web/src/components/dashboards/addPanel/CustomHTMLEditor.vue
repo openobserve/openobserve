@@ -23,10 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:modelValue="layoutSplitterUpdated"
       >
         <template #before>
-          <div class="col" style="height: 100%;">
+          <div class="col" style="height: 100%">
             <HTMLEditor
               v-model="htmlContent"
               :debounceTime="500"
+              @update:modelValue="onEditorValueChange"
             />
           </div>
         </template>
@@ -70,18 +71,20 @@ export default defineComponent({
     const htmlContent = ref(props.modelValue);
     const splitterModel = ref(50);
 
-    watch(htmlContent, (newVal) => {
-      emit("update:modelValue", newVal);
-    });
-
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));
+    };
+
+    const onEditorValueChange = (newVal: any) => {
+      htmlContent.value = newVal;
+      emit("update:modelValue", newVal);
     };
 
     return {
       htmlContent,
       splitterModel,
       layoutSplitterUpdated,
+      onEditorValueChange,
     };
   },
 });

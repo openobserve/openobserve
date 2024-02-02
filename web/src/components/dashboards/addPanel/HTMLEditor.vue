@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="html-editor"
     ref="editorRef"
     id="html-editor"
-    style="width: 100% !important; height: 100% !important;"
+    style="width: 100% !important; height: 100% !important"
   ></div>
 </template>
 
@@ -49,7 +49,12 @@ export default defineComponent({
       type: Number,
       default: 500,
     },
+    modelValue: {
+      type: String,
+      required: true,
+    },
   },
+  emits: ["update:modelValue"],
   setup(props: any, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
