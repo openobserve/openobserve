@@ -58,33 +58,40 @@ pub(crate) fn is_root_user(user_id: &str) -> bool {
 
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+    if O2_CONFIG.openfga.enabled {
+        use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
 
-    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
+        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
-    let parent_type = if obj.parent_type.is_empty() {
-        ""
-    } else {
-        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
-    };
+        let parent_type = if obj.parent_type.is_empty() {
+            ""
+        } else {
+            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+        };
 
-    authorizer::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+    }
 }
 #[cfg(not(feature = "enterprise"))]
 pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
-    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
-    let parent_type = if obj.parent_type.is_empty() {
-        ""
-    } else {
-        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
-    };
+    if O2_CONFIG.openfga.enabled {
+        use o2_enterprise::enterprise::openfga::{authorizer, meta::mapping::OFGA_MODELS};
+        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
 
-    authorizer::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        let parent_type = if obj.parent_type.is_empty() {
+            ""
+        } else {
+            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+        };
+
+        authorizer::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+    }
 }
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
