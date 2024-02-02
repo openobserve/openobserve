@@ -69,6 +69,8 @@ async fn search_in_cluster(
     // get querier nodes from cluster
     let mut nodes = cluster::get_cached_online_querier_nodes().unwrap();
     // sort nodes by node_id this will improve hit cache ratio
+    nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
     if nodes.is_empty() {
