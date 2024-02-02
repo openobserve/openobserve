@@ -57,6 +57,20 @@ const http = ({ headers } = {} as any) => {
     },
     function (error) {
       if (error && error.response && error.response.status) {
+        Notify.create({
+          message:
+            "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
+          timeout: 0, // This ensures the notification does not close automatically
+          color: "negative", // Customize color as needed
+          position: "top",
+          actions: [
+            {
+              color: "white",
+              icon: "close",
+              size: "sm",
+            },
+          ],
+        });
         switch (error.response.status) {
           case 400:
             console.log(
