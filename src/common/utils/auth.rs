@@ -230,7 +230,7 @@ impl FromRequest for AuthExtractor {
 
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
-                if (method.eq("POST") && path_columns[1].eq("_search"))
+                if (method.eq("POST") && path_columns[1].starts_with("_search"))
                     || path.contains("/prometheus/api/v1/query")
                     || path.contains("/resources")
                 {

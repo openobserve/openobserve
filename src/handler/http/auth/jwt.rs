@@ -33,6 +33,8 @@ pub async fn process_token(
         Option<TokenData<HashMap<String, Value>>>,
     ),
 ) {
+    use std::str::FromStr;
+
     use config::CONFIG;
     use o2_enterprise::enterprise::openfga::{
         authorizer::{
@@ -41,6 +43,8 @@ pub async fn process_token(
         },
         meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
     };
+
+    use crate::common::meta::user::UserRole;
 
     let dec_token = res.1.unwrap();
 
@@ -60,7 +64,7 @@ pub async fn process_token(
     let mut tuples_to_add = HashMap::new();
     if groups.is_empty() {
         source_orgs.push(UserOrg {
-            role: crate::common::meta::user::UserRole::Viewer,
+            role: UserRole::from_str(&O2_CONFIG.dex.default_role).unwrap(),
             name: O2_CONFIG.dex.default_org.clone(),
             ..UserOrg::default()
         });
@@ -90,7 +94,6 @@ pub async fn process_token(
                     &org.role.to_string(),
                     &mut tuples,
                 );
-
                 get_org_creation_tuples(
                     &org.name,
                     &mut tuples,
@@ -101,10 +104,12 @@ pub async fn process_token(
                     NON_OWNING_ORG.to_vec(),
                 )
                 .await;
+
                 if index == 0 {
                     // this is to allow user call organization api with org
                     tuples.push(get_user_org_tuple(&user_email, &user_email));
                 }
+
                 tuples_to_add.insert(org.name.to_owned(), tuples);
             }
         }

@@ -1,7 +1,37 @@
 <template>
-  <div class="q-px-md row">
+  <div class="q-pa-md row">
     <div class="col q-pr-xs">
-      <div class="flex justify-start bordered q-mt-sm q-mb-md">
+      <div class="flex justify-start bordered q-mb-md">
+        <div class="q-mr-md">
+          <div class="flex items-center q-pt-xs">
+            <span style="font-size: 14px"> Show </span>
+            <div
+              class="q-ml-xs"
+              style="
+                border: 1px solid #d7d7d7;
+                width: fit-content;
+                border-radius: 2px;
+              "
+            >
+              <template
+                v-for="visual in usersDisplayOptions"
+                :key="visual.value"
+              >
+                <q-btn
+                  :color="visual.value === usersDisplay ? 'primary' : ''"
+                  :flat="visual.value === usersDisplay ? false : true"
+                  dense
+                  no-caps
+                  size="11px"
+                  class="q-px-md visual-selection-btn"
+                  @click="updateUserTable(visual.value)"
+                >
+                  {{ visual.label }}</q-btn
+                >
+              </template>
+            </div>
+          </div>
+        </div>
         <div class="o2-input q-mr-md" style="width: 400px">
           <q-input
             data-test="alert-list-search-input"
@@ -17,32 +47,6 @@
             </template>
           </q-input>
         </div>
-        <div class="flex items-center" style="margin-bottom: 2px">
-          <span style="font-size: 14px"> Show </span>
-          <div
-            class="q-mx-sm"
-            style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 2px;
-            "
-          >
-            <template v-for="visual in usersDisplayOptions" :key="visual.value">
-              <q-btn
-                :color="visual.value === usersDisplay ? 'primary' : ''"
-                :flat="visual.value === usersDisplay ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-md visual-selection-btn"
-                @click="updateUserTable(visual.value)"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
-          </div>
-          <span style="font-size: 14px"> Users </span>
-        </div>
       </div>
       <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Permissions</div>
       <template v-if="rows.length">
@@ -51,6 +55,10 @@
           :columns="columns"
           :dense="true"
           style="height: fit-content"
+          :filter="{
+            value: userSearchKey,
+            method: filterUsers,
+          }"
         >
           <template v-slot:select="slotProps">
             <q-checkbox
@@ -73,6 +81,7 @@
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
+import type { A } from "msw/lib/SetupApi-8ab693f7";
 import { watch } from "vue";
 import type { Ref } from "vue";
 import { ref } from "vue";
@@ -241,6 +250,17 @@ const toggleUserSelection = (user: any) => {
   if (!user.isInGroup && props.addedUsers.has(user.email)) {
     props.removedUsers.delete(user.email);
   }
+};
+
+const filterUsers = (rows: any[], term: string) => {
+  var filtered = [];
+  for (var i = 0; i < rows.length; i++) {
+    var user = rows[i];
+    if (user.email.toLowerCase().indexOf(term.toLowerCase()) > -1) {
+      filtered.push(user);
+    }
+  }
+  return filtered;
 };
 
 updateGroupUsers();

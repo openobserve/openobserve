@@ -93,12 +93,12 @@ const removedRoles = ref(new Set());
 
 const tabs = [
   {
-    value: "users",
-    label: "Users",
-  },
-  {
     value: "roles",
     label: "Roles",
+  },
+  {
+    value: "users",
+    label: "Users",
   },
 ];
 
