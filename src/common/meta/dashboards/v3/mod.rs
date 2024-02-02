@@ -106,6 +106,10 @@ pub struct PanelFields {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weight: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<AxisItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<AxisItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<AxisItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<AxisItem>,
