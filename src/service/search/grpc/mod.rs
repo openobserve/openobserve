@@ -60,7 +60,8 @@ pub async fn search(
     }
 
     log::info!(
-        "[session_id {session_id}] grpc->search in: {}/{}/{}, time range: {:?}",
+        "[session_id {session_id}] grpc->search in: part_id: {}, stream: {}/{}/{}, time range: {:?}",
+        req.job.as_ref().unwrap().partition,
         sql.org_id,
         stream_type,
         sql.stream_name,

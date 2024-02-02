@@ -210,6 +210,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by_key(|x| x.id);
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
     let nodes = nodes;
 
     let querier_num = match nodes.iter().filter(|node| is_querier(&node.role)).count() {
