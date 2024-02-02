@@ -9,7 +9,9 @@ import { defineComponent } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import UsersCloud from "@/enterprise/components/users/User.vue";
-import UsersOpenSource from "@/components/iam/users/enterprise/User.vue";
+import UsersOpenSource from "@/components/iam/users/User.vue";
+import UsersEnterprise from "@/components/iam/users/enterprise/User.vue";
+
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -24,6 +26,8 @@ export default defineComponent({
     // check condition here and set the componentName accordingly
     if (config.isCloud == "true") {
       this.componentName = "UsersCloud";
+    } else if (config.isEnterprise == "true") {
+      this.componentName = "UsersEnterprise";
     } else {
       this.componentName = "UsersOpenSource";
     }
@@ -32,6 +36,7 @@ export default defineComponent({
   components: {
     UsersCloud,
     UsersOpenSource,
+    UsersEnterprise,
   },
   setup() {
     const store = useStore();
