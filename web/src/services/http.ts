@@ -17,6 +17,9 @@ import store from "../stores";
 import type { AxiosInstance } from "axios";
 import axios from "axios";
 import config from "../aws-exports";
+import { useQuasar } from "quasar";
+
+const q = useQuasar();
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
@@ -36,7 +39,8 @@ const http = ({ headers } = {} as any) => {
   } else {
     headers = {
       Authorization:
-        config.isEnterprise == "true" && (store.state as any).zoConfig.dex_enabled
+        config.isEnterprise == "true" &&
+        (store.state as any).zoConfig.dex_enabled
           ? "Bearer " + localStorage.getItem("access_token")
           : localStorage.getItem("token") || "",
       ...headers,
@@ -110,6 +114,28 @@ const http = ({ headers } = {} as any) => {
                 )
               );
             }
+            break;
+          case 403:
+            if (config.isEnterprise == "true" || config.isCloud == "true") {
+              q.notify({
+                message:
+                  "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.",
+                timeout: 0, // This ensures the notification does not close automatically
+                color: "negative", // Customize color as needed
+                position: "top",
+                actions: [
+                  {
+                    label: "Close",
+                    color: "white",
+                  },
+                ],
+              });
+            }
+            console.log(
+              JSON.stringify(
+                error.response.data["error"] || "Unauthorized Access"
+              )
+            );
             break;
           case 404:
             console.log(
