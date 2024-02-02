@@ -42,7 +42,7 @@
         method: filterRoles,
       }"
     >
-      <template v-slot:actions="slotProps">
+      <template v-slot:actions="slotProps: any">
         <div>
           <q-icon
             size="14px"
@@ -56,6 +56,7 @@
             name="delete"
             class="cursor-pointer"
             :title="t('common.delete')"
+            @click="() => deleteUserRole(slotProps.column.row)"
           />
         </div>
       </template>
@@ -77,9 +78,10 @@ import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
-import { getRoles } from "@/services/iam";
+import { getRoles, deleteRole } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
 
@@ -90,6 +92,8 @@ const rows: any = ref([]);
 const router = useRouter();
 
 const store = useStore();
+
+const q = useQuasar();
 
 const columns: any = [
   {
@@ -173,6 +177,25 @@ const filterRoles = (rows: any, terms: any) => {
 
 const hideForm = () => {
   showAddGroup.value = false;
+};
+
+const deleteUserRole = (role: any) => {
+  deleteRole(role.role_name, store.state.selectedOrganization.identifier)
+    .then(() => {
+      q.notify({
+        message: "Role deleted successfully!",
+        color: "positive",
+        position: "bottom",
+      });
+      setupRoles();
+    })
+    .catch(() => {
+      q.notify({
+        message: "Error while deleting role!",
+        color: "negative",
+        position: "bottom",
+      });
+    });
 };
 </script>
 
