@@ -68,7 +68,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
     if let Some(existing_model) = existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
-            Ok(meta.store_id)
+            Ok(existing_model.store_id)
         } else {
             let store_id = if existing_model.store_id.is_empty() {
                 create_open_fga_store().await.unwrap()
