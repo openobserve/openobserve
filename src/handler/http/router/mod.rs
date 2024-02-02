@@ -324,13 +324,14 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::org::create_org)
             .service(authz::fga::create_role)
             .service(authz::fga::get_roles)
-            .service(authz::fga::update_role_permissions)
+            .service(authz::fga::update_role)
             .service(authz::fga::get_role_permissions)
             .service(authz::fga::create_group)
             .service(authz::fga::update_group)
             .service(authz::fga::get_groups)
             .service(authz::fga::get_group_details)
-            .service(authz::fga::get_resources),
+            .service(authz::fga::get_resources)
+            .service(authz::fga::get_users_with_role),
     );
 }
 

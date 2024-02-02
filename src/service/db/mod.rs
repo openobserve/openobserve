@@ -59,35 +59,40 @@ pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<(), anyhow::Error> {
+pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
     use o2_enterprise::enterprise::openfga::model::{
         create_open_fga_store, read_ofga_model, write_auth_models,
     };
 
     let meta = read_ofga_model().await;
-    if let Some(existig_model) = existing_meta {
-        if meta.version == existig_model.version {
-            Ok(())
+    if let Some(existing_model) = existing_meta {
+        if meta.version == existing_model.version {
+            log::info!("OFGA model already exists & no changes required");
+            Ok(meta.store_id)
         } else {
-            let store_id = if existig_model.store_id.is_empty() {
+            let store_id = if existing_model.store_id.is_empty() {
                 create_open_fga_store().await.unwrap()
             } else {
-                existig_model.store_id
+                existing_model.store_id
             };
-
             match write_auth_models(&meta, &store_id).await {
                 Ok(_) => {
                     let db = infra_db::get_db().await;
                     let key = "/ofga/model";
+
+                    let mut loc_meta = meta.clone();
+                    loc_meta.store_id = store_id;
+                    loc_meta.model = None;
+
                     match db
                         .put(
                             key,
-                            json::to_vec(&meta).unwrap().into(),
+                            json::to_vec(&loc_meta).unwrap().into(),
                             infra_db::NO_NEED_WATCH,
                         )
                         .await
                     {
-                        Ok(_) => Ok(()),
+                        Ok(_) => Ok(loc_meta.store_id),
                         Err(e) => Err(anyhow::anyhow!(e)),
                     }
                 }
@@ -100,15 +105,20 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<(), anyh
             Ok(_) => {
                 let db = infra_db::get_db().await;
                 let key = "/ofga/model";
+
+                let mut loc_meta = meta.clone();
+                loc_meta.store_id = store_id;
+                loc_meta.model = None;
+
                 match db
                     .put(
                         key,
-                        json::to_vec(&meta).unwrap().into(),
+                        json::to_vec(&loc_meta).unwrap().into(),
                         infra_db::NO_NEED_WATCH,
                     )
                     .await
                 {
-                    Ok(_) => Ok(()),
+                    Ok(_) => Ok(loc_meta.store_id),
                     Err(e) => Err(anyhow::anyhow!(e)),
                 }
             }
