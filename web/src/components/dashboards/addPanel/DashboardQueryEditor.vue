@@ -477,6 +477,61 @@ export default defineComponent({
           ].fields.stream
         }"`;
 
+        // Add WHERE clause based on applied filters
+        const filterData =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter;
+
+        const filterItems = filterData.map((field) => {
+          let selectFilter = "";
+          // Handle different filter types and operators
+          if (field.type == "list" && field.values?.length > 0) {
+            selectFilter += `${field.column} IN (${field.values
+              .map((it) => `'${it}'`)
+              .join(", ")})`;
+          } else if (field.type == "condition" && field.operator != null) {
+            selectFilter += `${field?.column} `;
+            if (["Is Null", "Is Not Null"].includes(field.operator)) {
+              switch (field?.operator) {
+                case "Is Null":
+                  selectFilter += `IS NULL`;
+                  break;
+                case "Is Not Null":
+                  selectFilter += `IS NOT NULL`;
+                  break;
+              }
+            } else if (field.value != null && field.value != "") {
+              switch (field.operator) {
+                case "=":
+                case "<>":
+                case "<":
+                case ">":
+                case "<=":
+                case ">=":
+                  selectFilter += `${field?.operator} ${field?.value}`;
+                  break;
+                case "Contains":
+                  selectFilter += `LIKE '%${field.value}%'`;
+                  break;
+                case "Not Contains":
+                  selectFilter += `NOT LIKE '%${field.value}%'`;
+                  break;
+                default:
+                  selectFilter += `${field.operator} ${field.value}`;
+                  break;
+              }
+            }
+          }
+          return selectFilter;
+        });
+
+        const whereClause = filterItems.filter((it) => it).join(" AND ");
+        if (whereClause) {
+          query += ` WHERE ${whereClause} `;
+        }
+
+        // Group By clause
         if (name) {
           query += ` GROUP BY ${name.alias}`;
         }
