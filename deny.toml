@@ -20,6 +20,7 @@ exceptions = [
     { name = "webpki-roots", allow = ["MPL-2.0"] },
     { name = "openobserve", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
+    { name = "infra", allow = ["AGPL-3.0"] },
     { name = "ingester", allow = ["AGPL-3.0"] },
     { name = "wal", allow = ["AGPL-3.0"] },
 ]
