@@ -251,7 +251,7 @@ impl FromRequest for AuthExtractor {
                 } else if object_type.starts_with("stream") && !method.eq("LIST") {
                     let object_type = match stream_type {
                         Some(stream_type) => object_type
-                            .replace("stream:", format!("stream:{}_", stream_type).as_str()),
+                            .replace("stream:", format!("stream:{}/", stream_type).as_str()),
                         None => object_type,
                     };
                     return ready(Ok(AuthExtractor {

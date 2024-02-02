@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-use actix_web::{get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::RoleRequest;
 
@@ -42,6 +42,23 @@ pub async fn create_role(
     _org_id: web::Path<String>,
     _role_id: web::Json<UserRoleRequest>,
 ) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[delete("/{org_id}/roles/{role_id}")]
+pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, role_name) = path.into_inner();
+
+    match o2_enterprise::enterprise::openfga::authorizer::delete_role(&org_id, &role_name).await {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[delete("/{org_id}/roles/{role_id}")]
+pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
@@ -245,5 +262,22 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/resources")]
 pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[delete("/{org_id}/groups/{group_name}")]
+pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, group_name) = path.into_inner();
+
+    match o2_enterprise::enterprise::openfga::authorizer::delete_group(&org_id, &group_name).await {
+        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[delete("/{org_id}/groups/{group_name}")]
+pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

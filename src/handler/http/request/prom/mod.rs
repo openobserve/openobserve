@@ -169,7 +169,7 @@ async fn query(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("stream:{}", name),
+                            o2_type: format!("stream:{}/{}", "metrics", name),
                             org_id: org_id.to_string(),
                             bypass_check: false,
                         },
@@ -319,7 +319,7 @@ async fn query_range(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("stream:{}", name),
+                            o2_type: format!("stream:{}/{}", "metrics", name),
                             org_id: org_id.to_string(),
                             bypass_check: false,
                         },
