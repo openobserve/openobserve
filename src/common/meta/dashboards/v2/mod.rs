@@ -157,8 +157,6 @@ pub struct PanelConfig {
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    map_symbol_style: Option<MapSymbolStyle>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -223,19 +221,6 @@ pub struct MapView {
     pub zoom: f64,
     pub lat: f64,
     pub lng: f64,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct MapSymbolStyle {
-    pub size: String,
-    pub size_by_value: Option<SizeByValue>,
-    pub size_fixed: f64,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct SizeByValue {
-    pub min: f64,
-    pub max: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
