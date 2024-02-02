@@ -272,7 +272,7 @@ pub async fn delete_stream(
     crate::common::utils::auth::remove_ownership(
         org_id,
         "streams",
-        Authz::new(&format!("{stream_type}_{stream_name}")),
+        Authz::new(&format!("{stream_type}/{stream_name}")),
     )
     .await;
 
