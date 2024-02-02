@@ -87,6 +87,11 @@ export function convertDashboardSchemaVersion(data: any) {
       break;
     }
     case 2: {
+      // layout width migration from 12 col number to 48 col number
+      data.panels.forEach((panelItem: any) => {
+        panelItem.layout.w = panelItem.layout.w * 4;
+      });
+
       // convert array of panels to array of tabs
       data.tabs = [
         {
