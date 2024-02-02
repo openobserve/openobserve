@@ -208,7 +208,6 @@ const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
   return new Promise(async (resolve) => {
-    // TODO OK : Add code to fetch org users if not fetched
     const data: any = await usersState.getOrgUsers(
       store.state.selectedOrganization.identifier
     );

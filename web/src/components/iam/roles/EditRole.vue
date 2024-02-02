@@ -14,108 +14,125 @@
     />
 
     <q-separator />
-    <GroupUsers
-      v-show="activeTab === 'users'"
-      :groupUsers="roleUsers"
-      :activeTab="activeTab"
-      :added-users="addedUsers"
-      class="q-mt-xs"
-      :removed-users="removedUsers"
-    />
 
-    <div v-show="activeTab === 'permissions'" class="q-pa-md">
-      <div class="o2-input flex items-end q-mb-md justify-start">
-        <div class="flex items-center q-mb-sm q-mr-md">
-          <span style="font-size: 14px"> Show </span>
-          <div
-            class="q-ml-xs"
-            style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 2px;
-            "
-          >
-            <template
-              v-for="visual in permissionDisplayOptions"
-              :key="visual.value"
-            >
-              <q-btn
-                :color="visual.value === filter.permissions ? 'primary' : ''"
-                :flat="visual.value === filter.permissions ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-md visual-selection-btn"
-                @click="updateTableData(visual.value)"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
-          </div>
+    <template v-if="isFetchingIntitialRoles">
+      <div style="margin-top: 64px">
+        <q-spinner-hourglass
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; display: block"
+        />
+        <div class="text-center full-width">
+          Hold on tight, we're fetching your role details...
         </div>
-        <q-input
-          data-test="alert-list-search-input"
-          v-model="filter.value"
-          borderless
-          filled
-          dense
-          class="q-mb-xs no-border q-mr-md"
-          :placeholder="t('common.search')"
-          style="width: 300px"
-        >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
-          </template>
-        </q-input>
-        <q-select
-          v-model="filter.resource"
-          :options="resources"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-xs q-mr-sm"
-          placeholder="Select Resource"
-          map-options
-          use-input
-          emit-value
-          fill-input
-          hide-selected
-          outlined
-          filled
-          dense
-          clearable
-          style="width: 200px"
-          @update:model-value="onResourceChange"
+      </div>
+    </template>
+    <template v-else>
+      <GroupUsers
+        v-show="activeTab === 'users'"
+        :groupUsers="roleUsers"
+        :activeTab="activeTab"
+        :added-users="addedUsers"
+        class="q-mt-xs"
+        :removed-users="removedUsers"
+      />
+
+      <div v-show="activeTab === 'permissions'" class="q-pa-md">
+        <div class="o2-input flex items-end q-mb-md justify-start">
+          <div class="flex items-center q-mb-sm q-mr-md">
+            <span style="font-size: 14px"> Show </span>
+            <div
+              class="q-ml-xs"
+              style="
+                border: 1px solid #d7d7d7;
+                width: fit-content;
+                border-radius: 2px;
+              "
+            >
+              <template
+                v-for="visual in permissionDisplayOptions"
+                :key="visual.value"
+              >
+                <q-btn
+                  :color="visual.value === filter.permissions ? 'primary' : ''"
+                  :flat="visual.value === filter.permissions ? false : true"
+                  dense
+                  no-caps
+                  size="11px"
+                  class="q-px-md visual-selection-btn"
+                  @click="updateTableData(visual.value)"
+                >
+                  {{ visual.label }}</q-btn
+                >
+              </template>
+            </div>
+          </div>
+          <q-input
+            data-test="alert-list-search-input"
+            v-model="filter.value"
+            borderless
+            filled
+            dense
+            class="q-mb-xs no-border q-mr-md"
+            :placeholder="t('common.search')"
+            style="width: 300px"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
+          <q-select
+            v-model="filter.resource"
+            :options="resources"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-xs q-mr-sm"
+            placeholder="Select Resource"
+            map-options
+            use-input
+            emit-value
+            fill-input
+            hide-selected
+            outlined
+            filled
+            dense
+            clearable
+            style="width: 200px"
+            @update:model-value="onResourceChange"
+          />
+        </div>
+
+        <permissions-table
+          ref="permissionTableRef"
+          :rows="permissionsState.permissions"
+          :filter="filter"
+          :visibleResourceCount="countOfVisibleResources"
+          :selected-permissions-hash="selectedPermissionsHash"
+          @updated:permission="handlePermissionChange"
+          @expand:row="expandPermission"
         />
       </div>
-      <permissions-table
-        ref="permissionTableRef"
-        :rows="permissionsState.permissions"
-        :filter="filter"
-        :visibleResourceCount="countOfVisibleResources"
-        @updated:permission="handlePermissionChange"
-        @expand:row="expandPermission"
-      />
-    </div>
-    <div class="flex justify-end q-mt-lg q-px-md">
-      <q-btn
-        data-test="add-alert-cancel-btn"
-        class="text-bold"
-        :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
-        no-caps
-        @click="cancelPermissionsUpdate"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
-        no-caps
-        @click="saveRole"
-      />
-    </div>
+      <div class="flex justify-end q-mt-lg q-px-md">
+        <q-btn
+          data-test="add-alert-cancel-btn"
+          class="text-bold"
+          :label="t('alerts.cancel')"
+          text-color="light-text"
+          padding="sm md"
+          no-caps
+          @click="cancelPermissionsUpdate"
+        />
+        <q-btn
+          data-test="add-alert-submit-btn"
+          :label="t('alerts.save')"
+          class="text-bold no-border q-ml-md"
+          color="secondary"
+          padding="sm xl"
+          no-caps
+          @click="saveRole"
+        />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -186,6 +203,8 @@ const removedPermissions: any = ref({});
 
 const countOfVisibleResources = ref(0);
 
+const isFetchingIntitialRoles = ref(false);
+
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
@@ -241,9 +260,15 @@ const getRoleDetails = () => {
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
       setDefaultPermissions();
+
+      isFetchingIntitialRoles.value = true;
       await getResourcePermissions();
       await getUsers();
       await updateRolePermissions();
+      setTimeout(() => {
+        isFetchingIntitialRoles.value = false;
+      }, 3000);
+
       updateTableData();
     }
   );
@@ -499,7 +524,9 @@ const decodePermission = (permission: string) => {
   return { resource, entity };
 };
 
-const cancelPermissionsUpdate = () => {};
+const cancelPermissionsUpdate = () => {
+    router.push({ name: "roles" });
+};
 
 const handlePermissionChange = (row: any, permission: string) => {
   let entity = "";

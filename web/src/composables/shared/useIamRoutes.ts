@@ -29,6 +29,9 @@ const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
 
 import Organizations from "@/enterprise/components/organizations/Organization.vue";
 
+const EnterpriseOrganizations = () =>
+  import("@/components/iam/organizations/AppOrganizations.vue");
+
 import Users from "@/views/User.vue";
 
 const useEnterpriseRoutes = () => {
@@ -60,7 +63,10 @@ const useEnterpriseRoutes = () => {
         {
           path: "organizations",
           name: "organizations",
-          component: Organizations,
+          component:
+            config.isEnterprise == "true"
+              ? EnterpriseOrganizations
+              : Organizations,
           meta: {
             keepAlive: true,
           },
