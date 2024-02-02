@@ -42,16 +42,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <div v-html="htmlContent" class="preview"></div>
+          <div v-html="DOMPurify.sanitize(htmlContent)" class="preview"></div>
         </template>
       </q-splitter>
     </div>
-    <div v-if="!editMode" class="preview" v-html="htmlContent"></div>
+    <div
+      v-if="!editMode"
+      class="preview"
+      v-html="DOMPurify.sanitize(htmlContent)"
+    ></div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
+import DOMPurify from "dompurify";
 import HTMLEditor from "./HTMLEditor.vue";
 
 export default defineComponent({
@@ -85,6 +90,7 @@ export default defineComponent({
       splitterModel,
       layoutSplitterUpdated,
       onEditorValueChange,
+      DOMPurify,
     };
   },
 });
