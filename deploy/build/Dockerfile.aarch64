@@ -19,23 +19,23 @@ ARG AWS_CONTAINER_CREDENTIALS_RELATIVE_URI
 
 RUN rustc --version && sccache --version
 
-WORKDIR /app
-COPY . /app
+WORKDIR /openobserve
+COPY . /openobserve
 COPY --from=webBuilder /web/dist web/dist
-RUN mkdir -p /app/target/release/
+RUN mkdir -p /openobserve/target/release/
 
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
   CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
 RUN --mount=type=cache,target=/root/.cache/sccache cargo build --release --features mimalloc --target aarch64-unknown-linux-gnu \
   && sccache --show-stats
-RUN mv /app/target/aarch64-unknown-linux-gnu/release/openobserve /app/target/release/openobserve
+RUN mv /openobserve/target/aarch64-unknown-linux-gnu/release/openobserve /openobserve/target/release/openobserve
 
 # FROM gcr.io/distroless/cc:latest-arm64 as runtime
 FROM public.ecr.aws/debian/debian:bookworm-slim as runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3
 RUN update-ca-certificates
-COPY --from=builder /app/target/release/openobserve /
+COPY --from=builder /openobserve/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]

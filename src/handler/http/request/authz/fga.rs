@@ -69,7 +69,7 @@ pub async fn update_role(
 ) -> Result<HttpResponse, Error> {
     let (_org_id, role_id) = path.into_inner();
     let update_role = update_role.into_inner();
-    
+
     match o2_enterprise::enterprise::openfga::authorizer::update_role(
         &role_id,
         update_role.add,

@@ -134,6 +134,7 @@ pub(crate) async fn create_context(
         id: session_id.to_string(),
         storage_type: StorageType::Memory,
         search_type: SearchType::Normal,
+        work_group: None,
     };
 
     let ctx = register_table(

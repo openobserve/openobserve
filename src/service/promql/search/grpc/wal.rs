@@ -133,7 +133,7 @@ pub(crate) async fn create_context(
         })?;
     for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
         if !record_batches.is_empty() {
-            let ctx = prepare_datafusion_context(&SearchType::Normal)?;
+            let ctx = prepare_datafusion_context(None, &SearchType::Normal)?;
             // calulate schema diff
             let mut diff_fields = HashMap::new();
             let group_fields = arrow_schema.fields();
@@ -177,6 +177,7 @@ pub(crate) async fn create_context(
         id: session_id.to_string(),
         storage_type: StorageType::Tmpfs,
         search_type: SearchType::Normal,
+        work_group: None,
     };
 
     let ctx = register_table(
