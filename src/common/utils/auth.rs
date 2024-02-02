@@ -139,7 +139,7 @@ impl FromRequest for AuthExtractor {
         use config::meta::stream::StreamType;
         use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::common::utils::http::get_stream_type_from_request;
+        use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
@@ -235,6 +235,8 @@ impl FromRequest for AuthExtractor {
             Err(_) => Some(StreamType::Logs),
         };
 
+        let folder = get_folder(&query);
+
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 if (method.eq("POST") && path_columns[1].starts_with("_search"))
@@ -254,6 +256,17 @@ impl FromRequest for AuthExtractor {
                             .replace("stream:", format!("stream:{}/", stream_type).as_str()),
                         None => object_type,
                     };
+                    return ready(Ok(AuthExtractor {
+                        auth: auth_str.to_owned(),
+                        method,
+                        o2_type: object_type,
+                        org_id,
+                        bypass_check: false,
+                    }));
+                } else if object_type.contains("dashboard") && !method.eq("LIST") {
+                    let object_type = object_type
+                        .replace("dashboard:", format!("dashboard:{}/", folder).as_str());
+
                     return ready(Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
                         method,
