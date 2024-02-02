@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="gridLayoutRef"
         v-if="panels.length > 0"
         :layout.sync="getDashboardLayout(panels)"
-        :col-num="12"
+        :col-num="48"
         :row-height="30"
         :is-draggable="!viewOnly"
         :is-resizable="!viewOnly"
