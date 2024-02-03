@@ -209,7 +209,7 @@ impl Writer {
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
                 log::info!(
-                    "[INGESTER:WAL] done add to IMMUTABLES, file: {}/{}/{}/{}.wal",
+                    "[INGESTER:WAL] done  add to IMMUTABLES, file: {}/{}/{}/{}.wal",
                     thread_id,
                     &key.org_id,
                     &key.stream_type,

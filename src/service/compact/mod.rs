@@ -173,6 +173,13 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::Metadata,
     ];
     for org_id in orgs {
+        // check backlist
+        if !db::file_list::BLOCKED_ORGS.is_empty()
+            && db::file_list::BLOCKED_ORGS.contains(&org_id.as_str())
+        {
+            continue;
+        }
+
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
