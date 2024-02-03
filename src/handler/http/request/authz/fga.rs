@@ -58,7 +58,7 @@ pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpRespon
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/roles/{role_id}")]
-pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
@@ -278,6 +278,6 @@ pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpRespo
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/groups/{group_name}")]
-pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn delete_group(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
