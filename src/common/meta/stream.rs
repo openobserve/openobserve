@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
@@ -59,11 +59,11 @@ pub struct StreamSchema {
     pub schema: Schema,
 }
 
-#[derive(Clone, Debug, Deserialize, ToSchema, Default)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
-    pub partition_keys: Vec<String>,
+    pub partition_keys: Vec<StreamPartition>,
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -83,7 +83,7 @@ impl Serialize for StreamSettings {
         let mut state = serializer.serialize_struct("stream_settings", 4)?;
         let mut part_keys = HashMap::new();
         for (index, key) in self.partition_keys.iter().enumerate() {
-            part_keys.insert(format!("L{index}"), key.to_string());
+            part_keys.insert(format!("L{index}"), key);
         }
         state.serialize_field("partition_keys", &part_keys)?;
         state.serialize_field(
@@ -105,8 +105,18 @@ impl From<&str> for StreamSettings {
         if let Some(value) = settings.get("partition_keys") {
             let mut v: Vec<_> = value.as_object().unwrap().into_iter().collect();
             v.sort_by(|a, b| a.0.cmp(b.0));
-            for (_, value) in v {
-                partition_keys.push(value.as_str().unwrap().to_string());
+            for (_, value) in v.iter() {
+                match value {
+                    json::Value::String(v) => {
+                        partition_keys.push(StreamPartition::new(v));
+                    }
+                    json::Value::Object(v) => {
+                        let val: StreamPartition =
+                            json::from_value(json::Value::Object(v.to_owned())).unwrap();
+                        partition_keys.push(val);
+                    }
+                    _ => {}
+                }
             }
         }
 
@@ -144,6 +154,50 @@ impl From<&str> for StreamSettings {
             full_text_search_keys,
             bloom_filter_fields,
             data_retention,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct StreamPartition {
+    pub field: String,
+    #[serde(default)]
+    pub types: StreamPartitionType,
+    #[serde(default)]
+    pub disabled: bool,
+}
+
+impl StreamPartition {
+    pub fn new(field: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            types: StreamPartitionType::Value,
+            disabled: false,
+        }
+    }
+
+    pub fn new_hash(field: &str, buckets: u16) -> Self {
+        Self {
+            field: field.to_string(),
+            types: StreamPartitionType::Hash(buckets),
+            disabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum StreamPartitionType {
+    #[default]
+    Value, // each value is a partition
+    Hash(u16), // partition with fixed bucket size by hash
+}
+
+impl Display for StreamPartitionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StreamPartitionType::Value => write!(f, "value"),
+            StreamPartitionType::Hash(_) => write!(f, "hash"),
         }
     }
 }
@@ -212,7 +266,7 @@ impl ScanStats {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub struct PartitioningDetails {
-    pub partition_keys: Vec<String>,
+    pub partition_keys: Vec<StreamPartition>,
     pub partition_time_level: Option<PartitionTimeLevel>,
 }
 
