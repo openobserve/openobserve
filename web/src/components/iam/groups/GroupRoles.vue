@@ -48,7 +48,7 @@
           </q-input>
         </div>
       </div>
-      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Permissions</div>
+      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Roles</div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"
