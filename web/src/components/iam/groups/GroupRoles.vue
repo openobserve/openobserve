@@ -48,7 +48,7 @@
           </q-input>
         </div>
       </div>
-      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Permissions</div>
+      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Roles</div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -85,6 +85,8 @@ import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { getRoles } from "@/services/iam";
+import { useStore } from "vuex";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -152,6 +154,8 @@ const { t } = useI18n();
 
 const hasFetchedOrgUsers = ref(false);
 
+const store = useStore();
+
 const groupUsersMap = ref(new Set());
 
 const columns = [
@@ -213,16 +217,18 @@ const updateGroupUsers = () => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise((resolve) => {
-    users.value = cloneDeep(rolesState.roles).map(
-      (role: any, index: number) => {
-        return {
-          ...role,
-          "#": index + 1,
-          isInGroup: groupUsersMap.value.has(role.role_name),
-        };
-      }
+  return new Promise(async (resolve) => {
+    const data: any = await getRoles(
+      store.state.selectedOrganization.identifier
     );
+
+    users.value = cloneDeep(data.data).map((role: any, index: number) => {
+      return {
+        role_name: role,
+        "#": index + 1,
+        isInGroup: groupUsersMap.value.has(role.role_name),
+      };
+    });
     resolve(true);
   });
 };
