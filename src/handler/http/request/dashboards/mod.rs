@@ -207,8 +207,5 @@ async fn move_dashboard(
 
 fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    match query.get("folder") {
-        Some(s) => s.to_string(),
-        None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
-    }
+    crate::common::utils::http::get_folder(&query)
 }

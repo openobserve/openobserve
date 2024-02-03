@@ -11,6 +11,11 @@ export const getGroup = (group_name: string, org_identifier: string) => {
   return http().get(url);
 };
 
+export const deleteGroup = (group_name: string, org_identifier: string) => {
+  const url = `/api/${org_identifier}/groups/${group_name}`;
+  return http().delete(url);
+};
+
 export const createGroup = (group_name: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/groups`;
   return http({}).post(url, {
@@ -44,6 +49,11 @@ export const getRoles = (org_identifier: string) => {
 export const getRole = (role_id: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/roles/${role_id}`;
   return http().get(url);
+};
+
+export const deleteRole = (role_id: string, org_identifier: string) => {
+  const url = `/api/${org_identifier}/roles/${role_id}`;
+  return http().delete(url);
 };
 
 export const createRole = (role_id: string, org_identifier: string) => {
