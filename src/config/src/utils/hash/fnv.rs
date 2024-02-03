@@ -22,6 +22,10 @@ const PRIME64: u64 = 1099511628211;
 #[derive(Default)]
 pub struct Fnv64a {}
 
+pub fn new() -> Fnv64a {
+    Fnv64a::new()
+}
+
 impl Fnv64a {
     pub fn new() -> Fnv64a {
         Fnv64a {}
@@ -46,5 +50,7 @@ mod tests {
         let fnv = Fnv64a::new();
         assert_eq!(fnv.sum64("hello"), 11831194018420276491);
         assert_eq!(fnv.sum64("world"), 5717881983045765875);
+        assert_eq!(fnv.sum64("foo"), 15902901984413996407);
+        assert_eq!(fnv.sum64("bar"), 16101355973854746);
     }
 }

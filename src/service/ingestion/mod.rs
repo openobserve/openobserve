@@ -221,11 +221,8 @@ pub fn get_wal_time_key(
     for key in partition_keys {
         match local_val.get(&key.field) {
             Some(v) => {
-                let val = if v.is_string() {
-                    format!("{}={}", key.field, v.as_str().unwrap())
-                } else {
-                    format!("{}={}", key.field, v)
-                };
+                let val = get_string_value(v);
+                let val = key.get_partition_key(&val);
                 time_key.push_str(&format!("/{}", format_partition_key(&val)));
             }
             None => continue,
@@ -473,7 +470,10 @@ mod tests {
         assert_eq!(
             get_wal_time_key(
                 1620000000,
-                &vec![StreamPartition::new("country"), StreamPartition::new("sport")],
+                &vec![
+                    StreamPartition::new("country"),
+                    StreamPartition::new("sport")
+                ],
                 PartitionTimeLevel::Hourly,
                 &local_val,
                 None

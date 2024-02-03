@@ -57,7 +57,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    _filters: &[(&str, Vec<&str>)],
+    _filters: &[(&str, Vec<String>)],
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // get file list

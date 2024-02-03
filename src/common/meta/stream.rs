@@ -18,7 +18,7 @@ use std::{collections::HashMap, fmt::Display, sync::Arc};
 use arrow_schema::Field;
 use config::{
     meta::stream::{PartitionTimeLevel, StreamStats, StreamType},
-    utils::json,
+    utils::{hash::fnv, json},
 };
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
@@ -176,11 +176,26 @@ impl StreamPartition {
         }
     }
 
-    pub fn new_hash(field: &str, buckets: u16) -> Self {
+    pub fn new_hash(field: &str, buckets: u64) -> Self {
         Self {
             field: field.to_string(),
-            types: StreamPartitionType::Hash(buckets),
+            types: StreamPartitionType::Hash(std::cmp::max(16, buckets)),
             disabled: false,
+        }
+    }
+
+    pub fn get_partition_key(&self, value: &str) -> String {
+        format!("{}={}", self.field, self.get_partition_value(value))
+    }
+
+    pub fn get_partition_value(&self, value: &str) -> String {
+        match &self.types {
+            StreamPartitionType::Value => value.to_string(),
+            StreamPartitionType::Hash(n) => {
+                let h = fnv::new().sum64(value);
+                let bucket = h % n;
+                bucket.to_string()
+            }
         }
     }
 }
@@ -190,7 +205,7 @@ impl StreamPartition {
 pub enum StreamPartitionType {
     #[default]
     Value, // each value is a partition
-    Hash(u16), // partition with fixed bucket size by hash
+    Hash(u64), // partition with fixed bucket size by hash
 }
 
 impl Display for StreamPartitionType {
@@ -293,5 +308,14 @@ mod tests {
         assert_eq!(params.org_id, "org_id");
         assert_eq!(params.stream_name, "stream_name");
         assert_eq!(params.stream_type, StreamType::Logs);
+    }
+
+    #[test]
+    fn test_hash_partition() {
+        let part = StreamPartition::new_hash("field", 32);
+        assert_eq!(part.get_partition_key("hello"), "field=11");
+        assert_eq!(part.get_partition_key("world"), "field=19");
+        assert_eq!(part.get_partition_key("foo"), "field=23");
+        assert_eq!(part.get_partition_key("bar"), "field=26");
     }
 }

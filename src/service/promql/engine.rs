@@ -416,7 +416,7 @@ impl Engine {
             .matchers
             .iter()
             .filter(|mat| mat.op == MatchOp::Equal)
-            .map(|mat| (mat.name.as_str(), vec![mat.value.as_str()]))
+            .map(|mat| (mat.name.as_str(), vec![mat.value.to_string()]))
             .collect::<Vec<(_, _)>>();
         let ctxs = self
             .ctx

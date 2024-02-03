@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common::meta::{
         sql::{Sql as MetaSql, SqlOperator},
-        stream::StreamParams,
+        stream::{StreamParams, StreamPartition},
     },
     handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
@@ -626,8 +626,21 @@ impl Sql {
         match_min_ts_only: bool,
         is_wal: bool,
         stream_type: StreamType,
+        partition_keys: &[StreamPartition],
     ) -> bool {
-        let filters = generate_filter_from_quick_text(&self.meta.quick_text);
+        let mut filters = generate_filter_from_quick_text(&self.meta.quick_text);
+        // rewrite partition filters
+        let partition_keys: HashMap<&str, &StreamPartition> = partition_keys
+            .iter()
+            .map(|v| (v.field.as_str(), v))
+            .collect();
+        for entry in filters.iter_mut() {
+            if let Some(partition_key) = partition_keys.get(entry.0) {
+                for val in entry.1.iter_mut() {
+                    *val = partition_key.get_partition_value(val);
+                }
+            }
+        }
         match_source(
             StreamParams::new(&self.org_id, &self.stream_name, stream_type),
             self.meta.time_range,
@@ -642,7 +655,7 @@ impl Sql {
 
 pub fn generate_filter_from_quick_text(
     data: &[(String, String, SqlOperator)],
-) -> Vec<(&str, Vec<&str>)> {
+) -> Vec<(&str, Vec<String>)> {
     let quick_text_len = data.len();
     let mut filters = HashMap::with_capacity(quick_text_len);
     for i in 0..quick_text_len {
@@ -651,7 +664,7 @@ pub fn generate_filter_from_quick_text(
             || (op == &SqlOperator::Or && (i + 1 == quick_text_len || k == &data[i + 1].0))
         {
             let entry = filters.entry(k.as_str()).or_insert_with(Vec::new);
-            entry.push(v.as_str());
+            entry.push(v.to_string());
         } else {
             filters.clear();
             break;
