@@ -19,7 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="font-size: 18px">
         {{ t("iam.addRole") }}
       </div>
-      <q-icon name="cancel" class="cursor-pointer" size="20px"></q-icon>
+      <q-icon
+        name="cancel"
+        class="cursor-pointer"
+        size="20px"
+        @click="emits('cancel:hideform')"
+      ></q-icon>
     </div>
 
     <div class="full-width bg-grey-4" style="height: 1px" />

@@ -71,7 +71,7 @@ onBeforeMount(() => {
 
 const { groupsState } = usePermissions();
 
-const activeTab = ref("users");
+const activeTab = ref("roles");
 
 const store = useStore();
 

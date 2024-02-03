@@ -47,28 +47,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template> -->
 
       <template #top="scope">
-        <div class="q-table__title">{{ t("organization.header") }}</div>
+        <div
+          class="full-width flex justify-between items-start"
+          style="margin-bottom: 2px; height: 44px"
+        >
+          <div class="q-table__title">{{ t("organization.header") }}</div>
+          <q-btn
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            icon="add"
+            dense
+            :label="t(`organization.add`)"
+            @click="addOrganization"
+          />
+        </div>
         <q-input
           v-model="filterQuery"
           filled
           dense
-          class="q-ml-auto q-mb-xs"
+          class="q-ml-none q-mb-xs"
+          style="width: 400px"
           :placeholder="t('organization.search')"
         >
           <template #prepend>
             <q-icon name="search" />
           </template>
         </q-input>
-        <q-btn
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          icon="add"
-          dense
-          :label="t(`organization.add`)"
-          @click="addOrganization"
-        />
 
         <QTablePagination
           :scope="scope"
@@ -372,6 +378,7 @@ export default defineComponent({
           };
         });
 
+        console.log("dismis");
         dismiss();
       });
     };
