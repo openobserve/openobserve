@@ -45,6 +45,14 @@ pub(crate) fn get_stream_type_from_request(
     Ok(stream_type)
 }
 
+#[inline(always)]
+pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
+    match query.get("folder") {
+        Some(s) => s.to_string(),
+        None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

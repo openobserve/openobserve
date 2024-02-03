@@ -305,11 +305,12 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
             }
         }
     }
-    let role = if role.contains("admin") {
-        crate::common::meta::user::UserRole::Admin
-    } else {
+    let role = if role.is_empty() {
         UserRole::from_str(&O2_CONFIG.dex.default_role).unwrap()
+    } else {
+        UserRole::from_str(role).unwrap()
     };
+
     if org.is_empty() {
         org = &O2_CONFIG.dex.default_org;
     }

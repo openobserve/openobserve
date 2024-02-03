@@ -465,7 +465,7 @@ async fn handle_diff_schema_local_mode(
         crate::common::utils::auth::set_ownership(
             org_id,
             "streams",
-            Authz::new(&format!("{stream_type}_{stream_name}")),
+            Authz::new(&format!("{stream_type}/{stream_name}")),
         )
         .await;
     }
@@ -518,7 +518,7 @@ async fn handle_diff_schema_cluster_mode(
         crate::common::utils::auth::set_ownership(
             org_id,
             "streams",
-            Authz::new(&format!("{stream_type}_{stream_name}")),
+            Authz::new(&format!("{stream_type}/{stream_name}")),
         )
         .await;
     }
@@ -688,7 +688,7 @@ pub async fn set_schema_metadata(
         crate::common::utils::auth::set_ownership(
             org_id,
             "streams",
-            Authz::new(&format!("{stream_type}_{stream_name}")),
+            Authz::new(&format!("{stream_type}/{stream_name}")),
         )
         .await;
     }
