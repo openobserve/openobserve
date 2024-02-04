@@ -45,7 +45,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::{PartitioningDetails, SchemaRecords},
+            stream::{PartitioningDetails, SchemaRecords, StreamPartition},
         },
         utils::functions::get_vrl_compiler_config,
     },
@@ -197,7 +197,7 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
 
 pub fn get_wal_time_key(
     timestamp: i64,
-    partition_keys: &Vec<String>,
+    partition_keys: &Vec<StreamPartition>,
     time_level: PartitionTimeLevel,
     local_val: &Map<String, Value>,
     suffix: Option<&str>,
@@ -219,13 +219,13 @@ pub fn get_wal_time_key(
         time_key.push_str("/default");
     }
     for key in partition_keys {
-        match local_val.get(key) {
+        if key.disabled {
+            continue;
+        }
+        match local_val.get(&key.field) {
             Some(v) => {
-                let val = if v.is_string() {
-                    format!("{}={}", key, v.as_str().unwrap())
-                } else {
-                    format!("{}={}", key, v)
-                };
+                let val = get_string_value(v);
+                let val = key.get_partition_key(&val);
                 time_key.push_str(&format!("/{}", format_partition_key(&val)));
             }
             None => continue,
@@ -459,6 +459,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+    use crate::common::meta::stream::StreamPartition;
 
     #[test]
     fn test_format_partition_key() {
@@ -472,7 +473,10 @@ mod tests {
         assert_eq!(
             get_wal_time_key(
                 1620000000,
-                &vec!["country".to_string(), "sport".to_string()],
+                &vec![
+                    StreamPartition::new("country"),
+                    StreamPartition::new("sport")
+                ],
                 PartitionTimeLevel::Hourly,
                 &local_val,
                 None
@@ -523,7 +527,10 @@ mod tests {
         let keys = get_stream_partition_keys("olympics", &stream_schema_map).await;
         assert_eq!(
             keys.partition_keys,
-            vec!["country".to_string(), "sport".to_string()]
+            vec![
+                StreamPartition::new("country"),
+                StreamPartition::new("sport")
+            ]
         );
     }
 

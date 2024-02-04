@@ -41,7 +41,11 @@ use tracing::{info_span, Instrument};
 use crate::{
     common::{
         infra::wal,
-        meta::{self, search::SearchType, stream::ScanStats},
+        meta::{
+            self,
+            search::SearchType,
+            stream::{ScanStats, StreamPartition},
+        },
     },
     service::{
         db,
@@ -70,7 +74,14 @@ pub async fn search_parquet(
         unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
 
     // get file list
-    let mut files = get_file_list(session_id, &sql, stream_type, &partition_time_level).await?;
+    let mut files = get_file_list(
+        session_id,
+        &sql,
+        stream_type,
+        &partition_time_level,
+        &schema_settings.partition_keys,
+    )
+    .await?;
     if files.is_empty() {
         return Ok((HashMap::new(), ScanStats::new()));
     }
@@ -467,6 +478,7 @@ async fn get_file_list(
     sql: &Sql,
     stream_type: StreamType,
     _partition_time_level: &PartitionTimeLevel,
+    partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
     let wal_dir = match Path::new(&CONFIG.common.data_wal_dir).canonicalize() {
         Ok(path) => {
@@ -526,7 +538,10 @@ async fn get_file_list(
                 continue;
             }
         }
-        if sql.match_source(&file_key, false, true, stream_type).await {
+        if sql
+            .match_source(&file_key, false, true, stream_type, partition_keys)
+            .await
+        {
             result.push(file_key);
         } else {
             wal::release_files(&[file.clone()]).await;

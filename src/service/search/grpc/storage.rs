@@ -31,7 +31,11 @@ use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::meta::{self, search::SearchType, stream::ScanStats},
+    common::meta::{
+        self,
+        search::SearchType,
+        stream::{ScanStats, StreamPartition},
+    },
     service::{
         db, file_list,
         search::{
@@ -77,7 +81,16 @@ pub async fn search(
 
     // get file list
     let files = match file_list.is_empty() {
-        true => get_file_list(session_id, &sql, stream_type, partition_time_level).await?,
+        true => {
+            get_file_list(
+                session_id,
+                &sql,
+                stream_type,
+                partition_time_level,
+                &stream_settings.partition_keys,
+            )
+            .await?
+        }
         false => file_list.to_vec(),
     };
     if files.is_empty() {
@@ -265,6 +278,7 @@ async fn get_file_list(
     sql: &Sql,
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
+    partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = match file_list::query(
@@ -289,7 +303,10 @@ async fn get_file_list(
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
-        if sql.match_source(&file, false, false, stream_type).await {
+        if sql
+            .match_source(&file, false, false, stream_type, partition_keys)
+            .await
+        {
             files.push(file.to_owned());
         }
     }

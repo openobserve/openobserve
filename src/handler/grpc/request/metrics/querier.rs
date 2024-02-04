@@ -16,7 +16,7 @@
 use arrow::ipc::writer::StreamWriter;
 use config::{
     ider,
-    meta::stream::StreamType,
+    meta::stream::{FileKey, FileMeta, StreamType},
     metrics,
     utils::{
         file::{get_file_contents, scan_files},
@@ -31,7 +31,7 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::wal,
+    common::{infra::wal, meta::stream::StreamParams},
     handler::grpc::{
         cluster_rpc::{
             metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,
@@ -39,7 +39,7 @@ use crate::{
         },
         request::MetadataMap,
     },
-    service::promql::search as SearchService,
+    service::{promql::search as SearchService, search::match_source},
 };
 
 pub struct Querier;
@@ -96,6 +96,12 @@ impl Metrics for Querier {
         let end_time = req.get_ref().end_time;
         let org_id = &req.get_ref().org_id;
         let stream_name = &req.get_ref().stream_name;
+        let filters = req
+            .get_ref()
+            .filters
+            .iter()
+            .map(|f| (f.field.as_str(), f.value.clone()))
+            .collect::<Vec<_>>();
         let mut resp = MetricsWalFileResponse::default();
 
         // get memtable records
@@ -193,6 +199,29 @@ impl Metrics for Querier {
                     file_min_ts,
                     file_max_ts
                 );
+                wal::release_files(&[file.clone()]).await;
+                continue;
+            }
+            // filter by partition keys
+            let file_key = FileKey::new(
+                file,
+                FileMeta {
+                    min_ts: file_min_ts,
+                    max_ts: file_max_ts,
+                    ..Default::default()
+                },
+                false,
+            );
+            if !match_source(
+                StreamParams::new(org_id, stream_name, StreamType::Metrics),
+                Some((start_time, end_time)),
+                filters.as_slice(),
+                &file_key,
+                true,
+                false,
+            )
+            .await
+            {
                 wal::release_files(&[file.clone()]).await;
                 continue;
             }
