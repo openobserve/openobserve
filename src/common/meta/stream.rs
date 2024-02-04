@@ -312,7 +312,16 @@ mod tests {
 
     #[test]
     fn test_hash_partition() {
+        let part = StreamPartition::new("field");
+        assert_eq!(
+            json::to_string(&part).unwrap(),
+            r#"{"field":"field","types":"value","disabled":false}"#
+        );
         let part = StreamPartition::new_hash("field", 32);
+        assert_eq!(
+            json::to_string(&part).unwrap(),
+            r#"{"field":"field","types":{"hash":32},"disabled":false}"#
+        );
         assert_eq!(part.get_partition_key("hello"), "field=11");
         assert_eq!(part.get_partition_key("world"), "field=19");
         assert_eq!(part.get_partition_key("foo"), "field=23");
