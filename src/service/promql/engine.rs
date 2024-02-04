@@ -411,7 +411,7 @@ impl Engine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
-        let filters = selector
+        let mut filters = selector
             .matchers
             .matchers
             .iter()
@@ -421,7 +421,7 @@ impl Engine {
         let ctxs = self
             .ctx
             .table_provider
-            .create_context(&self.ctx.org_id, table_name, (start, end), &filters)
+            .create_context(&self.ctx.org_id, table_name, (start, end), &mut filters)
             .await?;
 
         let mut tasks = Vec::new();

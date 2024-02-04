@@ -26,13 +26,14 @@ use datafusion::{
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
+use hashbrown::HashMap;
 use infra::cache::file_data;
 use tokio::sync::Semaphore;
 
 use crate::{
     common::meta::{
         search::{SearchType, Session as SearchSession},
-        stream::{ScanStats, StreamParams},
+        stream::{ScanStats, StreamParams, StreamPartition},
     },
     service::{
         db, file_list,
@@ -50,7 +51,7 @@ pub(crate) async fn create_context(
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
-    filters: &[(&str, Vec<String>)],
+    filters: &mut [(&str, Vec<String>)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
@@ -76,6 +77,20 @@ pub(crate) async fn create_context(
     let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+
+    // rewrite partition filters
+    let partition_keys: HashMap<&str, &StreamPartition> = stream_settings
+        .partition_keys
+        .iter()
+        .map(|v| (v.field.as_str(), v))
+        .collect();
+    for entry in filters.iter_mut() {
+        if let Some(partition_key) = partition_keys.get(entry.0) {
+            for val in entry.1.iter_mut() {
+                *val = partition_key.get_partition_value(val);
+            }
+        }
+    }
 
     // get file list
     let mut files = get_file_list(
