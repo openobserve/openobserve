@@ -406,7 +406,7 @@ export default defineComponent({
             if (
               res.data.settings.partition_keys &&
               Object.values(res.data.settings.partition_keys).some(
-                (v) => v.field === property.name
+                (v) => !v.disabled && v.field === property.name
               )
             ) {
               property.partitionKey = true;
@@ -463,7 +463,10 @@ export default defineComponent({
             types: "value",
           });
         } else if (property.partitionKey) {
-          added_part_keys.push(property.name);
+          added_part_keys.push({
+            field: property.name,
+            types: "value",
+          });
         }
 
         if (property.bloomKey) {
