@@ -15,7 +15,8 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use arrow_schema::Schema;
+use arrow_schema::{Schema, SchemaRef};
+use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster,
@@ -28,13 +29,23 @@ use config::{
     },
     FxIndexMap, CONFIG,
 };
+use datafusion::{
+    datasource::MemTable, execution::context::SessionContext, prelude::*, scalar::ScalarValue,
+};
 use infra::{cache, storage};
-use parquet::arrow::ParquetRecordBatchStreamBuilder;
+use parquet::arrow::{
+    arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
+};
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
-    common::infra::wal,
-    service::{db, search::datafusion::exec::merge_parquet_files, stream},
+    common::{infra::wal, meta::stream::StreamParams},
+    service::{
+        db,
+        ingestion::{get_wal_time_key, index_writer::write_file_arrow},
+        search::datafusion::exec::merge_parquet_files,
+        stream,
+    },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -335,7 +346,7 @@ async fn merge_files(
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
-    let mut new_file_meta = merge_parquet_files(
+    let (mut new_file_meta, new_file_schema) = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
@@ -354,7 +365,7 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-
+    let min_ts = new_file_meta.min_ts;
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
@@ -365,9 +376,84 @@ async fn merge_files(
         new_file_meta.compressed_size,
     );
 
+    let buf = Bytes::from(buf);
     // upload file
-    match storage::put(&new_file_key, buf.into()).await {
-        Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
+    match storage::put(&new_file_key, buf.clone()).await {
+        Ok(_) => {
+            create_index_file(
+                buf,
+                new_file_key.clone(),
+                min_ts,
+                &org_id,
+                &stream_name,
+                new_file_schema,
+            )
+            .await?;
+            Ok((new_file_key, new_file_meta, retain_file_list))
+        }
         Err(e) => Err(e),
     }
+}
+
+/// Create an inverted index file for the given file
+async fn create_index_file(
+    buf: Bytes,
+    new_file_key: String,
+    min_ts: i64,
+    org_id: &str,
+    stream_name: &str,
+    schema: SchemaRef,
+) -> Result<(), anyhow::Error> {
+    let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
+    let ctx = SessionContext::new();
+    let provider = MemTable::try_new(schema, vec![batches])?;
+    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
+
+    let split_arr = string_to_array(lower(col("log")), lit(" "), lit(ScalarValue::Null));
+    let index_df = ctx.table("_tbl_raw_data").await?;
+
+    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
+    let index_df = index_df
+        .with_column("terms", split_arr)?
+        .unnest_column("terms")?
+        .with_column_renamed("terms", "term")?
+        .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
+        .with_column("filename", lit(file_name_without_prefix))?
+        .aggregate(
+            vec![col("term"), col("filename")],
+            vec![min(col("_timestamp")).alias("_timestamp")],
+        )?
+        .with_column("character_len", character_length(col("term")))?
+        .filter(col("character_len").gt_eq(lit(3)))?
+        .select_columns(&["term", "filename", "_timestamp"])?;
+
+    let record_batches = index_df.collect().await?;
+
+    let hour_key = get_wal_time_key(
+        min_ts,
+        &vec![],
+        config::meta::stream::PartitionTimeLevel::Hourly,
+        &serde_json::Map::new(),
+        None,
+    );
+
+    write_file_arrow(
+        record_batches,
+        0,
+        &&StreamParams {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type: StreamType::Index,
+        },
+        &hour_key,
+    )
+    .await;
+    log::info!("[INGESTER:JOB] Written index file successfully");
+    Ok(())
 }
