@@ -1170,7 +1170,7 @@ pub async fn merge_parquet_files(
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
     original_size: i64,
-) -> Result<FileMeta> {
+) -> Result<(FileMeta, Arc<Schema>)> {
     // query data
     let runtime_env = create_runtime_env(None)?;
     let session_config = create_session_config(&SearchType::Normal)?;
@@ -1235,7 +1235,7 @@ pub async fn merge_parquet_files(
     ctx.deregister_table("tbl")?;
     drop(ctx);
 
-    Ok(file_meta)
+    Ok((file_meta, schema))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {

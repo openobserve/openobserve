@@ -15,7 +15,8 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use arrow_schema::Schema;
+use arrow_schema::{Schema, SchemaRef};
+use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster,
@@ -28,13 +29,20 @@ use config::{
     },
     FxIndexMap, CONFIG,
 };
+use datafusion::{
+    datasource::MemTable, execution::context::SessionContext, prelude::*, scalar::ScalarValue,
+};
 use infra::{cache, storage};
-use parquet::arrow::ParquetRecordBatchStreamBuilder;
+use parquet::arrow::{
+    arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
+};
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
     common::infra::wal,
-    service::{db, search::datafusion::exec::merge_parquet_files, stream},
+    service::{
+        db, schema::schema_evolution, search::datafusion::exec::merge_parquet_files, stream,
+    },
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -335,7 +343,7 @@ async fn merge_files(
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
-    let mut new_file_meta = merge_parquet_files(
+    let (mut new_file_meta, new_file_schema) = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
@@ -354,7 +362,7 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-
+    let min_ts = new_file_meta.min_ts;
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
@@ -365,9 +373,85 @@ async fn merge_files(
         new_file_meta.compressed_size,
     );
 
+    let buf = Bytes::from(buf);
     // upload file
-    match storage::put(&new_file_key, buf.into()).await {
-        Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
+    match storage::put(&new_file_key, buf.clone()).await {
+        Ok(_) => {
+            create_index_file(
+                buf,
+                new_file_key.clone(),
+                min_ts,
+                &org_id,
+                &stream_name,
+                new_file_schema,
+            )
+            .await?;
+            Ok((new_file_key, new_file_meta, retain_file_list))
+        }
         Err(e) => Err(e),
+    }
+}
+
+async fn upload_file(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    wal_dir: &Path,
+    path_str: &str,
+    file_name: &str,
+) -> Result<(String, FileMeta), anyhow::Error> {
+    let file_path = wal_dir.join(path_str);
+    let mut file = std::fs::File::open(&file_path).unwrap();
+    let file_meta = file.metadata().unwrap();
+    let file_size = file_meta.len();
+    log::info!("[INGESTER:JOB] File upload begin: {}", path_str);
+    if file_size == 0 {
+        if let Err(e) = tokio::fs::remove_file(file_path).await {
+            log::error!(
+                "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                path_str,
+                e
+            );
+        }
+        return Err(anyhow::anyhow!("file is empty: {}", path_str));
+    }
+
+    // write metadata
+    let mut buf_parquet: Vec<u8> = Vec::new();
+    file.read_to_end(&mut buf_parquet)?;
+    let buf_parquet = bytes::Bytes::from(buf_parquet);
+    let mut file_meta = read_metadata_from_bytes(&buf_parquet).await?;
+    file_meta.compressed_size = file_size as i64;
+
+    // read schema
+    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    let inferred_schema = arrow_reader
+        .schema()
+        .as_ref()
+        .clone()
+        .with_metadata(std::collections::HashMap::new());
+
+    schema_evolution(
+        org_id,
+        stream_name,
+        stream_type,
+        Arc::new(inferred_schema),
+        file_meta.min_ts,
+    )
+    .await;
+
+    let new_file_name =
+        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
+    drop(file);
+    match storage::put(&new_file_name, buf_parquet).await {
+        Ok(_) => {
+            log::info!("[INGESTER:JOB] File upload succeeded: {}", new_file_name);
+            Ok((new_file_name, file_meta))
+        }
+        Err(err) => {
+            log::error!("[INGESTER:JOB] File upload error: {:?}", err);
+            Err(anyhow::anyhow!(err))
+        }
     }
 }

@@ -25,6 +25,7 @@ use config::{
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
+use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -59,6 +60,10 @@ static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\
 static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_indexed\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_indexed_ignore_case\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -77,6 +82,7 @@ pub struct Sql {
     pub query_context: String,
     pub uses_zo_fn: bool,
     pub query_fn: Option<String>,
+    pub fts_terms: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -371,6 +377,7 @@ impl Sql {
 
         // HACK full text search
         let mut fulltext = Vec::new();
+        let mut indexed_text = Vec::new();
         for token in &where_tokens {
             let tokens = split_sql_token_unwrap_brace(token);
             for token in &tokens {
@@ -383,9 +390,16 @@ impl Sql {
                 for cap in RE_MATCH_ALL_IGNORE_CASE.captures_iter(token) {
                     fulltext.push((cap[0].to_string(), cap[1].to_lowercase()));
                 }
+                for cap in RE_MATCH_ALL_INDEXED.captures_iter(token) {
+                    indexed_text.push((cap[0].to_string(), cap[1].to_string()));
+                }
+                for cap in RE_MATCH_ALL_INDEXED_IGNORE_CASE.captures_iter(token) {
+                    indexed_text.push((cap[0].to_string(), cap[1].to_lowercase()));
+                }
             }
         }
         // fetch fts fields
+        let mut fts_terms = HashSet::new();
         let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
         let match_all_fields = if !fts_fields.is_empty() {
             fts_fields.iter().map(|v| v.to_lowercase()).collect()
@@ -395,6 +409,33 @@ impl Sql {
                 .map(|v| v.to_string())
                 .collect::<String>()
         };
+
+        // Iterator for indexed texts only
+        for item in indexed_text.iter() {
+            let mut indexed_search = Vec::new();
+            for field in &schema_fields {
+                if !CONFIG.common.feature_fulltext_on_all_fields
+                    && !match_all_fields.contains(&field.name().to_lowercase())
+                {
+                    continue;
+                }
+                if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
+                    continue;
+                }
+                let mut func = "LIKE";
+                if item.0.to_lowercase().contains("_ignore_case") {
+                    func = "ILIKE";
+                }
+                indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+                fts_terms.insert(item.1.clone());
+            }
+            if indexed_search.is_empty() {
+                return Err(Error::ErrorCode(ErrorCodes::FullTextSearchFieldNotFound));
+            }
+            let indexed_search = format!("({})", indexed_search.join(" OR "));
+            origin_sql = origin_sql.replace(item.0.as_str(), &indexed_search);
+        }
+
         for item in fulltext.iter() {
             let mut fulltext_search = Vec::new();
             for field in &schema_fields {
@@ -452,6 +493,7 @@ impl Sql {
                         cap.get(0).unwrap().as_str(),
                         &format!("\"{field}\" {re_fn} '%{value}%'"),
                     );
+                    fts_terms.insert(value.to_string());
                 }
             }
         }
@@ -619,6 +661,7 @@ impl Sql {
             query_context: req_query.query_context.clone(),
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
+            fts_terms: fts_terms.into_iter().collect(),
         };
 
         // calculate all needs fields

@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(btree_cursors)]
+// #![deny(
+//     unused_import_braces,
+//     unused_imports,
+//     unused_variables,
+//     unused_allocation,
+//     unused_extern_crates
+// )]
 
 pub mod cli;
 pub mod common;
