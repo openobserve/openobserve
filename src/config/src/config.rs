@@ -244,6 +244,8 @@ pub struct Common {
     pub data_dir: String,
     #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/openobserve/wal/
     pub data_wal_dir: String,
+    #[env_config(name = "ZO_DATA_IDX_DIR", default = "")] // ./data/openobserve/idx/
+    pub data_idx_dir: String,
     #[env_config(name = "ZO_DATA_STREAM_DIR", default = "")] // ./data/openobserve/stream/
     pub data_stream_dir: String,
     #[env_config(name = "ZO_DATA_DB_DIR", default = "")] // ./data/openobserve/db/
@@ -800,6 +802,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_wal_dir.ends_with('/') {
         cfg.common.data_wal_dir = format!("{}/", cfg.common.data_wal_dir);
+    }
+    if cfg.common.data_idx_dir.is_empty() {
+        cfg.common.data_idx_dir = format!("{}idx/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_idx_dir.ends_with('/') {
+        cfg.common.data_idx_dir = format!("{}/", cfg.common.data_idx_dir);
     }
     if cfg.common.data_stream_dir.is_empty() {
         cfg.common.data_stream_dir = format!("{}stream/", cfg.common.data_dir);

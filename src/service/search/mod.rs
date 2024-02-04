@@ -20,6 +20,7 @@ use std::{
 };
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
+use async_recursion::async_recursion;
 use chrono::Duration;
 use config::{
     cluster::{is_ingester, is_querier},
@@ -31,11 +32,12 @@ use config::{
     utils::{flatten, json, str::find},
     CONFIG,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -207,6 +209,7 @@ async fn get_file_list(
     files
 }
 
+#[async_recursion]
 #[tracing::instrument(
     name = "service:search:cluster",
     skip(req),
@@ -246,15 +249,62 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let file_list = get_file_list(
-        &session_id,
-        &meta,
-        stream_type,
-        partition_time_level,
-        &stream_settings.partition_keys,
-    )
-    .await;
-    let total_files = file_list.len();
+    let mut idx_file_list = vec![];
+    let file_list = if !meta.fts_terms.is_empty() {
+        let mut idx_req = req.clone();
+
+        // Get all the unique terms which the user has searched.
+        let terms = meta
+            .fts_terms
+            .iter()
+            .flat_map(|t| t.split_whitespace().collect::<Vec<_>>())
+            .map(|t| format!("'{}'", t.to_lowercase()))
+            .collect::<HashSet<String>>();
+
+        // Join the transformed terms with ", " and surround them with parentheses
+        let terms = format!("({})", terms.iter().join(", "));
+
+        idx_req.stream_type = StreamType::Index.to_string();
+
+        // TODO(ansrivas): distinct filename isn't supported.
+        let query = format!(
+            // "select distinct filename from {} where term ~* '({})'",
+            "select filename from {} where term in {}",
+            meta.stream_name, terms
+        );
+        idx_req.query.as_mut().unwrap().sql = query;
+        let idx_resp: search::Response = search_in_cluster(idx_req).await?;
+
+        let unique_files = idx_resp
+            .hits
+            .iter()
+            .map(|hit| hit.get("filename").unwrap().as_str().unwrap())
+            .collect::<HashSet<_>>();
+
+        for filename in unique_files {
+            let prefixed_filename = format!(
+                "files/{}/logs/{}/{}",
+                meta.org_id, meta.stream_name, filename
+            );
+            if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
+                idx_file_list.push(FileKey {
+                    key: prefixed_filename.to_string(),
+                    meta: file_meta,
+                    deleted: false,
+                });
+            }
+        }
+        idx_file_list
+    } else {
+        get_file_list(
+            &session_id,
+            &meta,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
+        )
+        .await
+    };
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
@@ -328,7 +378,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
     };
     log::info!(
-        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {total_files}",
+        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
 

@@ -16,6 +16,7 @@
 use config::{cluster, ider, meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
 
 pub mod broadcast;
+pub mod idx;
 pub mod json;
 pub mod parquet;
 

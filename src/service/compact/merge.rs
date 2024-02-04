@@ -493,7 +493,7 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let mut new_file_meta = datafusion::exec::merge_parquet_files(
+    let (mut new_file_meta, _new_file_schema) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         schema,
