@@ -160,12 +160,12 @@ pub fn stream_res(
     }
 }
 
-#[tracing::instrument(skip(setting))]
+#[tracing::instrument(skip(settings))]
 pub async fn save_stream_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    setting: StreamSettings,
+    mut settings: StreamSettings,
 ) -> Result<HttpResponse, Error> {
     // check if we are allowed to ingest
     if db::compact::retention::is_deleting_stream(org_id, stream_name, stream_type, None) {
@@ -177,7 +177,7 @@ pub async fn save_stream_settings(
         );
     }
 
-    for key in setting.partition_keys.iter() {
+    for key in settings.partition_keys.iter() {
         if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -186,11 +186,34 @@ pub async fn save_stream_settings(
         }
     }
 
+    // we need to keep the old partition information, because the hash bucket num can't be changed
+    // get old settings and then update partition_keys
     let schema = db::schema::get(org_id, stream_name, stream_type)
         .await
         .unwrap();
+    let mut old_partition_keys = stream_settings(&schema).unwrap_or_default().partition_keys;
+    // first disable all old partition keys
+    for v in old_partition_keys.iter_mut() {
+        v.disabled = true;
+    }
+    // then update new partition keys
+    for v in settings.partition_keys.iter() {
+        if let Some(old_field) = old_partition_keys.iter_mut().find(|k| k.field == v.field) {
+            if old_field.types != v.types {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!("field [{}] partition types can't be changed", v.field),
+                )));
+            }
+            old_field.disabled = v.disabled;
+        } else {
+            old_partition_keys.push(v.clone());
+        }
+    }
+    settings.partition_keys = old_partition_keys;
+
     let mut metadata = schema.metadata.clone();
-    metadata.insert("settings".to_string(), json::to_string(&setting).unwrap());
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
     if !metadata.contains_key("created_at") {
         metadata.insert(
             "created_at".to_string(),

@@ -219,6 +219,9 @@ pub fn get_wal_time_key(
         time_key.push_str("/default");
     }
     for key in partition_keys {
+        if key.disabled {
+            continue;
+        }
         match local_val.get(&key.field) {
             Some(v) => {
                 let val = get_string_value(v);

@@ -405,18 +405,17 @@ export default defineComponent({
 
             if (
               res.data.settings.partition_keys &&
-              Object.values(res.data.settings.partition_keys).includes(
-                property.name
+              Object.values(res.data.settings.partition_keys).some(
+                (v) => v.field === property.name
               )
             ) {
-              let index = Object.values(
-                res.data.settings.partition_keys
-              ).indexOf(property.name);
               property.partitionKey = true;
               property.level = Object.keys(
                 res.data.settings.partition_keys
               ).find(
-                (key) => res.data.settings.partition_keys[key] === property.name
+                (key) =>
+                  res.data.settings.partition_keys[key]["field"] ===
+                  property.name
               );
             } else {
               property.partitionKey = false;
@@ -459,7 +458,10 @@ export default defineComponent({
           settings.full_text_search_keys.push(property.name);
         }
         if (property.level && property.partitionKey) {
-          settings.partition_keys.push(property.name);
+          settings.partition_keys.push({
+            field: property.name,
+            types: "value",
+          });
         } else if (property.partitionKey) {
           added_part_keys.push(property.name);
         }
