@@ -479,6 +479,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_by_stream() {
+        infra_file_list::create_table().await.unwrap();
         let org_id = "test";
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
@@ -490,6 +491,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_all() {
+        infra_file_list::create_table().await.unwrap();
         let org_id = "test";
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;

@@ -411,17 +411,17 @@ impl Engine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
-        let filters = selector
+        let mut filters = selector
             .matchers
             .matchers
             .iter()
             .filter(|mat| mat.op == MatchOp::Equal)
-            .map(|mat| (mat.name.as_str(), vec![mat.value.as_str()]))
+            .map(|mat| (mat.name.as_str(), vec![mat.value.to_string()]))
             .collect::<Vec<(_, _)>>();
         let ctxs = self
             .ctx
             .table_provider
-            .create_context(&self.ctx.org_id, table_name, (start, end), &filters)
+            .create_context(&self.ctx.org_id, table_name, (start, end), &mut filters)
             .await?;
 
         let mut tasks = Vec::new();

@@ -42,7 +42,10 @@ use crate::{
     common::{
         infra::config::LOCAL_SCHEMA_LOCKER,
         meta::{
-            authz::Authz, ingestion::StreamSchemaChk, prom::METADATA_LABEL, stream::SchemaEvolution,
+            authz::Authz,
+            ingestion::StreamSchemaChk,
+            prom::METADATA_LABEL,
+            stream::{SchemaEvolution, StreamPartition},
         },
     },
     service::{db, search::server_internal_error},
@@ -637,7 +640,7 @@ pub async fn add_stream_schema(
     metadata.insert("created_at".to_string(), min_ts.to_string());
     if stream_type == StreamType::Traces {
         let settings = crate::common::meta::stream::StreamSettings {
-            partition_keys: vec!["service_name".to_string()],
+            partition_keys: vec![StreamPartition::new("service_name")],
             partition_time_level: None,
             full_text_search_keys: vec![],
             bloom_filter_fields: vec![],

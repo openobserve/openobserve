@@ -205,7 +205,7 @@ mod tests {
     #[tokio::test]
     async fn test_organization() {
         let org_id = "default";
-        let user_id = "user1@example.com";
+        let user_id = "user-org-1@example.com";
         let init_user = "root@example.com";
         let pwd = "Complexpass#123";
 

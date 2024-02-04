@@ -35,7 +35,7 @@ use crate::{
     common::meta::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
-        stream::SchemaRecords,
+        stream::{SchemaRecords, StreamPartition},
         traces::{Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType},
     },
     service::{
@@ -120,7 +120,7 @@ pub async fn traces_json(
     )
     .await;
 
-    let mut partition_keys: Vec<String> = vec![];
+    let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level =
         PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str());
     if stream_schema.has_partition_keys {

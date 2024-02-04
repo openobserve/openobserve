@@ -29,7 +29,11 @@ use datafusion::arrow::datatypes::Schema;
 
 use super::ingestion::{get_string_value, TriggerAlertData};
 use crate::{
-    common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
+    common::meta::{
+        alerts::Alert,
+        ingestion::RecordStatus,
+        stream::{SchemaRecords, StreamPartition},
+    },
     service::{
         ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
     },
@@ -266,7 +270,7 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
 struct StreamMeta<'a> {
     org_id: String,
     stream_name: String,
-    partition_keys: &'a Vec<String>,
+    partition_keys: &'a Vec<StreamPartition>,
     partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
 }
