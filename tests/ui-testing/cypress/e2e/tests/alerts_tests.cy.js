@@ -306,30 +306,20 @@ describe("Alerts testcases", () => {
     cy.get('[data-test="alert-alerts-tab"]').click({ force: true });
     cy.get('[data-test="alert-list-add-alert-btn"]').click({ force: true });
     cy.get('[data-test="add-alert-name-input"]').type("cy-alert");
-    cy.get(
-      ".alert-stream-type > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
-    ).click({ force: true });
+    cy.get('[data-test="add-alert-stream-type-select"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
     // Find and click on the item with text 'logs'
     cy.contains(".q-item__label", "logs").click({ force: true });
-    cy.get(
-      ":nth-child(3) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
-    ).click({ force: true });
+    cy.get('[data-test="add-alert-stream-select"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
     cy.contains(".q-item__label", "e2e_automate").click();
     cy.get('[data-test="add-alert-scheduled-alert-radio"]').click({
       force: true,
     });
-    cy.get(
-      ".q-mt-md > .justify-start > :nth-child(1) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
-    ).click({ force: true });
-    cy.contains(".q-item__label", "kubernetes_labels_role").click();
-    cy.get(
-      ".q-mt-md > .justify-start > :nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
-    ).click({ force: true });
+    cy.get('[data-test="alert-conditions-select-column"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
+    cy.contains(".q-item__label", "_timestamp").click();
+    cy.get('[data-test="alert-conditions-operator-select"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
     cy.contains(".q-item__label", "=").click();
     cy.get('.justify-start > .flex > .q-field').type("200");
-    cy.get(
-      ":nth-child(5) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon"
-    ).click({ force: true });
+    cy.get('[data-test="add-alert-destination-select"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
     cy.contains(".q-item__label", "cy-destination").click();
     cy.get('[data-test="add-alert-submit-btn"]').click({ force: true });
     cy.get('[data-test$="-delete-alert"]').first().scrollIntoView();
