@@ -44,7 +44,7 @@ jobs:
           cache-on-failure: true
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v2
+        uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
 
