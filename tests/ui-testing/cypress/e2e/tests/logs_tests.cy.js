@@ -878,7 +878,7 @@ describe("Logs testcases", () => {
   });
 
   // TODO: change the last line to '.should('be.visible')' when bug https://github.com/openobserve/openobserve/issues/2210 is fixed
-  it.only("should display SQL query on switching between Menu options & navigating to Logs again", () => {
+  it("should display SQL query on switching between Menu options & navigating to Logs again", () => {
     cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[aria-label="SQL Mode"]').click({ force: true });
@@ -939,7 +939,7 @@ describe("Logs testcases", () => {
   });
 
   // TODO: change the last line to '.should('be.visible')' when bug is resolved
-  it.only("should display added function on switching between tabs and again navigate to logs", () => {
+  it("should display added function on switching between tabs and again navigate to logs", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
@@ -1124,7 +1124,7 @@ describe("Logs testcases", () => {
     );
   });
 
-  it.only("should not display error if match all case added in log query search", () => {
+  it("should not display error if match all case added in log query search", () => {
     // Type the value of a variable into an input field
     cy.intercept("GET", logData.ValueQuery).as("value");
 
@@ -1148,7 +1148,7 @@ describe("Logs testcases", () => {
     }).should("exist");
   });
 
-  it.only("should change stream settings and click on search stream", () => {
+  it("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
