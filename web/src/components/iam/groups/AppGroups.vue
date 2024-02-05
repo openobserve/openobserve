@@ -56,7 +56,7 @@
               name="delete"
               class="cursor-pointer"
               :title="t('common.delete')"
-              @click="deleteUserGroup(slotProps.column.row)"
+              @click="showConfirmDialog(slotProps.column.row)"
             />
           </div>
         </template>
@@ -71,6 +71,13 @@
         @added:group="setupGroups"
       />
     </q-dialog>
+    <ConfirmDialog
+      title="Delete Group"
+      :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
+      @update:ok="_deleteGroup"
+      @update:cancel="deleteConformDialog.show = false"
+      v-model="deleteConformDialog.show"
+    />
   </div>
 </template>
 
@@ -85,6 +92,7 @@ import { useStore } from "vuex";
 import { getGroups, deleteGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const showAddGroup = ref(false);
 
@@ -101,6 +109,11 @@ const { groupsState } = usePermissions();
 const filterQuery = ref("");
 
 const q = useQuasar();
+
+const deleteConformDialog = ref({
+  show: false,
+  data: null as any,
+});
 
 const columns: any = [
   {
@@ -200,6 +213,16 @@ const deleteUserGroup = (group: any) => {
         position: "bottom",
       });
     });
+};
+
+const showConfirmDialog = (row: any) => {
+  deleteConformDialog.value.show = true;
+  deleteConformDialog.value.data = row;
+};
+
+const _deleteGroup = () => {
+  deleteUserGroup(deleteConformDialog.value.data);
+  deleteConformDialog.value.data = null;
 };
 </script>
 

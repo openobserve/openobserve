@@ -56,7 +56,7 @@
             name="delete"
             class="cursor-pointer"
             :title="t('common.delete')"
-            @click="() => deleteUserRole(slotProps.column.row)"
+            @click="() => showConfirmDialog(slotProps.column.row)"
           />
         </div>
       </template>
@@ -69,6 +69,13 @@
       @added:role="setupRoles"
     />
   </q-dialog>
+  <ConfirmDialog
+    title="Delete Role"
+    :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+    @update:ok="_deleteRole"
+    @update:cancel="deleteConformDialog.show = false"
+    v-model="deleteConformDialog.show"
+  />
 </template>
 
 <script setup lang="ts">
@@ -82,6 +89,7 @@ import { getRoles, deleteRole } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const { t } = useI18n();
 
@@ -94,6 +102,11 @@ const router = useRouter();
 const store = useStore();
 
 const q = useQuasar();
+
+const deleteConformDialog = ref({
+  show: false,
+  data: null as any,
+});
 
 const columns: any = [
   {
@@ -195,6 +208,16 @@ const deleteUserRole = (role: any) => {
         position: "bottom",
       });
     });
+};
+
+const showConfirmDialog = (row: any) => {
+  deleteConformDialog.value.show = true;
+  deleteConformDialog.value.data = row;
+};
+
+const _deleteRole = () => {
+  deleteUserRole(deleteConformDialog.value.data);
+  deleteConformDialog.value.data = null;
 };
 </script>
 
