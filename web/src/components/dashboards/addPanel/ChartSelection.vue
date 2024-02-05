@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             item.id != 'area-stacked' &&
             item.id != 'metric' &&
             item.id != 'gauge' &&
-            item.id != 'html'
+            item.id != 'html' &&
+            item.id != 'markdown'
           "
           :key="index"
           clickable
@@ -164,6 +165,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
         title: "HTML",
         id: "html",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/Markdown.png"),
+        title: "Markdown",
+        id: "markdown",
       },
     ]);
 

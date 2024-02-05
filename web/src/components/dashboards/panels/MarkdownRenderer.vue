@@ -16,18 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="width: 100%; height: 100%; overflow: auto">
-    <div v-html="DOMPurify.sanitize(HTMLContent)"></div>
+    <div v-html="DOMPurify.sanitize(marked(markdownContent))"></div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 export default defineComponent({
-  name: "HTMLRenderer",
+  name: "MarkdownRenderer",
   props: {
-    HTMLContent: {
+    markdownContent: {
       type: String,
       default: "",
     },
@@ -35,6 +36,7 @@ export default defineComponent({
   setup() {
     return {
       DOMPurify,
+      marked,
     };
   },
 });

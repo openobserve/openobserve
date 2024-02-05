@@ -45,6 +45,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col"
         />
       </div>
+      <div
+        v-else-if="panelSchema.type == 'markdown'"
+        class="col column"
+        style="width: 100%; height: 100%; flex: 1"
+      >
+        <MarkdownRenderer
+          :HTMLContent="panelSchema.htmlContent"
+          style="width: 100%; height: 100%"
+          class="col"
+        />
+      </div>
       <ChartRenderer
         v-else
         :data="
@@ -59,7 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
       />
     </div>
-    <div v-if="!errorDetail && panelSchema.type != 'html'" class="noData">
+    <div
+      v-if="
+        !errorDetail &&
+        panelSchema.type != 'html' &&
+        panelSchema.type != 'markdown'
+      "
+      class="noData"
+    >
       {{ noData }}
     </div>
     <div
@@ -103,6 +121,7 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
 import HTMLRenderer from "./panels/HTMLRenderer.vue";
+import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -110,6 +129,7 @@ export default defineComponent({
     TableRenderer,
     GeoMapRenderer,
     HTMLRenderer,
+    MarkdownRenderer,
   },
   props: {
     selectedTimeObj: {

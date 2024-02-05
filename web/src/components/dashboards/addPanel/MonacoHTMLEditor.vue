@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="query-editor"
+    data-test="html-editor"
     class="html-editor"
     ref="editorRef"
     id="html-editor"

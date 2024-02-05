@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex q-gutter-sm">
         <q-btn
-          v-if="dashboardPanelData.data.type != 'html'"
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           outline
           padding="sm"
           class="q-mr-sm"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="savePanelData.isLoading.value"
         />
         <q-btn
-          v-if="dashboardPanelData.data.type != 'html'"
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           class="q-ml-md text-bold no-border"
           data-test="dashboard-apply"
           padding="sm lg"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="dashboardPanelData.data.type != 'html'"
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         class="col"
         style="width: 100%; height: 100%"
       >
@@ -257,6 +257,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
+      <div
+        v-if="dashboardPanelData.data.type == 'markdown'"
+        class="col column"
+        style="width: 100%; height: 100%; flex: 1"
+      >
+        <CustomMarkdownEditor
+          v-model="dashboardPanelData.data.htmlContent"
+          style="width: 100%; height: 100%"
+          class="col"
+        />
+        <DashboardErrorsComponent :errors="errorData" class="col-auto" />
+      </div>
     </div>
   </div>
 </template>
@@ -303,6 +315,7 @@ import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
 import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import { provide } from "vue";
+import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
 
 export default defineComponent({
   name: "AddPanel",
@@ -321,6 +334,7 @@ export default defineComponent({
     DashboardQueryEditor,
     QueryInspector,
     CustomHTMLEditor,
+    CustomMarkdownEditor,
   },
   setup(props) {
     // This will be used to copy the chart data to the chart renderer component
@@ -636,6 +650,7 @@ export default defineComponent({
           "metric",
           "gauge",
           "html",
+          "markdown",
         ];
         if (!allowedChartTypes.includes(dashboardPanelData.data.type)) {
           errors.push(
@@ -1040,8 +1055,8 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
-      // if chart type is html, no need to save query else it will call an api call
-      if (dashboardPanelData.data.type == "html") {
+      // if chart type is html or markdown, no need to save query else it will call an api call
+      if (["html", "markdown"].includes(dashboardPanelData.data.type)) {
         // remove query type
         dashboardPanelData.data.queryType = "";
         // reset queries array

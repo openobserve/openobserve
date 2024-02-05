@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="html-editor" style="width: 100%; height: 100%; overflow: auto">
+  <div
+    class="markdown-editor"
+    style="width: 100%; height: 100%; overflow: auto"
+  >
     <div style="width: 100%; height: 100%">
       <q-splitter
         v-model="splitterModel"
@@ -24,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #before>
           <div class="col" style="height: 100%">
-            <MonacoHTMLEditor
-              v-model="htmlContent"
+            <MonacoMarkdownEditor
+              v-model="markdownContent"
               :debounceTime="500"
               @update:modelValue="onEditorValueChange"
             />
@@ -42,7 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <div v-html="DOMPurify.sanitize(htmlContent)" class="preview"></div>
+          <div
+            v-html="DOMPurify.sanitize(marked(markdownContent))"
+            class="preview"
+          ></div>
         </template>
       </q-splitter>
     </div>
@@ -50,13 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref } from "vue";
 import DOMPurify from "dompurify";
-import MonacoHTMLEditor from "./MonacoHTMLEditor.vue";
+import { marked } from "marked";
+import MonacoMarkdownEditor from "./MonacoMarkdownEditor.vue";
 
 export default defineComponent({
-  components: { MonacoHTMLEditor },
-  name: "CustomHTMLEditor",
+  components: { MonacoMarkdownEditor },
+  name: "CustomMarkdownEditor",
   props: {
     modelValue: {
       type: String,
@@ -64,7 +71,7 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const htmlContent = ref(props.modelValue);
+    const markdownContent = ref(props.modelValue);
     const splitterModel = ref(50);
 
     const layoutSplitterUpdated = () => {
@@ -72,23 +79,24 @@ export default defineComponent({
     };
 
     const onEditorValueChange = (newVal: any) => {
-      htmlContent.value = newVal;
+      markdownContent.value = newVal;
       emit("update:modelValue", newVal);
     };
 
     return {
-      htmlContent,
+      markdownContent,
       splitterModel,
       layoutSplitterUpdated,
       onEditorValueChange,
       DOMPurify,
+      marked,
     };
   },
 });
 </script>
 
 <style scoped>
-.html-editor {
+.markdown-editor {
   display: flex;
   height: 100%;
 }
