@@ -62,6 +62,7 @@ const getDefaultDashboardPanelData: any = () => ({
       },
     },
     htmlContent: "",
+    markdownContent: "",
     queryType: "sql",
     queries: [
       {

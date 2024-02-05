@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%; height: 100%; flex: 1"
       >
         <MarkdownRenderer
-          :HTMLContent="panelSchema.htmlContent"
+          :markdownContent="panelSchema.markdownContent"
           style="width: 100%; height: 100%"
           class="col"
         />

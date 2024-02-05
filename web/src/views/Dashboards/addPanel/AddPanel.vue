@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%; height: 100%; flex: 1"
       >
         <CustomMarkdownEditor
-          v-model="dashboardPanelData.data.htmlContent"
+          v-model="dashboardPanelData.data.markdownContent"
           style="width: 100%; height: 100%"
           class="col"
         />
@@ -637,6 +637,20 @@ export default defineComponent({
             errors.push(`Query-${index + 1} is empty`);
           }
         });
+      }
+
+      //check content should be empty for html
+      if (dashboardData.data.type == "html") {
+        if (dashboardData.data.htmlContent.trim() == "") {
+          errors.push("Please enter your HTML code.");
+        }
+      }
+
+      //check content should be empty for html
+      if (dashboardData.data.type == "markdown") {
+        if (dashboardData.data.markdownContent.trim() == "") {
+          errors.push("Please enter your markdown code");
+        }
       }
 
       if (promqlMode.value) {

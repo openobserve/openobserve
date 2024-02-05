@@ -79,6 +79,8 @@ pub struct Panel {
     pub layout: Layout,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub html_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub markdown_content: Option<String>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
