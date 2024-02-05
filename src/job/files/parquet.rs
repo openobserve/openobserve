@@ -33,7 +33,7 @@ use config::{
         file::scan_files,
         parquet::{read_metadata_from_bytes, read_metadata_from_file},
     },
-    FxIndexMap, CONFIG,
+    FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::{
     datasource::MemTable, execution::context::SessionContext, prelude::*, scalar::ScalarValue,
@@ -51,7 +51,7 @@ use crate::{
         ingestion::{get_wal_time_key, index_writer::write_file_arrow},
         schema::schema_evolution,
         search::datafusion::exec::merge_parquet_files,
-        stream,
+        stream::{self, get_stream_setting_fts_fields},
     },
 };
 
@@ -504,29 +504,51 @@ async fn create_index_file(
 
     let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
     let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema, vec![batches])?;
+    let provider = MemTable::try_new(schema.clone(), vec![batches])?;
     ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
 
-    let split_arr = string_to_array(lower(col("log")), lit(" "), lit(ScalarValue::Null));
-    let index_df = ctx.table("_tbl_raw_data").await?;
+    let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
+    let columns_to_index = if !fts_fields.is_empty() {
+        fts_fields
+    } else {
+        SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+    };
+
+    log::error!("columns_to_index: {:?}", columns_to_index);
 
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
-    let index_df = index_df
-        .with_column("terms", split_arr)?
-        .unnest_column("terms")?
-        .with_column_renamed("terms", "term")?
-        .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
-        .with_column("filename", lit(file_name_without_prefix))?
-        .aggregate(
-            vec![col("term"), col("filename")],
-            vec![min(col("_timestamp")).alias("_timestamp")],
-        )?
-        .with_column("character_len", character_length(col("term")))?
-        .filter(col("character_len").gt_eq(lit(3)))?
-        .select_columns(&["term", "filename", "_timestamp"])?;
 
-    let record_batches = index_df.collect().await?;
+    let mut indexed_record_batches_to_merge = Vec::new();
+    for column in columns_to_index.iter() {
+        let index_df = ctx.table("_tbl_raw_data").await?;
+        if !index_df.schema().has_column_with_unqualified_name(column) {
+            continue;
+        }
+        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
+        let record_batch = index_df
+            .with_column("terms", split_arr)?
+            .unnest_column("terms")?
+            .with_column_renamed("terms", "term")?
+            .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
+            .with_column("filename", lit(file_name_without_prefix))?
+            .aggregate(
+                vec![col("term"), col("filename")],
+                vec![min(col("_timestamp")).alias("_timestamp")],
+            )?
+            .with_column("character_len", character_length(col("term")))?
+            .filter(col("character_len").gt_eq(lit(3)))?
+            .select_columns(&["term", "filename", "_timestamp"])?
+            .collect()
+            .await?;
+
+        indexed_record_batches_to_merge.push(record_batch);
+    }
+
+    let record_batches: Vec<arrow::record_batch::RecordBatch> = indexed_record_batches_to_merge
+        .into_iter()
+        .flatten()
+        .collect();
 
     let hour_key = get_wal_time_key(
         min_ts,
