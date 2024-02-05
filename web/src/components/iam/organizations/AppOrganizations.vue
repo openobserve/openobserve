@@ -16,7 +16,6 @@ import { watch } from "vue";
 
 export default defineComponent({
   name: "AppOrganizations",
-  data() {},
   components: {
     OrganizationsCloud,
     OrganizationsEnterprise,

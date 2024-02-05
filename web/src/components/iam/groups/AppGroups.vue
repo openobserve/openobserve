@@ -1,11 +1,11 @@
 <template>
   <div>
-    <div style="font-size: 18px" class="q-py-sm q-px-md">
+    <div style="font-size: 18px; padding-top: 12px" class="q-mb-md q-px-md">
       {{ t("iam.groups") }}
     </div>
 
-    <div class="q-mt-sm q-px-md">
-      <div class="q-mb-sm row items-center justify-between">
+    <div>
+      <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
         <q-input
           v-model="filterQuery"
           filled
@@ -29,10 +29,14 @@
           @click="addGroup"
         />
       </div>
-      <div class="q-py-sm q-pl-xs text-bold" style="font-size: 15px">
+      <div
+        class="q-px-md q-pt-sm q-ml-xs text-bold"
+        style="font-size: 14px; padding-bottom: 12px"
+      >
         {{ rows.length }} {{ t("iam.groups") }}
       </div>
       <app-table
+        class="iam-table"
         :rows="rows"
         :columns="columns"
         pagination
@@ -41,6 +45,7 @@
           value: filterQuery,
           method: filterGroups,
         }"
+        :bordered="false"
       >
         <template v-slot:actions="slotProps: any">
           <div>
@@ -133,10 +138,11 @@ const columns: any = [
     name: "actions",
     field: "actions",
     label: t("alerts.actions"),
-    align: "right",
+    align: "center",
     sortable: false,
     slot: true,
     slotName: "actions",
+    style: "width: 400px",
   },
 ];
 
@@ -227,3 +233,20 @@ const _deleteGroup = () => {
 </script>
 
 <style scoped></style>
+<style lang="scss">
+.iam-table {
+  .thead-sticky,
+  .tfoot-sticky {
+    position: sticky;
+    top: 0;
+    opacity: 1;
+    z-index: 1;
+    background: transparent !important;
+  }
+
+  .q-table--dark .thead-sticky,
+  .q-table--dark .tfoot-sticky {
+    background: transparent !important;
+  }
+}
+</style>

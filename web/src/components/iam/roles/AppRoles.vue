@@ -1,11 +1,10 @@
 <template>
-  <div style="font-size: 18px" class="q-py-sm q-px-md">
+  <div style="font-size: 18px; padding-top: 12px" class="q-mb-md q-px-md">
     {{ t("iam.roles") }}
   </div>
-  <div class="full-width bg-grey-4" style="height: 1px" />
 
-  <div class="q-mt-sm q-px-md">
-    <div class="q-mb-sm row items-center justify-between">
+  <div>
+    <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
       <q-input
         v-model="filterQuery"
         filled
@@ -29,10 +28,14 @@
         @click="addRole"
       />
     </div>
-    <div class="q-py-sm q-ml-xs text-bold" style="font-size: 16px">
+    <div
+      class="q-px-md q-pt-sm q-ml-xs text-bold"
+      style="font-size: 14px; padding-bottom: 12px"
+    >
       {{ rows.length }} {{ t("iam.roles") }}
     </div>
     <app-table
+      class="iam-table"
       :rows="rows"
       :columns="columns"
       pagination
@@ -41,6 +44,7 @@
         value: filterQuery,
         method: filterRoles,
       }"
+      :bordered="false"
     >
       <template v-slot:actions="slotProps: any">
         <div>
@@ -126,10 +130,11 @@ const columns: any = [
     name: "actions",
     field: "actions",
     label: t("common.actions"),
-    align: "right",
+    align: "center",
     sortable: false,
     slot: true,
     slotName: "actions",
+    style: "width: 400px",
   },
 ];
 
@@ -222,3 +227,20 @@ const _deleteRole = () => {
 </script>
 
 <style scoped></style>
+<style lang="scss">
+.iam-table {
+  .thead-sticky,
+  .tfoot-sticky {
+    position: sticky;
+    top: 0;
+    opacity: 1;
+    z-index: 1;
+    background: transparent !important;
+  }
+
+  .q-table--dark .thead-sticky,
+  .q-table--dark .tfoot-sticky {
+    background: transparent !important;
+  }
+}
+</style>

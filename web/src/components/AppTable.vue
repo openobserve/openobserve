@@ -25,89 +25,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     6. Rows should have boolean property to expand row. expandable: true
    -->
   <div :style="{ height: height, marginTop: 0 }" class="app-table-container">
-    <template v-if="!rows.length">
-      <div class="q-pt-md text-center text-subtitle">No Data Found</div>
-    </template>
-    <template v-else>
-      <q-table
-        flat
-        bordered
-        ref="qTableRef"
-        :title="title"
-        :rows="rows"
-        :columns="(columns as [])"
-        :table-colspan="9"
-        row-key="index"
-        :virtual-scroll="virtualScroll"
-        :virtual-scroll-item-size="48"
-        :rows-per-page-options="[0]"
-        :pagination="_pagination"
-        :dense="dense"
-        :hide-header="hideHeader"
-        :filter="filter && filter.value"
-        :filter-method="filter && filter.method"
-        @virtual-scroll="onScroll"
-        class="full-height"
-        :hide-bottom="!showPagination"
-      >
-        <template v-slot:header="props">
-          <q-tr :props="props" class="thead-sticky">
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template v-slot:body="props">
-          <q-tr :props="props" :key="`m_${props.row.index}`">
-            <q-td
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              @click="handleDataClick(col.name, props.row)"
-            >
-              <template v-if="col.slot">
-                <slot
-                  :name="col.slotName"
-                  :column="{ ...props }"
-                  :columnName="col.name"
-                />
-              </template>
-              <template v-else-if="col.type === 'action'">
-                <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
-              </template>
-              <template v-else>
-                {{ col.value }}
-              </template>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-show="props.row.expand"
+    <q-table
+      flat
+      :bordered="bordered"
+      ref="qTableRef"
+      :title="title"
+      :rows="rows"
+      :columns="(columns as [])"
+      :table-colspan="9"
+      row-key="index"
+      :virtual-scroll="virtualScroll"
+      :virtual-scroll-item-size="48"
+      :rows-per-page-options="[0]"
+      :pagination="_pagination"
+      :hide-header="hideHeader"
+      :filter="filter && filter.value"
+      :filter-method="filter && filter.method"
+      @virtual-scroll="onScroll"
+      class="full-height"
+    >
+      <template #no-data>
+        <NoData class="q-mb-lg" />
+      </template>
+      <template v-slot:header="props">
+        <q-tr :props="props" class="thead-sticky">
+          <q-th
+            v-for="col in props.cols"
+            :key="col.name"
             :props="props"
-            :key="`e_${props.row.index + 'entity'}`"
-            class="q-virtual-scroll--with-prev"
-            style="transition: display 2s ease-in"
+            :style="col.style"
           >
-            <q-td colspan="100%" style="padding: 0; border-bottom: none">
-              <slot :name="props.row.slotName" :row="props" />
-            </q-td>
-          </q-tr>
-        </template>
-        <template v-if="showPagination" #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-      </q-table>
-    </template>
+            {{ col.label }}
+          </q-th>
+        </q-tr>
+      </template>
+      <template v-slot:body="props">
+        <q-tr :props="props" :key="`m_${props.row.index}`">
+          <q-td
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+            @click="handleDataClick(col.name, props.row)"
+          >
+            <template v-if="col.slot">
+              <slot
+                :name="col.slotName"
+                :column="{ ...props }"
+                :columnName="col.name"
+              />
+            </template>
+            <template v-else-if="col.type === 'action'">
+              <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
+            </template>
+            <template v-else>
+              {{ col.value }}
+            </template>
+          </q-td>
+        </q-tr>
+        <q-tr
+          v-show="props.row.expand"
+          :props="props"
+          :key="`e_${props.row.index + 'entity'}`"
+          class="q-virtual-scroll--with-prev"
+          style="transition: display 2s ease-in"
+        >
+          <q-td colspan="100%" style="padding: 0; border-bottom: none">
+            <slot :name="props.row.slotName" :row="props" />
+          </q-td>
+        </q-tr>
+      </template>
+      <template v-if="showPagination" #bottom="scope">
+        <QTablePagination
+          :scope="scope"
+          :position="'bottom'"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          @update:changeRecordPerPage="changePagination"
+        />
+      </template>
+    </q-table>
   </div>
 </template>
 
@@ -117,6 +113,7 @@ import type { Ref } from "vue";
 import { ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { computed } from "vue";
+import NoData from "./shared/grid/NoData.vue";
 
 const props = defineProps({
   columns: {
@@ -172,6 +169,10 @@ const props = defineProps({
   filter: {
     type: Object,
     default: () => null,
+  },
+  bordered: {
+    type: Boolean,
+    default: true,
   },
 });
 

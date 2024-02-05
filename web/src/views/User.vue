@@ -17,7 +17,6 @@ import { watch } from "vue";
 
 export default defineComponent({
   name: "UserPage",
-  data() {},
   components: {
     UsersCloud,
     UsersOpenSource,

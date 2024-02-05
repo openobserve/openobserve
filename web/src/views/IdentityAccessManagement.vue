@@ -24,7 +24,6 @@ import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import { onActivated } from "vue";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 
@@ -52,6 +51,9 @@ watch(
         },
       });
     }
+  },
+  {
+    immediate: true,
   }
 );
 
@@ -121,7 +123,7 @@ const tabs = ref([
 ]);
 
 const updateActiveTab = (tab: string) => {
-  activeTab.value = tab;
+  if (tab) activeTab.value = tab;
 };
 </script>
 

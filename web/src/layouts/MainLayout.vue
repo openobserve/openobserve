@@ -442,7 +442,7 @@ export default defineComponent({
       {
         title: t("menu.iam"),
         icon: outlinedManageAccounts,
-        link: "/iam/users",
+        link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
       },
       {

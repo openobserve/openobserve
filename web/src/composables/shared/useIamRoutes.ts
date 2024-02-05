@@ -62,9 +62,6 @@ const useEnterpriseRoutes = () => {
           path: "organizations",
           name: "organizations",
           component: Organizations,
-          meta: {
-            keepAlive: true,
-          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
