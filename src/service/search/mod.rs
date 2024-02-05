@@ -250,7 +250,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let mut idx_file_list = vec![];
-    let file_list = if !meta.fts_terms.is_empty() {
+
+    let is_inverted_index = !meta.fts_terms.is_empty();
+    let file_list = if is_inverted_index {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -305,6 +307,18 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         )
         .await
     };
+
+    if is_inverted_index {
+        log::info!(
+            "is_inverted_index file_list to query: {:?}",
+            file_list.len()
+        );
+    } else {
+        log::info!(
+            "is_not inverted_indexfile_list to query: {:?}",
+            file_list.len()
+        );
+    }
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
