@@ -514,8 +514,6 @@ async fn create_index_file(
         SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
     };
 
-    log::error!("columns_to_index: {:?}", columns_to_index);
-
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
 
@@ -534,11 +532,14 @@ async fn create_index_file(
             .with_column("filename", lit(file_name_without_prefix))?
             .aggregate(
                 vec![col("term"), col("filename")],
-                vec![min(col("_timestamp")).alias("_timestamp")],
+                vec![
+                    min(col("_timestamp")).alias("_timestamp"),
+                    count(col("term")).alias("count"),
+                ],
             )?
             .with_column("character_len", character_length(col("term")))?
             .filter(col("character_len").gt_eq(lit(3)))?
-            .select_columns(&["term", "filename", "_timestamp"])?
+            .select_columns(&["term", "filename", "_timestamp", "count"])?
             .collect()
             .await?;
 
@@ -569,6 +570,7 @@ async fn create_index_file(
         &hour_key,
     )
     .await;
+    ctx.deregister_table("_tbl_raw_data")?;
     log::info!("[INGESTER:JOB] Written index file successfully");
     Ok(())
 }
