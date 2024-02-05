@@ -17,16 +17,16 @@ use config::{meta::stream::StreamType, RwHashMap};
 use infra::db as infra_db;
 use once_cell::sync::Lazy;
 
-static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
+static CACHES: Lazy<RwHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
 }
 
-pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType) -> (i64, String) {
+pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str) -> (i64, String) {
     let key = mk_key(org_id, stream_type, stream_name);
-    if let Some(offset) = CACHES.get(&key) {
-        return (*offset, "".to_string());
+    if let Some(val) = CACHES.get(&key) {
+        return val.value().clone();
     }
 
     let db = infra_db::get_db().await;
@@ -42,25 +42,49 @@ pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType
     } else {
         (value.parse().unwrap(), String::from(""))
     };
-    CACHES.insert(key.clone(), offset);
+    CACHES.insert(key.clone(), (offset, node.clone()));
     (offset, node)
 }
 
 pub async fn set_offset(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     offset: i64,
+    node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    CACHES.insert(key, offset);
+    let Some(node) = node else {
+        // release this key from this node
+        let db = infra_db::get_db().await;
+        db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
+            .await?;
+        CACHES.remove(&key);
+        return Ok(());
+    };
+
+    // set this key to this node
+    let old_node = CACHES
+        .get(&key)
+        .map(|x| x.value().1.clone())
+        .unwrap_or_default();
+    if old_node != node {
+        let db = infra_db::get_db().await;
+        db.put(
+            &key,
+            format!("{};{}", offset, node).into(),
+            infra_db::NO_NEED_WATCH,
+        )
+        .await?;
+    }
+    CACHES.insert(key, (offset, node.to_string()));
     Ok(())
 }
 
 pub async fn del_offset(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
     CACHES.remove(&key);
@@ -93,10 +117,14 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     for item in CACHES.clone().iter() {
         let key = item.key().to_string();
-        let offset = item.value();
+        let (offset, node) = item.value();
         if *offset > 0 {
-            db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
-                .await?;
+            let val = if !node.is_empty() {
+                format!("{};{}", offset, node)
+            } else {
+                offset.to_string()
+            };
+            db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?;
         }
     }
     Ok(())
@@ -109,13 +137,19 @@ mod tests {
     #[tokio::test]
     async fn test_compact_files() {
         const OFFSET: i64 = 100;
-        set_offset("default", "compact_file", "logs".into(), OFFSET)
-            .await
-            .unwrap();
+        set_offset(
+            "default",
+            "logs".into(),
+            "compact_file",
+            OFFSET,
+            Some("LOCAL"),
+        )
+        .await
+        .unwrap();
         sync_cache_to_db().await.unwrap();
         assert_eq!(
-            get_offset("default", "compact_file", "logs".into()).await,
-            (OFFSET, "".to_string())
+            get_offset("default", "logs".into(), "compact_file").await,
+            (OFFSET, "LOCAL".to_string())
         );
         assert!(!list_offset().await.unwrap().is_empty());
     }

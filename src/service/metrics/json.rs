@@ -273,8 +273,8 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
             org_id,
-            &stream_name,
             StreamType::Metrics,
+            &stream_name,
             None,
         ) {
             log::warn!("stream [{stream_name}] is being deleted");

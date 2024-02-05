@@ -51,7 +51,7 @@ pub async fn search(
     };
 
     // check if we are allowed to search
-    if db::compact::retention::is_deleting_stream(&sql.org_id, &sql.stream_name, stream_type, None)
+    if db::compact::retention::is_deleting_stream(&sql.org_id, stream_type, &sql.stream_name, None)
     {
         return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
             "stream [{}] is being deleted",

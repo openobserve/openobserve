@@ -367,8 +367,8 @@ pub async fn handle_grpc_request(
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
             org_id,
-            &stream_name,
             StreamType::Metrics,
+            &stream_name,
             None,
         ) {
             log::warn!("stream [{stream_name}] is being deleted");

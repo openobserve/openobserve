@@ -94,8 +94,8 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
                     if let Err(e) = retention::delete_by_stream(
                         &stream_data_retention_end,
                         &org_id,
-                        &stream_name,
                         stream_type,
+                        &stream_name,
                     )
                     .await
                     {
@@ -123,13 +123,13 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         tokio::task::yield_now().await; // yield to other tasks
 
         let ret = if retention.eq("all") {
-            retention::delete_all(org_id, stream_name, stream_type).await
+            retention::delete_all(org_id, stream_type, stream_name).await
         } else {
             let date_range = retention.split(',').collect::<Vec<&str>>();
             retention::delete_by_date(
                 org_id,
-                stream_name,
                 stream_type,
+                stream_name,
                 (date_range[0], date_range[1]),
             )
             .await
@@ -218,8 +218,8 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                 // check if we are allowed to merge or just skip
                 if db::compact::retention::is_deleting_stream(
                     &org_id,
-                    &stream_name,
                     stream_type,
+                    &stream_name,
                     None,
                 ) {
                     log::warn!(
@@ -234,7 +234,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                 let org_id = org_id.clone();
                 let permit = semaphore.clone().acquire_owned().await.unwrap();
                 let task = tokio::task::spawn(async move {
-                    if let Err(e) = merge::merge_by_stream(&org_id, &stream_name, stream_type).await
+                    if let Err(e) = merge::merge_by_stream(&org_id, stream_type, &stream_name).await
                     {
                         log::error!(
                             "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",

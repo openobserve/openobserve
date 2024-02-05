@@ -106,7 +106,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let stream_name = columns[3].to_string();
 
         // check if we are allowed to ingest or just delete the file
-        if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
+        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
             for file in files_with_size {
                 log::warn!(
                     "[INGESTER:JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
