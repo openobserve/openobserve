@@ -420,7 +420,7 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
-        filter: [{ name: "namespace_name", operator: "=", value: "$custom" }],
+        filter: [{ name: "", operator: "=", value: "" }],
       },
       value: "",
       options: [],
