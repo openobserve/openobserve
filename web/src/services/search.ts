@@ -35,6 +35,7 @@ const search = {
     size,
     query_context,
     query_fn,
+    stream_type,
   }: {
     org_identifier: string;
     index: string;
@@ -42,8 +43,9 @@ const search = {
     size: string;
     query_context: any;
     query_fn: any;
+    stream_type: string;
   }) => {
-    let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}`;
+    let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
     }

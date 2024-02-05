@@ -123,6 +123,7 @@ pub struct AuthExtractor {
     pub o2_type: String,
     pub org_id: String,
     pub bypass_check: bool,
+    pub parent_id: String,
 }
 
 impl FromRequest for AuthExtractor {
@@ -140,6 +141,14 @@ impl FromRequest for AuthExtractor {
         use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
+
+        let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+        let stream_type = match get_stream_type_from_request(&query) {
+            Ok(v) => v,
+            Err(_) => Some(StreamType::Logs),
+        };
+
+        let folder = get_folder(&query);
 
         let mut method = req.method().to_string();
         let local_path = req.path().to_string();
@@ -162,6 +171,7 @@ impl FromRequest for AuthExtractor {
                         o2_type: format!("stream:{org_id}"),
                         org_id,
                         bypass_check: true,
+                        parent_id: folder,
                     }));
                 }
             }
@@ -191,7 +201,33 @@ impl FromRequest for AuthExtractor {
                 path_columns[url_len - 2]
             )
         } else if url_len == 3 {
-            if method.eq("PUT") || method.eq("DELETE") {
+            if path_columns[2].starts_with("alerts") {
+                if method.eq("PUT") || method.eq("DELETE") {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or(path_columns[1], |model| model.key),
+                        path_columns[2]
+                    )
+                } else {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[2])
+                            .map_or(path_columns[2], |model| model.key),
+                        path_columns[0]
+                    )
+                }
+            } else if path_columns[2].starts_with("_values")
+                || path_columns[2].starts_with("_around")
+            {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get("streams").unwrap().key,
+                    path_columns[1]
+                )
+            } else if method.eq("PUT") || method.eq("DELETE") {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
@@ -208,17 +244,45 @@ impl FromRequest for AuthExtractor {
                     path_columns[0]
                 )
             }
+        } else if url_len == 4 {
+            if method.eq("PUT") || method.eq("DELETE") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
+            } else {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            }
         } else if method.eq("PUT") || method.eq("DELETE") {
             if path_columns[url_len - 1].eq("delete_fields") {
                 method = "DELETE".to_string();
             }
-            format!(
-                "{}:{}",
-                OFGA_MODELS
-                    .get(path_columns[1])
-                    .map_or(path_columns[1], |model| model.key),
-                path_columns[2]
-            )
+            if path_columns[url_len - 1].eq("enable") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[2])
+                        .map_or(path_columns[2], |model| model.key),
+                    path_columns[3]
+                )
+            } else {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2]
+                )
+            }
         } else {
             format!(
                 "{}:{}",
@@ -228,14 +292,6 @@ impl FromRequest for AuthExtractor {
                 path_columns[2]
             )
         };
-
-        let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-        let stream_type = match get_stream_type_from_request(&query) {
-            Ok(v) => v,
-            Err(_) => Some(StreamType::Logs),
-        };
-
-        let folder = get_folder(&query);
 
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
@@ -249,6 +305,7 @@ impl FromRequest for AuthExtractor {
                         o2_type: "".to_string(),
                         org_id: "".to_string(),
                         bypass_check: true, // bypass check permissions
+                        parent_id: folder,
                     }));
                 } else if object_type.starts_with("stream") && !method.eq("LIST") {
                     let object_type = match stream_type {
@@ -262,10 +319,20 @@ impl FromRequest for AuthExtractor {
                         o2_type: object_type,
                         org_id,
                         bypass_check: false,
+                        parent_id: folder,
                     }));
                 } else if object_type.contains("dashboard") && !method.eq("LIST") {
-                    let object_type = object_type
-                        .replace("dashboard:", format!("dashboard:{}/", folder).as_str());
+                    let object_type = if method.eq("POST") {
+                        format!(
+                            "{}:{}",
+                            OFGA_MODELS
+                                .get(path_columns[1])
+                                .map_or("dfolder", |model| model.parent),
+                            folder.as_str(),
+                        )
+                    } else {
+                        object_type
+                    };
 
                     return ready(Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
@@ -273,6 +340,7 @@ impl FromRequest for AuthExtractor {
                         o2_type: object_type,
                         org_id,
                         bypass_check: false,
+                        parent_id: folder,
                     }));
                 }
 
@@ -282,6 +350,7 @@ impl FromRequest for AuthExtractor {
                     o2_type: object_type,
                     org_id,
                     bypass_check: false,
+                    parent_id: folder,
                 }));
             }
         }
