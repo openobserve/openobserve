@@ -370,6 +370,7 @@ impl FromRequest for AuthExtractor {
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
                     bypass_check: true, // bypass check permissions
+                    parent_id: "".to_string(),
                 }));
             }
         }
