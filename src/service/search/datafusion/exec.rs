@@ -97,6 +97,7 @@ pub async fn sql(
 
     let start = std::time::Instant::now();
     let session_id = session.id.clone();
+
     let mut ctx = if !file_type.eq(&FileType::ARROW) {
         register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?
     } else {
