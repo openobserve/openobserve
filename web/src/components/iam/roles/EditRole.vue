@@ -525,7 +525,7 @@ const decodePermission = (permission: string) => {
 };
 
 const cancelPermissionsUpdate = () => {
-    router.push({ name: "roles" });
+  router.push({ name: "roles" });
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -783,7 +783,7 @@ const getEnrichmentTables = () => {
 };
 
 const getDashboards = async (resource: Entity | Resource) => {
-  const dashboards = await dashboardService.list(
+  let dashboards: any = await dashboardService.list(
     0,
     10000,
     "name",
@@ -832,9 +832,18 @@ const getSavedViews = async () => {
 };
 
 const getFolders = async () => {
-  const folders = await dashboardService.list_Folders(
+  const folders: any = await dashboardService.list_Folders(
     store.state.selectedOrganization.identifier
   );
+
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default"
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
   updateResourceEntities(
     "dfolder",
     ["folderId"],
