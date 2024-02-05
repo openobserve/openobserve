@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
@@ -122,7 +122,7 @@ const columns: any = [
 
 const { rolesState } = usePermissions();
 
-onMounted(() => {
+onBeforeMount(() => {
   setupRoles();
 });
 
@@ -142,7 +142,6 @@ const addRole = () => {
 };
 
 const editRole = (role: any) => {
-  console.log(role);
   router.push({
     name: "editRole",
     params: {

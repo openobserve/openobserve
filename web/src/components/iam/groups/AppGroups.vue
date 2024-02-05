@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onBeforeMount } from "vue";
 import AddGroup from "./AddGroup.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
@@ -129,7 +129,7 @@ const columns: any = [
 
 const groups = ref([]);
 
-onMounted(() => {
+onBeforeMount(() => {
   setupGroups();
 });
 
