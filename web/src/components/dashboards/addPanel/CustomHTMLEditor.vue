@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="html-editor" style="width: 100%; height: 100%; overflow: auto">
-    <div v-if="editMode" style="width: 100%; height: 100%">
+    <div style="width: 100%; height: 100%">
       <q-splitter
         v-model="splitterModel"
         style="width: 100%; height: 100% !important"
@@ -46,11 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div
-      v-if="!editMode"
-      class="preview"
-      v-html="DOMPurify.sanitize(htmlContent)"
-    ></div>
   </div>
 </template>
 
@@ -66,10 +61,6 @@ export default defineComponent({
     modelValue: {
       type: String,
       default: "",
-    },
-    editMode: {
-      type: Boolean,
-      default: false,
     },
   },
   setup(props, { emit }) {

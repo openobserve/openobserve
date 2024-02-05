@@ -39,9 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col column"
         style="width: 100%; height: 100%; flex: 1"
       >
-        <CustomHTMLEditor
-          v-model="panelSchema.htmlContent"
-          :editMode="false"
+        <HTMLRenderer
+          :HTMLContent="panelSchema.htmlContent"
           style="width: 100%; height: 100%"
           class="col"
         />
@@ -103,14 +102,14 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
-import CustomHTMLEditor from "@/components/dashboards/addPanel/CustomHTMLEditor.vue";
+import HTMLRenderer from "./panels/HTMLRenderer.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     ChartRenderer,
     TableRenderer,
     GeoMapRenderer,
-    CustomHTMLEditor,
+    HTMLRenderer,
   },
   props: {
     selectedTimeObj: {
