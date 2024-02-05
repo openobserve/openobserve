@@ -33,7 +33,7 @@ export default defineComponent({
       default: "",
     },
   },
-  setup() {
+  setup(): any {
     return {
       DOMPurify,
       marked,

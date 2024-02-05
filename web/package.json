@@ -75,6 +75,7 @@
     "@rushstack/eslint-patch": "^1.1.0",
     "@types/d3-hierarchy": "^3.1.2",
     "@types/d3-selection": "^3.0.5",
+    "@types/dompurify": "^3.0.5",
     "@types/js-cookie": "^3.0.2",
     "@types/jsdom": "^16.2.14",
     "@types/leaflet": "^1.9.4",

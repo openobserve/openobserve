@@ -70,7 +70,7 @@ export default defineComponent({
       default: "",
     },
   },
-  setup(props, { emit }) {
+  setup(props, { emit }): any {
     const markdownContent = ref(props.modelValue);
     const splitterModel = ref(50);
 

@@ -63,7 +63,7 @@ export default defineComponent({
       default: "",
     },
   },
-  setup(props, { emit }) {
+  setup(props, { emit }): any {
     const htmlContent = ref(props.modelValue);
     const splitterModel = ref(50);
 
