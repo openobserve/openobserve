@@ -268,7 +268,10 @@ pub async fn handle_trace_request(
                 }
                 // End row based transform */
                 // get json object
-                let record_val = value.as_object_mut().unwrap();
+                let mut record_val = match value.take() {
+                    json::Value::Object(v) => v,
+                    _ => unreachable!(""),
+                };
 
                 record_val.insert(
                     CONFIG.common.column_timestamp.clone(),
@@ -302,7 +305,7 @@ pub async fn handle_trace_request(
                     traces_stream_name,
                     StreamType::Traces,
                     &mut traces_schema_map,
-                    record_val,
+                    &record_val,
                     timestamp.try_into().unwrap(),
                 )
                 .await;
@@ -313,7 +316,7 @@ pub async fn handle_trace_request(
                     if let Some(alerts) = stream_alerts_map.get(&key) {
                         let mut trigger_alerts: TriggerAlertData = Vec::new();
                         for alert in alerts {
-                            if let Ok(Some(v)) = alert.evaluate(Some(record_val)).await {
+                            if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
                                 trigger_alerts.push((alert.clone(), v));
                             }
                         }
@@ -333,7 +336,7 @@ pub async fn handle_trace_request(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
                     partition_time_level,
-                    record_val,
+                    &record_val,
                     Some(&schema_key),
                 );
 
@@ -348,7 +351,7 @@ pub async fn handle_trace_request(
                     records: vec![],
                     records_size: 0,
                 });
-                let record_val = record_val.to_owned();
+                // let record_val = record_val.to_owned();
                 let record_val = json::Value::Object(record_val);
                 let record_size = json::estimate_json_bytes(&record_val);
                 hour_buf.records.push(Arc::new(record_val));
