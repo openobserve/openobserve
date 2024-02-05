@@ -167,16 +167,8 @@ pub async fn traces_json(
         }
     };
     let spans = match body.get("resourceSpans") {
-        Some(v) => match v.as_array() {
-            Some(v) => v,
-            None => {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
-                )));
-            }
-        },
-        None => {
+        Some(json::Value::Array(v)) => v,
+        _ => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 "Invalid json: the structure must be {{\"resourceSpans\":[]}}".to_string(),
@@ -330,7 +322,10 @@ pub async fn traces_json(
                     }
                     // End row based transform */
                     // get json object
-                    let record_val = value.as_object_mut().unwrap();
+                    let mut record_val = match value.take() {
+                        json::Value::Object(v) => v,
+                        _ => unreachable!(),
+                    };
 
                     record_val.insert(
                         CONFIG.common.column_timestamp.clone(),
@@ -364,7 +359,7 @@ pub async fn traces_json(
                         traces_stream_name,
                         StreamType::Traces,
                         &mut traces_schema_map,
-                        record_val,
+                        &record_val,
                         timestamp.try_into().unwrap(),
                     )
                     .await;
@@ -376,7 +371,7 @@ pub async fn traces_json(
                         if let Some(alerts) = stream_alerts_map.get(&key) {
                             let mut trigger_alerts: TriggerAlertData = Vec::new();
                             for alert in alerts {
-                                if let Ok(Some(v)) = alert.evaluate(Some(record_val)).await {
+                                if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
                                     trigger_alerts.push((alert.clone(), v));
                                 }
                             }
@@ -396,7 +391,7 @@ pub async fn traces_json(
                         timestamp.try_into().unwrap(),
                         &partition_keys,
                         partition_time_level,
-                        record_val,
+                        &record_val,
                         Some(&schema_key),
                     );
 
@@ -411,7 +406,7 @@ pub async fn traces_json(
                         records: vec![],
                         records_size: 0,
                     });
-                    let record_val = record_val.to_owned();
+                    // let record_val = record_val.to_owned();
                     let record_val = json::Value::Object(record_val);
                     let record_size = json::estimate_json_bytes(&record_val);
                     hour_buf.records.push(Arc::new(record_val));
