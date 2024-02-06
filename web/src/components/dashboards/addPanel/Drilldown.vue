@@ -72,8 +72,7 @@ import { useStore } from "vuex";
 export default defineComponent({
   name: "Drilldown",
   components: { DrilldownPopUp },
-  props: {},
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const showDrilldownPopUp = ref(false);
     const dataLink: any = ref([

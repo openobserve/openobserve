@@ -209,7 +209,7 @@
 
     <q-card-actions class="confirmActions">
       <q-btn
-        v-close-popup
+        v-close-popup="true"
         unelevated
         no-caps
         class="q-mr-sm"
@@ -219,7 +219,7 @@
         {{ t("confirmDialog.cancel") }}
       </q-btn>
       <q-btn
-        v-close-popup
+        v-close-popup="true"
         unelevated
         no-caps
         class="no-border"
