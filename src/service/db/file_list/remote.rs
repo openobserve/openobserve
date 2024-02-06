@@ -126,7 +126,7 @@ pub async fn cache(prefix: &str, force: bool) -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_stats() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache();
+    let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         let ret = infra_file_list::get_stream_stats(&org_id, None, None).await;
         if ret.is_err() {

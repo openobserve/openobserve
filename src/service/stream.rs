@@ -277,7 +277,9 @@ pub async fn delete_stream(
 
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    STREAM_SCHEMAS.remove(&key);
+    let mut w = STREAM_SCHEMAS.write().await;
+    w.remove(&key);
+    drop(w);
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);

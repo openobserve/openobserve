@@ -41,7 +41,7 @@ use crate::{
 pub static CLIENT: Lazy<Arc<Client>> = Lazy::new(|| Arc::new(Client::new()));
 
 pub async fn publish_stats() -> Result<(), anyhow::Error> {
-    let mut orgs = db::schema::list_organizations_from_cache();
+    let mut orgs = db::schema::list_organizations_from_cache().await;
     orgs.retain(|org: &String| org != &CONFIG.common.usage_org);
 
     for org_id in orgs {

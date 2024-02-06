@@ -535,7 +535,6 @@ mod tests {
     }
 
     #[tokio::test]
-
     async fn test_compile_vrl_function() {
         let result = compile_vrl_function(
             r#"if .country == "USA" {

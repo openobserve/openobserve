@@ -118,15 +118,14 @@ pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String,
 }
 
 pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<String, json::Value> {
-    let iter = STREAM_SCHEMAS.iter().clone();
     let mut num_streams = 0;
     let mut logs_streams = 0;
     let mut metrics_streams = 0;
     let mut orgs = HashSet::new();
-    for item in iter {
-        num_streams += item.value().len();
-
-        let stream_type = item.key().split('/').collect::<Vec<&str>>();
+    let r = STREAM_SCHEMAS.read().await;
+    for (key, val) in r.iter() {
+        num_streams += val.len();
+        let stream_type = key.split('/').collect::<Vec<&str>>();
         orgs.insert(stream_type[0].to_string());
         if stream_type.len() < 2 {
             continue;
@@ -137,6 +136,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             _ => (),
         }
     }
+    drop(r);
 
     data.insert("num_org".to_string(), orgs.len().into());
     data.insert("num_streams".to_string(), num_streams.into());

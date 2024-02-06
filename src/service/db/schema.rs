@@ -41,8 +41,9 @@ pub async fn get(
     let key = mk_key(org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
 
-    if let Some(schema) = STREAM_SCHEMAS.get(map_key) {
-        return Ok(schema.value().last().unwrap().clone());
+    let r = STREAM_SCHEMAS.read().await;
+    if let Some(schema) = r.get(map_key) {
+        return Ok(schema.last().unwrap().clone());
     }
 
     let db = infra_db::get_db().await;
@@ -99,8 +100,9 @@ pub async fn get_versions(
     let key = mk_key(org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
 
-    if STREAM_SCHEMAS.contains_key(map_key) {
-        return Ok(STREAM_SCHEMAS.get(map_key).unwrap().value().clone());
+    let r = STREAM_SCHEMAS.read().await;
+    if let Some(schema) = r.get(map_key) {
+        return Ok(schema.clone());
     }
 
     let db = infra_db::get_db().await;
@@ -131,11 +133,11 @@ pub async fn set(
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let mut versions: Vec<Schema>;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
-    if STREAM_SCHEMAS.contains_key(map_key) {
-        versions = STREAM_SCHEMAS.get(map_key).unwrap().value().clone();
+    let r = STREAM_SCHEMAS.read().await;
+    if let Some(versions) = r.get(map_key) {
+        let mut versions = versions.clone();
         if min_ts.is_some() && new_version {
             // update last schema to add end date
             let last_schema = versions.pop().unwrap();
@@ -169,37 +171,42 @@ pub async fn set(
                 )
                 .await;
         }
+        return Ok(());
+    }
+    drop(r);
+
+    // create new schema
+    let mut metadata = schema.metadata().clone();
+    if metadata.contains_key("created_at") {
+        metadata.insert(
+            "start_dt".to_string(),
+            metadata.get("created_at").unwrap().clone(),
+        );
     } else {
-        let mut metadata = schema.metadata().clone();
-        if metadata.contains_key("created_at") {
-            metadata.insert(
-                "start_dt".to_string(),
-                metadata.get("created_at").unwrap().clone(),
-            );
-        } else {
-            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-            metadata.insert("start_dt".to_string(), min_ts.to_string());
-            metadata.insert("created_at".to_string(), min_ts.to_string());
+        let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+        metadata.insert("start_dt".to_string(), min_ts.to_string());
+        metadata.insert("created_at".to_string(), min_ts.to_string());
+    }
+    let values = vec![schema.to_owned().with_metadata(metadata)];
+    match db
+        .put(
+            &key,
+            json::to_vec(&values).unwrap().into(),
+            infra_db::NEED_WATCH,
+        )
+        .await
+    {
+        Ok(_) => {
+            let mut w = STREAM_SCHEMAS.write().await;
+            w.insert(map_key.to_owned(), values);
+            drop(w);
+            Ok(())
         }
-        let values = vec![schema.to_owned().with_metadata(metadata)];
-        match db
-            .put(
-                &key,
-                json::to_vec(&values).unwrap().into(),
-                infra_db::NEED_WATCH,
-            )
-            .await
-        {
-            Ok(_) => {
-                STREAM_SCHEMAS.insert(map_key.to_owned(), values);
-            }
-            Err(e) => {
-                log::error!("Error putting schema: {}", e);
-                return Err(anyhow::anyhow!("Error putting schema: {}", e));
-            }
+        Err(e) => {
+            log::error!("Error putting schema: {}", e);
+            Err(anyhow::anyhow!("Error putting schema: {}", e))
         }
     }
-    Ok(())
 }
 
 pub async fn delete(
@@ -221,20 +228,23 @@ pub async fn delete(
 }
 
 #[tracing::instrument]
-fn list_stream_schemas(
+async fn list_stream_schemas(
     org_id: &str,
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Vec<StreamSchema> {
-    assert!(!STREAM_SCHEMAS.is_empty());
+    let r = STREAM_SCHEMAS.read().await;
+    if r.is_empty() {
+        return vec![];
+    }
+
     let prefix = match stream_type {
         None => format!("{org_id}/"),
         Some(stream_type) => format!("{org_id}/{stream_type}/"),
     };
-    STREAM_SCHEMAS
-        .iter()
-        .filter_map(|it| {
-            it.key().strip_prefix(&prefix).map(|key| {
+    r.iter()
+        .filter_map(|(key, val)| {
+            key.strip_prefix(&prefix).map(|key| {
                 let (stream_type, stream_name) = match stream_type {
                     Some(stream_type) => (stream_type, key.into()),
                     None => {
@@ -247,7 +257,7 @@ fn list_stream_schemas(
                     stream_name,
                     stream_type,
                     schema: if fetch_schema {
-                        it.value().last().unwrap().clone()
+                        val.last().unwrap().clone()
                     } else {
                         Schema::empty()
                     },
@@ -263,8 +273,10 @@ pub async fn list(
     stream_type: Option<StreamType>,
     fetch_schema: bool,
 ) -> Result<Vec<StreamSchema>, anyhow::Error> {
-    if !STREAM_SCHEMAS.is_empty() {
-        return Ok(list_stream_schemas(org_id, stream_type, fetch_schema));
+    let r = STREAM_SCHEMAS.read().await;
+    if !r.is_empty() {
+        drop(r);
+        return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
     }
 
     let db = infra_db::get_db().await;
@@ -317,7 +329,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = json::from_slice(&ev.value.unwrap()).unwrap();
-                STREAM_SCHEMAS.insert(item_key.to_owned(), item_value.clone());
+                let mut w = STREAM_SCHEMAS.write().await;
+                w.insert(item_key.to_owned(), item_value.clone());
+                drop(w);
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
                 let stream_type = StreamType::from(keys[1]);
@@ -342,7 +356,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = columns[0];
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
-                STREAM_SCHEMAS.remove(item_key);
+                let mut w = STREAM_SCHEMAS.write().await;
+                w.remove(item_key);
+                drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
                     super::compact::files::del_offset(org_id, stream_name, stream_type).await
@@ -401,15 +417,17 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 ));
             }
         };
-        STREAM_SCHEMAS.insert(item_key_str.to_string(), json_val);
+        let mut w = STREAM_SCHEMAS.write().await;
+        w.insert(item_key_str.to_string(), json_val);
+        drop(w);
     }
     log::info!("Stream schemas Cached");
     Ok(())
 }
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
-    for schema in STREAM_SCHEMAS.iter() {
-        let schema_key = schema.key();
+    let r = STREAM_SCHEMAS.read().await;
+    for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {
             continue;
         }
@@ -448,13 +466,14 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
     None
 }
 
-pub fn list_organizations_from_cache() -> Vec<String> {
+pub async fn list_organizations_from_cache() -> Vec<String> {
     let mut names = HashSet::new();
-    for schema in STREAM_SCHEMAS.iter() {
-        if !schema.key().contains('/') {
+    let r = STREAM_SCHEMAS.read().await;
+    for schema_key in r.keys() {
+        if !schema_key.contains('/') {
             continue;
         }
-        let name = schema.key().split('/').collect::<Vec<&str>>()[0].to_string();
+        let name = schema_key.split('/').collect::<Vec<&str>>()[0].to_string();
         if !names.contains(&name) {
             names.insert(name);
         }
@@ -462,13 +481,14 @@ pub fn list_organizations_from_cache() -> Vec<String> {
     names.into_iter().collect::<Vec<String>>()
 }
 
-pub fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
+pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
-    for schema in STREAM_SCHEMAS.iter() {
-        if !schema.key().contains('/') {
+    let r = STREAM_SCHEMAS.read().await;
+    for schema_key in r.keys() {
+        if !schema_key.contains('/') {
             continue;
         }
-        let columns = schema.key().split('/').collect::<Vec<&str>>();
+        let columns = schema_key.split('/').collect::<Vec<&str>>();
         let cur_org_id = columns[0];
         if !org_id.eq(cur_org_id) {
             continue;
