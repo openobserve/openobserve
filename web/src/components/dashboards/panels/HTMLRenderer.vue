@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="scroll" style="width: 100%; height: 100%; overflow: auto">
     <div
-      v-html="DOMPurify.sanitize(HTMLContent)"
+      v-html="DOMPurify.sanitize(htmlContent)"
       data-test="html-renderer"
     ></div>
   </div>
@@ -30,7 +30,7 @@ import DOMPurify from "dompurify";
 export default defineComponent({
   name: "HTMLRenderer",
   props: {
-    HTMLContent: {
+    htmlContent: {
       type: String,
       default: "",
     },

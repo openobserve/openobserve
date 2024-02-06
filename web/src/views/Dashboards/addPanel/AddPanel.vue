@@ -646,7 +646,7 @@ export default defineComponent({
       //check content should be empty for html
       if (dashboardData.data.type == "html") {
         if (dashboardData.data.htmlContent.trim() == "") {
-          errors.push("Please enter your HTML code.");
+          errors.push("Please enter your HTML code");
         }
       }
 

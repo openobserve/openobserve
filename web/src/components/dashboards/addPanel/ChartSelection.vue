@@ -171,7 +171,7 @@ export default defineComponent({
         id: "html",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/Markdown.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
         title: "Markdown",
         id: "markdown",
       },

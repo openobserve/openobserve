@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 100%; height: 100%; flex: 1"
       >
         <HTMLRenderer
-          :HTMLContent="panelSchema.htmlContent"
+          :htmlContent="panelSchema.htmlContent"
           style="width: 100%; height: 100%"
           class="col"
         />
@@ -70,15 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
       />
     </div>
-    <div
-      v-if="
-        !errorDetail &&
-        panelSchema.type != 'html' &&
-        panelSchema.type != 'markdown'
-      "
-      class="noData"
-      data-test="no-data"
-    >
+    <div v-if="!errorDetail" class="noData" data-test="no-data">
       {{ noData }}
     </div>
     <div
@@ -273,8 +265,15 @@ export default defineComponent({
 
     // Compute the value of the 'noData' variable
     const noData = computed(() => {
+      // if panel type is 'html' or 'markdown', return an empty string
+      if (
+        panelSchema.value.type == "html" ||
+        panelSchema.value.type == "markdown"
+      ) {
+        return "";
+      }
       // Check if the queryType is 'promql'
-      if (panelSchema.value?.queryType == "promql") {
+      else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
         return data.value.length &&
           data.value.some((item: any) => item?.result?.length)
