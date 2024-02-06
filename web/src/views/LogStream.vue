@@ -134,6 +134,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t(`logStream.refreshStats`)"
               @click="getLogStream"
             />
+            <q-btn
+              data-test="alert-list-add-alert-btn"
+              class="q-ml-md q-mb-xs text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              :label="t(`logStream.add`)"
+              @click="addStream"
+            />
           </div>
         </div>
         <QTablePagination
@@ -160,6 +169,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-table>
     <q-dialog
       v-model="showIndexSchemaDialog"
+      position="right"
+      full-height
+      maximized
+    >
+      <SchemaIndex v-model="schemaData" />
+    </q-dialog>
+
+    <q-dialog
+      v-model="addStreamDialog.show"
       position="right"
       full-height
       maximized
@@ -308,6 +326,23 @@ export default defineComponent({
     if (config.isCloud == "true") {
       columns.value?.splice(5, 1);
     }
+
+    const addStreamDialog = ref({
+      show: false,
+      data: {
+        name: "",
+        stream_type: "",
+        index_type: "",
+        retention_period: 14,
+      },
+    });
+
+    const streamIndexType = [
+      { label: "Hash based partition", value: "hash" },
+      { label: "Key based partition", value: "key" },
+      { label: "Inverted index", value: "inverted" },
+      { label: "Bloom filter", value: "bloom" },
+    ];
 
     let deleteStreamName = "";
     let deleteStreamType = "";
@@ -518,6 +553,15 @@ export default defineComponent({
       resultTotal.value = logStream.value.length;
     };
 
+    const addStream = () => {
+      // router.push({
+      //   name: "addStream",
+      //   query: {
+      //     org_identifier: store.state.selectedOrganization.identifier,
+      //   },
+      // });
+    };
+
     return {
       t,
       qTable,
@@ -550,6 +594,8 @@ export default defineComponent({
       selectedStreamType,
       streamFilterValues,
       onChangeStreamFilter,
+      addStreamDialog,
+      addStream,
     };
   },
 });

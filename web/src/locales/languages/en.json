@@ -360,7 +360,8 @@
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
-    "labelTraces": "Traces"
+    "labelTraces": "Traces",
+    "add": "Add Stream"
   },
   "function": {
     "header": "Functions",
