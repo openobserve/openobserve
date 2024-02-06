@@ -308,18 +308,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         .await
     };
 
-    if is_inverted_index {
-        log::info!(
-            "is_inverted_index file_list to query: {:?}",
-            file_list.len()
-        );
-    } else {
-        log::info!(
-            "is_not inverted_indexfile_list to query: {:?}",
-            file_list.len()
-        );
-    }
-
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
     // 1. get work group

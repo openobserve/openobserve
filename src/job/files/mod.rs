@@ -28,6 +28,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { json::run().await });
     tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });
+    tokio::task::spawn(async move { idx::run().await });
 
     Ok(())
 }

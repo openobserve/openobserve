@@ -20,6 +20,7 @@
 //     unused_allocation,
 //     unused_extern_crates
 // )]
+#![feature(btree_cursors)]
 
 pub mod cli;
 pub mod common;
