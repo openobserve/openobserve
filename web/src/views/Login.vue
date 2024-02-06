@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <sso-login
-    v-if="!store.state.zoConfig.dex_enabled && config.isEnterprise === 'true'"
-  />
-  <login v-else-if="store.state.zoConfig.dex_enabled == false"></login>
+  <login v-if="store.state.zoConfig.dex_enabled == false"></login>
   <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
     Wait while redirection...
   </div>
