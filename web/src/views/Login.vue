@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="store.state.zoConfig.dex_enabled == false"></login>
-  <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
-    Wait while redirection...
-  </div>
+  <login />
 </template>
 
 <script lang="ts">
@@ -29,7 +26,7 @@ import config from "@/aws-exports";
 import authService from "@/services/auth";
 import configService from "@/services/config";
 import { useStore } from "vuex";
-import { getUserInfo, getDecodedUserInfo, getPath } from "@/utils/zincutils";
+import { getUserInfo, getDecodedUserInfo } from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
@@ -40,7 +37,6 @@ export default defineComponent({
   name: "LoginPage",
   components: {
     Login,
-    SsoLogin,
   },
   setup() {
     const store = useStore();
@@ -60,7 +56,7 @@ export default defineComponent({
               try {
                 authService.get_dex_login().then((res) => {
                   if (res) {
-                    window.location.href = res;
+                    // window.location.href = res;
                     return;
                   }
                 });
