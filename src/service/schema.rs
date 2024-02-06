@@ -472,11 +472,12 @@ async fn handle_diff_schema_local_mode(
         )
         .await;
     }
+
+    // update thread cache
+    stream_schema_map.insert(stream_name.to_string(), final_schema);
+
     // release lock
     drop(lock_acquired);
-
-    assert!(!final_schema.fields().is_empty());
-    stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Some(SchemaEvolution {
         schema_compatible: true,
@@ -494,6 +495,17 @@ async fn handle_diff_schema_cluster_mode(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
+    // first update thread cache
+    if is_new {
+        let mut metadata = HashMap::with_capacity(1);
+        metadata.insert("created_at".to_string(), record_ts.to_string());
+        stream_schema_map.insert(
+            stream_name.to_string(),
+            inferred_schema.clone().with_metadata(metadata),
+        );
+    }
+
+    // acquire lock and update schema to meta store
     let key = format!("schema/{org_id}/{stream_type}/{stream_name}");
     let mut lock = etcd::Locker::new(&key);
     lock.lock(0).await.map_err(server_internal_error).unwrap();
@@ -543,15 +555,15 @@ async fn handle_diff_schema_cluster_mode(
         .await;
     }
 
+    // update thread cache
+    stream_schema_map.insert(stream_name.to_string(), final_schema);
+
     // release lock
     lock.unlock().await.map_err(server_internal_error).unwrap();
     log::info!(
         "Released lock for cluster stream {} after setting schema",
         stream_name
     );
-
-    assert!(!final_schema.fields().is_empty());
-    stream_schema_map.insert(stream_name.to_string(), final_schema);
 
     Some(SchemaEvolution {
         schema_compatible: true,
