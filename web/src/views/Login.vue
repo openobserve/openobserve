@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="store.state.zoConfig.dex_enabled == false"></login>
+  <sso-login
+    v-if="!store.state.zoConfig.dex_enabled && config.isEnterprise === 'true'"
+  />
+  <login v-else-if="store.state.zoConfig.dex_enabled == false"></login>
   <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
     Wait while redirection...
   </div>
@@ -34,11 +37,13 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import SsoLogin from "@/components/login/SsoLogin.vue";
 
 export default defineComponent({
   name: "LoginPage",
   components: {
     Login,
+    SsoLogin,
   },
   setup() {
     const store = useStore();
