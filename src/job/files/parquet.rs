@@ -571,6 +571,6 @@ async fn create_index_file(
     )
     .await;
     ctx.deregister_table("_tbl_raw_data")?;
-    log::info!("[INGESTER:JOB] Written index file successfully");
+    log::warn!("[INGESTER:JOB] Written index file successfully");
     Ok(())
 }

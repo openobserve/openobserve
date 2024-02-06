@@ -144,10 +144,32 @@ pub async fn search(
         .instrument(storage_span),
     );
 
+    // search in arrow idx
+    let work_group4 = work_group.clone();
+    let session_id4 = session_id.clone();
+    let sql4 = sql.clone();
+    let wal_mem_span = info_span!(
+        "service:search:grpc:in_idx_arrow",
+        session_id = session_id4.as_ref().clone(),
+        org_id = sql.org_id,
+        stream_name = sql.stream_name,
+        stream_type = stream_type.to_string(),
+    );
+    let task4 = tokio::task::spawn(
+        async move {
+            if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
+                wal::search_arrow(&session_id4, sql4, stream_type, &work_group4, timeout).await
+            } else {
+                Ok((HashMap::new(), ScanStats::default()))
+            }
+        }
+        .instrument(wal_mem_span),
+    );
+
     // merge result
     let mut results = HashMap::new();
     let mut scan_stats = ScanStats::new();
-    let tasks = try_join_all(vec![task1, task2, task3])
+    let tasks = try_join_all(vec![task1, task2, task3, task4])
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     for task in tasks {
