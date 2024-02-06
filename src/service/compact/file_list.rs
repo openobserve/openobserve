@@ -58,13 +58,14 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     if offset == 0 {
         // get earilest date from schema
         offset = time_now.timestamp_micros();
-        for item in STREAM_SCHEMAS.iter() {
-            if let Some(val) = item.value().first().unwrap().metadata.get("created_at") {
+        let r = STREAM_SCHEMAS.read().await;
+        for (key, val) in r.iter() {
+            if let Some(val) = val.first().unwrap().metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
                 if time_min == 0 {
                     log::info!(
                         "[COMPACT] file_list stream [{}] created_at is 0, just skip",
-                        item.key()
+                        key
                     );
                     continue;
                 }
@@ -73,6 +74,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
                 }
             }
         }
+        drop(r);
     }
 
     // still not found, just return

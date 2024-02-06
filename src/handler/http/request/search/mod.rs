@@ -727,11 +727,13 @@ async fn values_v1(
 
     // skip fields which arent part of the schema
     let key = format!("{org_id}/{stream_type}/{stream_name}");
-    let schema = if let Some(schema) = STREAM_SCHEMAS.get(&key) {
-        schema.value().last().unwrap().clone()
+    let r = STREAM_SCHEMAS.read().await;
+    let schema = if let Some(schema) = r.get(&key) {
+        schema.last().unwrap().clone()
     } else {
         arrow_schema::Schema::empty()
     };
+    drop(r);
 
     for field in &fields {
         // skip values for field which aren't part of the schema

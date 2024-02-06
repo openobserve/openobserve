@@ -146,13 +146,13 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     }
 
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
-    let orgs = db::schema::list_organizations_from_cache();
+    let orgs = db::schema::list_organizations_from_cache().await;
     metrics::META_NUM_ORGANIZATIONS
         .with_label_values(&[])
         .set(orgs.len() as i64);
     for org_id in &orgs {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(org_id, stream_type);
+            let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
                     .with_label_values(&[org_id.as_str(), stream_type.to_string().as_str()])
