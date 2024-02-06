@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         color="primary"
         no-caps
         style="width: 400px"
+        @click="loginWithSSo"
       >
         <div
           class="flex items-center justify-center full-width text-center realtive"
@@ -76,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="`${t('login.userEmail')} *`"
           placeholder="Email"
           class="showLabelOnTop no-case"
+          type="email"
           dense
           stack-label
           filled
@@ -89,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="`${t('login.password')} *`"
           placeholder="Password"
           class="showLabelOnTop no-case"
+          type="password"
           dense
           stack-label
           filled
@@ -156,6 +159,19 @@ export default defineComponent({
     const showSSO = computed(() => {
       return store.state.zoConfig.dex_enabled && config.isEnterprise === "true";
     });
+
+    const loginWithSSo = async () => {
+      try {
+        authService.get_dex_login().then((res) => {
+          if (res) {
+            window.location.href = res;
+            return;
+          }
+        });
+      } catch (error) {
+        console.error("Error during redirection:", error);
+      }
+    };
 
     const onSignIn = () => {
       if (name.value == "" || password.value == "") {
@@ -305,6 +321,7 @@ export default defineComponent({
       getImageURL,
       loginAsInternalUser,
       showSSO,
+      loginWithSSo,
     };
   },
   methods: {
