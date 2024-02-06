@@ -20,19 +20,42 @@
 <script setup lang="ts">
 import RouteTabs from "@/components/RouteTabs.vue";
 import { onBeforeMount } from "vue";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
+import { useRouter } from "vue-router";
+import { nextTick } from "vue";
 
 const store = useStore();
 const { t } = useI18n();
+
+const router = useRouter();
 
 const activeTab = ref("users");
 
 onBeforeMount(() => {
   setTabs();
 });
+
+watch(
+  () => router.currentRoute.value.name,
+  async (value) => {
+    if (!value) return;
+    await nextTick();
+    if (value === "iam") {
+      router.push({
+        name: activeTab.value,
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
+  },
+  {
+    immediate: true,
+  }
+);
 
 const setTabs = () => {
   const enterprise = ["users", "groups", "roles", "organizations"];
@@ -100,7 +123,7 @@ const tabs = ref([
 ]);
 
 const updateActiveTab = (tab: string) => {
-  activeTab.value = tab;
+  if (tab) activeTab.value = tab;
 };
 </script>
 

@@ -1,3 +1,19 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div>
     <!-- TODO OK : Add button to delete role in toolbar -->
@@ -525,7 +541,7 @@ const decodePermission = (permission: string) => {
 };
 
 const cancelPermissionsUpdate = () => {
-    router.push({ name: "roles" });
+  router.push({ name: "roles" });
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -783,7 +799,7 @@ const getEnrichmentTables = () => {
 };
 
 const getDashboards = async (resource: Entity | Resource) => {
-  const dashboards = await dashboardService.list(
+  let dashboards: any = await dashboardService.list(
     0,
     10000,
     "name",
@@ -832,9 +848,18 @@ const getSavedViews = async () => {
 };
 
 const getFolders = async () => {
-  const folders = await dashboardService.list_Folders(
+  const folders: any = await dashboardService.list_Folders(
     store.state.selectedOrganization.identifier
   );
+
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default"
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
   updateResourceEntities(
     "dfolder",
     ["folderId"],
