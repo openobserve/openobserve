@@ -40,7 +40,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         let date = now - Duration::days(CONFIG.compact.data_retention_days);
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
-        let orgs = db::schema::list_organizations_from_cache();
+        let orgs = db::schema::list_organizations_from_cache().await;
         let stream_types = [
             StreamType::Logs,
             StreamType::Metrics,
@@ -81,7 +81,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             drop(locker);
 
             for stream_type in stream_types {
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
+                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
                 for stream_name in streams {
                     let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
@@ -164,7 +164,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// 12. compact file list from storage
 pub async fn run_merge() -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
-    let orgs = db::schema::list_organizations_from_cache();
+    let orgs = db::schema::list_organizations_from_cache().await;
     let stream_types = [
         StreamType::Logs,
         StreamType::Metrics,
@@ -212,7 +212,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         drop(locker);
 
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type);
+            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if we are allowed to merge or just skip
@@ -282,7 +282,7 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         )
         .unwrap();
     let time_max = time_max.timestamp_micros();
-    let orgs = db::schema::list_organizations_from_cache();
+    let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;

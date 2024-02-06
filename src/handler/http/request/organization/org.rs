@@ -72,16 +72,17 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
             user_obj: user_detail.clone(),
         });
 
-        for schema in STREAM_SCHEMAS.iter() {
-            if !schema.key().contains('/') {
+        let r = STREAM_SCHEMAS.read().await;
+        for key in r.keys() {
+            if !key.contains('/') {
                 continue;
             }
 
             id += 1;
             let org = OrgDetails {
                 id,
-                identifier: schema.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-                name: schema.key().split('/').collect::<Vec<&str>>()[0].to_string(),
+                identifier: key.split('/').collect::<Vec<&str>>()[0].to_string(),
+                name: key.split('/').collect::<Vec<&str>>()[0].to_string(),
                 user_email: user_id.to_string(),
                 ingest_threshold: THRESHOLD,
                 search_threshold: THRESHOLD,
@@ -93,6 +94,7 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
                 orgs.push(org)
             }
         }
+        drop(r);
     }
     for user in USERS.iter() {
         if !user.key().contains('/') {

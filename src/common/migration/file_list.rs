@@ -80,10 +80,10 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
     ];
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = chrono::Utc::now().timestamp_micros();
-    let orgs = db::schema::list_organizations_from_cache();
+    let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs.iter() {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(org_id, stream_type);
+            let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
             for stream_name in streams.iter() {
                 // load file_list from source
                 let files = src

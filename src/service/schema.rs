@@ -475,7 +475,9 @@ async fn handle_diff_schema_local_mode(
     // release lock
     drop(lock_acquired);
 
+    assert!(!final_schema.fields().is_empty());
     stream_schema_map.insert(stream_name.to_string(), final_schema);
+
     Some(SchemaEvolution {
         schema_compatible: true,
         is_schema_changed: true,
@@ -492,7 +494,7 @@ async fn handle_diff_schema_cluster_mode(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
-    let key = format!("schema/{org_id}/{stream_type}/{stream_name}",);
+    let key = format!("schema/{org_id}/{stream_type}/{stream_name}");
     let mut lock = etcd::Locker::new(&key);
     lock.lock(0).await.map_err(server_internal_error).unwrap();
 
@@ -504,10 +506,12 @@ async fn handle_diff_schema_cluster_mode(
     };
 
     log::info!(
-        "Acquired lock for cluster stream {} to update schema",
-        stream_name
+        "Acquired lock for cluster stream {} to {} schema",
+        stream_name,
+        if is_new { "create" } else { "update" }
     );
-    db::schema::set(
+
+    if let Err(err) = db::schema::set(
         org_id,
         stream_name,
         stream_type,
@@ -516,7 +520,20 @@ async fn handle_diff_schema_cluster_mode(
         !field_datatype_delta.is_empty(),
     )
     .await
-    .expect("Failed to update schema");
+    {
+        log::error!(
+            "Failed to update schema for stream {} err: {:?}",
+            stream_name,
+            err
+        );
+        lock.unlock().await.map_err(server_internal_error).unwrap();
+        log::info!(
+            "Released lock for cluster stream {} after setting schema",
+            stream_name
+        );
+        return None;
+    }
+
     if is_new {
         crate::common::utils::auth::set_ownership(
             org_id,
@@ -525,10 +542,17 @@ async fn handle_diff_schema_cluster_mode(
         )
         .await;
     }
+
     // release lock
     lock.unlock().await.map_err(server_internal_error).unwrap();
+    log::info!(
+        "Released lock for cluster stream {} after setting schema",
+        stream_name
+    );
 
+    assert!(!final_schema.fields().is_empty());
     stream_schema_map.insert(stream_name.to_string(), final_schema);
+
     Some(SchemaEvolution {
         schema_compatible: true,
         is_schema_changed: true,

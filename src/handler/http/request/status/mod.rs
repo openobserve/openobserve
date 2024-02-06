@@ -123,7 +123,7 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     let nodes = cluster::get_cached_online_nodes();
     stats.insert("NODE_LIST", json::json!(nodes));
 
-    let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status();
+    let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
     stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));
 
     let stream_num = cache::stats::get_stream_stats_len();
@@ -164,15 +164,16 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(stats))
 }
 
-fn get_stream_schema_status() -> (usize, usize, usize) {
+async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
     let mut mem_size = 0;
-    for item in STREAM_SCHEMAS.iter() {
+    let r = STREAM_SCHEMAS.read().await;
+    for (key, val) in r.iter() {
         stream_num += 1;
         mem_size += std::mem::size_of::<Vec<Schema>>();
-        mem_size += item.key().len();
-        for schema in item.value().iter() {
+        mem_size += key.len();
+        for schema in val.iter() {
             stream_schema_num += 1;
             for (key, val) in schema.metadata.iter() {
                 mem_size += std::mem::size_of::<HashMap<String, String>>();

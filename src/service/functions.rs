@@ -57,14 +57,11 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             func.function = format!("{} \n .", func.function);
         }
         if func.trans_type.unwrap() == 0 {
-            match compile_vrl_function(func.function.as_str(), &org_id) {
-                Ok(_) => {}
-                Err(error) => {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        StatusCode::BAD_REQUEST.into(),
-                        error.to_string(),
-                    )));
-                }
+            if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )));
             }
         }
         extract_num_args(&mut func);
@@ -112,14 +109,11 @@ pub async fn update_function(
         func.function = format!("{} \n .", func.function);
     }
     if func.trans_type.unwrap() == 0 {
-        match compile_vrl_function(&func.function, org_id) {
-            Ok(_) => {}
-            Err(error) => {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
-                    error.to_string(),
-                )));
-            }
+        if let Err(e) = compile_vrl_function(&func.function, org_id) {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )));
         }
     }
     extract_num_args(&mut func);
