@@ -99,7 +99,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         log::info!("[JOB] convert disk file: {}", file);
 
         // check if we are allowed to ingest or just delete the file
-        if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
+        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
             log::info!(
                 "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
                 &org_id,
