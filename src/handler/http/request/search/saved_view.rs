@@ -18,11 +18,15 @@ use std::io::Error;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        saved_view::{
-            CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
+    common::{
+        meta::{
+            authz::Authz,
+            http::HttpResponse as MetaHttpResponse,
+            saved_view::{
+                CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
+            },
         },
+        utils::auth::{remove_ownership, set_ownership},
     },
     service::db::saved_view,
 };
@@ -128,10 +132,13 @@ pub async fn get_views(path: web::Path<String>) -> Result<HttpResponse, Error> {
 pub async fn delete_view(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, view_id) = path.into_inner();
     match saved_view::delete_view(&org_id, &view_id).await {
-        Ok(_) => Ok(MetaHttpResponse::json(DeleteViewResponse {
-            org_id,
-            view_id,
-        })),
+        Ok(_) => {
+            remove_ownership(&org_id, "savedviews", Authz::new(&view_id)).await;
+            Ok(MetaHttpResponse::json(DeleteViewResponse {
+                org_id,
+                view_id,
+            }))
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -168,11 +175,14 @@ pub async fn create_view(
     let org_id = path.into_inner();
 
     match saved_view::set_view(&org_id, &view).await {
-        Ok(created_view) => Ok(MetaHttpResponse::json(CreateViewResponse {
-            org_id,
-            view_id: created_view.view_id,
-            view_name: view.view_name.clone(),
-        })),
+        Ok(created_view) => {
+            set_ownership(&org_id, "savedviews", Authz::new(&created_view.view_id)).await;
+            Ok(MetaHttpResponse::json(CreateViewResponse {
+                org_id,
+                view_id: created_view.view_id,
+                view_name: view.view_name.clone(),
+            }))
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

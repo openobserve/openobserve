@@ -159,6 +159,7 @@ pub async fn search(
                         o2_type: format!("stream:{}/{}", stream_type, resp.stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
+                        parent_id: "".to_string(),
                     },
                 )
                 .await
