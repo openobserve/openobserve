@@ -48,11 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <div
-            v-html="DOMPurify.sanitize(marked(markdownContent))"
-            class="preview"
-            data-test="dashboard-markdown-editor-preview"
-          ></div>
+          <markdown-renderer :markdown-content="markdownContent" />
         </template>
       </q-splitter>
     </div>
@@ -61,12 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import MonacoMarkdownEditor from "./MonacoMarkdownEditor.vue";
+import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 export default defineComponent({
-  components: { MonacoMarkdownEditor },
+  components: { MonacoMarkdownEditor, MarkdownRenderer },
   name: "CustomMarkdownEditor",
   props: {
     modelValue: {
@@ -92,8 +87,6 @@ export default defineComponent({
       splitterModel,
       layoutSplitterUpdated,
       onEditorValueChange,
-      DOMPurify,
-      marked,
     };
   },
 });
@@ -125,10 +118,5 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
-}
-
-.preview {
-  height: 100%;
-  width: 100%;
 }
 </style>

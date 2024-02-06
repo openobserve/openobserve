@@ -45,11 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <div
-            v-html="DOMPurify.sanitize(htmlContent)"
-            class="preview"
-            data-test="dashboard-html-preview"
-          ></div>
+          <HTMLRenderer :htmlContent="htmlContent" />
         </template>
       </q-splitter>
     </div>
@@ -58,11 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import DOMPurify from "dompurify";
 import MonacoHTMLEditor from "./MonacoHTMLEditor.vue";
+import HTMLRenderer from "../panels/HTMLRenderer.vue";
 
 export default defineComponent({
-  components: { MonacoHTMLEditor },
+  components: { MonacoHTMLEditor, HTMLRenderer },
   name: "CustomHTMLEditor",
   props: {
     modelValue: {
@@ -70,7 +66,7 @@ export default defineComponent({
       default: "",
     },
   },
-  setup(props, { emit }): any {
+  setup(props, { emit }) {
     const htmlContent = ref(props.modelValue);
     const splitterModel = ref(50);
 
@@ -88,7 +84,6 @@ export default defineComponent({
       splitterModel,
       layoutSplitterUpdated,
       onEditorValueChange,
-      DOMPurify,
     };
   },
 });
@@ -120,10 +115,5 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
-}
-
-.preview {
-  height: 100%;
-  width: 100%;
 }
 </style>

@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'bg-grey-5'
                 : 'bg-grey-3'
               : '',
+            store.state.theme === 'dark' ? 'darkModeBorder' : 'whiteModeBorder',
           ]"
           v-for="(item, index) in ChartsArray"
           :disable="
@@ -44,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clickable
           v-ripple="true"
           @click="$emit('update:selectedChartType', item.id)"
-          style="width: 50px; border: 0.5px solid rgba(0, 0, 0, 0.12)"
+          style="width: 50px"
           data-test="dashboard-addpanel-chart-selection-item"
         >
           <q-item-section
@@ -195,4 +196,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="sass" scoped></style>
+<style scoped>
+.darkModeBorder {
+  border: 0.5px solid rgba(255, 255, 255, 0.28);
+}
+
+.whiteModeBorder {
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+}
+</style>

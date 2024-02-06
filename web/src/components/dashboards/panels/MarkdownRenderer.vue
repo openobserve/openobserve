@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scroll" style="width: 100%; height: 100%; overflow: auto">
+  <div
+    class="scroll"
+    style="width: 100%; height: 100%; overflow: auto; padding: 1%"
+  >
     <div
       v-html="DOMPurify.sanitize(marked(markdownContent))"
       data-test="markdown-renderer"
