@@ -177,7 +177,7 @@ pub struct PanelConfig {
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    drilldown: Vec<DrillDown>,
+    drilldown: Option<Vec<DrillDown>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -186,7 +186,8 @@ pub struct DrillDown {
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    type: Option<String>,
+    #[serde(rename = "type")]
+    type_field: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     target_blank: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

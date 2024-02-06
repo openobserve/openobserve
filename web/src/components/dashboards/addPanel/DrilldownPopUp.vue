@@ -51,7 +51,7 @@
     <div
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
-      Action*:
+      Go to:
       <q-btn
         :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
         size="sm"
@@ -62,10 +62,9 @@
         "
         ><q-icon
           class="q-mr-xs"
-          size="20px"
           :name="outlinedDashboard"
           style="cursor: pointer; height: 25px"
-        />Go to Dashboard</q-btn
+        />Dashboard</q-btn
       >
       <q-btn
         :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
@@ -77,10 +76,9 @@
         "
         ><q-icon
           class="q-mr-xs"
-          size="20px"
           name="link"
           style="cursor: pointer; height: 25px; display: flex !important"
-        />Go to URL</q-btn
+        />URL</q-btn
       >
     </div>
 
@@ -98,12 +96,19 @@
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
         <div class="dropdownDiv">
-          <div class="dropdownLabel">Select Folder*:</div>
           <q-select
             v-model="drilldownData.data.folder"
             :options="folderList"
-            class="dropdown"
             emit-value
+            label="Select Folder*:"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            style="width: 100%"
           >
             <!-- template when on options -->
             <template v-slot:no-option>
@@ -116,12 +121,19 @@
           >
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.folder">
-          <div class="dropdownLabel">Select Dashboard*:</div>
           <q-select
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
-            class="dropdown"
             emit-value
+            label="Select Dashboard*:"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            style="width: 100%"
           >
             <!-- template when on options -->
             <template v-slot:no-option>
@@ -134,12 +146,19 @@
           >
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
-          <div class="dropdownLabel">Select Tab*:</div>
           <q-select
             v-model="drilldownData.data.tab"
             :options="tabList"
-            class="dropdown"
             emit-value
+            label="Select Tab*:"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            style="width: 100%"
           >
             <!-- template when on options -->
             <template v-slot:no-option>
@@ -433,6 +452,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   margin: 10px 0px;
+  width: 100%;
 }
 
 .dropdownLabel {
@@ -440,6 +460,6 @@ export default defineComponent({
 }
 
 .dropdown {
-  min-width: 250px;
+  min-width: 100%;
 }
 </style>
