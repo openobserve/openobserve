@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         panelSchema.type != 'markdown'
       "
       class="noData"
+      data-test="no-data"
     >
       {{ noData }}
     </div>

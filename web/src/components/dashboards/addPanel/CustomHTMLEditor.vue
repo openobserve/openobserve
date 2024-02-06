@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="splitterModel"
         style="width: 100%; height: 100% !important"
         @update:modelValue="layoutSplitterUpdated"
+        data-test="dashboard-html-editor-splitter"
       >
         <template #before>
           <div class="col" style="height: 100%">
@@ -28,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="htmlContent"
               :debounceTime="500"
               @update:modelValue="onEditorValueChange"
+              data-test="dashboard-html-editor"
             />
           </div>
         </template>
@@ -39,10 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="20px"
             icon="drag_indicator"
             style="top: 10px; left: 3.5px"
+            data-test="dashboard-html-editor-drag-indicator"
           />
         </template>
         <template #after>
-          <div v-html="DOMPurify.sanitize(htmlContent)" class="preview"></div>
+          <div
+            v-html="DOMPurify.sanitize(htmlContent)"
+            class="preview"
+            data-test="dashboard-html-preview"
+          ></div>
         </template>
       </q-splitter>
     </div>
@@ -50,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref } from "vue";
 import DOMPurify from "dompurify";
 import MonacoHTMLEditor from "./MonacoHTMLEditor.vue";
 

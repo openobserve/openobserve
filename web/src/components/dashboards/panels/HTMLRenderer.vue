@@ -15,8 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="width: 100%; height: 100%; overflow: auto">
-    <div v-html="DOMPurify.sanitize(HTMLContent)"></div>
+  <div class="scroll" style="width: 100%; height: 100%; overflow: auto">
+    <div
+      v-html="DOMPurify.sanitize(HTMLContent)"
+      data-test="html-renderer"
+    ></div>
   </div>
 </template>
 
