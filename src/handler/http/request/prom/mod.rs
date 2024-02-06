@@ -172,6 +172,7 @@ async fn query(
                             o2_type: format!("stream:{}/{}", "metrics", name),
                             org_id: org_id.to_string(),
                             bypass_check: false,
+                            parent_id: "".to_string(),
                         },
                     )
                     .await
@@ -322,6 +323,7 @@ async fn query_range(
                             o2_type: format!("stream:{}/{}", "metrics", name),
                             org_id: org_id.to_string(),
                             bypass_check: false,
+                            parent_id: "".to_string(),
                         },
                     )
                     .await

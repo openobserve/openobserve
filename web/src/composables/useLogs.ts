@@ -1422,6 +1422,7 @@ const useLogs = () => {
           size: obj.size,
           query_context: query_context,
           query_fn: query_fn,
+          stream_type: searchObj.data.stream.streamType,
         })
         .then((res) => {
           searchObj.loading = false;
