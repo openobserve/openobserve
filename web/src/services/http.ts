@@ -26,7 +26,7 @@ const http = ({ headers } = {} as any) => {
       Authorization:
         config.isCloud == "true"
           ? "Bearer " + localStorage.getItem("token")
-          : localStorage.getItem("token") || "",
+          : localStorage.getItem("access_token") || "",
       ...headers,
     };
     instance = axios.create({
@@ -37,10 +37,9 @@ const http = ({ headers } = {} as any) => {
   } else {
     headers = {
       Authorization:
-        config.isEnterprise == "true" &&
-        (store.state as any).zoConfig.dex_enabled
-          ? "Bearer " + localStorage.getItem("access_token")
-          : localStorage.getItem("token") || "",
+        (localStorage.getItem("access_token")?.startsWith("Basic")
+          ? ""
+          : "Bearer") + localStorage.getItem("access_token"),
       ...headers,
     };
 

@@ -23,7 +23,7 @@ const http = () => {
     // timeout: 10000,
     baseURL: store.state.API_ENDPOINT,
     headers: {
-      Authorization: "Bearer " + localStorage.getItem("token"),
+      Authorization: "Bearer " + localStorage.getItem("access_token"),
     },
   });
 

@@ -333,7 +333,23 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.login-internal-link {
+  &:hover {
+    color: #595959;
+  }
+}
 .my-card {
   width: 400px;
+}
+</style>
+
+<style lang="scss">
+.login-inputs {
+  .q-field__label {
+    font-weight: normal !important;
+    font-size: 12px;
+    transform: translate(-0.75rem, -155%);
+    color: #3a3a3a;
+  }
 }
 </style>

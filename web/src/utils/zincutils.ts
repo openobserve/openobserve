@@ -98,10 +98,10 @@ export const getUserInfo = (loginString: string) => {
 
         useLocalUserInfo(encodedSessionData);
         useLocalToken(propArr[1]);
-      }
-      else if (propArr[0] == "access_token") {
+      } else if (propArr[0] == "access_token") {
         useLocalStorage("access_token", propArr[1], false, false);
-      } if (propArr[0] == "refresh_token") {
+      }
+      if (propArr[0] == "refresh_token") {
         useLocalStorage("refresh_token", propArr[1], false, false);
       }
     }
@@ -116,8 +116,7 @@ export const invlidateLoginData = () => {
   useLocalStorage("refresh_token", "", true, false);
   useLocalStorage("access_token", "", true, false);
   useLocalStorage("token", "", true, false);
-}
-
+};
 
 export const getLoginURL = () => {
   return `https://${config.oauth.domain}/oauth/v2/authorize?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}&scope=${config.oauth.scope}`;
@@ -178,7 +177,7 @@ export const getSessionStorageVal = (key: string) => {
 };
 
 export const useLocalToken = (val = "", isDelete = false) => {
-  return useLocalStorage("token", val, isDelete);
+  return useLocalStorage("access_token", val, isDelete);
 };
 
 export const useLocalOrganization = (val: any = "", isDelete = false) => {
@@ -292,8 +291,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-        ? window.location.pathname.slice(0, pos + 5)
-        : "";
+      ? window.location.pathname.slice(0, pos + 5)
+      : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
@@ -586,19 +585,19 @@ export function getUUID() {
 }
 
 export const maskText = (text: string) => {
-  return text;
-
   // Disabled masking as it was not great usefull
-  const visibleChars = 4; // Number of characters to keep visible at the beginning and end
-  const maskedChars = text.length - visibleChars * 2;
+  // const visibleChars = 4; // Number of characters to keep visible at the beginning and end
+  // const maskedChars = text.length - visibleChars * 2;
 
-  if (maskedChars > 0) {
-    const maskedText =
-      text.substring(0, visibleChars) +
-      "*".repeat(maskedChars) +
-      text.slice(-visibleChars);
-    return maskedText;
-  } else {
-    return "*".repeat(text.length); // If the text is too short, mask all characters
-  }
+  // if (maskedChars > 0) {
+  //   const maskedText =
+  //     text.substring(0, visibleChars) +
+  //     "*".repeat(maskedChars) +
+  //     text.slice(-visibleChars);
+  //   return maskedText;
+  // } else {
+  //   return "*".repeat(text.length); // If the text is too short, mask all characters
+  // }
+
+  return text;
 };
