@@ -350,7 +350,6 @@ export default defineComponent({
       promqlMode,
       resetDashboardPanelData,
       resetAggregationFunction,
-      getDefaultQueries,
     } = useDashboardPanelData();
     const editMode = ref(false);
     const selectedDate = ref();
@@ -1069,13 +1068,6 @@ export default defineComponent({
     };
 
     const savePanelChangesToDashboard = async (dashId: string) => {
-      // if chart type is html or markdown, no need to save query else it will call an api call
-      if (["html", "markdown"].includes(dashboardPanelData.data.type)) {
-        // remove query type
-        dashboardPanelData.data.queryType = "";
-        // reset queries array
-        dashboardPanelData.data.queries = getDefaultQueries();
-      }
       if (!isValid()) {
         return;
       }
