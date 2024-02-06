@@ -88,7 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
       <div
         class="col scroll"
-        style="overflow-y: auto; height: 100%; min-width: 90px; max-width: 90px"
+        style="
+          overflow-y: auto;
+          height: 100%;
+          min-width: 100px;
+          max-width: 100px;
+        "
       >
         <ChartSelection
           v-model:selectedChartType="dashboardPanelData.data.type"

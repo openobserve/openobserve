@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 90px">
-      <q-list separator>
+    <div class="q-pa-none" style="width: 100px">
+      <q-list separator style="display: flex; flex-wrap: wrap">
         <q-item
           :class="[
             'q-pa-none',
@@ -44,6 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clickable
           v-ripple="true"
           @click="$emit('update:selectedChartType', item.id)"
+          style="width: 50px; border: 0.5px solid rgba(0, 0, 0, 0.12)"
+          data-test="dashboard-addpanel-chart-selection-item"
         >
           <q-item-section
             :data-test="`selected-chart-${item.id}-item`"
@@ -54,12 +56,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               :name="item.image"
               class="q-mx-auto q-mb-sm"
+              data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <q-item-label
+            <!-- <q-item-label
               class="q-pa-none q-mx-auto"
-              style="text-align: center"
+              style="text-align: center; font-size: 8px;"
               caption
               >{{ item.title }}</q-item-label
+            > -->
+            <q-tooltip
+              style="text-align: center"
+              caption
+              data-test="dashboard-addpanel-chart-selection-tooltip"
+              >{{ item.title }}</q-tooltip
             >
           </q-item-section>
         </q-item>
@@ -96,11 +105,6 @@ export default defineComponent({
         id: "area-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
-        title: t("dashboard.lineLabel"),
-        id: "line",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
         title: t("dashboard.barLabel"),
         id: "bar",
@@ -111,9 +115,25 @@ export default defineComponent({
         id: "h-bar",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
+        title: t("dashboard.lineLabel"),
+        id: "line",
+      },
+      {
+        image:
+          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        title: t("dashboard.scatterLabel"),
+        id: "scatter",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
         title: t("dashboard.stackedLabel"),
         id: "stacked",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
+        title: t("dashboard.hstackedLabel"),
+        id: "h-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
@@ -126,11 +146,6 @@ export default defineComponent({
         id: "geomap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
-        title: t("dashboard.hstackedLabel"),
-        id: "h-stacked",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
         title: t("dashboard.pieLabel"),
         id: "pie",
@@ -139,12 +154,6 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
         title: t("dashboard.donutLabel"),
         id: "donut",
-      },
-      {
-        image:
-          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
-        title: t("dashboard.scatterLabel"),
-        id: "scatter",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/table.png"),
@@ -157,11 +166,6 @@ export default defineComponent({
         id: "metric",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
-        id: "gauge",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
         title: "HTML",
         id: "html",
@@ -170,6 +174,11 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.png"),
         title: "Markdown",
         id: "markdown",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
+        title: "Gauge",
+        id: "gauge",
       },
     ]);
 
