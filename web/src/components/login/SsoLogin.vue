@@ -39,7 +39,7 @@
         class="cursor-pointer login-internal-link"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
-        >Login with an internal user</a
+        >Sign in with an internal user</a
       >
 
       <div v-show="showLoginInput" class="o2-input login-inputs q-pt-lg">
