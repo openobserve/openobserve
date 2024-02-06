@@ -291,6 +291,7 @@ export default defineComponent({
               $q.notify({
                 color: "negative",
                 message: "Invalid username or password",
+                timeout: 4000,
               });
               console.log(e);
             });
