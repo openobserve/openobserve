@@ -198,7 +198,7 @@ arrow-json = "50.0.0"
 arrow-schema = { version = "50.0.0", features = ["serde"] }
 parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.9", features = ["aws", "azure", "gcp"] }
-dotenv_config = "0.1.8"
+dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
 etcd-client = { version = "0.12", features = ["tls"] }
