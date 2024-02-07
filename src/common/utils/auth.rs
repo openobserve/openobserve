@@ -316,7 +316,7 @@ impl FromRequest for AuthExtractor {
 
                                 object_type.replace(
                                     "stream:",
-                                    &format!(
+                                    format!(
                                         "{}:",
                                         OFGA_MODELS
                                             .get(stream_type_str.as_str())
