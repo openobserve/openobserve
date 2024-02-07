@@ -174,6 +174,7 @@ async fn query(
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
+                        Some(user.role),
                     )
                     .await
                 {
@@ -325,6 +326,7 @@ async fn query_range(
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
+                        Some(user.role),
                     )
                     .await
                 {

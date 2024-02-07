@@ -163,6 +163,7 @@ pub async fn search(
                         bypass_check: false,
                         parent_id: "".to_string(),
                     },
+                    Some(user.role),
                 )
                 .await
             {

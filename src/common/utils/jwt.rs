@@ -58,6 +58,7 @@ pub(crate) async fn verify_decode_token(
                         is_valid: true,
                         user_email: user_email.to_owned(),
                         is_internal_user: false,
+                        user_role: None,
                     },
                     if get_decode_token {
                         Some(decoded_token)

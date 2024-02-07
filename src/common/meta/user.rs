@@ -285,6 +285,7 @@ pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
     pub is_internal_user: bool,
+    pub user_role: Option<UserRole>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
