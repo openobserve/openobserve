@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="max-width: 90px">
-      <q-list separator>
+    <div class="q-pa-none" style="width: 100px">
+      <q-list separator style="display: flex; flex-wrap: wrap">
         <q-item
           :class="[
             'q-pa-none',
@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'bg-grey-5'
                 : 'bg-grey-3'
               : '',
+            store.state.theme === 'dark' ? 'darkModeBorder' : 'whiteModeBorder',
           ]"
           v-for="(item, index) in ChartsArray"
           :disable="
@@ -36,12 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             item.id != 'scatter' &&
             item.id != 'area-stacked' &&
             item.id != 'metric' &&
-            item.id != 'gauge'
+            item.id != 'gauge' &&
+            item.id != 'html' &&
+            item.id != 'markdown'
           "
           :key="index"
           clickable
           v-ripple="true"
           @click="$emit('update:selectedChartType', item.id)"
+          style="width: 50px"
+          data-test="dashboard-addpanel-chart-selection-item"
         >
           <q-item-section
             :data-test="`selected-chart-${item.id}-item`"
@@ -52,12 +57,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               :name="item.image"
               class="q-mx-auto q-mb-sm"
+              data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <q-item-label
+            <!-- <q-item-label
               class="q-pa-none q-mx-auto"
-              style="text-align: center"
+              style="text-align: center; font-size: 8px;"
               caption
               >{{ item.title }}</q-item-label
+            > -->
+            <q-tooltip
+              style="text-align: center"
+              caption
+              data-test="dashboard-addpanel-chart-selection-tooltip"
+              >{{ item.title }}</q-tooltip
             >
           </q-item-section>
         </q-item>
@@ -94,11 +106,6 @@ export default defineComponent({
         id: "area-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
-        title: t("dashboard.lineLabel"),
-        id: "line",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
         title: t("dashboard.barLabel"),
         id: "bar",
@@ -109,9 +116,25 @@ export default defineComponent({
         id: "h-bar",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
+        title: t("dashboard.lineLabel"),
+        id: "line",
+      },
+      {
+        image:
+          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        title: t("dashboard.scatterLabel"),
+        id: "scatter",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
         title: t("dashboard.stackedLabel"),
         id: "stacked",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
+        title: t("dashboard.hstackedLabel"),
+        id: "h-stacked",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
@@ -124,11 +147,6 @@ export default defineComponent({
         id: "geomap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
-        title: t("dashboard.hstackedLabel"),
-        id: "h-stacked",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
         title: t("dashboard.pieLabel"),
         id: "pie",
@@ -139,12 +157,6 @@ export default defineComponent({
         id: "donut",
       },
       {
-        image:
-          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
-        title: t("dashboard.scatterLabel"),
-        id: "scatter",
-      },
-      {
         image: "img:" + getImageURL("images/dashboard/charts/table.png"),
         title: t("dashboard.tableLabel"),
         id: "table",
@@ -153,6 +165,16 @@ export default defineComponent({
         image: "img:" + getImageURL("images/dashboard/charts/123.png"),
         title: t("dashboard.metricTextLabel"),
         id: "metric",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
+        title: "HTML",
+        id: "html",
+      },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
+        title: "Markdown",
+        id: "markdown",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
@@ -174,4 +196,12 @@ export default defineComponent({
 });
 </script>
 
-<style lang="sass" scoped></style>
+<style scoped>
+.darkModeBorder {
+  border: 0.5px solid rgba(255, 255, 255, 0.28);
+}
+
+.whiteModeBorder {
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+}
+</style>
