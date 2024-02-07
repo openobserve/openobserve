@@ -345,12 +345,22 @@ const setDefaultPermissions = () => {
       }
     }
 
+    modifyResourcePermissions(resourcePermission);
+
     permissionsState.permissions.push(resourcePermission as Resource);
   });
 
   permissionsState.permissions = permissionsState.permissions.filter(
     (resource) => !resource.parent
   );
+};
+
+const modifyResourcePermissions = (resource: Resource) => {
+  if (resource.resourceName === "settings") {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowDelete.show = false;
+    resource.permission.AllowPost.show = false;
+  }
 };
 
 const getResourcePermissions = () => {
@@ -378,39 +388,6 @@ const getResourcePermissions = () => {
         reject(err);
       });
   });
-};
-
-const getDefaultEntity = (): Entity => {
-  return {
-    name: "",
-    permission: {
-      AllowAll: {
-        show: true,
-        value: false,
-      },
-      AllowGet: {
-        show: true,
-        value: false,
-      },
-      AllowDelete: {
-        show: true,
-        value: false,
-      },
-      AllowPut: {
-        show: true,
-        value: false,
-      },
-      AllowList: {
-        show: false,
-        value: false,
-      },
-    },
-    display_name: "",
-    type: "Resource",
-    resourceName: "",
-    isSelected: false,
-    is_loading: false,
-  };
 };
 
 const getDefaultResource = (): Resource => {
@@ -1128,6 +1105,12 @@ const updateResourceEntities = (
         AllowList: {
           value: selectedPermissionsHash.value.has(
             getPermissionHash(resourceName, "AllowList", entityName)
+          ),
+          show: hasEntities,
+        },
+        AllowPost: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowPost", entityName)
           ),
           show: hasEntities,
         },

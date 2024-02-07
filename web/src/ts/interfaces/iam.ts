@@ -88,6 +88,10 @@ export interface Entity {
       show: boolean;
       value: boolean | null;
     };
+    AllowPost: {
+      show: boolean;
+      value: boolean | null;
+    };
   };
   display_name: string;
   entities?: Entity[];
