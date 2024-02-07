@@ -84,7 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="cursor-pointer text-bold"
           >
-            <q-td class="field_list bg-grey-3" style="line-height: 28px; padding-left: 10px;">
+            <q-td
+              class="field_list bg-grey-3"
+              style="line-height: 28px; padding-left: 10px"
+            >
               {{ props.row.name }}
               <q-icon
                 :name="
@@ -401,15 +404,11 @@ export default defineComponent({
   },
   computed: {
     sortedStreamFields() {
-      return this.searchObj.data.stream.selectedStreamFields.sort(
-        (a, b) => a.group - b.group
-      );
+      return this.searchObj.data.stream.selectedStreamFields.sort();
     },
   },
   setup() {
     const store = useStore();
-    const router = useRouter();
-    const { t } = useI18n();
     const $q = useQuasar();
     const {
       searchObj,
