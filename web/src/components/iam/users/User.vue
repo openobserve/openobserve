@@ -55,11 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
-            v-if="
-              (currentUserRole == 'admin' || currentUserRole == 'root') &&
-              !props.row.isLoggedinUser &&
-              props.row.role !== 'root'
-            "
+            v-if="props.row.enableDelete"
             :icon="outlinedDelete"
             :title="t('user.delete')"
             class="q-ml-xs"
@@ -72,11 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="cursor: pointer !important"
           />
           <q-btn
-            v-if="
-              props.row.isLoggedinUser ||
-              currentUserRole == 'root' ||
-              (currentUserRole == 'admin' && props.row.role !== 'root')
-            "
+            v-if="props.row.enableEdit"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -112,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="col-6">
             <q-btn
-              v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
+              v-if="showAddUserBtn"
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
               padding="sm lg"
@@ -220,6 +212,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
+import { computed, nextTick } from "vue";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -245,6 +238,8 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const qTable: any = ref(null);
     const { usersState } = usePermissions();
+    const isDexEnabled = ref(false);
+    const isCurrentUserInternal = ref(false);
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
@@ -258,8 +253,11 @@ export default defineComponent({
       }
     });
 
-    onBeforeMount(() => {
-      getOrgMembers();
+    onBeforeMount(async () => {
+      isDexEnabled.value = store.state.zoConfig.dex_enabled;
+      await getOrgMembers();
+      await nextTick();
+      updateUserActions();
     });
 
     const columns: any = ref<QTableProps["columns"]>([
@@ -316,54 +314,63 @@ export default defineComponent({
         message: "Please wait while loading users...",
       });
 
-      usersService
-        .orgUsers(
-          0,
-          1000,
-          "email",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
-        .then((res) => {
-          resultTotal.value = res.data.data.length;
-          let counter = 1;
-          currentUserRole.value = "";
-          usersState.users = res.data.data.map((data: any) => {
-            if (store.state.userInfo.email == data.email) {
-              currentUserRole.value = data.role;
-            }
+      return new Promise((resolve, reject) => {
+        usersService
+          .orgUsers(
+            0,
+            1000,
+            "email",
+            false,
+            "",
+            store.state.selectedOrganization.identifier
+          )
+          .then((res) => {
+            resultTotal.value = res.data.data.length;
+            let counter = 1;
+            currentUserRole.value = "";
+            usersState.users = res.data.data.map((data: any) => {
+              if (store.state.userInfo.email == data.email) {
+                currentUserRole.value = data.role;
+                isCurrentUserInternal.value = !data.is_external;
+              }
 
-            if (data.email == router.currentRoute.value.query.email) {
-              addUser({ row: data }, true);
-            }
+              if (data.email == router.currentRoute.value.query.email) {
+                addUser({ row: data }, true);
+              }
 
-            return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              email: maskText(data.email),
-              first_name: data.first_name,
-              last_name: data.last_name,
-              role: data.role,
-              member_created: date.formatDate(
-                parseInt(data.member_created),
-                "YYYY-MM-DDTHH:mm:ssZ"
-              ),
-              member_updated: date.formatDate(
-                parseInt(data.member_updated),
-                "YYYY-MM-DDTHH:mm:ssZ"
-              ),
-              org_member_id: data.org_member_id,
-              isLoggedinUser: store.state.userInfo.email == data.email,
-            };
+              return {
+                "#": counter <= 9 ? `0${counter++}` : counter++,
+                email: maskText(data.email),
+                first_name: data.first_name,
+                last_name: data.last_name,
+                role: data.role,
+                member_created: date.formatDate(
+                  parseInt(data.member_created),
+                  "YYYY-MM-DDTHH:mm:ssZ"
+                ),
+                member_updated: date.formatDate(
+                  parseInt(data.member_updated),
+                  "YYYY-MM-DDTHH:mm:ssZ"
+                ),
+                org_member_id: data.org_member_id,
+                isLoggedinUser: store.state.userInfo.email == data.email,
+                isExternal: !!data.is_external,
+                enableEdit: false,
+                enableChangeRole: false,
+                enableDelete: false,
+              };
+            });
+
+            dismiss();
+
+            resolve(true);
+          })
+          .catch(() => {
+            dismiss();
+            reject(false);
           });
-
-          dismiss();
-        });
+      });
     };
-
-    if (usersState.users.length == 0) {
-      getOrgMembers();
-    }
 
     interface OptionType {
       label: String;
@@ -382,11 +389,86 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
+
+    const showAddUserBtn = computed(() => {
+      if (isDexEnabled.value) {
+        return (
+          isCurrentUserInternal.value &&
+          (currentUserRole.value == "admin" || currentUserRole.value == "root")
+        );
+      } else {
+        return (
+          currentUserRole.value == "admin" || currentUserRole.value == "root"
+        );
+      }
+    });
+
+    const currentUser = computed(() => store.state.userInfo.email);
+
+    const updateUserActions = () => {
+      usersState.users.forEach((member: any) => {
+        member.enableEdit = shouldAllowEdit(member);
+        member.enableChangeRole = shouldAllowChangeRole(member);
+        member.enableDelete = shouldAllowDelete(member);
+      });
+    };
+    const shouldAllowEdit = (user: any) => {
+      if (isDexEnabled.value) {
+        return (
+          isCurrentUserInternal.value &&
+          (currentUserRole.value == "root" ||
+            (currentUserRole.value == "admin" && user.role !== "root"))
+        );
+      } else {
+        return (
+          user.isLoggedinUser ||
+          currentUserRole.value == "root" ||
+          (currentUserRole.value == "admin" && user.role !== "root")
+        );
+      }
+    };
+
+    const shouldAllowChangeRole = (user: any) => {
+      if (isDexEnabled.value) {
+        return (
+          isCurrentUserInternal.value &&
+          (currentUserRole.value == "root" ||
+            (currentUserRole.value == "admin" && user.role !== "root"))
+        );
+      } else {
+        return (
+          ((currentUserRole.value == "admin" && user.role !== "root") ||
+            currentUserRole.value == "root") &&
+          !user.isLoggedinUser
+        );
+      }
+    };
+
+    const shouldAllowDelete = (user: any) => {
+      if (isDexEnabled.value) {
+        return (
+          isCurrentUserInternal.value &&
+          user.role !== "root" &&
+          (currentUserRole.value == "root" ||
+            currentUserRole.value == "admin") &&
+          !user.isLoggedinUser
+        );
+      } else {
+        return (
+          (currentUserRole.value == "admin" ||
+            currentUserRole.value == "root") &&
+          !user.isLoggedinUser &&
+          user.role !== "root"
+        );
+      }
+    };
+
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
     };
@@ -635,6 +717,9 @@ export default defineComponent({
       updateUserRole,
       getImageURL,
       verifyOrganizationStatus,
+      isDexEnabled,
+      isCurrentUserInternal,
+      showAddUserBtn,
     };
   },
 });
