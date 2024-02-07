@@ -15,58 +15,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-layout view="hHh lpR fFf">
-    <q-page-container>
-      <q-page class="fullscreen bg-grey-7 flex flex-center">
-        <q-card square class="my-card shadow-24 bg-white text-white">
-          <q-card-section class="bg-primary">
-            <div class="text-h5 q-my-md">OpenObserve</div>
-          </q-card-section>
-          <q-card>
-            <q-card-section class="bg-white">
-              <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
-                <q-input
-                  v-model="name"
-                  data-cy="login-user-id"
-                  :label="t('login.email') + ' *'"
-                >
-                  <template #prepend>
-                    <q-icon name="email" />
-                  </template>
-                </q-input>
+  <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
+    <div class="flex justify-center" style="height: 150px">
+      <img
+        class="appLogo"
+        style="width: 250px; height: auto"
+        :src="
+          store?.state?.theme == 'dark'
+            ? getImageURL('images/common/open_observe_logo_2.svg')
+            : getImageURL('images/common/open_observe_logo.svg')
+        "
+      />
+    </div>
 
-                <q-input
-                  v-model="password"
-                  data-cy="login-password"
-                  type="password"
-                  :label="t('login.password') + ' *'"
-                >
-                  <template #prepend>
-                    <q-icon name="lock" />
-                  </template>
-                </q-input>
+    <div style="font-size: 22px" class="full-width text-center q-pb-md">
+      Sign In
+    </div>
 
-                <q-card-actions class="q-px-lg q-mt-md q-mb-xl">
-                  <q-btn
-                    data-cy="login-sign-in"
-                    unelevated
-                    size="lg"
-                    class="full-width"
-                    color="primary"
-                    type="submit"
-                    :label="t('login.signIn')"
-                    :loading="submitting"
-                    no-caps
-                    @click="onSignIn()"
-                  />
-                </q-card-actions>
-              </q-form>
-            </q-card-section>
-          </q-card>
-        </q-card>
-      </q-page>
-    </q-page-container>
-  </q-layout>
+    <div v-if="showSSO" class="flex justify-center">
+      <q-btn
+        data-test="sso-login-btn"
+        class="text-bold no-border"
+        padding="sm lg"
+        color="primary"
+        no-caps
+        style="width: 400px"
+        @click="loginWithSSo"
+      >
+        <div
+          class="flex items-center justify-center full-width text-center realtive"
+        >
+          <img
+            class="absolute"
+            style="width: 30px; left: 16px"
+            :src="getImageURL('images/common/sso.svg')"
+          />
+          <span class="text-center"> Login with SSO</span>
+        </div>
+      </q-btn>
+    </div>
+
+    <div v-if="showSSO" class="q-py-md text-center">
+      <a
+        class="cursor-pointer login-internal-link q-py-md"
+        style="text-decoration: underline"
+        @click="loginAsInternalUser = !loginAsInternalUser"
+        >Sign in with an internal user</a
+      >
+    </div>
+
+    <div
+      v-show="!showSSO || (showSSO && loginAsInternalUser)"
+      class="o2-input login-inputs"
+    >
+      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
+        <q-input
+          v-model="name"
+          data-cy="login-user-id"
+          data-test="login-user-id"
+          outlined
+          :label="`${t('login.userEmail')} *`"
+          placeholder="Email"
+          class="showLabelOnTop no-case"
+          type="email"
+          dense
+          stack-label
+          filled
+        />
+
+        <q-input
+          v-model="password"
+          data-cy="login-password"
+          data-test="login-password"
+          outlined
+          :label="`${t('login.password')} *`"
+          placeholder="Password"
+          class="showLabelOnTop no-case"
+          type="password"
+          dense
+          stack-label
+          filled
+        />
+
+        <div class="q-mt-lg q-mb-xl">
+          <q-btn
+            data-cy="login-sign-in"
+            unelevated
+            class="full-width text-bold no-border"
+            color="primary"
+            type="submit"
+            padding="sm lg"
+            :label="t('login.signIn')"
+            :loading="submitting"
+            no-caps
+            @click="onSignIn()"
+          />
+        </div>
+      </q-form>
+    </div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -85,8 +132,11 @@ import {
   useLocalUserInfo,
   useLocalCurrentUser,
   useLocalOrganization,
+  getImageURL,
 } from "@/utils/zincutils";
 import { getDefaultOrganization, redirectUser } from "@/utils/common";
+import { computed } from "vue";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageLogin",
@@ -103,6 +153,25 @@ export default defineComponent({
     const loginform = ref();
 
     const submitting = ref(false);
+
+    const loginAsInternalUser = ref(false);
+
+    const showSSO = computed(() => {
+      return store.state.zoConfig.dex_enabled && config.isEnterprise === "true";
+    });
+
+    const loginWithSSo = async () => {
+      try {
+        authService.get_dex_login().then((res) => {
+          if (res) {
+            window.location.href = res;
+            return;
+          }
+        });
+      } catch (error) {
+        console.error("Error during redirection:", error);
+      }
+    };
 
     const onSignIn = () => {
       if (name.value == "" || password.value == "") {
@@ -222,6 +291,7 @@ export default defineComponent({
               $q.notify({
                 color: "negative",
                 message: "Invalid username or password",
+                timeout: 4000,
               });
               console.log(e);
             });
@@ -248,6 +318,11 @@ export default defineComponent({
       onSignIn,
       tab: ref("signin"),
       innerTab: ref("signup"),
+      store,
+      getImageURL,
+      loginAsInternalUser,
+      showSSO,
+      loginWithSSo,
     };
   },
   methods: {
@@ -259,7 +334,23 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
+.login-internal-link {
+  &:hover {
+    color: #595959;
+  }
+}
 .my-card {
   width: 400px;
+}
+</style>
+
+<style lang="scss">
+.login-inputs {
+  .q-field__label {
+    font-weight: normal !important;
+    font-size: 12px;
+    transform: translate(-0.75rem, -155%);
+    color: #3a3a3a;
+  }
 }
 </style>

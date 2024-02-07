@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="store.state.zoConfig.dex_enabled == false"></login>
-  <div v-else-if="!router?.currentRoute.value.hash" class="text-bold q-page">
-    Wait while redirection...
-  </div>
+  <login />
 </template>
 
 <script lang="ts">
@@ -26,7 +23,6 @@ import { defineComponent, onBeforeMount, ref, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import config from "@/aws-exports";
-import authService from "@/services/auth";
 import configService from "@/services/config";
 import { useStore } from "vuex";
 import { getUserInfo, getDecodedUserInfo, getPath } from "@/utils/zincutils";
@@ -53,19 +49,6 @@ export default defineComponent({
           .get_config()
           .then(async (res) => {
             store.commit("setZoConfig", res.data);
-            await nextTick();
-            if (config.isEnterprise == "true" && res.data.dex_enabled == true) {
-              try {
-                authService.get_dex_login().then((res) => {
-                  if (res) {
-                    window.location.href = res;
-                    return;
-                  }
-                });
-              } catch (error) {
-                console.error("Error during redirection:", error);
-              }
-            }
           })
           .catch((err) => {
             console.error("Error while fetching config:", err);
