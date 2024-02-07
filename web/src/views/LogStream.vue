@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       full-height
       maximized
     >
-      <SchemaIndex v-model="schemaData" />
+      <AddStream />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -239,10 +239,11 @@ import config from "@/aws-exports";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
+import AddStream from "@/components/logstream/AddStream.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -336,13 +337,6 @@ export default defineComponent({
         retention_period: 14,
       },
     });
-
-    const streamIndexType = [
-      { label: "Hash based partition", value: "hash" },
-      { label: "Key based partition", value: "key" },
-      { label: "Inverted index", value: "inverted" },
-      { label: "Bloom filter", value: "bloom" },
-    ];
 
     let deleteStreamName = "";
     let deleteStreamType = "";
@@ -554,6 +548,7 @@ export default defineComponent({
     };
 
     const addStream = () => {
+      addStreamDialog.value.show = true;
       // router.push({
       //   name: "addStream",
       //   query: {

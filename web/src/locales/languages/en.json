@@ -361,7 +361,10 @@
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
     "labelTraces": "Traces",
-    "add": "Add Stream"
+    "add": "Add Stream",
+    "dataRetention": "Data Retention (in days)",
+    "indexing": "Indexing",
+    "createStream": "Create Stream"
   },
   "function": {
     "header": "Functions",
