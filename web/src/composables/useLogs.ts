@@ -47,6 +47,7 @@ import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
+import { isMapIterator } from "util/types";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -124,7 +125,7 @@ const defaultObject = {
     additionalErrorMsg: "",
     stream: {
       streamLists: <object[]>[],
-      selectedStream: { label: "", value: "" },
+      selectedStream: <any>[],
       selectedStreamFields: <object[]>[],
       selectedFields: <string[]>[],
       filterField: "",
@@ -196,7 +197,7 @@ const useLogs = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
     searchObj.data.stream.streamLists = [];
-    searchObj.data.stream.selectedStream = { label: "", value: "" };
+    searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
@@ -225,9 +226,11 @@ const useLogs = () => {
       useLocalLogFilterField()?.value != null
         ? useLocalLogFilterField()?.value
         : {};
-    selectedFields[
-      `${identifier}_${searchObj.data.stream.selectedStream.value}`
-    ] = searchObj.data.stream.selectedFields;
+
+    searchObj.data.stream.selectedStream.forEach((stream: any) => {
+      selectedFields[`${identifier}_${stream}`] =
+        searchObj.data.stream.selectedFields;
+    });
     useLocalLogFilterField(selectedFields);
   };
 
@@ -273,7 +276,7 @@ const useLogs = () => {
 
   function resetStreamData() {
     store.dispatch("resetStreams", {});
-    searchObj.data.stream.selectedStream = { label: "", value: "" };
+    searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
     searchObj.data.stream.filterField = "";
@@ -310,7 +313,7 @@ const useLogs = () => {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
 
-        let selectedStream = { label: "", value: "" };
+        let selectedStream: any[] = [];
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
@@ -328,14 +331,15 @@ const useLogs = () => {
 
           // If isFirstLoad is true, then select the stream from query params
           if (router.currentRoute.value?.query?.stream == item.name) {
-            selectedStream = itemObj;
+            selectedStream.push(itemObj.value);
           }
           if (
             !router.currentRoute.value?.query?.stream &&
             item.stats.doc_time_max >= lastUpdatedStreamTime
           ) {
+            selectedStream = [];
             lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream = itemObj;
+            selectedStream.push(itemObj.value);
           }
         }
         if (
@@ -396,9 +400,16 @@ const useLogs = () => {
       query["stream_type"] = searchObj.data.stream.streamType;
     }
 
-    if (searchObj.data.stream.selectedStream.label) {
-      query["stream"] = searchObj.data.stream.selectedStream.label;
-      query["stream_value"] = searchObj.data.stream.selectedStream.value;
+    if (
+      searchObj.data.stream.selectedStream.length > 0 &&
+      typeof searchObj.data.stream.selectedStream != "object"
+    ) {
+      query["stream"] = searchObj.data.stream.selectedStream.join(",");
+    } else if (
+      typeof searchObj.data.stream.selectedStream == "object" &&
+      searchObj.data.stream.selectedStream.hasOwnProperty("value")
+    ) {
+      query["stream"] = searchObj.data.stream.selectedStream.value;
     }
 
     if (date.type == "relative") {
@@ -618,7 +629,7 @@ const useLogs = () => {
 
         req.query.sql = req.query.sql.replace(
           "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.value
+          searchObj.data.stream.selectedStream.join(",")
         );
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
@@ -1390,8 +1401,11 @@ const useLogs = () => {
         const timestampField = store.state.zoConfig.timestamp_column;
 
         // searchObj.data.streamResults.list.forEach((stream: any) => {
+        const selectedStreamValues = searchObj.data.stream.selectedStream
+          .join(",")
+          .split(",");
         for (const stream of searchObj.data.streamResults.list) {
-          if (searchObj.data.stream.selectedStream.value == stream.name) {
+          if (selectedStreamValues.includes(stream.name)) {
             if (stream.hasOwnProperty("schema")) {
               queryResult.push(...stream.schema);
               schemaFields = new Set([
@@ -1471,10 +1485,15 @@ const useLogs = () => {
         useLocalLogFilterField()?.value != null
           ? useLocalLogFilterField()?.value
           : {};
-      const logFieldSelectedValue =
-        logFilterField[
-          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
-        ];
+
+      const logFieldSelectedValue: any = [];
+      searchObj.data.stream.selectedStream.forEach((stream: any) => {
+        logFieldSelectedValue.push(
+          ...logFilterField[
+            `${store.state.selectedOrganization.identifier}_${stream}`
+          ]
+        );
+      });
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (
         !searchObj.data.stream.selectedFields.length &&
@@ -1651,9 +1670,10 @@ const useLogs = () => {
         } else {
           whereClause = "";
         }
+
         query_context =
           `SELECT *${queryFunctions} FROM "` +
-          searchObj.data.stream.selectedStream.value +
+          searchObj.data.stream.selectedStream.join(",") +
           `" `;
         query_context = b64EncodeUnicode(query_context);
       }
@@ -1669,7 +1689,7 @@ const useLogs = () => {
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
-          index: searchObj.data.stream.selectedStream.value,
+          index: searchObj.data.stream.selectedStream.join(","),
           key: obj.key,
           size: obj.size,
           query_context: query_context,
@@ -1961,7 +1981,7 @@ const useLogs = () => {
 
   const onStreamChange = () => {
     const query = searchObj.meta.sqlMode
-      ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
+      ? `SELECT * FROM "${searchObj.data.stream.selectedStream.join(",")}"`
       : "";
 
     searchObj.data.editorValue = query;

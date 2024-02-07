@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('search.showHistogramLabel')"
         />
         <q-toggle
+          :disable="searchObj.data.stream.selectedStream.length > 1"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           v-model="searchObj.meta.sqlMode"
           :label="t('search.sqlModeLabel')"
@@ -861,8 +862,9 @@ export default defineComponent({
           searchObj.data.parsedQuery = parser.astify(value);
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
-              searchObj.data.parsedQuery.from[0].table !==
-                searchObj.data.stream.selectedStream.value &&
+              !searchObj.data.stream.selectedStream.includes(
+                searchObj.data.parsedQuery.from[0].table
+              ) &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
               let streamFound = false;
@@ -874,7 +876,7 @@ export default defineComponent({
                     label: stream.name,
                     value: stream.name,
                   };
-                  searchObj.data.stream.selectedStream = itemObj;
+                  searchObj.data.stream.selectedStream.push(itemObj.value);
                   stream.schema.forEach((field) => {
                     searchObj.data.stream.selectedStreamFields.push({
                       name: field.name,
@@ -883,7 +885,7 @@ export default defineComponent({
                 }
               });
               if (streamFound == false) {
-                searchObj.data.stream.selectedStream = { label: "", value: "" };
+                searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
                 $q.notify({
                   message: "Stream not found",
@@ -932,7 +934,7 @@ export default defineComponent({
           value: value,
           //user_org: this.store.state.selectedOrganization.identifier,
           //user_id: this.store.state.userInfo.email,
-          stream_name: searchObj.data.stream.selectedStream.value,
+          stream_name: searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });
       }
@@ -1327,7 +1329,7 @@ export default defineComponent({
     };
 
     const fnSavedView = () => {
-      if (!searchObj.data.stream.selectedStream.value) {
+      if (searchObj.data.stream.selectedStream.length == 0) {
         $q.notify({
           type: "negative",
           message: "No stream available to save view.",
@@ -1373,7 +1375,21 @@ export default defineComponent({
               //   extractedObj.data.stream.streamLists =
               //     searchObj.data.stream.streamLists;
               // }
+
+              // ----- Here we are explicitly handling stream change for multistream -----
+              let selectedStreams = [];
+              if (typeof extractedObj.data.stream.selectedStream == "object") {
+                selectedStreams.push(
+                  extractedObj.data.stream.selectedStream.value
+                );
+              } else {
+                selectedStreams.push(extractedObj.data.stream.selectedStream);
+              }
+              // extractedObj.data.stream.selectedStream = [];
+              // extractedObj.data.stream.selectedStream = selectedStreams;
+
               delete extractedObj.data.stream.streamLists;
+              delete extractedObj.data.stream.selectedStream;
               delete searchObj.data.stream.selectedStream;
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.stream.functions =
@@ -1387,7 +1403,7 @@ export default defineComponent({
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
               searchObj.value = mergeDeep(searchObj, extractedObj);
-              await nextTick();
+              // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
                   {
@@ -1416,6 +1432,8 @@ export default defineComponent({
               } else {
                 clearInterval(store.state.refreshIntervalID);
               }
+              searchObj.data.stream.selectedStream = selectedStreams;
+              
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
@@ -1423,11 +1441,15 @@ export default defineComponent({
               resetStreamData();
               searchObj.data.stream.streamType =
                 extractedObj.data.stream.streamType;
-              // Here copying selected stream object, as in loadStreamLists() we are setting selected stream object to empty object
-              // After loading stream list, we are setting selected stream object to copied object
-              const selectedStream = cloneDeep(
-                extractedObj.data.stream.selectedStream
-              );
+
+              let selectedStreams = [];
+              if (typeof extractedObj.data.stream.selectedStream == "object") {
+                selectedStreams.push(
+                  extractedObj.data.stream.selectedStream.value
+                );
+              } else {
+                selectedStreams.push(extractedObj.data.stream.selectedStream);
+              }
 
               extractedObj.data.transforms = searchObj.data.transforms;
               extractedObj.data.histogram = {
@@ -1448,10 +1470,10 @@ export default defineComponent({
               );
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
-              searchObj.data.stream.selectedStream = selectedStream;
+              searchObj.data.stream.selectedStream = selectedStreams;
               // searchObj.value = mergeDeep(searchObj, extractedObj);
 
-              await nextTick();
+              // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
                   {
@@ -1810,7 +1832,9 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`;
+        searchObj.data.query = `SELECT * FROM "${searchObj.data.stream.selectedStream.join(
+          ","
+        )}"`;
       } else {
         searchObj.data.query = "";
       }
