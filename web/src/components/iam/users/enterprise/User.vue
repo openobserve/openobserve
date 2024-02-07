@@ -87,8 +87,6 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import usersService from "@/services/users";
-import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
-import AddUser from "@/components/iam/users/AddUser.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
@@ -104,7 +102,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 
 export default defineComponent({
   name: "UserPageOpenSource",
-  components: { QTablePagination, UpdateUserRole, NoData, AddUser },
+  components: { QTablePagination, NoData },
   emits: [
     "updated:fields",
     "deleted:fields",

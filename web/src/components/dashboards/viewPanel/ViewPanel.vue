@@ -79,7 +79,7 @@
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
               />
-              <div style="flex: 1">
+              <div style="flex: 1; overflow: auto;">
                 <PanelSchemaRenderer
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"

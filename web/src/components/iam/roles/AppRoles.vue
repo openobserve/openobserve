@@ -1,11 +1,26 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
-  <div style="font-size: 18px" class="q-py-sm q-px-md">
+  <div style="font-size: 18px; padding-top: 12px" class="q-mb-md q-px-md">
     {{ t("iam.roles") }}
   </div>
-  <div class="full-width bg-grey-4" style="height: 1px" />
 
-  <div class="q-mt-sm q-px-md">
-    <div class="q-mb-sm row items-center justify-between">
+  <div>
+    <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
       <q-input
         v-model="filterQuery"
         filled
@@ -29,10 +44,14 @@
         @click="addRole"
       />
     </div>
-    <div class="q-py-sm q-ml-xs text-bold" style="font-size: 16px">
+    <div
+      class="q-px-md q-pt-sm q-ml-xs text-bold"
+      style="font-size: 14px; padding-bottom: 12px"
+    >
       {{ rows.length }} {{ t("iam.roles") }}
     </div>
     <app-table
+      class="iam-table"
       :rows="rows"
       :columns="columns"
       pagination
@@ -41,6 +60,7 @@
         value: filterQuery,
         method: filterRoles,
       }"
+      :bordered="false"
     >
       <template v-slot:actions="slotProps: any">
         <div>
@@ -56,7 +76,7 @@
             name="delete"
             class="cursor-pointer"
             :title="t('common.delete')"
-            @click="() => deleteUserRole(slotProps.column.row)"
+            @click="() => showConfirmDialog(slotProps.column.row)"
           />
         </div>
       </template>
@@ -69,10 +89,17 @@
       @added:role="setupRoles"
     />
   </q-dialog>
+  <ConfirmDialog
+    title="Delete Role"
+    :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+    @update:ok="_deleteRole"
+    @update:cancel="deleteConformDialog.show = false"
+    v-model="deleteConformDialog.show"
+  />
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
@@ -82,6 +109,7 @@ import { getRoles, deleteRole } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const { t } = useI18n();
 
@@ -94,6 +122,11 @@ const router = useRouter();
 const store = useStore();
 
 const q = useQuasar();
+
+const deleteConformDialog = ref({
+  show: false,
+  data: null as any,
+});
 
 const columns: any = [
   {
@@ -113,16 +146,17 @@ const columns: any = [
     name: "actions",
     field: "actions",
     label: t("common.actions"),
-    align: "right",
+    align: "center",
     sortable: false,
     slot: true,
     slotName: "actions",
+    style: "width: 400px",
   },
 ];
 
 const { rolesState } = usePermissions();
 
-onMounted(() => {
+onBeforeMount(() => {
   setupRoles();
 });
 
@@ -142,7 +176,6 @@ const addRole = () => {
 };
 
 const editRole = (role: any) => {
-  console.log(role);
   router.push({
     name: "editRole",
     params: {
@@ -197,6 +230,33 @@ const deleteUserRole = (role: any) => {
       });
     });
 };
+
+const showConfirmDialog = (row: any) => {
+  deleteConformDialog.value.show = true;
+  deleteConformDialog.value.data = row;
+};
+
+const _deleteRole = () => {
+  deleteUserRole(deleteConformDialog.value.data);
+  deleteConformDialog.value.data = null;
+};
 </script>
 
 <style scoped></style>
+<style lang="scss">
+.iam-table {
+  .thead-sticky,
+  .tfoot-sticky {
+    position: sticky;
+    top: 0;
+    opacity: 1;
+    z-index: 1;
+    background: transparent !important;
+  }
+
+  .q-table--dark .thead-sticky,
+  .q-table--dark .tfoot-sticky {
+    background: transparent !important;
+  }
+}
+</style>

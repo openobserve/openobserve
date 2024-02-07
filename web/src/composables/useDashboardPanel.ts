@@ -61,6 +61,8 @@ const getDefaultDashboardPanelData: any = () => ({
         lng: 0,
       },
     },
+    htmlContent: "",
+    markdownContent: "",
     queryType: "sql",
     queries: [
       {
@@ -135,6 +137,11 @@ const useDashboardPanelData = () => {
     dashboardPanelData.meta.dragAndDrop.dragElement = null;
     dashboardPanelData.meta.dragAndDrop.dragSource = null;
     dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
+  };
+
+  // get default queries
+  const getDefaultQueries = () => {
+    return getDefaultDashboardPanelData().data.queries;
   };
 
   const addQuery = () => {
@@ -492,6 +499,8 @@ const useDashboardPanelData = () => {
           dashboardPanelData.data.queries =
             dashboardPanelData.data.queries.slice(0, 1);
         }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
         break;
 
       case "area":
@@ -528,6 +537,8 @@ const useDashboardPanelData = () => {
           dashboardPanelData.data.queries =
             dashboardPanelData.data.queries.slice(0, 1);
         }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
         break;
       case "geomap":
         dashboardPanelData.data.queries[
@@ -542,6 +553,18 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.filter = [];
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        break;
+      case "html":
+        dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queryType = "";
+        break;
+      case "markdown":
+        dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.queryType = "";
         break;
       default:
         break;
@@ -1078,6 +1101,7 @@ const useDashboardPanelData = () => {
     removeQuery,
     resetAggregationFunction,
     cleanupDraggingFields,
+    getDefaultQueries,
   };
 };
 export default useDashboardPanelData;

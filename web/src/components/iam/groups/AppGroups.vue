@@ -1,11 +1,27 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div>
-    <div style="font-size: 18px" class="q-py-sm q-px-md">
+    <div style="font-size: 18px; padding-top: 12px" class="q-mb-md q-px-md">
       {{ t("iam.groups") }}
     </div>
 
-    <div class="q-mt-sm q-px-md">
-      <div class="q-mb-sm row items-center justify-between">
+    <div>
+      <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
         <q-input
           v-model="filterQuery"
           filled
@@ -29,10 +45,14 @@
           @click="addGroup"
         />
       </div>
-      <div class="q-py-sm q-pl-xs text-bold" style="font-size: 15px">
+      <div
+        class="q-px-md q-pt-sm q-ml-xs text-bold"
+        style="font-size: 14px; padding-bottom: 12px"
+      >
         {{ rows.length }} {{ t("iam.groups") }}
       </div>
       <app-table
+        class="iam-table"
         :rows="rows"
         :columns="columns"
         pagination
@@ -41,6 +61,7 @@
           value: filterQuery,
           method: filterGroups,
         }"
+        :bordered="false"
       >
         <template v-slot:actions="slotProps: any">
           <div>
@@ -56,7 +77,7 @@
               name="delete"
               class="cursor-pointer"
               :title="t('common.delete')"
-              @click="deleteUserGroup(slotProps.column.row)"
+              @click="showConfirmDialog(slotProps.column.row)"
             />
           </div>
         </template>
@@ -71,11 +92,18 @@
         @added:group="setupGroups"
       />
     </q-dialog>
+    <ConfirmDialog
+      title="Delete Group"
+      :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
+      @update:ok="_deleteGroup"
+      @update:cancel="deleteConformDialog.show = false"
+      v-model="deleteConformDialog.show"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onBeforeMount } from "vue";
 import AddGroup from "./AddGroup.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
@@ -85,6 +113,7 @@ import { useStore } from "vuex";
 import { getGroups, deleteGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const showAddGroup = ref(false);
 
@@ -101,6 +130,11 @@ const { groupsState } = usePermissions();
 const filterQuery = ref("");
 
 const q = useQuasar();
+
+const deleteConformDialog = ref({
+  show: false,
+  data: null as any,
+});
 
 const columns: any = [
   {
@@ -120,16 +154,17 @@ const columns: any = [
     name: "actions",
     field: "actions",
     label: t("alerts.actions"),
-    align: "right",
+    align: "center",
     sortable: false,
     slot: true,
     slotName: "actions",
+    style: "width: 400px",
   },
 ];
 
 const groups = ref([]);
 
-onMounted(() => {
+onBeforeMount(() => {
   setupGroups();
 });
 
@@ -201,6 +236,33 @@ const deleteUserGroup = (group: any) => {
       });
     });
 };
+
+const showConfirmDialog = (row: any) => {
+  deleteConformDialog.value.show = true;
+  deleteConformDialog.value.data = row;
+};
+
+const _deleteGroup = () => {
+  deleteUserGroup(deleteConformDialog.value.data);
+  deleteConformDialog.value.data = null;
+};
 </script>
 
 <style scoped></style>
+<style lang="scss">
+.iam-table {
+  .thead-sticky,
+  .tfoot-sticky {
+    position: sticky;
+    top: 0;
+    opacity: 1;
+    z-index: 1;
+    background: transparent !important;
+  }
+
+  .q-table--dark .thead-sticky,
+  .q-table--dark .tfoot-sticky {
+    background: transparent !important;
+  }
+}
+</style>

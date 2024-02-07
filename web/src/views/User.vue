@@ -5,7 +5,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import UsersCloud from "@/enterprise/components/users/User.vue";
@@ -13,26 +13,10 @@ import UsersOpenSource from "@/components/iam/users/User.vue";
 import UsersEnterprise from "@/components/iam/users/enterprise/User.vue";
 
 import config from "@/aws-exports";
+import { watch } from "vue";
 
 export default defineComponent({
   name: "UserPage",
-  data() {
-    return {
-      componentName: "",
-      loadComponent: false,
-    };
-  },
-  created() {
-    // check condition here and set the componentName accordingly
-    if (config.isCloud == "true") {
-      this.componentName = "UsersCloud";
-    } else if (config.isEnterprise == "true") {
-      this.componentName = "UsersEnterprise";
-    } else {
-      this.componentName = "UsersOpenSource";
-    }
-    this.loadComponent = true;
-  },
   components: {
     UsersCloud,
     UsersOpenSource,
@@ -42,7 +26,29 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
 
-    return { store, t };
+    const componentName = ref("");
+
+    const loadComponent = ref(false);
+
+    watch(
+      () => store.state.zoConfig,
+      (zoConfig) => {
+        if (config.isCloud == "true") {
+          componentName.value = "UsersCloud";
+        } else if (zoConfig.dex_enabled) {
+          componentName.value = "UsersEnterprise";
+        } else {
+          componentName.value = "UsersOpenSource";
+        }
+
+        loadComponent.value = true;
+      },
+      {
+        immediate: true,
+      }
+    );
+
+    return { store, t, componentName, loadComponent };
   },
 });
 </script>

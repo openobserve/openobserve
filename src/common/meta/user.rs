@@ -190,16 +190,22 @@ pub enum UserRole {
     #[serde(rename = "admin")]
     #[default]
     Admin,
-    #[serde(rename = "member")]
+    #[serde(rename = "member")] // admin in OpenSource
     Member,
     #[serde(rename = "root")]
     Root,
     #[cfg(feature = "enterprise")]
-    #[serde(rename = "viewer")]
+    #[serde(rename = "viewer")] // read only user
     Viewer,
     #[cfg(feature = "enterprise")]
-    #[serde(rename = "user")]
+    #[serde(rename = "user")] // No access only login user
     User,
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "editor")]
+    Editor,
+    #[cfg(feature = "enterprise")]
+    #[serde(rename = "service_account")]
+    ServiceAccount,
 }
 
 impl fmt::Display for UserRole {
@@ -211,7 +217,11 @@ impl fmt::Display for UserRole {
             #[cfg(feature = "enterprise")]
             UserRole::Viewer => write!(f, "viewer"),
             #[cfg(feature = "enterprise")]
+            UserRole::Editor => write!(f, "editor"),
+            #[cfg(feature = "enterprise")]
             UserRole::User => write!(f, "user"),
+            #[cfg(feature = "enterprise")]
+            UserRole::ServiceAccount => write!(f, "service_account"),
         }
     }
 }
@@ -228,7 +238,11 @@ impl FromStr for UserRole {
             #[cfg(feature = "enterprise")]
             "viewer" => Ok(UserRole::Viewer),
             #[cfg(feature = "enterprise")]
+            "editor" => Ok(UserRole::Editor),
+            #[cfg(feature = "enterprise")]
             "user" => Ok(UserRole::User),
+            #[cfg(feature = "enterprise")]
+            "service_account" => Ok(UserRole::ServiceAccount),
             #[cfg(feature = "enterprise")]
             _ => Ok(UserRole::User),
             #[cfg(not(feature = "enterprise"))]
