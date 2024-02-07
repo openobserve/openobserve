@@ -665,8 +665,9 @@ export default defineComponent({
         this.runQueryFn();
       }
     },
-    fullSQLMode(newVal) {
+    async fullSQLMode(newVal) {
       if (newVal) {
+        await nextTick();
         this.setQuery(newVal);
       } else {
         this.searchObj.meta.sqlMode = false;
