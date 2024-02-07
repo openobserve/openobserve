@@ -39,8 +39,8 @@ pub mod stats;
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
-/// compactor delete run steps:
-pub async fn run_delete() -> Result<(), anyhow::Error> {
+/// compactor retention run steps:
+pub async fn run_retention() -> Result<(), anyhow::Error> {
     // check data retention
     if CONFIG.compact.data_retention_days > 0 {
         let now = Utc::now();
@@ -59,7 +59,9 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             // get the working node for the organization
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::debug!("[COMPACT] organization {org_id} is processing by {node}");
+                log::debug!(
+                    "[COMPACT] run retention: organization {org_id} is processing by {node}"
+                );
                 continue;
             }
 
@@ -70,7 +72,9 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
             // first
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
             if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-                log::debug!("[COMPACT] organization {org_id} is processing by {node}");
+                log::debug!(
+                    "[COMPACT] run retention: organization {org_id} is processing by {node}"
+                );
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
@@ -270,10 +274,10 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// compactor delete files run steps:
+/// compactor delay delete files run steps:
 /// 1. get pending deleted files from file_list_deleted table, created_at > 2 hours
 /// 2. delete files from storage
-pub async fn run_delete_files() -> Result<(), anyhow::Error> {
+pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let now = Utc::now();
     let time_max = now - Duration::hours(CONFIG.compact.delete_files_delay_hours);
     let time_max = Utc
@@ -292,7 +296,9 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::debug!("[COMPACT] organization {org_id} is processing by {node}");
+            log::debug!(
+                "[COMPACT] run delay_deletion: organization {org_id} is processing by {node}"
+            );
             continue;
         }
 
@@ -304,7 +310,9 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::debug!("[COMPACT] organization {org_id} is processing by {node}");
+            log::debug!(
+                "[COMPACT] run delay_deletion organization {org_id} is processing by {node}"
+            );
             dist_lock::unlock(&locker).await?;
             continue;
         }
@@ -328,11 +336,11 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
         loop {
             match file_list_deleted::delete(&org_id, offset, time_max, batch_size).await {
                 Ok(affected) => {
-                    if CONFIG.common.print_key_event {
-                        log::info!("[COMPACTOR] deleted from file_list_deleted {affected} files");
-                    }
                     if affected == 0 {
                         break;
+                    }
+                    if CONFIG.common.print_key_event {
+                        log::info!("[COMPACTOR] deleted from file_list_deleted {affected} files");
                     }
                 }
                 Err(e) => {
