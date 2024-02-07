@@ -54,9 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    :key="
-                      searchObj.data.stream.selectedStream.value || 'default'
-                    "
                     class="full-height"
                   />
                   <q-btn
@@ -485,7 +482,7 @@ export default defineComponent({
           }
           searchObj.data.query =
             `SELECT *${selectFields} FROM "` +
-            searchObj.data.stream.selectedStream.value +
+            searchObj.data.stream.selectedStream.join(",") +
             `" ` +
             whereClause;
 
