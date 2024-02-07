@@ -1034,6 +1034,16 @@ const updateEntityEntities = (
             ),
             show: hasEntities,
           },
+          AllowPost: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(
+                entity.childName as string,
+                "AllowPost",
+                entityName
+              )
+            ),
+            show: hasEntities,
+          },
         },
         entities: [],
         type: "Resource",
