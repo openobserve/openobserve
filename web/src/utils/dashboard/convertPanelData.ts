@@ -46,12 +46,15 @@ export const convertPanelData = (
     case "donut":
     case "scatter":
     case "metric":
-    case "gauge": {
+    case "gauge":
+    case "sankey": {
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&
         // panelSchema?.customQuery &&
         panelSchema?.queryType == "promql"
       ) {
+        console.log("promql", panelSchema);
+
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
@@ -64,6 +67,8 @@ export const convertPanelData = (
           ),
         };
       } else {
+        console.log("sql", panelSchema);
+
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,

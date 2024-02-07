@@ -378,6 +378,8 @@ export default defineComponent({
       async () => {
         await nextTick();
         chart?.resize();
+        console.log(props.data.options, "optionsssssssss chart");
+
         chart?.setOption(props?.data?.options || {}, true);
         // we need that toolbox datazoom button initally selected
         // for that we required to dispatch an event

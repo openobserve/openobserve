@@ -420,6 +420,7 @@ export const convertSQLData = (
     case "line":
     case "area":
     case "scatter": {
+      console.log("panelSchema.type", panelSchema);
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
       if (
@@ -575,6 +576,39 @@ export const convertSQLData = (
           return seriesObj;
         });
       }
+      break;
+    }
+    case "sankey": {
+      console.log("sankey chart not implemented yet");
+      options.series = [
+        {
+          left: 50.0,
+          top: 20.0,
+          right: 150.0,
+          bottom: 25.0,
+          data: [
+            { name: "a" },
+            { name: "b" },
+            { name: "a1" },
+            { name: "a2" },
+            { name: "b1" },
+            { name: "c" },
+          ],
+          links: [
+            { source: "a", target: "a1", value: 5 },
+            { source: "a", target: "a2", value: 3 },
+            { source: "b", target: "b1", value: 8 },
+            { source: "a", target: "b1", value: 3 },
+            { source: "b1", target: "a1", value: 1 },
+            { source: "b1", target: "c", value: 2 },
+          ],
+        },
+      ];
+      options.tooltip = {
+        trigger: "item",
+      };
+      options.xAxis = [];
+      options.yAxis = [];
       break;
     }
     case "bar": {
@@ -1497,6 +1531,7 @@ export const convertSQLData = (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
+  console.log("options", options);
 
   return {
     options,
@@ -1604,6 +1639,23 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "scatter",
         emphasis: { focus: "series" },
         symbolSize: 5,
+      };
+    case "sankey":
+      return {
+        type: "sankey",
+        layout: "none",
+        emphasis: {
+          focus: "adjacency",
+        },
+        lineStyle: {
+          color: "source",
+          curveness: 0.5,
+        },
+        label: {
+          color: "rgba(0,0,0,0.7)",
+          fontFamily: "Arial",
+          fontSize: 10,
+        },
       };
     case "pie":
       return {

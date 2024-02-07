@@ -181,6 +181,11 @@ export default defineComponent({
         title: "Gauge",
         id: "gauge",
       },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
+        title: "Sankey",
+        id: "sankey",
+      }
     ]);
 
     const { promqlMode, dashboardPanelData } = useDashboardPanelData();
