@@ -626,33 +626,61 @@ const useLogs = () => {
   const getQueryPartitions = async (queryReq: any) => {
     // const queryReq = buildSearch();
 
-    const partitionQueryReq: any = {
-      sql: queryReq.query.sql,
-      start_time: queryReq.query.start_time,
-      end_time: queryReq.query.end_time,
-    };
+    if (!searchObj.meta.sqlMode) {
+      const partitionQueryReq: any = {
+        sql: queryReq.query.sql,
+        start_time: queryReq.query.start_time,
+        end_time: queryReq.query.end_time,
+      };
 
-    await searchService
-      .partition({
-        org_identifier: searchObj.organizationIdetifier,
-        query: partitionQueryReq,
-        page_type: searchObj.data.stream.streamType,
-      })
-      .then(async (res) => {
-        searchObj.data.queryResults.partitionDetail = {
-          partitions: [],
-          partitionTotal: [],
-          paginations: [],
-        };
+      await searchService
+        .partition({
+          org_identifier: searchObj.organizationIdetifier,
+          query: partitionQueryReq,
+          page_type: searchObj.data.stream.streamType,
+        })
+        .then(async (res) => {
+          searchObj.data.queryResults.partitionDetail = {
+            partitions: [],
+            partitionTotal: [],
+            paginations: [],
+          };
 
-        searchObj.data.queryResults.total = res.data.records;
-        const partitions = res.data.partitions.sort(
-          (a: number[], b: number[]) => a[0] - b[0]
-        );
+          searchObj.data.queryResults.total = res.data.records;
+          const partitions = res.data.partitions.sort(
+            (a: number[], b: number[]) => a[0] - b[0]
+          );
 
-        searchObj.data.queryResults.partitionDetail.partitions = partitions;
+          searchObj.data.queryResults.partitionDetail.partitions = partitions;
 
-        partitions.forEach((item: any, index: number) => {
+          partitions.forEach((item: any, index: number) => {
+            const pageObject = [
+              {
+                startTime: item[0],
+                endTime: item[1],
+                from: 0,
+                size: searchObj.meta.resultGrid.rowsPerPage,
+              },
+            ];
+            searchObj.data.queryResults.partitionDetail.paginations.push(
+              pageObject
+            );
+            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+          });
+        });
+    } else {
+      searchObj.data.queryResults.partitionDetail = {
+        partitions: [],
+        partitionTotal: [],
+        paginations: [],
+      };
+      
+      searchObj.data.queryResults.partitionDetail.partitions = [
+        [queryReq.query.start_time, queryReq.query.end_time],
+      ];
+
+      searchObj.data.queryResults.partitionDetail.partitions.forEach(
+        (item: any, index: number) => {
           const pageObject = [
             {
               startTime: item[0],
@@ -665,8 +693,9 @@ const useLogs = () => {
             pageObject
           );
           searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-        });
-      });
+        }
+      );
+    }
   };
 
   const refreshPartitionPagination = (regenrateFlag: boolean = false) => {
