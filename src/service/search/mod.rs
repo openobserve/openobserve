@@ -24,7 +24,10 @@ use chrono::Duration;
 use config::{
     cluster::{is_ingester, is_querier},
     ider,
-    meta::stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+    meta::{
+        cluster::{Node, Role},
+        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+    },
     utils::{flatten, json, str::find},
     CONFIG,
 };
@@ -42,7 +45,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
-        infra::cluster,
+        infra::cluster::{self, get_node_from_consistent_hash},
         meta::{
             functions::VRLResultResolver,
             search,
@@ -296,8 +299,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let mut partition_files = None;
     let mut file_num = file_list.len();
-    let offset = match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
-    {
+    let mut partition_strategy =
+        QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy);
+    if CONFIG.memory_cache.cache_latest_files && stream_type != StreamType::Metrics {
+        partition_strategy = QueryPartitionStrategy::FileHash;
+    }
+    let offset = match partition_strategy {
         QueryPartitionStrategy::FileNum => {
             if querier_num >= file_num {
                 1
@@ -307,6 +314,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
         QueryPartitionStrategy::FileSize => {
             let files = partition_file_by_bytes(&file_list, querier_num);
+            file_num = files.len();
+            partition_files = Some(files);
+            1
+        }
+        QueryPartitionStrategy::FileHash => {
+            let files = partition_file_by_hash(&file_list, &nodes).await;
             file_num = files.len();
             partition_files = Some(files);
             1
@@ -337,8 +350,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as i32;
-                match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
-                {
+                match partition_strategy {
                     QueryPartitionStrategy::FileNum => {
                         req.file_list = file_list
                             [offset_start..min(offset_start + offset, file_num)]
@@ -348,7 +360,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                             .collect();
                         offset_start += offset;
                     }
-                    QueryPartitionStrategy::FileSize => {
+                    QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
                         req.file_list = partition_files
                             .as_ref()
                             .unwrap()
@@ -714,6 +726,30 @@ fn partition_file_by_bytes(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<&
             continue;
         }
         partitions[node_k].push(fk);
+    }
+    partitions
+}
+
+async fn partition_file_by_hash<'a>(
+    file_keys: &'a [FileKey],
+    nodes: &'a [Node],
+) -> Vec<Vec<&'a FileKey>> {
+    let mut node_ids = HashMap::with_capacity(nodes.len());
+    let mut idx = 0;
+    for node in nodes {
+        if !is_querier(&node.role) {
+            continue;
+        }
+        node_ids.insert(&node.uuid, idx);
+        idx += 1;
+    }
+    let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); idx];
+    for fk in file_keys {
+        let node_uuid = get_node_from_consistent_hash(&fk.key, &Role::Querier)
+            .await
+            .expect("there is no querier node in consistent hash ring");
+        let idx = node_ids.get(&node_uuid).unwrap_or(&0);
+        partitions[*idx].push(fk);
     }
     partitions
 }
