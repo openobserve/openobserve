@@ -121,6 +121,7 @@ impl ObjectStore for Remote {
                 .with_label_values(&[columns[1], columns[2], "get"])
                 .inc_by(time);
         }
+        log::debug!("[STORAGE] get remote file: {:?}", file);
 
         Ok(result)
     }
