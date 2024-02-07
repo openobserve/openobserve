@@ -430,14 +430,21 @@ async fn handle_diff_schema_local_mode(
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
-    let key = format!(
-        "{}/schema/lock/{org_id}/{stream_type}/{stream_name}",
-        &CONFIG.sled.prefix
-    );
+    // first update thread cache
+    if is_new {
+        let mut metadata = HashMap::with_capacity(1);
+        metadata.insert("created_at".to_string(), record_ts.to_string());
+        stream_schema_map.insert(
+            stream_name.to_string(),
+            inferred_schema.clone().with_metadata(metadata),
+        );
+    }
+
+    let lock_key = format!("/lock/schema/{org_id}/{stream_type}/{stream_name}",);
     let local_map = LOCAL_SCHEMA_LOCKER.clone();
     let mut schema_locker = local_map.write().await;
     let locker = schema_locker
-        .entry(key)
+        .entry(lock_key)
         .or_insert_with(|| Arc::new(tokio::sync::RwLock::new(false)));
     let locker = locker.clone();
     drop(schema_locker);
@@ -506,8 +513,8 @@ async fn handle_diff_schema_cluster_mode(
     }
 
     // acquire lock and update schema to meta store
-    let key = format!("schema/{org_id}/{stream_type}/{stream_name}");
-    let mut lock = etcd::Locker::new(&key);
+    let lock_key = format!("schema/{org_id}/{stream_type}/{stream_name}");
+    let mut lock = etcd::Locker::new(&lock_key);
     lock.lock(0).await.map_err(server_internal_error).unwrap();
 
     let Some((field_datatype_delta, final_schema)) =

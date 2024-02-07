@@ -198,7 +198,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                 else {
                     continue; // no compactor node
                 };
-                if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+                if LOCAL_NODE_UUID.ne(&node) {
                     // Check if this node holds the stream
                     if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
                         &org_id,
