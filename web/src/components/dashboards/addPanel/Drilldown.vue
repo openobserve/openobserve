@@ -29,7 +29,7 @@
         "
       >
         <div
-          :onclick="onDataLinkClick(index)"
+          @click="onDataLinkClick(index)"
           style="
             cursor: pointer;
             text-decoration: underline;
@@ -87,8 +87,8 @@ export default defineComponent({
 
     onBeforeMount(() => {
       // Ensure that the drilldown is initialized
-      if (!dashboardPanelData.data.drilldown) {
-        dashboardPanelData.data.drilldown = [];
+      if (!dashboardPanelData.data.config.drilldown) {
+        dashboardPanelData.data.config.drilldown = [];
       }
     });
 
@@ -100,6 +100,7 @@ export default defineComponent({
 
     const addDataLink = () => {
       isDrilldownEditMode.value = false;
+      selectedDrilldownIndexToEdit.value = null;
       showDrilldownPopUp.value = true;
     };
 
@@ -108,9 +109,9 @@ export default defineComponent({
     };
 
     const saveDrilldownData = () => {
+      showDrilldownPopUp.value = false;
       selectedDrilldownIndexToEdit.value = null;
       isDrilldownEditMode.value = false;
-      showDrilldownPopUp.value = false;
     };
 
     return {

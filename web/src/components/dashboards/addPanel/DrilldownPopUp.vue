@@ -250,7 +250,6 @@
 
     <q-card-actions class="confirmActions">
       <q-btn
-        v-close-popup="true"
         unelevated
         no-caps
         class="q-mr-sm"
@@ -260,13 +259,11 @@
         {{ t("confirmDialog.cancel") }}
       </q-btn>
       <q-btn
-        v-close-popup="true"
         unelevated
         no-caps
         class="no-border"
         color="primary"
-        @click="saveDrilldown.execute()"
-        :loading="saveDrilldown.isLoading.value"
+        @click="saveDrilldown"
         style="min-width: 60px"
         data-test="confirm-button"
         :disable="isFormValid"
@@ -309,6 +306,7 @@ export default defineComponent({
       default: -1,
     },
   },
+  emits: ["close"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -336,9 +334,7 @@ export default defineComponent({
       props.isEditMode
         ? JSON.parse(
             JSON.stringify(
-              dashboardPanelData.data.config.drilldowns[
-                props.drilldownDataIndex
-              ]
+              dashboardPanelData.data.config.drilldown[props.drilldownDataIndex]
             )
           )
         : getDefaultDrilldownData()
@@ -438,7 +434,8 @@ export default defineComponent({
 
         // get dashboard data
         const dashboardData = allDashboardList?.find(
-          (dashboard: any) => dashboard.title === drilldownData.value.data.dashboard
+          (dashboard: any) =>
+            dashboard.title === drilldownData.value.data.dashboard
         );
 
         if (!dashboardData) {
@@ -470,7 +467,7 @@ export default defineComponent({
 
       // if action is by url
       if (drilldownData.value.type == "byUrl") {
-        if (drilldownData.value.url.trim()) {
+        if (drilldownData.value.data.url.trim()) {
           return false;
         }
       } else {
@@ -485,17 +482,17 @@ export default defineComponent({
       return true;
     });
 
-    const saveDrilldown = useLoading(async () => {
+    const saveDrilldown = () => {
       // if editmode then made changes
-      // else add new
+      // else add new drilldown
       if (props.isEditMode) {
-        dashboardPanelData.data.config.drilldowns[props.drilldownDataIndex] =
+        dashboardPanelData.data.config.drilldown[props.drilldownDataIndex] =
           drilldownData.value;
       } else {
-        dashboardPanelData.data.config.drilldowns.push(drilldownData.value);
+        dashboardPanelData.data.config.drilldown.push(drilldownData.value);
       }
       emit("close");
-    });
+    };
 
     return {
       t,
