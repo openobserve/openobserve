@@ -23,27 +23,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-select
         data-test="log-search-index-list-select-stream"
         v-model="searchObj.data.stream.selectedStream"
-        :label="
-          searchObj.data.stream.selectedStream.label
-            ? ''
-            : t('search.selectIndex')
-        "
         :options="streamOptions"
         data-cy="index-dropdown"
         input-debounce="0"
-        behavior="menu"
         filled
         borderless
         dense
         use-input
-        hide-selected
         fill-input
+        multiple
+        emit-value
+        map-options
         @filter="filterStreamFn"
-        @update:model-value="onStreamChange"
+        @update:model-value="handleMultiStreamSelection"
       >
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
+          </q-item>
+        </template>
+        <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+          <q-item style="cursor: pointer;">
+            <q-item-section @click="handleSingleStreamSelect(opt)">
+              <q-item-label v-html="opt.label" />
+            </q-item-section>
+            <q-item-section side>
+              <q-toggle
+                :model-value="selected"
+                size="20px"
+                @update:model-value="toggleOption(opt)"
+              />
+            </q-item-section>
           </q-item>
         </template>
       </q-select>
@@ -54,9 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="searchObj.data.stream.selectedFields"
         :visible-columns="['name']"
         :rows="searchObj.data.stream.selectedStreamFields"
-        :row-key="
-          (row) => searchObj.data.stream.selectedStream.label + row.name
-        "
+        :row-key="(row) => searchObj.data.stream.selectedStream[0] + row.name"
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
         :pagination="{ rowsPerPage: 10000 }"
@@ -353,6 +361,18 @@ interface Filter {
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: { EqualIcon, NotEqualIcon },
+  methods: {
+    handleMultiStreamSelection() {
+      if (this.searchObj.meta.sqlMode) {
+        this.searchObj.meta.sqlMode = false;
+      }
+      this.onStreamChange();
+    },
+    handleSingleStreamSelect(opt: any) {
+      this.searchObj.data.stream.selectedStream = [opt.value];
+      this.onStreamChange();
+    },
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -451,9 +471,8 @@ export default defineComponent({
           : cloneDeep(searchObj.data.datetime);
 
       if (searchObj.data.stream.streamType === "enrichment_tables") {
-        const stream = searchObj.data.streamResults.list.find(
-          (stream: any) =>
-            stream.name === searchObj.data.stream.selectedStream.value
+        const stream = searchObj.data.streamResults.list.find((stream: any) =>
+          searchObj.data.stream.selectedStream.includes(stream.name)
         );
         if (stream.stats) {
           timestamps = {
@@ -501,7 +520,7 @@ export default defineComponent({
 
           query_context =
             `SELECT *${queryFunctions} FROM "` +
-            searchObj.data.stream.selectedStream.value +
+            searchObj.data.stream.selectedStream.join(",") +
             `" [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
@@ -548,7 +567,7 @@ export default defineComponent({
         streamService
           .fieldValues({
             org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.value,
+            stream_name: searchObj.data.stream.selectedStream.join(","),
             start_time: startISOTimestamp,
             end_time: endISOTimestamp,
             fields: [name],
