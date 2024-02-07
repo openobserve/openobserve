@@ -1671,9 +1671,22 @@ const useLogs = () => {
         const timestampField = store.state.zoConfig.timestamp_column;
         let schemaInterestingFields: string[] = [];
 
+        // searchObj.data.streamResults.list.forEach((stream: any) => {
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
           .split(",");
+        for (const stream of searchObj.data.streamResults.list) {
+          if (selectedStreamValues.includes(stream.name)) {
+            if (stream.hasOwnProperty("schema")) {
+              queryResult.push(...stream.schema);
+              schemaFields = new Set([
+                ...stream.schema.map((e: any) => e.name),
+              ]);
+            } else {
+              const streamSchema: any = await loadStreamFileds(stream.name);
+              queryResult.push(...streamSchema);
+              schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
+            }
 
           for (const stream of searchObj.data.streamResults.list) {
           if (selectedStreamValues.includes(stream.name)) {
