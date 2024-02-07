@@ -96,7 +96,8 @@ export default defineComponent({
         folder: "",
         dashboard: "",
         tab: "",
-        queryParams: [
+        passAllVariables: true,
+        variables: [
           {
             name: "",
             value: "",

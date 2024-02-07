@@ -207,6 +207,8 @@ pub struct DrillDownData {
     #[serde(skip_serializing_if = "Option::is_none")]
     tab: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pass_all_variables: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     variables: Option<Vec<DrillDownVariables>>,
 }
 

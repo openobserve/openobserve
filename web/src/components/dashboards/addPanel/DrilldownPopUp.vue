@@ -181,7 +181,7 @@
               align-items: center;
             "
           >
-            <div>Query Params:</div>
+            <div>Variables:</div>
             <q-btn
               icon="add"
               color="primary"
@@ -189,38 +189,60 @@
               padding="sm"
               @click="
                 () =>
-                  drilldownData.data.queryParams.push({
+                  drilldownData.data.variables.push({
                     name: '',
                     value: '',
                   })
               "
-              >Add Query</q-btn
+              >Add</q-btn
             >
           </div>
           <div
-            v-for="(variable, index) in drilldownData.data.queryParams"
+            v-for="(variable, index) in drilldownData.data.variables"
             :key="index"
           >
             <div style="display: flex; gap: 10px; margin-bottom: 10px">
-              <q-input v-model="variable.name" placeholder="Name" />
-              <q-input v-model="variable.value" placeholder="Value" />
+              <q-input
+                v-model="variable.name"
+                placeholder="Name"
+                stack-label
+                outlined
+                filled
+                dense
+              />
+              <q-input
+                v-model="variable.value"
+                placeholder="Value"
+                stack-label
+                outlined
+                filled
+                dense
+              />
               <q-icon
                 class="q-mr-xs"
                 size="20px"
                 :name="outlinedDelete"
                 style="cursor: pointer; height: 35px; display: flex !important"
-                @click="() => drilldownData.data.queryParams.splice(index, 1)"
+                @click="() => drilldownData.data.variables.splice(index, 1)"
               />
             </div>
           </div>
         </div>
+      </div>
+      <!-- radio button for new tab -->
+      <div style="margin-top: 10px">
+        <q-toggle
+          :label="`Pass all current variables: `"
+          left-label
+          v-model="drilldownData.data.passAllVariables"
+        />
       </div>
     </div>
 
     <!-- radio button for new tab -->
     <div style="margin-top: 10px">
       <q-toggle
-        :label="`New Tab: `"
+        :label="`Open in new tab: `"
         left-label
         v-model="drilldownData.targetBlank"
       />
