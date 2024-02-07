@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, time::Duration};
+use std::{collections::BTreeMap, path::Path, time::Duration};
 
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
@@ -34,6 +34,7 @@ pub type RwHashMap<K, V> = dashmap::DashMap<K, V, ahash::RandomState>;
 pub type RwHashSet<K> = dashmap::DashSet<K, ahash::RandomState>;
 pub type RwAHashMap<K, V> = tokio::sync::RwLock<HashMap<K, V>>;
 pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
+pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 pub const MMDB_CITY_FILE_NAME: &str = "GeoLite2-City.mmdb";
 pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";

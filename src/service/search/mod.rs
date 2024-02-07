@@ -267,24 +267,26 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     // get a cluster search queue lock
     let locker = dist_lock::lock(&locker_key, 0).await?;
     #[cfg(feature = "enterprise")]
-    while work_group
-        .as_ref()
-        .unwrap()
-        .need_wait()
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?
-    {
-        // wait in the queue
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    loop {
+        match work_group.as_ref().unwrap().need_wait().await {
+            Ok(true) => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+            Ok(false) => {
+                break;
+            }
+            Err(e) => {
+                dist_lock::unlock(&locker).await?;
+                return Err(Error::Message(e.to_string()));
+            }
+        }
     }
     // 3. process the search in the work group
     #[cfg(feature = "enterprise")]
-    work_group
-        .as_ref()
-        .unwrap()
-        .process(&session_id)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
+    if let Err(e) = work_group.as_ref().unwrap().process(&session_id).await {
+        dist_lock::unlock(&locker).await?;
+        return Err(Error::Message(e.to_string()));
+    }
     #[cfg(feature = "enterprise")]
     dist_lock::unlock(&locker).await?;
     let took_wait = start.elapsed().as_millis() as usize;

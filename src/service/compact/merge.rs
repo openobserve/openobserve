@@ -25,10 +25,13 @@ use config::{
     utils::{json, parquet::parse_file_key_columns},
     CONFIG, FILE_EXT_PARQUET,
 };
-use infra::{cache, file_list as infra_file_list, storage};
+use infra::{cache, dist_lock, file_list as infra_file_list, storage};
 use tokio::{sync::Semaphore, task::JoinHandle};
 
-use crate::service::{db, file_list, search::datafusion, stream};
+use crate::{
+    common::infra::cluster::get_node_by_uuid,
+    service::{db, file_list, search::datafusion, stream},
+};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -48,8 +51,33 @@ pub async fn merge_by_stream(
     let start = std::time::Instant::now();
 
     // get last compacted offset
-    let (mut offset, _node) =
-        db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        return Ok(()); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+        let lock_key = format!("compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        // check the working node again, maybe other node locked it first
+        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            dist_lock::unlock(&locker).await?;
+            return Ok(()); // other node is processing
+        }
+        // set to current node
+        let ret = db::compact::files::set_offset(
+            org_id,
+            stream_type,
+            stream_name,
+            offset,
+            Some(&LOCAL_NODE_UUID.clone()),
+        )
+        .await;
+        dist_lock::unlock(&locker).await?;
+        drop(locker);
+        ret?;
+    }
 
     // get schema
     let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;

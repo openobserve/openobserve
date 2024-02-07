@@ -70,12 +70,8 @@ async fn update_stats_lock_node() -> Result<i64, anyhow::Error> {
     }
 
     // bind the job to this node
-    if let Err(e) = db::compact::stats::set_offset(offset, Some(&LOCAL_NODE_UUID.clone())).await {
-        dist_lock::unlock(&locker).await?;
-        return Err(e);
-    }
-
+    let ret = db::compact::stats::set_offset(offset, Some(&LOCAL_NODE_UUID.clone())).await;
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
-    Ok(offset)
+    if let Err(e) = ret { Err(e) } else { Ok(offset) }
 }

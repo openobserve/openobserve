@@ -203,10 +203,11 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     }
 
     // before start merging, set current node to lock the offset
-    db::compact::file_list::set_process(offset, &LOCAL_NODE_UUID.clone()).await?;
+    let ret = db::compact::file_list::set_process(offset, &LOCAL_NODE_UUID.clone()).await;
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     drop(locker);
+    ret?;
 
     // get all small file list keys in this hour
     let offset_time = Utc.timestamp_nanos(offset * 1000);

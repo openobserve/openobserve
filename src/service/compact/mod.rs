@@ -16,12 +16,19 @@
 use std::sync::Arc;
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
+use config::{
+    cluster::LOCAL_NODE_UUID,
+    meta::{cluster::Role, stream::StreamType},
+    CONFIG,
+};
 use infra::dist_lock;
 use once_cell::sync::Lazy;
 use tokio::sync::{Mutex, Semaphore};
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::db};
+use crate::{
+    common::infra::cluster::{get_node_by_uuid, get_node_from_consistent_hash},
+    service::db,
+};
 
 mod file_list;
 pub mod file_list_deleted;
@@ -67,18 +74,21 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
-            if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+            let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
                 db::compact::organization::set_offset(
                     &org_id,
                     "retention",
                     0,
                     Some(&LOCAL_NODE_UUID.clone()),
                 )
-                .await?;
-            }
+                .await
+            } else {
+                Ok(())
+            };
             // already bind to this node, we can unlock now
             dist_lock::unlock(&locker).await?;
             drop(locker);
+            ret?;
 
             for stream_type in stream_types {
                 let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
@@ -179,42 +189,37 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         {
             continue;
         }
-
-        // get the working node for the organization
-        let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::debug!("[COMPACT] organization {org_id} is processing by {node}");
-            continue;
-        }
-
-        // before start processing, set current node to lock the organization
-        let lock_key = format!("compact/organization/{org_id}");
-        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
-        // check the working node for the organization again, maybe other node locked it
-        // first
-        let (_, node) = db::compact::organization::get_offset(&org_id, "merge").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-            log::debug!("[COMPACT] organization {org_id} is processing by {node}");
-            dist_lock::unlock(&locker).await?;
-            continue;
-        }
-        if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-            db::compact::organization::set_offset(
-                &org_id,
-                "merge",
-                0,
-                Some(&LOCAL_NODE_UUID.clone()),
-            )
-            .await?;
-        }
-        // already bind to this node, we can unlock now
-        dist_lock::unlock(&locker).await?;
-        drop(locker);
-
         for stream_type in stream_types {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
+                let Some(node) =
+                    get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
+                else {
+                    continue; // no compactor node
+                };
+                if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+                    // Check if this node holds the stream
+                    if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    )
+                    .await
+                    {
+                        // release the stream
+                        db::compact::files::set_offset(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                            offset,
+                            None,
+                        )
+                        .await?;
+                    }
+                    continue; // not this node
+                }
+
                 // check if we are allowed to merge or just skip
                 if db::compact::retention::is_deleting_stream(
                     &org_id,
@@ -303,18 +308,21 @@ pub async fn run_delete_files() -> Result<(), anyhow::Error> {
             dist_lock::unlock(&locker).await?;
             continue;
         }
-        if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+        let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
             db::compact::organization::set_offset(
                 &org_id,
                 "file_list_deleted",
                 offset,
                 Some(&LOCAL_NODE_UUID.clone()),
             )
-            .await?;
-        }
+            .await
+        } else {
+            Ok(())
+        };
         // already bind to this node, we can unlock now
         dist_lock::unlock(&locker).await?;
         drop(locker);
+        ret?;
 
         let batch_size = 10000;
         loop {

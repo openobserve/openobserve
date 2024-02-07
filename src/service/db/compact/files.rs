@@ -13,21 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, RwHashMap};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, RwAHashMap};
 use infra::db as infra_db;
 use once_cell::sync::Lazy;
 
-static CACHES: Lazy<RwHashMap<String, (i64, String)>> = Lazy::new(Default::default);
+static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
 }
 
+pub async fn get_offset_from_cache(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<(i64, String)> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let r = CACHES.read().await;
+    r.get(&key).cloned()
+}
+
 pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str) -> (i64, String) {
     let key = mk_key(org_id, stream_type, stream_name);
-    if let Some(val) = CACHES.get(&key) {
-        return val.value().clone();
+    let r = CACHES.read().await;
+    if let Some(val) = r.get(&key) {
+        return val.clone();
     }
+    drop(r);
 
     let db = infra_db::get_db().await;
     let value = match db.get(&key).await {
@@ -42,7 +54,12 @@ pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str
     } else {
         (value.parse().unwrap(), String::from(""))
     };
-    CACHES.insert(key.clone(), (offset, node.clone()));
+    // only cache the value if it's empty or it's from this node
+    if node.is_empty() || LOCAL_NODE_UUID.eq(&node) {
+        let mut w = CACHES.write().await;
+        w.insert(key.clone(), (offset, node.clone()));
+        drop(w);
+    }
     (offset, node)
 }
 
@@ -59,25 +76,16 @@ pub async fn set_offset(
         let db = infra_db::get_db().await;
         db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
             .await?;
-        CACHES.remove(&key);
+        let mut w = CACHES.write().await;
+        w.remove(&key);
+        drop(w);
         return Ok(());
     };
 
     // set this key to this node
-    let old_node = CACHES
-        .get(&key)
-        .map(|x| x.value().1.clone())
-        .unwrap_or_default();
-    if old_node != node {
-        let db = infra_db::get_db().await;
-        db.put(
-            &key,
-            format!("{};{}", offset, node).into(),
-            infra_db::NO_NEED_WATCH,
-        )
-        .await?;
-    }
-    CACHES.insert(key, (offset, node.to_string()));
+    let mut w = CACHES.write().await;
+    w.insert(key, (offset, node.to_string()));
+    drop(w);
     Ok(())
 }
 
@@ -87,7 +95,9 @@ pub async fn del_offset(
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    CACHES.remove(&key);
+    let mut w = CACHES.write().await;
+    w.remove(&key);
+    drop(w);
     let db = infra_db::get_db().await;
     db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
         .await
@@ -115,16 +125,15 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    for item in CACHES.clone().iter() {
-        let key = item.key().to_string();
-        let (offset, node) = item.value();
+    let r = CACHES.read().await;
+    for (key, (offset, node)) in r.iter() {
         if *offset > 0 {
             let val = if !node.is_empty() {
                 format!("{};{}", offset, node)
             } else {
                 offset.to_string()
             };
-            db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?;
+            db.put(key, val.into(), infra_db::NO_NEED_WATCH).await?;
         }
     }
     Ok(())

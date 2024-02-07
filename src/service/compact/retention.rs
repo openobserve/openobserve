@@ -90,17 +90,18 @@ pub async fn delete_all(
     }
 
     // before start merging, set current node to lock the stream
-    db::compact::retention::process_stream(
+    let ret = db::compact::retention::process_stream(
         org_id,
         stream_type,
         stream_name,
         None,
         &LOCAL_NODE_UUID.clone(),
     )
-    .await?;
+    .await;
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     drop(locker);
+    ret?;
 
     let start_time = BASE_TIME.timestamp_micros();
     let end_time = Utc::now().timestamp_micros();
@@ -194,17 +195,18 @@ pub async fn delete_by_date(
     }
 
     // before start merging, set current node to lock the stream
-    db::compact::retention::process_stream(
+    let ret = db::compact::retention::process_stream(
         org_id,
         stream_type,
         stream_name,
         Some(date_range),
         &LOCAL_NODE_UUID.clone(),
     )
-    .await?;
+    .await;
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     drop(locker);
+    ret?;
 
     let mut date_start =
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc);

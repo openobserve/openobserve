@@ -18,7 +18,10 @@ use std::{collections::HashMap, fmt::Display, sync::Arc};
 use arrow_schema::Field;
 use config::{
     meta::stream::{PartitionTimeLevel, StreamStats, StreamType},
-    utils::{hash::fnv, json},
+    utils::{
+        hash::{fnv, Sum64},
+        json,
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
