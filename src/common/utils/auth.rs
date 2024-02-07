@@ -70,7 +70,7 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
         };
 
-        authorizer::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
     }
 }
 #[cfg(not(feature = "enterprise"))]
@@ -90,7 +90,7 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
         };
 
-        authorizer::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
     }
 }
 #[cfg(not(feature = "enterprise"))]

@@ -29,7 +29,11 @@ pub async fn create_role(
     let org_id = org_id.into_inner();
     let user_req = user_req.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::create_role(&user_req.name, &org_id).await
+    match o2_enterprise::enterprise::openfga::authorizer::roles::create_role(
+        &user_req.name,
+        &org_id,
+    )
+    .await
     {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
@@ -50,7 +54,9 @@ pub async fn create_role(
 pub async fn delete_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::delete_role(&org_id, &role_name).await {
+    match o2_enterprise::enterprise::openfga::authorizer::roles::delete_role(&org_id, &role_name)
+        .await
+    {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
@@ -66,7 +72,7 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
 #[get("/{org_id}/roles")]
 pub async fn get_roles(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::get_all_roles(&org_id).await {
+    match o2_enterprise::enterprise::openfga::authorizer::roles::get_all_roles(&org_id).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
@@ -87,7 +93,7 @@ pub async fn update_role(
     let (_org_id, role_id) = path.into_inner();
     let update_role = update_role.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::update_role(
+    match o2_enterprise::enterprise::openfga::authorizer::roles::update_role(
         &role_id,
         update_role.add,
         update_role.remove,
@@ -116,7 +122,7 @@ pub async fn get_role_permissions(
     path: web::Path<(String, String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, role_id, resource) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::get_role_permissions(
+    match o2_enterprise::enterprise::openfga::authorizer::roles::get_role_permissions(
         &org_id, &role_id, &resource,
     )
     .await
@@ -138,8 +144,10 @@ pub async fn get_role_permissions(
 #[get("/{org_id}/roles/{role_id}/users")]
 pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, role_id) = path.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::get_users_with_role(&org_id, &role_id)
-        .await
+    match o2_enterprise::enterprise::openfga::authorizer::roles::get_users_with_role(
+        &org_id, &role_id,
+    )
+    .await
     {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
@@ -161,7 +169,7 @@ pub async fn create_group(
     let org_id = org_id.into_inner();
     let user_grp = user_group.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::create_group(
+    match o2_enterprise::enterprise::openfga::authorizer::groups::create_group(
         &org_id,
         &user_grp.name,
         user_grp.users.unwrap_or_default(),
@@ -191,7 +199,7 @@ pub async fn update_group(
     let (org_id, group_name) = path.into_inner();
     let user_grp = user_group.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::update_group(
+    match o2_enterprise::enterprise::openfga::authorizer::groups::update_group(
         &org_id,
         &group_name,
         user_grp.add_users,
@@ -220,7 +228,7 @@ pub async fn update_group(
 pub async fn get_groups(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::get_all_groups(&org_id).await {
+    match o2_enterprise::enterprise::openfga::authorizer::groups::get_all_groups(&org_id).await {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
@@ -237,7 +245,9 @@ pub async fn get_groups(_path: web::Path<String>) -> Result<HttpResponse, Error>
 pub async fn get_group_details(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (_org_id, group_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::get_group_details(&group_name).await {
+    match o2_enterprise::enterprise::openfga::authorizer::groups::get_group_details(&group_name)
+        .await
+    {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
@@ -270,7 +280,9 @@ pub async fn get_resources(_org_id: web::Path<String>) -> Result<HttpResponse, E
 pub async fn delete_group(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, group_name) = path.into_inner();
 
-    match o2_enterprise::enterprise::openfga::authorizer::delete_group(&org_id, &group_name).await {
+    match o2_enterprise::enterprise::openfga::authorizer::groups::delete_group(&org_id, &group_name)
+        .await
+    {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
