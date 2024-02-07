@@ -1430,7 +1430,6 @@ export default defineComponent({
                 clearInterval(store.state.refreshIntervalID);
               }
               searchObj.data.stream.selectedStream = selectedStreams;
-
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
