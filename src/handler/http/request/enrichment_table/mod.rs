@@ -29,7 +29,7 @@ use crate::{
 #[utoipa::path(
     context_path = "/api",
     tag = "Functions",
-    operation_id = "CreateEnrichmentTable",
+    operation_id = "CreateUpdateEnrichmentTable",
     security(
         ("Authorization" = [])
     ),

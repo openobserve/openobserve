@@ -405,7 +405,7 @@ pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -
     } else {
         object_str
     };
-    o2_enterprise::enterprise::openfga::authorizer::is_allowed(
+    o2_enterprise::enterprise::openfga::authorizer::authz::is_allowed(
         &auth_info.org_id,
         user_id,
         &auth_info.method,
