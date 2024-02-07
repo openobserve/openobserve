@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
             <q-item
               clickable
-              v-if="metaData && metaData.queries.length > 0"
+              v-if="metaData && metaData.queries?.length > 0"
               v-close-popup="true"
               @click="showViewPanel = true"
             >
