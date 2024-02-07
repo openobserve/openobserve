@@ -541,9 +541,7 @@ export default defineComponent({
   },
   computed: {
     sortedStreamFields() {
-      return this.searchObj.data.stream.selectedStreamFields.sort(
-        (a, b) => a.group - b.group
-      );
+      return this.searchObj.data.stream.selectedStreamFields.sort();
     },
   },
   setup(props, { emit }) {
