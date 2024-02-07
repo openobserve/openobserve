@@ -70,7 +70,7 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
         };
 
-        authorizer::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
     }
 }
 #[cfg(not(feature = "enterprise"))]
@@ -90,7 +90,7 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
         };
 
-        authorizer::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
+        authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
     }
 }
 #[cfg(not(feature = "enterprise"))]
@@ -309,8 +309,26 @@ impl FromRequest for AuthExtractor {
                     }));
                 } else if object_type.starts_with("stream") && !method.eq("LIST") {
                     let object_type = match stream_type {
-                        Some(stream_type) => object_type
-                            .replace("stream:", format!("stream:{}/", stream_type).as_str()),
+                        Some(stream_type) => {
+                            if stream_type.eq(&StreamType::EnrichmentTables) {
+                                // since enrichment tables have seperate permissions
+                                let stream_type_str = format!("{stream_type}");
+
+                                object_type.replace(
+                                    "stream:",
+                                    format!(
+                                        "{}:",
+                                        OFGA_MODELS
+                                            .get(stream_type_str.as_str())
+                                            .map_or(stream_type_str.as_str(), |model| model.key)
+                                    )
+                                    .as_str(),
+                                )
+                            } else {
+                                object_type
+                                    .replace("stream:", format!("stream:{}/", stream_type).as_str())
+                            }
+                        }
                         None => object_type,
                     };
                     return ready(Ok(AuthExtractor {
