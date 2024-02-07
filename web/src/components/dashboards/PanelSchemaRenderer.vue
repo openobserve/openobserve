@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
         @error="errorDetail = $event"
-        @click="$emit('chartClick', $event)"
+        @click="(...args) => $emit('chartClick', ...args)"
       />
     </div>
     <div v-if="!errorDetail" class="noData" data-test="no-data">

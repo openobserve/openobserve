@@ -173,7 +173,12 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
+import {
+  getAllDashboardsByFolderId,
+  getDashboard,
+  getFoldersList,
+  movePanelToAnotherTab,
+} from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -545,8 +550,122 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
-    const onChartClick = () => {
-      window.open("https://google.com", "_blank");
+    const onChartClick = async (params: any, panelId: any) => {
+      // current tabId
+      const tabId = route.query.tab ?? "default";
+
+      // find clicked panel data
+      const panelData = currentDashboardData.data.tabs
+        .find((tab: any) => tab.tabId == tabId)
+        .panels.find((panel: any) => panel.id == panelId);
+
+      // if paneldata exists
+      if (panelData) {
+        // find drilldown data
+        const drilldownData = panelData.config.drilldown[0];
+
+        // if drilldown by url
+        if (drilldownData.type == "byUrl") {
+          // open url
+          return window.open(
+            new URL(drilldownData.data.url),
+            drilldownData.targetBlank ? "_blank" : "_self"
+          );
+        } else if (drilldownData.type == "byDashboard") {
+          // we have folder, dashboard and tabs name
+          // so we have to get id of folder, dashboard and tab
+
+          // get folder id
+          if (
+            !store.state.organizationData.folders ||
+            (Array.isArray(store.state.organizationData.folders) &&
+              store.state.organizationData.folders.length === 0)
+          ) {
+            await getFoldersList(store);
+          }
+          const folderId = store.state.organizationData.folders.find(
+            (folder: any) => folder.name == drilldownData.data.folder
+          )?.folderId;
+
+          if (!folderId) {
+            return;
+          }
+
+          // get dashboard id
+          const allDashboardData = await getAllDashboardsByFolderId(
+            store,
+            folderId
+          );
+          const dashboardData = allDashboardData.find(
+            (dashboard: any) => dashboard.title == drilldownData.data.dashboard
+          );
+
+          if (!dashboardData) {
+            return;
+          }
+
+          // get tab id
+          const tabId =
+            dashboardData.tabs.find(
+              (tab: any) => tab.name == drilldownData.data.tab
+            )?.tabId ?? "default";
+
+          // if targetBlank is true then create new url
+          // else made changes in current router only
+          if (drilldownData.targetBlank) {
+            let currentUrl = window.location.origin;
+
+            // if pass all variables in url
+            currentUrl += drilldownData.data.passAllVariables
+              ? route.fullPath
+              : route.path;
+
+            const url = new URL(currentUrl);
+
+            // set variables provided by user
+            drilldownData.data.variables.forEach((variable: any) => {
+              if (variable?.name?.trim() && variable?.value?.trim()) {
+                url.searchParams.set(variable.name, variable.value);
+              }
+            });
+
+            url.searchParams.set("dashboard", dashboardData.dashboardId);
+            url.searchParams.set("folder", folderId);
+            url.searchParams.set("tab", tabId);
+            currentUrl = url.toString();
+
+            window.open(currentUrl, "_blank");
+          } else {
+            let oldParams = [];
+            // if pass all variables is true
+            if (drilldownData.data.passAllVariables) {
+              // get current query params
+              oldParams = route.query;
+            }
+
+            drilldownData.data.variables.forEach((variable: any) => {
+              if (variable?.name?.trim() && variable?.value?.trim()) {
+                oldParams[variable.name] = variable.value;
+              }
+            });
+
+            // make changes in router
+            await router.push({
+              path: "/dashboards/view",
+              query: {
+                ...oldParams,
+                org_identifier: store.state.selectedOrganization.identifier,
+                dashboard: dashboardData.dashboardId,
+                folder: folderId,
+                tab: tabId,
+              },
+            });
+
+            // reload dashboard because it will be in same path
+            await loadDashboard();
+          }
+        }
+      }
     };
 
     return {

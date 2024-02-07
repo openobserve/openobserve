@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
-              @chart-click="$emit('chartClick', $event)"
+              @chartClick="(...args) => $emit('chartClick', ...args)"
               @onMovePanel="onMovePanel"
               @refresh="refreshDashboard"
             >

@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :variablesData="props.variablesData"
       @metadata-update="metaDataValue"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
-      @chart-click="$emit('chartClick', $event)"
+      @chartClick="(...args: any) => $emit('chartClick', ...args)"
       ref="PanleSchemaRendererRef"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
@@ -221,7 +221,8 @@ export default defineComponent({
   emits: [
     "onDeletePanel",
     "onViewPanel",
-    "updated:data-zoom", "chartClick",
+    "updated:data-zoom",
+    "chartClick",
     "onMovePanel",
     "refresh",
   ],
