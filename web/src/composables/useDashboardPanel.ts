@@ -60,6 +60,7 @@ const getDefaultDashboardPanelData: any = () => ({
         lat: 0,
         lng: 0,
       },
+      drilldown: [],
     },
     htmlContent: "",
     markdownContent: "",

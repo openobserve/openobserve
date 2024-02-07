@@ -17,7 +17,10 @@
 <template>
   <div>
     <div style="font-size: 14px; padding-bottom: 5px">Data Link :</div>
-    <div v-for="(data, index) in dataLink" :key="JSON.stringify(data)">
+    <div
+      v-for="(data, index) in dashboardPanelData.data.config.drilldown"
+      :key="JSON.stringify(data) + index"
+    >
       <div
         style="
           display: flex;
@@ -26,7 +29,7 @@
         "
       >
         <div
-          :onclick="onDataLinkClick"
+          :onclick="onDataLinkClick(index)"
           style="
             cursor: pointer;
             text-decoration: underline;
@@ -49,16 +52,17 @@
       </div>
     </div>
     <q-btn
-      @click="onDataLinkClick"
+      @click="addDataLink"
       style="cursor: pointer; padding: 0px 5px"
       label="+ Add link"
       no-caps
     />
     <q-dialog v-model="showDrilldownPopUp">
       <drilldown-pop-up
-        @close="() => (showDrilldownPopUp = false)"
+        :drilldown-data-index="selectedDrilldownIndexToEdit"
+        :is-edit-mode="isDrilldownEditMode"
+        @close="saveDrilldownData"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-        :drilldown-data="drilldownData"
       />
     </q-dialog>
   </div>
@@ -68,6 +72,8 @@
 import { defineComponent, ref } from "vue";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import { useStore } from "vuex";
+import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
@@ -75,55 +81,48 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const showDrilldownPopUp = ref(false);
-    const dataLink: any = ref([
-      {
-        name: "Drill down 1 asfdhk dfashsj ewfjklsda;lkewfsd",
-      },
-      {
-        name: "Drill down 2",
-      },
-      {
-        name: "Drill down 3",
-      },
-    ]);
-    const drilldownData: any = ref({
-      name: "",
-      type: "",
-      targetBlank: false,
-      findBy: "name",
-      data: {
-        url: "",
-        folder: "",
-        dashboard: "",
-        tab: "",
-        passAllVariables: true,
-        variables: [
-          {
-            name: "",
-            value: "",
-          },
-        ],
-      },
+    const isDrilldownEditMode = ref(false);
+    const selectedDrilldownIndexToEdit: any = ref(null);
+    const { dashboardPanelData } = useDashboardPanelData();
+
+    onBeforeMount(() => {
+      // Ensure that the drilldown is initialized
+      if (!dashboardPanelData.data.drilldown) {
+        dashboardPanelData.data.drilldown = [];
+      }
     });
 
+    const onDataLinkClick = (index: any) => {
+      selectedDrilldownIndexToEdit.value = index;
+      isDrilldownEditMode.value = true;
+      showDrilldownPopUp.value = true;
+    };
 
-    const onDataLinkClick = () => {
-      console.log("onDataLinkClick");
-
+    const addDataLink = () => {
+      isDrilldownEditMode.value = false;
       showDrilldownPopUp.value = true;
     };
 
     const removeDataLink = (index: any) => {
-      dataLink.value.splice(index, 1);
+      dashboardPanelData.data.config.drilldown.splice(index, 1);
+    };
+
+    const saveDrilldownData = () => {
+      selectedDrilldownIndexToEdit.value = null;
+      isDrilldownEditMode.value = false;
+      showDrilldownPopUp.value = false;
     };
 
     return {
       store,
-      dataLink,
+      dashboardPanelData,
       onDataLinkClick,
       showDrilldownPopUp,
       removeDataLink,
-      drilldownData,
+      selectedDrilldownIndexToEdit,
+      saveDrilldownData,
+      addDataLink,
+      isDrilldownEditMode,
     };
   },
 });

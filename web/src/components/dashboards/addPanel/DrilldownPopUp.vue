@@ -294,19 +294,55 @@ import {
 } from "../../../utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
+import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {},
   props: {
-    drilldownData: {
-      type: Object,
-      required: true,
+    isEditMode: {
+      type: Boolean,
+      default: false,
+    },
+    drilldownDataIndex: {
+      type: Number,
+      default: -1,
     },
   },
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const { dashboardPanelData } = useDashboardPanelData();
+    const getDefaultDrilldownData = () => ({
+      name: "",
+      type: "byDashboard",
+      targetBlank: false,
+      findBy: "name",
+      data: {
+        url: "",
+        folder: "",
+        dashboard: "",
+        tab: "",
+        passAllVariables: true,
+        variables: [
+          {
+            name: "",
+            value: "",
+          },
+        ],
+      },
+    });
+    const drilldownData = ref(
+      props.isEditMode
+        ? JSON.parse(
+            JSON.stringify(
+              dashboardPanelData.data.config.drilldowns[
+                props.drilldownDataIndex
+              ]
+            )
+          )
+        : getDefaultDrilldownData()
+    );
     const dashboardList = ref([]);
     const tabList = ref([]);
 
@@ -318,21 +354,21 @@ export default defineComponent({
 
     // on folder change, reset dashboard and tab values
     watch(
-      () => props.drilldownData.data.folder,
+      () => drilldownData.value.data.folder,
       (newVal, oldVal) => {
         if (newVal !== oldVal) {
-          props.drilldownData.data.dashboard = "";
-          props.drilldownData.data.tab = "";
+          drilldownData.value.data.dashboard = "";
+          drilldownData.value.data.tab = "";
         }
       }
     );
 
     // on dashboard change, reset tab value
     watch(
-      () => props.drilldownData.data.dashboard,
+      () => drilldownData.value.data.dashboard,
       (newVal, oldVal) => {
         if (newVal !== oldVal) {
-          props.drilldownData.data.tab = "";
+          drilldownData.value.data.tab = "";
         }
       }
     );
@@ -353,11 +389,11 @@ export default defineComponent({
     });
 
     watch(
-      () => props.drilldownData.data.folder,
+      () => drilldownData.value.data.folder,
       async () => {
         // get folder data
         const folderData = store.state.organizationData.folders?.find(
-          (folder: any) => folder.name === props.drilldownData.data.folder
+          (folder: any) => folder.name === drilldownData.value.data.folder
         );
 
         if (!folderData) {
@@ -383,11 +419,11 @@ export default defineComponent({
     );
 
     watch(
-      () => props.drilldownData.data.dashboard,
+      () => drilldownData.value.data.dashboard,
       async () => {
         // get folder data
         const folderData = store.state.organizationData.folders?.find(
-          (folder: any) => folder.name === props.drilldownData.data.folder
+          (folder: any) => folder.name === drilldownData.value.data.folder
         );
 
         if (!folderData) {
@@ -402,8 +438,7 @@ export default defineComponent({
 
         // get dashboard data
         const dashboardData = allDashboardList?.find(
-          (dashboard: any) =>
-            dashboard.title === props.drilldownData.data.dashboard
+          (dashboard: any) => dashboard.title === drilldownData.value.data.dashboard
         );
 
         if (!dashboardData) {
@@ -424,25 +459,25 @@ export default defineComponent({
 
     const isFormValid = computed(() => {
       // if name is empty
-      if (!props.drilldownData.name.trim()) {
+      if (!drilldownData.value.name.trim()) {
         return true;
       }
 
       // if action is not selected
-      if (!props.drilldownData.type) {
+      if (!drilldownData.value.type) {
         return true;
       }
 
       // if action is by url
-      if (props.drilldownData.type == "byUrl") {
-        if (props.drilldownData.data.url.trim()) {
+      if (drilldownData.value.type == "byUrl") {
+        if (drilldownData.value.url.trim()) {
           return false;
         }
       } else {
         if (
-          props.drilldownData.data.folder &&
-          props.drilldownData.data.dashboard &&
-          props.drilldownData.data.tab
+          drilldownData.value.data.folder &&
+          drilldownData.value.data.dashboard &&
+          drilldownData.value.data.tab
         ) {
           return false;
         }
@@ -451,12 +486,22 @@ export default defineComponent({
     });
 
     const saveDrilldown = useLoading(async () => {
-      emit("save", props.drilldownData);
+      // if editmode then made changes
+      // else add new
+      if (props.isEditMode) {
+        dashboardPanelData.data.config.drilldowns[props.drilldownDataIndex] =
+          drilldownData.value;
+      } else {
+        dashboardPanelData.data.config.drilldowns.push(drilldownData.value);
+      }
+      emit("close");
     });
 
     return {
       t,
       outlinedDashboard,
+      dashboardPanelData,
+      drilldownData,
       outlinedDelete,
       store,
       folderList,
