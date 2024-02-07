@@ -173,6 +173,12 @@ pub async fn register() -> Result<()> {
     let mut node_id = 1;
     let mut node_ids = Vec::new();
     for node in node_list {
+        if is_querier(&node.role) {
+            add_node_to_consistent_hash(&node, &Role::Querier).await;
+        }
+        if is_compactor(&node.role) {
+            add_node_to_consistent_hash(&node, &Role::Compactor).await;
+        }
         node_ids.push(node.id);
         NODES.insert(node.uuid.clone(), node);
     }
