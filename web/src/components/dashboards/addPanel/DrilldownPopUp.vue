@@ -103,7 +103,7 @@
             label="Select Folder*:"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-py-sm showLabelOnTop no-case"
             stack-label
             outlined
             filled
@@ -128,7 +128,7 @@
             label="Select Dashboard*:"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-py-sm showLabelOnTop no-case"
             stack-label
             outlined
             filled
@@ -153,7 +153,7 @@
             label="Select Tab*:"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
+            class="q-py-sm showLabelOnTop no-case"
             stack-label
             outlined
             filled
@@ -290,7 +290,6 @@ import {
   getFoldersList,
 } from "../../../utils/commons";
 import { onMounted } from "vue";
-import { useLoading } from "@/composables/useLoading";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 
 export default defineComponent({
@@ -343,9 +342,16 @@ export default defineComponent({
     const tabList = ref([]);
 
     onMounted(async () => {
-      if (store.state.organizationData.folders) {
+      if (
+        !store.state.organizationData.folders ||
+        (Array.isArray(store.state.organizationData.folders) &&
+          store.state.organizationData.folders.length === 0)
+      ) {
         await getFoldersList(store);
       }
+
+      await getDashboardList();
+      await getTabList();
     });
 
     // on folder change, reset dashboard and tab values
@@ -384,73 +390,81 @@ export default defineComponent({
       );
     });
 
+    const getDashboardList = async () => {
+      // get folder data
+      const folderData = store.state.organizationData.folders?.find(
+        (folder: any) => folder.name === drilldownData.value.data.folder
+      );
+
+      if (!folderData) {
+        dashboardList.value = [];
+        return;
+      }
+
+      // get all dashboards from folder
+      const allDashboardList = await getAllDashboardsByFolderId(
+        store,
+        folderData?.folderId
+      );
+
+      // make list of dashboards
+      dashboardList.value =
+        allDashboardList?.map((dashboard: any) => {
+          return {
+            label: dashboard.title,
+            value: dashboard.title,
+          };
+        }) ?? [];
+    };
+
+    const getTabList = async () => {
+      // get folder data
+      const folderData = store.state.organizationData.folders?.find(
+        (folder: any) => folder.name === drilldownData.value.data.folder
+      );
+
+      if (!folderData) {
+        dashboardList.value = [];
+        return;
+      }
+
+      const allDashboardList = await getAllDashboardsByFolderId(
+        store,
+        folderData?.folderId
+      );
+
+      // get dashboard data
+      const dashboardData = allDashboardList?.find(
+        (dashboard: any) =>
+          dashboard.title === drilldownData.value.data.dashboard
+      );
+
+      if (!dashboardData) {
+        dashboardList.value = [];
+        return;
+      }
+
+      // make list of tabs
+      tabList.value =
+        dashboardData?.tabs?.map((tab: any) => {
+          return {
+            label: tab.name,
+            value: tab.name,
+          };
+        }) ?? [];
+    };
+
     watch(
       () => drilldownData.value.data.folder,
       async () => {
-        // get folder data
-        const folderData = store.state.organizationData.folders?.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder
-        );
-
-        if (!folderData) {
-          dashboardList.value = [];
-          return;
-        }
-
-        // get all dashboards from folder
-        const allDashboardList = await getAllDashboardsByFolderId(
-          store,
-          folderData?.folderId
-        );
-
-        // make list of dashboards
-        dashboardList.value =
-          allDashboardList?.map((dashboard: any) => {
-            return {
-              label: dashboard.title,
-              value: dashboard.title,
-            };
-          }) ?? [];
+        await getDashboardList();
       }
     );
 
     watch(
       () => drilldownData.value.data.dashboard,
       async () => {
-        // get folder data
-        const folderData = store.state.organizationData.folders?.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder
-        );
-
-        if (!folderData) {
-          dashboardList.value = [];
-          return;
-        }
-
-        const allDashboardList = await getAllDashboardsByFolderId(
-          store,
-          folderData?.folderId
-        );
-
-        // get dashboard data
-        const dashboardData = allDashboardList?.find(
-          (dashboard: any) =>
-            dashboard.title === drilldownData.value.data.dashboard
-        );
-
-        if (!dashboardData) {
-          dashboardList.value = [];
-          return;
-        }
-
-        // make list of tabs
-        tabList.value =
-          dashboardData?.tabs?.map((tab: any) => {
-            return {
-              label: tab.name,
-              value: tab.name,
-            };
-          }) ?? [];
+        await getTabList();
       }
     );
 
@@ -525,5 +539,9 @@ export default defineComponent({
 
 .dropdown {
   min-width: 100%;
+}
+
+:deep(.no-case .q-field__native > :first-child) {
+  text-transform: none !important;
 }
 </style>

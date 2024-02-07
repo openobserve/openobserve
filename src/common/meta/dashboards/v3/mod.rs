@@ -197,6 +197,7 @@ pub struct DrillDown {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DrillDownData {
     #[serde(skip_serializing_if = "Option::is_none")]
     url: Option<String>,
