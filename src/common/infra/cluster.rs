@@ -48,6 +48,9 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         let hash = h.sum64(&key);
         nodes.insert(hash, node.uuid.clone());
     }
+    for (k, v) in nodes.iter() {
+        log::debug!("consistent hash[{}] {} {}", role, k, v);
+    }
 }
 
 pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
@@ -61,6 +64,9 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
+    }
+    for (k, v) in nodes.iter() {
+        log::debug!("consistent hash[{}] {} {}", role, k, v);
     }
 }
 
