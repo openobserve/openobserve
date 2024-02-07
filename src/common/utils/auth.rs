@@ -245,7 +245,7 @@ impl FromRequest for AuthExtractor {
                 )
             }
         } else if url_len == 4 {
-            if method.eq("PUT") || method.eq("DELETE") {
+            if method.eq("PUT") && path_columns[1] != "streams" || method.eq("DELETE") {
                 format!(
                     "{}:{}",
                     OFGA_MODELS
