@@ -234,9 +234,10 @@ const useLogs = () => {
         ? useLocalLogFilterField()?.value
         : {};
 
-    const stream = searchObj.data.stream.selectedStream.sort().join("_");
-    selectedFields[`${identifier}_${stream}`] =
-      searchObj.data.stream.selectedFields;
+    searchObj.data.stream.selectedStream.forEach((stream: any) => {
+      selectedFields[`${identifier}_${stream}`] =
+        searchObj.data.stream.selectedFields;
+    });
     useLocalLogFilterField(selectedFields);
   };
 
