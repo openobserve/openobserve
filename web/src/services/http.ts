@@ -23,10 +23,7 @@ const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
   if (config.isEnterprise == "false") {
     headers = {
-      Authorization:
-        config.isCloud == "true"
-          ? "Bearer " + localStorage.getItem("token")
-          : localStorage.getItem("token") || "",
+      Authorization: localStorage.getItem("access_token") || "",
       ...headers,
     };
     instance = axios.create({
@@ -36,11 +33,7 @@ const http = ({ headers } = {} as any) => {
     });
   } else {
     headers = {
-      Authorization:
-        config.isEnterprise == "true" &&
-        (store.state as any).zoConfig.dex_enabled
-          ? "Bearer " + localStorage.getItem("access_token")
-          : localStorage.getItem("token") || "",
+      Authorization: localStorage.getItem("access_token"),
       ...headers,
     };
 
@@ -83,7 +76,8 @@ const http = ({ headers } = {} as any) => {
               config.isEnterprise == "true" &&
               (store.state as any).zoConfig.dex_enabled &&
               !error.config.url.includes("/config/dex_login") &&
-              !error.config.url.includes("/config/dex_refresh")
+              !error.config.url.includes("/config/dex_refresh") &&
+              !error.config.url.includes("/auth/login")
             ) {
               // Call refresh token API
               const refreshToken = localStorage.getItem("refresh_token");
@@ -94,7 +88,7 @@ const http = ({ headers } = {} as any) => {
                   headers: { Authorization: `${refreshToken}` },
                 })
                 .then((res) => {
-                  localStorage.setItem("access_token", res.data);
+                  localStorage.setItem("access_token", "Bearer " + res.data);
                   error.config.headers["Authorization"] = "Bearer " + res.data;
                   return instance(error.config);
                 })
