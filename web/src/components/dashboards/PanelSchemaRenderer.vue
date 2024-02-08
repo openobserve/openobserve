@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
         @error="errorDetail = $event"
-        @click="(...args) => $emit('chartClick', ...args)"
+        @click="onChartClick"
       />
     </div>
     <div v-if="!errorDetail" class="noData" data-test="no-data">
@@ -117,6 +117,8 @@ import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
 import HTMLRenderer from "./panels/HTMLRenderer.vue";
 import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
+import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
+import { useRoute, useRouter } from "vue-router";
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -140,9 +142,11 @@ export default defineComponent({
       type: Object,
     },
   },
-  emits: ["updated:data-zoom", "error", "metadata-update", "chartClick"],
+  emits: ["updated:data-zoom", "error", "metadata-update", "refresh"],
   setup(props, { emit }) {
     const store = useStore();
+    const route = useRoute();
+    const router = useRouter();
 
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
@@ -310,6 +314,174 @@ export default defineComponent({
       emit("error", errorDetail);
     });
 
+    // drilldown
+    const replacePlaceholders = (str: any, obj: any) => {
+      return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
+        let parts = key.split(".");
+        let value = obj;
+        for (let part of parts) {
+          if (value && part in value) {
+            value = value[part];
+          } else {
+            return "${" + part + "}";
+          }
+        }
+        return value;
+      });
+    };
+
+    const onChartClick = async (params: any, panelId: any) => {
+      // if panelSchema exists
+      if (panelSchema.value) {
+        // check if drilldown data exists
+        if (
+          !panelSchema.value.config.drilldown ||
+          panelSchema.value.config.drilldown.length == 0
+        ) {
+          return;
+        }
+
+        // find drilldown data
+        const drilldownData = panelSchema.value.config.drilldown[0];
+
+        // need to change dynamic variables to it's value using current variables, current chart data(params)
+        const drilldownVariables: any = {
+          series: {
+            __name: params.seriesName,
+            __value: Array.isArray(params.value)
+              ? params.value[1]
+              : params.value,
+          },
+        };
+
+        variablesData.value.values.forEach((variable: any) => {
+          if (variable.type != "dynamic_filters") {
+            drilldownVariables["var-" + variable.name] = variable.value;
+          }
+        });
+
+        // if drilldown by url
+        if (drilldownData.type == "byUrl") {
+          // open url
+          return window.open(
+            new URL(
+              replacePlaceholders(drilldownData.data.url, drilldownVariables)
+            ),
+            drilldownData.targetBlank ? "_blank" : "_self"
+          );
+        } else if (drilldownData.type == "byDashboard") {
+          // we have folder, dashboard and tabs name
+          // so we have to get id of folder, dashboard and tab
+
+          // get folder id
+          if (
+            !store.state.organizationData.folders ||
+            (Array.isArray(store.state.organizationData.folders) &&
+              store.state.organizationData.folders.length === 0)
+          ) {
+            await getFoldersList(store);
+          }
+          const folderId = store.state.organizationData.folders.find(
+            (folder: any) => folder.name == drilldownData.data.folder
+          )?.folderId;
+
+          if (!folderId) {
+            return;
+          }
+
+          // get dashboard id
+          const allDashboardData = await getAllDashboardsByFolderId(
+            store,
+            folderId
+          );
+          const dashboardData = allDashboardData.find(
+            (dashboard: any) => dashboard.title == drilldownData.data.dashboard
+          );
+
+          if (!dashboardData) {
+            return;
+          }
+
+          // get tab id
+          const tabId =
+            dashboardData.tabs.find(
+              (tab: any) => tab.name == drilldownData.data.tab
+            )?.tabId ?? "default";
+
+          // if targetBlank is true then create new url
+          // else made changes in current router only
+          if (drilldownData.targetBlank) {
+            console.log(route);
+
+            // get current origin
+            const pos = window.location.pathname.indexOf("/web/");
+            let currentUrl: any =
+              pos > -1
+                ? window.location.origin +
+                  window.location.pathname.slice(0, pos)
+                : window.location.origin;
+
+            // always, go to view dashboard page
+            currentUrl += "/dashboards/view?";
+
+            // if pass all variables in url
+            currentUrl += drilldownData.data.passAllVariables
+              ? new URLSearchParams(route.query as any).toString()
+              : "";
+
+            const url = new URL(currentUrl);
+
+            // set variables provided by user
+            drilldownData.data.variables.forEach((variable: any) => {
+              if (variable?.name?.trim() && variable?.value?.trim()) {
+                url.searchParams.set(
+                  replacePlaceholders(variable.name, drilldownVariables),
+                  replacePlaceholders(variable.value, drilldownVariables)
+                );
+              }
+            });
+
+            url.searchParams.set("dashboard", dashboardData.dashboardId);
+            url.searchParams.set("folder", folderId);
+            url.searchParams.set("tab", tabId);
+            currentUrl = url.toString();
+
+            window.open(currentUrl, "_blank");
+          } else {
+            let oldParams: any = [];
+            // if pass all variables is true
+            if (drilldownData.data.passAllVariables) {
+              // get current query params
+              oldParams = route.query;
+            }
+
+            drilldownData.data.variables.forEach((variable: any) => {
+              if (variable?.name?.trim() && variable?.value?.trim()) {
+                oldParams[
+                  replacePlaceholders(variable.name, drilldownVariables)
+                ] = replacePlaceholders(variable.value, drilldownVariables);
+              }
+            });
+
+            // make changes in router
+            await router.push({
+              path: "/dashboards/view",
+              query: {
+                ...oldParams,
+                org_identifier: store.state.selectedOrganization.identifier,
+                dashboard: dashboardData.dashboardId,
+                folder: folderId,
+                tab: tabId,
+              },
+            });
+
+            // reload dashboard because it will be in same path
+            emit("refresh");
+          }
+        }
+      }
+    };
+
     return {
       chartPanelRef,
       data,
@@ -319,6 +491,7 @@ export default defineComponent({
       noData,
       metadata,
       tableRendererRef,
+      onChartClick,
     };
   },
 });
