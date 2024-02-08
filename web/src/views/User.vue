@@ -35,8 +35,6 @@ export default defineComponent({
       (zoConfig) => {
         if (config.isCloud == "true") {
           componentName.value = "UsersCloud";
-        } else if (zoConfig.dex_enabled) {
-          componentName.value = "UsersEnterprise";
         } else {
           componentName.value = "UsersOpenSource";
         }

@@ -80,6 +80,7 @@ import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
+import { useQuasar } from "quasar";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -94,6 +95,8 @@ const store = useStore();
 const router = useRouter();
 
 const { t } = useI18n();
+
+const q = useQuasar();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -154,11 +157,18 @@ const saveGroupChanges = () => {
     payload,
   })
     .then((res) => {
-      console.log(res);
-      router.push({ name: "groups" });
+      q.notify({
+        type: "positive",
+        message: `Updated group successfully!`,
+        timeout: 3000,
+      });
     })
     .catch((err) => {
-      console.log(err);
+      q.notify({
+        type: "negative",
+        message: "Error while updating group!",
+        timeout: 3000,
+      });
     });
 };
 
