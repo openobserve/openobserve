@@ -97,8 +97,9 @@ pub async fn search(
         return Ok((HashMap::new(), ScanStats::default()));
     }
     log::info!(
-        "[session_id {session_id}] search->storage: org {}, stream {}, load file_list num {}",
+        "[session_id {session_id}] search->storage: stream {}/{}/{}, load file_list num {}",
         &sql.org_id,
+        &stream_type,
         &sql.stream_name,
         files.len(),
     );
@@ -152,8 +153,9 @@ pub async fn search(
     }
 
     log::info!(
-        "[session_id {session_id}] search->storage: org {}, stream {}, load files {}, scan_size {}, compressed_size {}",
+        "[session_id {session_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
         &sql.org_id,
+        &stream_type,
         &sql.stream_name,
         scan_stats.files,
         scan_stats.original_size,
@@ -173,8 +175,9 @@ pub async fn search(
         }
     }
     log::info!(
-        "[session_id {session_id}] search->storage: org {}, stream {}, load files {}, into {:?} cache done",
+        "[session_id {session_id}] search->storage: org {}/{}/{}, load files {}, into {:?} cache done",
         &sql.org_id,
+        &stream_type,
         &sql.stream_name,
         scan_stats.files,
         cache_type,
@@ -280,6 +283,13 @@ async fn get_file_list(
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
+    log::debug!(
+        "[session_id {session_id}] grpc->storage: get file list, stream {}/{}/{}, time_level {:?}",
+        &sql.org_id,
+        &stream_type,
+        &sql.stream_name,
+        time_level
+    );
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = match file_list::query(
         &sql.org_id,
