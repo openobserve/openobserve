@@ -694,7 +694,7 @@
     "period": "Period",
     "threshold": "Threshold",
     "interval": "Frequency",
-    "silenceNotification": "Silence notification after",
+    "silenceNotification": "Silence notification for",
     "destination": "Destination",
     "additionalVariables": "Additional Variables",
     "description": "Description",
