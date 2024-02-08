@@ -1155,20 +1155,14 @@ const saveRole = () => {
     .then((res) => {
       q.notify({
         type: "positive",
-        message: `Updated "${editingRole.value}" role permissions successfully!"`,
+        message: `Updated role permissions successfully!`,
         timeout: 3000,
-      });
-      router.push({
-        name: "roles",
-        params: {
-          org_name: store.state.selectedOrganization.name,
-        },
       });
     })
     .catch((err) => {
       q.notify({
         type: "negative",
-        message: `Error While updating "${editingRole.value}" role permissions!`,
+        message: `Error While updating role permissions!`,
         timeout: 3000,
       });
       console.log(err);
