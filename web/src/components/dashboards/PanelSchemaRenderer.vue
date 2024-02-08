@@ -345,11 +345,15 @@ export default defineComponent({
         const drilldownData = panelSchema.value.config.drilldown[0];
 
         // need to change dynamic variables to it's value using current variables, current chart data(params)
+        // if pie, donut or heatmap then series name will come in name field
+        // also, if value is an array, then last value will be taken
         const drilldownVariables: any = {
           series: {
-            __name: params.seriesName,
+            __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
+              ? params.name
+              : params.seriesName,
             __value: Array.isArray(params.value)
-              ? params.value[1]
+              ? params.value[params.value.length - 1]
               : params.value,
           },
         };
@@ -411,8 +415,6 @@ export default defineComponent({
           // if targetBlank is true then create new url
           // else made changes in current router only
           if (drilldownData.targetBlank) {
-            console.log(route);
-
             // get current origin
             const pos = window.location.pathname.indexOf("/web/");
             let currentUrl: any =
