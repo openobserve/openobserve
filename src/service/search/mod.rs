@@ -368,7 +368,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                             .map(|f| cluster_rpc::FileKey::from(*f))
                             .collect();
                         offset_start += offset;
-                        if req.file_list.is_empty() {
+                        if req.file_list.is_empty() && !is_ingester(&node.role) {
                             continue;
                         }
                     }

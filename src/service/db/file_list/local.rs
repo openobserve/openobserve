@@ -42,7 +42,7 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
     for _ in 0..5 {
         if let Err(e) = super::progress(key, meta.as_ref(), deleted).await {
             log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         } else {
             break;
         }
