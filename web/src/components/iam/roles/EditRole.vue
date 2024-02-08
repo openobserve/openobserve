@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-select
             v-model="filter.resource"
-            :options="resources"
+            :options="filteredResources"
             color="input-border"
             bg-color="input-bg"
             class="q-py-xs q-mr-sm"
@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             clearable
             style="width: 200px"
+            @filter="filterResourceOptions"
             @update:model-value="onResourceChange"
           />
         </div>
@@ -255,14 +256,9 @@ const filter = ref({
   method: filterResources,
 });
 
-const resources = computed(() =>
-  permissionsState.resources.map((r) => {
-    return {
-      label: r.display_name,
-      value: r.key,
-    };
-  })
-);
+const filteredResources: Ref<any[]> = ref([]);
+
+const resourceOptions: Ref<any[]> = ref([]);
 
 const updateActiveTab = (tab: string) => {
   if (!tab) return;
@@ -276,6 +272,15 @@ const getRoleDetails = () => {
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
       setDefaultPermissions();
+
+      filteredResources.value = permissionsState.resources.map((r) => {
+        return {
+          label: r.display_name,
+          value: r.key,
+        };
+      });
+
+      resourceOptions.value = cloneDeep(filteredResources.value);
 
       isFetchingIntitialRoles.value = true;
       await getResourcePermissions();
@@ -345,12 +350,22 @@ const setDefaultPermissions = () => {
       }
     }
 
+    modifyResourcePermissions(resourcePermission);
+
     permissionsState.permissions.push(resourcePermission as Resource);
   });
 
   permissionsState.permissions = permissionsState.permissions.filter(
     (resource) => !resource.parent
   );
+};
+
+const modifyResourcePermissions = (resource: Resource) => {
+  if (resource.resourceName === "settings") {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowDelete.show = false;
+    resource.permission.AllowPost.show = false;
+  }
 };
 
 const getResourcePermissions = () => {
@@ -378,39 +393,6 @@ const getResourcePermissions = () => {
         reject(err);
       });
   });
-};
-
-const getDefaultEntity = (): Entity => {
-  return {
-    name: "",
-    permission: {
-      AllowAll: {
-        show: true,
-        value: false,
-      },
-      AllowGet: {
-        show: true,
-        value: false,
-      },
-      AllowDelete: {
-        show: true,
-        value: false,
-      },
-      AllowPut: {
-        show: true,
-        value: false,
-      },
-      AllowList: {
-        show: false,
-        value: false,
-      },
-    },
-    display_name: "",
-    type: "Resource",
-    resourceName: "",
-    isSelected: false,
-    is_loading: false,
-  };
 };
 
 const getDefaultResource = (): Resource => {
@@ -713,7 +695,7 @@ function filterResources(rows: any, terms: any) {
   terms = terms.toLowerCase();
   for (var i = 0; i < rows.length; i++) {
     let isAdded = false;
-    if (rows[i]["name"].toLowerCase().includes(terms)) {
+    if (rows[i]["display_name"].toLowerCase().includes(terms)) {
       filtered.push(rows[i]);
       isAdded = true;
       continue;
@@ -721,7 +703,7 @@ function filterResources(rows: any, terms: any) {
     for (var j = 0; j < rows[i].entities.length; j++) {
       if (
         !isAdded &&
-        rows[i].entities[j]["name"].toLowerCase().includes(terms)
+        rows[i].entities[j]["display_name"].toLowerCase().includes(terms)
       ) {
         filtered.push(rows[i]);
         break;
@@ -1057,6 +1039,16 @@ const updateEntityEntities = (
             ),
             show: hasEntities,
           },
+          AllowPost: {
+            value: selectedPermissionsHash.value.has(
+              getPermissionHash(
+                entity.childName as string,
+                "AllowPost",
+                entityName
+              )
+            ),
+            show: hasEntities,
+          },
         },
         entities: [],
         type: "Resource",
@@ -1131,6 +1123,12 @@ const updateResourceEntities = (
           ),
           show: hasEntities,
         },
+        AllowPost: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(resourceName, "AllowPost", entityName)
+          ),
+          show: hasEntities,
+        },
       },
       entities: [],
       type: "Resource",
@@ -1162,24 +1160,43 @@ const saveRole = () => {
     .then((res) => {
       q.notify({
         type: "positive",
-        message: `Updated "${editingRole.value}" role permissions successfully!"`,
+        message: `Updated role permissions successfully!`,
         timeout: 3000,
-      });
-      router.push({
-        name: "roles",
-        params: {
-          org_name: store.state.selectedOrganization.name,
-        },
       });
     })
     .catch((err) => {
       q.notify({
         type: "negative",
-        message: `Error While updating "${editingRole.value}" role permissions!`,
+        message: `Error While updating role permissions!`,
         timeout: 3000,
       });
       console.log(err);
     });
+};
+
+const filterColumns = (options: any[], val: String, update: Function) => {
+  let filteredOptions: any[] = [];
+  if (val === "") {
+    update(() => {
+      filteredOptions = [...options];
+    });
+    return filteredOptions;
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredOptions = options.filter(
+      (column: any) => column.label.toLowerCase().indexOf(value) > -1
+    );
+  });
+  return filteredOptions;
+};
+
+const filterResourceOptions = (val: string, update: any) => {
+  filteredResources.value = filterColumns(
+    resourceOptions.value,
+    val,
+    update
+  ) as any[];
 };
 </script>
 

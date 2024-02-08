@@ -372,6 +372,19 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let root = ROOT_USER.get("root").unwrap();
+        let root_user = root.value();
+        user_list.push(UserResponse {
+            email: root_user.email.clone(),
+            role: root_user.role.clone(),
+            first_name: root_user.first_name.clone(),
+            last_name: root_user.last_name.clone(),
+            is_external: root_user.is_external,
+        })
+    }
+
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
 }
 
