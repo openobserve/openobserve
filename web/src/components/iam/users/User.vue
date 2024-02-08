@@ -31,14 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData></NoData>
       </template>
       <template #body-cell-role="props">
-        <q-td
-          :props="props"
-          v-if="
-            ((currentUserRole == 'admin' && props.row.role !== 'root') ||
-              currentUserRole == 'root') &&
-            !props.row.isLoggedinUser
-          "
-        >
+        <q-td :props="props" v-if="props?.row?.enableChangeRole">
           <q-select
             dense
             borderless
@@ -238,7 +231,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const qTable: any = ref(null);
     const { usersState } = usePermissions();
-    const isDexEnabled = ref(false);
+    const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
 
     onActivated(() => {
@@ -254,9 +247,26 @@ export default defineComponent({
     });
 
     onBeforeMount(async () => {
-      isDexEnabled.value = store.state.zoConfig.dex_enabled;
+      isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
       await nextTick();
+
+      if (isEnterprise.value && isCurrentUserInternal.value) {
+        columns.value.push({
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        });
+      } else if (!isEnterprise.value) {
+        columns.value.push({
+          name: "actions",
+          field: "actions",
+          label: t("user.actions"),
+          align: "left",
+        });
+      }
+
       updateUserActions();
     });
 
@@ -294,12 +304,6 @@ export default defineComponent({
         label: t("user.role"),
         align: "left",
         sortable: true,
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "left",
       },
     ]);
     const userEmail: any = ref("");
@@ -397,7 +401,7 @@ export default defineComponent({
     };
 
     const showAddUserBtn = computed(() => {
-      if (isDexEnabled.value) {
+      if (isEnterprise.value) {
         return (
           isCurrentUserInternal.value &&
           (currentUserRole.value == "admin" || currentUserRole.value == "root")
@@ -418,10 +422,12 @@ export default defineComponent({
         member.enableDelete = shouldAllowDelete(member);
       });
     };
+
     const shouldAllowEdit = (user: any) => {
-      if (isDexEnabled.value) {
+      if (isEnterprise.value) {
         return (
           isCurrentUserInternal.value &&
+          !user.isExternal &&
           (currentUserRole.value == "root" ||
             (currentUserRole.value == "admin" && user.role !== "root"))
         );
@@ -435,9 +441,10 @@ export default defineComponent({
     };
 
     const shouldAllowChangeRole = (user: any) => {
-      if (isDexEnabled.value) {
+      if (isEnterprise.value) {
         return (
           isCurrentUserInternal.value &&
+          !user.isExternal &&
           (currentUserRole.value == "root" ||
             (currentUserRole.value == "admin" && user.role !== "root"))
         );
@@ -451,9 +458,10 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
-      if (isDexEnabled.value) {
+      if (isEnterprise.value) {
         return (
           isCurrentUserInternal.value &&
+          !user.isExternal &&
           user.role !== "root" &&
           (currentUserRole.value == "root" ||
             currentUserRole.value == "admin") &&
@@ -561,7 +569,7 @@ export default defineComponent({
           if (
             store.state.selectedOrganization.identifier == data.organization
           ) {
-            usersState.users.push({
+            const user = {
               "#":
                 usersState.users.length + 1 <= 9
                   ? `0${usersState.users.length + 1}`
@@ -570,7 +578,17 @@ export default defineComponent({
               first_name: data.first_name,
               last_name: data.last_name,
               role: data.role,
-            });
+              isExternal: false,
+              enableEdit: false,
+              enableChangeRole: false,
+              enableDelete: false,
+            };
+
+            user["enableEdit"] = shouldAllowEdit(user);
+            user["enableChangeRole"] = shouldAllowChangeRole(user);
+            user["enableDelete"] = shouldAllowDelete(user);
+
+            usersState.users.push(user);
           }
         } else {
           usersState.users.forEach((member: any, key: number) => {
@@ -717,7 +735,7 @@ export default defineComponent({
       updateUserRole,
       getImageURL,
       verifyOrganizationStatus,
-      isDexEnabled,
+      isEnterprise,
       isCurrentUserInternal,
       showAddUserBtn,
     };
