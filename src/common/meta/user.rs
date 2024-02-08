@@ -227,6 +227,24 @@ impl fmt::Display for UserRole {
     }
 }
 
+impl UserRole {
+    pub fn get_label(&self) -> String {
+        match self {
+            UserRole::Admin => "Admin".to_string(),
+            UserRole::Member => "Member".to_string(),
+            UserRole::Root => "Root".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::Viewer => "Viewer".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::Editor => "Editor".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::User => "User".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::ServiceAccount => "Service Account".to_string(),
+        }
+    }
+}
+
 // Implementing FromStr for UserRole
 impl FromStr for UserRole {
     type Err = ();
@@ -313,4 +331,10 @@ pub struct UserGroupRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UserRoleRequest {
     pub name: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct RolesResponse {
+    pub label: String,
+    pub value: String,
 }

@@ -20,8 +20,13 @@ use strum::IntoEnumIterator;
 
 use crate::{
     common::{
-        meta,
-        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest, UserRole},
+        meta::{
+            self,
+            user::{
+                RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest,
+                UserRole,
+            },
+        },
         utils::auth::UserEmail,
     },
     service::users,
@@ -246,13 +251,16 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let roles = UserRole::iter()
         .filter_map(|role| {
-            if !role.eq(&UserRole::Root) || !role.eq(&UserRole::Member) {
-                Some(role.to_string())
-            } else {
+            if role.eq(&UserRole::Root) || role.eq(&UserRole::Member) {
                 None
+            } else {
+                Some(RolesResponse {
+                    label: role.get_label(),
+                    value: role.to_string(),
+                })
             }
         })
-        .collect::<Vec<String>>();
+        .collect::<Vec<RolesResponse>>();
 
     Ok(HttpResponse::Ok().json(roles))
 }

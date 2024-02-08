@@ -134,6 +134,42 @@ pub async fn get_latest_traces(
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
+    // Check permissions on stream
+    let user_id = in_req.headers().get("user_id").unwrap();
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        if !is_root_user(user_id.to_str().unwrap()) {
+            let user: meta::user::User = USERS
+                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                .unwrap()
+                .clone();
+
+            if user.is_external
+                && !crate::handler::http::auth::validator::check_permissions(
+                    user_id.to_str().unwrap(),
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!("stream:{}/{}", StreamType::Traces, stream_name),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    Some(user.role),
+                )
+                .await
+            {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+        // Check permissions on stream ends
+    }
+
     let filter = match query.get("filter") {
         Some(v) => v.to_string(),
         None => "".to_string(),
