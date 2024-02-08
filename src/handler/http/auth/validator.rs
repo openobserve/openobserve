@@ -31,7 +31,6 @@ use crate::{
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
-    handler::http::request::organization::org,
     service::{db, users},
 };
 
@@ -43,7 +42,7 @@ pub async fn validator(
     req: ServiceRequest,
     user_id: &str,
     password: &str,
-    mut auth_info: AuthExtractor,
+    auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = match req
         .request()
@@ -444,7 +443,11 @@ pub(crate) async fn check_permissions(
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor) -> bool {
+pub(crate) async fn check_permissions(
+    _user_id: &str,
+    _auth_info: AuthExtractor,
+    _role: Option<UserRole>,
+) -> bool {
     true
 }
 

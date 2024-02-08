@@ -82,7 +82,10 @@ pub async fn save(
             )),
         );
     }
-    user.role = meta::user::UserRole::Admin;
+    #[cfg(not(feature = "enterprise"))]
+    {
+        user.role = meta::user::UserRole::Admin;
+    }
     users::post_user(&org_id, user, &initiator_id).await
 }
 
@@ -111,7 +114,10 @@ pub async fn update(
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_string();
+    #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
+    #[cfg(feature = "enterprise")]
+    let user = user.into_inner();
     if user.eq(&UpdateUser::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -120,7 +126,10 @@ pub async fn update(
             )),
         );
     }
-    user.role = Some(meta::user::UserRole::Admin);
+    #[cfg(not(feature = "enterprise"))]
+    {
+        user.role = Some(meta::user::UserRole::Admin);
+    }
     let initiator_id = &user_email.user_id;
     let self_update = user_email.user_id.eq(&email_id);
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
