@@ -16,11 +16,12 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use strum::IntoEnumIterator;
 
 use crate::{
     common::{
         meta,
-        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest},
+        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest, UserRole},
         utils::auth::UserEmail,
     },
     service::users,
@@ -224,4 +225,34 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
     }
+}
+
+/// ListUsers
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserRoles",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[get("/{org_id}/users/roles")]
+pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let roles = UserRole::iter()
+        .filter_map(|role| {
+            if !role.eq(&UserRole::Root) || !role.eq(&UserRole::Member) {
+                Some(role.to_string())
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<String>>();
+
+    Ok(HttpResponse::Ok().json(roles))
 }
