@@ -172,12 +172,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import {
-  getAllDashboardsByFolderId,
-  getDashboard,
-  getFoldersList,
-  movePanelToAnotherTab,
-} from "../../utils/commons.ts";
+import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -192,7 +187,7 @@ import { onUnmounted } from "vue";
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel", "chartClick"],
+  emits: ["onDeletePanel"],
   components: {
     DateTimePickerDashboard,
     AutoRefreshInterval,

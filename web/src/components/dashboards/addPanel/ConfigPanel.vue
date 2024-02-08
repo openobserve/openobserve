@@ -549,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </q-input>
 
-      <Drilldown></Drilldown>
+      <Drilldown />
 
       <div class="space"></div>
 

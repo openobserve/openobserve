@@ -330,7 +330,7 @@ export default defineComponent({
       });
     };
 
-    const onChartClick = async (params: any, panelId: any) => {
+    const onChartClick = async (params: any) => {
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists

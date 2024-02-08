@@ -244,7 +244,7 @@ export default defineComponent({
         }
       });
       chart?.on("click", function (params: any) {
-        return emit("click", params, props.data.extras?.panelId);
+        emit("click", params);
       });
       window.addEventListener("resize", windowResizeEventCallback);
 
