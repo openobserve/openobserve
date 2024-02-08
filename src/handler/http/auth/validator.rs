@@ -31,6 +31,7 @@ use crate::{
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
+    handler::http::request::organization::org,
     service::{db, users},
 };
 
@@ -42,7 +43,7 @@ pub async fn validator(
     req: ServiceRequest,
     user_id: &str,
     password: &str,
-    auth_info: AuthExtractor,
+    mut auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = match req
         .request()
@@ -67,6 +68,7 @@ pub async fn validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
+
                 if auth_info.bypass_check
                     || check_permissions(user_id, auth_info, res.user_role).await
                 {
@@ -415,11 +417,23 @@ pub(crate) async fn check_permissions(
         object_str
     };
     let role = match role {
-        Some(role) => format!("{role}"),
+        Some(role) => {
+            if role.eq(&UserRole::Root) {
+                "admin".to_string()
+            } else {
+                format!("{role}")
+            }
+        }
         None => "".to_string(),
     };
+    let org_id = if auth_info.org_id.eq("organizations") {
+        user_id
+    } else {
+        &auth_info.org_id
+    };
+
     o2_enterprise::enterprise::openfga::authorizer::authz::is_allowed(
-        &auth_info.org_id,
+        org_id,
         user_id,
         &auth_info.method,
         &obj_str,
