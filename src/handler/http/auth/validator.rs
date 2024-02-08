@@ -31,6 +31,7 @@ use crate::{
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
+    handler::http::request::organization::org,
     service::{db, users},
 };
 
@@ -42,7 +43,7 @@ pub async fn validator(
     req: ServiceRequest,
     user_id: &str,
     password: &str,
-    auth_info: AuthExtractor,
+    mut auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = match req
         .request()
