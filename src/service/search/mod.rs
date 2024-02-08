@@ -297,11 +297,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     // set work_group
     req.work_group = work_group_str;
 
-    let mut partition_files = None;
+    let mut partition_files = Vec::new();
     let mut file_num = file_list.len();
     let mut partition_strategy =
         QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy);
-    if CONFIG.memory_cache.cache_latest_files && stream_type != StreamType::Metrics {
+    if CONFIG.memory_cache.cache_latest_files {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
     let offset = match partition_strategy {
@@ -315,13 +315,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         QueryPartitionStrategy::FileSize => {
             let files = partition_file_by_bytes(&file_list, querier_num);
             file_num = files.len();
-            partition_files = Some(files);
+            partition_files = files;
             1
         }
         QueryPartitionStrategy::FileHash => {
             let files = partition_file_by_hash(&file_list, &nodes).await;
             file_num = files.len();
-            partition_files = Some(files);
+            partition_files = files;
             1
         }
     };
@@ -362,14 +362,15 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     }
                     QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
                         req.file_list = partition_files
-                            .as_ref()
-                            .unwrap()
                             .get(offset_start)
                             .unwrap()
                             .iter()
-                            .map(|fk| cluster_rpc::FileKey::from(*fk))
+                            .map(|f| cluster_rpc::FileKey::from(*f))
                             .collect();
                         offset_start += offset;
+                        if req.file_list.is_empty() {
+                            continue;
+                        }
                     }
                 };
             } else if !is_ingester(&node.role) {
@@ -734,13 +735,13 @@ async fn partition_file_by_hash<'a>(
     file_keys: &'a [FileKey],
     nodes: &'a [Node],
 ) -> Vec<Vec<&'a FileKey>> {
-    let mut node_ids = HashMap::with_capacity(nodes.len());
+    let mut node_idx = HashMap::with_capacity(nodes.len());
     let mut idx = 0;
     for node in nodes {
         if !is_querier(&node.role) {
             continue;
         }
-        node_ids.insert(&node.uuid, idx);
+        node_idx.insert(&node.uuid, idx);
         idx += 1;
     }
     let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); idx];
@@ -748,7 +749,7 @@ async fn partition_file_by_hash<'a>(
         let node_uuid = get_node_from_consistent_hash(&fk.key, &Role::Querier)
             .await
             .expect("there is no querier node in consistent hash ring");
-        let idx = node_ids.get(&node_uuid).unwrap_or(&0);
+        let idx = node_idx.get(&node_uuid).unwrap_or(&0);
         partitions[*idx].push(fk);
     }
     partitions
