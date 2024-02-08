@@ -690,7 +690,7 @@ function filterResources(rows: any, terms: any) {
   terms = terms.toLowerCase();
   for (var i = 0; i < rows.length; i++) {
     let isAdded = false;
-    if (rows[i]["name"].toLowerCase().includes(terms)) {
+    if (rows[i]["display_name"].toLowerCase().includes(terms)) {
       filtered.push(rows[i]);
       isAdded = true;
       continue;
@@ -698,7 +698,7 @@ function filterResources(rows: any, terms: any) {
     for (var j = 0; j < rows[i].entities.length; j++) {
       if (
         !isAdded &&
-        rows[i].entities[j]["name"].toLowerCase().includes(terms)
+        rows[i].entities[j]["display_name"].toLowerCase().includes(terms)
       ) {
         filtered.push(rows[i]);
         break;
