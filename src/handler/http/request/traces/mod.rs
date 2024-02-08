@@ -135,14 +135,14 @@ pub async fn get_latest_traces(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     // Check permissions on stream
-    let user_id = in_req.headers().get("user_id").unwrap();
+
     #[cfg(feature = "enterprise")]
     {
         use crate::common::{
             infra::config::USERS,
             utils::auth::{is_root_user, AuthExtractor},
         };
-
+        let user_id = in_req.headers().get("user_id").unwrap();
         if !is_root_user(user_id.to_str().unwrap()) {
             let user: meta::user::User = USERS
                 .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
