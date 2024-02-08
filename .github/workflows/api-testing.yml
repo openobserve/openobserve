@@ -61,7 +61,7 @@ jobs:
         with:
           enable-cache: true
           working-directory: 'tests/api-testing/'
-          version: '0.16.0'
+          version: '0.21.0'
 
       - name: Start OpenObserve
         run: target/debug/openobserve &

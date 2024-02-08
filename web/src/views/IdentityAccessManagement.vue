@@ -3,6 +3,7 @@
     <div class="flex no-wrap" style="height: calc(100vh - 60px) !important">
       <div style="width: 160px" class="iam-tabs">
         <route-tabs
+          ref="iamRouteTabsRef"
           dataTest="iam-tabs"
           :tabs="tabs"
           :activeTab="activeTab"
@@ -33,6 +34,8 @@ const { t } = useI18n();
 const router = useRouter();
 
 const activeTab = ref("users");
+
+const iamRouteTabsRef: any = ref(null);
 
 onBeforeMount(() => {
   setTabs();
@@ -124,6 +127,19 @@ const tabs = ref([
 
 const updateActiveTab = (tab: string) => {
   if (tab) activeTab.value = tab;
+  else {
+    const value = router.currentRoute.value.name;
+
+    if (!iamRouteTabsRef.value) return;
+
+    if (value === "editGroup") {
+      iamRouteTabsRef.value.setActiveTab("groups");
+    }
+
+    if (value === "editRole") {
+      iamRouteTabsRef.value.setActiveTab("roles");
+    }
+  }
 };
 </script>
 

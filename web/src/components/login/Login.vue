@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div style="font-size: 22px" class="full-width text-center q-pb-md">
-      Sign In
+      Login
     </div>
 
     <div v-if="showSSO" class="flex justify-center">
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="cursor-pointer login-internal-link q-py-md"
         style="text-decoration: underline"
         @click="loginAsInternalUser = !loginAsInternalUser"
-        >Sign in with an internal user</a
+        >Login as internal user</a
       >
     </div>
 
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             type="submit"
             padding="sm lg"
-            :label="t('login.signIn')"
+            :label="t('login.Login')"
             :loading="submitting"
             no-caps
             @click="onSignIn()"

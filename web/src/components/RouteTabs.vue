@@ -21,7 +21,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { nextTick } from "vue";
+import { ref, watch } from "vue";
 
 const props = defineProps({
   tabs: {
@@ -46,10 +47,19 @@ const emits = defineEmits(["update:activeTab"]);
 
 const activeTab = ref(props.activeTab);
 
+const setActiveTab = async (value: string) => {
+  await nextTick();
+  activeTab.value = value;
+};
+
 const handleTabChange = (tab: string) => {
   activeTab.value = tab;
   emits("update:activeTab", tab);
 };
+
+defineExpose({
+  setActiveTab,
+});
 </script>
 
 <style lang="scss">
