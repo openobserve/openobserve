@@ -197,7 +197,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node = db::compact::file_list::get_process(offset).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
-        log::error!("[COMPACT] list_list offset [{offset}] is merging by {node}");
+        log::debug!("[COMPACT] list_list offset [{offset}] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }
