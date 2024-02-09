@@ -42,7 +42,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
-    let mut h = config::utils::hash::default::new();
+    let mut h = config::utils::hash::fnv::new();
     for i in 0..CONSISTENT_HASH_VNODES {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
@@ -59,7 +59,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
-    let mut h = config::utils::hash::default::new();
+    let mut h = config::utils::hash::fnv::new();
     for i in 0..CONSISTENT_HASH_VNODES {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
@@ -79,7 +79,7 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     if nodes.is_empty() {
         return None;
     }
-    let hash = config::utils::hash::default::new().sum64(key);
+    let hash = config::utils::hash::fnv::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     loop {
         if let Some(uuid) = iter.value() {
