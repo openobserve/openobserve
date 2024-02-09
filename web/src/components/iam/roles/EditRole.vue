@@ -944,7 +944,7 @@ const getAlerts = async () => {
   });
 };
 
-const getLogs = async (resource: Resource) => {
+const getLogs = async (resource: Resource | Entity) => {
   const logs = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "logs",
@@ -958,7 +958,7 @@ const getLogs = async (resource: Resource) => {
   });
 };
 
-const getMetrics = async (resource: Resource) => {
+const getMetrics = async (resource: Resource | Entity) => {
   const metrics = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "metrics",
@@ -972,7 +972,7 @@ const getMetrics = async (resource: Resource) => {
   });
 };
 
-const getTraces = async (resource: Resource) => {
+const getTraces = async (resource: Resource | Entity) => {
   const traces = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "traces",
