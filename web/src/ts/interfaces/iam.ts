@@ -97,7 +97,7 @@ export interface Entity {
   display_name: string;
   entities?: Entity[];
   has_entities?: boolean;
-  type: "Resource";
+  type: "Resource" | "Type";
   resourceName: string;
   isSelected: boolean;
   expand?: boolean;

@@ -102,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import type { A } from "msw/lib/SetupApi-8ab693f7";
 import { watch } from "vue";
 import type { Ref } from "vue";
 import { ref } from "vue";

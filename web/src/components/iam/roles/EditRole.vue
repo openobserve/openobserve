@@ -245,7 +245,7 @@ const isFetchingIntitialRoles = ref(false);
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
-const roleUsers = ref([]);
+const roleUsers: Ref<string[]> = ref([]);
 
 const tabs = [
   {
@@ -1026,13 +1026,13 @@ const getStreamsTypes = async () => {
   ];
 
   streams.forEach((stream) => {
-    updateResourceEntities(
+    updateResourceResource(
+      stream.stream_type,
       "stream",
       ["stream_type"],
       [stream],
       true,
-      "name",
-      stream.stream_type
+      "name"
     );
   });
 
@@ -1224,6 +1224,110 @@ const updateResourceEntities = (
   updatePermissionVisibility(permissionsState.permissions);
 };
 
+const updateResourceResource = (
+  resourceName: string,
+  parentResourceName: string,
+  entityNameKeys: string[],
+  data: any[],
+  hasEntities: boolean = false,
+  displayNameKey?: string
+) => {
+  const resource: Resource | null | undefined = getResourceByName(
+    permissionsState.permissions,
+    parentResourceName
+  );
+
+  if (!resource) return;
+
+  data.forEach((_entity: any) => {
+    let entityName = "";
+    if (typeof _entity === "string") entityName = _entity;
+
+    if (typeof _entity === "object") {
+      entityName = entityNameKeys.reduce((acc, curr) => {
+        return acc ? acc + "/" + (_entity[curr] || curr) : _entity[curr];
+      }, "");
+    }
+
+    resource.entities.push({
+      name: entityName,
+      permission: {
+        AllowAll: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowAll",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowGet: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowGet",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowDelete: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowDelete",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowPut: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowPut",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowList: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowList",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: hasEntities,
+        },
+        AllowPost: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowPost",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: hasEntities,
+        },
+      },
+      entities: [],
+      type: "Type",
+      resourceName: resourceName,
+      isSelected: false,
+      has_entities: hasEntities,
+      childName: resourceName,
+      display_name: displayNameKey ? _entity[displayNameKey] : entityName,
+      show: true,
+      top_level: true,
+    });
+  });
+
+  updatePermissionVisibility(permissionsState.permissions);
+};
+
 const saveRole = () => {
   const payload = {
     add: Object.values(addedPermissions.value),
@@ -1237,12 +1341,37 @@ const saveRole = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then((res) => {
+    .then(async (res) => {
+      // combine permissionsHash and selectedPermissionsHash
+
       q.notify({
         type: "positive",
         message: `Updated role permissions successfully!`,
         timeout: 3000,
       });
+
+      permissionsHash.value = new Set([
+        ...Array.from(permissionsHash.value),
+        ...Array.from(selectedPermissionsHash.value),
+      ]);
+
+      selectedPermissionsHash.value = new Set([]);
+
+      addedPermissions.value = {};
+
+      removedPermissions.value = {};
+
+      roleUsers.value = roleUsers.value.filter(
+        (user) => !removedUsers.value.has(user)
+      );
+
+      addedUsers.value.forEach((value: any) => {
+        roleUsers.value.push(value);
+      });
+
+      addedUsers.value = new Set([]);
+
+      removedUsers.value = new Set([]);
     })
     .catch((err) => {
       q.notify({

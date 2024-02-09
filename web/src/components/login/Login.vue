@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="primary"
             type="submit"
             padding="sm lg"
-            :label="t('login.Login')"
+            :label="t('login.login')"
             :loading="submitting"
             no-caps
             @click="onSignIn()"
