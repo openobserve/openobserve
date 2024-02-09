@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    cluster::{is_querier, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    cluster::{is_compactor, is_querier, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::{cluster::Role, stream::FileKey},
     metrics, CONFIG,
 };
@@ -55,16 +55,20 @@ impl Event for Eventer {
             .filter(|v| v.deleted)
             .map(|v| v.key.clone())
             .collect::<Vec<_>>();
-        if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            // metrics
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                .inc();
-            return Err(Status::internal(e.to_string()));
+        // querier and compactor can accept add new files
+        // ingester only accept remove old files
+        if is_querier(&LOCAL_NODE_ROLE) || is_compactor(&LOCAL_NODE_ROLE) {
+            if let Err(e) = infra_file_list::batch_add(&put_items).await {
+                // metrics
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .inc();
+                return Err(Status::internal(e.to_string()));
+            }
         }
         if let Err(e) = infra_file_list::batch_remove(&del_items).await {
             // metrics
@@ -78,7 +82,7 @@ impl Event for Eventer {
             return Err(Status::internal(e.to_string()));
         }
 
-        // cache latest files
+        // cache latest files for querier
         if CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
             for item in put_items {
                 let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
