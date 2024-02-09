@@ -190,7 +190,7 @@ base64 = "0.21"
 bytes = "1.4"
 byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-cityhash = "0.1"
+cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
 datafusion = "35"
 datafusion-expr = "35"

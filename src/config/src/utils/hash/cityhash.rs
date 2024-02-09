@@ -23,7 +23,7 @@ pub fn new() -> CityHash {
 
 impl Sum64 for CityHash {
     fn sum64(&mut self, key: &str) -> u64 {
-        cityhash::city_hash_64(key.as_bytes())
+        cityhasher::hash(key)
     }
 }
 
