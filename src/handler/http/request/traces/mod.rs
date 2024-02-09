@@ -155,7 +155,7 @@ pub async fn get_latest_traces(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("stream:{}/{}", StreamType::Traces, stream_name),
+                        o2_type: format!("{}:{}", StreamType::Traces, stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),

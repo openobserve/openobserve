@@ -169,7 +169,7 @@ async fn query(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("stream:{}/{}", "metrics", name),
+                            o2_type: format!("{}:{}", "metrics", name),
                             org_id: org_id.to_string(),
                             bypass_check: false,
                             parent_id: "".to_string(),
@@ -321,7 +321,7 @@ async fn query_range(
                         AuthExtractor {
                             auth: "".to_string(),
                             method: "GET".to_string(),
-                            o2_type: format!("stream:{}/{}", "metrics", name),
+                            o2_type: format!("{}:{}", "metrics", name),
                             org_id: org_id.to_string(),
                             bypass_check: false,
                             parent_id: "".to_string(),
@@ -775,8 +775,9 @@ fn validate_metadata_params(
 pub async fn format_query_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestFormatQuery>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    format_query(&org_id, &req.query)
+    format_query(&org_id, &req.query, _in_req)
 }
 
 #[post("/{org_id}/prometheus/api/v1/format_query")]
@@ -784,16 +785,17 @@ pub async fn format_query_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestFormatQuery>,
     web::Form(form): web::Form<meta::prom::RequestFormatQuery>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let query = if !form.query.is_empty() {
         &form.query
     } else {
         &req.query
     };
-    format_query(&org_id, query)
+    format_query(&org_id, query, _in_req)
 }
 
-fn format_query(_org_id: &str, query: &str) -> Result<HttpResponse, Error> {
+fn format_query(_org_id: &str, query: &str, _in_req: HttpRequest) -> Result<HttpResponse, Error> {
     let expr = match promql_parser::parser::parse(query) {
         Ok(expr) => expr,
         Err(err) => {

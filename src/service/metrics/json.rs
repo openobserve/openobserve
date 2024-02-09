@@ -30,6 +30,7 @@ use vrl::compiler::runtime::Runtime;
 use super::get_exclude_labels;
 use crate::{
     common::meta::{
+        authz::Authz,
         ingestion::{IngestionResponse, StreamStatus},
         prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         stream::{PartitioningDetails, SchemaRecords},
@@ -204,6 +205,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     false,
                 )
                 .await?;
+                crate::common::utils::auth::set_ownership(
+                    org_id,
+                    &StreamType::Metrics.to_string(),
+                    Authz::new(&stream_name),
+                )
+                .await;
             }
             stream_schema_map.insert(stream_name.clone(), schema);
         }
