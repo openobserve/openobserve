@@ -358,6 +358,8 @@ const setDefaultPermissions = () => {
     resourcePermission.name = resource.key;
     resourcePermission.resourceName = resource.key;
     resourcePermission.display_name = resource.display_name;
+    resourcePermission.top_level = resource.top_level;
+
     if (resource.has_entities) resourcePermission.has_entities = true;
 
     resourcePermission.parent = resource.parent;
@@ -456,6 +458,7 @@ const getDefaultResource = (): Resource => {
     entities: [],
     has_entities: false,
     is_loading: false,
+    top_level: true,
   };
 };
 
@@ -551,12 +554,18 @@ const cancelPermissionsUpdate = () => {
 
 const handlePermissionChange = (row: any, permission: string) => {
   let entity = "";
+  let resourceName = row.resourceName;
 
   if (row.type === "Type") entity = store.state.selectedOrganization.identifier;
   else entity = row.name;
 
-  const permissionHash = `${row.resourceName}:${entity}:${permission}`;
-  const object = `${row.resourceName}:${entity}`;
+  if (row.type === "Resource" && row.top_level) {
+    resourceName = row.name;
+    entity = store.state.selectedOrganization.identifier;
+  }
+
+  const permissionHash = `${resourceName}:${entity}:${permission}`;
+  const object = `${resourceName}:${entity}`;
 
   // Add permission to addedPermissions if not present
   if (
@@ -1127,6 +1136,7 @@ const updateEntityEntities = (
         has_entities: hasEntities,
         display_name: displayNameKey ? _entity[displayNameKey] : entityName,
         show: true,
+        top_level: false,
       });
   });
 
@@ -1206,6 +1216,8 @@ const updateResourceEntities = (
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
       show: true,
       childName: childName || "",
+      top_level: !!resource.childs.find((child) => child.name === childName)
+        ?.top_level,
     });
   });
 
