@@ -37,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             v-model="props.row.role"
             :options="options"
+            emit-value
+            map-options
             style="width: 70px"
             @update:model-value="updateUserRole(props.row)"
           />
@@ -206,6 +208,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
+import { getRoles } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -249,6 +252,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
+      if (isEnterprise.value) await getRoles();
       await nextTick();
 
       if (isEnterprise.value && isCurrentUserInternal.value) {
@@ -307,10 +311,20 @@ export default defineComponent({
       },
     ]);
     const userEmail: any = ref("");
-    const options = ["admin"];
-    const selectedRole = ref(options[0]);
+    const options = ref([{ label: "Admin", value: "admin" }]);
+    const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
+
+    const getRoles = () => {
+      return new Promise(() => {
+        usersService
+          .getRoles(store.state.selectedOrganization.identifier)
+          .then((res) => {
+            options.value = res.data;
+          });
+      });
+    };
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
