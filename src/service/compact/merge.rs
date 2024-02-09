@@ -18,16 +18,20 @@ use std::{collections::HashMap, io::Write, sync::Arc};
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    cluster::LOCAL_NODE_UUID,
     ider,
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     metrics,
     utils::{json, parquet::parse_file_key_columns},
     CONFIG, FILE_EXT_PARQUET,
 };
-use infra::{cache, file_list as infra_file_list, storage};
+use infra::{cache, dist_lock, file_list as infra_file_list, storage};
 use tokio::{sync::Semaphore, task::JoinHandle};
 
-use crate::service::{db, file_list, search::datafusion, stream};
+use crate::{
+    common::infra::cluster::get_node_by_uuid,
+    service::{db, file_list, search::datafusion, stream},
+};
 
 /// compactor run steps on a stream:
 /// 3. get a cluster lock for compactor stream
@@ -41,14 +45,39 @@ use crate::service::{db, file_list, search::datafusion, stream};
 /// 11. release cluster lock
 pub async fn merge_by_stream(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
     // get last compacted offset
-    let (mut offset, _node) =
-        db::compact::files::get_offset(org_id, stream_name, stream_type).await;
+    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        return Ok(()); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+        let lock_key = format!("compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        // check the working node again, maybe other node locked it first
+        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            dist_lock::unlock(&locker).await?;
+            return Ok(()); // other node is processing
+        }
+        // set to current node
+        let ret = db::compact::files::set_offset(
+            org_id,
+            stream_type,
+            stream_name,
+            offset,
+            Some(&LOCAL_NODE_UUID.clone()),
+        )
+        .await;
+        dist_lock::unlock(&locker).await?;
+        drop(locker);
+        ret?;
+    }
 
     // get schema
     let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
@@ -159,7 +188,14 @@ pub async fn merge_by_stream(
             + Duration::seconds(CONFIG.compact.step_secs)
                 .num_microseconds()
                 .unwrap();
-        db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
+        db::compact::files::set_offset(
+            org_id,
+            stream_type,
+            stream_name,
+            offset,
+            Some(&LOCAL_NODE_UUID.clone()),
+        )
+        .await?;
         return Ok(());
     }
 
@@ -195,8 +231,8 @@ pub async fn merge_by_stream(
                 // merge file and get the big file key
                 let (new_file_name, new_file_meta, new_file_list) = match merge_files(
                     &org_id,
-                    &stream_name,
                     stream_type,
+                    &stream_name,
                     schema.clone(),
                     &prefix,
                     &files_with_size,
@@ -274,7 +310,14 @@ pub async fn merge_by_stream(
         + Duration::seconds(CONFIG.compact.step_secs)
             .num_microseconds()
             .unwrap();
-    db::compact::files::set_offset(org_id, stream_name, stream_type, offset).await?;
+    db::compact::files::set_offset(
+        org_id,
+        stream_type,
+        stream_name,
+        offset,
+        Some(&LOCAL_NODE_UUID.clone()),
+    )
+    .await?;
 
     // update stream stats
     if stream_stats.doc_num != 0 {
@@ -304,8 +347,8 @@ pub async fn merge_by_stream(
 /// file key and merged files
 async fn merge_files(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     schema: Arc<Schema>,
     prefix: &str,
     files_with_size: &[FileKey],
@@ -586,7 +629,7 @@ async fn write_file_list_s3(org_id: &str, events: &[FileKey]) -> Result<(), anyh
         let mut cache_success = true;
         for event in events.iter() {
             if let Err(e) =
-                db::file_list::progress(&event.key, Some(&event.meta), event.deleted, false).await
+                db::file_list::progress(&event.key, Some(&event.meta), event.deleted).await
             {
                 cache_success = false;
                 log::error!(
@@ -625,9 +668,16 @@ mod tests {
     async fn test_compact() {
         infra_db::create_table().await.unwrap();
         infra_file_list::create_table().await.unwrap();
-        let off_set = Duration::hours(2).num_microseconds().unwrap();
-        let _ = db::compact::files::set_offset("nexus", "default", "logs".into(), off_set).await;
-        let resp = merge_by_stream("nexus", "default", "logs".into()).await;
+        let offset = Duration::hours(2).num_microseconds().unwrap();
+        let _ = db::compact::files::set_offset(
+            "default",
+            "logs".into(),
+            "default",
+            offset,
+            Some(&LOCAL_NODE_UUID.clone()),
+        )
+        .await;
+        let resp = merge_by_stream("default", "logs".into(), "default").await;
         assert!(resp.is_ok());
     }
 }

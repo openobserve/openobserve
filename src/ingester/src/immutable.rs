@@ -17,7 +17,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{metrics, CONFIG};
-use futures::future::try_join_all;
+use futures::future::join_all;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::{sync::Semaphore, task};
@@ -135,27 +135,33 @@ pub(crate) async fn persist() -> Result<()> {
     }
 
     // remove entry from IMMUTABLES
-    let tasks = try_join_all(tasks).await.context(TokioJoinSnafu)?;
+    let tasks = join_all(tasks).await;
     for task in tasks {
-        if let Some((path, json_size, arrow_size)) = task? {
-            log::info!(
-                "[INGESTER:WAL] done  persist file: {}, json_size: {}, arrow_size: {}",
-                path.to_string_lossy(),
-                json_size,
-                arrow_size
-            );
-            // remove entry
-            let mut rw = IMMUTABLES.write().await;
-            rw.remove(&path);
-            drop(rw);
-            // update metrics
-            metrics::INGEST_MEMTABLE_BYTES
-                .with_label_values(&[])
-                .sub(json_size);
-            metrics::INGEST_MEMTABLE_ARROW_BYTES
-                .with_label_values(&[])
-                .sub(arrow_size as i64);
-            metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+        match task.context(TokioJoinSnafu {})? {
+            Err(e) => {
+                log::error!("[INGESTER:WAL] persist error: {}", e);
+            }
+            Ok(None) => {}
+            Ok(Some((path, json_size, arrow_size))) => {
+                log::info!(
+                    "[INGESTER:WAL] done  persist file: {}, json_size: {}, arrow_size: {}",
+                    path.to_string_lossy(),
+                    json_size,
+                    arrow_size
+                );
+                // remove entry
+                let mut rw = IMMUTABLES.write().await;
+                rw.remove(&path);
+                drop(rw);
+                // update metrics
+                metrics::INGEST_MEMTABLE_BYTES
+                    .with_label_values(&[])
+                    .sub(json_size);
+                metrics::INGEST_MEMTABLE_ARROW_BYTES
+                    .with_label_values(&[])
+                    .sub(arrow_size as i64);
+                metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
+            }
         }
     }
     let mut rw = IMMUTABLES.write().await;

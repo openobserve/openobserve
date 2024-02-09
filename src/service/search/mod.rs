@@ -24,7 +24,10 @@ use chrono::Duration;
 use config::{
     cluster::{is_ingester, is_querier},
     ider,
-    meta::stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+    meta::{
+        cluster::{Node, Role},
+        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+    },
     utils::{flatten, json, str::find},
     CONFIG,
 };
@@ -42,7 +45,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
-        infra::cluster,
+        infra::cluster::{self, get_node_from_consistent_hash},
         meta::{
             functions::VRLResultResolver,
             search,
@@ -251,6 +254,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         &stream_settings.partition_keys,
     )
     .await;
+    let total_files = file_list.len();
+
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
     // 1. get work group
@@ -267,24 +272,26 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     // get a cluster search queue lock
     let locker = dist_lock::lock(&locker_key, 0).await?;
     #[cfg(feature = "enterprise")]
-    while work_group
-        .as_ref()
-        .unwrap()
-        .need_wait()
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?
-    {
-        // wait in the queue
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    loop {
+        match work_group.as_ref().unwrap().need_wait().await {
+            Ok(true) => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+            Ok(false) => {
+                break;
+            }
+            Err(e) => {
+                dist_lock::unlock(&locker).await?;
+                return Err(Error::Message(e.to_string()));
+            }
+        }
     }
     // 3. process the search in the work group
     #[cfg(feature = "enterprise")]
-    work_group
-        .as_ref()
-        .unwrap()
-        .process(&session_id)
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
+    if let Err(e) = work_group.as_ref().unwrap().process(&session_id).await {
+        dist_lock::unlock(&locker).await?;
+        return Err(Error::Message(e.to_string()));
+    }
     #[cfg(feature = "enterprise")]
     dist_lock::unlock(&locker).await?;
     let took_wait = start.elapsed().as_millis() as usize;
@@ -292,10 +299,14 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     // set work_group
     req.work_group = work_group_str;
 
-    let mut partition_files = None;
+    let mut partition_files = Vec::new();
     let mut file_num = file_list.len();
-    let offset = match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
-    {
+    let mut partition_strategy =
+        QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy);
+    if CONFIG.memory_cache.cache_latest_files {
+        partition_strategy = QueryPartitionStrategy::FileHash;
+    }
+    let offset = match partition_strategy {
         QueryPartitionStrategy::FileNum => {
             if querier_num >= file_num {
                 1
@@ -306,12 +317,18 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         QueryPartitionStrategy::FileSize => {
             let files = partition_file_by_bytes(&file_list, querier_num);
             file_num = files.len();
-            partition_files = Some(files);
+            partition_files = files;
+            1
+        }
+        QueryPartitionStrategy::FileHash => {
+            let files = partition_file_by_hash(&file_list, &nodes).await;
+            file_num = files.len();
+            partition_files = files;
             1
         }
     };
     log::info!(
-        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {total_files}",
         meta.meta.time_range
     );
 
@@ -335,8 +352,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         if is_querier {
             if offset_start < file_num {
                 req.stype = cluster_rpc::SearchType::Cluster as i32;
-                match QueryPartitionStrategy::from(&CONFIG.common.feature_query_partition_strategy)
-                {
+                match partition_strategy {
                     QueryPartitionStrategy::FileNum => {
                         req.file_list = file_list
                             [offset_start..min(offset_start + offset, file_num)]
@@ -346,16 +362,21 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                             .collect();
                         offset_start += offset;
                     }
-                    QueryPartitionStrategy::FileSize => {
+                    QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
                         req.file_list = partition_files
-                            .as_ref()
-                            .unwrap()
                             .get(offset_start)
                             .unwrap()
                             .iter()
-                            .map(|fk| cluster_rpc::FileKey::from(*fk))
+                            .map(|f| cluster_rpc::FileKey::from(*f))
                             .collect();
                         offset_start += offset;
+                        if req.file_list.is_empty() {
+                            if is_ingester(&node.role) {
+                                req.stype = cluster_rpc::SearchType::WalOnly as i32;
+                            } else {
+                                continue; // no need more querier
+                            }
+                        }
                     }
                 };
             } else if !is_ingester(&node.role) {
@@ -363,6 +384,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             }
         }
 
+        let req_files = req.file_list.len();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
@@ -387,7 +409,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     )
                 });
 
-                log::info!("[session_id {session_id}] search->grpc: request node: {}, is_querier: {}", &node_addr, is_querier);
+                log::info!("[session_id {session_id}] search->grpc: request node: {}, is_querier: {}, files: {req_files}", &node_addr, is_querier);
 
                 let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                     .parse()
@@ -712,6 +734,30 @@ fn partition_file_by_bytes(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<&
             continue;
         }
         partitions[node_k].push(fk);
+    }
+    partitions
+}
+
+async fn partition_file_by_hash<'a>(
+    file_keys: &'a [FileKey],
+    nodes: &'a [Node],
+) -> Vec<Vec<&'a FileKey>> {
+    let mut node_idx = HashMap::with_capacity(nodes.len());
+    let mut idx = 0;
+    for node in nodes {
+        if !is_querier(&node.role) {
+            continue;
+        }
+        node_idx.insert(&node.uuid, idx);
+        idx += 1;
+    }
+    let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); idx];
+    for fk in file_keys {
+        let node_uuid = get_node_from_consistent_hash(&fk.key, &Role::Querier)
+            .await
+            .expect("there is no querier node in consistent hash ring");
+        let idx = node_idx.get(&node_uuid).unwrap_or(&0);
+        partitions[*idx].push(fk);
     }
     partitions
 }

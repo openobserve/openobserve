@@ -13,21 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, RwHashMap};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, RwAHashMap};
 use infra::db as infra_db;
 use once_cell::sync::Lazy;
 
-static CACHES: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
+static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
 }
 
-pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType) -> (i64, String) {
+pub async fn get_offset_from_cache(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<(i64, String)> {
     let key = mk_key(org_id, stream_type, stream_name);
-    if let Some(offset) = CACHES.get(&key) {
-        return (*offset, "".to_string());
+    let r = CACHES.read().await;
+    r.get(&key).cloned()
+}
+
+pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str) -> (i64, String) {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let r = CACHES.read().await;
+    if let Some(val) = r.get(&key) {
+        return val.clone();
     }
+    drop(r);
 
     let db = infra_db::get_db().await;
     let value = match db.get(&key).await {
@@ -42,28 +54,50 @@ pub async fn get_offset(org_id: &str, stream_name: &str, stream_type: StreamType
     } else {
         (value.parse().unwrap(), String::from(""))
     };
-    CACHES.insert(key.clone(), offset);
+    // only cache the value if it's empty or it's from this node
+    if node.is_empty() || LOCAL_NODE_UUID.eq(&node) {
+        let mut w = CACHES.write().await;
+        w.insert(key.clone(), (offset, node.clone()));
+        drop(w);
+    }
     (offset, node)
 }
 
 pub async fn set_offset(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
     offset: i64,
+    node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    CACHES.insert(key, offset);
+    let Some(node) = node else {
+        // release this key from this node
+        let db = infra_db::get_db().await;
+        db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
+            .await?;
+        let mut w = CACHES.write().await;
+        w.remove(&key);
+        drop(w);
+        return Ok(());
+    };
+
+    // set this key to this node
+    let mut w = CACHES.write().await;
+    w.insert(key, (offset, node.to_string()));
+    drop(w);
     Ok(())
 }
 
 pub async fn del_offset(
     org_id: &str,
-    stream_name: &str,
     stream_type: StreamType,
+    stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    CACHES.remove(&key);
+    let mut w = CACHES.write().await;
+    w.remove(&key);
+    drop(w);
     let db = infra_db::get_db().await;
     db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
         .await
@@ -91,12 +125,15 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    for item in CACHES.clone().iter() {
-        let key = item.key().to_string();
-        let offset = item.value();
+    let r = CACHES.read().await;
+    for (key, (offset, node)) in r.iter() {
         if *offset > 0 {
-            db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
-                .await?;
+            let val = if !node.is_empty() {
+                format!("{};{}", offset, node)
+            } else {
+                offset.to_string()
+            };
+            db.put(key, val.into(), infra_db::NO_NEED_WATCH).await?;
         }
     }
     Ok(())
@@ -109,13 +146,19 @@ mod tests {
     #[tokio::test]
     async fn test_compact_files() {
         const OFFSET: i64 = 100;
-        set_offset("default", "compact_file", "logs".into(), OFFSET)
-            .await
-            .unwrap();
+        set_offset(
+            "default",
+            "logs".into(),
+            "compact_file",
+            OFFSET,
+            Some("LOCAL"),
+        )
+        .await
+        .unwrap();
         sync_cache_to_db().await.unwrap();
         assert_eq!(
-            get_offset("default", "compact_file", "logs".into()).await,
-            (OFFSET, "".to_string())
+            get_offset("default", "logs".into(), "compact_file").await,
+            (OFFSET, "LOCAL".to_string())
         );
         assert!(!list_offset().await.unwrap().is_empty());
     }

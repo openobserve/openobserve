@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use super::Sum64;
+
 // offset64 FNVa offset basis. See https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function#FNV-1a_hash
 const OFFSET64: u64 = 14695981039346656037;
 // prime64 FNVa prime value. See https://en.wikipedia.org/wiki/Fowler–Noll–Vo_hash_function#FNV-1a_hash
@@ -30,11 +32,13 @@ impl Fnv64a {
     pub fn new() -> Fnv64a {
         Fnv64a {}
     }
+}
 
-    pub fn sum64(&self, key: &str) -> u64 {
-        let mut hash: u64 = OFFSET64;
-        for c in key.chars() {
-            hash ^= c as u64;
+impl Sum64 for Fnv64a {
+    fn sum64(&mut self, key: &str) -> u64 {
+        let mut hash = OFFSET64;
+        for byte in key.bytes() {
+            hash ^= byte as u64;
             hash = hash.wrapping_mul(PRIME64);
         }
         hash
@@ -47,10 +51,13 @@ mod tests {
 
     #[test]
     fn test_fnv64a() {
-        let fnv = Fnv64a::new();
-        assert_eq!(fnv.sum64("hello"), 11831194018420276491);
-        assert_eq!(fnv.sum64("world"), 5717881983045765875);
-        assert_eq!(fnv.sum64("foo"), 15902901984413996407);
-        assert_eq!(fnv.sum64("bar"), 16101355973854746);
+        let mut h = new();
+        assert_eq!(h.sum64("hello"), 11831194018420276491);
+        assert_eq!(h.sum64("world"), 5717881983045765875);
+        assert_eq!(h.sum64("foo"), 15902901984413996407);
+        assert_eq!(h.sum64("bar"), 16101355973854746);
+        assert_eq!(h.sum64("test"), 18007334074686647077);
+        assert_eq!(h.sum64("test1"), 2271358237066212092);
+        assert_eq!(h.sum64("test2"), 2271361535601096725);
     }
 }

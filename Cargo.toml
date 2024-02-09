@@ -94,7 +94,6 @@ maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
-openidconnect = "3.4.0"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
   "http-proto",
@@ -159,7 +158,9 @@ prost-build = "0.11"
 
 [dev-dependencies]
 expect-test = "1.4"
+base64 = "0.21"
 float-cmp = "0.9"
+walkdir = "2"
 
 [workspace]
 members = ["src/config", "src/infra", "src/ingester", "src/wal"]
@@ -197,7 +198,7 @@ arrow-json = "50.0.0"
 arrow-schema = { version = "50.0.0", features = ["serde"] }
 parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.9", features = ["aws", "azure", "gcp"] }
-dotenv_config = "0.1.8"
+dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
 etcd-client = { version = "0.12", features = ["tls"] }
@@ -255,5 +256,4 @@ url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 walkdir = "2"
-xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

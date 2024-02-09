@@ -333,7 +333,7 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
 
     // check if we are allowed to ingest
     if let Some(stream_name) = stream_name {
-        if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
+        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, stream_name, None) {
             return Err(anyhow!("stream [{stream_name}] is being deleted"));
         }
     };
