@@ -75,8 +75,8 @@ pub async fn save_enrichment_data(
     // check if we are allowed to ingest
     if db::compact::retention::is_deleting_stream(
         org_id,
-        stream_name,
         StreamType::EnrichmentTables,
+        stream_name,
         None,
     ) {
         return Ok(
@@ -236,7 +236,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
         log::error!("Error deleting stream schema: {}", e);
     }
 
-    if let Err(e) = retention::delete_all(org_id, stream_name, stream_type).await {
+    if let Err(e) = retention::delete_all(org_id, stream_type, stream_name).await {
         log::error!("Error deleting stream {}", e);
     }
 

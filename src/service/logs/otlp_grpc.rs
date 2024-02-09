@@ -76,7 +76,7 @@ pub async fn usage_ingest(
     }
 
     // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Logs, None) {
+    if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, stream_name, None) {
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 

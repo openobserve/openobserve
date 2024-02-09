@@ -46,12 +46,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
         dist_lock::unlock(&locker).await?;
         return Ok(());
     }
-    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-        db::alerts::alert_manager::set_mark(org_id, Some(&LOCAL_NODE_UUID.clone())).await?;
-    }
+    let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+        db::alerts::alert_manager::set_mark(org_id, Some(&LOCAL_NODE_UUID.clone())).await
+    } else {
+        Ok(())
+    };
     // already bind to this node, we can unlock now
     dist_lock::unlock(&locker).await?;
     drop(locker);
+    ret?;
 
     let now = Utc::now().timestamp_micros();
     let cacher = TRIGGERS.read().await;

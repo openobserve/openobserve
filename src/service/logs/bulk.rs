@@ -350,7 +350,7 @@ pub async fn ingest(
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
     for (stream_name, stream_data) in stream_data_map {
         // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(org_id, &stream_name, StreamType::Logs, None)
+        if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
             continue;

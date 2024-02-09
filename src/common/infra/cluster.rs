@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{ops::Bound, sync::Arc};
 
 use config::{
     cluster::*,
     meta::cluster::{Node, NodeStatus, Role},
-    utils::json,
-    RwHashMap, CONFIG, INSTANCE_ID,
+    utils::{hash::Sum64, json},
+    RwBTreeMap, RwHashMap, CONFIG, INSTANCE_ID,
 };
 use etcd_client::PutOptions;
 use infra::{
@@ -30,7 +30,64 @@ use once_cell::sync::Lazy;
 
 use crate::service::db;
 
+const CONSISTENT_HASH_VNODES: usize = 3;
+
 static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
+static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
+static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
+
+pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
+    let mut nodes = match role {
+        Role::Querier => QUERIER_CONSISTENT_HASH.write().await,
+        Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
+        _ => return,
+    };
+    let mut h = config::utils::hash::default::new();
+    for i in 0..CONSISTENT_HASH_VNODES {
+        let key = format!("{}{}", node.uuid, i);
+        let hash = h.sum64(&key);
+        nodes.insert(hash, node.uuid.clone());
+    }
+    for (k, v) in nodes.iter() {
+        log::debug!("consistent hash[{}] {} {}", role, k, v);
+    }
+}
+
+pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
+    let mut nodes = match role {
+        Role::Querier => QUERIER_CONSISTENT_HASH.write().await,
+        Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
+        _ => return,
+    };
+    let mut h = config::utils::hash::default::new();
+    for i in 0..CONSISTENT_HASH_VNODES {
+        let key = format!("{}{}", node.uuid, i);
+        let hash = h.sum64(&key);
+        nodes.remove(&hash);
+    }
+    for (k, v) in nodes.iter() {
+        log::debug!("consistent hash[{}] {} {}", role, k, v);
+    }
+}
+
+pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<String> {
+    let nodes = match role {
+        Role::Querier => QUERIER_CONSISTENT_HASH.read().await,
+        Role::Compactor => COMPACTOR_CONSISTENT_HASH.read().await,
+        _ => return None,
+    };
+    if nodes.is_empty() {
+        return None;
+    }
+    let hash = config::utils::hash::default::new().sum64(key);
+    let mut iter = nodes.lower_bound(Bound::Included(&hash));
+    loop {
+        if let Some(uuid) = iter.value() {
+            return Some(uuid.clone());
+        };
+        iter.move_next();
+    }
+}
 
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
@@ -40,7 +97,10 @@ pub async fn register_and_keepalive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        NODES.insert(LOCAL_NODE_UUID.clone(), load_local_mode_node());
+        let node = load_local_mode_node();
+        add_node_to_consistent_hash(&node, &Role::Querier).await;
+        add_node_to_consistent_hash(&node, &Role::Compactor).await;
+        NODES.insert(LOCAL_NODE_UUID.clone(), node);
         return Ok(());
     }
     if let Err(e) = register().await {
@@ -113,6 +173,12 @@ pub async fn register() -> Result<()> {
     let mut node_id = 1;
     let mut node_ids = Vec::new();
     for node in node_list {
+        if is_querier(&node.role) {
+            add_node_to_consistent_hash(&node, &Role::Querier).await;
+        }
+        if is_compactor(&node.role) {
+            add_node_to_consistent_hash(&node, &Role::Compactor).await;
+        }
         node_ids.push(node.id);
         NODES.insert(node.uuid.clone(), node);
     }
@@ -131,7 +197,7 @@ pub async fn register() -> Result<()> {
 
     // 4. join the cluster
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
-    let val = Node {
+    let node = Node {
         id: node_id,
         uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
@@ -148,8 +214,14 @@ pub async fn register() -> Result<()> {
             && CONFIG.common.ingester_sidecar_querier,
     };
     // cache local node
-    NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
-    let val = json::to_string(&val).unwrap();
+    if is_querier(&node.role) {
+        add_node_to_consistent_hash(&node, &Role::Querier).await;
+    }
+    if is_compactor(&node.role) {
+        add_node_to_consistent_hash(&node, &Role::Compactor).await;
+    }
+    NODES.insert(LOCAL_NODE_UUID.clone(), node.clone());
+    let val = json::to_string(&node).unwrap();
     // register node to cluster
     let mut client = etcd::get_etcd_client().await.clone();
     let resp = client
@@ -180,7 +252,7 @@ pub async fn set_online() -> Result<()> {
     }
 
     // set node status to online
-    let val = match NODES.get(LOCAL_NODE_UUID.as_str()) {
+    let node = match NODES.get(LOCAL_NODE_UUID.as_str()) {
         Some(node) => {
             let mut val = node.value().clone();
             val.status = NodeStatus::Online;
@@ -209,8 +281,14 @@ pub async fn set_online() -> Result<()> {
     }
 
     // cache local node
-    NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
-    let val = json::to_string(&val).unwrap();
+    if is_querier(&node.role) {
+        add_node_to_consistent_hash(&node, &Role::Querier).await;
+    }
+    if is_compactor(&node.role) {
+        add_node_to_consistent_hash(&node, &Role::Compactor).await;
+    }
+    NODES.insert(LOCAL_NODE_UUID.clone(), node.clone());
+    let val = json::to_string(&node).unwrap();
 
     let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
@@ -366,12 +444,24 @@ async fn watch_node_list() -> Result<()> {
                     }
                 }
                 item_value.broadcasted = true;
+                if is_querier(&item_value.role) {
+                    add_node_to_consistent_hash(&item_value, &Role::Querier).await;
+                }
+                if is_compactor(&item_value.role) {
+                    add_node_to_consistent_hash(&item_value, &Role::Compactor).await;
+                }
                 NODES.insert(item_key.to_string(), item_value);
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value = NODES.get(item_key).unwrap().clone();
                 log::info!("[CLUSTER] leave {:?}", item_value);
+                if is_querier(&item_value.role) {
+                    remove_node_from_consistent_hash(&item_value, &Role::Querier).await;
+                }
+                if is_compactor(&item_value.role) {
+                    remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
+                }
                 NODES.remove(item_key);
             }
             Event::Empty => {}
@@ -404,19 +494,58 @@ pub fn get_node_by_uuid(uuid: &str) -> Option<Node> {
     NODES.get(uuid).map(|node| node.clone())
 }
 
-#[tokio::test]
-#[ignore]
-async fn test_list_nodes() {
-    assert!(list_nodes().await.unwrap().is_empty());
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[tokio::test]
-async fn test_cluster() {
-    register_and_keepalive().await.unwrap();
-    set_online().await.unwrap();
-    leave().await.unwrap();
-    assert!(get_cached_online_nodes().is_some());
-    assert!(get_cached_online_query_nodes().is_some());
-    assert!(get_cached_online_ingester_nodes().is_some());
-    assert!(get_cached_online_querier_nodes().is_some());
+    #[tokio::test]
+    #[ignore]
+    async fn test_list_nodes() {
+        assert!(list_nodes().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cluster() {
+        register_and_keepalive().await.unwrap();
+        set_online().await.unwrap();
+        leave().await.unwrap();
+        assert!(get_cached_online_nodes().is_some());
+        assert!(get_cached_online_query_nodes().is_some());
+        assert!(get_cached_online_ingester_nodes().is_some());
+        assert!(get_cached_online_querier_nodes().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_consistent_hashing() {
+        let node = load_local_mode_node();
+        for i in 0..10 {
+            let node_q = Node {
+                uuid: format!("node-q-{i}").to_string(),
+                role: [Role::Querier].to_vec(),
+                ..node.clone()
+            };
+            let node_c = Node {
+                uuid: format!("node-c-{i}").to_string(),
+                role: [Role::Compactor].to_vec(),
+                ..node.clone()
+            };
+            add_node_to_consistent_hash(&node_q, &Role::Querier).await;
+            add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
+        }
+
+        for key in vec![
+            ["test", "node-q-8", "node-c-6"],
+            ["test1", "node-q-3", "node-c-9"],
+            ["test2", "node-q-3", "node-c-0"],
+        ] {
+            assert_eq!(
+                get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Querier).await,
+                Some(key.get(1).unwrap().to_string())
+            );
+            assert_eq!(
+                get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Compactor).await,
+                Some(key.get(2).unwrap().to_string())
+            );
+        }
+    }
 }

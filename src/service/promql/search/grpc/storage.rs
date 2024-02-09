@@ -54,7 +54,7 @@ pub(crate) async fn create_context(
     filters: &mut [(&str, Vec<String>)],
 ) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
     // check if we are allowed to search
-    if db::compact::retention::is_deleting_stream(org_id, stream_name, StreamType::Metrics, None) {
+    if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
         log::error!("stream [{}] is being deleted", stream_name);
         return Ok((
             SessionContext::new(),
@@ -245,7 +245,9 @@ async fn cache_parquet_files(
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
             let ret = match cache_type {
                 file_data::CacheType::Memory => {
-                    if !file_data::memory::exist(&file_name).await {
+                    if !file_data::memory::exist(&file_name).await
+                        && !file_data::disk::exist(&file_name).await
+                    {
                         file_data::memory::download(session_id, &file_name)
                             .await
                             .err()
