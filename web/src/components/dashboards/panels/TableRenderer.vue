@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     row-key="id"
     ref="tableRef"
     data-test="dashboard-panel-table"
+    @row-click="(...args) => $emit('click', ...args)"
   >
   </q-table>
 </template>
@@ -44,6 +45,7 @@ export default defineComponent({
       default: () => ({ rows: [], columns: {} }),
     },
   },
+  emits: ["click"],
   setup(props: any) {
     const $q = useQuasar();
     const tableRef: any = ref(null);

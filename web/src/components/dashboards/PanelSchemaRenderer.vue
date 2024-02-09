@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? panelData
             : { options: { backgroundColor: 'transparent' } }
         "
+        @click="onChartClick"
         ref="tableRendererRef"
       />
       <div
@@ -317,7 +318,9 @@ export default defineComponent({
     // drilldown
     const replacePlaceholders = (str: any, obj: any) => {
       return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
-        let parts = key.split(".");
+        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
+        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
+
         let value = obj;
         for (let part of parts) {
           if (value && part in value) {
@@ -330,7 +333,7 @@ export default defineComponent({
       });
     };
 
-    const onChartClick = async (params: any) => {
+    const onChartClick = async (params: any, ...args: any) => {
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists
@@ -347,16 +350,40 @@ export default defineComponent({
         // need to change dynamic variables to it's value using current variables, current chart data(params)
         // if pie, donut or heatmap then series name will come in name field
         // also, if value is an array, then last value will be taken
-        const drilldownVariables: any = {
-          series: {
+        const drilldownVariables: any = {};
+
+        // if chart type is 'table' then we need to pass the table name
+        if (panelSchema.value.type == "table") {
+          const fields: any = {};
+          panelSchema.value.queries.forEach((query: any) => {
+            // take all field from x, y and z
+            const panelFields: any = [
+              ...query.fields.x,
+              ...query.fields.y,
+              ...query.fields.z,
+            ];
+            console.log(panelFields);
+            panelFields.forEach((field: any) => {
+              // we have label and alias, use both in dynamic values
+              fields[field.label] = args[0][field.alias];
+              fields[field.alias] = args[0][field.alias];
+            });
+          });
+          drilldownVariables.row = {
+            field: fields,
+            index: args[1],
+          };
+        } else {
+          // we have an series object
+          drilldownVariables.series = {
             __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
               ? params.name
               : params.seriesName,
             __value: Array.isArray(params.value)
               ? params.value[params.value.length - 1]
               : params.value,
-          },
-        };
+          };
+        }
 
         variablesData.value.values.forEach((variable: any) => {
           if (variable.type != "dynamic_filters") {
