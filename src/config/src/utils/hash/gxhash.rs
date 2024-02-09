@@ -13,18 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::hash::{DefaultHasher, Hasher};
-
 use super::Sum64;
 
-pub fn new() -> DefaultHasher {
-    DefaultHasher::new()
+pub struct GxHash {}
+
+pub fn new() -> GxHash {
+    GxHash {}
 }
 
-impl Sum64 for DefaultHasher {
+impl Sum64 for GxHash {
     fn sum64(&mut self, key: &str) -> u64 {
-        self.write(key.as_bytes());
-        self.finish()
+        gxhash::gxhash64(key.as_bytes(), 0)
     }
 }
 
@@ -33,14 +32,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_hasher_sum64() {
+    fn test_gxhash_sum64() {
         let mut h = new();
-        assert_eq!(h.sum64("hello"), 16350172494705860510);
-        assert_eq!(h.sum64("world"), 1348462810646499051);
-        assert_eq!(h.sum64("foo"), 13658606619662280602);
-        assert_eq!(h.sum64("bar"), 11254443135816450233);
-        assert_eq!(h.sum64("test"), 18199023029103496422);
-        assert_eq!(h.sum64("test1"), 5073490808167294919);
-        assert_eq!(h.sum64("test2"), 14030261930256505646);
+        for key in &[
+            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
+        ] {
+            let sum = h.sum64(key);
+            println!("{}: {}", key, sum);
+        }
+        assert_eq!(h.sum64("hello"), 17199510979973968020);
+        assert_eq!(h.sum64("world"), 16083628800851799373);
+        assert_eq!(h.sum64("foo"), 12351526755496507957);
+        assert_eq!(h.sum64("bar"), 2492955946775841796);
+        assert_eq!(h.sum64("test"), 687545438460047850);
+        assert_eq!(h.sum64("test1"), 13065486829486102133);
+        assert_eq!(h.sum64("test2"), 16870625056057693394);
+        assert_eq!(h.sum64("test3"), 14341735574462002086);
     }
 }

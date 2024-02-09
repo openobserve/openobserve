@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    cluster::{is_compactor, is_querier, LOCAL_NODE_UUID},
+    cluster::{is_compactor, is_ingester, is_querier, LOCAL_NODE_UUID},
     meta::{
         cluster::{Node, NodeStatus},
         stream::FileKey,
@@ -48,7 +48,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         cluster::get_cached_nodes(|node| {
             node.scheduled
                 && (node.status == NodeStatus::Prepare || node.status == NodeStatus::Online)
-                && (is_querier(&node.role) || is_compactor(&node.role))
+                && (is_querier(&node.role) || is_compactor(&node.role) || is_ingester(&node.role))
         })
         .unwrap()
     };
@@ -58,7 +58,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
         if node.uuid.eq(&local_node_uuid) {
             continue;
         }
-        if !is_querier(&node.role) && !is_compactor(&node.role) {
+        if !is_querier(&node.role) && !is_compactor(&node.role) && !is_ingester(&node.role) {
             continue;
         }
         let node_uuid = node.uuid.clone();
