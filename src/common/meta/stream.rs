@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     meta::stream::{PartitionTimeLevel, StreamStats, StreamType},
     utils::{
-        hash::{cityhash, Sum64},
+        hash::{gxhash, Sum64},
         json,
     },
 };
@@ -195,7 +195,7 @@ impl StreamPartition {
         match &self.types {
             StreamPartitionType::Value => value.to_string(),
             StreamPartitionType::Hash(n) => {
-                let h = cityhash::new().sum64(value);
+                let h = gxhash::new().sum64(value);
                 let bucket = h % n;
                 bucket.to_string()
             }
