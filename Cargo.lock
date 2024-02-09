@@ -2067,6 +2067,7 @@ dependencies = [
  "dotenvy",
  "get_if_addrs",
  "getrandom",
+ "gxhash",
  "hashbrown 0.14.3",
  "hex",
  "indexmap 2.1.0",
@@ -3289,6 +3290,16 @@ checksum = "273797968160270573071022613fc4aa28b91fe68f3eef6c96a1b2a1947ddfbd"
 dependencies = [
  "glob",
  "onig",
+]
+
+[[package]]
+name = "gxhash"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "370b2ac6cb58eb38e600bf6a783f8cca3f164d5fe5e501ad274d5dc8e94c7212"
+dependencies = [
+ "rand",
+ "rustc_version",
 ]
 
 [[package]]

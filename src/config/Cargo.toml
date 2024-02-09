@@ -21,6 +21,7 @@ dashmap.workspace = true
 dotenv_config.workspace = true
 dotenvy.workspace = true
 get_if_addrs.workspace = true
+gxhash.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
 indexmap.workspace = true

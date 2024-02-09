@@ -16,6 +16,7 @@
 pub mod cityhash;
 pub mod fnv;
 pub mod murmur3;
+pub mod gxhash;
 
 pub trait Sum64 {
     fn sum64(&mut self, key: &str) -> u64;
