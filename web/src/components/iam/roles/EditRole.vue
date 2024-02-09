@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="relative-position full-height">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div style="font-size: 18px" class="q-py-sm q-px-md">
       {{ editingRole }}
@@ -44,92 +44,113 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <GroupUsers
-        v-show="activeTab === 'users'"
-        :groupUsers="roleUsers"
-        :activeTab="activeTab"
-        :added-users="addedUsers"
-        class="q-mt-xs"
-        :removed-users="removedUsers"
-      />
-
-      <div v-show="activeTab === 'permissions'" class="q-pa-md">
-        <div class="o2-input flex items-end q-mb-md justify-start">
-          <div class="flex items-center q-mb-sm q-mr-md">
-            <span style="font-size: 14px"> Show </span>
-            <div
-              class="q-ml-xs"
-              style="
-                border: 1px solid #d7d7d7;
-                width: fit-content;
-                border-radius: 2px;
-              "
-            >
-              <template
-                v-for="visual in permissionDisplayOptions"
-                :key="visual.value"
-              >
-                <q-btn
-                  :color="visual.value === filter.permissions ? 'primary' : ''"
-                  :flat="visual.value === filter.permissions ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-md visual-selection-btn"
-                  @click="updateTableData(visual.value)"
-                >
-                  {{ visual.label }}</q-btn
-                >
-              </template>
-            </div>
-          </div>
-          <q-input
-            data-test="alert-list-search-input"
-            v-model="filter.value"
-            borderless
-            filled
-            dense
-            class="q-mb-xs no-border q-mr-md"
-            :placeholder="t('common.search')"
-            style="width: 300px"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-select
-            v-model="filter.resource"
-            :options="filteredResources"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-xs q-mr-sm"
-            placeholder="Select Resource"
-            map-options
-            use-input
-            emit-value
-            fill-input
-            hide-selected
-            outlined
-            filled
-            dense
-            clearable
-            style="width: 200px"
-            @filter="filterResourceOptions"
-            @update:model-value="onResourceChange"
-          />
-        </div>
-
-        <permissions-table
-          ref="permissionTableRef"
-          :rows="permissionsState.permissions"
-          :filter="filter"
-          :visibleResourceCount="countOfVisibleResources"
-          :selected-permissions-hash="selectedPermissionsHash"
-          @updated:permission="handlePermissionChange"
-          @expand:row="expandPermission"
+      <div style="min-height: calc(100% - (39px + 55px + 43px))">
+        <GroupUsers
+          v-show="activeTab === 'users'"
+          :groupUsers="roleUsers"
+          :activeTab="activeTab"
+          :added-users="addedUsers"
+          :removed-users="removedUsers"
         />
+
+        <div v-show="activeTab === 'permissions'">
+          <div
+            class="o2-input flex items-start q-px-md q-py-sm justify-start bg-white"
+            style="
+              position: sticky;
+              top: 0px;
+              z-index: 2;
+              box-shadow: rgb(240 240 240) 0px 4px 7px 0px;
+            "
+          >
+            <div class="flex items-center q-pt-xs q-mr-md">
+              <span style="font-size: 14px"> Show </span>
+              <div
+                class="q-ml-xs"
+                style="
+                  border: 1px solid #d7d7d7;
+                  width: fit-content;
+                  border-radius: 2px;
+                "
+              >
+                <template
+                  v-for="visual in permissionDisplayOptions"
+                  :key="visual.value"
+                >
+                  <q-btn
+                    :color="
+                      visual.value === filter.permissions ? 'primary' : ''
+                    "
+                    :flat="visual.value === filter.permissions ? false : true"
+                    dense
+                    no-caps
+                    size="11px"
+                    class="q-px-md visual-selection-btn"
+                    @click="updateTableData(visual.value)"
+                  >
+                    {{ visual.label }}</q-btn
+                  >
+                </template>
+              </div>
+            </div>
+            <q-input
+              data-test="alert-list-search-input"
+              v-model="filter.value"
+              borderless
+              filled
+              dense
+              class="q-mb-xs no-border q-mr-md"
+              :placeholder="t('common.search')"
+              style="width: 300px"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+            <q-select
+              v-model="filter.resource"
+              :options="filteredResources"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-mr-sm"
+              placeholder="Select Resource"
+              map-options
+              use-input
+              emit-value
+              fill-input
+              hide-selected
+              outlined
+              filled
+              dense
+              clearable
+              style="width: 200px"
+              @filter="filterResourceOptions"
+              @update:model-value="onResourceChange"
+            />
+          </div>
+
+          <div class="q-px-md q-my-sm">
+            <permissions-table
+              ref="permissionTableRef"
+              :rows="permissionsState.permissions"
+              :filter="filter"
+              :visibleResourceCount="countOfVisibleResources"
+              :selected-permissions-hash="selectedPermissionsHash"
+              @updated:permission="handlePermissionChange"
+              @expand:row="expandPermission"
+            />
+          </div>
+        </div>
       </div>
-      <div class="flex justify-end q-mt-lg q-px-md">
+      <div
+        class="flex justify-end q-px-md q-py-sm bg-white full-width"
+        style="
+          position: sticky;
+          bottom: 0px;
+          z-index: 2;
+          box-shadow: rgb(240 240 240) 0px -4px 7px 0px;
+        "
+      >
         <q-btn
           data-test="add-alert-cancel-btn"
           class="text-bold"
@@ -171,7 +192,6 @@ import {
 } from "@/services/iam";
 import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
-import { computed } from "vue";
 import streamService from "@/services/stream";
 import alertService from "@/services/alerts";
 import templateService from "@/services/alert_templates";
@@ -266,8 +286,10 @@ const updateActiveTab = (tab: string) => {
 };
 
 const getRoleDetails = () => {
-  getResources(store.state.selectedOrganization.identifier).then(
-    async (res) => {
+  isFetchingIntitialRoles.value = true;
+
+  getResources(store.state.selectedOrganization.identifier)
+    .then(async (res) => {
       permissionsState.resources = res.data
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
@@ -282,7 +304,6 @@ const getRoleDetails = () => {
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
-      isFetchingIntitialRoles.value = true;
       await getResourcePermissions();
       await getUsers();
       await updateRolePermissions();
@@ -291,8 +312,10 @@ const getRoleDetails = () => {
       }, 3000);
 
       updateTableData();
-    }
-  );
+    })
+    .catch(() => {
+      isFetchingIntitialRoles.value = false;
+    });
 };
 
 const getUsers = () => {

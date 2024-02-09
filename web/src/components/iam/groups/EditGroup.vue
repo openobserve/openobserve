@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="relative-position full-height">
     <div style="font-size: 18px" class="q-py-sm q-px-md">
       {{ groupDetails.group_name }}
     </div>
@@ -29,24 +29,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-separator />
+    <div style="min-height: calc(100% - (39px + 55px + 43px))">
+      <GroupUsers
+        v-show="activeTab === 'users'"
+        :groupUsers="groupDetails.users"
+        :activeTab="activeTab"
+        :added-users="addedUsers"
+        :removed-users="removedUsers"
+      />
 
-    <GroupUsers
-      v-show="activeTab === 'users'"
-      :groupUsers="groupDetails.users"
-      :activeTab="activeTab"
-      :added-users="addedUsers"
-      :removed-users="removedUsers"
-    />
-
-    <GroupRoles
-      v-show="activeTab === 'roles'"
-      :groupRoles="groupDetails.roles"
-      :activeTab="activeTab"
-      :added-roles="addedRoles"
-      :removed-roles="removedRoles"
-    />
-
-    <div class="flex justify-end q-mt-lg q-px-md">
+      <GroupRoles
+        v-show="activeTab === 'roles'"
+        :groupRoles="groupDetails.roles"
+        :activeTab="activeTab"
+        :added-roles="addedRoles"
+        :removed-roles="removedRoles"
+      />
+    </div>
+    <div
+      class="flex justify-end q-px-md q-py-sm bg-white full-width"
+      style="
+        position: sticky;
+        bottom: 0px;
+        z-index: 2;
+        box-shadow: rgb(240 240 240) 0px -4px 7px 0px;
+      "
+    >
       <q-btn
         data-test="add-alert-cancel-btn"
         class="text-bold"

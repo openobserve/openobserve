@@ -15,56 +15,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-md row">
-    <div class="col q-pr-xs">
-      <div class="flex justify-start bordered q-mb-md">
-        <div class="q-mr-md">
-          <div class="flex items-center q-pt-xs">
-            <span style="font-size: 14px"> Show </span>
-            <div
-              class="q-ml-xs"
-              style="
-                border: 1px solid #d7d7d7;
-                width: fit-content;
-                border-radius: 2px;
-              "
-            >
-              <template
-                v-for="visual in usersDisplayOptions"
-                :key="visual.value"
+  <div class="col q-pr-xs">
+    <div
+      class="flex justify-start bordered q-px-md q-py-sm bg-white"
+      style="
+        position: sticky;
+        top: 0px;
+        z-index: 2;
+        box-shadow: rgb(240 240 240) 0px 4px 7px 0px;
+      "
+    >
+      <div class="q-mr-md">
+        <div class="flex items-center q-pt-xs">
+          <span style="font-size: 14px"> Show </span>
+          <div
+            class="q-ml-xs"
+            style="
+              border: 1px solid #d7d7d7;
+              width: fit-content;
+              border-radius: 2px;
+            "
+          >
+            <template v-for="visual in usersDisplayOptions" :key="visual.value">
+              <q-btn
+                :color="visual.value === usersDisplay ? 'primary' : ''"
+                :flat="visual.value === usersDisplay ? false : true"
+                dense
+                no-caps
+                size="11px"
+                class="q-px-md visual-selection-btn"
+                @click="updateUserTable(visual.value)"
               >
-                <q-btn
-                  :color="visual.value === usersDisplay ? 'primary' : ''"
-                  :flat="visual.value === usersDisplay ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-md visual-selection-btn"
-                  @click="updateUserTable(visual.value)"
-                >
-                  {{ visual.label }}</q-btn
-                >
-              </template>
-            </div>
+                {{ visual.label }}</q-btn
+              >
+            </template>
           </div>
         </div>
-        <div class="o2-input q-mr-md" style="width: 400px">
-          <q-input
-            data-test="alert-list-search-input"
-            v-model="userSearchKey"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            placeholder="Search"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-        </div>
       </div>
-      <div class="q-ml-sm q-mb-sm text-bold">{{ rows.length }} Users</div>
+      <div class="o2-input q-mr-md" style="width: 400px">
+        <q-input
+          data-test="alert-list-search-input"
+          v-model="userSearchKey"
+          borderless
+          filled
+          dense
+          class="q-ml-auto q-mb-xs no-border"
+          placeholder="Search"
+        >
+          <template #prepend>
+            <q-icon name="search" class="cursor-pointer" />
+          </template>
+        </q-input>
+      </div>
+    </div>
+    <div class="q-px-md">
+      <div class="q-my-sm text-bold">{{ rows.length }} Users</div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"

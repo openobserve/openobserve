@@ -132,11 +132,11 @@ const updateActiveTab = (tab: string) => {
 
     if (!iamRouteTabsRef.value) return;
 
-    if (value === "editGroup") {
+    if (value === "editGroup" || value === "groups") {
       iamRouteTabsRef.value.setActiveTab("groups");
     }
 
-    if (value === "editRole") {
+    if (value === "editRole" || value === "roles") {
       iamRouteTabsRef.value.setActiveTab("roles");
     }
   }
