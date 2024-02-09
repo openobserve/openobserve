@@ -254,6 +254,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         &stream_settings.partition_keys,
     )
     .await;
+    let total_files = file_list.len();
+
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
     // 1. get work group
@@ -326,7 +328,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
     };
     log::info!(
-        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {total_files}",
         meta.meta.time_range
     );
 
@@ -382,6 +384,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             }
         }
 
+        let req_files = req.file_list.len();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
@@ -406,7 +409,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     )
                 });
 
-                log::info!("[session_id {session_id}] search->grpc: request node: {}, is_querier: {}", &node_addr, is_querier);
+                log::info!("[session_id {session_id}] search->grpc: request node: {}, is_querier: {}, files: {req_files}", &node_addr, is_querier);
 
                 let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                     .parse()

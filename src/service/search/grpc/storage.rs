@@ -175,7 +175,7 @@ pub async fn search(
         }
     }
     log::info!(
-        "[session_id {session_id}] search->storage: org {}/{}/{}, load files {}, into {:?} cache done",
+        "[session_id {session_id}] search->storage: stream {}/{}/{}, load files {}, into {:?} cache done",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
@@ -284,11 +284,11 @@ async fn get_file_list(
     partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
     log::debug!(
-        "[session_id {session_id}] grpc->storage: get file list, stream {}/{}/{}, time_level {:?}",
+        "[session_id {session_id}] search->storage: get file_list in grpc, stream {}/{}/{}, time_range {:?}",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
-        time_level
+        &sql.meta.time_range
     );
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = match file_list::query(
