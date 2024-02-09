@@ -42,7 +42,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
-    let mut h = config::utils::hash::fnv::new();
+    let mut h = config::utils::hash::cityhash::new();
     for i in 0..CONSISTENT_HASH_VNODES {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
@@ -59,7 +59,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
-    let mut h = config::utils::hash::fnv::new();
+    let mut h = config::utils::hash::cityhash::new();
     for i in 0..CONSISTENT_HASH_VNODES {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
@@ -79,7 +79,7 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     if nodes.is_empty() {
         return None;
     }
-    let hash = config::utils::hash::fnv::new().sum64(key);
+    let hash = config::utils::hash::cityhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     loop {
         if let Some(uuid) = iter.value() {
@@ -533,11 +533,46 @@ mod tests {
             add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
         }
 
-        for key in vec![
+        for key in vec!["test", "test1", "test2"] {
+            println!(
+                "{key}-q: {}",
+                get_node_from_consistent_hash(key, &Role::Querier)
+                    .await
+                    .unwrap()
+            );
+            println!(
+                "{key}-c: {}",
+                get_node_from_consistent_hash(key, &Role::Compactor)
+                    .await
+                    .unwrap()
+            );
+        }
+
+        // default hash
+        let _data = vec![
             ["test", "node-q-8", "node-c-6"],
             ["test1", "node-q-3", "node-c-9"],
             ["test2", "node-q-3", "node-c-0"],
-        ] {
+        ];
+        // fnv hash
+        let _data = vec![
+            ["test", "node-q-8", "node-c-8"],
+            ["test1", "node-q-8", "node-c-8"],
+            ["test2", "node-q-8", "node-c-8"],
+        ];
+        // murmur3 hash
+        let _data = vec![
+            ["test", "node-q-2", "node-c-3"],
+            ["test1", "node-q-5", "node-c-6"],
+            ["test2", "node-q-4", "node-c-2"],
+        ];
+        // cityhash hash
+        let data = vec![
+            ["test", "node-q-6", "node-c-7"],
+            ["test1", "node-q-5", "node-c-2"],
+            ["test2", "node-q-2", "node-c-4"],
+        ];
+        for key in data {
             assert_eq!(
                 get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Querier).await,
                 Some(key.get(1).unwrap().to_string())
