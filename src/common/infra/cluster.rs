@@ -42,7 +42,7 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
-    let mut h = config::utils::hash::cityhash::new();
+    let mut h = config::utils::hash::murmur3::new();
     for i in 0..CONSISTENT_HASH_VNODES {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
@@ -59,7 +59,7 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         Role::Compactor => COMPACTOR_CONSISTENT_HASH.write().await,
         _ => return,
     };
-    let mut h = config::utils::hash::cityhash::new();
+    let mut h = config::utils::hash::murmur3::new();
     for i in 0..CONSISTENT_HASH_VNODES {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
@@ -79,7 +79,7 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     if nodes.is_empty() {
         return None;
     }
-    let hash = config::utils::hash::cityhash::new().sum64(key);
+    let hash = config::utils::hash::murmur3::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     loop {
         if let Some(uuid) = iter.value() {
@@ -556,14 +556,14 @@ mod tests {
             ["test3", "node-q-8", "node-c-8"],
         ];
         // murmur3 hash
-        let _data = vec![
+        let data = vec![
             ["test", "node-q-2", "node-c-3"],
             ["test1", "node-q-5", "node-c-6"],
             ["test2", "node-q-4", "node-c-2"],
             ["test3", "node-q-0", "node-c-3"],
         ];
         // cityhash hash
-        let data = vec![
+        let _data = vec![
             ["test", "node-q-6", "node-c-7"],
             ["test1", "node-q-5", "node-c-2"],
             ["test2", "node-q-2", "node-c-4"],
