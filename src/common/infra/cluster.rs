@@ -533,7 +533,7 @@ mod tests {
             add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
         }
 
-        for key in vec!["test", "test1", "test2"] {
+        for key in vec!["test", "test1", "test2", "test3"] {
             println!(
                 "{key}-q: {}",
                 get_node_from_consistent_hash(key, &Role::Querier)
@@ -548,29 +548,26 @@ mod tests {
             );
         }
 
-        // default hash
-        let _data = vec![
-            ["test", "node-q-8", "node-c-6"],
-            ["test1", "node-q-3", "node-c-9"],
-            ["test2", "node-q-3", "node-c-0"],
-        ];
         // fnv hash
         let _data = vec![
             ["test", "node-q-8", "node-c-8"],
             ["test1", "node-q-8", "node-c-8"],
             ["test2", "node-q-8", "node-c-8"],
+            ["test3", "node-q-8", "node-c-8"],
         ];
         // murmur3 hash
         let _data = vec![
             ["test", "node-q-2", "node-c-3"],
             ["test1", "node-q-5", "node-c-6"],
             ["test2", "node-q-4", "node-c-2"],
+            ["test3", "node-q-0", "node-c-3"],
         ];
         // cityhash hash
         let data = vec![
             ["test", "node-q-6", "node-c-7"],
             ["test1", "node-q-5", "node-c-2"],
             ["test2", "node-q-2", "node-c-4"],
+            ["test3", "node-q-2", "node-c-1"],
         ];
         for key in data {
             assert_eq!(

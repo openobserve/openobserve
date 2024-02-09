@@ -52,6 +52,12 @@ mod tests {
     #[test]
     fn test_fnv64a() {
         let mut h = new();
+        for key in &[
+            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
+        ] {
+            let sum = h.sum64(key);
+            println!("{}: {}", key, sum);
+        }
         assert_eq!(h.sum64("hello"), 11831194018420276491);
         assert_eq!(h.sum64("world"), 5717881983045765875);
         assert_eq!(h.sum64("foo"), 15902901984413996407);
@@ -59,5 +65,6 @@ mod tests {
         assert_eq!(h.sum64("test"), 18007334074686647077);
         assert_eq!(h.sum64("test1"), 2271358237066212092);
         assert_eq!(h.sum64("test2"), 2271361535601096725);
+        assert_eq!(h.sum64("test3"), 2271360436089468514);
     }
 }

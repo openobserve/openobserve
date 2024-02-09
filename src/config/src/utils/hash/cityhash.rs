@@ -34,7 +34,9 @@ mod tests {
     #[test]
     fn test_cityhash_sum64() {
         let mut h = new();
-        for key in &["hello", "world", "foo", "bar", "test", "test1", "test2"] {
+        for key in &[
+            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
+        ] {
             let sum = h.sum64(key);
             println!("{}: {}", key, sum);
         }
@@ -45,5 +47,6 @@ mod tests {
         assert_eq!(h.sum64("test"), 8581389452482819506);
         assert_eq!(h.sum64("test1"), 10258151040114700067);
         assert_eq!(h.sum64("test2"), 13211586869705959535);
+        assert_eq!(h.sum64("test3"), 3708989183841402594);
     }
 }
