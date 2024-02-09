@@ -745,7 +745,11 @@ const getResourceEntities = (resource: Resource | Entity) => {
   const listEntitiesFnMap: {
     [key: string]: (resource: Resource | Entity) => Promise<any>;
   } = {
-    stream: getStreams,
+    stream: getStreamsTypes,
+    stream_type: getStreamsTypes,
+    logs: getLogs,
+    metrics: getMetrics,
+    traces: getTraces,
     alert: getAlerts,
     template: getTemplates,
     destination: getDestinations,
@@ -774,8 +778,16 @@ const getResourceEntities = (resource: Resource | Entity) => {
   });
 };
 
-const getEnrichmentTables = () => {
-  return new Promise((resolve) => {
+const getEnrichmentTables = async () => {
+  const data = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "enrichment_tables",
+    false
+  );
+
+  updateResourceEntities("enrichment_table", ["name"], data.data.list);
+
+  return new Promise((resolve, reject) => {
     resolve(true);
   });
 };
@@ -847,7 +859,8 @@ const getFolders = async () => {
     ["folderId"],
     [...folders.data.list],
     true,
-    "name"
+    "name",
+    "dashboard"
   );
   return new Promise((resolve) => {
     resolve(true);
@@ -931,28 +944,65 @@ const getAlerts = async () => {
   });
 };
 
-const getStreams = async () => {
+const getLogs = async (resource: Resource) => {
   const logs = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "logs",
     false
   );
-  const traces = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "traces",
-    false
-  );
+
+  updateEntityEntities(resource, ["name"], logs.data.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getMetrics = async (resource: Resource) => {
   const metrics = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "metrics",
     false
   );
 
-  updateResourceEntities(
-    "stream",
-    ["stream_type", "name"],
-    [...logs.data.list, ...metrics.data.list, ...traces.data.list]
+  updateEntityEntities(resource, ["name"], metrics.data.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getTraces = async (resource: Resource) => {
+  const traces = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "traces",
+    false
   );
+
+  updateEntityEntities(resource, ["name"], traces.data.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getStreamsTypes = async () => {
+  const streams = [
+    { stream_type: "logs", name: "Logs" },
+    { stream_type: "traces", name: "Traces" },
+    { stream_type: "metrics", name: "Metrics" },
+  ];
+
+  streams.forEach((stream) => {
+    updateResourceEntities(
+      "stream",
+      ["stream_type"],
+      [stream],
+      true,
+      "name",
+      stream.stream_type
+    );
+  });
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -967,9 +1017,6 @@ const updateEntityEntities = (
   displayNameKey?: string
 ) => {
   if (!entity) return;
-
-  if (entity.entities) entity.entities.length = 0;
-  entity.entities = [];
 
   data.forEach((_entity: any) => {
     let entityName = "";
@@ -1068,7 +1115,8 @@ const updateResourceEntities = (
   entityNameKeys: string[],
   data: any[],
   hasEntities: boolean = false,
-  displayNameKey?: string
+  displayNameKey?: string,
+  childName?: string
 ) => {
   const resource: Resource | null | undefined = getResourceByName(
     permissionsState.permissions,
@@ -1076,9 +1124,6 @@ const updateResourceEntities = (
   );
 
   if (!resource) return;
-
-  resource.entities.length = 0;
-  resource.entities = [];
 
   data.forEach((_entity: any) => {
     let entityName = "";
@@ -1137,7 +1182,7 @@ const updateResourceEntities = (
       has_entities: hasEntities,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
       show: true,
-      childName: hasEntities ? resource.childs[0].resourceName : "",
+      childName: childName || "",
     });
   });
 
