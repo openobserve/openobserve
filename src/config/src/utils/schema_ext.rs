@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-};
+use std::{collections::HashMap, hash::BuildHasher};
 
 use arrow_schema::{Field, Schema};
+use gxhash::GxBuildHasher;
 
 const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
 
@@ -35,9 +33,7 @@ impl SchemaExt for Schema {
     }
 
     fn hash_key(&self) -> String {
-        let mut hasher = xxhash_rust::xxh3::Xxh3::new();
-        self.hash(&mut hasher);
-        format!("{:x}", hasher.finish())
+        format!("{:x}", GxBuildHasher::default().hash_one(self))
     }
 
     fn size(&self) -> usize {
