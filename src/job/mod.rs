@@ -243,6 +243,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         .await;
                     }
                     drop(r);
+                    // No Data Ingested hence STREAM_SCHEMAS is empty , so we need to create at
+                    // least default org
+                    if tuples.is_empty() {
+                        get_org_creation_tuples(
+                            DEFAULT_ORG,
+                            &mut tuples,
+                            OFGA_MODELS
+                                .iter()
+                                .map(|(_, fga_entity)| fga_entity.key)
+                                .collect(),
+                            NON_OWNING_ORG.to_vec(),
+                        )
+                        .await;
+                    }
 
                     for user_key_val in USERS.iter() {
                         let user = user_key_val.value();

@@ -17,6 +17,7 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 use config::{ider, utils::rand::generate_random_string};
+use vrl::path::ValuePath;
 
 use crate::{
     common::{
@@ -442,15 +443,17 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
 
     #[cfg(feature = "enterprise")]
     {
-        let root = ROOT_USER.get("root").unwrap();
-        let root_user = root.value();
-        user_list.push(UserResponse {
-            email: root_user.email.clone(),
-            role: root_user.role.clone(),
-            first_name: root_user.first_name.clone(),
-            last_name: root_user.last_name.clone(),
-            is_external: root_user.is_external,
-        })
+        if !org_id.eq(DEFAULT_ORG) {
+            let root = ROOT_USER.get("root").unwrap();
+            let root_user = root.value();
+            user_list.push(UserResponse {
+                email: root_user.email.clone(),
+                role: root_user.role.clone(),
+                first_name: root_user.first_name.clone(),
+                last_name: root_user.last_name.clone(),
+                is_external: root_user.is_external,
+            })
+        }
     }
 
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))
