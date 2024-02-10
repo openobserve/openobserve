@@ -30,7 +30,10 @@ use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
 use crate::{
     common::{
         infra::config::SYSLOG_ENABLED,
-        meta::{organization::DEFAULT_ORG, user::UserRequest},
+        meta::{
+            organization::DEFAULT_ORG,
+            user::{UserRequest, UserRole},
+        },
     },
     service::{compact::stats::update_stats_from_file_list, db, users},
 };
@@ -246,12 +249,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         if user.is_external {
                             continue;
                         } else {
-                            get_user_role_tuple(
-                                &user.role.to_string(),
-                                &user.email,
-                                &user.org,
-                                &mut tuples,
-                            );
+                            let role = if user.role.eq(&UserRole::Root) {
+                                UserRole::Admin.to_string()
+                            } else {
+                                user.role.to_string()
+                            };
+
+                            get_user_role_tuple(&role, &user.email, &user.org, &mut tuples);
                         }
                     }
 
