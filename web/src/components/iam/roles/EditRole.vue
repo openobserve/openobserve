@@ -55,13 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-show="activeTab === 'permissions'">
           <div
-            class="o2-input flex items-start q-px-md q-py-sm justify-start bg-white"
-            style="
-              position: sticky;
-              top: 0px;
-              z-index: 2;
-              box-shadow: rgb(240 240 240) 0px 4px 7px 0px;
-            "
+            class="o2-input flex items-start q-px-md q-py-sm justify-start"
+            style="position: sticky; top: 57px; z-index: 2"
+            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            :style="{
+              'box-shadow':
+                store.state.theme === 'dark'
+                  ? 'rgb(45 45 45) 0px 4px 7px 0px'
+                  : 'rgb(240 240 240) 0px 4px 7px 0px',
+            }"
           >
             <div class="flex items-center q-pt-xs q-mr-md">
               <span style="font-size: 14px"> Show </span>
@@ -143,13 +145,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end q-px-md q-py-sm bg-white full-width"
-        style="
-          position: sticky;
-          bottom: 0px;
-          z-index: 2;
-          box-shadow: rgb(240 240 240) 0px -4px 7px 0px;
-        "
+        class="flex justify-end q-px-md q-py-sm full-width"
+        style="position: sticky; bottom: 0px; z-index: 2"
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :style="{
+          'box-shadow':
+            store.state.theme === 'dark'
+              ? 'rgb(45 45 45) 0px -4px 7px 0px'
+              : 'rgb(240 240 240) 0px -4px 7px 0px',
+        }"
       >
         <q-btn
           data-test="add-alert-cancel-btn"
@@ -1350,12 +1354,22 @@ const saveRole = () => {
         timeout: 3000,
       });
 
+      // Reseting permissions state on save
+
+      Object.keys(removedPermissions.value).forEach((permission) => {
+        if (permissionsHash.value.has(permission))
+          permissionsHash.value.delete(permission);
+
+        if (selectedPermissionsHash.value.has(permission))
+          selectedPermissionsHash.value.delete(permission);
+      });
+
       permissionsHash.value = new Set([
         ...Array.from(permissionsHash.value),
         ...Array.from(selectedPermissionsHash.value),
       ]);
 
-      selectedPermissionsHash.value = new Set([]);
+      selectedPermissionsHash.value = cloneDeep(permissionsHash.value);
 
       addedPermissions.value = {};
 

@@ -47,13 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-      class="flex justify-end q-px-md q-py-sm bg-white full-width"
-      style="
-        position: sticky;
-        bottom: 0px;
-        z-index: 2;
-        box-shadow: rgb(240 240 240) 0px -4px 7px 0px;
-      "
+      class="flex justify-end q-px-md q-py-sm full-width"
+      style="position: sticky; bottom: 0px; z-index: 2"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :style="{
+        'box-shadow':
+          store.state.theme === 'dark'
+            ? 'rgb(45 45 45) 0px -4px 7px 0px'
+            : 'rgb(240 240 240) 0px -4px 7px 0px',
+      }"
     >
       <q-btn
         data-test="add-alert-cancel-btn"
@@ -108,8 +110,8 @@ const q = useQuasar();
 
 const groupDetails = ref({
   group_name: "dev",
-  roles: [],
-  users: [],
+  roles: [] as string[],
+  users: [] as string[],
 });
 
 const addedUsers = ref(new Set());
@@ -170,6 +172,32 @@ const saveGroupChanges = () => {
         message: `Updated group successfully!`,
         timeout: 3000,
       });
+
+      // Reset Roles
+      groupDetails.value.roles = groupDetails.value.roles.filter(
+        (user) => !removedRoles.value.has(user)
+      );
+
+      addedRoles.value.forEach((value: any) => {
+        groupDetails.value.roles.push(value as string);
+      });
+
+      addedRoles.value = new Set([]);
+
+      removedRoles.value = new Set([]);
+
+      // Reset Users
+      groupDetails.value.users = groupDetails.value.users.filter(
+        (user) => !removedUsers.value.has(user)
+      );
+
+      addedUsers.value.forEach((value: any) => {
+        groupDetails.value.users.push(value as string);
+      });
+
+      addedUsers.value = new Set([]);
+
+      removedUsers.value = new Set([]);
     })
     .catch((err) => {
       q.notify({

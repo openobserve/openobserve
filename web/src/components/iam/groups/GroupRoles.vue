@@ -17,13 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col q-pr-xs">
     <div
-      class="flex justify-start bordered q-px-md q-py-sm bg-white"
-      style="
-        position: sticky;
-        top: 0px;
-        z-index: 2;
-        box-shadow: rgb(240 240 240) 0px 4px 7px 0px;
-      "
+      class="flex justify-start bordered q-px-md q-py-sm"
+      style="position: sticky; top: 57px; z-index: 2"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :style="{
+        'box-shadow':
+          store.state.theme === 'dark'
+            ? 'rgb(45 45 45) 0px 4px 7px 0px'
+            : 'rgb(240 240 240) 0px 4px 7px 0px',
+      }"
     >
       <div class="q-mr-md">
         <div class="flex items-center q-pt-xs">
@@ -99,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch } from "vue";
+import { watch, onBeforeMount } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
@@ -133,24 +135,7 @@ const props = defineProps({
 
 const emits = defineEmits(["add", "remove"]);
 
-const users = ref([
-  {
-    role_name: "example@example.com",
-  },
-  {
-    role_name: "root@example.com",
-  },
-]);
-
-watch(
-  () => props.groupRoles,
-  () => {
-    updateGroupUsers();
-  },
-  {
-    deep: true,
-  }
-);
+const users = ref([]);
 
 const { rolesState, groupsState } = usePermissions();
 
@@ -198,10 +183,19 @@ const columns = [
   },
 ];
 
+onBeforeMount(async () => {
+  groupUsersMap.value = new Set(props.groupRoles);
+  await getchOrgUsers();
+  updateUserTable(usersDisplay.value);
+});
+
 watch(
   () => props.groupRoles,
-  () => {
-    updateGroupUsers();
+  async () => {
+    hasFetchedOrgUsers.value = false;
+    groupUsersMap.value = new Set(props.groupRoles);
+    await getchOrgUsers();
+    updateUserTable(usersDisplay.value);
   },
   {
     deep: true,
@@ -222,19 +216,6 @@ const updateUserTable = async (value: string) => {
   }
 };
 
-const updateGroupUsers = () => {
-  users.value = props.groupRoles.map((role: any, index: number) => {
-    groupUsersMap.value.add(role);
-    return {
-      role_name: role,
-      "#": index + 1,
-      isInGroup: true,
-    };
-  });
-
-  updateUserTable(usersDisplay.value);
-};
-
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
@@ -247,7 +228,7 @@ const getchOrgUsers = async () => {
       return {
         role_name: role,
         "#": index + 1,
-        isInGroup: groupUsersMap.value.has(role.role_name),
+        isInGroup: groupUsersMap.value.has(role),
       };
     });
     resolve(true);
