@@ -129,7 +129,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
         let mut total = 0;
         let mut i = 0;
         loop {
-            if i > 0 && i % 100 == 0 {
+            if i > 0 && i % 1000 == 0 {
                 log::warn!(
                     "replay wal file: {:?}, entries: {}, records: {}",
                     wal_file,

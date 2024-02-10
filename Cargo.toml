@@ -259,5 +259,4 @@ url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 walkdir = "2"
-xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

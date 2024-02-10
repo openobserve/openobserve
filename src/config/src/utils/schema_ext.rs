@@ -35,7 +35,7 @@ impl SchemaExt for Schema {
     }
 
     fn hash_key(&self) -> String {
-        let mut hasher = xxhash_rust::xxh3::Xxh3::new();
+        let mut hasher = gxhash::GxHasher::with_seed(0);
         self.hash(&mut hasher);
         format!("{:x}", hasher.finish())
     }
