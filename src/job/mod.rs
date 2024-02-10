@@ -25,9 +25,11 @@ use o2_enterprise::enterprise::openfga::authorizer::authz::{
 use o2_enterprise::enterprise::openfga::meta::mapping::{NON_OWNING_ORG, OFGA_MODELS};
 use regex::Regex;
 
+#[cfg(feature = "enterprise")]
+use crate::common::infra::config::STREAM_SCHEMAS;
 use crate::{
     common::{
-        infra::config::{STREAM_SCHEMAS, SYSLOG_ENABLED},
+        infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
     service::{compact::stats::update_stats_from_file_list, db, users},
