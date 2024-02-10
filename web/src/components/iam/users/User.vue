@@ -152,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="selectedUser"
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
+        :roles="options"
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
@@ -253,16 +254,11 @@ export default defineComponent({
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
       if (isEnterprise.value) await getRoles();
-      await nextTick();
 
-      if (isEnterprise.value && isCurrentUserInternal.value) {
-        columns.value.push({
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        });
-      } else if (!isEnterprise.value) {
+      if (
+        (isEnterprise.value && isCurrentUserInternal.value) ||
+        !isEnterprise.value
+      ) {
         columns.value.push({
           name: "actions",
           field: "actions",
@@ -317,12 +313,13 @@ export default defineComponent({
     let deleteUserEmail = "";
 
     const getRoles = () => {
-      return new Promise(() => {
+      return new Promise((resolve) => {
         usersService
           .getRoles(store.state.selectedOrganization.identifier)
           .then((res) => {
             options.value = res.data;
-          });
+          })
+          .finally(() => resolve(true));
       });
     };
 
@@ -459,8 +456,8 @@ export default defineComponent({
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
-          (currentUserRole.value == "root" ||
-            (currentUserRole.value == "admin" && user.role !== "root"))
+          user.role !== "root" &&
+          (currentUserRole.value == "root" || currentUserRole.value == "admin")
         );
       } else {
         return (
