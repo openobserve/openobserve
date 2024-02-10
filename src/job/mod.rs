@@ -32,10 +32,7 @@ use crate::common::meta::user::UserRole;
 use crate::{
     common::{
         infra::config::SYSLOG_ENABLED,
-        meta::{
-            organization::DEFAULT_ORG,
-            user::{UserRequest, UserRole},
-        },
+        meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
     service::{compact::stats::update_stats_from_file_list, db, users},
 };
