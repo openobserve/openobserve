@@ -17,11 +17,17 @@ use config::{cluster, ider, utils::file::clean_empty_dirs, CONFIG, INSTANCE_ID};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::authorizer::authz::{
+    get_org_creation_tuples, update_tuples,
+};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::openfga::meta::mapping::{NON_OWNING_ORG, OFGA_MODELS};
 use regex::Regex;
 
 use crate::{
     common::{
-        infra::config::SYSLOG_ENABLED,
+        infra::config::{STREAM_SCHEMAS, SYSLOG_ENABLED},
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
     service::{compact::stats::update_stats_from_file_list, db, users},
@@ -210,6 +216,37 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
             Err(e) => {
                 log::error!("Error setting OFGA model: {:?}", e);
+            }
+        }
+        let mut tuples = vec![];
+        let r = STREAM_SCHEMAS.read().await;
+        for key in r.keys() {
+            if !key.contains('/') {
+                continue;
+            }
+            let org_name = key.split('/').collect::<Vec<&str>>()[0];
+            get_org_creation_tuples(
+                org_name,
+                &mut tuples,
+                OFGA_MODELS
+                    .iter()
+                    .map(|(_, fga_entity)| fga_entity.key)
+                    .collect(),
+                NON_OWNING_ORG.to_vec(),
+            )
+            .await;
+        }
+        drop(r);
+        if tuples.is_empty() {
+            log::info!("No orgs to update to the openfga");
+        } else {
+            match update_tuples(tuples, vec![]).await {
+                Ok(_) => {
+                    log::info!("Orgs updated to the openfga");
+                }
+                Err(e) => {
+                    log::error!("Error updating orgs to the openfga: {}", e);
+                }
             }
         }
     }

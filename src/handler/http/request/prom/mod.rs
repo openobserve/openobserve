@@ -502,14 +502,16 @@ pub async fn metadata(
 pub async fn series_get(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestSeries>,
+    _in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    series(&org_id, req.into_inner()).await
+    series(&org_id, req.into_inner(), _in_req).await
 }
 
 #[post("/{org_id}/prometheus/api/v1/series")]
 pub async fn series_post(
     org_id: web::Path<String>,
     req: web::Query<meta::prom::RequestSeries>,
+    _in_req: HttpRequest,
     web::Form(form): web::Form<meta::prom::RequestSeries>,
 ) -> Result<HttpResponse, Error> {
     let req = if form.matcher.is_some() || form.start.is_some() || form.end.is_some() {
@@ -517,10 +519,14 @@ pub async fn series_post(
     } else {
         req.into_inner()
     };
-    series(&org_id, req).await
+    series(&org_id, req, _in_req).await
 }
 
-async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResponse, Error> {
+async fn series(
+    org_id: &str,
+    req: meta::prom::RequestSeries,
+    _in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let meta::prom::RequestSeries {
         matcher,
         start,
@@ -534,6 +540,50 @@ async fn series(org_id: &str, req: meta::prom::RequestSeries) -> Result<HttpResp
             );
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        let metric_name = match selector
+            .as_ref()
+            .and_then(metrics::prom::try_into_metric_name)
+        {
+            Some(name) => name,
+            None => "".to_string(),
+        };
+
+        let user_id = _in_req.headers().get("user_id").unwrap();
+        let user_email = user_id.to_str().unwrap();
+
+        if !is_root_user(user_email) {
+            let user: meta::user::User = USERS
+                .get(&format!("{org_id}/{}", user_email))
+                .unwrap()
+                .clone();
+            if user.is_external
+                && !crate::handler::http::auth::validator::check_permissions(
+                    user_email,
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!("{}:{}", "metrics", metric_name),
+                        org_id: org_id.to_string(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    Some(user.role),
+                )
+                .await
+            {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+    }
+
     Ok(
         match metrics::prom::get_series(org_id, selector, start, end).await {
             Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),

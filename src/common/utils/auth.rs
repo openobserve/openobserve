@@ -299,6 +299,7 @@ impl FromRequest for AuthExtractor {
                     || path.contains("/prometheus/api/v1/query")
                     || path.contains("/resources")
                     || path.contains("/format_query")
+                    || path.contains("/prometheus/api/v1/series")
                 {
                     return ready(Ok(AuthExtractor {
                         auth: auth_str.to_owned(),

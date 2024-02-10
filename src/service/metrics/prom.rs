@@ -771,7 +771,7 @@ pub(crate) async fn get_label_values(
     Ok(label_values)
 }
 
-fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
+pub(crate) fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
     match &selector.name {
         Some(name) => {
             // `match[]` argument contains a metric name, e.g.
