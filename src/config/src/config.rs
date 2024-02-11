@@ -373,8 +373,9 @@ pub struct Limit {
     pub max_file_retention_time: u64,
     #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 64)] // MB, per log file size on disk
     pub max_file_size_on_disk: usize,
-    #[env_config(name = "ZO_MEM_FILE_MAX_SIZE", default = 256)] // MB, per log file size in memory
-    pub mem_file_max_size: usize,
+    #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
+    // MB, per log file size in memory
+    pub max_file_size_in_memory: usize,
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
     // MB, total file size in memory, default is 50% of system memory
     pub mem_table_max_size: usize,
@@ -682,10 +683,21 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 60;
     }
-    // check max_file_size_on_disk to MB
-    cfg.limit.max_file_size_on_disk *= 1024 * 1024;
     if cfg.limit.req_cols_per_record_limit == 0 {
         cfg.limit.req_cols_per_record_limit = 1000;
+    }
+
+    // check max_file_size_on_disk to MB
+    if cfg.limit.max_file_size_on_disk == 0 {
+        cfg.limit.max_file_size_on_disk = 64 * 1024 * 1024; // 64MB
+    } else {
+        cfg.limit.max_file_size_on_disk *= 1024 * 1024;
+    }
+    // check max_file_size_in_memory to MB
+    if cfg.limit.max_file_size_in_memory == 0 {
+        cfg.limit.max_file_size_in_memory = 256 * 1024 * 1024; // 256MB
+    } else {
+        cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
 
     // HACK instance_name
@@ -896,18 +908,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
     }
 
-    // for memtable limit check
-    cfg.limit.mem_file_max_size *= 1024 * 1024;
-    if cfg.limit.mem_table_max_size == 0 {
-        cfg.limit.mem_table_max_size = mem_total / 2; // 50%
-    } else {
-        cfg.limit.mem_table_max_size *= 1024 * 1024;
-    }
-
     // check query settings
-    cfg.limit.query_group_base_speed *= 1024 * 1024;
     if cfg.limit.query_group_base_speed == 0 {
         cfg.limit.query_group_base_speed = SIZE_IN_GB as usize;
+    } else {
+        cfg.limit.query_group_base_speed *= 1024 * 1024;
     }
     if cfg.limit.query_partition_by_secs == 0 {
         cfg.limit.query_partition_by_secs = 30;
