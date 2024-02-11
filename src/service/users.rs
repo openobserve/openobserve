@@ -18,6 +18,8 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 use config::{ider, utils::rand::generate_random_string};
 
+
+
 use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
@@ -63,6 +65,29 @@ pub async fn post_user(
                 usr_req.is_external,
             );
             db::user::set(user).await.unwrap();
+            // Update OFGA
+            #[cfg(feature = "enterprise")]
+            {
+                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                    get_user_role_tuple, update_tuples,
+                };
+
+                let mut tuples = vec![];
+                get_user_role_tuple(
+                    &usr_req.role.to_string(),
+                    &usr_req.email,
+                    &org_id.replace(' ', "_"),
+                    &mut tuples,
+                );
+                match update_tuples(tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("Orgs updated to the openfga");
+                    }
+                    Err(e) => {
+                        log::error!("Error updating orgs to the openfga: {}", e);
+                    }
+                }
+            }
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 "User saved successfully".to_string(),
@@ -115,6 +140,9 @@ pub async fn update_user(
     } else {
         db::user::get(Some(org_id), email).await
     };
+
+    let mut old_role = None;
+    let mut new_role = None;
 
     if existing_user.is_ok() {
         let mut new_user;
@@ -187,7 +215,9 @@ pub async fn update_user(
                         || (local_user.role.eq(&UserRole::Admin)
                             || local_user.role.eq(&UserRole::Root)))
                 {
+                    old_role = Some(new_user.role);
                     new_user.role = user.role.unwrap();
+                    new_role = Some(new_user.role.clone());
                     is_org_updated = true;
                 }
                 if user.token.is_some() {
@@ -224,6 +254,27 @@ pub async fn update_user(
                             }
 
                             db::user::set(db_user).await.unwrap();
+
+                            #[cfg(feature = "enterprise")]
+                            {
+                                use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
+                                if old_role.is_some() && new_role.is_some() {
+                                    let old = old_role.unwrap();
+                                    let new = new_role.unwrap();
+                                    if !old.eq(&new) {
+                                        update_user_role(
+                                            &old.to_string(),
+                                            &new.to_string(),
+                                            email,
+                                            org_id,
+                                        )
+                                        .await;
+                                    }
+                                }
+                            }
+
+                            #[cfg(not(feature = "enterprise"))]
+                            log::debug!("Role chnaged from {:?} to {:?}", old_role, new_role);
                             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                                 http::StatusCode::OK.into(),
                                 "User updated successfully".to_string(),
@@ -287,7 +338,7 @@ pub async fn add_user_to_org(
                     name: local_org.to_string(),
                     token,
                     rum_token: Some(rum_token),
-                    role,
+                    role: role.clone(),
                 }]
             } else {
                 orgs.retain(|org| !org.name.eq(&local_org));
@@ -295,12 +346,31 @@ pub async fn add_user_to_org(
                     name: local_org.to_string(),
                     token,
                     rum_token: Some(rum_token),
-                    role,
+                    role: role.clone(),
                 });
                 orgs
             };
             db_user.organizations = new_orgs;
             db::user::set(db_user).await.unwrap();
+
+            // Update OFGA
+            #[cfg(feature = "enterprise")]
+            {
+                use o2_enterprise::enterprise::openfga::authorizer::authz::{
+                    get_user_role_tuple, update_tuples,
+                };
+
+                let mut tuples = vec![];
+                get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
+                match update_tuples(tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("Orgs updated to the openfga");
+                    }
+                    Err(e) => {
+                        log::error!("Error updating orgs to the openfga: {}", e);
+                    }
+                }
+            }
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 "User added to org successfully".to_string(),
@@ -374,15 +444,17 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
 
     #[cfg(feature = "enterprise")]
     {
-        let root = ROOT_USER.get("root").unwrap();
-        let root_user = root.value();
-        user_list.push(UserResponse {
-            email: root_user.email.clone(),
-            role: root_user.role.clone(),
-            first_name: root_user.first_name.clone(),
-            last_name: root_user.last_name.clone(),
-            is_external: root_user.is_external,
-        })
+        if !org_id.eq(DEFAULT_ORG) {
+            let root = ROOT_USER.get("root").unwrap();
+            let root_user = root.value();
+            user_list.push(UserResponse {
+                email: root_user.email.clone(),
+                role: root_user.role.clone(),
+                first_name: root_user.first_name.clone(),
+                last_name: root_user.last_name.clone(),
+                is_external: root_user.is_external,
+            })
+        }
     }
 
     Ok(HttpResponse::Ok().json(UserList { data: user_list }))

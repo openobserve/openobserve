@@ -16,11 +16,17 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use strum::IntoEnumIterator;
 
 use crate::{
     common::{
-        meta,
-        meta::user::{SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest},
+        meta::{
+            self,
+            user::{
+                RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole, UserRequest,
+                UserRole,
+            },
+        },
         utils::auth::UserEmail,
     },
     service::users,
@@ -82,7 +88,10 @@ pub async fn save(
             )),
         );
     }
-    user.role = meta::user::UserRole::Admin;
+    #[cfg(not(feature = "enterprise"))]
+    {
+        user.role = meta::user::UserRole::Admin;
+    }
     users::post_user(&org_id, user, &initiator_id).await
 }
 
@@ -111,7 +120,10 @@ pub async fn update(
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_string();
+    #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
+    #[cfg(feature = "enterprise")]
+    let user = user.into_inner();
     if user.eq(&UpdateUser::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
@@ -120,7 +132,10 @@ pub async fn update(
             )),
         );
     }
-    user.role = Some(meta::user::UserRole::Admin);
+    #[cfg(not(feature = "enterprise"))]
+    {
+        user.role = Some(meta::user::UserRole::Admin);
+    }
     let initiator_id = &user_email.user_id;
     let self_update = user_email.user_id.eq(&email_id);
     users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
@@ -215,4 +230,37 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
     }
+}
+
+/// ListUsers
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserRoles",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserList),
+    )
+)]
+#[get("/{org_id}/users/roles")]
+pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let roles = UserRole::iter()
+        .filter_map(|role| {
+            if role.eq(&UserRole::Root) || role.eq(&UserRole::Member) {
+                None
+            } else {
+                Some(RolesResponse {
+                    label: role.get_label(),
+                    value: role.to_string(),
+                })
+            }
+        })
+        .collect::<Vec<RolesResponse>>();
+
+    Ok(HttpResponse::Ok().json(roles))
 }
