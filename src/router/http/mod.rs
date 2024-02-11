@@ -176,11 +176,13 @@ async fn dispatch(
     }
 
     // set body
-    let body = resp
-        .body()
-        .limit(CONFIG.limit.req_payload_limit)
-        .await
-        .unwrap();
+    let body = match resp.body().limit(CONFIG.limit.req_payload_limit).await {
+        Ok(b) => b,
+        Err(e) => {
+            log::error!("{}: {}", new_url.value, e);
+            return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
+        }
+    };
     Ok(new_resp.body(body))
 }
 
