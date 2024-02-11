@@ -300,6 +300,7 @@ impl FromRequest for AuthExtractor {
                     || path.contains("/resources")
                     || path.contains("/format_query")
                     || path.contains("/prometheus/api/v1/series")
+                    || path.contains("/traces/latest")
                 {
                     return ready(Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
