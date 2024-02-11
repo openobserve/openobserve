@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix_web::http;
 use arrow_schema::DataType;
+use boa_engine::{property::Attribute, Context, JsValue, NativeFunction, Source};
 use chrono::{Duration, Local, TimeZone, Utc};
 use config::{
     ider,
@@ -27,6 +28,8 @@ use config::{
     },
     CONFIG,
 };
+use futures::future::join;
+use serde_json::json;
 
 use super::promql;
 use crate::{
@@ -34,6 +37,7 @@ use crate::{
         meta::{
             alerts::{
                 destinations::{DestinationWithTemplate, HTTPType},
+                scripts::Script,
                 AggFunction, Alert, Condition, Operator, QueryCondition, QueryType,
             },
             authz::Authz,
@@ -46,6 +50,8 @@ use crate::{
 
 pub mod alert_manager;
 pub mod destinations;
+pub mod js_vm;
+pub mod scripts;
 pub mod templates;
 pub mod triggers;
 
@@ -71,13 +77,20 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
     }
 
-    // before saving alert check alert destination
-    if alert.destinations.is_empty() {
-        return Err(anyhow::anyhow!("Alert destinations is required"));
+    // before saving alert check alert destinations and scripts
+    if alert.destinations.is_empty() && alert.scripts.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Atleast one destination/script is required"
+        ));
     }
     for dest in alert.destinations.iter() {
         if db::alerts::destinations::get(org_id, dest).await.is_err() {
             return Err(anyhow::anyhow!("Alert destination {dest} not found"));
+        };
+    }
+    for script in alert.scripts.iter() {
+        if db::alerts::scripts::get(org_id, script).await.is_err() {
+            return Err(anyhow::anyhow!("Alert script {script} not found"));
         };
     }
 
@@ -233,7 +246,7 @@ pub async fn trigger(
         }
     };
     alert
-        .send_notification(&[])
+        .take_action(&[])
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -248,6 +261,24 @@ impl Alert {
         } else {
             self.query_condition.evaluate_scheduled(self).await
         }
+    }
+
+    pub async fn execute_scripts(&self, rows: &[Map<String, Value>]) -> Result<(), anyhow::Error> {
+        for script in self.scripts.iter() {
+            let script = scripts::get(&self.org_id, script).await?;
+            if let Err(e) = execute_script(self, &script, rows).await {
+                log::error!(
+                    "Error running script {} for {}/{}/{}/{} err: {}",
+                    script.name,
+                    self.org_id,
+                    self.stream_type,
+                    self.stream_name,
+                    self.name,
+                    e
+                );
+            }
+        }
+        Ok(())
     }
 
     pub async fn send_notification(
@@ -268,6 +299,24 @@ impl Alert {
             }
         }
         Ok(())
+    }
+
+    pub async fn take_action(&self, rows: &[Map<String, Value>]) -> Result<(), anyhow::Error> {
+        let notify = self.send_notification(rows);
+        let execute = self.execute_scripts(rows);
+
+        match join(notify, execute).await {
+            (Ok(_), Err(e)) => Err(anyhow::anyhow!(
+                "Alert notifications sent successfully, but scripts execution failed: {e}"
+            )),
+            (Err(e), Ok(_)) => Err(anyhow::anyhow!(
+                "Alert scripts executed successfully, but notifications could not be sent: {e}"
+            )),
+            (Err(notify_e), Err(exec_e)) => Err(anyhow::anyhow!(
+                "Failed to send alert notifications and execute scripts: {notify_e};{exec_e}"
+            )),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -744,6 +793,172 @@ fn build_expr(
     Ok(expr)
 }
 
+pub async fn execute_script(
+    alert: &Alert,
+    script: &Script,
+    rows: &[Map<String, Value>],
+) -> Result<(), anyhow::Error> {
+    let alert_type = get_alert_type(alert.is_real_time);
+    let alert_count = rows.len();
+    let mut alert_start_time = 0;
+    let mut alert_end_time = 0;
+
+    // Don't instantiate `boa_engine::Context` here, as `Context` is not `Send`,
+    // it will not work across the `.await` calls. So, as a workaround, first
+    // convert `rows` and `alert.context_attributes` into `serde_json::Value` arrays
+    // and in the final step while registering `alert` global object into boa `Context`,
+    // convert `serde_json::Value` into `boa_engine::JsValue`.
+    let mut script_rows = vec![];
+
+    for row in rows.iter() {
+        script_rows.push({
+            let mut alert_row_start_time = 0;
+            let mut alert_row_end_time = 0;
+            let mut script_row = Map::<String, Value>::new();
+            for (key, value) in row.iter() {
+                let value = if value.is_string() {
+                    value.as_str().unwrap_or_default().to_string()
+                } else if value.is_f64() {
+                    format!("{:.2}", value.as_f64().unwrap_or_default())
+                } else {
+                    value.to_string()
+                };
+
+                // calculate start and end time for the row
+                if key == &CONFIG.common.column_timestamp {
+                    let val = value.parse::<i64>().unwrap_or_default();
+                    if alert_row_start_time == 0 || val < alert_row_start_time {
+                        alert_row_start_time = val;
+                    }
+                    if alert_row_end_time == 0 || val > alert_row_end_time {
+                        alert_row_end_time = val;
+                    }
+                }
+                if key == "zo_sql_min_time" {
+                    let val = value.parse::<i64>().unwrap_or_default();
+                    if alert_row_start_time == 0 || val < alert_row_start_time {
+                        alert_row_start_time = val;
+                    }
+                }
+                if key == "zo_sql_max_time" {
+                    let val = value.parse::<i64>().unwrap_or_default();
+                    if alert_row_end_time == 0 || val > alert_row_end_time {
+                        alert_row_end_time = val;
+                    }
+                }
+
+                script_row.insert(key.to_string(), value.into());
+            }
+
+            // calculate start and end time for the alert
+            if alert_start_time == 0 || alert_row_start_time < alert_start_time {
+                alert_start_time = alert_row_start_time;
+            }
+
+            if alert_end_time == 0 || alert_row_end_time > alert_end_time {
+                alert_end_time = alert_row_end_time;
+            }
+
+            let alert_row_start_time = format_timestamp(alert_row_start_time);
+            let alert_row_end_time = format_timestamp(alert_row_end_time);
+
+            script_row.insert("alertStartTime".to_string(), alert_row_start_time.into());
+            script_row.insert("alertEndTime".to_string(), alert_row_end_time.into());
+            script_row
+        });
+    }
+
+    let script_rows = json!(script_rows);
+    let alert_url = get_alert_url(alert, alert_start_time, alert_end_time).await;
+    let alert_start_time = format_timestamp(alert_start_time);
+    let alert_end_time = format_timestamp(alert_end_time);
+
+    let mut script_alert_context = Map::<String, Value>::new();
+    if let Some(attrs) = &alert.context_attributes {
+        for (key, value) in attrs.iter() {
+            script_alert_context.insert(key.to_string(), value.to_string().into());
+        }
+    }
+    let script_alert_context = json!(script_alert_context);
+
+    // alert: {
+    //     orgName: string,
+    //     streamType: string,
+    //     streamName: string,
+    //     alertName: string,
+    //     alertType: string,
+    //     alertPeriod: number,
+    //     alertOperator: string,
+    //     alertThreshold: number,
+    //     alertCount: number,
+    //     alertStartTime: string,
+    //     alertEndTime: string,
+    //     alertUrl: string,
+    //     rows: Array<{
+    //         alertStartTime: string,
+    //         alertEndTime: string,
+    //         [key: string]: string,
+    //     }>,
+    //     context: {
+    //         [key: string]: string,
+    //     }
+    // }
+    //
+    // In the Alert JS script, `alert` can be directly accessed as a global object.
+    let script_alert_obj = json!({
+        "orgName": &alert.org_id,
+        "streamType": &alert.stream_type,
+        "streamName": &alert.stream_name,
+        "alertName": &alert.name,
+        "alertType": alert_type,
+        "alertPeriod": alert.trigger_condition.period,
+        "alertOperator": alert.trigger_condition.operator.to_string(),
+        "alertThreshold": alert.trigger_condition.threshold,
+        "alertCount": alert_count,
+        "alertStartTime": alert_start_time,
+        "alertEndTime": alert_end_time,
+        "alertUrl": alert_url,
+        "rows": script_rows,
+        "context": script_alert_context
+    });
+
+    let mut context = Context::default();
+    let script_alert_obj = match JsValue::from_json(&script_alert_obj, &mut context) {
+        Ok(js_obj) => js_obj,
+        Err(e) => return Err(anyhow::anyhow!("Script execution error: {}", e.to_string())),
+    };
+    if let Err(e) = context.register_global_property(
+        "alert",
+        script_alert_obj,
+        Attribute::ENUMERABLE | Attribute::READONLY,
+    ) {
+        return Err(anyhow::anyhow!("Script execution error: {}", e.to_string()));
+    }
+    if let Err(e) = context.register_global_builtin_callable(
+        "fetch",
+        1,
+        NativeFunction::from_async_fn(js_vm::fetch),
+    ) {
+        return Err(anyhow::anyhow!("Script execution error: {}", e.to_string()));
+    }
+    if let Err(e) = context.register_global_builtin_callable(
+        "toJson",
+        1,
+        NativeFunction::from_fn_ptr(js_vm::to_json),
+    ) {
+        return Err(anyhow::anyhow!("Script execution error: {}", e.to_string()));
+    }
+    match context.eval(Source::from_bytes(script.script.as_str())) {
+        Ok(_) => {
+            context.run_jobs();
+            drop(context);
+        }
+        Err(e) => return Err(anyhow::anyhow!("Script execution error: {}", e.to_string())),
+    };
+
+    Ok(())
+}
+
 pub async fn send_notification(
     alert: &Alert,
     dest: &DestinationWithTemplate,
@@ -796,11 +1011,7 @@ pub async fn send_notification(
 }
 
 fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
-    let alert_type = if alert.is_real_time {
-        "realtime"
-    } else {
-        "scheduled"
-    };
+    let alert_type = get_alert_type(alert.is_real_time);
     let alert_count = rows.len();
     let mut rows_tpl = Vec::with_capacity(rows.len());
     for row in rows.iter() {
@@ -840,22 +1051,8 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
                 }
             }
         }
-        let alert_start_time_str = if alert_start_time > 0 {
-            Local
-                .timestamp_nanos(alert_start_time * 1000)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        } else {
-            String::from("N/A")
-        };
-        let alert_end_time_str = if alert_end_time > 0 {
-            Local
-                .timestamp_nanos(alert_end_time * 1000)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        } else {
-            String::from("N/A")
-        };
+        let alert_start_time_str = format_timestamp(alert_start_time);
+        let alert_end_time_str = format_timestamp(alert_end_time);
 
         resp = resp
             .replace("{org_name}", &alert.org_id)
@@ -944,29 +1141,56 @@ async fn process_dest_template(
             }
         }
     }
-    let alert_start_time_str = if alert_start_time > 0 {
-        Local
-            .timestamp_nanos(alert_start_time * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
-    let alert_end_time_str = if alert_end_time > 0 {
-        Local
-            .timestamp_nanos(alert_end_time * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
+    let alert_start_time_str = format_timestamp(alert_start_time);
+    let alert_end_time_str = format_timestamp(alert_end_time);
 
-    let alert_type = if alert.is_real_time {
-        "realtime"
-    } else {
-        "scheduled"
-    };
+    let alert_type = get_alert_type(alert.is_real_time);
 
+    let alert_url = get_alert_url(alert, alert_start_time, alert_end_time).await;
+
+    let mut resp = tpl
+        .replace("{org_name}", &alert.org_id)
+        .replace("{stream_type}", &alert.stream_type.to_string())
+        .replace("{stream_name}", &alert.stream_name)
+        .replace("{alert_name}", &alert.name)
+        .replace("{alert_type}", alert_type)
+        .replace(
+            "{alert_period}",
+            &alert.trigger_condition.period.to_string(),
+        )
+        .replace(
+            "{alert_operator}",
+            &alert.trigger_condition.operator.to_string(),
+        )
+        .replace(
+            "{alert_threshold}",
+            &alert.trigger_condition.threshold.to_string(),
+        )
+        .replace("{alert_count}", &alert_count.to_string())
+        .replace("{alert_start_time}", &alert_start_time_str)
+        .replace("{alert_end_time}", &alert_end_time_str)
+        .replace("{alert_url}", &alert_url);
+    process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val));
+    for (key, value) in vars.iter() {
+        if resp.contains(&format!("{{{key}}}")) {
+            let val = value.iter().cloned().collect::<Vec<_>>();
+            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")));
+        }
+    }
+    if let Some(attrs) = &alert.context_attributes {
+        for (key, value) in attrs.iter() {
+            process_variable_replace(&mut resp, key, &VarValue::Str(value));
+        }
+    }
+
+    resp
+}
+
+async fn get_alert_url(
+    alert: &Alert,
+    mut alert_start_time: i64,
+    mut alert_end_time: i64,
+) -> String {
     // Hack time range for alert url
     alert_end_time = if alert_end_time == 0 {
         Utc::now().timestamp_micros()
@@ -988,7 +1212,7 @@ async fn process_dest_template(
     }
 
     let mut alert_query = String::new();
-    let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
+    if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
             let condition = alert.query_condition.promql_condition.as_ref().unwrap();
             alert_query = format!(
@@ -1031,44 +1255,26 @@ async fn process_dest_template(
             base64::encode(&alert_query).replace('+', "%2B"),
             alert.org_id,
         )
-    };
-
-    let mut resp = tpl
-        .replace("{org_name}", &alert.org_id)
-        .replace("{stream_type}", &alert.stream_type.to_string())
-        .replace("{stream_name}", &alert.stream_name)
-        .replace("{alert_name}", &alert.name)
-        .replace("{alert_type}", alert_type)
-        .replace(
-            "{alert_period}",
-            &alert.trigger_condition.period.to_string(),
-        )
-        .replace(
-            "{alert_operator}",
-            &alert.trigger_condition.operator.to_string(),
-        )
-        .replace(
-            "{alert_threshold}",
-            &alert.trigger_condition.threshold.to_string(),
-        )
-        .replace("{alert_count}", &alert_count.to_string())
-        .replace("{alert_start_time}", &alert_start_time_str)
-        .replace("{alert_end_time}", &alert_end_time_str)
-        .replace("{alert_url}", &alert_url);
-    process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val));
-    for (key, value) in vars.iter() {
-        if resp.contains(&format!("{{{key}}}")) {
-            let val = value.iter().cloned().collect::<Vec<_>>();
-            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")));
-        }
     }
-    if let Some(attrs) = &alert.context_attributes {
-        for (key, value) in attrs.iter() {
-            process_variable_replace(&mut resp, key, &VarValue::Str(value));
-        }
-    }
+}
 
-    resp
+fn get_alert_type(is_real_time: bool) -> &'static str {
+    if is_real_time {
+        "realtime"
+    } else {
+        "scheduled"
+    }
+}
+
+fn format_timestamp(alert_time: i64) -> String {
+    if alert_time > 0 {
+        Local
+            .timestamp_nanos(alert_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    }
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue) {

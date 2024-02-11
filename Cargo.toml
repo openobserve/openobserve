@@ -150,6 +150,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+boa_engine = "0.17.3"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

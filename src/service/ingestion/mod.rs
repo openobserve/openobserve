@@ -189,8 +189,8 @@ pub async fn evaluate_trigger(trigger: Option<TriggerAlertData>) {
     }
     let trigger = trigger.unwrap();
     for (alert, val) in trigger.iter() {
-        if let Err(e) = alert.send_notification(val).await {
-            log::error!("Failed to send notification: {}", e)
+        if let Err(e) = alert.take_action(val).await {
+            log::error!("Failed to take action on alert: {}", e)
         }
     }
 }

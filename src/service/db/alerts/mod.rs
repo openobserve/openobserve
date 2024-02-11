@@ -29,6 +29,7 @@ use crate::common::{
 
 pub mod alert_manager;
 pub mod destinations;
+pub mod scripts;
 pub mod templates;
 pub mod triggers;
 
@@ -217,7 +218,15 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 let destinations = if let Some(dest) = data.get("destination") {
                     vec![dest.as_str().unwrap().to_string()]
                 } else {
-                    vec![]
+                    // Due to the introduction of "scripts" field to Alert, this data may also
+                    // contain the "destinations" key.
+                    let mut destinations = vec![];
+                    if let Some(dests) = data.get("destinations") {
+                        for dest in dests.as_array().unwrap().iter() {
+                            destinations.push(dest.as_str().unwrap().to_string());
+                        }
+                    }
+                    destinations
                 };
                 let alert = Alert {
                     name: data.get("name").unwrap().as_str().unwrap().to_string(),

@@ -141,9 +141,9 @@ pub async fn handle_triggers(
             .unwrap();
     }
 
-    // send notification
+    // take action
     if let Some(data) = ret {
-        alert.send_notification(&data).await?;
+        alert.take_action(&data).await?;
     }
 
     // update trigger
