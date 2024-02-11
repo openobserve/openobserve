@@ -134,9 +134,20 @@ pub async fn search(
     let mut rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
-    let resp: SearchService::sql::Sql = crate::service::search::sql::Sql::new(&rpc_req)
-        .await
-        .unwrap();
+    let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req).await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(match e {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            });
+        }
+    };
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
