@@ -18,8 +18,6 @@ use std::io::Error;
 use actix_web::{http, HttpResponse};
 use config::{ider, utils::rand::generate_random_string};
 
-
-
 use crate::{
     common::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
