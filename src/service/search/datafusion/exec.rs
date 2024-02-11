@@ -421,7 +421,11 @@ async fn get_fast_mode_ctx(
     file_type: FileType,
 ) -> Result<(SessionContext, Arc<Schema>)> {
     let mut files = files.to_vec();
-    files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    if !sql.meta.order_by.is_empty() && !sql.meta.order_by[0].1 {
+        files.sort_by(|a, b| b.meta.min_ts.cmp(&a.meta.min_ts));
+    } else {
+        files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    }
 
     let mut loaded_records = 0;
     let mut new_files = Vec::new();
