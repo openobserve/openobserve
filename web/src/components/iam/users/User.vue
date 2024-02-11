@@ -37,6 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             v-model="props.row.role"
             :options="options"
+            emit-value
+            map-options
             style="width: 70px"
             @update:model-value="updateUserRole(props.row)"
           />
@@ -150,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="selectedUser"
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
+        :roles="options"
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
@@ -206,6 +209,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
+import { getRoles } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -249,16 +253,12 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      await nextTick();
+      if (isEnterprise.value) await getRoles();
 
-      if (isEnterprise.value && isCurrentUserInternal.value) {
-        columns.value.push({
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        });
-      } else if (!isEnterprise.value) {
+      if (
+        (isEnterprise.value && isCurrentUserInternal.value) ||
+        !isEnterprise.value
+      ) {
         columns.value.push({
           name: "actions",
           field: "actions",
@@ -307,10 +307,21 @@ export default defineComponent({
       },
     ]);
     const userEmail: any = ref("");
-    const options = ["admin"];
-    const selectedRole = ref(options[0]);
+    const options = ref([{ label: "Admin", value: "admin" }]);
+    const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
+
+    const getRoles = () => {
+      return new Promise((resolve) => {
+        usersService
+          .getRoles(store.state.selectedOrganization.identifier)
+          .then((res) => {
+            options.value = res.data;
+          })
+          .finally(() => resolve(true));
+      });
+    };
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -445,8 +456,8 @@ export default defineComponent({
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
-          (currentUserRole.value == "root" ||
-            (currentUserRole.value == "admin" && user.role !== "root"))
+          user.role !== "root" &&
+          (currentUserRole.value == "root" || currentUserRole.value == "admin")
         );
       } else {
         return (

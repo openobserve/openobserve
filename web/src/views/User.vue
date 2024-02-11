@@ -5,22 +5,19 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import UsersCloud from "@/enterprise/components/users/User.vue";
 import UsersOpenSource from "@/components/iam/users/User.vue";
-import UsersEnterprise from "@/components/iam/users/enterprise/User.vue";
 
 import config from "@/aws-exports";
-import { watch } from "vue";
 
 export default defineComponent({
   name: "UserPage",
   components: {
     UsersCloud,
     UsersOpenSource,
-    UsersEnterprise,
   },
   setup() {
     const store = useStore();
@@ -30,21 +27,15 @@ export default defineComponent({
 
     const loadComponent = ref(false);
 
-    watch(
-      () => store.state.zoConfig,
-      (zoConfig) => {
-        if (config.isCloud == "true") {
-          componentName.value = "UsersCloud";
-        } else {
-          componentName.value = "UsersOpenSource";
-        }
-
-        loadComponent.value = true;
-      },
-      {
-        immediate: true,
+    onBeforeMount(() => {
+      if (config.isCloud == "true") {
+        componentName.value = "UsersCloud";
+      } else {
+        componentName.value = "UsersOpenSource";
       }
-    );
+
+      loadComponent.value = true;
+    });
 
     return { store, t, componentName, loadComponent };
   },

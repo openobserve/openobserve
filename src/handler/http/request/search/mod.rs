@@ -158,11 +158,12 @@ pub async fn search(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("stream:{}/{}", stream_type, resp.stream_name),
+                        o2_type: format!("{}:{}", stream_type, resp.stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),
                     },
+                    Some(user.role),
                 )
                 .await
             {

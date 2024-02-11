@@ -70,6 +70,9 @@ const users = {
   getRefreshToken: () => {
     return http().get(`/api/auth/refresh_token`);
   },
+  getRoles: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/users/roles`);
+  },
 };
 
 export default users;

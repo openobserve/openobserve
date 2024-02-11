@@ -63,6 +63,7 @@ export interface Resource {
   is_loading?: boolean;
   show?: boolean;
   childName?: string;
+  top_level: boolean;
 }
 
 export interface Entity {
@@ -96,13 +97,14 @@ export interface Entity {
   display_name: string;
   entities?: Entity[];
   has_entities?: boolean;
-  type: "Resource";
+  type: "Resource" | "Type";
   resourceName: string;
   isSelected: boolean;
   expand?: boolean;
   show?: boolean;
   is_loading?: boolean;
   childName?: string;
+  top_level: boolean;
 }
 
 interface User {}

@@ -67,9 +67,9 @@ pub async fn validator(
                     header::HeaderName::from_static("user_id"),
                     header::HeaderValue::from_str(&res.user_email).unwrap(),
                 );
-                if res.is_internal_user
-                    || auth_info.bypass_check
-                    || check_permissions(user_id, auth_info).await
+
+                if auth_info.bypass_check
+                    || check_permissions(user_id, auth_info, res.user_role).await
                 {
                     Ok(req)
                 } else {
@@ -117,6 +117,7 @@ pub async fn validate_credentials(
                 is_valid: false,
                 user_email: "".to_string(),
                 is_internal_user: false,
+                user_role: None,
             });
         }
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -147,6 +148,7 @@ pub async fn validate_credentials(
             is_valid: false,
             user_email: "".to_string(),
             is_internal_user: false,
+            user_role: None,
         });
     }
     let user = user.unwrap();
@@ -158,6 +160,7 @@ pub async fn validate_credentials(
             is_valid: true,
             user_email: user.email,
             is_internal_user: !user.is_external,
+            user_role: Some(user.role),
         });
     }
 
@@ -167,6 +170,7 @@ pub async fn validate_credentials(
             is_valid: false,
             user_email: "".to_string(),
             is_internal_user: false,
+            user_role: None,
         });
     }
     if !path.contains("/user")
@@ -179,6 +183,7 @@ pub async fn validate_credentials(
             is_valid: true,
             user_email: user.email,
             is_internal_user: !user.is_external,
+            user_role: Some(user.role),
         })
     } else {
         Err(ErrorForbidden("Not allowed"))
@@ -198,6 +203,7 @@ async fn validate_user_from_db(
                     is_valid: true,
                     user_email: user.email,
                     is_internal_user: !user.is_external,
+                    user_role: None,
                 })
             } else {
                 Err(ErrorForbidden("Not allowed"))
@@ -392,7 +398,11 @@ pub async fn oo_validator(
     }
 }
 #[cfg(feature = "enterprise")]
-pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -> bool {
+pub(crate) async fn check_permissions(
+    user_id: &str,
+    auth_info: AuthExtractor,
+    role: Option<UserRole>,
+) -> bool {
     use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
     if !O2_CONFIG.openfga.enabled {
@@ -405,18 +415,39 @@ pub(crate) async fn check_permissions(user_id: &str, auth_info: AuthExtractor) -
     } else {
         object_str
     };
+    let role = match role {
+        Some(role) => {
+            if role.eq(&UserRole::Root) {
+                "admin".to_string()
+            } else {
+                format!("{role}")
+            }
+        }
+        None => "".to_string(),
+    };
+    let org_id = if auth_info.org_id.eq("organizations") {
+        user_id
+    } else {
+        &auth_info.org_id
+    };
+
     o2_enterprise::enterprise::openfga::authorizer::authz::is_allowed(
-        &auth_info.org_id,
+        org_id,
         user_id,
         &auth_info.method,
         &obj_str,
         &auth_info.parent_id,
+        &role,
     )
     .await
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub(crate) async fn check_permissions(_user_id: &str, _auth_info: AuthExtractor) -> bool {
+pub(crate) async fn check_permissions(
+    _user_id: &str,
+    _auth_info: AuthExtractor,
+    _role: Option<UserRole>,
+) -> bool {
     true
 }
 

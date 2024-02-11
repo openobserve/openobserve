@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="relative-position full-height">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div style="font-size: 18px" class="q-py-sm q-px-md">
       {{ editingRole }}
@@ -44,92 +44,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <GroupUsers
-        v-show="activeTab === 'users'"
-        :groupUsers="roleUsers"
-        :activeTab="activeTab"
-        :added-users="addedUsers"
-        class="q-mt-xs"
-        :removed-users="removedUsers"
-      />
-
-      <div v-show="activeTab === 'permissions'" class="q-pa-md">
-        <div class="o2-input flex items-end q-mb-md justify-start">
-          <div class="flex items-center q-mb-sm q-mr-md">
-            <span style="font-size: 14px"> Show </span>
-            <div
-              class="q-ml-xs"
-              style="
-                border: 1px solid #d7d7d7;
-                width: fit-content;
-                border-radius: 2px;
-              "
-            >
-              <template
-                v-for="visual in permissionDisplayOptions"
-                :key="visual.value"
-              >
-                <q-btn
-                  :color="visual.value === filter.permissions ? 'primary' : ''"
-                  :flat="visual.value === filter.permissions ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-md visual-selection-btn"
-                  @click="updateTableData(visual.value)"
-                >
-                  {{ visual.label }}</q-btn
-                >
-              </template>
-            </div>
-          </div>
-          <q-input
-            data-test="alert-list-search-input"
-            v-model="filter.value"
-            borderless
-            filled
-            dense
-            class="q-mb-xs no-border q-mr-md"
-            :placeholder="t('common.search')"
-            style="width: 300px"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-select
-            v-model="filter.resource"
-            :options="filteredResources"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-xs q-mr-sm"
-            placeholder="Select Resource"
-            map-options
-            use-input
-            emit-value
-            fill-input
-            hide-selected
-            outlined
-            filled
-            dense
-            clearable
-            style="width: 200px"
-            @filter="filterResourceOptions"
-            @update:model-value="onResourceChange"
-          />
-        </div>
-
-        <permissions-table
-          ref="permissionTableRef"
-          :rows="permissionsState.permissions"
-          :filter="filter"
-          :visibleResourceCount="countOfVisibleResources"
-          :selected-permissions-hash="selectedPermissionsHash"
-          @updated:permission="handlePermissionChange"
-          @expand:row="expandPermission"
+      <div style="min-height: calc(100% - (39px + 55px + 43px))">
+        <GroupUsers
+          v-show="activeTab === 'users'"
+          :groupUsers="roleUsers"
+          :activeTab="activeTab"
+          :added-users="addedUsers"
+          :removed-users="removedUsers"
         />
+
+        <div v-show="activeTab === 'permissions'">
+          <div
+            class="o2-input flex items-start q-px-md q-py-sm justify-start"
+            style="position: sticky; top: 57px; z-index: 2"
+            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            :style="{
+              'box-shadow':
+                store.state.theme === 'dark'
+                  ? 'rgb(45 45 45) 0px 4px 7px 0px'
+                  : 'rgb(240 240 240) 0px 4px 7px 0px',
+            }"
+          >
+            <div class="flex items-center q-pt-xs q-mr-md">
+              <span style="font-size: 14px"> Show </span>
+              <div
+                class="q-ml-xs"
+                style="
+                  border: 1px solid #d7d7d7;
+                  width: fit-content;
+                  border-radius: 2px;
+                "
+              >
+                <template
+                  v-for="visual in permissionDisplayOptions"
+                  :key="visual.value"
+                >
+                  <q-btn
+                    :color="
+                      visual.value === filter.permissions ? 'primary' : ''
+                    "
+                    :flat="visual.value === filter.permissions ? false : true"
+                    dense
+                    no-caps
+                    size="11px"
+                    class="q-px-md visual-selection-btn"
+                    @click="updateTableData(visual.value)"
+                  >
+                    {{ visual.label }}</q-btn
+                  >
+                </template>
+              </div>
+            </div>
+            <q-input
+              data-test="alert-list-search-input"
+              v-model="filter.value"
+              borderless
+              filled
+              dense
+              class="q-mb-xs no-border q-mr-md"
+              :placeholder="t('common.search')"
+              style="width: 300px"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+            <q-select
+              v-model="filter.resource"
+              :options="filteredResources"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-mr-sm"
+              placeholder="Select Resource"
+              map-options
+              use-input
+              emit-value
+              fill-input
+              hide-selected
+              outlined
+              filled
+              dense
+              clearable
+              style="width: 200px"
+              @filter="filterResourceOptions"
+              @update:model-value="onResourceChange"
+            />
+          </div>
+
+          <div class="q-px-md q-my-sm">
+            <permissions-table
+              ref="permissionTableRef"
+              :rows="permissionsState.permissions"
+              :filter="filter"
+              :visibleResourceCount="countOfVisibleResources"
+              :selected-permissions-hash="selectedPermissionsHash"
+              @updated:permission="handlePermissionChange"
+              @expand:row="expandPermission"
+            />
+          </div>
+        </div>
       </div>
-      <div class="flex justify-end q-mt-lg q-px-md">
+      <div
+        class="flex justify-end q-px-md q-py-sm full-width"
+        style="position: sticky; bottom: 0px; z-index: 2"
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        :style="{
+          'box-shadow':
+            store.state.theme === 'dark'
+              ? 'rgb(45 45 45) 0px -4px 7px 0px'
+              : 'rgb(240 240 240) 0px -4px 7px 0px',
+        }"
+      >
         <q-btn
           data-test="add-alert-cancel-btn"
           class="text-bold"
@@ -171,7 +196,6 @@ import {
 } from "@/services/iam";
 import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
-import { computed } from "vue";
 import streamService from "@/services/stream";
 import alertService from "@/services/alerts";
 import templateService from "@/services/alert_templates";
@@ -225,7 +249,7 @@ const isFetchingIntitialRoles = ref(false);
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
-const roleUsers = ref([]);
+const roleUsers: Ref<string[]> = ref([]);
 
 const tabs = [
   {
@@ -266,8 +290,10 @@ const updateActiveTab = (tab: string) => {
 };
 
 const getRoleDetails = () => {
-  getResources(store.state.selectedOrganization.identifier).then(
-    async (res) => {
+  isFetchingIntitialRoles.value = true;
+
+  getResources(store.state.selectedOrganization.identifier)
+    .then(async (res) => {
       permissionsState.resources = res.data
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
@@ -282,7 +308,6 @@ const getRoleDetails = () => {
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
-      isFetchingIntitialRoles.value = true;
       await getResourcePermissions();
       await getUsers();
       await updateRolePermissions();
@@ -291,8 +316,10 @@ const getRoleDetails = () => {
       }, 3000);
 
       updateTableData();
-    }
-  );
+    })
+    .catch(() => {
+      isFetchingIntitialRoles.value = false;
+    });
 };
 
 const getUsers = () => {
@@ -335,6 +362,8 @@ const setDefaultPermissions = () => {
     resourcePermission.name = resource.key;
     resourcePermission.resourceName = resource.key;
     resourcePermission.display_name = resource.display_name;
+    resourcePermission.top_level = resource.top_level;
+
     if (resource.has_entities) resourcePermission.has_entities = true;
 
     resourcePermission.parent = resource.parent;
@@ -433,6 +462,7 @@ const getDefaultResource = (): Resource => {
     entities: [],
     has_entities: false,
     is_loading: false,
+    top_level: true,
   };
 };
 
@@ -528,12 +558,18 @@ const cancelPermissionsUpdate = () => {
 
 const handlePermissionChange = (row: any, permission: string) => {
   let entity = "";
+  let resourceName = row.resourceName;
 
   if (row.type === "Type") entity = store.state.selectedOrganization.identifier;
   else entity = row.name;
 
-  const permissionHash = `${row.resourceName}:${entity}:${permission}`;
-  const object = `${row.resourceName}:${entity}`;
+  if (row.type === "Resource" && row.top_level) {
+    resourceName = row.name;
+    entity = store.state.selectedOrganization.identifier;
+  }
+
+  const permissionHash = `${resourceName}:${entity}:${permission}`;
+  const object = `${resourceName}:${entity}`;
 
   // Add permission to addedPermissions if not present
   if (
@@ -745,7 +781,11 @@ const getResourceEntities = (resource: Resource | Entity) => {
   const listEntitiesFnMap: {
     [key: string]: (resource: Resource | Entity) => Promise<any>;
   } = {
-    stream: getStreams,
+    stream: getStreamsTypes,
+    stream_type: getStreamsTypes,
+    logs: getLogs,
+    metrics: getMetrics,
+    traces: getTraces,
     alert: getAlerts,
     template: getTemplates,
     destination: getDestinations,
@@ -774,8 +814,16 @@ const getResourceEntities = (resource: Resource | Entity) => {
   });
 };
 
-const getEnrichmentTables = () => {
-  return new Promise((resolve) => {
+const getEnrichmentTables = async () => {
+  const data = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "enrichment_tables",
+    false
+  );
+
+  updateResourceEntities("enrichment_table", ["name"], data.data.list);
+
+  return new Promise((resolve, reject) => {
     resolve(true);
   });
 };
@@ -847,7 +895,8 @@ const getFolders = async () => {
     ["folderId"],
     [...folders.data.list],
     true,
-    "name"
+    "name",
+    "dashboard"
   );
   return new Promise((resolve) => {
     resolve(true);
@@ -931,28 +980,65 @@ const getAlerts = async () => {
   });
 };
 
-const getStreams = async () => {
+const getLogs = async (resource: Resource | Entity) => {
   const logs = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "logs",
     false
   );
-  const traces = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "traces",
-    false
-  );
+
+  updateEntityEntities(resource, ["name"], logs.data.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getMetrics = async (resource: Resource | Entity) => {
   const metrics = await streamService.nameList(
     store.state.selectedOrganization.identifier,
     "metrics",
     false
   );
 
-  updateResourceEntities(
-    "stream",
-    ["stream_type", "name"],
-    [...logs.data.list, ...metrics.data.list, ...traces.data.list]
+  updateEntityEntities(resource, ["name"], metrics.data.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getTraces = async (resource: Resource | Entity) => {
+  const traces = await streamService.nameList(
+    store.state.selectedOrganization.identifier,
+    "traces",
+    false
   );
+
+  updateEntityEntities(resource, ["name"], traces.data.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getStreamsTypes = async () => {
+  const streams = [
+    { stream_type: "logs", name: "Logs" },
+    { stream_type: "traces", name: "Traces" },
+    { stream_type: "metrics", name: "Metrics" },
+  ];
+
+  streams.forEach((stream) => {
+    updateResourceResource(
+      stream.stream_type,
+      "stream",
+      ["stream_type"],
+      [stream],
+      true,
+      "name"
+    );
+  });
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -967,9 +1053,6 @@ const updateEntityEntities = (
   displayNameKey?: string
 ) => {
   if (!entity) return;
-
-  if (entity.entities) entity.entities.length = 0;
-  entity.entities = [];
 
   data.forEach((_entity: any) => {
     let entityName = "";
@@ -1057,6 +1140,7 @@ const updateEntityEntities = (
         has_entities: hasEntities,
         display_name: displayNameKey ? _entity[displayNameKey] : entityName,
         show: true,
+        top_level: false,
       });
   });
 
@@ -1068,7 +1152,8 @@ const updateResourceEntities = (
   entityNameKeys: string[],
   data: any[],
   hasEntities: boolean = false,
-  displayNameKey?: string
+  displayNameKey?: string,
+  childName?: string
 ) => {
   const resource: Resource | null | undefined = getResourceByName(
     permissionsState.permissions,
@@ -1076,9 +1161,6 @@ const updateResourceEntities = (
   );
 
   if (!resource) return;
-
-  resource.entities.length = 0;
-  resource.entities = [];
 
   data.forEach((_entity: any) => {
     let entityName = "";
@@ -1137,7 +1219,113 @@ const updateResourceEntities = (
       has_entities: hasEntities,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
       show: true,
-      childName: hasEntities ? resource.childs[0].resourceName : "",
+      childName: childName || "",
+      top_level: !!resource.childs.find((child) => child.name === childName)
+        ?.top_level,
+    });
+  });
+
+  updatePermissionVisibility(permissionsState.permissions);
+};
+
+const updateResourceResource = (
+  resourceName: string,
+  parentResourceName: string,
+  entityNameKeys: string[],
+  data: any[],
+  hasEntities: boolean = false,
+  displayNameKey?: string
+) => {
+  const resource: Resource | null | undefined = getResourceByName(
+    permissionsState.permissions,
+    parentResourceName
+  );
+
+  if (!resource) return;
+
+  data.forEach((_entity: any) => {
+    let entityName = "";
+    if (typeof _entity === "string") entityName = _entity;
+
+    if (typeof _entity === "object") {
+      entityName = entityNameKeys.reduce((acc, curr) => {
+        return acc ? acc + "/" + (_entity[curr] || curr) : _entity[curr];
+      }, "");
+    }
+
+    resource.entities.push({
+      name: entityName,
+      permission: {
+        AllowAll: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowAll",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowGet: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowGet",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowDelete: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowDelete",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowPut: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowPut",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: true,
+        },
+        AllowList: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowList",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: hasEntities,
+        },
+        AllowPost: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              resourceName,
+              "AllowPost",
+              store.state.selectedOrganization.identifier
+            )
+          ),
+          show: hasEntities,
+        },
+      },
+      entities: [],
+      type: "Type",
+      resourceName: resourceName,
+      isSelected: false,
+      has_entities: hasEntities,
+      childName: resourceName,
+      display_name: displayNameKey ? _entity[displayNameKey] : entityName,
+      show: true,
+      top_level: true,
     });
   });
 
@@ -1157,12 +1345,47 @@ const saveRole = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then((res) => {
+    .then(async (res) => {
+      // combine permissionsHash and selectedPermissionsHash
+
       q.notify({
         type: "positive",
         message: `Updated role permissions successfully!`,
         timeout: 3000,
       });
+
+      // Reseting permissions state on save
+
+      Object.keys(removedPermissions.value).forEach((permission) => {
+        if (permissionsHash.value.has(permission))
+          permissionsHash.value.delete(permission);
+
+        if (selectedPermissionsHash.value.has(permission))
+          selectedPermissionsHash.value.delete(permission);
+      });
+
+      permissionsHash.value = new Set([
+        ...Array.from(permissionsHash.value),
+        ...Array.from(selectedPermissionsHash.value),
+      ]);
+
+      selectedPermissionsHash.value = cloneDeep(permissionsHash.value);
+
+      addedPermissions.value = {};
+
+      removedPermissions.value = {};
+
+      roleUsers.value = roleUsers.value.filter(
+        (user) => !removedUsers.value.has(user)
+      );
+
+      addedUsers.value.forEach((value: any) => {
+        roleUsers.value.push(value);
+      });
+
+      addedUsers.value = new Set([]);
+
+      removedUsers.value = new Set([]);
     })
     .catch((err) => {
       q.notify({

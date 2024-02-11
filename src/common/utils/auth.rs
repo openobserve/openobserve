@@ -298,6 +298,8 @@ impl FromRequest for AuthExtractor {
                 if (method.eq("POST") && path_columns[1].starts_with("_search"))
                     || path.contains("/prometheus/api/v1/query")
                     || path.contains("/resources")
+                    || path.contains("/format_query")
+                    || path.contains("/prometheus/api/v1/series")
                 {
                     return ready(Ok(AuthExtractor {
                         auth: auth_str.to_owned(),
@@ -325,8 +327,7 @@ impl FromRequest for AuthExtractor {
                                     .as_str(),
                                 )
                             } else {
-                                object_type
-                                    .replace("stream:", format!("stream:{}/", stream_type).as_str())
+                                object_type.replace("stream:", format!("{}:", stream_type).as_str())
                             }
                         }
                         None => object_type,
