@@ -371,13 +371,14 @@ pub struct Limit {
     pub req_payload_limit: usize,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 64)] // MB, per log file size on disk
+    // MB, per log file size limit on disk
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 64)]
     pub max_file_size_on_disk: usize,
+    // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
-    // MB, per log file size in memory
     pub max_file_size_in_memory: usize,
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
-    // MB, total file size in memory, default is 50% of system memory
+    // MB, total data size in memory, default is 50% of system memory
     pub mem_table_max_size: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
     pub mem_persist_interval: u64,
@@ -906,6 +907,13 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
         cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
+    }
+
+    // for memtable limit check
+    if cfg.limit.mem_table_max_size == 0 {
+        cfg.limit.mem_table_max_size = mem_total / 2; // 50%
+    } else {
+        cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
 
     // check query settings
