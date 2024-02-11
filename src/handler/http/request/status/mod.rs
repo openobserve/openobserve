@@ -68,6 +68,7 @@ struct ConfigResponse<'a> {
     data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
     dex_enabled: bool,
+    native_login_enabled: bool,
 }
 
 /// Healthz
@@ -91,6 +92,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let dex_enabled = O2_CONFIG.dex.dex_enabled;
     #[cfg(not(feature = "enterprise"))]
     let dex_enabled = false;
+    #[cfg(feature = "enterprise")]
+    let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let native_login_enabled = true;
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -111,6 +116,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         data_retention_days: CONFIG.compact.data_retention_days,
         restricted_routes_on_empty_data: CONFIG.common.restricted_routes_on_empty_data,
         dex_enabled,
+        native_login_enabled,
     }))
 }
 
