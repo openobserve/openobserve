@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-btn>
     </div>
 
-    <div v-if="showSSO" class="q-py-md text-center">
+    <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
       <a
         class="cursor-pointer login-internal-link q-py-md"
         style="text-decoration: underline"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      v-show="!showSSO || (showSSO && loginAsInternalUser)"
+      v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
       <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
@@ -134,7 +134,7 @@ import {
   useLocalOrganization,
   getImageURL,
 } from "@/utils/zincutils";
-import { getDefaultOrganization, redirectUser } from "@/utils/common";
+import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
 
@@ -158,6 +158,10 @@ export default defineComponent({
 
     const showSSO = computed(() => {
       return store.state.zoConfig.dex_enabled && config.isEnterprise === "true";
+    });
+
+    const showInternalLogin = computed(() => {
+      return store.state.zoConfig.native_login_enabled;
     });
 
     const loginWithSSo = async () => {
@@ -322,6 +326,7 @@ export default defineComponent({
       getImageURL,
       loginAsInternalUser,
       showSSO,
+      showInternalLogin,
       loginWithSSo,
     };
   },
