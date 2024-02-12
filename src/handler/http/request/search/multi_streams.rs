@@ -294,7 +294,6 @@ pub async fn search_multi(
                         stream_type.to_string().as_str(),
                     ])
                     .inc();
-
                 log::error!("search error: {:?}", err);
 
                 multi_res.function_error = format!("{};{:?}", multi_res.function_error, err);
