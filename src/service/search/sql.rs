@@ -324,8 +324,20 @@ impl Sql {
             }
             origin_sql = if meta.order_by.is_empty() && !sql_mode.eq(&SqlMode::Full) {
                 let sort_by = if req_query.sort_by.is_empty() {
+                    meta.order_by = vec![(CONFIG.common.column_timestamp.to_string(), true)];
                     format!("{} DESC", CONFIG.common.column_timestamp)
                 } else {
+                    if req_query.sort_by.to_uppercase().ends_with(" DESC") {
+                        meta.order_by = vec![(
+                            req_query.sort_by[0..req_query.sort_by.len() - 5].to_string(),
+                            true,
+                        )];
+                    } else if req_query.sort_by.to_uppercase().ends_with(" ASC") {
+                        meta.order_by = vec![(
+                            req_query.sort_by[0..req_query.sort_by.len() - 4].to_string(),
+                            false,
+                        )];
+                    }
                     req_query.sort_by.clone()
                 };
                 format!(
