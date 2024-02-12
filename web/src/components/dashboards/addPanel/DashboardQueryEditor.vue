@@ -288,6 +288,15 @@ export default defineComponent({
         ].fields.weight,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
         ].config.limit,
       ],
       () => {
@@ -299,6 +308,8 @@ export default defineComponent({
         ) {
           if (dashboardPanelData.data.type == "geomap") {
             query = geoMapChart();
+          } else if (dashboardPanelData.data.type == "sankey") {
+            query = sankeyChartQuery();
           } else {
             query = sqlchart();
           }
@@ -370,6 +381,96 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit ?? 0;
       query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    const sankeyChartQuery = () => {
+      let query = "";
+
+      const { source, target, value } =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields;
+
+      if (source && target && value) {
+        query += `SELECT ${source.column} as ${source.alias}, ${target.column} as ${target.alias}, ${value.aggregationFunction}(${value.column}) as ${value.alias}`;
+      } 
+
+      query += ` FROM "${
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream
+      }"`;
+
+      // Add WHERE clause based on applied filters
+      const filterData =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter;
+
+      const filterItems = filterData.map((field) => {
+        let selectFilter = "";
+        // Handle different filter types and operators
+        if (field.type == "list" && field.values?.length > 0) {
+          selectFilter += `${field.column} IN (${field.values
+            .map((it) => `'${it}'`)
+            .join(", ")})`;
+        } else if (field.type == "condition" && field.operator != null) {
+          selectFilter += `${field.column} `;
+          if (["Is Null", "Is Not Null"].includes(field.operator)) {
+            switch (field.operator) {
+              case "Is Null":
+                selectFilter += `IS NULL`;
+                break;
+              case "Is Not Null":
+                selectFilter += `IS NOT NULL`;
+                break;
+            }
+          } else if (field.value != null && field.value != "") {
+            switch (field.operator) {
+              case "=":
+              case "<>":
+              case "<":
+              case ">":
+              case "<=":
+              case ">=":
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+              case "Contains":
+                selectFilter += `LIKE '%${field.value}%'`;
+                break;
+              case "Not Contains":
+                selectFilter += `NOT LIKE '%${field.value}%'`;
+                break;
+              default:
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+            }
+          }
+        }
+        return selectFilter;
+      });
+
+      const whereClause = filterItems.filter((it) => it).join(" AND ");
+      if (whereClause) {
+        query += ` WHERE ${whereClause}`;
+      }
+
+      // Group By clause
+      query += ` GROUP BY ${source.column}, ${target.column}`;
+
+      // Order By clause
+      // No specific order by for Sankey chart, as it's a flow diagram
+
+      // Limit
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      if (queryLimit > 0) {
+        query += ` LIMIT ${queryLimit}`;
+      }
 
       return query;
     };
