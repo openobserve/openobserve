@@ -83,6 +83,42 @@ pub async fn search(
     search_in_cluster(req).await
 }
 
+#[tracing::instrument(name = "service:search_partition_multi:enter", skip(req))]
+pub async fn search_partition_multi(
+    session_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: &search::MultiSearchPartitionRequest,
+) -> Result<search::MultiSearchPartitionResponse, Error> {
+    let mut res = search::MultiSearchPartitionResponse {
+        success: HashMap::new(),
+        error: HashMap::new(),
+    };
+
+    for query in &req.sql {
+        match search_partition(
+            session_id,
+            org_id,
+            stream_type,
+            &search::SearchPartitionRequest {
+                start_time: req.start_time,
+                end_time: req.end_time,
+                sql: query.to_string(),
+            },
+        )
+        .await
+        {
+            Ok(resp) => {
+                res.success.insert(query.to_string(), resp);
+            }
+            Err(err) => {
+                res.error.insert(query.to_string(), err.to_string());
+            }
+        };
+    }
+    Ok(res)
+}
+
 #[tracing::instrument(name = "service:search_partition:enter", skip(req))]
 pub async fn search_partition(
     session_id: &str,

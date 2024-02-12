@@ -40,6 +40,7 @@ use crate::{
 
 pub mod multi_streams;
 pub mod saved_view;
+pub mod multi_streams;
 
 /// SearchStreamData
 #[utoipa::path(
