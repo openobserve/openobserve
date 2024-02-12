@@ -40,8 +40,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         outlined
         filled
         dense
-        :rules="[(val, rules) => !!val || t('common.nameRequired')]"
-      />
+        :rules="[
+          (val, rules) =>
+            !!val
+              ? isValidRoleName ||
+                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+              : t('common.nameRequired'),
+        ]"
+      >
+        <template v-slot:hint>
+          Use alphanumeric and '+=,.@-_' characters only, without spaces.
+        </template>
+      </q-input>
 
       <div class="flex justify-center q-mt-lg">
         <q-btn
@@ -99,7 +109,14 @@ const store = useStore();
 
 const q = useQuasar();
 
+const isValidRoleName = computed(() => {
+  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
+  // Check if the role name is valid
+  return roleNameRegex.test(name.value);
+});
+
 const saveRole = () => {
+  if (!name.value || !isValidRoleName.value) return;
   createRole(name.value, store.state.selectedOrganization.identifier)
     .then(() => {
       emits("cancel:hideform");
