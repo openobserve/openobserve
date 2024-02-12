@@ -421,11 +421,11 @@ async fn get_fast_mode_ctx(
     file_type: FileType,
 ) -> Result<(SessionContext, Arc<Schema>)> {
     let mut files = files.to_vec();
-    let asc = !sql.meta.order_by.is_empty() && !sql.meta.order_by[0].1;
-    if asc {
-        files.sort_by(|a, b| b.meta.min_ts.cmp(&a.meta.min_ts));
-    } else {
+    let desc = sql.meta.order_by.is_empty() || sql.meta.order_by[0].1;
+    if desc {
         files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    } else {
+        files.sort_by(|a, b| b.meta.min_ts.cmp(&a.meta.min_ts));
     };
 
     let mut loaded_records = 0;
@@ -434,7 +434,7 @@ async fn get_fast_mode_ctx(
     for i in (0..files.len()).rev() {
         loaded_records += files.get(i).unwrap().meta.records as usize;
         new_files.push(files[i].clone());
-        if loaded_records >= needs && (!asc || new_files.len() > 1) {
+        if loaded_records >= needs && (desc || new_files.len() > 1) {
             break;
         }
     }
