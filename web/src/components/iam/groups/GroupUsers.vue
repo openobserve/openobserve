@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'rgb(45 45 45) 0px 4px 7px 0px'
             : 'rgb(240 240 240) 0px 4px 7px 0px',
       }"
-      style="position: sticky; top: 57px; z-index: 2"
+      style="position: sticky; top: 0px; z-index: 2"
     >
       <div class="q-mr-md">
         <div class="flex items-center q-pt-xs">

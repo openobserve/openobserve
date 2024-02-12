@@ -11,7 +11,7 @@
         />
       </div>
       <q-separator vertical />
-      <div style="width: calc(100% - 160px)">
+      <div style="width: calc(100% - 160px); overflow-y: auto">
         <RouterView />
       </div>
     </div>

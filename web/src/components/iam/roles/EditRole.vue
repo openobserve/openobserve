@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-show="activeTab === 'permissions'">
           <div
             class="o2-input flex items-start q-px-md q-py-sm justify-start"
-            style="position: sticky; top: 57px; z-index: 2"
+            style="position: sticky; top: 0px; z-index: 2"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
             :style="{
               'box-shadow':
@@ -311,9 +311,7 @@ const getRoleDetails = () => {
       await getResourcePermissions();
       await getUsers();
       await updateRolePermissions();
-      setTimeout(() => {
-        isFetchingIntitialRoles.value = false;
-      }, 3000);
+      isFetchingIntitialRoles.value = false;
 
       updateTableData();
     })
@@ -535,6 +533,15 @@ const updateRolePermissions = async () => {
         (e: Entity) => e.name === folderId
       );
       await getResourceEntities(dashResource as Entity);
+    } else if (
+      resource === "logs" ||
+      resource === "metrics" ||
+      resource === "traces"
+    ) {
+      const streamResource = resourceMapper["stream"].entities.find(
+        (e: Entity) => e.name === resource
+      );
+      await getResourceEntities(streamResource as Entity);
     } else {
       await getResourceEntities(resourceMapper[resource]);
     }
@@ -670,6 +677,7 @@ const updatePermissionVisibility = (
     if (permission.entities?.length) {
       updatePermissionVisibility(permission.entities);
     }
+
     const showEntity = permission.entities?.some((entity) => entity.show);
 
     // Update the permission object to add `show` property
