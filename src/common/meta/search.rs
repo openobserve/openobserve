@@ -280,6 +280,82 @@ pub struct SearchPartitionResponse {
     pub partitions: Vec<[i64; 2]>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct MultiSearchPartitionRequest {
+    pub sql: Vec<String>,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct MultiSearchPartitionResponse {
+    pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
+    pub error: hashbrown::HashMap<String, String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[schema(as = SearchRequest)]
+pub struct MultiStreamRequest {
+    #[serde(default)]
+    pub sql: Vec<String>,
+    #[serde(default)]
+    pub aggs: HashMap<String, String>,
+    #[serde(default)]
+    pub encoding: RequestEncoding,
+    #[serde(default)]
+    pub timeout: i64,
+    #[serde(default)]
+    pub from: usize,
+    #[serde(default = "default_size")]
+    pub size: usize,
+    #[serde(default)]
+    pub start_time: i64,
+    #[serde(default)]
+    pub end_time: i64,
+    #[serde(default)]
+    pub sort_by: Option<String>,
+    #[serde(default)]
+    pub sql_mode: String,
+    #[serde(default)]
+    pub query_type: String,
+    #[serde(default)]
+    pub track_total_hits: bool,
+    #[serde(default)]
+    pub query_context: Option<String>,
+    #[serde(default)]
+    pub uses_zo_fn: bool,
+    #[serde(default)]
+    pub query_fn: Option<String>,
+}
+
+impl MultiStreamRequest {
+    pub fn to_query_req(&mut self) -> Vec<Request> {
+        let mut res = vec![];
+        for query in &self.sql {
+            res.push(Request {
+                query: Query {
+                    sql: query.to_string(),
+                    from: self.from,
+                    size: self.size,
+                    start_time: self.start_time,
+                    end_time: self.end_time,
+                    sort_by: self.sort_by.clone(),
+                    sql_mode: self.sql_mode.clone(),
+                    query_type: self.query_type.clone(),
+                    track_total_hits: self.track_total_hits,
+                    query_context: self.query_context.clone(),
+                    uses_zo_fn: self.uses_zo_fn,
+                    query_fn: self.query_fn.clone(),
+                },
+                aggs: self.aggs.clone(),
+                encoding: self.encoding,
+                timeout: self.timeout,
+            });
+        }
+        res
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
