@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col q-pr-xs">
     <div
       class="flex justify-start bordered q-px-md q-py-sm"
-      style="position: sticky; top: 57px; z-index: 2"
+      style="position: sticky; top: 0px; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{
         'box-shadow':
