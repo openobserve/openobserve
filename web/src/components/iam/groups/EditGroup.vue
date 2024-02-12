@@ -161,6 +161,23 @@ const saveGroupChanges = () => {
     remove_roles: Array.from(removedRoles.value) as string[],
   };
 
+  if (
+    !(
+      payload.add_users.length ||
+      payload.remove_users.length ||
+      payload.add_roles.length ||
+      payload.remove_roles.length
+    )
+  ) {
+    q.notify({
+      type: "info",
+      message: `No updates detected.`,
+      timeout: 3000,
+    });
+
+    return;
+  }
+
   updateGroup({
     group_name: groupDetails.value.group_name,
     org_identifier: store.state.selectedOrganization.identifier,

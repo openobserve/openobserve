@@ -503,9 +503,11 @@ const aggregationData = ref(props.aggregation);
 const filteredFields = ref(props.columns);
 
 const getNumericColumns = computed(() => {
-  return props.columns.filter((column: any) => {
-    return column.type !== "Utf8";
-  });
+  if (aggregationData.value.function === "count") return props.columns;
+  else
+    return props.columns.filter((column: any) => {
+      return column.type !== "Utf8";
+    });
 });
 
 const filteredNumericColumns = ref(getNumericColumns.value);

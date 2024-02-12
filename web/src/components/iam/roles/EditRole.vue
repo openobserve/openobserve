@@ -209,6 +209,7 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
+import { computed } from "vue";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -1348,6 +1349,23 @@ const saveRole = () => {
     remove_users: Array.from(removedUsers.value) as string[],
   };
 
+  if (
+    !(
+      payload.add.length ||
+      payload.remove.length ||
+      payload.add_users.length ||
+      payload.remove_users.length
+    )
+  ) {
+    q.notify({
+      type: "info",
+      message: `No updates detected.`,
+      timeout: 3000,
+    });
+
+    return;
+  }
+
   updateRole({
     role_id: editingRole.value,
     org_identifier: store.state.selectedOrganization.identifier,
@@ -1358,7 +1376,7 @@ const saveRole = () => {
 
       q.notify({
         type: "positive",
-        message: `Updated role permissions successfully!`,
+        message: `Updated role successfully!`,
         timeout: 3000,
       });
 
@@ -1398,7 +1416,7 @@ const saveRole = () => {
     .catch((err) => {
       q.notify({
         type: "negative",
-        message: `Error While updating role permissions!`,
+        message: `Error while updating role!`,
         timeout: 3000,
       });
       console.log(err);

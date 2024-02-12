@@ -42,8 +42,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         outlined
         filled
         dense
-        :rules="[(val, rules) => !!val || t('common.nameRequired')]"
-      />
+        :rules="[
+          (val, rules) =>
+            !!val
+              ? isValidGroupName ||
+                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+              : t('common.nameRequired'),
+        ]"
+      >
+        <template v-slot:hint>
+          Use alphanumeric and '+=,.@-_' characters only, without spaces.
+        </template>
+      </q-input>
 
       <div class="flex justify-center q-mt-lg">
         <q-btn
@@ -71,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createGroup, updateGroup } from "@/services/iam";
+import { createGroup } from "@/services/iam";
 import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -101,7 +111,14 @@ const q = useQuasar();
 
 const store = useStore();
 
+const isValidGroupName = computed(() => {
+  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
+  // Check if the role name is valid
+  return roleNameRegex.test(name.value);
+});
+
 const saveGroup = () => {
+  if (!name.value || !isValidGroupName.value) return;
   createGroup(name.value, store.state.selectedOrganization.identifier)
     .then((res) => {
       emits("added:group", res.data);
