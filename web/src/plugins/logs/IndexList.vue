@@ -433,6 +433,13 @@ export default defineComponent({
       this.onStreamChange();
     },
   },
+  computed: {
+    sortedStreamFields() {
+      return this.searchObj.data.stream.selectedStreamFields.sort(
+        (a, b) => a.group - b.group
+      );
+    },
+  },
   setup() {
     const { t } = useI18n();
     const router = useRouter();
