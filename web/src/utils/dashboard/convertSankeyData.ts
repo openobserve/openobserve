@@ -37,29 +37,36 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   const nodes: Set<string> = new Set();
   const links: any[] = [];
 
-  searchQueryData[0].forEach((item: any) => {
-    const source = item[panelSchema.queries[0].fields.source.alias];
-    const target = item[panelSchema.queries[0].fields.target.alias];
-    const value = item[panelSchema.queries[0].fields.value.alias];
+  const filteredData = panelSchema.queries.map((query: any, index: any) => {
+    return searchQueryData[index].filter((item: any) => {
+      return (
+        item[query.fields.source.alias] != null &&
+        item[query.fields.target.alias] != null &&
+        item[query.fields.value.alias] != null
+      );
+    });
+  });
 
-    console.log("Item:", item);
-    console.log("Source:", source);
-    console.log("Target:", target);
-    console.log("Value:", value);
+  filteredData.forEach((queryData: any) => {
+    queryData.forEach((item: any) => {
+      const source = item[panelSchema.queries[0].fields.source.alias];
+      const target = item[panelSchema.queries[0].fields.target.alias];
+      const value = item[panelSchema.queries[0].fields.value.alias];
 
-    if (source && target && value) {
-      nodes.add(source);
-      nodes.add(target);
+      if (source && target && value) {
+        nodes.add(source);
+        nodes.add(target);
 
-      links.push({
-        source: source,
-        target: target,
-        value: value,
-        lineStyle: {
-          curveness: 0.5,
-        },
-      });
-    }
+        links.push({
+          source: source,
+          target: target,
+          value: value,
+          lineStyle: {
+            curveness: 0.5,
+          },
+        });
+      }
+    });
   });
 
   const options = {
@@ -74,7 +81,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
       },
     },
   };
-  console.log("Options:", options);
 
   return { options };
 };
+
