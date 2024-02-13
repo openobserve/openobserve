@@ -386,48 +386,56 @@ export default defineComponent({
     };
 
     const sankeyChartQuery = () => {
-      let query = "";
-
-      const { source, target, value } =
+      const queryData =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields;
+        ];
+      const { source, target, value } = queryData.fields;
+      const stream = queryData.fields.stream;
 
-      if (source && target && value) {
-        query += `SELECT ${source.column} as ${source.alias}, ${target.column} as ${target.alias}, ${value.aggregationFunction}(${value.column}) as ${value.alias}`;
-      } 
-
-      query += ` FROM "${
+      if (!source && !target && !value) {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
-      }"`;
+        ].query = "";
+        return;
+      }
 
-      // Add WHERE clause based on applied filters
-      const filterData =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter;
+      let query = "SELECT ";
+      const selectFields = [];
 
-      const filterItems = filterData.map((field) => {
+      if (source) {
+        selectFields.push(`${source.column} as ${source.alias}`);
+      }
+
+      if (target) {
+        selectFields.push(`${target.column} as ${target.alias}`);
+      }
+
+      if (value) {
+        selectFields.push(
+          `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+        );
+      }
+
+      // Adding the selected fields to the query
+      query += selectFields.join(", ");
+
+      query += ` FROM "${stream}"`;
+
+      // Adding filter conditions
+      const filterData = queryData.fields.filter || [];
+      const filterConditions = filterData.map((field: any) => {
         let selectFilter = "";
-        // Handle different filter types and operators
-        if (field.type == "list" && field.values?.length > 0) {
+        if (field.type === "list" && field.values?.length > 0) {
           selectFilter += `${field.column} IN (${field.values
-            .map((it) => `'${it}'`)
+            .map((it: string) => `'${it}'`)
             .join(", ")})`;
-        } else if (field.type == "condition" && field.operator != null) {
+        } else if (field.type === "condition" && field.operator != null) {
           selectFilter += `${field.column} `;
           if (["Is Null", "Is Not Null"].includes(field.operator)) {
-            switch (field.operator) {
-              case "Is Null":
-                selectFilter += `IS NULL`;
-                break;
-              case "Is Not Null":
-                selectFilter += `IS NOT NULL`;
-                break;
-            }
-          } else if (field.value != null && field.value != "") {
+            selectFilter +=
+              field.operator === "Is Null" ? "IS NULL" : "IS NOT NULL";
+          } else if (field.value != null && field.value !== "") {
             switch (field.operator) {
               case "=":
               case "<>":
@@ -452,22 +460,30 @@ export default defineComponent({
         return selectFilter;
       });
 
-      const whereClause = filterItems.filter((it) => it).join(" AND ");
-      if (whereClause) {
-        query += ` WHERE ${whereClause}`;
+      // Adding filter conditions to the query
+      if (filterConditions.length > 0) {
+        query += " WHERE " + filterConditions.join(" AND ");
       }
 
-      // Group By clause
-      query += ` GROUP BY ${source.column}, ${target.column}`;
+      // Adding group by statement
+      if (source && target) {
+        query += ` GROUP BY ${source.alias}, ${target.alias}`;
+      }
 
-      // Order By clause
-      // No specific order by for Sankey chart, as it's a flow diagram
+      // Adding sorting
+      const orderByArr: string[] = [];
+      [source, target, value].forEach((field) => {
+        if (field && field.sortBy) {
+          orderByArr.push(`${field.alias} ${field.sortBy}`);
+        }
+      });
 
-      // Limit
-      const queryLimit =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.limit ?? 0;
+      if (orderByArr.length > 0) {
+        query += ` ORDER BY ${orderByArr.join(", ")}`;
+      }
+
+      // Adding limit
+      const queryLimit = queryData.config.limit ?? 0;
       if (queryLimit > 0) {
         query += ` LIMIT ${queryLimit}`;
       }
