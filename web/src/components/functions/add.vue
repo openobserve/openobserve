@@ -159,6 +159,7 @@ import { useQuasar } from "quasar";
 
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
+import useStreams from "@/composables/useStreams";
 
 const defaultValue: any = () => {
   return {
@@ -210,6 +211,8 @@ export default defineComponent({
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
+
+    const { getStreams } = useStreams();
 
     onMounted(async () => {
       monaco.editor.defineTheme("myCustomTheme", {
@@ -300,15 +303,10 @@ end`;
       }
 
       isFetchingStreams.value = true;
-      streamService
-        .nameList(
-          store.state.selectedOrganization.identifier,
-          formData.value.stream_type,
-          true
-        )
+      getStreams(formData.value.stream_type, true)
         .then((res) => {
-          streams.value[formData.value.stream_type] = res.data.list;
-          indexOptions.value = res.data.list.map((data: any) => {
+          streams.value[formData.value.stream_type] = res.list;
+          indexOptions.value = res.list.map((data: any) => {
             return data.name;
           });
         })
