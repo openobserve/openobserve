@@ -22,6 +22,7 @@ import streamService from "@/services/stream";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import billings from "@/services/billings";
+import useStreams from "@/composables/useStreams";
 
 const useLocalStorage = (
   key: string,
@@ -300,6 +301,7 @@ export const getPath = () => {
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   const q = useQuasar();
+  const { getStreams } = useStreams();
 
   if (
     config.isCloud &&
@@ -324,19 +326,16 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   if (
     to.path.indexOf("/ingestion") == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
-    store.state.zoConfig.restricted_routes_on_empty_data == true
+    store.state.zoConfig.restricted_routes_on_empty_data == true &&
+    !store.state.organizationData.isDataIngested
   ) {
-    const local_organization: any = useLocalOrganization();
-
-    await streamService
-      .nameList(local_organization?.value?.identifier, "", false)
-      .then((response) => {
-        if (response.data.list.length == 0) {
-          next({ path: "/ingestion" });
-        } else {
-          next();
-        }
-      });
+    await getStreams("", false).then((response: any) => {
+      if (response.list.length == 0) {
+        next({ path: "/ingestion" });
+      } else {
+        next();
+      }
+    });
   } else {
     next();
   }
