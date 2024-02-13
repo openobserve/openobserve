@@ -420,7 +420,6 @@ export const convertSQLData = (
     case "line":
     case "area":
     case "scatter": {
-      console.log("panelSchema.type", panelSchema);
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
       if (
@@ -1498,7 +1497,6 @@ export const convertSQLData = (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
-  console.log("options", options);
 
   return {
     options,

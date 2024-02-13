@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col"
         />
       </div>
-      <!-- <SankeyRenderer v-else-if="panelSchema.type == 'sankey'"></SankeyRenderer> -->
       <ChartRenderer
         v-else
         :data="
@@ -116,7 +115,6 @@ import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
 import HTMLRenderer from "./panels/HTMLRenderer.vue";
 import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
-import SankeyRenderer from "@/components/dashboards/panels/SankeyRenderer.vue";
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -125,7 +123,6 @@ export default defineComponent({
     GeoMapRenderer,
     HTMLRenderer,
     MarkdownRenderer,
-    SankeyRenderer,
   },
   props: {
     selectedTimeObj: {
@@ -181,8 +178,6 @@ export default defineComponent({
               chartPanelRef,
               hoveredSeriesState
             );
-            console.log("panelData", panelData.value);
-            console.log("panelSchema", panelSchema.value);
 
             errorDetail.value = "";
           } catch (error: any) {
@@ -267,10 +262,12 @@ export default defineComponent({
           );
         }
         case "sankey": {
-          return data.value[0]?.length > 1 ||
-          source.every((s: any) => data.value[0][0][s] != null) ||
-          target.every((t: any) => data.value[0][0][t] != null) ||
-          value.every((v: any) => data.value[0][0][v] != null);
+          return (
+            data.value[0]?.length > 1 ||
+            source.every((s: any) => data.value[0][0][s] != null) ||
+            target.every((t: any) => data.value[0][0][t] != null) ||
+            value.every((v: any) => data.value[0][0][v] != null)
+          );
         }
         default:
           break;
