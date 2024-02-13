@@ -269,6 +269,7 @@ import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -339,6 +340,7 @@ export default defineComponent({
     ]);
     const addFunctionInProgress = ref(false);
     const addFunctionInProgressLoading = ref(false);
+    const { getStreams } = useStreams();
 
     const functionsColumns = ref<QTableProps["columns"]>([
       {
@@ -386,15 +388,14 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
 
-        streamService
-          .nameList(store.state.selectedOrganization.identifier, "", false)
+        getStreams("", false)
           .then((res) => {
             let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
-            resultTotal.value = res.data.list.length;
-            logStream.value = res.data.list
+            resultTotal.value = res.list.length;
+            logStream.value = res.list
               .filter(
                 (stream: any) => stream.stream_type !== "enrichment_tables"
               )

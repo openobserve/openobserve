@@ -305,6 +305,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
+import useStreams from "@/composables/useStreams";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -372,6 +373,7 @@ export default defineComponent({
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
+    const { getStreams } = useStreams();
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -602,22 +604,20 @@ export default defineComponent({
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
-      await streamService
-        .nameList(selectedOrgData?.identifier, "", false)
-        .then((response) => {
-          store.dispatch("setSelectedOrganization", {
-            ...selectedOrgData,
-          });
-          if (response.data.list.length == 0) {
-            $q.notify({
-              type: "warning",
-              message:
-                "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
-              timeout: 5000,
-            });
-            router.push({ name: "ingestion" });
-          }
+      await getStreams("", false).then((response) => {
+        store.dispatch("setSelectedOrganization", {
+          ...selectedOrgData,
         });
+        if (response.list.length == 0) {
+          $q.notify({
+            type: "warning",
+            message:
+              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+            timeout: 5000,
+          });
+          router.push({ name: "ingestion" });
+        }
+      });
     };
 
     const setSelectedOrganization = async () => {

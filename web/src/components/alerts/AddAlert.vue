@@ -419,6 +419,7 @@ import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import PreviewAlert from "./PreviewAlert.vue";
+import useStreams from "@/composables/useStreams";
 
 const defaultValue: any = () => {
   return {
@@ -525,6 +526,8 @@ export default defineComponent({
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
+
+    const { getStreams } = useStreams();
 
     const previewQuery = ref("");
 
@@ -666,16 +669,11 @@ export default defineComponent({
       if (!formData.value.stream_type) return Promise.resolve();
 
       isFetchingStreams.value = true;
-      return streamService
-        .nameList(
-          store.state.selectedOrganization.identifier,
-          formData.value.stream_type,
-          true
-        )
+      return getStreams(formData.value.stream_type, true)
         .then((res) => {
-          streams.value[formData.value.stream_type] = res.data.list;
-          schemaList.value = res.data.list;
-          indexOptions.value = res.data.list.map((data: any) => {
+          streams.value[formData.value.stream_type] = res.list;
+          schemaList.value = res.list;
+          indexOptions.value = res.list.map((data: any) => {
             return data.name;
           });
 

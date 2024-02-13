@@ -24,9 +24,9 @@ const useStreams = () => {
   const getStreams = async (streamName: string, schema: boolean) => {
     try {
       if (
-        store.state.organizationData.streams[streamName] == undefined ||
-        (schema != false &&
-          store.state.organizationData.streams[streamName].schema != schema)
+        !store.state.organizationData.streams[streamName || "all"] ||
+        (schema &&
+          !store.state.organizationData.streams[streamName || "all"].schema)
       ) {
         return await StreamService.nameList(
           store.state.selectedOrganization.identifier,
@@ -34,6 +34,12 @@ const useStreams = () => {
           schema
         )
           .then((res: any) => {
+            if (
+              !store.state.organizationData.isDataIngested &&
+              !!res.data.list.length
+            )
+              store.dispatch("setIsDataIngested", !!res.data.list.length);
+
             const streamObject: {
               name: string;
               list: any;
@@ -44,14 +50,73 @@ const useStreams = () => {
               schema: schema,
             };
 
-            store.dispatch("setStreams", streamObject);
+            if (!streamName.trim()) {
+              const streams: {
+                [key: string]: {
+                  name: string;
+                  list: any;
+                  schema: boolean;
+                };
+              } = {};
+
+              res.data.list.forEach((stream: any) => {
+                if (streams[stream.stream_type]) {
+                  streams[stream.stream_type].list.push(stream);
+                } else {
+                  streams[stream.stream_type] = {
+                    name: stream.stream_type,
+                    list: [stream],
+                    schema: schema,
+                  };
+                }
+              });
+
+              streams["all"] = {
+                name: "all",
+                list: [],
+                schema: schema,
+              };
+
+              Object.values(streams).forEach((stream: any) => {
+                store.dispatch("setStreams", stream);
+              });
+            } else {
+              store.dispatch("setStreams", streamObject);
+            }
             return streamObject;
           })
           .catch((e: any) => {
             throw new Error(e.message);
           });
       } else {
-        return store.state.organizationData.streams[streamName];
+        if (!streamName.trim()) {
+          const allstreams = [
+            "logs",
+            "metrics",
+            "traces",
+            "enrichment_table",
+            "metadata",
+          ];
+
+          const allStreamsData = store.state.organizationData.streams["all"];
+
+          allStreamsData.list = allstreams.reduce(
+            (acc: any[], stream: string) => {
+              const streamData = store.state.organizationData.streams[stream];
+              if (streamData !== undefined) {
+                // Check if the stream data exists
+                return [...acc, ...streamData.list];
+              }
+              return acc; // If data is undefined, return the accumulator as is
+            },
+            []
+          );
+
+          console.log("allStreamsData", allStreamsData);
+          return allStreamsData;
+        } else {
+          return store.state.organizationData.streams[streamName];
+        }
       }
     } catch (e: any) {
       throw new Error(e.message);

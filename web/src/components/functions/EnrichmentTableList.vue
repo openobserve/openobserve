@@ -148,6 +148,7 @@ import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -191,6 +192,7 @@ export default defineComponent({
         sortable: false,
       },
     ]);
+    const { getStreams } = useStreams();
 
     onBeforeMount(() => {
       getLookupTables();
@@ -202,16 +204,11 @@ export default defineComponent({
         message: "Please wait while loading functions...",
       });
 
-      streamService
-        .nameList(
-          store.state.selectedOrganization.identifier,
-          "enrichment_tables",
-          false
-        )
+      getStreams("enrichment_tables", false)
         .then((res) => {
           let counter = 1;
-          resultTotal.value = res.data.list.length;
-          jsTransforms.value = res.data.list.map((data: any) => {
+          resultTotal.value = res.list.length;
+          jsTransforms.value = res.list.map((data: any) => {
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.name + counter,
