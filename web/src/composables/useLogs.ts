@@ -242,10 +242,9 @@ const useLogs = () => {
         ? useLocalLogFilterField()?.value
         : {};
 
-    searchObj.data.stream.selectedStream.forEach((stream: any) => {
-      selectedFields[`${identifier}_${stream}`] =
-        searchObj.data.stream.selectedFields;
-    });
+    const stream = searchObj.data.stream.selectedStream.sort().join("_");
+    selectedFields[`${identifier}_${stream}`] =
+      searchObj.data.stream.selectedFields;
     useLocalLogFilterField(selectedFields);
   };
 
@@ -1672,22 +1671,9 @@ const useLogs = () => {
         const timestampField = store.state.zoConfig.timestamp_column;
         let schemaInterestingFields: string[] = [];
 
-        // searchObj.data.streamResults.list.forEach((stream: any) => {
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
           .split(",");
-        for (const stream of searchObj.data.streamResults.list) {
-          if (selectedStreamValues.includes(stream.name)) {
-            if (stream.hasOwnProperty("schema")) {
-              queryResult.push(...stream.schema);
-              schemaFields = new Set([
-                ...stream.schema.map((e: any) => e.name),
-              ]);
-            } else {
-              const streamSchema: any = await loadStreamFileds(stream.name);
-              queryResult.push(...streamSchema);
-              schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
-            }
 
           for (const stream of searchObj.data.streamResults.list) {
           if (selectedStreamValues.includes(stream.name)) {
@@ -2240,6 +2226,11 @@ const useLogs = () => {
             searchObj.data.stream.selectedStreamFields.length > 1 &&
             finalArray[stream].length > 0
           ) {
+
+        delete finalArray.common;
+        // Object.keys(finalArray).forEach((stream: any) => {
+        for (const stream of Object.keys(finalArray)) {
+          if (searchObj.data.stream.selectedStreamFields.length > 1 && finalArray[stream].length > 0) {
             searchObj.data.stream.selectedStreamFields.push({
               name: convertToCamelCase(stream),
               label: true,
