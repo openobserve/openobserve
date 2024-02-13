@@ -52,7 +52,7 @@ use openobserve::{
                 file_list::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
-                search::Searcher,
+                search::intra_cluster::Searcher,
                 traces::TraceServer,
                 usage::UsageServerImpl,
             },
