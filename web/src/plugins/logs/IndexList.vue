@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item>
         </template>
         <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-          <q-item style="cursor: pointer;">
+          <q-item style="cursor: pointer">
             <q-item-section @click="handleSingleStreamSelect(opt)">
               <q-item-label v-html="opt.label" />
             </q-item-section>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="index-table q-mt-xs">
       <q-table
         data-test="log-search-index-list-fields-table"
-        v-model="searchObj.data.stream.selectedFields"
+        v-model="sortedStreamFields"
         :visible-columns="['name']"
         :rows="searchObj.data.stream.selectedStreamFields"
         :row-key="(row) => searchObj.data.stream.selectedStream[0] + row.name"
@@ -75,7 +75,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="fieldList"
       >
         <template #body-cell-name="props">
-          <q-tr :props="props">
+          <q-tr
+            :props="props"
+            v-if="props.row.label"
+            @click="
+              searchObj.data.stream.expandGroupRows[props.row.group] =
+                !searchObj.data.stream.expandGroupRows[props.row.group]
+            "
+            class="cursor-pointer text-bold"
+          >
+            <q-td class="field_list bg-grey-3" style="line-height: 28px; padding-left: 10px;">
+              {{ props.row.name }}
+              <q-icon
+                :name="
+                  searchObj.data.stream.expandGroupRows[props.row.group]
+                    ? 'expand_less'
+                    : 'expand_more'
+                "
+                size="25px"
+                class="float-right"
+              ></q-icon>
+            </q-td>
+          </q-tr>
+          <q-tr
+            :props="props"
+            v-else
+            v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
+          >
             <q-td
               :props="props"
               class="field_list"
@@ -373,6 +399,13 @@ export default defineComponent({
       this.onStreamChange();
     },
   },
+  computed: {
+    sortedStreamFields() {
+      return this.searchObj.data.stream.selectedStreamFields.sort(
+        (a, b) => a.group - b.group
+      );
+    },
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -455,7 +488,7 @@ export default defineComponent({
 
     const openFilterCreator = (
       event: any,
-      { name, ftsKey, isSchemaField }: any
+      { name, ftsKey, isSchemaField, streams }: any
     ) => {
       if (ftsKey) {
         event.stopPropagation();
@@ -518,10 +551,7 @@ export default defineComponent({
             whereClause = parseQuery[0].trim();
           }
 
-          query_context =
-            `SELECT *${queryFunctions} FROM "` +
-            searchObj.data.stream.selectedStream.join(",") +
-            `" [WHERE_CLAUSE]`;
+          query_context = `SELECT *${queryFunctions} FROM [INDEX_NAME] [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
             whereClause = whereClause
@@ -554,7 +584,7 @@ export default defineComponent({
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
           }
-          query_context = b64EncodeUnicode(query_context) || "";
+          // query_context = b64EncodeUnicode(query_context) || "";
         }
 
         let query_fn = "";
@@ -564,35 +594,84 @@ export default defineComponent({
         ) {
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
-        streamService
-          .fieldValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.join(","),
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-            fields: [name],
-            size: 10,
-            query_context: query_context,
-            query_fn: query_fn,
-            type: searchObj.data.stream.streamType,
-          })
-          .then((res: any) => {
-            if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
-                .find((field: any) => field.field === name)
-                .values.map((value: any) => {
-                  return {
-                    key: value.zo_sql_key?.toString()
-                      ? value.zo_sql_key
-                      : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  };
+
+        fieldValues.value[name] = {
+          isLoading: true,
+          values: [],
+        };
+        streams.forEach(async (selectedStream: string) => {
+          await streamService
+            .fieldValues({
+              org_identifier: store.state.selectedOrganization.identifier,
+              stream_name: selectedStream,
+              start_time: startISOTimestamp,
+              end_time: endISOTimestamp,
+              fields: [name],
+              size: 10,
+              query_context:
+                b64EncodeUnicode(
+                  query_context.replace("[INDEX_NAME]", selectedStream)
+                ) || "",
+              query_fn: query_fn,
+              type: searchObj.data.stream.streamType,
+            })
+            .then((res: any) => {
+              if (res.data.hits.length) {
+                console.log("===", res.data.hits);
+
+                res.data.hits.forEach((item: any) => {
+                  item.values.forEach((subItem: any) => {
+                    if (fieldValues.value[name]["values"].length) {
+                      let index = fieldValues.value[name]["values"].findIndex(
+                        (value: any) => value.key == subItem.zo_sql_key
+                      );
+                      if (index != -1) {
+                        fieldValues.value[name]["values"][index].count =
+                          formatLargeNumber(
+                            parseInt(subItem.zo_sql_num) +
+                              parseInt(
+                                fieldValues.value[name]["values"][index].count
+                              )
+                          );
+                      } else {
+                        fieldValues.value[name]["values"].push({
+                          key: subItem.zo_sql_key,
+                          count: formatLargeNumber(subItem.zo_sql_num),
+                        });
+                      }
+                    } else {
+                      fieldValues.value[name]["values"].push({
+                        key: subItem.zo_sql_key,
+                        count: formatLargeNumber(subItem.zo_sql_num),
+                      });
+                    }
+                  });
                 });
-            }
-          })
-          .finally(() => {
-            fieldValues.value[name]["isLoading"] = false;
-          });
+
+                // fieldValues.value[name]["values"] = res.data.hits
+                //   .find((field: any) => field.field === name)
+                //   .values.map((value: any) => {
+                //     let mergeCount = value.zo_sql_num;
+                //     if (fieldValues[name] != undefined) {
+                //       console.log(fieldValues.value[name]["values"])
+                //       mergeCount =
+                //         value.zo_sql_num +
+                //         fieldValues.value[name]["values"].count;
+                //     }
+                //     return {
+                //       key: value.zo_sql_key?.toString()
+                //         ? value.zo_sql_key
+                //         : "null",
+                //       count: formatLargeNumber(mergeCount),
+                //     };
+                //   });
+              }
+            })
+            .finally(() => {
+              console.log(fieldValues.value);
+              fieldValues.value[name]["isLoading"] = false;
+            });
+        });
       } catch (err) {
         console.log(err);
         $q.notify({

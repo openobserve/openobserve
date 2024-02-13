@@ -30,6 +30,7 @@ import {
   histogramDateTimezone,
   useLocalWrapContent,
   useLocalTimezone,
+  convertToCamelCase,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -127,6 +128,7 @@ const defaultObject = {
       addToFilter: "",
       functions: <any>[],
       streamType: "logs",
+      expandGroupRows: <any>{},
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -177,7 +179,7 @@ const useLogs = () => {
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream } = useStreams();
+  const { getStreams, getStream, streams } = useStreams();
   const router = useRouter();
   const parser = new Parser();
   const fieldValues = ref();
@@ -216,10 +218,9 @@ const useLogs = () => {
         ? useLocalLogFilterField()?.value
         : {};
 
-    searchObj.data.stream.selectedStream.forEach((stream: any) => {
-      selectedFields[`${identifier}_${stream}`] =
-        searchObj.data.stream.selectedFields;
-    });
+    const stream = searchObj.data.stream.selectedStream.sort().join("_");
+    selectedFields[`${identifier}_${stream}`] =
+      searchObj.data.stream.selectedFields;
     useLocalLogFilterField(selectedFields);
   };
 
@@ -608,8 +609,18 @@ const useLogs = () => {
 
         req.query.sql = req.query.sql.replace(
           "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.join(",")
+          searchObj.data.stream.selectedStream[0]
         );
+
+        // const preSQLQuery = req.query.sql;
+        // req.query.sql = [];
+        // searchObj.data.stream.selectedStream
+        //   .join(",")
+        //   .split(",")
+        //   .forEach((item: any) => {
+        //     req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
+        //   });
+
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
         // console.log(unparsedSQL);
@@ -1299,6 +1310,7 @@ const useLogs = () => {
       searchObj.data.stream.selectedStreamFields = [];
       let ftsKeys: Set<any> = new Set();
       let schemaFields: Set<any> = new Set();
+      searchObj.data.stream.expandGroupRows = [];
       if (searchObj.data.streamResults.list.length > 0) {
         const queryResult: {
           name: string;
@@ -1306,34 +1318,174 @@ const useLogs = () => {
         }[] = [];
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
+
+////********START CONFLICT*********** */
+        // const timestampField = store.state.zoConfig.timestamp_column;
+
+        // // searchObj.data.streamResults.list.forEach((stream: any) => {
+        // const selectedStreamValues = searchObj.data.stream.selectedStream
+        //   .join(",")
+        //   .split(",");
+        // for (const stream of searchObj.data.streamResults.list) {
+        //   if (selectedStreamValues.includes(stream.name)) {
+        //     if (stream.hasOwnProperty("schema")) {
+        //       queryResult.push(...stream.schema);
+        //       schemaFields = new Set([
+        //         ...stream.schema.map((e: any) => e.name),
+        //       ]);
+        //     } else {
+        //       const streamSchema: any = await loadStreamFileds(stream.name);
+        //       queryResult.push(...streamSchema);
+        //       schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
+        //     }
+
+        //     ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+        //   }
+        // }
+
+        // // queryResult.forEach((field: any) => {
+        // for (const field of queryResult) {
+        //   tempFieldsName.push(field.name);
+        // }
+//***************** */
+        let ftsKeys: any[] = [];
+        let schemaFields: Set<any>;
         const timestampField = store.state.zoConfig.timestamp_column;
 
-        // searchObj.data.streamResults.list.forEach((stream: any) => {
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
           .split(",");
-        for (const stream of searchObj.data.streamResults.list) {
-          if (selectedStreamValues.includes(stream.name)) {
-            if (stream.hasOwnProperty("schema")) {
-              queryResult.push(...stream.schema);
-              schemaFields = new Set([
-                ...stream.schema.map((e: any) => e.name),
-              ]);
-            } else {
-              const streamSchema: any = await loadStreamFileds(stream.name);
-              queryResult.push(...streamSchema);
-              schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
-            }
 
-            ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+        let multiStreamObj: any = [];
+        console.log("work needed", searchObj.data.streamResults);
+        console.log("composable streams:", streams);
+        console.log("selectedStreamValues", selectedStreamValues)
+        for( const stream of selectedStreamValues){
+          // work needed replace searchObj.data.streamResults.list with composable variable
+          for(const stream of searchObj.data.streamResults.list){
+            if(selectedStreamValues.includes(stream.name)){
+              multiStreamObj.push({
+                streamName: stream,
+                streamType: searchObj.data.stream.streamType,
+                schema: true,
+              });
+            }
           }
+        }
+        const streamSchemas = await getStreamListFields(multiStreamObj);
+
+        console.log("streamSchemas", streamSchemas);
+
+        const finalArray: any = {
+          common: [],
+          ...Object.fromEntries(
+            selectedStreamValues.map((stream: any) => [stream, []])
+          ),
+        };
+        searchObj.data.stream.expandGroupRows = {
+          common: true,
+          ...Object.fromEntries(
+            selectedStreamValues.map((stream: any) => [stream, true])
+          ),
+        };
+
+        const fieldToStreamsMap: any = {};
+        const commonFieldNames = new Set();
+
+        // work needed replace searchObj.data.streamResults.list with composable variable
+        for (const stream of searchObj.data.streamResults.list) {
+          //   if (selectedStreamValues.includes(stream.name)) {
+          //     queryResult.push(...stream.schema);
+          //     ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+          //     schemaFields = new Set([...stream.schema.map((e: any) => e.name)]);
+          //   }
+          // Initialize the final array
+          // streams.forEach((stream) => {
+          // Skip streams that are not selected
+          if (!selectedStreamValues.includes(stream.name)) {
+            return;
+          }
+
+          ftsKeys = [
+            ...ftsKeys,
+            ...Object.values(stream.settings.full_text_search_keys),
+          ];
+
+          stream.schema.forEach((schema: { name: string }) => {
+            // Check if the schema name exists in other streams
+            // const otherStreams = searchObj.data.streamResults.list.filter(
+            //   (otherStream: { schema: any[]; name: any }) => {
+            //     if (
+            //       selectedStreamValues.includes(otherStream.name) &&
+            //       otherStream.name !== stream.name
+            //     ) {
+            //       console.log(otherStream.name, stream.name);
+            //       console.log(otherStream.schema, schema.name);
+            //       console.log(otherStream.schema.some(
+            //         (otherSchema: { name: any }) =>
+            //           otherSchema.name === schema.name
+            //       ))
+            //       otherStream.schema.some(
+            //         (otherSchema: { name: any }) =>
+            //           otherSchema.name === schema.name
+            //       );
+            //     }
+            //   }
+            // );
+            const otherStreams = searchObj.data.streamResults.list.filter(
+              (otherStream: any) =>
+                otherStream.schema.some(
+                  (otherSchema: any) =>
+                    otherSchema.name === schema.name &&
+                    otherStream.name !== stream.name &&
+                    selectedStreamValues.includes(otherStream.name)
+                )
+            );
+
+            if (otherStreams.length > 0) {
+              if (!fieldToStreamsMap[schema.name]) {
+                fieldToStreamsMap[schema.name] = [stream.name];
+              } else if (
+                !fieldToStreamsMap[schema.name].includes(stream.name)
+              ) {
+                fieldToStreamsMap[schema.name].push(stream.name);
+              }
+              // If the field is part of other streams, add to common array
+              if (!commonFieldNames.has(schema.name)) {
+                commonFieldNames.add(schema.name);
+                finalArray.common.push({
+                  ...schema,
+                  label: false,
+                  streams: [],
+                  ftsKey: false,
+                  isSchemaField: true,
+                  showValues: schema.name !== timestampField,
+                  group: "common",
+                });
+              }
+            } else {
+              // If not in other streams, add to stream-specific array
+              if (!commonFieldNames.has(schema.name)) {
+                commonFieldNames.add(schema.name);
+                finalArray[stream.name].push({
+                  ...schema,
+                  label: false,
+                  ftsKey: ftsKeys.includes(schema.name),
+                  isSchemaField: true,
+                  showValues: schema.name !== timestampField,
+                  streams: [stream.name],
+                  group: stream.name,
+                });
+              }
+            }
+            // });
+          });
         }
 
         // queryResult.forEach((field: any) => {
-        for (const field of queryResult) {
-          tempFieldsName.push(field.name);
-        }
-
+        //   tempFieldsName.push(field.name);
+        // });
+///*************END CONFLICT*********************** */
         if (searchObj.data.queryResults.hits.length > 0) {
           // Find the index of the record with max attributes
           const maxAttributesIndex = searchObj.data.queryResults.hits.reduce(
@@ -1352,33 +1504,118 @@ const useLogs = () => {
           const recordwithMaxAttribute =
             searchObj.data.queryResults.hits[maxAttributesIndex];
 
-          // Object.keys(recordwithMaxAttribute).forEach((key) => {
-          for (const key of Object.keys(recordwithMaxAttribute)) {
-            if (!tempFieldsName.includes(key)) {
-              queryResult.push({
-                name: key,
+          // Check for new attributes in resultMaxObject
+          // Object.keys(recordwithMaxAttribute).forEach((attribute) => {
+          for (const attribute of Object.keys(recordwithMaxAttribute)) {
+            if (!commonFieldNames.has(attribute)) {
+              // If the attribute is not in the common set, add to common array
+              commonFieldNames.add(attribute);
+              finalArray.common.push({
+                name: attribute,
+                label: false,
                 type: "Utf8",
+                streams: [],
+                ftsKey: false,
+                isSchemaField: false,
+                showValues: attribute !== timestampField,
+                group: "common",
               });
             }
           }
+
+          // Object.keys(recordwithMaxAttribute).forEach((key) => {
+          //   if (!tempFieldsName.includes(key)) {
+          //     queryResult.push({
+          //       name: key,
+          //       type: "Utf8",
+          //     });
+          //   }
+          // });
         }
 
-        const fields: any = {};
-        // queryResult.forEach((row: any) => {
-        for (const row of queryResult) {
-          // let keys = deepKeys(row);
-          // for (let i in row) {
-          if (fields[row.name] == undefined) {
-            fields[row.name] = {};
+        // console.log(searchObj.data.stream.selectedStreamFields)
+        if (
+          finalArray.common.length > 0 &&
+          searchObj.data.stream.selectedStream.length > 1
+        ) {
+          searchObj.data.stream.selectedStreamFields.push({
+            name: "Common Fields Group",
+            label: true,
+            ftsKey: false,
+            isSchemaField: false,
+            showValues: false,
+            group: "common",
+            isExpanded: true,
+            streams: fieldToStreamsMap.hasOwnProperty("common")
+              ? fieldToStreamsMap["common"]
+              : [],
+          });
+
+          // finalArray.common.forEach((group: any, group_index: any) => {
+          for(const group of finalArray.common){
             searchObj.data.stream.selectedStreamFields.push({
-              name: row.name,
-              ftsKey: ftsKeys?.has(row.name),
-              isSchemaField: schemaFields.has(row.name),
-              showValues: row.name !== timestampField,
+              name: group.name,
+              ftsKey: group.ftsKey,
+              isSchemaField: group.isSchemaField,
+              showValues: group.name !== timestampField,
+              group: group.group,
+              streams: fieldToStreamsMap.hasOwnProperty(group.name)
+                ? fieldToStreamsMap[group.name]
+                : [],
             });
           }
-          // }
         }
+
+        delete finalArray.common;
+        // Object.keys(finalArray).forEach((stream: any) => {
+        for (const stream of Object.keys(finalArray)) {
+          if (searchObj.data.stream.selectedStreamFields.length > 1 && finalArray[stream].length > 0) {
+            searchObj.data.stream.selectedStreamFields.push({
+              name: convertToCamelCase(stream),
+              label: true,
+              ftsKey: false,
+              isSchemaField: false,
+              showValues: false,
+              group: stream,
+              isExpanded: false,
+              streams: fieldToStreamsMap.hasOwnProperty(stream)
+                ? fieldToStreamsMap[stream]
+                : [stream],
+            });
+          }
+          searchObj.data.stream.selectedStreamFields.push(
+            ...finalArray[stream]
+          );
+        }
+        // finalArray.forEach((group: any, group_index: any) => {
+        //   // console.log(group, group_index);
+        //   // Object.keys(finalArray[group]).forEach((row: any, row_index: any) => {
+        //   searchObj.data.stream.selectedStreamFields.push({
+        //     name: group.name,
+        //     ftsKey: group.ftsKey,
+        //     isSchemaField: group.isSchemaField,
+        //     showValues: group.name !== timestampField,
+        //     group: group.group,
+        //   });
+        //   // });
+        // });
+
+        // searchObj.data.stream.selectedStreamFields = finalArray;
+        // const fields: any = {};
+        // queryResult.forEach((row: any) => {
+        //   // let keys = deepKeys(row);
+        //   // for (let i in row) {
+        //   if (fields[row.name] == undefined) {
+        //     fields[row.name] = {};
+        //     searchObj.data.stream.selectedStreamFields.push({
+        //       name: row.name,
+        //       ftsKey: ftsKeys.has(row.name),
+        //       isSchemaField: schemaFields.has(row.name),
+        //       showValues: row.name !== timestampField,
+        //     });
+        //   }
+        //   // }
+        // });
       }
     } catch (e: any) {
       console.log("Error while extracting fields");
@@ -1395,21 +1632,26 @@ const useLogs = () => {
           : {};
 
       const logFieldSelectedValue: any = [];
-      searchObj.data.stream.selectedStream.forEach((stream: any) => {
+      const stream = searchObj.data.stream.selectedStream.sort().join("_");
+      if (
+        logFilterField.length > 0 &&
+        logFilterField[
+          `${store.state.selectedOrganization.identifier}_${stream}`
+        ] != undefined
+      ) {
         logFieldSelectedValue.push(
           ...logFilterField[
             `${store.state.selectedOrganization.identifier}_${stream}`
           ]
         );
-      });
+      }
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (
-        !searchObj.data.stream.selectedFields.length &&
-        selectedFields.length
+        searchObj.data.stream.selectedFields.length == 0 &&
+        selectedFields.length > 0
       ) {
         return (searchObj.data.stream.selectedFields = selectedFields);
       }
-      searchObj.data.stream.selectedFields = selectedFields;
 
       searchObj.data.resultGrid.columns.push({
         name: "@timestamp",

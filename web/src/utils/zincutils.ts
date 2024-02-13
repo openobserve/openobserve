@@ -372,6 +372,14 @@ export const convertToTitleCase = (str: string) => {
     .join(" ");
 };
 
+export const convertToCamelCase = (str: string) => {
+  if (!str) {
+    return ''; // or handle the case as needed
+  }
+
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
 export const verifyOrganizationStatus = (Organizations: any, Router: any) => {
   // for (const org of Organizations) {
   //   if (org.status == "pending-subscription") {
