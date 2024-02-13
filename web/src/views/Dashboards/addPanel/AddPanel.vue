@@ -868,6 +868,27 @@ export default defineComponent({
               errors.push("Add one field for the longitude");
             }
           }
+
+          case "sankey": {
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.source == null
+            ) {
+              errors.push("Add one field for the source");
+            }
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.target == null
+            ) {
+              errors.push("Add one field for the target");
+            }
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.value == null
+            ) {
+              errors.push("Add one field for the value");
+            }
+          }
           default:
             break;
         }

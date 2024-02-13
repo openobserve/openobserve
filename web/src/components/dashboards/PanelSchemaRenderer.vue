@@ -221,7 +221,9 @@ export default defineComponent({
       const zAlias = panelSchema.value.queries[0].fields.z.map(
         (it: any) => it.alias
       );
-
+      const source = panelSchema.value.queries[0].fields.source.alias;
+      const target = panelSchema.value.queries[0].fields.target.alias;
+      const value = panelSchema.value.queries[0].fields.value.alias;
       switch (panelType) {
         case "area":
         case "area-stacked":
@@ -263,6 +265,12 @@ export default defineComponent({
             data.value[0]?.length > 1 ||
             yAlias.every((y: any) => data.value[0][0][y] != null)
           );
+        }
+        case "sankey": {
+          return data.value[0]?.length > 1 ||
+          source.every((s: any) => data.value[0][0][s] != null) ||
+          target.every((t: any) => data.value[0][0][t] != null) ||
+          value.every((v: any) => data.value[0][0][v] != null);
         }
         default:
           break;

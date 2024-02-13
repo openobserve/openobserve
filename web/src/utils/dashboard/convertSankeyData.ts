@@ -71,6 +71,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
 
   const options = {
     tooltip: {},
+    backgroundColor: "transparent",
     series: {
       type: "sankey",
       layout: "none",
@@ -84,4 +85,3 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
 
   return { options };
 };
-
