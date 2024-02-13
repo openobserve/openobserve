@@ -96,8 +96,10 @@ impl FileData {
                     break;
                 }
                 let (key, data_size) = item.unwrap();
-                // remove file from data cache
-                DATA.remove(&key);
+                // move the file from memory to disk cache
+                if let Some((key, data)) = DATA.remove(&key) {
+                    _ = super::disk::set(session_id, &key, data).await;
+                }
                 // metrics
                 let columns = key.split('/').collect::<Vec<&str>>();
                 if columns[0] == "files" {

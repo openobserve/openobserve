@@ -13,4 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod cityhash;
 pub mod fnv;
+pub mod gxhash;
+pub mod murmur3;
+
+pub trait Sum64 {
+    fn sum64(&mut self, key: &str) -> u64;
+}

@@ -168,7 +168,7 @@ pub async fn save_stream_settings(
     mut settings: StreamSettings,
 ) -> Result<HttpResponse, Error> {
     // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(org_id, stream_name, stream_type, None) {
+    if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -255,7 +255,7 @@ pub async fn delete_stream(
 
     // create delete for compactor
     if let Err(e) =
-        db::compact::retention::delete_stream(org_id, stream_name, stream_type, None).await
+        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -285,7 +285,7 @@ pub async fn delete_stream(
     stats::remove_stream_stats(org_id, stream_name, stream_type);
 
     // delete stream compaction offset
-    if let Err(e) = db::compact::files::del_offset(org_id, stream_name, stream_type).await {
+    if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
                 StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -296,8 +296,8 @@ pub async fn delete_stream(
 
     crate::common::utils::auth::remove_ownership(
         org_id,
-        "streams",
-        Authz::new(&format!("{stream_type}/{stream_name}")),
+        &stream_type.to_string(),
+        Authz::new(stream_name),
     )
     .await;
 

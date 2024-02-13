@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
+  <div class="relative-position full-height">
     <div style="font-size: 18px" class="q-py-sm q-px-md">
       {{ groupDetails.group_name }}
     </div>
@@ -29,24 +29,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-separator />
+    <div style="min-height: calc(100% - (39px + 55px + 43px))">
+      <GroupUsers
+        v-show="activeTab === 'users'"
+        :groupUsers="groupDetails.users"
+        :activeTab="activeTab"
+        :added-users="addedUsers"
+        :removed-users="removedUsers"
+      />
 
-    <GroupUsers
-      v-show="activeTab === 'users'"
-      :groupUsers="groupDetails.users"
-      :activeTab="activeTab"
-      :added-users="addedUsers"
-      :removed-users="removedUsers"
-    />
-
-    <GroupRoles
-      v-show="activeTab === 'roles'"
-      :groupRoles="groupDetails.roles"
-      :activeTab="activeTab"
-      :added-roles="addedRoles"
-      :removed-roles="removedRoles"
-    />
-
-    <div class="flex justify-end q-mt-lg q-px-md">
+      <GroupRoles
+        v-show="activeTab === 'roles'"
+        :groupRoles="groupDetails.roles"
+        :activeTab="activeTab"
+        :added-roles="addedRoles"
+        :removed-roles="removedRoles"
+      />
+    </div>
+    <div
+      class="flex justify-end q-px-md q-py-sm full-width"
+      style="position: sticky; bottom: 0px; z-index: 2"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :style="{
+        'box-shadow':
+          store.state.theme === 'dark'
+            ? 'rgb(45 45 45) 0px -4px 7px 0px'
+            : 'rgb(240 240 240) 0px -4px 7px 0px',
+      }"
+    >
       <q-btn
         data-test="add-alert-cancel-btn"
         class="text-bold"
@@ -80,6 +90,7 @@ import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
+import { useQuasar } from "quasar";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -95,10 +106,12 @@ const router = useRouter();
 
 const { t } = useI18n();
 
+const q = useQuasar();
+
 const groupDetails = ref({
   group_name: "dev",
-  roles: [],
-  users: [],
+  roles: [] as string[],
+  users: [] as string[],
 });
 
 const addedUsers = ref(new Set());
@@ -148,17 +161,67 @@ const saveGroupChanges = () => {
     remove_roles: Array.from(removedRoles.value) as string[],
   };
 
+  if (
+    !(
+      payload.add_users.length ||
+      payload.remove_users.length ||
+      payload.add_roles.length ||
+      payload.remove_roles.length
+    )
+  ) {
+    q.notify({
+      type: "info",
+      message: `No updates detected.`,
+      timeout: 3000,
+    });
+
+    return;
+  }
+
   updateGroup({
     group_name: groupDetails.value.group_name,
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
     .then((res) => {
-      console.log(res);
-      router.push({ name: "groups" });
+      q.notify({
+        type: "positive",
+        message: `Updated group successfully!`,
+        timeout: 3000,
+      });
+
+      // Reset Roles
+      groupDetails.value.roles = groupDetails.value.roles.filter(
+        (user) => !removedRoles.value.has(user)
+      );
+
+      addedRoles.value.forEach((value: any) => {
+        groupDetails.value.roles.push(value as string);
+      });
+
+      addedRoles.value = new Set([]);
+
+      removedRoles.value = new Set([]);
+
+      // Reset Users
+      groupDetails.value.users = groupDetails.value.users.filter(
+        (user) => !removedUsers.value.has(user)
+      );
+
+      addedUsers.value.forEach((value: any) => {
+        groupDetails.value.users.push(value as string);
+      });
+
+      addedUsers.value = new Set([]);
+
+      removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      console.log(err);
+      q.notify({
+        type: "negative",
+        message: "Error while updating group!",
+        timeout: 3000,
+      });
     });
 };
 

@@ -99,8 +99,8 @@ pub async fn token_validator(
                         header::HeaderName::from_static("user_id"),
                         header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                     );
-
-                    if auth_info.bypass_check || check_permissions(user_id, auth_info).await {
+                    // send user role as None as it applies only to internal users
+                    if auth_info.bypass_check || check_permissions(user_id, auth_info, None).await {
                         Ok(req)
                     } else {
                         Err((ErrorForbidden("Unauthorized Access"), req))

@@ -222,15 +222,5 @@ mod tests {
             "DbError# key /another/shrubbery does not exist",
             &err.to_string()
         );
-        assert_eq!(
-            r#"
-            DbError(
-                KeyNotExists(
-                    "/another/shrubbery",
-                ),
-            )
-        "#,
-            &err.to_string()
-        );
     }
 }

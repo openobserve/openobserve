@@ -361,7 +361,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
-                    super::compact::files::del_offset(org_id, stream_name, stream_type).await
+                    super::compact::files::del_offset(org_id, stream_type, stream_name).await
                 {
                     log::error!("del_offset: {}", e);
                 }

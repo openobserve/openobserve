@@ -13,13 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::FileKey, metrics};
+use config::{
+    cluster::{is_compactor, is_querier, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    meta::{cluster::Role, stream::FileKey},
+    metrics, CONFIG,
+};
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
+use crate::{
+    common::infra::cluster::get_node_from_consistent_hash,
+    handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList},
+};
 
 pub struct Eventer;
 
@@ -48,16 +55,20 @@ impl Event for Eventer {
             .filter(|v| v.deleted)
             .map(|v| v.key.clone())
             .collect::<Vec<_>>();
-        if let Err(e) = infra_file_list::batch_add(&put_items).await {
-            // metrics
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                .inc();
-            return Err(Status::internal(e.to_string()));
+        // querier and compactor can accept add new files
+        // ingester only accept remove old files
+        if is_querier(&LOCAL_NODE_ROLE) || is_compactor(&LOCAL_NODE_ROLE) {
+            if let Err(e) = infra_file_list::batch_add(&put_items).await {
+                // metrics
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                    .inc();
+                return Err(Status::internal(e.to_string()));
+            }
         }
         if let Err(e) = infra_file_list::batch_remove(&del_items).await {
             // metrics
@@ -69,6 +80,21 @@ impl Event for Eventer {
                 .with_label_values(&["/event/send_file_list", "500", "", "", ""])
                 .inc();
             return Err(Status::internal(e.to_string()));
+        }
+
+        // cache latest files for querier
+        if CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
+            for item in put_items {
+                let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
+                else {
+                    continue; // no querier node
+                };
+                if LOCAL_NODE_UUID.ne(&node) {
+                    continue; // not this node
+                }
+                // maybe load already merged file, no need report error
+                _ = infra::cache::file_data::memory::download("download", &item.key).await;
+            }
         }
 
         // metrics

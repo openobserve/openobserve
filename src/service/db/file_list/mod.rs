@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    cluster::{is_querier, LOCAL_NODE_ROLE},
-    meta::stream::FileMeta,
-    RwHashMap, RwHashSet, CONFIG,
-};
+use config::{meta::stream::FileMeta, RwHashMap, RwHashSet, CONFIG};
 use dashmap::{DashMap, DashSet};
 use infra::{cache, file_list};
 use once_cell::sync::Lazy;
@@ -39,7 +35,6 @@ pub async fn progress(
     key: &str,
     data: Option<&FileMeta>,
     delete: bool,
-    download: bool,
 ) -> Result<(), anyhow::Error> {
     if delete {
         if let Err(e) = file_list::remove(key).await {
@@ -66,10 +61,6 @@ pub async fn progress(
                     e
                 );
             }
-        }
-        if download && CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
-            // maybe load already merged file, no need report error
-            _ = cache::file_data::memory::download("", key).await;
         }
     }
 

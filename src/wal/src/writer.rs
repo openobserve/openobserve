@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, File, OpenOptions},
+    fs::{create_dir_all, remove_file, File, OpenOptions},
     io::{self, Seek, SeekFrom, Write},
     path::PathBuf,
 };
@@ -56,11 +56,16 @@ impl Writer {
                 .context(FileReadSnafu { path: path.clone() })?;
         }
 
-        f.write_all(super::FILE_TYPE_IDENTIFIER)
-            .context(WriteFileTypeSnafu)?;
+        if let Err(e) = f.write_all(super::FILE_TYPE_IDENTIFIER) {
+            _ = remove_file(&path);
+            return Err(Error::WriteFileType { source: e });
+        }
         let bytes_written = super::FILE_TYPE_IDENTIFIER.len();
 
-        f.sync_all().expect("fsync failure");
+        if let Err(e) = f.sync_all() {
+            _ = remove_file(&path);
+            return Err(Error::WriteFileType { source: e });
+        }
 
         Ok(Self {
             path,

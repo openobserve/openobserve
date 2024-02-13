@@ -16,6 +16,7 @@
 use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
+use strum::EnumIter;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -185,7 +186,7 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
 pub enum UserRole {
     #[serde(rename = "admin")]
     #[default]
@@ -222,6 +223,24 @@ impl fmt::Display for UserRole {
             UserRole::User => write!(f, "user"),
             #[cfg(feature = "enterprise")]
             UserRole::ServiceAccount => write!(f, "service_account"),
+        }
+    }
+}
+
+impl UserRole {
+    pub fn get_label(&self) -> String {
+        match self {
+            UserRole::Admin => "Admin".to_string(),
+            UserRole::Member => "Member".to_string(),
+            UserRole::Root => "Root".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::Viewer => "Viewer".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::Editor => "Editor".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::User => "User".to_string(),
+            #[cfg(feature = "enterprise")]
+            UserRole::ServiceAccount => "Service Account".to_string(),
         }
     }
 }
@@ -285,6 +304,7 @@ pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
     pub is_internal_user: bool,
+    pub user_role: Option<UserRole>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -311,4 +331,10 @@ pub struct UserGroupRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UserRoleRequest {
     pub name: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct RolesResponse {
+    pub label: String,
+    pub value: String,
 }

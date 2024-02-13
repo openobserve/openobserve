@@ -37,7 +37,7 @@ pub async fn process_token(
 
     use config::CONFIG;
     use o2_enterprise::enterprise::openfga::{
-        authorizer::{
+        authorizer::authz::{
             get_org_creation_tuples, get_user_creation_tuples, get_user_org_tuple,
             get_user_role_creation_tuple, get_user_role_deletion_tuple, update_tuples,
         },

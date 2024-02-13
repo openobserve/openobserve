@@ -106,7 +106,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let stream_name = columns[3].to_string();
 
         // check if we are allowed to ingest or just delete the file
-        if db::compact::retention::is_deleting_stream(&org_id, &stream_name, stream_type, None) {
+        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
             for file in files_with_size {
                 log::warn!(
                     "[INGESTER:JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
@@ -443,11 +443,10 @@ async fn upload_file(
     let new_file_name =
         super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
     drop(file);
-    let file_name = new_file_name.to_owned();
     match storage::put(&new_file_name, buf_parquet).await {
         Ok(_) => {
-            log::info!("[INGESTER:JOB] File upload succeeded: {}", file_name);
-            Ok((file_name, file_meta))
+            log::info!("[INGESTER:JOB] File upload succeeded: {}", new_file_name);
+            Ok((new_file_name, file_meta))
         }
         Err(err) => {
             log::error!("[INGESTER:JOB] File upload error: {:?}", err);

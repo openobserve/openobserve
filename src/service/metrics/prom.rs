@@ -399,8 +399,8 @@ pub async fn remote_write(
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(
             org_id,
-            &stream_name,
             StreamType::Metrics,
+            &stream_name,
             None,
         ) {
             log::warn!("stream [{stream_name}] is being deleted");
@@ -771,7 +771,7 @@ pub(crate) async fn get_label_values(
     Ok(label_values)
 }
 
-fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
+pub(crate) fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
     match &selector.name {
         Some(name) => {
             // `match[]` argument contains a metric name, e.g.

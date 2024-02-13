@@ -54,15 +54,23 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
 
         // get lock
         let locker = dist_lock::lock(&format!("/stats/publish_stats/org/{org_id}"), 0).await?;
-
         let (last_query_ts, node) = get_last_stats_offset(&org_id).await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
             log::debug!("[STATS] for organization {org_id} are being calculated by {node}");
+            dist_lock::unlock(&locker).await?;
             continue;
         }
+        // set current node to lock the organization
+        let ret = if !node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+            set_last_stats_offset(&org_id, last_query_ts, Some(&LOCAL_NODE_UUID.clone())).await
+        } else {
+            Ok(())
+        };
         // release lock
         dist_lock::unlock(&locker).await?;
         drop(locker);
+        ret?;
+
         let current_ts = chrono::Utc::now().timestamp_micros();
 
         let sql = if CONFIG.common.usage_report_compressed_size {

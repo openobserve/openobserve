@@ -17,7 +17,7 @@ keywords = [
 license = "AGPL-3.0-only"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.8.0"
+version = "0.8.1"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -94,7 +94,6 @@ maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
-openidconnect = "3.4.0"
 opentelemetry = { version = "0.18", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.11", features = [
   "http-proto",
@@ -159,7 +158,9 @@ prost-build = "0.11"
 
 [dev-dependencies]
 expect-test = "1.4"
+base64 = "0.21"
 float-cmp = "0.9"
+walkdir = "2"
 
 [workspace]
 members = ["src/config", "src/infra", "src/ingester", "src/wal"]
@@ -189,6 +190,7 @@ base64 = "0.21"
 bytes = "1.4"
 byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
 datafusion = "35"
 datafusion-expr = "35"
@@ -197,7 +199,7 @@ arrow-json = "50.0.0"
 arrow-schema = { version = "50.0.0", features = ["serde"] }
 parquet = { version = "50.0.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.9", features = ["aws", "azure", "gcp"] }
-dotenv_config = "0.1.8"
+dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
 etcd-client = { version = "0.12", features = ["tls"] }
@@ -206,6 +208,7 @@ flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
+gxhash = "~3.0.0"
 hashlink = "0.8.4"
 hashbrown = { version = "0.14.3", features = ["serde"] }
 hex = "0.4"
@@ -214,6 +217,7 @@ ipnetwork = "0.20"
 itertools = "0.12"
 log = "0.4"
 memchr = "2.5"
+murmur3 = "0.5"
 once_cell = "1.17"
 parking_lot = "0.12"
 prometheus = "0.13"
@@ -255,5 +259,4 @@ url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 walkdir = "2"
-xxhash-rust = { version = "0.8", features = ["xxh3"] }
 zstd = "0.13"

@@ -131,10 +131,23 @@ pub async fn search(
     }
 
     let user_id = in_req.headers().get("user_id").unwrap();
-    let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
-    let resp: SearchService::sql::Sql = crate::service::search::sql::Sql::new(&rpc_req)
-        .await
-        .unwrap();
+    let mut rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
+    rpc_req.org_id = org_id.to_string();
+    rpc_req.stream_type = stream_type.to_string();
+    let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req).await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(match e {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            });
+        }
+    };
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
@@ -156,11 +169,12 @@ pub async fn search(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("stream:{}/{}", stream_type, resp.stream_name),
+                        o2_type: format!("{}:{}", stream_type, resp.stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),
                     },
+                    Some(user.role),
                 )
                 .await
             {

@@ -18,7 +18,10 @@ use std::{collections::HashMap, fmt::Display, sync::Arc};
 use arrow_schema::Field;
 use config::{
     meta::stream::{PartitionTimeLevel, StreamStats, StreamType},
-    utils::{hash::fnv, json},
+    utils::{
+        hash::{gxhash, Sum64},
+        json,
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
@@ -192,7 +195,7 @@ impl StreamPartition {
         match &self.types {
             StreamPartitionType::Value => value.to_string(),
             StreamPartitionType::Hash(n) => {
-                let h = fnv::new().sum64(value);
+                let h = gxhash::new().sum64(value);
                 let bucket = h % n;
                 bucket.to_string()
             }
@@ -322,9 +325,19 @@ mod tests {
             json::to_string(&part).unwrap(),
             r#"{"field":"field","types":{"hash":32},"disabled":false}"#
         );
-        assert_eq!(part.get_partition_key("hello"), "field=11");
-        assert_eq!(part.get_partition_key("world"), "field=19");
-        assert_eq!(part.get_partition_key("foo"), "field=23");
-        assert_eq!(part.get_partition_key("bar"), "field=26");
+
+        for key in &[
+            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
+        ] {
+            println!("{}: {}", key, part.get_partition_key(key));
+        }
+        assert_eq!(part.get_partition_key("hello"), "field=8");
+        assert_eq!(part.get_partition_key("world"), "field=14");
+        assert_eq!(part.get_partition_key("foo"), "field=3");
+        assert_eq!(part.get_partition_key("bar"), "field=23");
+        assert_eq!(part.get_partition_key("test"), "field=18");
+        assert_eq!(part.get_partition_key("test1"), "field=3");
+        assert_eq!(part.get_partition_key("test2"), "field=15");
+        assert_eq!(part.get_partition_key("test3"), "field=2");
     }
 }

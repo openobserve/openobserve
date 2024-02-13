@@ -30,25 +30,35 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     return { options: null };
   }
 
-  // validate if response is not at number
-  const nonNumericValues = panelSchema.queries.forEach(
-    (query: any, index: any) => {
-      const queryResult = mapData[index];
+  const filterdMapData = panelSchema.queries.map((query: any, index: any) => {
+    return mapData[index].filter((item: any) => {
+      if (
+        item[query.fields.latitude.alias] != null &&
+        item[query.fields.longitude.alias] != null
+      ) {
+        return true;
+      }
+      return false;
+    });
+  });
 
-      const queryField = queryResult?.forEach((item: any) => {
-        if (isNaN(item[query.fields.latitude.alias])) {
-          throw new Error("All latitude values should be numeric value.");
-        }
-        if (isNaN(item[query.fields.longitude.alias])) {
-          throw new Error("All longitude values should be numeric value.");
-        }
-        if (query.fields.weight && isNaN(item[query.fields.weight.alias])) {
-          throw new Error("All weight values should be numeric value.");
-        }
-      });
-      return queryField;
-    }
-  );
+  // validate if response is not at number
+  panelSchema.queries.forEach((query: any, index: any) => {
+    const queryResult = filterdMapData[index];
+
+    const queryField = queryResult?.forEach((item: any) => {
+      if (isNaN(item[query.fields.latitude.alias])) {
+        throw new Error("All latitude values should be numeric value.");
+      }
+      if (isNaN(item[query.fields.longitude.alias])) {
+        throw new Error("All longitude values should be numeric value.");
+      }
+      if (query.fields.weight && isNaN(item[query.fields.weight.alias])) {
+        throw new Error("All weight values should be numeric value.");
+      }
+    });
+    return queryField;
+  });
 
   const options: any = {
     lmap: {
@@ -137,7 +147,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
           show: true,
         },
       },
-      data: mapData[index]?.map((item: any) => {
+      data: filterdMapData[index]?.map((item: any) => {
         if (query.customQuery) {
           // For custom queries
           return [

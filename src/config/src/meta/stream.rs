@@ -240,6 +240,7 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 pub enum QueryPartitionStrategy {
     FileNum,
     FileSize,
+    FileHash,
 }
 
 impl From<&String> for QueryPartitionStrategy {
@@ -247,6 +248,7 @@ impl From<&String> for QueryPartitionStrategy {
         match s.to_lowercase().as_str() {
             "file_num" => QueryPartitionStrategy::FileNum,
             "file_size" => QueryPartitionStrategy::FileSize,
+            "file_hash" => QueryPartitionStrategy::FileHash,
             _ => QueryPartitionStrategy::FileNum,
         }
     }

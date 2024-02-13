@@ -184,7 +184,8 @@
     "password": "Password",
     "cnfpassword": "Confirm Password",
     "singnInWithGoogle": "Continue with Google",
-    "email": "Email"
+    "email": "Email",
+    "login": "Login"
   },
   "user": {
     "header": "Organization Member",
@@ -255,7 +256,7 @@
     "create": "Create",
     "update": "Update",
     "delete": "Delete",
-    "entityName": "Entity Name",  
+    "entityName": "Entity Name",
     "userName": "User Name",
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
@@ -694,7 +695,7 @@
     "period": "Period",
     "threshold": "Threshold",
     "interval": "Frequency",
-    "silenceNotification": "Silence notification after",
+    "silenceNotification": "Silence notification for",
     "destination": "Destination",
     "additionalVariables": "Additional Variables",
     "description": "Description",
