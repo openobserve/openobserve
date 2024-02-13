@@ -1,3 +1,18 @@
+// Copyright 2023 Zinc Labs Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 #[cfg(feature = "enterprise")]
 use hashbrown::HashSet;
 #[cfg(feature = "enterprise")]
@@ -20,7 +35,7 @@ use crate::service::db;
 #[cfg(feature = "enterprise")]
 pub async fn init() {
     let mut migrate_native_objects = false;
-    let existing_meta = match db::get_ofga_model().await {
+    let existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
         Ok(None) | Err(_) => {
             migrate_native_objects = true;
@@ -30,11 +45,11 @@ pub async fn init() {
     // 1. create a cluster lock
     let mut dist_locker = None;
     if !config::CONFIG.common.local_mode {
-        let mut locker = etcd::Locker::new("/ofga/model/lock");
+        let mut locker = etcd::Locker::new("/lock/ofga/model/");
         locker.lock(0).await.expect("Failed to acquire lock");
         dist_locker = Some(locker);
     }
-    match db::set_ofga_model(existing_meta).await {
+    match db::ofga::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
             if store_id.is_empty() {
                 log::error!("OFGA store id is empty");

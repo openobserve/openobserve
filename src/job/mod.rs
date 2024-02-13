@@ -114,6 +114,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::watch().await });
     tokio::task::spawn(async move { db::alerts::triggers::watch().await });
     tokio::task::spawn(async move { db::organization::watch().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { db::ofga::watch().await });
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata
@@ -171,6 +173,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::file_list::remote::cache_stats()
         .await
         .expect("Load stream stats failed");
+
+    #[cfg(feature = "enterprise")]
+    db::ofga::cache().await.expect("ofga model cache failed");
 
     // check wal directory
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
