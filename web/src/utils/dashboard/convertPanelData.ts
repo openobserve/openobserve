@@ -100,9 +100,6 @@ export const convertPanelData = (
         ...convertSankeyData(
           panelSchema,
           data,
-          store,
-          chartPanelRef,
-          hoveredSeriesState
         ),
       };
     }

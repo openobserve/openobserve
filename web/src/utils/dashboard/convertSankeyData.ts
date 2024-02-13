@@ -22,89 +22,59 @@
  * @return {Object} - the options object for rendering the chart
  */
 
-export const convertSankeyData = (
-  panelSchema: any,
-  searchQueryData: any,
-  store: any,
-  chartPanelRef: any,
-  hoveredSeriesState: any
-) => {
-  // if no data than return it
+export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   if (
     !Array.isArray(searchQueryData) ||
     searchQueryData.length === 0 ||
     !searchQueryData[0] ||
-    !panelSchema.queries[0].fields.x ||
-    !panelSchema.queries[0].fields.y
+    !panelSchema.queries[0].fields.source ||
+    !panelSchema.queries[0].fields.target ||
+    !panelSchema.queries[0].fields.value
   ) {
     return { options: null };
   }
-  console.log("searchQueryData", searchQueryData);
+
+  const nodes: Set<string> = new Set();
+  const links: any[] = [];
+
+  searchQueryData[0].forEach((item: any) => {
+    const source = item[panelSchema.queries[0].fields.source.alias];
+    const target = item[panelSchema.queries[0].fields.target.alias];
+    const value = item[panelSchema.queries[0].fields.value.alias];
+
+    console.log("Item:", item);
+    console.log("Source:", source);
+    console.log("Target:", target);
+    console.log("Value:", value);
+
+    if (source && target && value) {
+      nodes.add(source);
+      nodes.add(target);
+
+      links.push({
+        source: source,
+        target: target,
+        value: value,
+        lineStyle: {
+          curveness: 0.5,
+        },
+      });
+    }
+  });
+
   const options = {
+    tooltip: {},
     series: {
       type: "sankey",
       layout: "none",
+      data: [...nodes].map((node: string) => ({ name: node })),
+      links: links,
       emphasis: {
         focus: "adjacency",
       },
-      data: [
-        {
-          name: "a",
-        },
-        {
-          name: "b",
-        },
-        {
-          name: "a1",
-        },
-        {
-          name: "a2",
-        },
-        {
-          name: "b1",
-        },
-        {
-          name: "c",
-        },
-      ],
-      links: [
-        {
-          source: "a",
-          target: "a1",
-          value: 5,
-        },
-        {
-          source: "a",
-          target: "a2",
-          value: 3,
-        },
-        {
-          source: "b",
-          target: "b1",
-          value: 8,
-        },
-        {
-          source: "a",
-          target: "b1",
-          value: 3,
-        },
-        {
-          source: "b1",
-          target: "a1",
-          value: 1,
-        },
-        {
-          source: "b1",
-          target: "c",
-          value: 2,
-        },
-      ],
     },
   };
+  console.log("Options:", options);
 
-  console.log("option", options);
-  
-  return {
-    options
-  }
+  return { options };
 };

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="col"
         />
       </div>
-      <SankeyRenderer v-else-if="panelSchema.type == 'sankey'"></SankeyRenderer>
+      <!-- <SankeyRenderer v-else-if="panelSchema.type == 'sankey'"></SankeyRenderer> -->
       <ChartRenderer
         v-else
         :data="
