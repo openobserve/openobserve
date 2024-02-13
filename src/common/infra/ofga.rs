@@ -27,9 +27,13 @@ pub async fn init() {
             None
         }
     };
-    // 1. create a cluster lock for node register
-    let mut locker = etcd::Locker::new("/ofga/model/lock");
-    locker.lock(0).await.expect("Failed to acquire lock");
+    // 1. create a cluster lock
+    let mut dist_locker = None;
+    if !config::CONFIG.common.local_mode {
+        let mut locker = etcd::Locker::new("/ofga/model/lock");
+        locker.lock(0).await.expect("Failed to acquire lock");
+        dist_locker = Some(locker);
+    }
     match db::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
             if store_id.is_empty() {
@@ -112,5 +116,7 @@ pub async fn init() {
         }
     }
     // release lock
-    locker.unlock().await.expect("Failed to release lock");
+    if let Some(locker) = dist_locker {
+        locker.unlock().await.expect("Failed to release lock");
+    }
 }
