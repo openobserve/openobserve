@@ -12,10 +12,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+#[cfg(feature = "enterprise")]
 use std::sync::Arc;
 
+#[cfg(feature = "enterprise")]
 use config::utils::json;
+#[cfg(feature = "enterprise")]
 use infra::db as infra_db;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel;
@@ -50,7 +52,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                         .put(
                             key,
                             json::to_vec(&loc_meta).unwrap().into(),
-                            infra_db::NO_NEED_WATCH,
+                            infra_db::NEED_WATCH,
                         )
                         .await
                     {
@@ -116,6 +118,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_value: OFGAModel = json::from_slice(&ev.value.unwrap()).unwrap();
+                log::info!("[WATCH] Got store id {}", &item_value.store_id);
                 o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
                     .insert("store_id".to_owned(), item_value.store_id);
             }
@@ -135,9 +138,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db.list(key).await?;
     for (_, item_value) in ret {
         let json_val: OFGAModel = json::from_slice(&item_value).unwrap();
+        log::info!("Caching store id {}", &json_val.store_id);
         o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
             .insert("store_id".to_owned(), json_val.store_id);
     }
-    log::info!("/ofga/model Cached");
+    log::info!("/ofga/model Cached ");
     Ok(())
 }
