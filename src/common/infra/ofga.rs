@@ -1,18 +1,23 @@
+#[cfg(feature = "enterprise")]
 use hashbrown::HashSet;
+#[cfg(feature = "enterprise")]
 use infra::db::etcd;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::authorizer::authz::{
-    get_org_creation_tuples, get_user_role_tuple, update_tuples,
+use o2_enterprise::enterprise::openfga::{
+    authorizer::authz::{get_org_creation_tuples, get_user_role_tuple, update_tuples},
+    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+};
+
+#[cfg(feature = "enterprise")]
+use crate::common::{
+    infra::config::{STREAM_SCHEMAS, USERS},
+    meta::organization::DEFAULT_ORG,
+    meta::user::UserRole,
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::{NON_OWNING_ORG, OFGA_MODELS};
+use crate::service::db;
 
 #[cfg(feature = "enterprise")]
-use crate::common::infra::config::{STREAM_SCHEMAS, USERS};
-#[cfg(feature = "enterprise")]
-use crate::common::meta::user::UserRole;
-use crate::{common::meta::organization::DEFAULT_ORG, service::db};
-
 pub async fn init() {
     let mut migrate_native_objects = false;
     let existing_meta = match db::get_ofga_model().await {
