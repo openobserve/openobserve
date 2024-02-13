@@ -15,8 +15,6 @@
 
 use config::utils::json;
 use infra::db as infra_db;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel;
 
 pub mod alerts;
 pub mod compact;
@@ -26,6 +24,7 @@ pub mod file_list;
 pub mod functions;
 pub mod kv;
 pub mod metrics;
+pub mod ofga;
 pub mod organization;
 pub mod saved_view;
 pub mod schema;
@@ -56,82 +55,4 @@ pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
         Ok(_) => Ok(()),
         Err(e) => Err(anyhow::anyhow!(e)),
     }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
-    use o2_enterprise::enterprise::openfga::model::{
-        create_open_fga_store, read_ofga_model, write_auth_models,
-    };
-
-    let meta = read_ofga_model().await;
-    if let Some(existing_model) = existing_meta {
-        if meta.version == existing_model.version {
-            log::info!("OFGA model already exists & no changes required");
-            Ok(existing_model.store_id)
-        } else {
-            let store_id = if existing_model.store_id.is_empty() {
-                create_open_fga_store().await.unwrap()
-            } else {
-                existing_model.store_id
-            };
-            match write_auth_models(&meta, &store_id).await {
-                Ok(_) => {
-                    let db = infra_db::get_db().await;
-                    let key = "/ofga/model";
-
-                    let mut loc_meta = meta.clone();
-                    loc_meta.store_id = store_id;
-                    loc_meta.model = None;
-
-                    match db
-                        .put(
-                            key,
-                            json::to_vec(&loc_meta).unwrap().into(),
-                            infra_db::NO_NEED_WATCH,
-                        )
-                        .await
-                    {
-                        Ok(_) => Ok(loc_meta.store_id),
-                        Err(e) => Err(anyhow::anyhow!(e)),
-                    }
-                }
-                Err(e) => Err(anyhow::anyhow!(e)),
-            }
-        }
-    } else {
-        let store_id = create_open_fga_store().await.unwrap();
-        match write_auth_models(&meta, &store_id).await {
-            Ok(_) => {
-                let db = infra_db::get_db().await;
-                let key = "/ofga/model";
-
-                let mut loc_meta = meta.clone();
-                loc_meta.store_id = store_id;
-                loc_meta.model = None;
-
-                match db
-                    .put(
-                        key,
-                        json::to_vec(&loc_meta).unwrap().into(),
-                        infra_db::NO_NEED_WATCH,
-                    )
-                    .await
-                {
-                    Ok(_) => Ok(loc_meta.store_id),
-                    Err(e) => Err(anyhow::anyhow!(e)),
-                }
-            }
-            Err(e) => Err(anyhow::anyhow!(e)),
-        }
-    }
-}
-#[cfg(feature = "enterprise")]
-pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
-    let db = infra_db::get_db().await;
-    let key = "/ofga/model";
-    let ret = db.get(key).await?;
-    let loc_value = json::from_slice(&ret).unwrap();
-    let value = Some(loc_value);
-    Ok(value)
 }
