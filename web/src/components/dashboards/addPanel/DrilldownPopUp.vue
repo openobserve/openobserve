@@ -117,8 +117,8 @@
                   No folders available
                 </q-item-section>
               </q-item>
-            </template></q-select
-          >
+            </template>
+          </q-select>
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.folder">
           <q-select
@@ -137,13 +137,15 @@
           >
             <!-- template when on options -->
             <template v-slot:no-option>
-              <q-item data-test="dashboard-tab-move-select-no-option">
+              <q-item
+                data-test="dashboard-drilldown-no-dashboard-available-option"
+              >
                 <q-item-section class="text-italic text-grey">
                   No dashboards available
                 </q-item-section>
               </q-item>
-            </template></q-select
-          >
+            </template>
+          </q-select>
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
           <q-select
@@ -162,7 +164,7 @@
           >
             <!-- template when on options -->
             <template v-slot:no-option>
-              <q-item data-test="dashboard-tab-move-select-no-option">
+              <q-item data-test="dashboard-drilldown-no-tab-available-option">
                 <q-item-section class="text-italic text-grey">
                   No tab Available
                 </q-item-section>
@@ -338,8 +340,8 @@ export default defineComponent({
           )
         : getDefaultDrilldownData()
     );
-    const dashboardList = ref([]);
-    const tabList = ref([]);
+    const dashboardList: any = ref([]);
+    const tabList: any = ref([]);
 
     onMounted(async () => {
       if (
@@ -357,10 +359,13 @@ export default defineComponent({
     // on folder change, reset dashboard and tab values
     watch(
       () => drilldownData.value.data.folder,
-      (newVal, oldVal) => {
+      async (newVal, oldVal) => {
+        await getDashboardList();
         if (newVal !== oldVal) {
-          drilldownData.value.data.dashboard = "";
-          drilldownData.value.data.tab = "";
+          // take first value from new options list
+          drilldownData.value.data.dashboard =
+            dashboardList?.value[0]?.value ?? "";
+          drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
       }
     );
@@ -368,9 +373,11 @@ export default defineComponent({
     // on dashboard change, reset tab value
     watch(
       () => drilldownData.value.data.dashboard,
-      (newVal, oldVal) => {
+      async (newVal, oldVal) => {
+        await getTabList();
         if (newVal !== oldVal) {
-          drilldownData.value.data.tab = "";
+          // take first value from new options list
+          drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
       }
     );
@@ -453,20 +460,6 @@ export default defineComponent({
           };
         }) ?? [];
     };
-
-    watch(
-      () => drilldownData.value.data.folder,
-      async () => {
-        await getDashboardList();
-      }
-    );
-
-    watch(
-      () => drilldownData.value.data.dashboard,
-      async () => {
-        await getTabList();
-      }
-    );
 
     const isFormValid = computed(() => {
       // if name is empty

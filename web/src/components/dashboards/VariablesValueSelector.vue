@@ -127,14 +127,14 @@ export default defineComponent({
       values: [],
     });
 
-    onMounted(() => {
-      getVariablesData();
+    onMounted(async () => {
+      await getVariablesData();
     });
     // you may need to query the data if the variable configs or the data/time changes
     watch(
       () => [props.variablesConfig, props.selectedTimeDate],
-      () => {
-        getVariablesData();
+      async () => {
+        await getVariablesData();
       }
     );
     watch(
@@ -150,14 +150,24 @@ export default defineComponent({
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
 
+    const changeInitialVariableValues = async (newInitialVariableValues: any) => {
+      // reset the values
+      variablesData.values = [];
+      variablesData.isVariablesLoading = false;
+
+      props.initialVariableValues.value = newInitialVariableValues;
+    };
+
     const getVariablesData = async () => {
-       if(isInvalidDate(props.selectedTimeDate?.start_time) || isInvalidDate(props.selectedTimeDate?.end_time)){
-        return
-       }
+      if (
+        isInvalidDate(props.selectedTimeDate?.start_time) ||
+        isInvalidDate(props.selectedTimeDate?.end_time)
+      ) {
+        return;
+      }
 
       // do we have variables & date?
-      if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time)
-      {
+      if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
         variablesData.values = [];
         variablesData.isVariablesLoading = false;
         emitVariablesData();
@@ -183,14 +193,16 @@ export default defineComponent({
           variablesConfigList
             ?.filter((it: any) => it.type == "dynamic_filters")
             ?.map((it: any) => it.name) || [];
-        oldVariableValue = Object.keys(props?.initialVariableValues ?? []).map(
-          (key: any) => ({
-            name: key,
-            value: dynamicVariables.includes(key)
-              ? JSON.parse(decodeURIComponent(props.initialVariableValues[key]))
-              : props.initialVariableValues[key],
-          })
-        );
+        oldVariableValue = Object.keys(
+          props?.initialVariableValues?.value ?? []
+        ).map((key: any) => ({
+          name: key,
+          value: dynamicVariables.includes(key)
+            ? JSON.parse(
+                decodeURIComponent(props.initialVariableValues?.value[key])
+              )
+            : props.initialVariableValues?.value[key],
+        }));
       }
 
       // continue as we have variables
@@ -423,6 +435,7 @@ export default defineComponent({
     return {
       props,
       variablesData,
+      changeInitialVariableValues,
     };
   },
 });

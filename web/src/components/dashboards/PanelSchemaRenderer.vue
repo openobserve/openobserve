@@ -143,7 +143,12 @@ export default defineComponent({
       type: Object,
     },
   },
-  emits: ["updated:data-zoom", "error", "metadata-update", "refresh"],
+  emits: [
+    "updated:data-zoom",
+    "error",
+    "metadata-update",
+    "update:initialVariableValues",
+  ],
   setup(props, { emit }) {
     const store = useStore();
     const route = useRoute();
@@ -504,8 +509,18 @@ export default defineComponent({
               },
             });
 
-            // reload dashboard because it will be in same path
-            emit("refresh");
+            // ======= [START] default variable values
+
+            const initialVariableValues: any = {};
+            Object.keys(route.query).forEach((key) => {
+              if (key.startsWith("var-")) {
+                const newKey = key.slice(4);
+                initialVariableValues[newKey] = route.query[key];
+              }
+            });
+            // ======= [END] default variable values
+
+            emit("update:initialVariableValues", initialVariableValues);
           }
         }
       }
