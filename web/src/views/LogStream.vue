@@ -220,6 +220,7 @@ import {
 import config from "@/aws-exports";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { cloneDeep } from "lodash-es";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -248,6 +249,7 @@ export default defineComponent({
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
     ];
+    const { getStreams } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -331,15 +333,14 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
 
-        streamService
-          .nameList(store.state.selectedOrganization.identifier, "", false)
+        getStreams("", false)
           .then((res) => {
             let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
-            resultTotal.value = res.data.list.length;
-            logStream.value = res.data.list.map((data: any) => {
+            resultTotal.value = res.list.length;
+            logStream.value = res.list.map((data: any) => {
               doc_num = "--";
               storage_size = "--";
               if (data.stats) {

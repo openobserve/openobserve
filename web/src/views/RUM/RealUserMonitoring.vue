@@ -99,6 +99,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
+import useStreams from "@/composables/useStreams";
 
 const route = useRoute();
 const router = useRouter();
@@ -122,6 +123,7 @@ const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
 const { rumState } = useRum();
+const { getStreams } = useStreams();
 
 const activeTab = ref<string>("performance");
 const tabs = [
@@ -213,10 +215,9 @@ const updateTabOnRouteChange = () => {
 const checkIfRumEnabled = async () => {
   await nextTick();
   return new Promise((resolve) => {
-    streamService
-      .nameList(store.state.selectedOrganization.identifier, "logs", false)
+    getStreams("logs", false)
       .then((response: any) => {
-        response.data.list.forEach((stream: any) => {
+        response.list.forEach((stream: any) => {
           if (stream.name === "_rumdata") isRumEnabled.value = true;
           if (stream.name === "_sessionreplay")
             isSessionReplayEnabled.value = true;
