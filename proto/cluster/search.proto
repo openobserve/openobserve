@@ -63,3 +63,5 @@ message SearchAggResponse {
     string name = 1;
     bytes  hits = 2;
 }
+
+
