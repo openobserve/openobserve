@@ -53,11 +53,11 @@ const useStreams = () => {
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
             ? q.notify({
-                spinner: true,
-                message: "Please wait while loading streams...",
-                timeout: 5000,
-              })
-            : () => {};
+              spinner: true,
+              message: "Please wait while loading streams...",
+              timeout: 5000,
+            })
+            : () => { };
           if (streamName === "all") {
             // As in RBAC there can be permission on certain types of streams
             // So here added some additional logic to handle those
@@ -407,6 +407,7 @@ const useStreams = () => {
   };
 
   return {
+    streams,
     getStreams,
     getStream,
     setStreams,
