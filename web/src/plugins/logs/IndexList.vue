@@ -543,6 +543,8 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const { t } = useI18n();
+    const router = useRouter();
     const store = useStore();
     const $q = useQuasar();
     const {
