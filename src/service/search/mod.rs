@@ -91,7 +91,7 @@ pub async fn search_partition_multi(
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
-
+    let mut total_rec = 0;
     for query in &req.sql {
         match search_partition(
             session_id,
@@ -106,8 +106,8 @@ pub async fn search_partition_multi(
         .await
         {
             Ok(resp) => {
-                
                 if resp.partitions.len() > res.partitions.len() {
+                    total_rec += resp.records;
                     res = resp;
                 }
             }
@@ -116,6 +116,7 @@ pub async fn search_partition_multi(
             }
         };
     }
+    res.records = total_rec;
     Ok(res)
 }
 
