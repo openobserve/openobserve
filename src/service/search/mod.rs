@@ -985,6 +985,43 @@ pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }
 
+#[tracing::instrument(name = "service:search_partition_multi:enter", skip(req))]
+pub async fn search_partition_multi(
+    session_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: &search::MultiSearchPartitionRequest,
+) -> Result<search::SearchPartitionResponse, Error> {
+    let mut res = search::SearchPartitionResponse::default();
+    let mut total_rec = 0;
+    for query in &req.sql {
+        match search_partition(
+            session_id,
+            org_id,
+            stream_type,
+            &search::SearchPartitionRequest {
+                start_time: req.start_time,
+                end_time: req.end_time,
+                sql: query.to_string(),
+            },
+        )
+        .await
+        {
+            Ok(resp) => {
+                if resp.partitions.len() > res.partitions.len() {
+                    total_rec += resp.records;
+                    res = resp;
+                }
+            }
+            Err(err) => {
+                log::error!("search_partition_multi error: {:?}", err);
+            }
+        };
+    }
+    res.records = total_rec;
+    Ok(res)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
