@@ -157,7 +157,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, ref, toRefs, computed, inject } from "vue";
+import {
+  defineComponent,
+  watch,
+  ref,
+  toRefs,
+  computed,
+  inject,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -204,7 +212,7 @@ export default defineComponent({
 
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
-    const chartPanelRef = ref(null); // holds the ref to the whole div
+    const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
 
@@ -406,6 +414,7 @@ export default defineComponent({
     const onChartClick = async (params: any, ...args: any) => {
       drilldownParams = [params, args];
 
+      // drilldownarrayref offset values
       let offSetValues = { left: 0, top: 0 };
 
       // if type is table, calculate offset
@@ -421,53 +430,45 @@ export default defineComponent({
         offSetValues.top = params?.event?.offsetY;
       }
 
+      // set drilldown array, to show list of drilldowns
       drilldownArray.value = panelSchema.value.config.drilldown;
+
+      // temporarily show the popup to calculate its dimensions
+      drilldownPopUpRef.value.style.display = "block";
+
+      // wait for the next DOM update cycle before calculating the dimensions
+      await nextTick();
+
+      // if not enough space to show drilldown at the bottom, show it above the cursor
+      if (
+        offSetValues.top + drilldownPopUpRef.value.offsetHeight >
+        chartPanelRef.value.offsetHeight
+      ) {
+        offSetValues.top =
+          offSetValues.top - drilldownPopUpRef.value.offsetHeight;
+      }
+      if (
+        offSetValues.left + drilldownPopUpRef.value.offsetWidth >
+        chartPanelRef.value.offsetWidth
+      ) {
+        // if not enough space on the right, show the popup to the left of the cursor
+        offSetValues.left =
+          offSetValues.left - drilldownPopUpRef.value.offsetWidth;
+      }
+
       // 24 px takes panel header height
       drilldownPopUpRef.value.style.top = offSetValues?.top + 24 + "px";
       drilldownPopUpRef.value.style.left = offSetValues?.left + 5 + "px";
 
-      // console.log(
-      //   offSetValues,
-      //   drilldownPopUpRef.value.offsetWidth,
-      //   drilldownPopUpRef.value.offsetHeight,
-      //   JSON.stringify(chartPanelRef.value.clientWidth),
-      //   JSON.stringify(chartPanelRef.value.clientHeight)
-      // );
-
-      // // if not enough space to show drilldown, show to left side
-      // if (
-      //   offSetValues?.top + drilldownPopUpRef.value.clientHeight >
-      //   +chartPanelRef.value.clientHeight
-      // ) {
-      //   console.log("top");
-
-      //   drilldownPopUpRef.value.style.top =
-      //     chartPanelRef.value.clientHeight -
-      //     drilldownPopUpRef.value.clientHeight +
-      //     "px";
-      // }
-
-      // if (
-      //   offSetValues?.left + drilldownPopUpRef.value.clientWidth >
-      //   +chartPanelRef.value.clientWidth
-      // ) {
-      //   console.log("left");
-      //   drilldownPopUpRef.value.style.left =
-      //     chartPanelRef.value.clientWidth -
-      //     drilldownPopUpRef.value.clientWidth +
-      //     "px";
-      // }
-
-      // console.log(
-      //   chartPanelRef.value.clientWidth,
-      //   chartPanelRef.value.clientHeight
-      // );
-
       // if drilldownArray has at least one element then only show the drilldown pop up
       if (drilldownArray.value.length > 0) {
         drilldownPopUpRef.value.style.display = "block";
+      } else {
+        // hide the popup if there's no drilldown
+        drilldownPopUpRef.value.style.display = "none";
       }
     };
+
     const openDrilldown = async (index: any) => {
       // if panelSchema exists
       if (panelSchema.value) {
