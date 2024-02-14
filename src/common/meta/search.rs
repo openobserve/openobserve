@@ -287,12 +287,6 @@ pub struct MultiSearchPartitionRequest {
     pub end_time: i64,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct MultiSearchPartitionResponse {
-    pub success: hashbrown::HashMap<String, SearchPartitionResponse>,
-    pub error: hashbrown::HashMap<String, String>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct MultiStreamRequest {
@@ -355,7 +349,6 @@ impl MultiStreamRequest {
         res
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
