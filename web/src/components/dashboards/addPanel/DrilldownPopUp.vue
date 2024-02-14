@@ -37,7 +37,7 @@
     </div>
     <q-input
       v-model="drilldownData.name"
-      :label="t('dashboard.nameOfVariable') + '*'"
+      :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
       color="input-border"
       bg-color="input-bg"
       class="q-py-md showLabelOnTop"
@@ -51,7 +51,7 @@
     <div
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
-      Go to:
+      Go to :
       <q-btn-group class="">
         <q-btn
           :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
@@ -108,7 +108,7 @@
             v-model="drilldownData.data.folder"
             :options="folderList"
             emit-value
-            label="Select Folder*:"
+            label="Select Folder * :"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
@@ -191,7 +191,7 @@
               align-items: center;
             "
           >
-            <div>Variables:</div>
+            <div>Variables :</div>
             <q-btn
               icon="add"
               color="primary"
@@ -242,7 +242,7 @@
       <!-- radio button for new tab -->
       <div style="margin-top: 10px">
         <q-toggle
-          :label="`Pass all current variables: `"
+          :label="`Pass all current variables : `"
           left-label
           v-model="drilldownData.data.passAllVariables"
         />
@@ -252,7 +252,7 @@
     <!-- radio button for new tab -->
     <div style="margin-top: 10px">
       <q-toggle
-        :label="`Open in new tab: `"
+        :label="`Open in new tab : `"
         left-label
         v-model="drilldownData.targetBlank"
       />
@@ -534,6 +534,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.selected {
+  background-color: var(--q-primary) !important;
+  font-weight: bold;
+  color: white;
+}
 .dropdownDiv {
   display: flex;
   align-items: center;
