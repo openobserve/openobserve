@@ -84,7 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="cursor-pointer text-bold"
           >
-            <q-td class="field_list bg-grey-3" style="line-height: 28px; padding-left: 10px;">
+            <q-td
+              class="field_list bg-grey-3"
+              style="line-height: 28px; padding-left: 10px"
+            >
               {{ props.row.name }}
               <q-icon
                 :name="
@@ -129,7 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="field_overlay">
                   <q-btn
-                    v-if="props.row.isSchemaField"
+                    v-if="
+                      props.row.isSchemaField &&
+                      searchObj.data.stream.selectedStream.length ==
+                        props.row.streams.length
+                    "
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
@@ -192,7 +199,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="field_overlay">
                       <q-btn
-                        v-if="props.row.isSchemaField"
+                        v-if="
+                          props.row.isSchemaField &&
+                          searchObj.data.stream.selectedStream.length ==
+                            props.row.streams.length
+                        "
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
@@ -265,24 +276,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <div
                               class="flex row wrap justify-between"
-                              style="width: calc(100% - 42px)"
+                              :style="
+                                searchObj.data.stream.selectedStream.length ==
+                                props.row.streams.length
+                                  ? 'width: calc(100% - 42px)'
+                                  : 'width: calc(100% - 0px)'
+                              "
                             >
                               <div
                                 :title="value.key"
                                 class="ellipsis q-pr-xs"
-                                style="width: calc(100% - 50px)"
+                                :style="
+                                  searchObj.data.stream.selectedStream.length ==
+                                  props.row.streams.length
+                                    ? 'width: calc(100% - 50px)'
+                                    : ''
+                                "
                               >
                                 {{ value.key }}
                               </div>
                               <div
                                 :title="value.count"
                                 class="ellipsis text-right q-pr-sm"
-                                style="width: 50px"
+                                :style="
+                                  searchObj.data.stream.selectedStream.length ==
+                                  props.row.streams.length
+                                    ? 'width: 50px'
+                                    : ''
+                                "
                               >
                                 {{ value.count }}
                               </div>
                             </div>
                             <div
+                              v-if="
+                                searchObj.data.stream.selectedStream.length ==
+                                props.row.streams.length
+                              "
                               class="flex row"
                               :class="
                                 store.state.theme === 'dark'

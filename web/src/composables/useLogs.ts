@@ -576,19 +576,21 @@ const useLogs = () => {
           queryFunctions
         );
 
-        req.query.sql = req.query.sql.replace(
-          "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream[0]
-        );
-
-        // const preSQLQuery = req.query.sql;
-        // req.query.sql = [];
-        // searchObj.data.stream.selectedStream
-        //   .join(",")
-        //   .split(",")
-        //   .forEach((item: any) => {
-        //     req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
-        //   });
+        if (searchObj.data.stream.selectedStream.length > 1) {
+          const preSQLQuery = req.query.sql;
+          req.query.sql = [];
+          searchObj.data.stream.selectedStream
+            .join(",")
+            .split(",")
+            .forEach((item: any) => {
+              req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
+            });
+        } else {
+          req.query.sql = req.query.sql.replace(
+            "[INDEX_NAME]",
+            searchObj.data.stream.selectedStream[0]
+          );
+        }
 
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
@@ -669,27 +671,64 @@ const useLogs = () => {
             paginations: [],
           };
 
-          searchObj.data.queryResults.total = res.data.records;
-          const partitions = res.data.partitions.sort(
-            (a: number[], b: number[]) => a[0] - b[0]
-          );
+          if (typeof partitionQueryReq.sql != "string") {
+            const partitionSize = 0;
+            let partitions = [];
+            let pageObject = [];
+            Object.values(res.data.success).forEach((partItem: any) => {
+              searchObj.data.queryResults.total += partItem.records;
+              
+              if (partItem.partitions.length > partitionSize) {
+                partitions = partItem.partitions.sort(
+                  (a: number[], b: number[]) => a[0] - b[0]
+                );
+  
+                searchObj.data.queryResults.partitionDetail.partitions =
+                  partitions;
 
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
-
-          partitions.forEach((item: any, index: number) => {
-            const pageObject = [
-              {
-                startTime: item[0],
-                endTime: item[1],
-                from: 0,
-                size: searchObj.meta.resultGrid.rowsPerPage,
-              },
-            ];
-            searchObj.data.queryResults.partitionDetail.paginations.push(
-              pageObject
+                partitions.forEach((item: any) => {
+                  pageObject = [
+                    {
+                      startTime: item[0],
+                      endTime: item[1],
+                      from: 0,
+                      size: searchObj.meta.resultGrid.rowsPerPage,
+                    },
+                  ];
+                  searchObj.data.queryResults.partitionDetail.paginations.push(
+                    pageObject
+                  );
+                  searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                    -1
+                  );
+                });
+              }
+            });
+          } else {
+            searchObj.data.queryResults.total = res.data.records;
+            const partitions = res.data.partitions.sort(
+              (a: number[], b: number[]) => a[0] - b[0]
             );
-            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          });
+            let pageObject = [];
+            searchObj.data.queryResults.partitionDetail.partitions = partitions;
+
+            partitions.forEach((item: any, index: number) => {
+              pageObject = [
+                {
+                  startTime: item[0],
+                  endTime: item[1],
+                  from: 0,
+                  size: searchObj.meta.resultGrid.rowsPerPage,
+                },
+              ];
+              searchObj.data.queryResults.partitionDetail.paginations.push(
+                pageObject
+              );
+              searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                -1
+              );
+            });
+          }
         });
     } else {
       searchObj.data.queryResults.partitionDetail = {
@@ -1409,7 +1448,10 @@ const useLogs = () => {
 
         delete finalArray.common;
         Object.keys(finalArray).forEach((stream: any) => {
-          if (searchObj.data.stream.selectedStreamFields.length > 1 && finalArray[stream].length > 0) {
+          if (
+            searchObj.data.stream.selectedStreamFields.length > 1 &&
+            finalArray[stream].length > 0
+          ) {
             searchObj.data.stream.selectedStreamFields.push({
               name: convertToCamelCase(stream),
               label: true,
