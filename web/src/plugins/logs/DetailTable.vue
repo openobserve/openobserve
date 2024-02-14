@@ -117,7 +117,6 @@ align="left">
                   {{ t("search.sourceValue") }}
                 </q-item-section>
               </q-item>
-
               <q-item
                 v-for="(key, value) in rowData"
                 :key="'field_' + value"
@@ -152,6 +151,7 @@ align="left">
                                     ? item.isSchemaField
                                     : ''
                               )
+                              && multiStreamFields.includes(value)
                             "
                       >
                         <q-item-section>
@@ -183,6 +183,7 @@ align="left">
                                     ? item.isSchemaField
                                     : ''
                               )
+                              && multiStreamFields.includes(value)
                             "
                       >
                         <q-item-section>
@@ -231,7 +232,7 @@ align="left">
                           >
                         </q-item-section>
                       </q-item>
-                      <q-item v-else clickable
+                      <q-item q-item clickable
 v-close-popup="true">
                         <q-item-section>
                           <q-item-label
@@ -413,6 +414,7 @@ export default defineComponent({
     const shouldWrapValues: any = ref(true);
     const { searchObj } = useLogs();
     const $q = useQuasar();
+    let multiStreamFields: any = ref([]);
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -420,6 +422,14 @@ export default defineComponent({
       }
       shouldWrapValues.value =
         window.localStorage.getItem("wrap-log-details") === "true";
+
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        if (
+          item.streams.length == searchObj.data.stream.selectedStream.length
+        ) {
+          multiStreamFields.value.push(item.name);
+        }
+      });
     });
 
     const toggleWrapLogDetails = () => {
@@ -475,6 +485,7 @@ export default defineComponent({
       copyContentToClipboard,
       addFieldToTable,
       searchObj,
+      multiStreamFields,
     };
   },
   async created() {
