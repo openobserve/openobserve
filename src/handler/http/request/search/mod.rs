@@ -38,6 +38,7 @@ use crate::{
     service::{search as SearchService, usage::report_request_usage_stats},
 };
 
+pub mod multi_streams;
 pub mod saved_view;
 pub mod multi_streams;
 
