@@ -203,7 +203,7 @@ pub async fn search_multi(
         #[cfg(not(feature = "enterprise"))]
         let locker = locker.lock().await;
         #[cfg(not(feature = "enterprise"))]
-        if !CONFIG.common.feature_query_queue_enabled {
+        if !config.CONFIG.common.feature_query_queue_enabled {
             drop(locker);
         }
         #[cfg(not(feature = "enterprise"))]
