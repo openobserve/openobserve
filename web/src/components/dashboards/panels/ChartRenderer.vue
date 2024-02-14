@@ -84,7 +84,7 @@ import { useStore } from "vuex";
 
 export default defineComponent({
   name: "ChartRenderer",
-  emits: ["updated:chart", "click", "updated:dataZoom"],
+  emits: ["updated:chart", "click", "updated:dataZoom", "error"],
   props: {
     data: {
       required: true,
@@ -162,7 +162,11 @@ export default defineComponent({
       // set options with selected object
       if (legendOption) {
         legendOption.selected = params?.selected || 0;
-        chart?.setOption({ legend: [legendOption] });
+        try {
+          chart?.setOption({ legend: [legendOption] });
+        } catch (e) {
+          emit("error", e);
+        }
       }
     };
 
@@ -336,8 +340,13 @@ export default defineComponent({
           (options.tooltip.backgroundColor =
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
-        chart?.setOption(options, true);
-        chart?.setOption({ animation: true });
+        try {
+          chart?.setOption(options, true);
+          chart?.setOption({ animation: true });
+        } catch (e) {
+          emit("error", e);
+        }
+
         chartInitialSetUp();
       }
     );
@@ -354,7 +363,11 @@ export default defineComponent({
       if (chartRef.value) {
         chart = echarts.init(chartRef.value, theme);
       }
-      chart?.setOption(props?.data?.options || {}, true);
+      try {
+        chart?.setOption(props?.data?.options || {}, true);
+      } catch (e) {
+        emit("error", e);
+      }
       chartInitialSetUp();
     });
     onUnmounted(() => {
@@ -378,8 +391,11 @@ export default defineComponent({
       async () => {
         await nextTick();
         chart?.resize();
-
-        chart?.setOption(props?.data?.options || {}, true);
+        try {
+          chart?.setOption(props?.data?.options || {}, true);
+        } catch (e) {
+          emit("error", e);
+        }
         // we need that toolbox datazoom button initally selected
         // for that we required to dispatch an event
         // while dispatching an event we need to pass a datazoomselectactive as true
