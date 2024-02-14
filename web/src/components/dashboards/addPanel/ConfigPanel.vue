@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="" style="max-width: 300px">
-      <div class="q-mb-sm">{{ t("dashboard.description") }}</div>
+      <div class="q-mb-sm" style="font-weight: 600">
+        {{ t("dashboard.description") }}
+      </div>
       <q-input
         outlined
         v-model="dashboardPanelData.data.description"
@@ -286,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
         class="q-py-md showLabelOnTop"
+        style="font-weight: 600"
       >
         Query
         <q-tabs
@@ -549,8 +552,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </q-input>
 
-      <Drilldown />
-
       <div class="space"></div>
 
       <q-toggle
@@ -567,6 +568,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
       />
+
+      <div class="space"></div>
+      <Drilldown />
     </div>
   </div>
 </template>

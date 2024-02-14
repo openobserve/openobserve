@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div style="font-size: 14px; padding-bottom: 5px">Drilldown:</div>
+    <div class="q-mb-sm" style="font-weight: 600">Drilldown</div>
     <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
