@@ -310,7 +310,6 @@ pub struct MultiSearchPartitionResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct MultiStreamRequest {
-    #[serde(default)]
     pub sql: Vec<String>,
     #[serde(default)]
     pub aggs: HashMap<String, String>,
@@ -322,9 +321,7 @@ pub struct MultiStreamRequest {
     pub from: usize,
     #[serde(default = "default_size")]
     pub size: usize,
-    #[serde(default)]
     pub start_time: i64,
-    #[serde(default)]
     pub end_time: i64,
     #[serde(default)]
     pub sort_by: Option<String>,
@@ -341,6 +338,8 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     pub query_fn: Option<String>,
 }
+
+
 
 impl MultiStreamRequest {
     pub fn to_query_req(&mut self) -> Vec<Request> {
