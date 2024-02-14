@@ -2230,7 +2230,10 @@ const useLogs = () => {
         delete finalArray.common;
         // Object.keys(finalArray).forEach((stream: any) => {
         for (const stream of Object.keys(finalArray)) {
-          if (searchObj.data.stream.selectedStreamFields.length > 1 && finalArray[stream].length > 0) {
+          if (
+            searchObj.data.stream.selectedStreamFields.length > 1 &&
+            finalArray[stream].length > 0
+          ) {
             searchObj.data.stream.selectedStreamFields.push({
               name: convertToCamelCase(stream),
               label: true,

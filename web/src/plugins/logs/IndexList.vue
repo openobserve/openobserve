@@ -88,7 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="cursor-pointer text-bold"
           >
-            <q-td class="field_list bg-grey-3" style="line-height: 28px; padding-left: 10px;">
+            <q-td
+              class="field_list bg-grey-3"
+              style="line-height: 28px; padding-left: 10px"
+            >
               {{ props.row.name }}
               <q-icon
                 :name="
