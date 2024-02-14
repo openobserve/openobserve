@@ -684,49 +684,20 @@ const useLogs = () => {
                 searchObj.data.queryResults.partitionDetail.partitions =
                   partitions;
 
-                partitions.forEach((item: any) => {
-                  pageObject = [
-                    {
-                      startTime: item[0],
-                      endTime: item[1],
-                      from: 0,
-                      size: searchObj.meta.resultGrid.rowsPerPage,
-                    },
-                  ];
-                  searchObj.data.queryResults.partitionDetail.paginations.push(
-                    pageObject
-                  );
-                  searchObj.data.queryResults.partitionDetail.partitionTotal.push(
-                    -1
-                  );
-                });
-              }
-            });
-          } else {
-            searchObj.data.queryResults.total = res.data.records;
-            const partitions = res.data.partitions.sort(
-              (a: number[], b: number[]) => a[0] - b[0]
+          partitions.forEach((item: any, index: number) => {
+            pageObject = [
+              {
+                startTime: item[0],
+                endTime: item[1],
+                from: 0,
+                size: searchObj.meta.resultGrid.rowsPerPage,
+              },
+            ];
+            searchObj.data.queryResults.partitionDetail.paginations.push(
+              pageObject
             );
-            let pageObject = [];
-            searchObj.data.queryResults.partitionDetail.partitions = partitions;
-
-            partitions.forEach((item: any, index: number) => {
-              pageObject = [
-                {
-                  startTime: item[0],
-                  endTime: item[1],
-                  from: 0,
-                  size: searchObj.meta.resultGrid.rowsPerPage,
-                },
-              ];
-              searchObj.data.queryResults.partitionDetail.paginations.push(
-                pageObject
-              );
-              searchObj.data.queryResults.partitionDetail.partitionTotal.push(
-                -1
-              );
-            });
-          }
+            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+          });
         });
     } else {
       searchObj.data.queryResults.partitionDetail = {
