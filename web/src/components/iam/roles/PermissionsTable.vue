@@ -15,12 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="!level" class="q-mb-md text-bold">
+  <div
+    data-test="edit-role-permissions-table-title"
+    v-if="!level"
+    class="q-mb-md text-bold"
+  >
     {{ selectedPermissionsHash.size }} Permissions
   </div>
   <div class="iam-permissions-table">
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <div
+        data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length"
         class="w-full text-center q-mt-lg text-bold text-grey-9"
         style="margin-top: 64px; font-size: 18px"
@@ -28,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span> No Permissions Selected </span>
       </div>
       <div
+        data-test="edit-role-permissions-table-no-resources-title"
         v-if="level && !parent.is_loading && !rows.length"
         class="q-py-sm text-left text-subtitle text-grey-9"
         :style="{
@@ -44,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         No Resources Present
       </div>
       <div
+        data-test="edit-role-permissions-table-loading-resources-loader"
         v-show="parent.expand && parent.is_loading"
         class="flex items-center"
         :style="{
@@ -67,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>Loading Resources...</div>
       </div>
       <q-table
+        data-test="edit-role-permissions-table"
         flat
         bordered
         ref="qTableRef"
@@ -85,8 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="full-height"
       >
         <template v-slot:header="props">
-          <q-tr :props="props" class="thead-sticky">
+          <q-tr
+            data-test="edit-role-permissions-table-header"
+            :props="props"
+            class="thead-sticky"
+          >
             <q-th
+              :data-test="`edit-role-permissions-table-header-column-${col.name}`"
               v-for="col in props.cols"
               :key="col.name"
               :props="props"
@@ -97,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
           <q-tr v-if="!visibleResourceCount">
             <q-td
+              data-test="edit-role-permissions-table-no-permissions-title"
               colspan="100%"
               class="text-center text-bold text-grey-9"
               style="padding-top: 16px; font-size: 16px"
@@ -107,11 +121,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body="props">
           <q-tr
+            :data-test="`edit-role-permissions-table-body-row-${props.row.name}`"
             v-show="props.row.show"
             :props="props"
             :key="`m_${props.row.index}`"
           >
             <q-td
+              :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}`"
               v-for="(col, index) in props.cols"
               :key="col.name"
               :props="props"
@@ -128,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template v-if="col.name === 'expand' && props.row.has_entities">
                 <q-icon
+                  :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}-icon`"
                   :name="
                     props.row.expand
                       ? 'keyboard_arrow_up'
@@ -140,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="col.field === 'permission'">
                 <q-checkbox
+                  :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}-checkbox`"
                   v-if="props.row.permission[col.name]?.show"
                   size="xs"
                   v-model="props.row.permission[col.name].value"
@@ -154,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="col.name !== 'expand' && col.field !== 'permission'"
               >
                 <span
+                  :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}-text`"
                   :title="
                     JSON.stringify({
                       name: props.row.name,
