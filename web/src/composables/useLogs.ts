@@ -664,19 +664,21 @@ const useLogs = () => {
           queryFunctions
         );
 
-        req.query.sql = req.query.sql.replace(
-          "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream[0]
-        );
-
-        // const preSQLQuery = req.query.sql;
-        // req.query.sql = [];
-        // searchObj.data.stream.selectedStream
-        //   .join(",")
-        //   .split(",")
-        //   .forEach((item: any) => {
-        //     req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
-        //   });
+        if (searchObj.data.stream.selectedStream.length > 1) {
+          const preSQLQuery = req.query.sql;
+          req.query.sql = [];
+          searchObj.data.stream.selectedStream
+            .join(",")
+            .split(",")
+            .forEach((item: any) => {
+              req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
+            });
+        } else {
+          req.query.sql = req.query.sql.replace(
+            "[INDEX_NAME]",
+            searchObj.data.stream.selectedStream[0]
+          );
+        }
 
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
@@ -781,39 +783,61 @@ const useLogs = () => {
             paginations: [],
           };
 
-          searchObj.data.queryResults.total = res.data.records;
-          const partitions = res.data.partitions;
+          if (typeof partitionQueryReq.sql != "string") {
+            const partitionSize = 0;
+            let partitions = [];
+            let pageObject = [];
+            Object.values(res.data.success).forEach((partItem: any) => {
+              searchObj.data.queryResults.total += partItem.records;
 
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
+              if (partItem.partitions.length > partitionSize) {
+                partitions = partItem.partitions;
 
-          let pageObject: any = [];
-          // partitions.forEach((item: any, index: number) => {
-          //   pageObject = [
-          //     {
-          //       startTime: item[0],
-          //       endTime: item[1],
-          //       from: 0,
-          //       size: searchObj.meta.resultGrid.rowsPerPage,
-          //     },
-          //   ];
-          //   searchObj.data.queryResults.partitionDetail.paginations.push(
-          //     pageObject
-          //   );
-          //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          // });
-          for (const [index, item] of partitions.entries()) {
-            pageObject = [
-              {
-                startTime: item[0],
-                endTime: item[1],
-                from: 0,
-                size: searchObj.meta.resultGrid.rowsPerPage,
-              },
-            ];
-            searchObj.data.queryResults.partitionDetail.paginations.push(
-              pageObject
+                searchObj.data.queryResults.partitionDetail.partitions =
+                  partitions;
+
+                for (const [index, item] of partitions.entries()) {
+                  pageObject = [
+                    {
+                      startTime: item[0],
+                      endTime: item[1],
+                      from: 0,
+                      size: searchObj.meta.resultGrid.rowsPerPage,
+                    },
+                  ];
+                  searchObj.data.queryResults.partitionDetail.paginations.push(
+                    pageObject
+                  );
+                  searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                    -1
+                  );
+                }
+              }
+            });
+          } else {
+            searchObj.data.queryResults.total = res.data.records;
+            const partitions = res.data.partitions.sort(
+              (a: number[], b: number[]) => a[0] - b[0]
             );
-            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+            let pageObject = [];
+            searchObj.data.queryResults.partitionDetail.partitions = partitions;
+
+            for (const [index, item] of partitions.entries()) {
+              pageObject = [
+                {
+                  startTime: item[0],
+                  endTime: item[1],
+                  from: 0,
+                  size: searchObj.meta.resultGrid.rowsPerPage,
+                },
+              ];
+              searchObj.data.queryResults.partitionDetail.paginations.push(
+                pageObject
+              );
+              searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                -1
+              );
+            }
           }
         });
     } else {
@@ -1504,7 +1528,7 @@ const useLogs = () => {
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
 
-////********START CONFLICT*********** */
+        ////********START CONFLICT*********** */
         // const timestampField = store.state.zoConfig.timestamp_column;
 
         // // searchObj.data.streamResults.list.forEach((stream: any) => {
@@ -1532,7 +1556,7 @@ const useLogs = () => {
         // for (const field of queryResult) {
         //   tempFieldsName.push(field.name);
         // }
-//***************** */
+        //***************** */
         let ftsKeys: any[] = [];
         let schemaFields: Set<any>;
         const timestampField = store.state.zoConfig.timestamp_column;
@@ -1569,8 +1593,8 @@ const useLogs = () => {
         // console.log("selectedStreamValues", selectedStreamValues)
         for( const stream of selectedStreamValues){
           // work needed replace searchObj.data.streamResults.list with composable variable
-          for(const stream of searchObj.data.streamResults.list){
-            if(selectedStreamValues.includes(stream.name)){
+          for (const stream of searchObj.data.streamResults.list) {
+            if (selectedStreamValues.includes(stream.name)) {
               multiStreamObj.push({
                 streamName: stream,
                 streamType: searchObj.data.stream.streamType,
@@ -1775,6 +1799,8 @@ const useLogs = () => {
         for (const row of queryResult) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
+          // finalArray.common.forEach((group: any, group_index: any) => {
+          for (const group of finalArray.common) {
             searchObj.data.stream.selectedStreamFields.push({
               name: row.name,
               ftsKey: ftsKeys?.has(row.name),
@@ -1863,7 +1889,10 @@ const useLogs = () => {
         delete finalArray.common;
         // Object.keys(finalArray).forEach((stream: any) => {
         for (const stream of Object.keys(finalArray)) {
-          if (searchObj.data.stream.selectedStreamFields.length > 1 && finalArray[stream].length > 0) {
+          if (
+            searchObj.data.stream.selectedStreamFields.length > 1 &&
+            finalArray[stream].length > 0
+          ) {
             searchObj.data.stream.selectedStreamFields.push({
               name: convertToCamelCase(stream),
               label: true,
