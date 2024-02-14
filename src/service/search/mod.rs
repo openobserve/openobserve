@@ -89,11 +89,8 @@ pub async fn search_partition_multi(
     org_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
-) -> Result<search::MultiSearchPartitionResponse, Error> {
-    let mut res = search::MultiSearchPartitionResponse {
-        success: HashMap::new(),
-        error: HashMap::new(),
-    };
+) -> Result<search::SearchPartitionResponse, Error> {
+    let mut res = search::SearchPartitionResponse::default();
 
     for query in &req.sql {
         match search_partition(
@@ -109,10 +106,13 @@ pub async fn search_partition_multi(
         .await
         {
             Ok(resp) => {
-                res.success.insert(query.to_string(), resp);
+                
+                if resp.partitions.len() > res.partitions.len() {
+                    res = resp;
+                }
             }
             Err(err) => {
-                res.error.insert(query.to_string(), err.to_string());
+                log::error!("search_partition_multi error: {:?}", err);
             }
         };
     }
