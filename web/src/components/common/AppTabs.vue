@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="show" class="flex items-center rum-tabs">
     <div v-for="tab in (tabs as Tab[])" :key="tab.value" class="cursor-pointer">
       <div
+        :data-test="`tab-${tab.value}`"
         class="q-px-lg q-py-sm rum-tab text-center"
         :style="tab.style"
         :class="activeTab === tab.value ? 'active text-primary' : ''"
