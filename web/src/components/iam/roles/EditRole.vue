@@ -15,15 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative-position full-height">
+  <div class="relative-position full-height" data-test="edit-role-page">
     <!-- TODO OK : Add button to delete role in toolbar -->
-    <div style="font-size: 18px" class="q-py-sm q-px-md">
+    <div
+      data-test="edit-role-title"
+      style="font-size: 18px"
+      class="q-py-sm q-px-md"
+    >
       {{ editingRole }}
     </div>
 
     <div class="full-width bg-grey-4" style="height: 1px" />
 
     <AppTabs
+      data-test="edit-role-tabs"
       :tabs="tabs"
       :active-tab="activeTab"
       @update:active-tab="updateActiveTab"
@@ -32,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <template v-if="isFetchingIntitialRoles">
-      <div style="margin-top: 64px">
+      <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
         <q-spinner-hourglass
           color="primary"
           size="40px"
@@ -46,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div style="min-height: calc(100% - (39px + 55px + 43px))">
         <GroupUsers
+          data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
           :groupUsers="roleUsers"
           :activeTab="activeTab"
@@ -53,8 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :removed-users="removedUsers"
         />
 
-        <div v-show="activeTab === 'permissions'">
+        <div
+          v-show="activeTab === 'permissions'"
+          data-test="edit-role-permissions-section"
+        >
           <div
+            data-test="edit-role-permissions-filters"
             class="o2-input flex items-start q-px-md q-py-sm justify-start"
             style="position: sticky; top: 0px; z-index: 2"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
@@ -65,8 +75,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'rgb(240 240 240) 0px 4px 7px 0px',
             }"
           >
-            <div class="flex items-center q-pt-xs q-mr-md">
-              <span style="font-size: 14px"> Show </span>
+            <div
+              data-test="edit-role-permissions-show-toggle"
+              class="flex items-center q-pt-xs q-mr-md"
+            >
+              <span
+                data-test="edit-role-permissions-show-text"
+                style="font-size: 14px"
+              >
+                Show
+              </span>
               <div
                 class="q-ml-xs"
                 style="
@@ -80,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="visual.value"
                 >
                   <q-btn
+                    :data-test="`edit-role-permissions-show-${visual.value}-btn`"
                     :color="
                       visual.value === filter.permissions ? 'primary' : ''
                     "
@@ -95,43 +114,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </div>
             </div>
-            <q-input
-              data-test="alert-list-search-input"
-              v-model="filter.value"
-              borderless
-              filled
-              dense
-              class="q-mb-xs no-border q-mr-md"
-              :placeholder="t('common.search')"
-              style="width: 300px"
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
-            <q-select
-              v-model="filter.resource"
-              :options="filteredResources"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-mr-sm"
-              placeholder="Select Resource"
-              map-options
-              use-input
-              emit-value
-              fill-input
-              hide-selected
-              outlined
-              filled
-              dense
-              clearable
-              style="width: 200px"
-              @filter="filterResourceOptions"
-              @update:model-value="onResourceChange"
-            />
+            <div data-test="edit-role-permissions-search-input">
+              <q-input
+                data-test="alert-list-search-input"
+                v-model="filter.value"
+                borderless
+                filled
+                dense
+                class="q-mb-xs no-border q-mr-md"
+                :placeholder="t('common.search')"
+                style="width: 300px"
+              >
+                <template #prepend>
+                  <q-icon name="search" class="cursor-pointer" />
+                </template>
+              </q-input>
+            </div>
+            <div data-test="edit-role-permissions-resource-select-input">
+              <q-select
+                v-model="filter.resource"
+                :options="filteredResources"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-mr-sm"
+                placeholder="Select Resource"
+                map-options
+                use-input
+                emit-value
+                fill-input
+                hide-selected
+                outlined
+                filled
+                dense
+                clearable
+                style="width: 200px"
+                @filter="filterResourceOptions"
+                @update:model-value="onResourceChange"
+              />
+            </div>
           </div>
 
-          <div class="q-px-md q-my-sm">
+          <div
+            data-test="edit-role-permissions-table-section"
+            class="q-px-md q-my-sm"
+          >
             <permissions-table
               ref="permissionTableRef"
               :rows="permissionsState.permissions"
@@ -156,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
       >
         <q-btn
-          data-test="add-alert-cancel-btn"
+          data-test="edit-role-cancel-btn"
           class="text-bold"
           :label="t('alerts.cancel')"
           text-color="light-text"
@@ -165,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelPermissionsUpdate"
         />
         <q-btn
-          data-test="add-alert-submit-btn"
+          data-test="edit-role-save-btn"
           :label="t('alerts.save')"
           class="text-bold no-border q-ml-md"
           color="secondary"
