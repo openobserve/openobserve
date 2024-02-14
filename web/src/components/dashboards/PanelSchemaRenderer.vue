@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         top: 0px;
         left: 0px;
         display: none;
+        text-wrap: nowrap;
       "
       ref="drilldownPopUpRef"
       @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
@@ -375,17 +376,13 @@ export default defineComponent({
 
     // get offset from parent
     function getOffsetFromParent(parent: any, child: any) {
-      let offsetLeft = 0;
-      let offsetTop = 0;
+      const parentRect = parent.getBoundingClientRect();
+      const childRect = child.getBoundingClientRect();
 
-      let currentElement = child;
-      while (currentElement && currentElement !== parent) {
-        offsetLeft += currentElement.offsetLeft;
-        offsetTop += currentElement.offsetTop;
-        currentElement = currentElement.offsetParent;
-      }
-
-      return { left: offsetLeft, top: offsetTop };
+      return {
+        left: childRect.left - parentRect.left,
+        top: childRect.top - parentRect.top,
+      };
     }
 
     // need to save click event params, to open drilldown
