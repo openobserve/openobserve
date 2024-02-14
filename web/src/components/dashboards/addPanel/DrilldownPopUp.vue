@@ -138,7 +138,7 @@
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
             emit-value
-            label="Select Dashboard*:"
+            label="Select Dashboard * :"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"
@@ -165,7 +165,7 @@
             v-model="drilldownData.data.tab"
             :options="tabList"
             emit-value
-            label="Select Tab*:"
+            label="Select Tab * :"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm showLabelOnTop no-case"

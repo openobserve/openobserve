@@ -121,21 +121,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         display: none;
         text-wrap: nowrap;
       "
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       ref="drilldownPopUpRef"
       @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
     >
       <div
         v-for="(drilldown, index) in drilldownArray"
         :key="JSON.stringify(drilldown)"
-        style="display: flex; flex-direction: row"
+        style="
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          position: relative;
+        "
       >
-        <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
         <div
           @click="openDrilldown(index)"
-          style="cursor: pointer; text-decoration: underline"
+          style="cursor: pointer; display: flex; align-items: center"
         >
-          {{ drilldown.name }}
+          <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
+          <span>{{ drilldown.name }}</span>
         </div>
+        <div
+          style="
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-bottom: 1px solid gray;
+          "
+        ></div>
       </div>
     </div>
   </div>
