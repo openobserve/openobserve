@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div style="font-size: 14px; padding-bottom: 5px">Data Link :</div>
+    <div style="font-size: 14px; padding-bottom: 5px">Drilldown:</div>
     <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
@@ -54,7 +54,7 @@
     <q-btn
       @click="addDataLink"
       style="cursor: pointer; padding: 0px 5px"
-      label="+ Add link"
+      label="+ Add"
       no-caps
     />
     <q-dialog v-model="showDrilldownPopUp">

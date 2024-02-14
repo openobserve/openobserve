@@ -21,7 +21,12 @@
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span data-test="dashboard-viewpanel-title"> Create Drilldown </span>
+        <span data-test="dashboard-viewpanel-title" v-if="isEditMode"
+          >Edit Drilldown
+        </span>
+        <span data-test="dashboard-viewpanel-title" v-else
+          >Create Drilldown</span
+        >
       </div>
       <div class="flex q-gutter-sm items-center">
         <q-btn
@@ -231,7 +236,7 @@
               <q-icon
                 class="q-mr-xs"
                 size="20px"
-                :name="outlinedDelete"
+                name="close"
                 style="cursor: pointer; height: 35px; display: flex !important"
                 @click="() => drilldownData.data.variables.splice(index, 1)"
               />
@@ -278,7 +283,7 @@
         data-test="confirm-button"
         :disable="isFormValid"
       >
-        {{ t("confirmDialog.ok") }}
+        Add
       </q-btn>
     </q-card-actions>
   </div>
