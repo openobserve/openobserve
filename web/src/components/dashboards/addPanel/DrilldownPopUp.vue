@@ -52,34 +52,36 @@
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
       Go to:
-      <q-btn
-        :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
-        size="sm"
-        @click="
-          () => {
-            drilldownData.type = 'byDashboard';
-          }
-        "
-        ><q-icon
-          class="q-mr-xs"
-          :name="outlinedDashboard"
-          style="cursor: pointer; height: 25px"
-        />Dashboard</q-btn
-      >
-      <q-btn
-        :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
-        size="sm"
-        @click="
-          () => {
-            drilldownData.type = 'byUrl';
-          }
-        "
-        ><q-icon
-          class="q-mr-xs"
-          name="link"
-          style="cursor: pointer; height: 25px; display: flex !important"
-        />URL</q-btn
-      >
+      <q-btn-group class="">
+        <q-btn
+          :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
+          size="sm"
+          @click="
+            () => {
+              drilldownData.type = 'byDashboard';
+            }
+          "
+          ><q-icon
+            class="q-mr-xs"
+            :name="outlinedDashboard"
+            style="cursor: pointer; height: 25px"
+          />Dashboard</q-btn
+        >
+        <q-btn
+          :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
+          size="sm"
+          @click="
+            () => {
+              drilldownData.type = 'byUrl';
+            }
+          "
+          ><q-icon
+            class="q-mr-xs"
+            name="link"
+            style="cursor: pointer; height: 25px; display: flex !important"
+          />URL</q-btn
+        >
+      </q-btn-group>
     </div>
 
     <div v-if="drilldownData.type == 'byUrl'">
@@ -90,6 +92,12 @@
           v-model="drilldownData.data.url"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
         ></textarea>
+        <div
+          style="color: red; font-size: 12px"
+          v-if="!isFormURLValid && drilldownData.data.url.trim()"
+        >
+          Invalid URL
+        </div>
       </div>
     </div>
 
@@ -461,6 +469,11 @@ export default defineComponent({
         }) ?? [];
     };
 
+    const isFormURLValid = computed(() => {
+      const urlRegex = /^(http|https|ftp|file|mailto|telnet|data|ws|wss):\/\//;
+      return urlRegex.test(drilldownData.value.data.url.trim());
+    });
+
     const isFormValid = computed(() => {
       // if name is empty
       if (!drilldownData.value.name.trim()) {
@@ -475,7 +488,8 @@ export default defineComponent({
       // if action is by url
       if (drilldownData.value.type == "byUrl") {
         if (drilldownData.value.data.url.trim()) {
-          return false;
+          // check if url is valid with protocol
+          return !isFormURLValid.value;
         }
       } else {
         if (
@@ -513,6 +527,7 @@ export default defineComponent({
       tabList,
       isFormValid,
       saveDrilldown,
+      isFormURLValid,
     };
   },
 });

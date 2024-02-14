@@ -15,95 +15,127 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="chartPanelRef" style="height: 100%; position: relative">
-    <div v-if="!errorDetail" style="height: 100%; width: 100%">
-      <GeoMapRenderer
-        v-if="panelSchema.type == 'geomap'"
-        :data="
-          panelData.chartType == 'geomap'
-            ? panelData
-            : { options: { backgroundColor: 'transparent' } }
-        "
-      />
-      <TableRenderer
-        v-else-if="panelSchema.type == 'table'"
-        :data="
-          panelData.chartType == 'table'
-            ? panelData
-            : { options: { backgroundColor: 'transparent' } }
-        "
-        @click="onChartClick"
-        ref="tableRendererRef"
-      />
-      <div
-        v-else-if="panelSchema.type == 'html'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
-      >
-        <HTMLRenderer
-          :htmlContent="panelSchema.htmlContent"
-          style="width: 100%; height: 100%"
-          class="col"
+  <div
+    style="width: 100%; height: 100%"
+    @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
+  >
+    <div ref="chartPanelRef" style="height: 100%; position: relative">
+      <div v-if="!errorDetail" style="height: 100%; width: 100%">
+        <GeoMapRenderer
+          v-if="panelSchema.type == 'geomap'"
+          :data="
+            panelData.chartType == 'geomap'
+              ? panelData
+              : { options: { backgroundColor: 'transparent' } }
+          "
+        />
+        <TableRenderer
+          v-else-if="panelSchema.type == 'table'"
+          :data="
+            panelData.chartType == 'table'
+              ? panelData
+              : { options: { backgroundColor: 'transparent' } }
+          "
+          @click="onChartClick"
+          ref="tableRendererRef"
+        />
+        <div
+          v-else-if="panelSchema.type == 'html'"
+          class="col column"
+          style="width: 100%; height: 100%; flex: 1"
+        >
+          <HTMLRenderer
+            :htmlContent="panelSchema.htmlContent"
+            style="width: 100%; height: 100%"
+            class="col"
+          />
+        </div>
+        <div
+          v-else-if="panelSchema.type == 'markdown'"
+          class="col column"
+          style="width: 100%; height: 100%; flex: 1"
+        >
+          <MarkdownRenderer
+            :markdownContent="panelSchema.markdownContent"
+            style="width: 100%; height: 100%"
+            class="col"
+          />
+        </div>
+        <ChartRenderer
+          v-else
+          :data="
+            panelSchema.queryType === 'promql' ||
+            (data.length &&
+              data[0]?.length &&
+              panelData.chartType != 'geomap' &&
+              panelData.chartType != 'table')
+              ? panelData
+              : { options: { backgroundColor: 'transparent' } }
+          "
+          @updated:data-zoom="$emit('updated:data-zoom', $event)"
+          @error="errorDetail = $event"
+          @click="onChartClick"
         />
       </div>
+      <div v-if="!errorDetail" class="noData" data-test="no-data">
+        {{ noData }}
+      </div>
       <div
-        v-else-if="panelSchema.type == 'markdown'"
-        class="col column"
-        style="width: 100%; height: 100%; flex: 1"
+        v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
+        class="errorMessage"
       >
-        <MarkdownRenderer
-          :markdownContent="panelSchema.markdownContent"
-          style="width: 100%; height: 100%"
-          class="col"
+        <q-icon size="md" name="warning" />
+        <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
+      </div>
+      <div
+        v-if="
+          errorDetail &&
+          panelSchema?.error_config?.custom_error_handeling &&
+          !panelSchema?.error_config?.default_data_on_error &&
+          panelSchema?.error_config?.custom_error_message
+        "
+        class="customErrorMessage"
+      >
+        {{ panelSchema?.error_config?.custom_error_message }}
+      </div>
+      <div
+        v-if="loading"
+        class="row"
+        style="position: absolute; top: 0px; width: 100%; z-index: 999"
+      >
+        <q-spinner-dots
+          color="primary"
+          size="40px"
+          style="margin: 0 auto; z-index: 999"
         />
       </div>
-      <ChartRenderer
-        v-else
-        :data="
-          panelSchema.queryType === 'promql' ||
-          (data.length &&
-            data[0]?.length &&
-            panelData.chartType != 'geomap' &&
-            panelData.chartType != 'table')
-            ? panelData
-            : { options: { backgroundColor: 'transparent' } }
-        "
-        @updated:data-zoom="$emit('updated:data-zoom', $event)"
-        @error="errorDetail = $event"
-        @click="onChartClick"
-      />
-    </div>
-    <div v-if="!errorDetail" class="noData" data-test="no-data">
-      {{ noData }}
     </div>
     <div
-      v-if="errorDetail && !panelSchema?.error_config?.custom_error_handeling"
-      class="errorMessage"
-    >
-      <q-icon size="md" name="warning" />
-      <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
-    </div>
-    <div
-      v-if="
-        errorDetail &&
-        panelSchema?.error_config?.custom_error_handeling &&
-        !panelSchema?.error_config?.default_data_on_error &&
-        panelSchema?.error_config?.custom_error_message
+      style="
+        border: 1px solid gray;
+        border-radius: 4px;
+        padding: 3px;
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        display: none;
       "
-      class="customErrorMessage"
+      ref="drilldownPopUpRef"
+      @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
     >
-      {{ panelSchema?.error_config?.custom_error_message }}
-    </div>
-    <div
-      v-if="loading"
-      class="row"
-      style="position: absolute; top: 0px; width: 100%; z-index: 999"
-    >
-      <q-spinner-dots
-        color="primary"
-        size="40px"
-        style="margin: 0 auto; z-index: 999"
-      />
+      <div
+        v-for="(drilldown, index) in drilldownArray"
+        :key="JSON.stringify(drilldown)"
+        style="display: flex; flex-direction: row"
+      >
+        <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
+        <div
+          @click="openDrilldown(index)"
+          style="cursor: pointer; text-decoration: underline"
+        >
+          {{ drilldown.name }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -157,6 +189,9 @@ export default defineComponent({
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef = ref(null); // holds the ref to the whole div
+    const drilldownArray: any = ref([]);
+    const drilldownPopUpRef: any = ref(null);
+
     // get refs from props
     const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
 
@@ -338,7 +373,90 @@ export default defineComponent({
       });
     };
 
+    // get offset from parent
+    function getOffsetFromParent(parent: any, child: any) {
+      let offsetLeft = 0;
+      let offsetTop = 0;
+
+      let currentElement = child;
+      while (currentElement && currentElement !== parent) {
+        offsetLeft += currentElement.offsetLeft;
+        offsetTop += currentElement.offsetTop;
+        currentElement = currentElement.offsetParent;
+      }
+
+      return { left: offsetLeft, top: offsetTop };
+    }
+
+    // need to save click event params, to open drilldown
+    let drilldownParams: any = [];
+
     const onChartClick = async (params: any, ...args: any) => {
+      drilldownParams = [params, args];
+
+      let offSetValues = { left: 0, top: 0 };
+
+      // if type is table, calculate offset
+      if (panelSchema.value.type == "table") {
+        offSetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
+
+        // also, add offset of clicked position
+        offSetValues.left += params?.offsetX;
+        offSetValues.top += params?.offsetY;
+      } else {
+        // for all other charts
+        offSetValues.left = params?.event?.offsetX;
+        offSetValues.top = params?.event?.offsetY;
+      }
+
+      drilldownArray.value = panelSchema.value.config.drilldown;
+      // 24 px takes panel header height
+      drilldownPopUpRef.value.style.top = offSetValues?.top + 24 + "px";
+      drilldownPopUpRef.value.style.left = offSetValues?.left + 5 + "px";
+
+      // console.log(
+      //   offSetValues,
+      //   drilldownPopUpRef.value.offsetWidth,
+      //   drilldownPopUpRef.value.offsetHeight,
+      //   JSON.stringify(chartPanelRef.value.clientWidth),
+      //   JSON.stringify(chartPanelRef.value.clientHeight)
+      // );
+
+      // // if not enough space to show drilldown, show to left side
+      // if (
+      //   offSetValues?.top + drilldownPopUpRef.value.clientHeight >
+      //   +chartPanelRef.value.clientHeight
+      // ) {
+      //   console.log("top");
+
+      //   drilldownPopUpRef.value.style.top =
+      //     chartPanelRef.value.clientHeight -
+      //     drilldownPopUpRef.value.clientHeight +
+      //     "px";
+      // }
+
+      // if (
+      //   offSetValues?.left + drilldownPopUpRef.value.clientWidth >
+      //   +chartPanelRef.value.clientWidth
+      // ) {
+      //   console.log("left");
+      //   drilldownPopUpRef.value.style.left =
+      //     chartPanelRef.value.clientWidth -
+      //     drilldownPopUpRef.value.clientWidth +
+      //     "px";
+      // }
+
+      // console.log(
+      //   chartPanelRef.value.clientWidth,
+      //   chartPanelRef.value.clientHeight
+      // );
+
+      // if drilldownArray has at least one element then only show the drilldown pop up
+      if (drilldownArray.value.length > 0) {
+        drilldownPopUpRef.value.style.display = "block";
+      }
+    };
+    const openDrilldown = async (index: any) => {
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists
@@ -350,7 +468,7 @@ export default defineComponent({
         }
 
         // find drilldown data
-        const drilldownData = panelSchema.value.config.drilldown[0];
+        const drilldownData = panelSchema.value.config.drilldown[index];
 
         // need to change dynamic variables to it's value using current variables, current chart data(params)
         // if pie, donut or heatmap then series name will come in name field
@@ -367,26 +485,25 @@ export default defineComponent({
               ...query.fields.y,
               ...query.fields.z,
             ];
-            console.log(panelFields);
             panelFields.forEach((field: any) => {
               // we have label and alias, use both in dynamic values
-              fields[field.label] = args[0][field.alias];
-              fields[field.alias] = args[0][field.alias];
+              fields[field.label] = drilldownParams[1][0][field.alias];
+              fields[field.alias] = drilldownParams[1][0][field.alias];
             });
           });
           drilldownVariables.row = {
             field: fields,
-            index: args[1],
+            index: drilldownParams[1][1],
           };
         } else {
           // we have an series object
           drilldownVariables.series = {
             __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-              ? params.name
-              : params.seriesName,
-            __value: Array.isArray(params.value)
-              ? params.value[params.value.length - 1]
-              : params.value,
+              ? drilldownParams[0].name
+              : drilldownParams[0].seriesName,
+            __value: Array.isArray(drilldownParams[0].value)
+              ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
+              : drilldownParams[0].value,
           };
         }
 
@@ -398,13 +515,13 @@ export default defineComponent({
 
         // if drilldown by url
         if (drilldownData.type == "byUrl") {
-          // open url
-          return window.open(
-            new URL(
-              replacePlaceholders(drilldownData.data.url, drilldownVariables)
-            ),
-            drilldownData.targetBlank ? "_blank" : "_self"
-          );
+          try {
+            // open url
+            return window.open(
+              replacePlaceholders(drilldownData.data.url, drilldownVariables),
+              drilldownData.targetBlank ? "_blank" : "_self"
+            );
+          } catch (error) {}
         } else if (drilldownData.type == "byDashboard") {
           // we have folder, dashboard and tabs name
           // so we have to get id of folder, dashboard and tab
@@ -527,6 +644,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       chartPanelRef,
       data,
       loading,
@@ -536,6 +654,9 @@ export default defineComponent({
       metadata,
       tableRendererRef,
       onChartClick,
+      drilldownArray,
+      openDrilldown,
+      drilldownPopUpRef,
     };
   },
 });
