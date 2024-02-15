@@ -22,7 +22,8 @@
             <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" :data-test="`dashboard-variable-adhoc-close-${index}`"/>
             <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>
-        <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded icon="add" padding="xs" @click="addFields" data-test="dashboard-variable-adhoc-add-selector" >
+        <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded padding="xs" @click="addFields" data-test="dashboard-variable-adhoc-add-selector" >
+            <DynamicFilterIcon />
             <q-tooltip>Add Dynamic Filter</q-tooltip>
         </q-btn>
     </div>
@@ -32,11 +33,14 @@
 import { defineComponent, ref, toRef, watch, type Ref, toRefs } from 'vue';
 import { useSelectAutoComplete } from '../../../composables/useSelectAutocomplete';
 import { useStore } from "vuex";
+import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 
 export default defineComponent({
     name: 'VariableAdHocValueSelector',
     props: ['modelValue', 'variableItem'],
     emits: ['update:modelValue'],
+    components: { DynamicFilterIcon },
+    
     setup(props: any, { emit }) {
         const store = useStore();
         const operatorOptions = ['=', '!='];
