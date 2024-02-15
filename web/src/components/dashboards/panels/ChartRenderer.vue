@@ -97,9 +97,11 @@ export default defineComponent({
     let chart: any;
     const store = useStore();
     const windowResizeEventCallback = async () => {
-      await nextTick();
-      await nextTick();
-      chart?.resize();
+      try {
+        await nextTick();
+        await nextTick();
+        chart?.resize();
+      } catch (e) {}
     };
 
     // currently hovered series state
@@ -161,12 +163,7 @@ export default defineComponent({
 
       // set options with selected object
       if (legendOption) {
-        legendOption.selected = params?.selected || 0;
-        try {
-          chart?.setOption({ legend: [legendOption] });
-        } catch (e) {
-          emit("error", e);
-        }
+        chart?.setOption({ legend: [legendOption] });
       }
     };
 
@@ -352,23 +349,23 @@ export default defineComponent({
     );
 
     onMounted(async () => {
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      const theme = store.state.theme === "dark" ? "dark" : "light";
-      if (chartRef.value) {
-        chart = echarts.init(chartRef.value, theme);
-      }
       try {
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        const theme = store.state.theme === "dark" ? "dark" : "light";
+        if (chartRef.value) {
+          chart = echarts.init(chartRef.value, theme);
+        }
         chart?.setOption(props?.data?.options || {}, true);
+        chartInitialSetUp();
       } catch (e) {
         emit("error", e);
       }
-      chartInitialSetUp();
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
@@ -389,23 +386,26 @@ export default defineComponent({
     watch(
       () => props.data.options,
       async () => {
-        await nextTick();
-        chart?.resize();
         try {
-          chart?.setOption(props?.data?.options || {}, true);
+          await nextTick();
+          chart?.resize();
+          try {
+            chart?.setOption(props?.data?.options || {}, true);
+          } catch (error) {}
+
+          // we need that toolbox datazoom button initally selected
+          // for that we required to dispatch an event
+          // while dispatching an event we need to pass a datazoomselectactive as true
+          // this action is available in the echarts docs in list of brush actions
+          chart?.dispatchAction({
+            type: "takeGlobalCursor",
+            key: "dataZoomSelect",
+            dataZoomSelectActive: true,
+          });
+          windowResizeEventCallback();
         } catch (e) {
           emit("error", e);
         }
-        // we need that toolbox datazoom button initally selected
-        // for that we required to dispatch an event
-        // while dispatching an event we need to pass a datazoomselectactive as true
-        // this action is available in the echarts docs in list of brush actions
-        chart?.dispatchAction({
-          type: "takeGlobalCursor",
-          key: "dataZoomSelect",
-          dataZoomSelectActive: true,
-        });
-        windowResizeEventCallback();
       },
       { deep: true }
     );

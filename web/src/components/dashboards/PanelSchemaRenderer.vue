@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
-    <div v-show="!errorDetail" style="height: 100%; width: 100%">
+    <div v-if="!errorDetail" style="height: 100%; width: 100%">
       <GeoMapRenderer
         v-if="panelSchema.type == 'geomap'"
         :data="
