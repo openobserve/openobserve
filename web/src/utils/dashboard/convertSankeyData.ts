@@ -22,6 +22,11 @@
  * @return {Object} - the options object for rendering the chart
  */
 
+import {
+  formatUnitValue,
+  getUnitValue,
+} from "./convertDataIntoUnitValue";
+
 export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   if (
     !Array.isArray(searchQueryData) ||
@@ -51,7 +56,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
     queryData.forEach((item: any) => {
       const source = item[panelSchema.queries[0].fields.source.alias];
       const target = item[panelSchema.queries[0].fields.target.alias];
-      const value = item[panelSchema.queries[0].fields.value.alias];
+      let value = item[panelSchema.queries[0].fields.value.alias];
 
       if (source && target && value) {
         nodes.add(source);
@@ -70,7 +75,25 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   });
 
   const options = {
-    tooltip: {},
+    tooltip: {
+      trigger: "item",
+      formatter: function (params: any) {
+        let value = params.data.value;
+
+        if (getUnitValue && formatUnitValue) {
+          value = formatUnitValue(
+            getUnitValue(
+              value,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
+            )
+          );
+        }
+
+        return `${params.data.source} -> ${params.data.target}: ${value}`;
+      },
+    },
     backgroundColor: "transparent",
     series: {
       type: "sankey",
