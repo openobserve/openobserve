@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md" data-test="dashboard-folder-move-header">
+    <q-card-section
+      class="q-px-md q-py-md"
+      data-test="dashboard-folder-move-header"
+    >
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-body1 text-bold">
@@ -24,13 +27,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" data-test="dashboard-folder-move-cancel"/>
+          <q-btn
+            v-close-popup="true"
+            round
+            flat
+            icon="cancel"
+            data-test="dashboard-folder-move-cancel"
+          />
         </div>
       </div>
     </q-card-section>
     <q-separator />
-    <q-card-section class="q-w-md q-mx-lg" data-test="dashboard-folder-move-body">
-      <q-form ref="moveFolderForm" @submit.stop="onSubmit.execute()" data-test="dashboard-folder-move-form">
+    <q-card-section
+      class="q-w-md q-mx-lg"
+      data-test="dashboard-folder-move-body"
+    >
+      <q-form
+        ref="moveFolderForm"
+        @submit.stop="onSubmit.execute()"
+        data-test="dashboard-folder-move-form"
+      >
         <q-input
           v-model="store.state.organizationData.folders.find((item: any) => item.folderId === activeFolderId).name"
           :label="t('dashboard.currentFolderLabel')"
@@ -137,9 +153,7 @@ export default defineComponent({
         } catch (err: any) {
           $q.notify({
             type: "negative",
-            message: JSON.stringify(
-              err.response.data.message || "Dashboard move failed."
-            ),
+            message: err?.message ?? "Dashboard move failed.",
             timeout: 2000,
           });
         }

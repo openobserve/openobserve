@@ -171,8 +171,8 @@ const getMaxIAndMaxYFromTab = (tab: any) => {
   tab.panels.map((it: any) => {
     maxI = Math.max(it.layout?.i || 0, maxI);
     maxY = Math.max(it.layout?.y || 0, maxY);
-     // last panel will have max y
-     if (maxY == it.layout?.y) {
+    // last panel will have max y
+    if (maxY == it.layout?.y) {
       lastPanel = it;
     }
   });
@@ -429,7 +429,7 @@ export const updateDashboard = async (
     await getAllDashboards(store, folderId);
     return res;
   } catch (error) {
-    return error;
+    throw error;
   }
 };
 

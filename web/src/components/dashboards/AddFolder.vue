@@ -27,7 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" data-test="dashboard-folder-cancel"/>
+          <q-btn
+            v-close-popup="true"
+            round
+            flat
+            icon="cancel"
+            data-test="dashboard-folder-cancel"
+          />
         </div>
       </div>
     </q-card-section>
@@ -154,7 +160,7 @@ export default defineComponent({
             );
             $q.notify({
               type: "positive",
-              message: "Folder updated",
+              message: "Folder updated successfully",
               timeout: 2000,
             });
             emit("update:modelValue", folderData.value);
@@ -165,25 +171,26 @@ export default defineComponent({
             emit("update:modelValue", newFolder);
             $q.notify({
               type: "positive",
-              message: `Folder added successfully.`,
+              message: `Folder added successfully`,
               timeout: 2000,
             });
           }
-        } catch (err: any) {
-          $q.notify({
-            type: "negative",
-            message: JSON.stringify(
-              err?.response?.data["error"] || "Folder creation failed."
-            ),
-            timeout: 2000,
-          });
-        } finally {
           folderData.value = {
             folderId: "",
             name: "",
             description: "",
           };
           await addFolderForm.value.resetValidation();
+        } catch (err: any) {
+          $q.notify({
+            type: "negative",
+            message:
+              err?.message ??
+              (props.editMode
+                ? "Folder updation failed"
+                : "Folder creation failed"),
+            timeout: 2000,
+          });
         }
       });
     });

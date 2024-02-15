@@ -1077,55 +1077,68 @@ export default defineComponent({
         return;
       }
 
-      if (editMode.value) {
-        const errorMessageOnSave = await updatePanel(
-          store,
-          dashId,
-          dashboardPanelData.data,
-          route.query.folder ?? "default",
-          route.query.tab ?? "default"
-        );
-        if (errorMessageOnSave instanceof Error) {
-          errorData.errors.push(
-            "Error saving panel configuration : " + errorMessageOnSave.message
+      try {
+        if (editMode.value) {
+          const errorMessageOnSave = await updatePanel(
+            store,
+            dashId,
+            dashboardPanelData.data,
+            route.query.folder ?? "default",
+            route.query.tab ?? "default"
           );
-          return;
-        }
-      } else {
-        const panelId =
-          "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+          if (errorMessageOnSave instanceof Error) {
+            errorData.errors.push(
+              "Error saving panel configuration : " + errorMessageOnSave.message
+            );
+            return;
+          }
+        } else {
+          const panelId =
+            "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
-        dashboardPanelData.data.id = panelId;
-        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+          dashboardPanelData.data.id = panelId;
+          chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
-        const errorMessageOnSave = await addPanel(
-          store,
-          dashId,
-          dashboardPanelData.data,
-          route.query.folder ?? "default",
-          route.query.tab ?? "default"
-        );
-        if (errorMessageOnSave instanceof Error) {
-          errorData.errors.push(
-            "Error saving panel configuration  : " + errorMessageOnSave.message
+          const errorMessageOnSave = await addPanel(
+            store,
+            dashId,
+            dashboardPanelData.data,
+            route.query.folder ?? "default",
+            route.query.tab ?? "default"
           );
-          return;
+          if (errorMessageOnSave instanceof Error) {
+            errorData.errors.push(
+              "Error saving panel configuration  : " +
+                errorMessageOnSave.message
+            );
+            return;
+          }
         }
+
+        isPanelConfigWatcherActivated = false;
+        isPanelConfigChanged.value = false;
+
+        await nextTick();
+        return router.push({
+          path: "/dashboards/view",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            dashboard: dashId,
+            folder: route.query.folder ?? "default",
+            tab: route.query.tab ?? "default",
+          },
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message:
+            error?.message ??
+            (editMode.value
+              ? "Error while updating panel"
+              : "Error while creating panel"),
+          timeout: 2000,
+        });
       }
-
-      isPanelConfigWatcherActivated = false;
-      isPanelConfigChanged.value = false;
-
-      await nextTick();
-      return router.push({
-        path: "/dashboards/view",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: dashId,
-          folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? "default",
-        },
-      });
     };
 
     const layoutSplitterUpdated = () => {
