@@ -32,15 +32,14 @@
           @click="onDataLinkClick(index)"
           style="
             cursor: pointer;
-            text-decoration: underline;
-            padding-left: 20px;
+            padding-left: 10px;
             width: 250px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
           "
         >
-          {{ data.name }}
+          {{ index + 1 }}. {{ data.name }}
         </div>
         <q-icon
           class="q-mr-xs"
