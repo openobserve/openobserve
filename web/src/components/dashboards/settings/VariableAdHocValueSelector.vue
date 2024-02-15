@@ -40,6 +40,7 @@ export default defineComponent({
     props: ['modelValue', 'variableItem'],
     emits: ['update:modelValue'],
     components: { DynamicFilterIcon },
+    
     setup(props: any, { emit }) {
         const store = useStore();
         const operatorOptions = ['=', '!='];
