@@ -364,7 +364,8 @@
     "add": "Add Stream",
     "dataRetention": "Data Retention (in days)",
     "indexing": "Indexing",
-    "createStream": "Create Stream"
+    "createStream": "Create Stream",
+    "indexType": "Index Type"
   },
   "function": {
     "header": "Functions",
