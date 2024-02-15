@@ -220,22 +220,29 @@ export default defineComponent({
     });
 
     const handleDragEnd = async () => {
-      await updateDashboard(
-        store,
-        store.state.selectedOrganization.identifier,
-        currentDashboardData.data.dashboardId,
-        currentDashboardData.data,
-        route.query.folder ?? "default"
-      );
+      try {
+        await updateDashboard(
+          store,
+          store.state.selectedOrganization.identifier,
+          currentDashboardData.data.dashboardId,
+          currentDashboardData.data,
+          route.query.folder ?? "default"
+        );
 
-      // emit refresh to rerender
-      emit("refresh");
+        // emit refresh to rerender
+        emit("refresh");
 
-      $q.notify({
-        type: "positive",
-        message: "Dashboard updated successfully.",
-        timeout: 2000,
-      });
+        $q.notify({
+          type: "positive",
+          message: "Dashboard updated successfully.",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "tab reorder failed",
+        });
+      }
     };
 
     const editItem = (tabId: any) => {
@@ -248,29 +255,40 @@ export default defineComponent({
     };
 
     const saveEdit = async () => {
-      if (editTabId.value) {
-        // only allowed to edit name
-        await editTab(
-          store,
-          currentDashboardData.data.dashboardId,
-          route.query.folder ?? "default",
-          editTabObj.data.tabId,
-          editTabObj.data
-        );
+      try {
+        if (editTabId.value) {
+          // only allowed to edit name
+          await editTab(
+            store,
+            currentDashboardData.data.dashboardId,
+            route.query.folder ?? "default",
+            editTabObj.data.tabId,
+            editTabObj.data
+          );
+
+          // emit refresh to rerender
+          emit("refresh");
+          await getDashboardData();
+
+          $q.notify({
+            type: "positive",
+            message: "Tab updated successfully",
+            timeout: 2000,
+          });
+
+          // reset edit mode
+          editTabId.value = null;
+          editTabObj.data = {};
+        }
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "tab updation failed",
+        });
 
         // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
-
-        $q.notify({
-          type: "positive",
-          message: "Tab updated",
-          timeout: 2000,
-        });
-
-        // reset edit mode
-        editTabId.value = null;
-        editTabObj.data = {};
       }
     };
 
@@ -294,20 +312,33 @@ export default defineComponent({
     };
 
     const confirmDelete = async (moveTabId: any) => {
-      await deleteTab(
-        store,
-        route.query.dashboard,
-        route.query.folder,
-        tabIdToBeDeleted.value,
-        moveTabId
-      );
-      await getDashboardData();
+      try {
+        await deleteTab(
+          store,
+          route.query.dashboard,
+          route.query.folder,
+          tabIdToBeDeleted.value,
+          moveTabId
+        );
+        await getDashboardData();
 
-      // emit event
-      emit("refresh");
+        // emit event
+        emit("refresh");
 
-      tabIdToBeDeleted.value = null;
-      deletePopupVisible.value = false;
+        tabIdToBeDeleted.value = null;
+        deletePopupVisible.value = false;
+        $q.notify({
+          type: "positive",
+          message: "Tab deleted successfully",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "Tab deletion failed",
+          timeout: 2000,
+        });
+      }
     };
 
     const refreshRequired = async () => {

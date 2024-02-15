@@ -168,7 +168,7 @@ export default defineComponent({
 
             $q.notify({
               type: "positive",
-              message: "Tab updated",
+              message: "Tab updated successfully",
               timeout: 2000,
             });
           }
@@ -190,20 +190,20 @@ export default defineComponent({
               timeout: 2000,
             });
           }
-        } catch (err: any) {
-          $q.notify({
-            type: "negative",
-            message: JSON.stringify(
-              err?.response?.data["error"] || "Tab creation failed."
-            ),
-            timeout: 2000,
-          });
-        } finally {
           tabData.value = {
             name: "",
             panels: [],
           };
           await addTabForm.value.resetValidation();
+        } catch (err: any) {
+          $q.notify({
+            type: "negative",
+            message:
+              err?.message ??
+              (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+            timeout: 2000,
+          });
+        } finally {
         }
       });
     });

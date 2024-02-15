@@ -219,19 +219,30 @@ export default defineComponent({
 
     // save the dashboard value
     const saveDashboard = async () => {
-      await updateDashboard(
-        store,
-        store.state.selectedOrganization.identifier,
-        props.dashboardData.dashboardId,
-        props.dashboardData,
-        route.query.folder ?? "default"
-      );
+      try {
+        await updateDashboard(
+          store,
+          store.state.selectedOrganization.identifier,
+          props.dashboardData.dashboardId,
+          props.dashboardData,
+          route.query.folder ?? "default"
+        );
 
-      $q.notify({
-        type: "positive",
-        message: "Dashboard updated successfully.",
-        timeout: 5000,
-      });
+        $q.notify({
+          type: "positive",
+          message: "Dashboard updated successfully.",
+          timeout: 5000,
+        });
+      } catch (error) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "Dashboard update failed.",
+          timeout: 2000,
+        });
+
+        // refresh dashboard
+        refreshDashboard();
+      }
     };
 
     //add panel
@@ -246,13 +257,13 @@ export default defineComponent({
       });
     };
 
-    const movedEvent = (i, newX, newY) => {
-      saveDashboard();
+    const movedEvent = async (i, newX, newY) => {
+      await saveDashboard();
     };
 
-    const resizedEvent = (i, newX, newY, newHPx, newWPx) => {
+    const resizedEvent = async (i, newX, newY, newHPx, newWPx) => {
       window.dispatchEvent(new Event("resize"));
-      saveDashboard();
+      await saveDashboard();
     };
 
     const getDashboardLayout: any = (panels: any) => {

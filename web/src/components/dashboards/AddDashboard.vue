@@ -226,9 +226,7 @@ export default defineComponent({
         } catch (err: any) {
           $q.notify({
             type: "negative",
-            message: JSON.stringify(
-              err?.response?.data["message"] ?? "Dashboard creation failed."
-            ),
+            message: err?.message ?? "Dashboard creation failed.",
           });
         }
       });
