@@ -242,6 +242,10 @@ export default defineComponent({
           type: "negative",
           message: error?.message ?? "Tab reorder failed",
         });
+
+        // emit refresh to rerender
+        emit("refresh");
+        await getDashboardData();
       }
     };
 
