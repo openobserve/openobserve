@@ -114,52 +114,63 @@ export default defineComponent({
 
       dashboardData.title = data.title;
       dashboardData.description = data.description;
-      dashboardData.showDynamicFilters = data.variables?.showDynamicFilters ?? false
+      dashboardData.showDynamicFilters =
+        data.variables?.showDynamicFilters ?? false;
     };
     onMounted(async () => {
       await getDashboardData();
     });
 
     const saveDashboardApi = useLoading(async () => {
-      // get the latest dashboard data and update the title and description
-      const data = JSON.parse(
-        JSON.stringify(
-          await getDashboard(
-            store,
-            route.query.dashboard,
-            route.query.folder ?? "default"
+      try {
+        // get the latest dashboard data and update the title and description
+        const data = JSON.parse(
+          JSON.stringify(
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder ?? "default"
+            )
           )
-        )
-      );
+        );
 
-      // update the values
-      data.title = dashboardData.title;
-      data.description = dashboardData.description;
-      
-      if(!data.variables) {
-        data.variables = {
-          list: [],
-          showDynamicFilters: dashboardData.showDynamicFilters
+        // update the values
+        data.title = dashboardData.title;
+        data.description = dashboardData.description;
+
+        if (!data.variables) {
+          data.variables = {
+            list: [],
+            showDynamicFilters: dashboardData.showDynamicFilters,
+          };
+        } else {
+          data.variables.showDynamicFilters = dashboardData.showDynamicFilters;
         }
-      } else {
-        data.variables.showDynamicFilters = dashboardData.showDynamicFilters
+
+        // now lets save it
+        await updateDashboard(
+          store,
+          store.state.selectedOrganization.identifier,
+          route.query.dashboard,
+          data,
+          route?.query?.folder ?? "default"
+        );
+
+        $q.notify({
+          type: "positive",
+          message: "Dashboard updated successfully.",
+        });
+
+        emit("save");
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message:
+            error?.message ??
+            "Dashboard updation failed",
+          timeout: 2000,
+        });
       }
-
-      // now lets save it
-      await updateDashboard(
-        store,
-        store.state.selectedOrganization.identifier,
-        route.query.dashboard,
-        data,
-        route?.query?.folder ?? "default"
-      );
-
-      $q.notify({
-        type: "positive",
-        message: "Dashboard updated successfully.",
-      });
-
-      emit("save");
     });
 
     const onSubmit = () => {

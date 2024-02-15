@@ -339,9 +339,7 @@ export default defineComponent({
         // Show an error notification.
         $q.notify({
           type: "negative",
-          message: err?.response?.data["error"]
-            ? JSON.stringify(err?.response?.data["error"])
-            : "Panel duplication failed",
+          message: err?.message ?? "Panel duplication failed",
         });
       }
       // Hide the loading spinner notification.

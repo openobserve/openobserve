@@ -426,32 +426,53 @@ export default defineComponent({
     });
 
     const onDeletePanel = async (panelId: any) => {
-      await deletePanel(
-        store,
-        route.query.dashboard,
-        panelId,
-        route.query.folder ?? "default",
-        route.query.tab ?? "default"
-      );
-      await loadDashboard();
+      try {
+        await deletePanel(
+          store,
+          route.query.dashboard,
+          panelId,
+          route.query.folder ?? "default",
+          route.query.tab ?? "default"
+        );
+        await loadDashboard();
+        $q.notify({
+          type: "positive",
+          message: "Panel deleted successfully",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "Panel deletion failed",
+          timeout: 2000,
+        });
+      }
     };
 
     // move single panel to another tab
     const onMovePanel = async (panelId: any, newTabId: any) => {
-      await movePanelToAnotherTab(
-        store,
-        route.query.dashboard,
-        panelId,
-        route.query.folder ?? "default",
-        route.query.tab ?? "default",
-        newTabId
-      );
-      await loadDashboard();
-      $q.notify({
-        type: "positive",
-        message: "Panel Moved Successfully!",
-        timeout: 2000,
-      });
+      try {
+        await movePanelToAnotherTab(
+          store,
+          route.query.dashboard,
+          panelId,
+          route.query.folder ?? "default",
+          route.query.tab ?? "default",
+          newTabId
+        );
+        await loadDashboard();
+        $q.notify({
+          type: "positive",
+          message: "Panel moved successfully!",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "Panel move failed",
+          timeout: 2000,
+        });
+      }
     };
 
     const shareLink = () => {
@@ -472,14 +493,14 @@ export default defineComponent({
         .then(() => {
           $q.notify({
             type: "positive",
-            message: "Link Copied Successfully!",
+            message: "Link copied successfully",
             timeout: 5000,
           });
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while copy link.",
+            message: "Error while copying link",
             timeout: 5000,
           });
         });

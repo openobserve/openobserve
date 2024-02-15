@@ -321,7 +321,7 @@ export default defineComponent({
       {
         label: t("dashboard.custom"),
         value: "custom",
-      }
+      },
     ]);
 
     const variableData: any = reactive({
@@ -389,7 +389,7 @@ export default defineComponent({
         } catch (error: any) {
           $q.notify({
             type: "negative",
-            message: error.message,
+            message: error.message ?? "Variable update failed",
             timeout: 2000,
           });
         }
@@ -409,7 +409,7 @@ export default defineComponent({
         } catch (error: any) {
           $q.notify({
             type: "negative",
-            message: error.message,
+            message: error.message ?? "Variable creation failed",
             timeout: 2000,
           });
         }
@@ -424,9 +424,11 @@ export default defineComponent({
         saveVariableApiCall.execute().catch((err: any) => {
           $q.notify({
             type: "negative",
-            message: JSON.stringify(
-              err.response.data["error"] || "Dashboard creation failed."
-            ),
+            message:
+              err?.message ??
+              (editMode.value
+                ? "Variable update failed"
+                : "Variable creation failed"),
           });
         });
       });

@@ -345,7 +345,7 @@ export default defineComponent({
         if (allFulfilledValues) {
           $q.notify({
             type: "positive",
-            message: `${allFulfilledValues} Dashboard(s) Imported Successfully.`,
+            message: `${allFulfilledValues} Dashboard(s) Imported Successfully`,
           });
         }
 
@@ -354,7 +354,7 @@ export default defineComponent({
             type: "negative",
             message: `${
               results.length - allFulfilledValues
-            } Dashboard(s) Failed to Import.`,
+            } Dashboard(s) Failed to Import`,
           });
         }
 
