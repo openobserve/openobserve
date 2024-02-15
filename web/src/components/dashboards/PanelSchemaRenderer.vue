@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(drilldown, index) in drilldownArray"
         :key="JSON.stringify(drilldown)"
+        class="drilldown-item"
         style="
           display: flex;
           flex-direction: row;
@@ -142,15 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
           <span>{{ drilldown.name }}</span>
         </div>
-        <div
-          style="
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            border-bottom: 1px solid gray;
-          "
-        ></div>
       </div>
     </div>
   </div>
@@ -676,6 +668,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.drilldown-item:hover {
+  background-color: rgba(202, 201, 201, 0.908);
+}
 .errorMessage {
   position: absolute;
   top: 20%;
