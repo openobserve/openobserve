@@ -207,7 +207,7 @@ export default defineComponent({
           const res = await callDashboard;
 
           const data = convertDashboardSchemaVersion(
-            res.data["v" + res.data.version]
+            res?.data["v" + res?.data?.version]
           );
 
           //update store
@@ -219,11 +219,15 @@ export default defineComponent({
             description: "",
           };
           await addDashboardForm.value.resetValidation();
+          $q.notify({
+            type: "positive",
+            message: `Dashboard added successfully.`,
+          });
         } catch (err: any) {
           $q.notify({
             type: "negative",
             message: JSON.stringify(
-              err.response.data["error"] || "Dashboard creation failed."
+              err?.response?.data["message"] ?? "Dashboard creation failed."
             ),
           });
         }

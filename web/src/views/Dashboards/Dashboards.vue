@@ -739,11 +739,6 @@ export default defineComponent({
     async updateDashboardList(dashboardId: any, folderId: any) {
       this.showAddDashboardDialog = false;
 
-      this.$q.notify({
-        type: "positive",
-        message: `Dashboard added successfully.`,
-      });
-
       this.$router.push({
         path: "/dashboards/view/",
         query: {
