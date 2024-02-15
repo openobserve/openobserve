@@ -62,26 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="min-width: 220px"
         />
 
-        <q-select
-          v-model="streamInputs.index_type"
-          :options="streamIndexType"
-          :label="t('logStream.indexing') + ' *'"
-          :popup-content-style="{ textTransform: 'capitalize' }"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          map-options
-          stack-label
-          outlined
-          filled
-          emit-value
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
-          style="min-width: 220px"
-        />
-
         <q-input
-          v-model="streamInputs.retention_period"
+          v-model="streamInputs.dataRetentionDays"
           :label="t('logStream.dataRetention') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -95,7 +77,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="min-width: 480px"
         />
 
-        <div class="flex justify-end">
+        <StreamFieldInputs
+          :fields="fields"
+          @add="addField"
+          @remove="removeField"
+        />
+
+        <div class="flex justify-end q-mt-sm">
+          <q-btn
+            v-close-popup="true"
+            data-test="add-stream-cancel-btn"
+            :label="t('logStream.cancel')"
+            class="q-my-sm text-bold q-mr-md"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+          />
           <q-btn
             data-test="save-stream-btn"
             :label="t('logStream.createStream')"
@@ -114,6 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import StreamFieldInputs from "./StreamFieldInputs.vue";
+import type { Ref } from "vue";
+import streamService from "@/services/stream";
+import { useStore } from "vuex";
+import { computed } from "vue";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
 
@@ -124,22 +127,117 @@ const streamTypes = [
   { label: "Enrichment Table", value: "enrichment_tables" },
 ];
 
-const streamIndexType = [
-  { label: "Hash based partition", value: "hash" },
-  { label: "Key based partition", value: "key" },
-  { label: "Inverted index", value: "inverted" },
-  { label: "Bloom filter", value: "bloom" },
-];
+const fields: Ref<any[]> = ref([]);
+
+const store = useStore();
+
+const q = useQuasar();
 
 const streamInputs = ref({
   name: "",
   stream_type: "",
   index_type: "",
-  retention_period: 14,
+  dataRetentionDays: 14,
 });
 
+const getDefaultField = () => {
+  return {
+    name: "",
+    type: "",
+    index_type: "",
+  };
+};
+
+const showDataRetention = computed(
+  () =>
+    !!(store.state.zoConfig.data_retention_days || false) &&
+    streamInputs.value.stream_type !== "enrichment_tables"
+);
+
 const saveStream = () => {
-  console.log("Stream Inputs", streamInputs.value);
+  const payload = getStreamPayload();
+  streamService
+    .updateSettings(
+      store.state.selectedOrganization.identifier,
+      streamInputs.value.name,
+      streamInputs.value.stream_type,
+      payload
+    )
+    .then(() => {
+      q.notify({
+        color: "positive",
+        message: "Stream created successfully",
+        timeout: 4000,
+      });
+    })
+    .catch((err) => {
+      q.notify({
+        color: "negative",
+        message: err.response?.data?.message || "Failed to create stream",
+        timeout: 4000,
+      });
+    });
+};
+
+const getStreamPayload = () => {
+  let settings: {
+    partition_keys: any[];
+    full_text_search_keys: any[];
+    bloom_filter_fields: any[];
+    data_retention?: number;
+  } = {
+    partition_keys: [],
+    full_text_search_keys: [],
+    bloom_filter_fields: [],
+  };
+
+  if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
+    q.notify({
+      color: "negative",
+      message:
+        "Invalid Data Retention Period: Retention period must be at least 1 day.",
+      timeout: 4000,
+    });
+    return;
+  }
+
+  if (showDataRetention.value) {
+    settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
+  }
+
+  fields.value.forEach((field) => {
+    if (field.index_type === "fullTextSearchKey") {
+      settings.full_text_search_keys.push(field.name);
+    }
+
+    if (field.index_type === "partitionKey") {
+      settings.partition_keys.push({
+        field: field.name,
+        types: "value",
+      });
+    }
+
+    // if (field.index_type === "intertedIndex") {
+    //   settings.partition_keys.push({
+    //     field: field.name,
+    //     types: "value",
+    //   });
+    // }
+
+    if (field.index_type === "bloomFilterKey") {
+      settings.bloom_filter_fields.push(field.name);
+    }
+  });
+
+  return settings;
+};
+
+const addField = () => {
+  fields.value.push(getDefaultField());
+};
+
+const removeField = (field: any, index: number) => {
+  fields.value.splice(index, 1);
 };
 </script>
 
