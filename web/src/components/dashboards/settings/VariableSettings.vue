@@ -107,7 +107,7 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import type { QTableProps } from "quasar";
+import { useQuasar, type QTableProps } from "quasar";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -120,6 +120,7 @@ export default defineComponent({
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
+    const $q = useQuasar();
     const beingUpdated: any = ref(false);
     const addDashboardForm: any = ref(null);
     const disableColor: any = ref("");
@@ -171,21 +172,21 @@ export default defineComponent({
     const variableTypes = ref([
       {
         label: t("dashboard.queryValues"),
-        value: 'query_values'
+        value: "query_values",
       },
       {
         label: t("dashboard.constant"),
-        value: 'constant'
+        value: "constant",
       },
       {
         label: t("dashboard.textbox"),
-        value: 'textbox'
+        value: "textbox",
       },
       {
         label: t("dashboard.custom"),
-        value: 'custom'
-      }
-    ])
+        value: "custom",
+      },
+    ]);
 
     onMounted(async () => {
       await getDashboardData();
@@ -196,16 +197,27 @@ export default defineComponent({
     });
 
     const getDashboardData = async () => {
-      const data = JSON.parse(JSON.stringify(await getDashboard(store,route.query.dashboard, route.query.folder ?? "default")))?.variables?.list
+      const data = JSON.parse(
+        JSON.stringify(
+          await getDashboard(
+            store,
+            route.query.dashboard,
+            route.query.folder ?? "default"
+          )
+        )
+      )?.variables?.list;
 
-      dashboardVariableData.data = (data || []).map((it:any, index:number) => {
-
-        return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
-          name: it.name,
-          type: variableTypes.value.find((type: any) => type.value === it.type)?.label,
+      dashboardVariableData.data = (data || []).map(
+        (it: any, index: number) => {
+          return {
+            "#": index < 9 ? `0${index + 1}` : index + 1,
+            name: it.name,
+            type: variableTypes.value.find(
+              (type: any) => type.value === it.type
+            )?.label,
+          };
         }
-      });
+      );
     };
 
     const addVariables = () => {
@@ -219,18 +231,31 @@ export default defineComponent({
     };
 
     const deleteVariableFn = async () => {
-      if (selectedDelete.value) {
-        const variableName = selectedDelete?.value?.name;
+      try {
+        if (selectedDelete.value) {
+          const variableName = selectedDelete?.value?.name;
 
-        await deleteVariable(
-          store,
-          route.query.dashboard,
-          variableName,
-          route.query.folder ?? "default"
-        );
+          await deleteVariable(
+            store,
+            route.query.dashboard,
+            variableName,
+            route.query.folder ?? "default"
+          );
 
-        await getDashboardData();
-        emit("save");
+          await getDashboardData();
+          emit("save");
+        }
+        $q.notify({
+          type: "positive",
+          message: "Variable deleted successfully",
+          timeout: 2000,
+        });
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error?.message ?? "Variable deletion failed",
+          timeout: 2000,
+        });
       }
     };
     const handleSaveVariable = async () => {
@@ -271,7 +296,7 @@ export default defineComponent({
       editVariableFn,
       selectedVariable,
       handleSaveVariable,
-      variableTypes
+      variableTypes,
     };
   },
 });
