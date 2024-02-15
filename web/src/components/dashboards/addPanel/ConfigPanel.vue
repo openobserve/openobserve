@@ -570,10 +570,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
-
-      <Drilldown />
-
-      <div class="space"></div>
+      <Drilldown
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+      />
     </div>
   </div>
 </template>
