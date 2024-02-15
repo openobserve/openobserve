@@ -78,7 +78,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
     tooltip: {
       trigger: "item",
       formatter: function (params: any) {
-        let value = params.data.value;
+        let value = params.value;
 
         if (getUnitValue && formatUnitValue) {
           value = formatUnitValue(
@@ -91,7 +91,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
           );
         }
 
-        return `${params.data.source} -> ${params.data.target}: ${value}`;
+        return `${params.name} : ${value}`;
       },
     },
     backgroundColor: "transparent",
