@@ -475,7 +475,7 @@ async fn watch_node_list() -> Result<()> {
 pub fn load_local_mode_node() -> Node {
     Node {
         id: 1,
-        uuid: load_local_node_uuid(),
+        uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
         http_addr: format!("http://127.0.0.1:{}", CONFIG.http.port),
         grpc_addr: format!("http://127.0.0.1:{}", CONFIG.grpc.port),
