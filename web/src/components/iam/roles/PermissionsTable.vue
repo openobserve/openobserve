@@ -73,18 +73,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div>Loading Resources...</div>
       </div>
-      <q-table
+      <div
+        v-if="level && rows.length === 50"
+        class="q-py-sm text-left text-grey-10 bg-white relative-position"
+        :style="{
+          paddingLeft: level
+            ? parent.has_entities
+              ? 16 + 8 + level * 20 + 'px'
+              : 16 +
+                8 +
+                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
+                'px'
+            : '',
+        }"
+      >
+        Showing <span class="text-bold"> Top 50 </span> resources (Search to get
+        specific resource)
+      </div>
+      <q-virtual-scroll
         data-test="edit-role-permissions-table"
+        :id="`permissions-table-${parent.resourceName}`"
+        style="max-height: 725px; overflow-x: hidden; overflow-y: auto"
+        :style="{
+          'max-height': level > 0 ? (level > 1 ? '400px' : '100%') : '100%',
+        }"
+        :items-size="5"
+        :virtual-scroll-item-size="25"
+        :virtual-scroll-sticky-size-start="0"
+        :virtual-scroll-sticky-size-end="0"
+        :virtual-scroll-slice-size="100"
+        :virtual-scroll-slice-ratio-before="100"
+        type="table"
+        :items="rows"
         flat
         bordered
         ref="qTableRef"
         :rows="rows"
         :columns="(columns as [])"
         :table-colspan="9"
-        row-key="index"
-        virtual-scroll
-        :virtual-scroll-item-size="48"
-        :rows-per-page-options="[0]"
+        row-key="name"
         dense
         :hide-header="!!level"
         :filter="filter && filter.value"
@@ -119,16 +146,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </q-tr>
         </template>
-        <template v-slot:body="props">
-          <q-tr
-            :data-test="`edit-role-permissions-table-body-row-${props.row.name}`"
-            v-show="props.row.show"
-            :props="props"
-            :key="`m_${props.row.index}`"
-          >
-            <q-td
-              :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}`"
-              v-for="(col, index) in props.cols"
+
+        <template v-slot="{ item: row }">
+          <tr v-if="row.show" :key="`m_${row.name}`">
+            <td
+              v-for="(col, index) in columns"
               :key="col.name"
               :props="props"
               :style="{
@@ -188,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr
             v-show="props.row.expand && props.row.show"
             :props="props"
-            :key="`e_${props.row.index + 'entity'}`"
+            :key="`e_${row.name + 'entity'}`"
             class="q-virtual-scroll--with-prev"
             style="transition: display 2s ease-in"
           >
@@ -196,8 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="props.row.entities">
                 <PermissionsTable
                   :level="level + 1"
-                  :rows="props.row.entities"
-                  :parent="props.row"
+                  :rows="row.entities"
+                  :customFilteredPermissions="customFilteredPermissions"
+                  :parent="row"
                   @updated:permission="handlePermissionChange"
                   @expand:row="expandPermission"
                 />
@@ -236,6 +259,10 @@ const props = defineProps({
     default: 0,
   },
   parent: {
+    type: Object,
+    default: () => ({}),
+  },
+  customFilteredPermissions: {
     type: Object,
     default: () => ({}),
   },

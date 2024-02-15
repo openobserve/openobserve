@@ -105,6 +105,7 @@ export interface Entity {
   is_loading?: boolean;
   childName?: string;
   top_level: boolean;
+  parent?: string;
 }
 
 interface User {}
