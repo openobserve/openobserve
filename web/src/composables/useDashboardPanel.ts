@@ -578,6 +578,7 @@ const useDashboardPanelData = () => {
       case "h-stacked":
       case "metric":
       case "table":
+      case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
