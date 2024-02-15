@@ -493,14 +493,14 @@ export default defineComponent({
         .then(() => {
           $q.notify({
             type: "positive",
-            message: "Link Copied Successfully!",
+            message: "Link Copied Successfully",
             timeout: 5000,
           });
         })
         .catch(() => {
           $q.notify({
             type: "negative",
-            message: "Error while copy link.",
+            message: "Error while copy link",
             timeout: 5000,
           });
         });

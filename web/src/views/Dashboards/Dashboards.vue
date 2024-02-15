@@ -539,9 +539,7 @@ export default defineComponent({
       } catch (err) {
         $q.notify({
           type: "negative",
-          message: err?.response?.data["error"]
-            ? JSON.stringify(err?.response?.data["error"])
-            : "Dashboard duplication failed",
+          message: err?.message ?? "Dashboard duplication failed",
         });
       }
 
@@ -610,7 +608,7 @@ export default defineComponent({
         } catch (err) {
           $q.notify({
             type: "negative",
-            message: "Dashboard deletion failed",
+            message: err?.message ?? "Dashboard deletion failed",
             timeout: 2000,
           });
         }
@@ -660,7 +658,7 @@ export default defineComponent({
 
           $q.notify({
             type: "positive",
-            message: `Folder deleted successfully.`,
+            message: `Folder deleted successfully`,
             timeout: 2000,
           });
         } catch (err) {
