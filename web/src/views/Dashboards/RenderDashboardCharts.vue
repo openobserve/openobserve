@@ -233,7 +233,7 @@ export default defineComponent({
           message: "Dashboard updated successfully",
           timeout: 5000,
         });
-      } catch (error) {
+      } catch (error: any) {
         $q.notify({
           type: "negative",
           message: error?.message ?? "Dashboard update failed",

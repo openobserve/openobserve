@@ -240,7 +240,7 @@ export default defineComponent({
       } catch (error: any) {
         $q.notify({
           type: "negative",
-          message: error?.message ?? "tab reorder failed",
+          message: error?.message ?? "Tab reorder failed",
         });
       }
     };
@@ -283,7 +283,7 @@ export default defineComponent({
       } catch (error: any) {
         $q.notify({
           type: "negative",
-          message: error?.message ?? "tab updation failed",
+          message: error?.message ?? "Tab updation failed",
         });
 
         // emit refresh to rerender
