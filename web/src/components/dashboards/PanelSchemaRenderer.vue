@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(drilldown, index) in drilldownArray"
         :key="JSON.stringify(drilldown)"
-        class="drilldown-item"
+        class="drilldown-item q-px-sm q-py-xs"
         style="
           display: flex;
           flex-direction: row;

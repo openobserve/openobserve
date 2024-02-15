@@ -43,7 +43,7 @@
         </div>
         <q-icon
           class="q-mr-xs"
-          size="20px"
+          size="15px"
           name="close"
           style="cursor: pointer"
           @click="removeDataLink(index)"
