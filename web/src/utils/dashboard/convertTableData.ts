@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+
 /**
  * Converts table data based on the panel schema and search query data.
  *
@@ -46,7 +48,18 @@ export const convertTableData = (panelSchema: any, searchQueryData: any) => {
     if (isNumber) {
       obj["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
       obj["format"] = (val: any) =>
-        val ? val?.toFixed(panelSchema?.config?.decimals ?? 2) ?? 0 : val;
+        !Number.isNaN(val)
+          ? `${
+              formatUnitValue(
+                getUnitValue(
+                  val,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals ?? 2
+                )
+              ) ?? 0
+            }`
+          : val;
     }
     return obj;
   });
