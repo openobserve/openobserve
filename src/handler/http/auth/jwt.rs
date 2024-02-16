@@ -58,8 +58,13 @@ pub async fn process_token(
             }
         }
     };
-    let name = dec_token.claims.get("name").unwrap().as_str().unwrap();
+
     let user_email = res.0.user_email.to_owned();
+
+    let name = match dec_token.claims.get("name") {
+        None => res.0.user_email.to_owned(),
+        Some(name) => name.as_str().unwrap().to_string(),
+    };
     let mut source_orgs: Vec<UserOrg> = vec![];
     let mut tuples_to_add = HashMap::new();
     if groups.is_empty() {

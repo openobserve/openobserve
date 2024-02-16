@@ -54,7 +54,6 @@ const useEnterpriseRoutes = () => {
     },
   ];
 
-  console.log(config.isCloud, typeof config.isEnterprise);
   if (config.isCloud == "true" || config.isEnterprise == "true") {
     routes[0].children.push(
       ...[
