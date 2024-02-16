@@ -94,18 +94,20 @@ maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
-opentelemetry = { version = "0.18", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.11", features = [
+opentelemetry = "0.21"
+opentelemetry_sdk = { version = "0.21", features = ["rt-tokio", "trace"] }
+opentelemetry-otlp = { version = "0.14", features = [
   "http-proto",
   "serialize",
+  "serde",
   "reqwest-client",
 ] }
-opentelemetry-proto = { version = "0.2", features = [
+opentelemetry-proto = { version = "0.4", features = [
   "gen-tonic",
-  "traces",
+  "serde",
   "logs",
   "metrics",
-  "with-serde",
+  "trace",
 ] }
 parking_lot.workspace = true
 prometheus.workspace = true
@@ -153,7 +155,7 @@ ingester.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-tonic-build = { version = "0.8", features = ["prost"] }
+tonic-build = { version = "0.9", features = ["prost"] }
 prost-build = "0.11"
 
 [dev-dependencies]
@@ -178,7 +180,7 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = "4.4"
+actix-web = "4.5"
 actix-web-prometheus = { version = "0.1", features = ["process"] }
 anyhow = "1.0"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -249,11 +251,11 @@ thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
-tonic = { version = "0.8", features = ["prost", "gzip"] }
-tracing = { version = "0.1.40", features = ["attributes"] }
+tonic = { version = "0.9", features = ["prost", "gzip"] }
+tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
-tracing-opentelemetry = "0.18"
+tracing-opentelemetry = "0.22"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }

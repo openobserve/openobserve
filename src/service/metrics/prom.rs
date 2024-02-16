@@ -262,8 +262,9 @@ pub async fn remote_write(
             // get partition keys
             if !stream_partitioning_map.contains_key(&metric_name) {
                 let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    org_id,
+                    &StreamType::Metrics,
                     &metric_name,
-                    &metric_schema_map,
                 )
                 .await;
                 stream_partitioning_map.insert(metric_name.clone(), partition_det.clone());
@@ -278,7 +279,7 @@ pub async fn remote_write(
             // Start get stream alerts
             crate::service::ingestion::get_stream_alerts(
                 org_id,
-                StreamType::Metrics,
+                &StreamType::Metrics,
                 &metric_name,
                 &mut stream_alerts_map,
             )
@@ -291,7 +292,7 @@ pub async fn remote_write(
             let (local_trans, stream_vrl_map) =
                 crate::service::ingestion::register_stream_transforms(
                     org_id,
-                    StreamType::Metrics,
+                    &StreamType::Metrics,
                     &metric_name,
                 );
 

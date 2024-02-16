@@ -61,16 +61,14 @@ use openobserve::{
     job, router,
     service::{db, distinct_values},
 };
-use opentelemetry::{
-    sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource},
-    KeyValue,
-};
+use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_proto::tonic::collector::{
     logs::v1::logs_service_server::LogsServiceServer,
     metrics::v1::metrics_service_server::MetricsServiceServer,
     trace::v1::trace_service_server::TraceServiceServer,
 };
+use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
@@ -457,7 +455,7 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             KeyValue::new("service.instance", CONFIG.common.instance_name.as_str()),
             KeyValue::new("service.version", VERSION),
         ])))
-        .install_batch(opentelemetry::runtime::Tokio)?;
+        .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     let layer = if CONFIG.log.json_format {
         tracing_subscriber::fmt::layer()
