@@ -17,6 +17,7 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 use config::{ider, utils::rand::generate_random_string};
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
 use crate::{
