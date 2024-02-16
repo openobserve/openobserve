@@ -48,7 +48,7 @@ pub async fn process_token(
 
     let dec_token = res.1.unwrap();
 
-    let groups = match dec_token.claims.get("groups") {
+    let groups = match dec_token.claims.get(&O2_CONFIG.dex.group_claim) {
         None => vec![],
         Some(groups) => {
             if !groups.is_array() {
