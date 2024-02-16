@@ -288,6 +288,15 @@ export default defineComponent({
         ].fields.weight,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
         ].config.limit,
       ],
       () => {
@@ -299,6 +308,8 @@ export default defineComponent({
         ) {
           if (dashboardPanelData.data.type == "geomap") {
             query = geoMapChart();
+          } else if (dashboardPanelData.data.type == "sankey") {
+            query = sankeyChartQuery();
           } else {
             query = sqlchart();
           }
@@ -370,6 +381,112 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit ?? 0;
       query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    const sankeyChartQuery = () => {
+      const queryData =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      const { source, target, value } = queryData.fields;
+      const stream = queryData.fields.stream;
+
+      if (!source && !target && !value) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+        return;
+      }
+
+      let query = "SELECT ";
+      const selectFields = [];
+
+      if (source) {
+        selectFields.push(`${source.column} as ${source.alias}`);
+      }
+
+      if (target) {
+        selectFields.push(`${target.column} as ${target.alias}`);
+      }
+
+      if (value) {
+        selectFields.push(
+          `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+        );
+      }
+
+      // Adding the selected fields to the query
+      query += selectFields.join(", ");
+
+      query += ` FROM "${stream}"`;
+
+      // Adding filter conditions
+      const filterData = queryData.fields.filter || [];
+      const filterConditions = filterData.map((field: any) => {
+        let selectFilter = "";
+        if (field.type === "list" && field.values?.length > 0) {
+          selectFilter += `${field.column} IN (${field.values
+            .map((it: string) => `'${it}'`)
+            .join(", ")})`;
+        } else if (field.type === "condition" && field.operator != null) {
+          selectFilter += `${field.column} `;
+          if (["Is Null", "Is Not Null"].includes(field.operator)) {
+            selectFilter +=
+              field.operator === "Is Null" ? "IS NULL" : "IS NOT NULL";
+          } else if (field.value != null && field.value !== "") {
+            switch (field.operator) {
+              case "=":
+              case "<>":
+              case "<":
+              case ">":
+              case "<=":
+              case ">=":
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+              case "Contains":
+                selectFilter += `LIKE '%${field.value}%'`;
+                break;
+              case "Not Contains":
+                selectFilter += `NOT LIKE '%${field.value}%'`;
+                break;
+              default:
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+            }
+          }
+        }
+        return selectFilter;
+      });
+
+      // Adding filter conditions to the query
+      if (filterConditions.length > 0) {
+        query += " WHERE " + filterConditions.join(" AND ");
+      }
+
+      // Adding group by statement
+      if (source && target) {
+        query += ` GROUP BY ${source.alias}, ${target.alias}`;
+      }
+
+      // Adding sorting
+      const orderByArr: string[] = [];
+      [source, target, value].forEach((field) => {
+        if (field && field.sortBy) {
+          orderByArr.push(`${field.alias} ${field.sortBy}`);
+        }
+      });
+
+      if (orderByArr.length > 0) {
+        query += ` ORDER BY ${orderByArr.join(", ")}`;
+      }
+
+      // Adding limit
+      const queryLimit = queryData.config.limit ?? 0;
+      if (queryLimit > 0) {
+        query += ` LIMIT ${queryLimit}`;
+      }
 
       return query;
     };

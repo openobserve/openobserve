@@ -78,6 +78,9 @@ const getDefaultDashboardPanelData: any = () => ({
           latitude: null,
           longitude: null,
           weight: null,
+          source: null,
+          target: null,
+          value: null,
         },
         config: {
           promql_legend: "",
@@ -166,6 +169,9 @@ const useDashboardPanelData = () => {
         latitude: null,
         longitude: null,
         weight: null,
+        source: null,
+        target: null,
+        value: null,
       },
       config: {
         promql_legend: "",
@@ -469,6 +475,60 @@ const useDashboardPanelData = () => {
     }
   };
 
+  const addSource = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.source
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.source = {
+        label: generateLabelFromName(row.name),
+        alias: "source",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
+  const addTarget = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.target
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.target = {
+        label: generateLabelFromName(row.name),
+        alias: "target",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: null, // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
+  const addValue = (row: any) => {
+    if (
+      !dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value
+    ) {
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value = {
+        label: generateLabelFromName(row.name),
+        alias: "value",
+        column: row.name,
+        color: getNewColorValue(),
+        aggregationFunction: "sum", // You can set the appropriate aggregation function here
+      };
+    }
+  };
+
   // get new color value based on existing color from the chart
   const getNewColorValue = () => {
     const YAxisColor = dashboardPanelData.data.queries[
@@ -493,6 +553,9 @@ const useDashboardPanelData = () => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -515,6 +578,7 @@ const useDashboardPanelData = () => {
       case "h-stacked":
       case "metric":
       case "table":
+      case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.y.forEach((itemY: any) => {
@@ -531,6 +595,9 @@ const useDashboardPanelData = () => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -555,6 +622,11 @@ const useDashboardPanelData = () => {
         ].fields.filter = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+        });
         break;
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
@@ -566,6 +638,26 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.queryType = "";
         break;
+      case "sankey":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter = [];
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+        });
       default:
         break;
     }
@@ -667,6 +759,24 @@ const useDashboardPanelData = () => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.weight = null;
+  };
+
+  const removeSource = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.source = null;
+  };
+
+  const removeTarget = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.target = null;
+  };
+
+  const removeValue = () => {
+    dashboardPanelData.data.queries[
+      dashboardPanelData.layout.currentQueryIndex
+    ].fields.value = null;
   };
 
   const addFilteredItem = (name: string) => {
@@ -850,6 +960,15 @@ const useDashboardPanelData = () => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.weight = null;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.source = null;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.target = null;
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.value = null;
     }
   };
 
@@ -885,6 +1004,21 @@ const useDashboardPanelData = () => {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.weight;
+          } else if (name === "source") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.source;
+          } else if (name === "target") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.target;
+          } else if (name === "value") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.value;
           } else {
             // For other field types (x, y, z), determine the type and index as before
             let currentFieldType;
@@ -1067,6 +1201,48 @@ const useDashboardPanelData = () => {
           field.alias = newName;
           field.column = newName;
         }
+
+        //Check if the field is in the source fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.source;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the target fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.target;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
+
+        //Check if the field is in the value fields array
+        field =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.value;
+
+        if (field && field.alias == oldName) {
+          const newName = newArray[changedIndex[0]]?.name;
+
+          // Update the field alias and column to the new name
+          field.alias = newName;
+          field.column = newName;
+        }
       }
     }
   };
@@ -1081,6 +1257,9 @@ const useDashboardPanelData = () => {
     addLatitude,
     addLongitude,
     addWeight,
+    addSource,
+    addTarget,
+    addValue,
     removeXAxisItem,
     removeYAxisItem,
     removeZAxisItem,
@@ -1088,6 +1267,9 @@ const useDashboardPanelData = () => {
     removeLatitude,
     removeLongitude,
     removeWeight,
+    removeSource,
+    removeTarget,
+    removeValue,
     addFilteredItem,
     loadFilterItem,
     removeXYFilters,

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="chartPanelRef" style="height: 100%; position: relative">
-    <div v-show="!errorDetail" style="height: 100%; width: 100%">
+    <div v-if="!errorDetail" style="height: 100%; width: 100%">
       <GeoMapRenderer
         v-if="panelSchema.type == 'geomap'"
         :data="
@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : { options: { backgroundColor: 'transparent' } }
         "
         @updated:data-zoom="$emit('updated:data-zoom', $event)"
+        @error="errorDetail = $event"
       />
     </div>
     <div v-if="!errorDetail" class="noData" data-test="no-data">
@@ -178,6 +179,7 @@ export default defineComponent({
               chartPanelRef,
               hoveredSeriesState
             );
+
             errorDetail.value = "";
           } catch (error: any) {
             errorDetail.value = error.message;
@@ -256,6 +258,17 @@ export default defineComponent({
           return (
             data.value[0]?.length > 1 ||
             yAlias.every((y: any) => data.value[0][0][y] != null)
+          );
+        }
+        case "sankey": {
+          const source = panelSchema.value.queries[0].fields.source.alias;
+          const target = panelSchema.value.queries[0].fields.target.alias;
+          const value = panelSchema.value.queries[0].fields.value.alias;
+          return (
+            data.value[0]?.length > 1 ||
+            source.every((s: any) => data.value[0][0][s] != null) ||
+            target.every((t: any) => data.value[0][0][t] != null) ||
+            value.every((v: any) => data.value[0][0][v] != null)
           );
         }
         default:

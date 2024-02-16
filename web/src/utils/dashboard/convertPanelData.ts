@@ -17,6 +17,7 @@ import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertSQLData } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertMapData } from "@/utils/dashboard/convertMapData";
+import { convertSankeyData } from "./convertSankeyData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -52,6 +53,7 @@ export const convertPanelData = (
         // panelSchema?.customQuery &&
         panelSchema?.queryType == "promql"
       ) {
+
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
@@ -64,6 +66,7 @@ export const convertPanelData = (
           ),
         };
       } else {
+
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
@@ -87,6 +90,15 @@ export const convertPanelData = (
       return {
         chartType: panelSchema.type,
         ...convertMapData(panelSchema, data),
+      };
+    }
+    case "sankey": {
+      return {
+        chartType: panelSchema.type,
+        ...convertSankeyData(
+          panelSchema,
+          data,
+        ),
       };
     }
     default: {

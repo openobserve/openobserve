@@ -336,6 +336,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>+W</div>
                   </q-btn>
                 </div>
+                <div
+                  class="field_icons"
+                  v-if="
+                    !(
+                      promqlMode ||
+                      (dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].customQuery &&
+                        props.pageIndex >=
+                          dashboardPanelData.meta.stream.customQueryFields
+                            .length)
+                    ) && dashboardPanelData.data.type == 'sankey'
+                  "
+                >
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.source != null
+                    "
+                    no-caps
+                    padding="sm"
+                    @click="addSource(props.row)"
+                    data-test="dashboard-add-source-data"
+                  >
+                    <div>+S</div>
+                  </q-btn>
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.target != null
+                    "
+                    no-caps
+                    padding="sm"
+                    @click="addTarget(props.row)"
+                    data-test="dashboard-add-target-data"
+                  >
+                    <div>+T</div>
+                  </q-btn>
+                  <q-btn
+                    :disabled="
+                      dashboardPanelData.data.queries[
+                        dashboardPanelData.layout.currentQueryIndex
+                      ].fields?.value != null
+                    "
+                    padding="sm"
+                    @click="addValue(props.row)"
+                    data-test="dashboard-add-value-data"
+                  >
+                    <div>+V</div>
+                  </q-btn>
+                  <q-btn
+                    padding="sm"
+                    @click="addFilteredItem(props.row.name)"
+                    data-test="dashboard-add-filter-sankey-data"
+                  >
+                    <div>+F</div>
+                  </q-btn>
+                </div>
               </div>
             </q-td>
           </q-tr>
@@ -408,7 +468,10 @@ export default defineComponent({
       addLatitude,
       addLongitude,
       addWeight,
-      cleanupDraggingFields
+      addSource,
+      addTarget,
+      addValue,
+      cleanupDraggingFields,
     } = useDashboardPanelData();
 
     const onDragEnd = () => {
@@ -624,6 +687,9 @@ export default defineComponent({
       addLatitude,
       addLongitude,
       addWeight,
+      addSource,
+      addTarget,
+      addValue,
       addFilteredItem,
       data,
       getStreamList,
@@ -637,7 +703,7 @@ export default defineComponent({
       streamDataLoading,
       metricsIconMapping,
       selectedMetricTypeIcon,
-      onDragEnd
+      onDragEnd,
     };
   },
 });
