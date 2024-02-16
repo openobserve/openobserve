@@ -67,8 +67,9 @@ struct ConfigResponse<'a> {
     syslog_enabled: bool,
     data_retention_days: i64,
     restricted_routes_on_empty_data: bool,
-    dex_enabled: bool,
+    sso_enabled: bool,
     native_login_enabled: bool,
+    rbac_enabled: bool,
 }
 
 /// Healthz
@@ -89,13 +90,17 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
-    let dex_enabled = O2_CONFIG.dex.dex_enabled;
+    let sso_enabled = O2_CONFIG.dex.dex_enabled;
     #[cfg(not(feature = "enterprise"))]
-    let dex_enabled = false;
+    let sso_enabled = false;
     #[cfg(feature = "enterprise")]
     let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
     #[cfg(not(feature = "enterprise"))]
     let native_login_enabled = true;
+    #[cfg(feature = "enterprise")]
+    let rbac_enabled = O2_CONFIG.openfga.enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let rbac_enabled = false;
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -115,8 +120,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: CONFIG.compact.data_retention_days,
         restricted_routes_on_empty_data: CONFIG.common.restricted_routes_on_empty_data,
-        dex_enabled,
+        sso_enabled,
         native_login_enabled,
+        rbac_enabled,
     }))
 }
 
