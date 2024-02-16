@@ -15,7 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="!promqlMode && dashboardPanelData.data.type != 'geomap'">
+  <div
+    v-if="
+      !promqlMode &&
+      dashboardPanelData.data.type != 'geomap' &&
+      dashboardPanelData.data.type != 'sankey'
+    "
+  >
     <!-- x axis container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -544,7 +550,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-z-item-${itemZ?.column}`"
                   class="q-pl-sm"
                 >
-                  <q-menu class="q-pa-md" :data-test="`dashboard-z-item-${itemZ?.column}-menu`">
+                  <q-menu
+                    class="q-pa-md"
+                    :data-test="`dashboard-z-item-${itemZ?.column}-menu`"
+                  >
                     <div>
                       <div class="row q-mb-sm" style="align-items: center">
                         <div
@@ -904,6 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <DashboardMapQueryBuilder />
+  <DashboardSankeyChartBuilder />
 </template>
 
 <script lang="ts">
@@ -912,6 +922,7 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
+import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { useQuasar } from "quasar";
@@ -922,6 +933,7 @@ export default defineComponent({
     DashboardMapQueryBuilder,
     SortByBtnGrp,
     HistogramIntervalDropDown,
+    DashboardSankeyChartBuilder
   },
   setup() {
     const showXAxis = ref(true);
@@ -1158,7 +1170,6 @@ export default defineComponent({
       sourceIndex: number,
       targetIndex: number
     ) => {
-
       const fieldList =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex

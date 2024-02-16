@@ -603,7 +603,10 @@
     "promQL": "PromQL",
     "latitude": "Latitude",
     "longitude": "Longitude",
-    "weight": "Weight"
+    "weight": "Weight",
+    "source": "Source",
+    "target": "Target",
+    "value": "Value"
   },
   "home": {
     "streams": "Streams",

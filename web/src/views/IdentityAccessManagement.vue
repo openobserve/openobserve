@@ -20,7 +20,6 @@
 
 <script setup lang="ts">
 import RouteTabs from "@/components/RouteTabs.vue";
-import { onBeforeMount } from "vue";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -36,43 +35,6 @@ const router = useRouter();
 const activeTab = ref("users");
 
 const iamRouteTabsRef: any = ref(null);
-
-onBeforeMount(() => {
-  setTabs();
-});
-
-watch(
-  () => router.currentRoute.value.name,
-  async (value) => {
-    if (!value) return;
-    await nextTick();
-    if (value === "iam") {
-      router.push({
-        name: activeTab.value,
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    }
-  },
-  {
-    immediate: true,
-  }
-);
-
-const setTabs = () => {
-  const enterprise = ["users", "groups", "roles", "organizations"];
-  const os = ["users"];
-
-  const isEnterprise =
-    config.isEnterprise == "true" || config.isCloud == "true";
-
-  if (isEnterprise) {
-    tabs.value = tabs.value.filter((tab) => enterprise.includes(tab.name));
-  } else {
-    tabs.value = tabs.value.filter((tab) => os.includes(tab.name));
-  }
-};
 
 const tabs = ref([
   {
@@ -124,6 +86,61 @@ const tabs = ref([
     class: "tab_content",
   },
 ]);
+
+watch(
+  () => router.currentRoute.value.name,
+  async (value) => {
+    if (!value) return;
+    await nextTick();
+    if (value === "iam") {
+      router.push({
+        name: activeTab.value,
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
+  },
+  {
+    immediate: true,
+  }
+);
+
+watch(
+  () => store.state.zoConfig,
+  () => {
+    setTabs();
+  },
+  {
+    immediate: true,
+  }
+);
+
+function setTabs() {
+  const cloud = ["users", "organizations"];
+
+  const rbac = ["groups", "roles"];
+
+  const os = ["users"];
+
+  const isEnterprise =
+    config.isEnterprise == "true" || config.isCloud == "true";
+
+  if (isEnterprise) {
+    let filteredTabs = tabs.value.filter((tab) => cloud.includes(tab.name));
+
+    if (store.state.zoConfig.rbac_enabled) {
+      filteredTabs = [
+        ...filteredTabs,
+        ...tabs.value.filter((tab) => rbac.includes(tab.name)),
+      ];
+    }
+
+    tabs.value = filteredTabs;
+  } else {
+    tabs.value = tabs.value.filter((tab) => os.includes(tab.name));
+  }
+}
 
 const updateActiveTab = (tab: string) => {
   if (tab) activeTab.value = tab;

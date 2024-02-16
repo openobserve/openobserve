@@ -84,7 +84,7 @@ import { useStore } from "vuex";
 
 export default defineComponent({
   name: "ChartRenderer",
-  emits: ["updated:chart", "click", "updated:dataZoom"],
+  emits: ["updated:chart", "click", "updated:dataZoom", "error"],
   props: {
     data: {
       required: true,
@@ -97,9 +97,11 @@ export default defineComponent({
     let chart: any;
     const store = useStore();
     const windowResizeEventCallback = async () => {
-      await nextTick();
-      await nextTick();
-      chart?.resize();
+      try {
+        await nextTick();
+        await nextTick();
+        chart?.resize();
+      } catch (e) {}
     };
 
     // currently hovered series state
@@ -111,6 +113,12 @@ export default defineComponent({
       if (params?.componentSubType === "pie") {
         params.seriesName = params?.data?.name;
         params.seriesIndex = params?.dataIndex;
+      }
+
+      // if sankey chart then do not set seriesName and seriesIndex
+      if (params?.componentSubType === "sankey") {
+        params.seriesName = "";
+        params.seriesIndex = -1;
       }
 
       // set current hovered series name in state
@@ -161,7 +169,6 @@ export default defineComponent({
 
       // set options with selected object
       if (legendOption) {
-        legendOption.selected = params?.selected || 0;
         chart?.setOption({ legend: [legendOption] });
       }
     };
@@ -336,26 +343,35 @@ export default defineComponent({
           (options.tooltip.backgroundColor =
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
-        chart?.setOption(options, true);
-        chart?.setOption({ animation: true });
+        try {
+          chart?.setOption(options, true);
+          chart?.setOption({ animation: true });
+        } catch (e) {
+          emit("error", e);
+        }
+
         chartInitialSetUp();
       }
     );
 
     onMounted(async () => {
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      await nextTick();
-      const theme = store.state.theme === "dark" ? "dark" : "light";
-      if (chartRef.value) {
-        chart = echarts.init(chartRef.value, theme);
+      try {
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        const theme = store.state.theme === "dark" ? "dark" : "light";
+        if (chartRef.value) {
+          chart = echarts.init(chartRef.value, theme);
+        }
+        chart?.setOption(props?.data?.options || {}, true);
+        chartInitialSetUp();
+      } catch (e) {
+        emit("error", e);
       }
-      chart?.setOption(props?.data?.options || {}, true);
-      chartInitialSetUp();
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
@@ -376,19 +392,26 @@ export default defineComponent({
     watch(
       () => props.data.options,
       async () => {
-        await nextTick();
-        chart?.resize();
-        chart?.setOption(props?.data?.options || {}, true);
-        // we need that toolbox datazoom button initally selected
-        // for that we required to dispatch an event
-        // while dispatching an event we need to pass a datazoomselectactive as true
-        // this action is available in the echarts docs in list of brush actions
-        chart?.dispatchAction({
-          type: "takeGlobalCursor",
-          key: "dataZoomSelect",
-          dataZoomSelectActive: true,
-        });
-        windowResizeEventCallback();
+        try {
+          await nextTick();
+          chart?.resize();
+          try {
+            chart?.setOption(props?.data?.options || {}, true);
+          } catch (error) {}
+
+          // we need that toolbox datazoom button initally selected
+          // for that we required to dispatch an event
+          // while dispatching an event we need to pass a datazoomselectactive as true
+          // this action is available in the echarts docs in list of brush actions
+          chart?.dispatchAction({
+            type: "takeGlobalCursor",
+            key: "dataZoomSelect",
+            dataZoomSelectActive: true,
+          });
+          windowResizeEventCallback();
+        } catch (e) {
+          emit("error", e);
+        }
       },
       { deep: true }
     );
