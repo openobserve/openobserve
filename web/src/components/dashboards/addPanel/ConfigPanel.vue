@@ -571,7 +571,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
       <Drilldown
-        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        v-if="
+          !['html', 'markdown', 'geomap', 'geojson'].includes(
+            dashboardPanelData.data.type
+          )
+        "
       />
     </div>
   </div>
