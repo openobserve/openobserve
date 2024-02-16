@@ -22,10 +22,7 @@
  * @return {Object} - the options object for rendering the chart
  */
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   if (
@@ -95,15 +92,17 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
       },
     },
     backgroundColor: "transparent",
-    series: {
-      type: "sankey",
-      layout: "none",
-      data: [...nodes].map((node: string) => ({ name: node })),
-      links: links,
-      emphasis: {
-        focus: "adjacency",
+    series: [
+      {
+        type: "sankey",
+        layout: "none",
+        data: [...nodes].map((node: string) => ({ name: node })),
+        links: links,
+        emphasis: {
+          focus: "adjacency",
+        },
       },
-    },
+    ],
   };
 
   return { options };
