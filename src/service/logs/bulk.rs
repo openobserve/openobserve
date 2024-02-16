@@ -121,7 +121,7 @@ pub async fn ingest(
 
             crate::service::ingestion::get_stream_transforms(
                 org_id,
-                StreamType::Logs,
+                &StreamType::Logs,
                 &stream_name,
                 &mut stream_transform_map,
                 &mut stream_vrl_map,
@@ -132,7 +132,7 @@ pub async fn ingest(
             // Start get stream alerts
             crate::service::ingestion::get_stream_alerts(
                 org_id,
-                StreamType::Logs,
+                &StreamType::Logs,
                 &stream_name,
                 &mut stream_alerts_map,
             )
@@ -148,8 +148,9 @@ pub async fn ingest(
                 )
                 .await;
                 let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                    org_id,
+                    &StreamType::Logs,
                     &stream_name,
-                    &stream_schema_map,
                 )
                 .await;
                 stream_partition_keys_map

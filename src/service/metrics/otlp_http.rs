@@ -190,8 +190,9 @@ pub async fn metrics_json_handler(
                     // get partition keys
                     if !stream_partitioning_map.contains_key(metric_name) {
                         let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                            org_id,
+                            &StreamType::Metrics,
                             metric_name,
-                            &metric_schema_map,
                         )
                         .await;
                         stream_partitioning_map
@@ -207,7 +208,7 @@ pub async fn metrics_json_handler(
                     // Start get stream alerts
                     crate::service::ingestion::get_stream_alerts(
                         org_id,
-                        StreamType::Metrics,
+                        &StreamType::Metrics,
                         metric_name,
                         &mut stream_alerts_map,
                     )
@@ -218,7 +219,7 @@ pub async fn metrics_json_handler(
                     let (mut local_trans, mut stream_vrl_map) =
                         crate::service::ingestion::register_stream_transforms(
                             org_id,
-                            StreamType::Metrics,
+                            &StreamType::Metrics,
                             metric_name,
                         );
                     // End Register Transforms for stream
@@ -322,8 +323,9 @@ pub async fn metrics_json_handler(
                             if !stream_partitioning_map.contains_key(local_metric_name) {
                                 let partition_det =
                                     crate::service::ingestion::get_stream_partition_keys(
+                                        org_id,
+                                        &StreamType::Metrics,
                                         local_metric_name,
-                                        &metric_schema_map,
                                     )
                                     .await;
                                 stream_partitioning_map
@@ -339,7 +341,7 @@ pub async fn metrics_json_handler(
                             // Start get stream alerts
                             crate::service::ingestion::get_stream_alerts(
                                 org_id,
-                                StreamType::Metrics,
+                                &StreamType::Metrics,
                                 local_metric_name,
                                 &mut stream_alerts_map,
                             )
@@ -350,7 +352,7 @@ pub async fn metrics_json_handler(
                             (local_trans, stream_vrl_map) =
                                 crate::service::ingestion::register_stream_transforms(
                                     org_id,
-                                    StreamType::Metrics,
+                                    &StreamType::Metrics,
                                     local_metric_name,
                                 );
                             // End Register Transforms for stream
@@ -741,9 +743,9 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
 
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
@@ -776,9 +778,9 @@ fn process_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
@@ -846,9 +848,9 @@ fn process_exp_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
@@ -933,9 +935,9 @@ fn process_summary_data_point(
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }

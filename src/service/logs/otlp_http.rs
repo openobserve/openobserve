@@ -149,15 +149,19 @@ pub async fn logs_json_handler(
     let min_ts =
         (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
 
-    let partition_det =
-        crate::service::ingestion::get_stream_partition_keys(stream_name, &stream_schema_map).await;
+    let partition_det = crate::service::ingestion::get_stream_partition_keys(
+        org_id,
+        &StreamType::Logs,
+        stream_name,
+    )
+    .await;
     let partition_keys = partition_det.partition_keys;
     let partition_time_level = partition_det.partition_time_level;
 
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
         org_id,
-        StreamType::Logs,
+        &StreamType::Logs,
         stream_name,
         &mut stream_alerts_map,
     )
@@ -167,7 +171,7 @@ pub async fn logs_json_handler(
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
-        StreamType::Logs,
+        &StreamType::Logs,
         stream_name,
     );
     // End Register Transforms for stream

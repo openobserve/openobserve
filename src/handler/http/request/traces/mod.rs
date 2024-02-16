@@ -402,6 +402,8 @@ pub async fn get_latest_traces(
             });
         }
     }
+    let mut traces_data = traces_data.values().collect::<Vec<&TraceResponseItem>>();
+    traces_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
 
     let time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
@@ -428,10 +430,7 @@ pub async fn get_latest_traces(
     resp.insert("total", json::Value::from(traces_data.len()));
     resp.insert("from", json::Value::from(from));
     resp.insert("size", json::Value::from(size));
-    resp.insert(
-        "hits",
-        json::to_value(traces_data.values().collect::<Vec<&TraceResponseItem>>()).unwrap(),
-    );
+    resp.insert("hits", json::to_value(traces_data).unwrap());
     resp.insert("session_id", json::Value::from(session_id));
     Ok(HttpResponse::Ok().json(resp))
 }

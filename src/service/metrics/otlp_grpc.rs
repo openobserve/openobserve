@@ -111,8 +111,9 @@ pub async fn handle_grpc_request(
                 // get partition keys
                 if !stream_partitioning_map.contains_key(metric_name) {
                     let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                        org_id,
+                        &StreamType::Metrics,
                         metric_name,
-                        &metric_schema_map,
                     )
                     .await;
                     stream_partitioning_map
@@ -128,7 +129,7 @@ pub async fn handle_grpc_request(
                 // Start get stream alerts
                 crate::service::ingestion::get_stream_alerts(
                     org_id,
-                    StreamType::Metrics,
+                    &StreamType::Metrics,
                     metric_name,
                     &mut stream_alerts_map,
                 )
@@ -139,7 +140,7 @@ pub async fn handle_grpc_request(
                 let (mut local_trans, mut stream_vrl_map) =
                     crate::service::ingestion::register_stream_transforms(
                         org_id,
-                        StreamType::Metrics,
+                        &StreamType::Metrics,
                         metric_name,
                     );
                 // End Register Transforms for stream
@@ -228,8 +229,9 @@ pub async fn handle_grpc_request(
                         if !stream_partitioning_map.contains_key(local_metric_name) {
                             let partition_det =
                                 crate::service::ingestion::get_stream_partition_keys(
+                                    org_id,
+                                    &StreamType::Metrics,
                                     local_metric_name,
-                                    &metric_schema_map,
                                 )
                                 .await;
                             stream_partitioning_map
@@ -245,7 +247,7 @@ pub async fn handle_grpc_request(
                         // Start get stream alerts
                         crate::service::ingestion::get_stream_alerts(
                             org_id,
-                            StreamType::Metrics,
+                            &StreamType::Metrics,
                             local_metric_name,
                             &mut stream_alerts_map,
                         )
@@ -256,7 +258,7 @@ pub async fn handle_grpc_request(
                         (local_trans, stream_vrl_map) =
                             crate::service::ingestion::register_stream_transforms(
                                 org_id,
-                                StreamType::Metrics,
+                                &StreamType::Metrics,
                                 local_metric_name,
                             );
                         // End Register Transforms for stream
@@ -575,9 +577,9 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
@@ -595,9 +597,9 @@ fn process_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
@@ -644,9 +646,9 @@ fn process_exp_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
@@ -709,9 +711,9 @@ fn process_summary_data_point(
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     // add count record

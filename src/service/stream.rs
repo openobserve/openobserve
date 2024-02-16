@@ -30,7 +30,7 @@ use infra::cache::stats;
 
 use crate::{
     common::{
-        infra::config::STREAM_SCHEMAS,
+        infra::config::{STREAM_SCHEMAS, STREAM_SETTINGS},
         meta::{
             self,
             authz::Authz,
@@ -278,6 +278,11 @@ pub async fn delete_stream(
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut w = STREAM_SCHEMAS.write().await;
+    w.remove(&key);
+    drop(w);
+
+    // delete stream settings cache
+    let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
 

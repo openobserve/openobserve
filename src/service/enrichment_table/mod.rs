@@ -37,7 +37,7 @@ use infra::cache::stats;
 
 use crate::{
     common::{
-        infra::config::STREAM_SCHEMAS,
+        infra::config::{STREAM_SCHEMAS, STREAM_SETTINGS},
         meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     },
     service::{
@@ -243,6 +243,11 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     // delete stream schema cache
     let key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut w = STREAM_SCHEMAS.write().await;
+    w.remove(&key);
+    drop(w);
+
+    // delete stream settings cache
+    let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
 

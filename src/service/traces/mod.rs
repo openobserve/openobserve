@@ -46,7 +46,7 @@ use crate::{
         traces::{Event, Span, SpanRefType},
     },
     service::{
-        db, distinct_values, format_partition_key, format_stream_name,
+        db, distinct_values, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
         schema::{check_for_schema, stream_schema_exists},
         stream::unwrap_partition_time_level,
@@ -69,6 +69,8 @@ pub async fn handle_trace_request(
     is_grpc: bool,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -95,23 +97,19 @@ pub async fn handle_trace_request(
         );
     }
 
-    let start = std::time::Instant::now();
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
+    let mut traces_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    let mut distinct_values = Vec::with_capacity(16);
 
     let traces_stream_name = match in_stream_name {
         Some(name) => format_stream_name(name),
         None => "default".to_owned(),
     };
 
-    let traces_stream_name = &traces_stream_name;
-
-    let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut traces_schema_map: HashMap<String, Schema> = HashMap::new();
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut distinct_values = Vec::with_capacity(16);
-
     let stream_schema = stream_schema_exists(
         org_id,
-        traces_stream_name,
+        &traces_stream_name,
         StreamType::Traces,
         &mut traces_schema_map,
     )
@@ -122,20 +120,24 @@ pub async fn handle_trace_request(
         PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str());
     if stream_schema.has_partition_keys {
         let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            traces_stream_name,
-            &traces_schema_map,
+            org_id,
+            &StreamType::Traces,
+            &traces_stream_name,
         )
         .await;
         partition_keys = partition_det.partition_keys;
         partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
+    if partition_keys.is_empty() {
+        partition_keys.push(StreamPartition::new("service_name"));
+    }
 
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
         org_id,
-        StreamType::Traces,
-        traces_stream_name,
+        &StreamType::Traces,
+        &traces_stream_name,
         &mut stream_alerts_map,
     )
     .await;
@@ -144,8 +146,8 @@ pub async fn handle_trace_request(
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
-        StreamType::Traces,
-        traces_stream_name,
+        &StreamType::Traces,
+        &traces_stream_name,
     );
     // End Register Transforms for stream
 
@@ -259,7 +261,7 @@ pub async fn handle_trace_request(
                         &local_trans,
                         value,
                         &stream_vrl_map,
-                        traces_stream_name,
+                        &traces_stream_name,
                         &mut runtime,
                     )
                     .map_err(|e| {
@@ -302,7 +304,7 @@ pub async fn handle_trace_request(
                 // check schema
                 let _ = check_for_schema(
                     org_id,
-                    traces_stream_name,
+                    &traces_stream_name,
                     StreamType::Traces,
                     &mut traces_schema_map,
                     &record_val,
@@ -327,23 +329,18 @@ pub async fn handle_trace_request(
 
                 // get hour key
                 let rec_schema = traces_schema_map
-                    .get(traces_stream_name)
+                    .get(&traces_stream_name)
                     .unwrap()
                     .clone()
                     .with_metadata(HashMap::new());
                 let schema_key = rec_schema.hash_key();
-                let mut hour_key = super::ingestion::get_wal_time_key(
+                let hour_key = super::ingestion::get_wal_time_key(
                     timestamp.try_into().unwrap(),
                     &partition_keys,
                     partition_time_level,
                     &record_val,
                     Some(&schema_key),
                 );
-
-                if partition_keys.is_empty() {
-                    let partition_key = format!("service_name={}", service_name);
-                    hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
-                }
 
                 let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
                     schema_key,
@@ -367,7 +364,7 @@ pub async fn handle_trace_request(
 
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
-    let mut req_stats = write_file(&writer, traces_stream_name, data_buf).await;
+    let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
@@ -392,7 +389,7 @@ pub async fn handle_trace_request(
             ep,
             "200",
             org_id,
-            traces_stream_name,
+            &traces_stream_name,
             StreamType::Traces.to_string().as_str(),
         ])
         .observe(time);
@@ -401,7 +398,7 @@ pub async fn handle_trace_request(
             ep,
             "200",
             org_id,
-            traces_stream_name,
+            &traces_stream_name,
             StreamType::Traces.to_string().as_str(),
         ])
         .inc();
@@ -410,7 +407,7 @@ pub async fn handle_trace_request(
     report_request_usage_stats(
         req_stats,
         org_id,
-        traces_stream_name,
+        &traces_stream_name,
         StreamType::Traces,
         UsageType::Traces,
         0,

@@ -19,7 +19,6 @@ use std::{
 };
 
 use anyhow::{anyhow, Result};
-use arrow_schema::Schema;
 use chrono::{TimeZone, Utc};
 use config::{
     cluster,
@@ -49,7 +48,7 @@ use crate::{
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key, stream::stream_settings},
+    service::{db, format_partition_key},
 };
 
 pub mod grpc;
@@ -118,12 +117,12 @@ pub fn apply_vrl_fn(runtime: &mut Runtime, vrl_runtime: &VRLResultResolver, row:
 
 pub async fn get_stream_transforms<'a>(
     org_id: &str,
-    stream_type: StreamType,
+    stream_type: &StreamType,
     stream_name: &str,
     stream_transform_map: &mut HashMap<String, Vec<StreamTransform>>,
     stream_vrl_map: &mut HashMap<String, VRLResultResolver>,
 ) {
-    let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
     if stream_transform_map.contains_key(&key) {
         return;
     }
@@ -134,15 +133,13 @@ pub async fn get_stream_transforms<'a>(
 }
 
 pub async fn get_stream_partition_keys(
+    org_id: &str,
+    stream_type: &StreamType,
     stream_name: &str,
-    stream_schema_map: &HashMap<String, Schema>,
 ) -> PartitioningDetails {
-    let schema = match stream_schema_map.get(stream_name) {
-        Some(schema) => schema,
-        None => return PartitioningDetails::default(),
-    };
-
-    let stream_settings = stream_settings(schema).unwrap_or_default();
+    let stream_settings = db::schema::get_settings(org_id, stream_type, stream_name)
+        .await
+        .unwrap_or_default();
     PartitioningDetails {
         partition_keys: stream_settings.partition_keys,
         partition_time_level: stream_settings.partition_time_level,
@@ -151,7 +148,7 @@ pub async fn get_stream_partition_keys(
 
 pub async fn get_stream_alerts(
     org_id: &str,
-    stream_type: StreamType,
+    stream_type: &StreamType,
     stream_name: &str,
     stream_alerts_map: &mut HashMap<String, Vec<Alert>>,
 ) {
@@ -236,12 +233,12 @@ pub fn get_wal_time_key(
 
 pub fn register_stream_transforms(
     org_id: &str,
-    stream_type: StreamType,
+    stream_type: &StreamType,
     stream_name: &str,
 ) -> (Vec<StreamTransform>, HashMap<String, VRLResultResolver>) {
     let mut local_trans = vec![];
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
-    let key = format!("{}/{}/{}", &org_id, stream_type, &stream_name);
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
 
     if let Some(transforms) = STREAM_FUNCTIONS.get(&key) {
         local_trans = (*transforms.list).to_vec();
@@ -357,6 +354,14 @@ pub fn get_int_value(val: &Value) -> i64 {
     }
 }
 
+pub fn get_uint_value(val: &Value) -> u64 {
+    match val {
+        Value::String(v) => v.parse::<u64>().unwrap_or(0),
+        Value::Number(v) => v.as_u64().unwrap_or(0),
+        _ => 0,
+    }
+}
+
 pub fn get_string_value(value: &Value) -> String {
     if value.is_boolean() {
         value.as_bool().unwrap_or_default().to_string()
@@ -459,7 +464,10 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::common::meta::stream::StreamPartition;
+    use crate::{
+        common::{infra::config::STREAM_SETTINGS, meta::stream::StreamPartition},
+        service::stream::stream_settings,
+    };
 
     #[test]
     fn test_format_partition_key() {
@@ -516,15 +524,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_get_stream_partition_keys() {
-        let mut stream_schema_map = HashMap::new();
         let mut meta = HashMap::new();
         meta.insert(
             "settings".to_string(),
             r#"{"partition_keys": {"country": "country", "sport": "sport"}}"#.to_string(),
         );
-        let schema = Schema::empty().with_metadata(meta);
-        stream_schema_map.insert("olympics".to_string(), schema);
-        let keys = get_stream_partition_keys("olympics", &stream_schema_map).await;
+        let schema = arrow_schema::Schema::empty().with_metadata(meta);
+        let settings = stream_settings(&schema).unwrap();
+        let mut w = STREAM_SETTINGS.write().await;
+        w.insert("default/logs/olympics".to_string(), settings);
+        drop(w);
+        let keys = get_stream_partition_keys("default", &StreamType::Logs, "olympics").await;
         assert_eq!(
             keys.partition_keys,
             vec![
