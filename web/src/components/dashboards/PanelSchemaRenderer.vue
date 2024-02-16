@@ -109,39 +109,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin: 0 auto; z-index: 999"
         />
       </div>
-    </div>
-    <div
-      style="
-        border: 1px solid gray;
-        border-radius: 4px;
-        padding: 3px;
-        position: absolute;
-        top: 0px;
-        left: 0px;
-        display: none;
-        text-wrap: nowrap;
-      "
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      ref="drilldownPopUpRef"
-      @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
-    >
       <div
-        v-for="(drilldown, index) in drilldownArray"
-        :key="JSON.stringify(drilldown)"
-        class="drilldown-item q-px-sm q-py-xs"
         style="
-          display: flex;
-          flex-direction: row;
-          align-items: center;
-          position: relative;
+          border: 1px solid gray;
+          border-radius: 4px;
+          padding: 3px;
+          position: absolute;
+          top: 0px;
+          left: 0px;
+          display: none;
+          text-wrap: nowrap;
+          z-index: 9999999;
         "
+        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        ref="drilldownPopUpRef"
+        @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
       >
         <div
-          @click="openDrilldown(index)"
-          style="cursor: pointer; display: flex; align-items: center"
+          v-for="(drilldown, index) in drilldownArray"
+          :key="JSON.stringify(drilldown)"
+          class="drilldown-item q-px-sm q-py-xs"
+          style="
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            position: relative;
+          "
         >
-          <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
-          <span>{{ drilldown.name }}</span>
+          <div
+            @click="openDrilldown(index)"
+            style="cursor: pointer; display: flex; align-items: center"
+          >
+            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
+            <span>{{ drilldown.name }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -382,7 +383,7 @@ export default defineComponent({
           if (value && part in value) {
             value = value[part];
           } else {
-            return "${" + part + "}";
+            return "${" + key + "}";
           }
         }
         return value;
@@ -449,7 +450,7 @@ export default defineComponent({
       }
 
       // 24 px takes panel header height
-      drilldownPopUpRef.value.style.top = offSetValues?.top + 24 + "px";
+      drilldownPopUpRef.value.style.top = offSetValues?.top + 5 + "px";
       drilldownPopUpRef.value.style.left = offSetValues?.left + 5 + "px";
 
       // if drilldownArray has at least one element then only show the drilldown pop up
@@ -500,6 +501,23 @@ export default defineComponent({
             field: fields,
             index: drilldownParams[1][1],
           };
+        } else if (panelSchema.value.type == "sankey") {
+          // if dataType is node then set node data
+          // else set edge data
+          if (drilldownParams[0].dataType == "node") {
+            // set node data
+            drilldownVariables.node = {
+              __name: drilldownParams[0]?.name ?? "",
+              __value: drilldownParams[0]?.value ?? "",
+            };
+          } else {
+            // set edge data
+            drilldownVariables.edge = {
+              __source: drilldownParams[0]?.data?.source ?? "",
+              __target: drilldownParams[0]?.data?.target ?? "",
+              __value: drilldownParams[0]?.data?.value ?? "",
+            };
+          }
         } else {
           // we have an series object
           drilldownVariables.series = {
