@@ -23,10 +23,10 @@ use infra::{cache, db as infra_db};
 
 use crate::{
     common::{
-        infra::config::{ENRICHMENT_TABLES, STREAM_SCHEMAS},
-        meta::stream::StreamSchema,
+        infra::config::{ENRICHMENT_TABLES, STREAM_SCHEMAS, STREAM_SETTINGS},
+        meta::stream::{StreamSchema, StreamSettings},
     },
-    service::enrichment::StreamTable,
+    service::{enrichment::StreamTable, stream::stream_settings},
 };
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -64,6 +64,16 @@ pub async fn get(
             }
         }
     })
+}
+
+pub async fn get_settings(
+    org_id: &str,
+    stream_type: &StreamType,
+    stream_name: &str,
+) -> Option<StreamSettings> {
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let r = STREAM_SETTINGS.read().await;
+    r.get(&key).cloned()
 }
 
 pub async fn get_from_db(
@@ -197,9 +207,14 @@ pub async fn set(
         .await
     {
         Ok(_) => {
+            let settings = stream_settings(values.last().unwrap()).unwrap_or_default();
             let mut w = STREAM_SCHEMAS.write().await;
-            w.insert(map_key.to_owned(), values);
+            w.insert(map_key.to_string(), values);
             drop(w);
+            let mut w = STREAM_SETTINGS.write().await;
+            w.insert(map_key.to_string(), settings);
+            drop(w);
+
             Ok(())
         }
         Err(e) => {
@@ -329,8 +344,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = json::from_slice(&ev.value.unwrap()).unwrap();
+                let settings = stream_settings(item_value.last().unwrap()).unwrap_or_default();
                 let mut w = STREAM_SCHEMAS.write().await;
-                w.insert(item_key.to_owned(), item_value.clone());
+                w.insert(item_key.to_string(), item_value.clone());
+                drop(w);
+                let mut w = STREAM_SETTINGS.write().await;
+                w.insert(item_key.to_string(), settings);
                 drop(w);
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
@@ -357,6 +376,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
                 let mut w = STREAM_SCHEMAS.write().await;
+                w.remove(item_key);
+                drop(w);
+                let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
@@ -417,8 +439,12 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 ));
             }
         };
+        let settings = stream_settings(json_val.last().unwrap()).unwrap_or_default();
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key_str.to_string(), json_val);
+        drop(w);
+        let mut w = STREAM_SETTINGS.write().await;
+        w.insert(item_key_str.to_string(), settings);
         drop(w);
     }
     log::info!("Stream schemas Cached");

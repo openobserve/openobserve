@@ -15,8 +15,8 @@
 
 pub mod cluster;
 pub mod config;
-pub mod wal;
 pub mod ofga;
+pub mod wal;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     wal::init().await?;

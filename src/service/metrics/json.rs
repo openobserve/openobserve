@@ -229,8 +229,9 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         // write into buffer
         if !stream_partitioning_map.contains_key(&stream_name) {
             let partition_det = crate::service::ingestion::get_stream_partition_keys(
+                org_id,
+                &StreamType::Metrics,
                 &stream_name,
-                &stream_schema_map,
             )
             .await;
             stream_partitioning_map.insert(stream_name.to_string(), partition_det.clone());
@@ -338,7 +339,7 @@ fn apply_func(
 ) -> Result<json::Value> {
     let (local_tans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
-        StreamType::Metrics,
+        &StreamType::Metrics,
         metric_name,
     );
 

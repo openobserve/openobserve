@@ -39,7 +39,7 @@ use crate::{
         traces::{Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType},
     },
     service::{
-        db, distinct_values, format_partition_key, format_stream_name,
+        db, distinct_values, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
         schema::{check_for_schema, stream_schema_exists},
         stream::unwrap_partition_time_level,
@@ -69,6 +69,8 @@ pub async fn traces_json(
     body: web::Bytes,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::error(
@@ -95,13 +97,6 @@ pub async fn traces_json(
         );
     }
 
-    let start = std::time::Instant::now();
-    let traces_stream_name = match in_stream_name {
-        Some(name) => format_stream_name(name),
-        None => "default".to_string(),
-    };
-    let traces_stream_name = &traces_stream_name;
-
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut traces_schema_map: HashMap<String, Schema> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -112,9 +107,14 @@ pub async fn traces_json(
     let mut partial_success = ExportTracePartialSuccess::default();
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
+    let traces_stream_name = match in_stream_name {
+        Some(name) => format_stream_name(name),
+        None => "default".to_string(),
+    };
+
     let stream_schema = stream_schema_exists(
         org_id,
-        traces_stream_name,
+        &traces_stream_name,
         StreamType::Traces,
         &mut traces_schema_map,
     )
@@ -125,20 +125,24 @@ pub async fn traces_json(
         PartitionTimeLevel::from(CONFIG.limit.traces_file_retention.as_str());
     if stream_schema.has_partition_keys {
         let partition_det = crate::service::ingestion::get_stream_partition_keys(
-            traces_stream_name,
-            &traces_schema_map,
+            org_id,
+            &StreamType::Traces,
+            &traces_stream_name,
         )
         .await;
         partition_keys = partition_det.partition_keys;
         partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
+    if partition_keys.is_empty() {
+        partition_keys.push(StreamPartition::new("service_name"));
+    }
 
     // Start get stream alerts
     crate::service::ingestion::get_stream_alerts(
         org_id,
-        StreamType::Traces,
-        traces_stream_name,
+        &StreamType::Traces,
+        &traces_stream_name,
         &mut stream_alerts_map,
     )
     .await;
@@ -147,8 +151,8 @@ pub async fn traces_json(
     // Start Register Transforms for stream
     let (local_trans, stream_vrl_map) = crate::service::ingestion::register_stream_transforms(
         org_id,
-        StreamType::Traces,
-        traces_stream_name,
+        &StreamType::Traces,
+        &traces_stream_name,
     );
     // End Register Transforms for stream
 
@@ -313,7 +317,7 @@ pub async fn traces_json(
                             &local_trans,
                             value,
                             &stream_vrl_map,
-                            traces_stream_name,
+                            &traces_stream_name,
                             &mut runtime,
                         )
                         .map_err(|e| {
@@ -356,7 +360,7 @@ pub async fn traces_json(
                     // check schema
                     let _ = check_for_schema(
                         org_id,
-                        traces_stream_name,
+                        &traces_stream_name,
                         StreamType::Traces,
                         &mut traces_schema_map,
                         &record_val,
@@ -382,23 +386,18 @@ pub async fn traces_json(
 
                     // get hour key
                     let rec_schema = traces_schema_map
-                        .get(traces_stream_name)
+                        .get(&traces_stream_name)
                         .unwrap()
                         .clone()
                         .with_metadata(HashMap::new());
                     let schema_key = rec_schema.hash_key();
-                    let mut hour_key = crate::service::ingestion::get_wal_time_key(
+                    let hour_key = crate::service::ingestion::get_wal_time_key(
                         timestamp.try_into().unwrap(),
                         &partition_keys,
                         partition_time_level,
                         &record_val,
                         Some(&schema_key),
                     );
-
-                    if partition_keys.is_empty() {
-                        let partition_key = format!("service_name={}", service_name);
-                        hour_key.push_str(&format!("/{}", format_partition_key(&partition_key)));
-                    }
 
                     let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
                         schema_key,
@@ -418,7 +417,7 @@ pub async fn traces_json(
 
     // write data to wal
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Traces.to_string()).await;
-    let mut req_stats = write_file(&writer, traces_stream_name, data_buf).await;
+    let mut req_stats = write_file(&writer, &traces_stream_name, data_buf).await;
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
@@ -438,7 +437,7 @@ pub async fn traces_json(
             "/api/org/v1/traces",
             "200",
             org_id,
-            traces_stream_name,
+            &traces_stream_name,
             StreamType::Traces.to_string().as_str(),
         ])
         .observe(time);
@@ -447,7 +446,7 @@ pub async fn traces_json(
             "/api/org/v1/traces",
             "200",
             org_id,
-            traces_stream_name,
+            &traces_stream_name,
             StreamType::Traces.to_string().as_str(),
         ])
         .inc();
@@ -456,7 +455,7 @@ pub async fn traces_json(
     report_request_usage_stats(
         req_stats,
         org_id,
-        traces_stream_name,
+        &traces_stream_name,
         StreamType::Traces,
         UsageType::Traces,
         0,
