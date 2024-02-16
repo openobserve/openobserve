@@ -26,6 +26,7 @@ use config::{
 use infra::storage;
 use tokio::{sync::Semaphore, task, time};
 
+use super::{ider, FILE_EXT_PARQUET};
 use crate::{
     common::{infra::wal, meta::stream::StreamParams, utils::stream::populate_file_meta},
     service::{db, schema::schema_evolution, usage::report_compression_stats},
@@ -224,6 +225,44 @@ async fn upload_file(
         let record_batch = read_result?;
         batches.push(record_batch);
     }
+    write_to_disk(
+        batches,
+        file_size,
+        org_id,
+        stream_name,
+        stream_type,
+        file_name,
+        "upload_file",
+    )
+    .await
+}
+
+fn generate_index_file_name_from_compacted_file(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    compacted_file_name: &str,
+) -> String {
+    // eg: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
+    let file_columns = compacted_file_name.split('/').collect::<Vec<&str>>();
+    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let file_date = format!(
+        "{}/{}/{}/{}",
+        file_columns[4], file_columns[5], file_columns[6], file_columns[7]
+    );
+    let file_name = ider::generate();
+    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+}
+
+pub(crate) async fn write_to_disk(
+    batches: Vec<arrow::record_batch::RecordBatch>,
+    file_size: u64,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    file_name: &str,
+    caller: &str,
+) -> Result<(String, FileMeta, StreamType), anyhow::Error> {
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
     } else {
@@ -251,19 +290,27 @@ async fn upload_file(
 
     schema_evolution(org_id, stream_name, stream_type, schema, file_meta.min_ts).await;
 
-    let new_file_name =
-        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
-    drop(file);
-    let file_name = new_file_name.to_owned();
+    let new_idx_file_name =
+        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name);
+    log::warn!(
+        "[JOB] IDX: write_to_disk: {} {} {} {} {} {}",
+        org_id,
+        stream_name,
+        stream_type,
+        new_idx_file_name,
+        file_name,
+        caller,
+    );
+    let store_file_name = new_idx_file_name.to_owned();
     match task::spawn_blocking(move || async move {
-        storage::put(&new_file_name, bytes::Bytes::from(buf_parquet)).await
+        storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await
     })
     .await
     {
         Ok(output) => match output.await {
             Ok(_) => {
-                log::info!("[JOB] disk file upload succeeded: {}", file_name);
-                Ok((file_name, file_meta, stream_type))
+                log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
+                Ok((new_idx_file_name, file_meta, stream_type))
             }
             Err(err) => {
                 log::error!("[JOB] disk file upload error: {:?}", err);

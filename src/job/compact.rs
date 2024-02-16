@@ -30,10 +30,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // tokio::task::spawn(async move { run_merge().await });
-    // tokio::task::spawn(async move { run_delete().await });
-    // tokio::task::spawn(async move { run_delete_files().await });
-    // tokio::task::spawn(async move { run_sync_to_db().await });
+    tokio::task::spawn(async move { run_merge().await });
+    tokio::task::spawn(async move { run_retention().await });
+    tokio::task::spawn(async move { run_delay_deletion().await });
+    tokio::task::spawn(async move { run_sync_to_db().await });
 
     Ok(())
 }
@@ -44,6 +44,7 @@ async fn run_merge() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        log::warn!("Running merge");
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         let ret = service::compact::run_merge().await;
