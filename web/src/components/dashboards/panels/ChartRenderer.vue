@@ -115,6 +115,12 @@ export default defineComponent({
         params.seriesIndex = params?.dataIndex;
       }
 
+      // if sankey chart then do not set seriesName and seriesIndex
+      if (params?.componentSubType === "sankey") {
+        params.seriesName = "";
+        params.seriesIndex = -1;
+      }
+
       // set current hovered series name in state
       hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName);
 
