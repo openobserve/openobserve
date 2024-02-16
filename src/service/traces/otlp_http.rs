@@ -40,7 +40,10 @@ use crate::{
     },
     service::{
         db, distinct_values, format_stream_name,
-        ingestion::{evaluate_trigger, grpc::get_val_for_attr, write_file, TriggerAlertData},
+        ingestion::{
+            evaluate_trigger, get_string_value, get_uint_value, grpc::get_val_for_attr, write_file,
+            TriggerAlertData,
+        },
         schema::{check_for_schema, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -246,8 +249,8 @@ pub async fn traces_json(
                             .insert(REF_TYPE.to_string(), format!("{:?}", SpanRefType::ChildOf));
                     }
 
-                    let start_time: u64 = span.get("startTimeUnixNano").unwrap().as_u64().unwrap();
-                    let end_time: u64 = span.get("endTimeUnixNano").unwrap().as_u64().unwrap();
+                    let start_time = get_uint_value(span.get("startTimeUnixNano").unwrap());
+                    let end_time = get_uint_value(span.get("endTimeUnixNano").unwrap());
                     let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                     let attributes = span.get("attributes").unwrap().as_array().unwrap();
                     for span_att in attributes {
@@ -285,10 +288,10 @@ pub async fn traces_json(
                         trace_id: trace_id.clone(),
                         span_id,
                         span_kind: span.get("kind").unwrap().to_string(),
-                        span_status: span
-                            .get("status")
-                            .unwrap_or(&json::Value::String("UNSET".to_string()))
-                            .to_string(),
+                        span_status: get_string_value(
+                            span.get("status")
+                                .unwrap_or(&json::Value::String("UNSET".to_string())),
+                        ),
                         operation_name: span.get("name").unwrap().as_str().unwrap().to_string(),
                         start_time,
                         end_time,

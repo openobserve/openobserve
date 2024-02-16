@@ -354,6 +354,14 @@ pub fn get_int_value(val: &Value) -> i64 {
     }
 }
 
+pub fn get_uint_value(val: &Value) -> u64 {
+    match val {
+        Value::String(v) => v.parse::<u64>().unwrap_or(0),
+        Value::Number(v) => v.as_u64().unwrap_or(0),
+        _ => 0,
+    }
+}
+
 pub fn get_string_value(value: &Value) -> String {
     if value.is_boolean() {
         value.as_bool().unwrap_or_default().to_string()
