@@ -116,10 +116,13 @@ pub async fn init() {
                 } else {
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
-                            log::info!("Orgs updated to the openfga");
+                            log::info!("Data migrated to openfga");
                         }
                         Err(e) => {
-                            log::error!("Error updating orgs to the openfga: {}", e);
+                            log::error!(
+                                "Error updating orgs & users to the openfga during migration: {}",
+                                e
+                            );
                         }
                     }
                 }

@@ -81,10 +81,10 @@ pub async fn post_user(
                     );
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
-                            log::info!("Orgs updated to the openfga");
+                            log::info!("User saved successfully in openfga");
                         }
                         Err(e) => {
-                            log::error!("Error updating orgs to the openfga: {}", e);
+                            log::error!("Error creating user in openfga: {}", e);
                         }
                     }
                 }
@@ -369,10 +369,10 @@ pub async fn add_user_to_org(
                     get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
-                            log::info!("Orgs updated to the openfga");
+                            log::info!("User added to org successfully in openfga");
                         }
                         Err(e) => {
-                            log::error!("Error updating orgs to the openfga: {}", e);
+                            log::error!("Error adding user to the org in openfga: {}", e);
                         }
                     }
                 }
