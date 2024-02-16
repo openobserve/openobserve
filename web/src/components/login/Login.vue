@@ -157,7 +157,7 @@ export default defineComponent({
     const loginAsInternalUser = ref(false);
 
     const showSSO = computed(() => {
-      return store.state.zoConfig.dex_enabled && config.isEnterprise === "true";
+      return store.state.zoConfig.sso_enabled && config.isEnterprise === "true";
     });
 
     const showInternalLogin = computed(() => {

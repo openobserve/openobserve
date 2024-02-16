@@ -51,7 +51,7 @@ export default defineComponent({
           componentName.value = "OrganizationsCloud";
         }
 
-        if (zoConfig.dex_enabled || config.isEnterprise == "true") {
+        if (zoConfig.sso_enabled || config.isEnterprise == "true") {
           componentName.value = "OrganizationsEnterprise";
         }
 

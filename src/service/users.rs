@@ -17,6 +17,8 @@ use std::io::Error;
 
 use actix_web::{http, HttpResponse};
 use config::{ider, utils::rand::generate_random_string};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
 use crate::{
     common::{
@@ -70,19 +72,21 @@ pub async fn post_user(
                     get_user_role_tuple, update_tuples,
                 };
 
-                let mut tuples = vec![];
-                get_user_role_tuple(
-                    &usr_req.role.to_string(),
-                    &usr_req.email,
-                    &org_id.replace(' ', "_"),
-                    &mut tuples,
-                );
-                match update_tuples(tuples, vec![]).await {
-                    Ok(_) => {
-                        log::info!("Orgs updated to the openfga");
-                    }
-                    Err(e) => {
-                        log::error!("Error updating orgs to the openfga: {}", e);
+                if O2_CONFIG.openfga.enabled {
+                    let mut tuples = vec![];
+                    get_user_role_tuple(
+                        &usr_req.role.to_string(),
+                        &usr_req.email,
+                        &org_id.replace(' ', "_"),
+                        &mut tuples,
+                    );
+                    match update_tuples(tuples, vec![]).await {
+                        Ok(_) => {
+                            log::info!("User saved successfully in openfga");
+                        }
+                        Err(e) => {
+                            log::error!("Error creating user in openfga: {}", e);
+                        }
                     }
                 }
             }
@@ -256,7 +260,11 @@ pub async fn update_user(
                             #[cfg(feature = "enterprise")]
                             {
                                 use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
-                                if old_role.is_some() && new_role.is_some() {
+
+                                if O2_CONFIG.openfga.enabled
+                                    && old_role.is_some()
+                                    && new_role.is_some()
+                                {
                                     let old = old_role.unwrap();
                                     let new = new_role.unwrap();
                                     if !old.eq(&new) {
@@ -357,15 +365,16 @@ pub async fn add_user_to_org(
                 use o2_enterprise::enterprise::openfga::authorizer::authz::{
                     get_user_role_tuple, update_tuples,
                 };
-
-                let mut tuples = vec![];
-                get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
-                match update_tuples(tuples, vec![]).await {
-                    Ok(_) => {
-                        log::info!("Orgs updated to the openfga");
-                    }
-                    Err(e) => {
-                        log::error!("Error updating orgs to the openfga: {}", e);
+                if O2_CONFIG.openfga.enabled {
+                    let mut tuples = vec![];
+                    get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
+                    match update_tuples(tuples, vec![]).await {
+                        Ok(_) => {
+                            log::info!("User added to org successfully in openfga");
+                        }
+                        Err(e) => {
+                            log::error!("Error adding user to the org in openfga: {}", e);
+                        }
                     }
                 }
             }
