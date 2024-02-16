@@ -74,7 +74,7 @@ const http = ({ headers } = {} as any) => {
             // Check if the failing request is not the login or refresh token request
             else if (
               config.isEnterprise == "true" &&
-              (store.state as any).zoConfig.dex_enabled &&
+              (store.state as any).zoConfig.sso_enabled &&
               !error.config.url.includes("/config/dex_login") &&
               !error.config.url.includes("/config/dex_refresh") &&
               !error.config.url.includes("/auth/login")
