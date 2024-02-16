@@ -36,7 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dashboardPanelData.data.type != 'heatmap' &&
         dashboardPanelData.data.type != 'metric' &&
         dashboardPanelData.data.type != 'gauge' &&
-        dashboardPanelData.data.type != 'geomap'
+        dashboardPanelData.data.type != 'geomap' &&
+        dashboardPanelData.data.type != 'sankey'
       "
       v-model="dashboardPanelData.data.config.show_legends"
       :label="t('dashboard.showLegendsLabel')"
@@ -44,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <div class="space"></div>
-    
+
     <div class="o2-input">
       <q-select
         v-if="
@@ -53,7 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'metric' &&
           dashboardPanelData.data.type != 'gauge' &&
           dashboardPanelData.data.type != 'geomap' &&
-          dashboardPanelData.data.config.show_legends
+          dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.type != 'sankey'
         "
         outlined
         v-model="dashboardPanelData.data.config.legends_position"
@@ -81,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'gauge' &&
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right'
+            dashboardPanelData.data.config.legends_position == 'right' &&
+            dashboardPanelData.data.type != 'sankey'
           "
           v-model.number="legendWidthValue"
           :label="t('common.legendWidth')"
@@ -106,7 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'gauge' &&
             dashboardPanelData.data.type != 'geomap' &&
             dashboardPanelData.data.config.show_legends &&
-            dashboardPanelData.data.config.legends_position == 'right'
+            dashboardPanelData.data.config.legends_position == 'right' &&
+            dashboardPanelData.data.type != 'sankey'
           "
         >
           <button
@@ -226,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-select>
 
       <div class="space"></div>
-      
+
       <div v-if="dashboardPanelData.data.type == 'geomap'">
         <span>Initial View:</span>
         <div class="row">
@@ -524,7 +528,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'geomap' &&
           dashboardPanelData.data.type != 'table' &&
           dashboardPanelData.data.type != 'pie' &&
-          dashboardPanelData.data.type != 'donut'
+          dashboardPanelData.data.type != 'donut' &&
+          dashboardPanelData.data.type != 'sankey'
         "
         v-model.number="dashboardPanelData.data.config.axis_width"
         :label="t('common.axisWidth')"
@@ -556,7 +561,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type != 'geomap' &&
           dashboardPanelData.data.type != 'table' &&
           dashboardPanelData.data.type != 'pie' &&
-          dashboardPanelData.data.type != 'donut'
+          dashboardPanelData.data.type != 'donut' &&
+          dashboardPanelData.data.type != 'sankey'
         "
         v-model="dashboardPanelData.data.config.axis_border_show"
         :label="t('dashboard.showBorder')"
