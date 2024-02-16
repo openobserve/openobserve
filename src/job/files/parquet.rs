@@ -440,9 +440,9 @@ pub(crate) async fn create_index_file_on_ingester(
             .unnest_column("terms")?
             .with_column_renamed("terms", "term")?
             .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
-            .with_column("filename", lit(file_name_without_prefix))?
+            .with_column("file_name", lit(file_name_without_prefix))?
             .aggregate(
-                vec![col("term"), col("filename")],
+                vec![col("term"), col("file_name")],
                 vec![
                     min(col("_timestamp")).alias("_timestamp"),
                     count(col("term")).alias("count"),
@@ -451,7 +451,7 @@ pub(crate) async fn create_index_file_on_ingester(
             .with_column("character_len", character_length(col("term")))?
             .with_column("deleted", lit("false"))?
             .filter(col("character_len").gt_eq(lit(3)))?
-            .select_columns(&["term", "filename", "_timestamp", "count", "deleted"])?
+            .select_columns(&["term", "file_name", "_timestamp", "count", "deleted"])?
             .collect()
             .await?;
 
@@ -492,7 +492,6 @@ pub(crate) async fn create_index_file_on_compactor(
     file_list_to_invalidate: &Vec<FileKey>,
     buf: Bytes,
     new_file_key: String,
-    min_ts: i64,
     org_id: &str,
     stream_name: &str,
     schema: SchemaRef,
@@ -501,6 +500,10 @@ pub(crate) async fn create_index_file_on_compactor(
         .unwrap()
         .build()
         .unwrap();
+
+    for f in file_list_to_invalidate.iter() {
+        log::warn!("Now creating index for files: {}", f.key);
+    }
 
     let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
     let ctx = SessionContext::new();
@@ -529,17 +532,18 @@ pub(crate) async fn create_index_file_on_compactor(
             .unnest_column("terms")?
             .with_column_renamed("terms", "term")?
             .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
-            .with_column("filename", lit(file_name_without_prefix))?
+            .with_column("file_name", lit(file_name_without_prefix))?
             .aggregate(
-                vec![col("term"), col("filename")],
+                vec![col("term"), col("file_name")],
                 vec![
                     min(col("_timestamp")).alias("_timestamp"),
                     count(col("term")).alias("count"),
                 ],
             )?
             .with_column("character_len", character_length(col("term")))?
+            .with_column("deleted", lit("false"))?
             .filter(col("character_len").gt_eq(lit(3)))?
-            .select_columns(&["term", "filename", "_timestamp", "count"])?
+            .select_columns(&["term", "file_name", "_timestamp", "count", "deleted"])?
             .collect()
             .await?;
 
@@ -551,15 +555,15 @@ pub(crate) async fn create_index_file_on_compactor(
         .flatten()
         .collect();
 
-    let hour_key = get_wal_time_key(
-        min_ts,
-        &vec![],
-        config::meta::stream::PartitionTimeLevel::Hourly,
-        &serde_json::Map::new(),
-        None,
-    );
+    // let hour_key = get_wal_time_key(
+    //     min_ts,
+    //     &vec![],
+    //     config::meta::stream::PartitionTimeLevel::Hourly,
+    //     &serde_json::Map::new(),
+    //     None,
+    // );
 
-    let original_file_size = 0;
+    let original_file_size = 0; // The file never existed before this function was called
     let (filename, ..) = write_to_disk(
         record_batches,
         original_file_size,
