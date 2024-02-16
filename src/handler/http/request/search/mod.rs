@@ -1169,3 +1169,148 @@ pub async fn search_partition(
         }
     }
 }
+
+#[post("/{org_id}/_search_follower")]
+pub async fn search_follower(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let session_id = ider::uuid();
+    log::info!("search_follower start");
+    // handle encoding for query and aggs
+    let rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    log::info!("search_follower start rpc_req: {:?}", rpc_req);
+
+    let user_id = in_req.headers().get("user_id").unwrap();
+
+    let stream_type_str = &rpc_req.stream_type;
+
+    let stream_type = StreamType::from(stream_type_str.as_str());
+
+    let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req).await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(match e {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                    .json(meta::http::HttpResponse::error_code(code)),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            });
+        }
+    };
+
+    // Check permissions on stream
+    #[cfg(feature = "enterprise")]
+    {
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        if !is_root_user(user_id.to_str().unwrap()) {
+            let user: meta::user::User = USERS
+                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
+                .unwrap()
+                .clone();
+
+            if user.is_external
+                && !crate::handler::http::auth::validator::check_permissions(
+                    user_id.to_str().unwrap(),
+                    AuthExtractor {
+                        auth: "".to_string(),
+                        method: "GET".to_string(),
+                        o2_type: format!("{}:{}", stream_type_str, resp.stream_name),
+                        org_id: org_id.clone(),
+                        bypass_check: false,
+                        parent_id: "".to_string(),
+                    },
+                    Some(user.role),
+                )
+                .await
+            {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+        // Check permissions on stream ends
+    }
+
+    // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !CONFIG.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+
+    // do search
+    match SearchService::search_as_federation_participant(
+        &session_id,
+        &org_id,
+        stream_type,
+        rpc_req.clone(),
+    )
+    .await
+    {
+        Ok(res) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&["/api/org/_search", "200", &org_id, "", stream_type_str])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&["/api/org/_search", "200", &org_id, "", stream_type_str])
+                .inc();
+            //  res.set_session_id(session_id);
+            // res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+            //
+            // let req_stats = RequestStats {
+            // records: res.hits.len() as i64,
+            // response_time: time,
+            // size: res.scan_size as f64,
+            // request_body: Some(req.query.sql),
+            // user_email: Some(user_id.to_str().unwrap().to_string()),
+            // ..Default::default()
+            // };
+            // let num_fn = req.query.query_fn.is_some() as u16;
+            // report_request_usage_stats(
+            // req_stats,
+            // &org_id,
+            // &resp.stream_name,
+            // StreamType::Logs,
+            // UsageType::Search,
+            // num_fn,
+            // )
+            // .await;
+
+            Ok(HttpResponse::Ok()
+                .content_type("application/json")
+                .body(res))
+        }
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&["/api/org/_search", "500", &org_id, "", stream_type_str])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&["/api/org/_search", "500", &org_id, "", stream_type_str])
+                .inc();
+            log::error!("search error: {:?}", err);
+            Ok(
+                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            )
+        }
+    }
+}

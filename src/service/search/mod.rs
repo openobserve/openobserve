@@ -45,6 +45,7 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
+use self::federation::make_inter_cluster_req;
 use crate::{
     common::{
         infra::cluster::{self, get_node_from_consistent_hash},
@@ -59,6 +60,7 @@ use crate::{
 };
 
 pub(crate) mod datafusion;
+pub(crate) mod federation;
 pub(crate) mod grpc;
 pub(crate) mod sql;
 
@@ -226,8 +228,39 @@ async fn get_file_list(
     skip(req),
     fields(session_id = req.job.as_ref().unwrap().session_id, org_id = req.org_id)
 )]
-async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
+async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
+    let scan_stats = ScanStats::new();
+    let mut took_wait = 0;
+    let mut all_resp = vec![];
+    let resp = search_in_cluster_get_batches(req.clone(), scan_stats, start).await?;
+    took_wait += resp.took_wait;
+    all_resp.push(resp);
+    log::info!(
+        "[session_id {session_id}] search->cluster: took_wait: {took_wait}",
+        session_id = req.job.as_ref().unwrap().session_id,
+        took_wait = took_wait,
+    );
+    // call same cluster as follower
+    let cl_resp = make_inter_cluster_req(
+        &req,
+        "Basic YUBhLmNvbTph",
+        "http://localhost:5085/api/default/_search_follower",
+        60,
+    )
+    .await?;
+    log::info!("--------------------------------------------------------");
+    took_wait += cl_resp.took_wait;
+    all_resp.push(cl_resp);
+    let final_res = federation::merge_cluster_responses(all_resp, &req).await?;
+    record_batches_to_response(final_res, &req, scan_stats, start, took_wait).await
+}
+
+async fn search_in_cluster_get_batches(
+    mut req: cluster_rpc::SearchRequest,
+    mut scan_stats: ScanStats,
+    start: std::time::Instant,
+) -> Result<search::SearchFollowerResponse, Error> {
     let session_id = req.job.as_ref().unwrap().session_id.clone();
 
     // handle request time range
@@ -504,7 +537,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
-    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
+
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // make cluster request
@@ -671,7 +704,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     }
 
     // merge multiple instances data
-    let mut scan_stats = ScanStats::new();
+    // let mut scan_stats = ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let sql = Arc::new(meta);
     for (node, resp) in results {
@@ -773,8 +806,25 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
 
+    Ok(search::SearchFollowerResponse {
+        data: merge_batches,
+        took_wait,
+    })
     // final result
+}
+
+async fn record_batches_to_response(
+    merge_batches: HashMap<String, Vec<RecordBatch>>,
+    req: &cluster_rpc::SearchRequest,
+    scan_stats: ScanStats,
+    start: std::time::Instant,
+    took_wait: usize,
+) -> Result<search::Response, Error> {
+    let session_id = req.job.as_ref().unwrap().session_id.clone();
+    let meta = sql::Sql::new(req).await?;
+    let sql = Arc::new(meta);
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
+    let query_fn = req.query.as_ref().unwrap().query_fn.clone();
 
     // hits
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
@@ -783,7 +833,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         Some(batches) => batches,
         None => &empty_vec,
     };
-
     if !batches_query.is_empty() {
         let schema = batches_query[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
@@ -1138,6 +1187,41 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 
 pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
+}
+
+#[tracing::instrument(name = "service:search_as_federation_participant:enter", skip(req))]
+pub async fn search_as_federation_participant(
+    session_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: cluster_rpc::SearchRequest,
+) -> Result<Vec<u8>, String> {
+    let session_id = if session_id.is_empty() {
+        ider::uuid()
+    } else {
+        session_id.to_string()
+    };
+    //   let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
+    // req.job.as_mut().unwrap().session_id = session_id.clone();
+    // req.org_id = org_id.to_string();
+    // req.stype = cluster_rpc::SearchType::User as i32;
+    // req.stream_type = stream_type.to_string();
+    let start = std::time::Instant::now();
+    let scan_stats = ScanStats::new();
+    log::info!("search_as_federation_participant");
+    let resp = search_in_cluster_get_batches(req, scan_stats, start).await;
+
+    match resp {
+        Ok(resp) => federation::serialize_response(resp.data, resp.took_wait),
+        Err(err) => {
+            log::error!(
+                "[session_id {session_id}] search->federation: error: {err}",
+                session_id = session_id,
+                err = err
+            );
+            Err(err.to_string())
+        }
+    }
 }
 
 #[cfg(test)]

@@ -293,6 +293,11 @@ pub struct SearchPartitionResponse {
     pub compressed_size: usize,
     pub partitions: Vec<[i64; 2]>,
 }
+#[derive(Clone, Debug, Default)]
+pub struct SearchFollowerResponse {
+    pub data: hashbrown::HashMap<String, Vec<arrow::record_batch::RecordBatch>>,
+    pub took_wait: usize,
+}
 
 #[cfg(test)]
 mod tests {

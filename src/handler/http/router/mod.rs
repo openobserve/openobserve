@@ -343,7 +343,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(authz::fga::get_users_with_role)
             .service(authz::fga::delete_role)
             .service(authz::fga::delete_group)
-            .service(users::list_roles),
+            .service(users::list_roles)
+            .service(search::search_follower),
     );
 }
 

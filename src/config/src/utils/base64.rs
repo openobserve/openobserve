@@ -39,6 +39,7 @@ pub fn encode(s: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
 }
 
+
 pub fn encode_url(s: &str) -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(s.as_bytes())
 }
@@ -54,6 +55,15 @@ pub fn decode_url(s: &str) -> Result<String, Error> {
             format!("base64 decode error: {e}"),
         )),
     }
+
+pub fn encode_url_safe_no_padding(input: &Vec<u8>) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(input)
+}
+
+pub fn decode_url_safe_no_padding(input: &str) -> Result<Vec<u8>, Error> {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(input)
+        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("base64 decode error: {e}")))
 }
 
 #[cfg(test)]
