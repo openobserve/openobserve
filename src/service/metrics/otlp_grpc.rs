@@ -577,9 +577,9 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) {
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
@@ -597,9 +597,9 @@ fn process_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
@@ -646,9 +646,9 @@ fn process_exp_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     process_exemplars(rec, &data_point.exemplars);
@@ -711,9 +711,9 @@ fn process_summary_data_point(
     rec[&CONFIG.common.column_timestamp] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = if data_point.flags == 1 {
-        DataPointFlags::FlagNoRecordedValue.as_str_name()
+        DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
-        DataPointFlags::FlagNone.as_str_name()
+        DataPointFlags::DoNotUse.as_str_name()
     }
     .into();
     // add count record

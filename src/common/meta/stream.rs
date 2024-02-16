@@ -331,13 +331,13 @@ mod tests {
         ] {
             println!("{}: {}", key, part.get_partition_key(key));
         }
-        assert_eq!(part.get_partition_key("hello"), "field=8");
-        assert_eq!(part.get_partition_key("world"), "field=14");
-        assert_eq!(part.get_partition_key("foo"), "field=3");
-        assert_eq!(part.get_partition_key("bar"), "field=23");
-        assert_eq!(part.get_partition_key("test"), "field=18");
-        assert_eq!(part.get_partition_key("test1"), "field=3");
-        assert_eq!(part.get_partition_key("test2"), "field=15");
-        assert_eq!(part.get_partition_key("test3"), "field=2");
+        assert_eq!(part.get_partition_key("hello"), "field=20");
+        assert_eq!(part.get_partition_key("world"), "field=13");
+        assert_eq!(part.get_partition_key("foo"), "field=21");
+        assert_eq!(part.get_partition_key("bar"), "field=4");
+        assert_eq!(part.get_partition_key("test"), "field=10");
+        assert_eq!(part.get_partition_key("test1"), "field=21");
+        assert_eq!(part.get_partition_key("test2"), "field=18");
+        assert_eq!(part.get_partition_key("test3"), "field=6");
     }
 }

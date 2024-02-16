@@ -15,7 +15,6 @@
 
 use config::metrics;
 use infra::errors;
-use opentelemetry::global;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -34,7 +33,7 @@ impl Search for Searcher {
         req: Request<SearchRequest>,
     ) -> Result<Response<SearchResponse>, Status> {
         let start = std::time::Instant::now();
-        let parent_cx = global::get_text_map_propagator(|prop| {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
             prop.extract(&super::MetadataMap(req.metadata()))
         });
         tracing::Span::current().set_parent(parent_cx);

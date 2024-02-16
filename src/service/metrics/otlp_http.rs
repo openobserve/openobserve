@@ -743,9 +743,9 @@ fn process_data_point(rec: &mut json::Value, data_point: &json::Map<String, json
 
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
@@ -778,9 +778,9 @@ fn process_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
@@ -848,9 +848,9 @@ fn process_exp_hist_data_point(
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
@@ -935,9 +935,9 @@ fn process_summary_data_point(
     rec[&CONFIG.common.column_timestamp] = (ts / 1000).into();
     if let Some(v) = data_point.get("flags") {
         rec["flag"] = if v.as_u64().unwrap() == 1 {
-            DataPointFlags::FlagNoRecordedValue.as_str_name()
+            DataPointFlags::NoRecordedValueMask.as_str_name()
         } else {
-            DataPointFlags::FlagNone.as_str_name()
+            DataPointFlags::DoNotUse.as_str_name()
         }
         .into();
     }
