@@ -29,6 +29,7 @@ use tokio::{sync::Semaphore, task, time};
 use super::{ider, FILE_EXT_PARQUET};
 use crate::{
     common::{infra::wal, meta::stream::StreamParams, utils::stream::populate_file_meta},
+    job::files::generate_storage_file_name,
     service::{db, schema::schema_evolution, usage::report_compression_stats},
 };
 
@@ -290,8 +291,12 @@ pub(crate) async fn write_to_disk(
 
     schema_evolution(org_id, stream_name, stream_type, schema, file_meta.min_ts).await;
 
-    let new_idx_file_name =
-        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name);
+    let new_idx_file_name = if (caller == "upload_file") {
+        generate_storage_file_name(org_id, stream_type, stream_name, file_name)
+    } else {
+        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name)
+    };
+
     log::warn!(
         "[JOB] IDX: write_to_disk: {} {} {} {} {} {}",
         org_id,

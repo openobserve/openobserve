@@ -271,7 +271,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
             // "select distinct filename from {} where term ~* '({})'",
-            "select filename from {} where term in {}",
+            "select file_name from {} where term in {}",
             meta.stream_name, terms
         );
         idx_req.query.as_mut().unwrap().sql = query;
@@ -280,9 +280,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let unique_files = idx_resp
             .hits
             .iter()
-            .map(|hit| hit.get("filename").unwrap().as_str().unwrap())
+            .map(|hit| hit.get("file_name").unwrap().as_str().unwrap())
             .collect::<HashSet<_>>();
 
+        log::warn!("searching in unique_files {:?}", unique_files);
         for filename in unique_files {
             let prefixed_filename = format!(
                 "files/{}/logs/{}/{}",

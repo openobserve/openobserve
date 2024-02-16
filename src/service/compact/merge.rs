@@ -536,7 +536,6 @@ async fn merge_files(
         new_file_meta.compressed_size,
     );
 
-    let min_ts = new_file_meta.min_ts;
     let buf = Bytes::from(buf);
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
@@ -545,7 +544,6 @@ async fn merge_files(
                 &new_file_list,
                 buf,
                 new_file_key.clone(),
-                min_ts,
                 org_id,
                 stream_name,
                 new_file_schema.clone(),
