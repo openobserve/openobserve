@@ -283,7 +283,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .map(|hit| hit.get("file_name").unwrap().as_str().unwrap())
             .collect::<HashSet<_>>();
 
-        log::warn!("searching in unique_files {:?}", unique_files);
+        log::warn!("searching in unique_files_len {:?}", unique_files.len());
+        for f in unique_files.iter() {
+            log::warn!("searching in get_file_list {:?}", f);
+        }
         for filename in unique_files {
             let prefixed_filename = format!(
                 "files/{}/logs/{}/{}",
@@ -299,14 +302,20 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
         idx_file_list
     } else {
-        get_file_list(
+        let file_list = get_file_list(
             &session_id,
             &meta,
             stream_type,
             partition_time_level,
             &stream_settings.partition_keys,
         )
-        .await
+        .await;
+        log::warn!("searching in get_file_list_len {:?}", file_list.len());
+        for f in file_list.iter() {
+            log::warn!("searching in get_file_list {:?}", f.key);
+        }
+
+        file_list
     };
 
     #[cfg(not(feature = "enterprise"))]
