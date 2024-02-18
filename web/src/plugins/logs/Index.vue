@@ -83,6 +83,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>
                 <div
                   v-if="
+                    searchObj.data.filterErrMsg !== '' &&
+                    searchObj.loading == false
+                  "
+                >
+                  <h5 class="text-center">
+                    <q-icon name="warning" color="warning"
+size="10rem" /><br />
+                    <div
+                      data-test="logs-search-filter-error-message"
+                      v-html="searchObj.data.filterErrMsg"
+                    ></div>
+                  </h5>
+                </div>
+                <div
+                  v-else-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
                 >
@@ -144,14 +159,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.queryResults.hits.length == 0 &&
                     searchObj.loading == false
                   "
+                  class="text-center"
                 >
                   <h5 data-test="logs-search-error-message" class="text-center">
                     <q-icon
                       name="warning"
                       color="warning"
                       size="10rem"
-                    /><br />{{ t("search.noRecordFound") }}
+                    /><br />{{ t("search.noRecordFound") }}<br />
                   </h5>
+                  <div class="text-subtitle1">{{ searchObj.data.missingStreamMessage ? "Note: " + searchObj.data.missingStreamMessage : "" }}</div>
                 </div>
                 <div
                   v-else
