@@ -647,9 +647,7 @@ const useLogs = () => {
           };
 
           searchObj.data.queryResults.total = res.data.records;
-          const partitions = res.data.partitions.sort(
-            (a: number[], b: number[]) => a[0] - b[0]
-          );
+          const partitions = res.data.partitions;
 
           searchObj.data.queryResults.partitionDetail.partitions = partitions;
 
