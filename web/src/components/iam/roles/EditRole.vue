@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div style="min-height: calc(100% - (39px + 55px + 43px))">
+      <div style="min-height: calc(100% - (39px + 55px + 46px))">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
@@ -64,9 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="edit-role-permissions-section"
         >
           <div
-            data-test="edit-role-permissions-filters"
-            class="o2-input flex items-start q-px-md q-py-sm justify-start"
-            style="position: sticky; top: 0px; z-index: 2"
+            class="flex justify-between items-center"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
             :style="{
               'box-shadow':
@@ -76,82 +74,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             <div
-              data-test="edit-role-permissions-show-toggle"
-              class="flex items-center q-pt-xs q-mr-md"
+              data-test="edit-role-permissions-filters"
+              class="o2-input flex items-start q-px-md q-py-sm justify-start"
+              style="position: sticky; top: 0px; z-index: 2"
             >
-              <span
-                data-test="edit-role-permissions-show-text"
-                style="font-size: 14px"
-              >
-                Show
-              </span>
               <div
-                class="q-ml-xs"
-                style="
-                  border: 1px solid #d7d7d7;
-                  width: fit-content;
-                  border-radius: 2px;
-                "
+                data-test="edit-role-permissions-show-toggle"
+                class="flex items-center q-pt-xs q-mr-md"
               >
-                <template
-                  v-for="visual in permissionDisplayOptions"
-                  :key="visual.value"
+                <span
+                  data-test="edit-role-permissions-show-text"
+                  style="font-size: 14px"
                 >
-                  <q-btn
-                    :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                    :color="
-                      visual.value === filter.permissions ? 'primary' : ''
-                    "
-                    :flat="visual.value === filter.permissions ? false : true"
-                    dense
-                    no-caps
-                    size="11px"
-                    class="q-px-md visual-selection-btn"
-                    @click="updateTableData(visual.value)"
+                  Show
+                </span>
+                <div
+                  class="q-ml-xs"
+                  style="
+                    border: 1px solid #d7d7d7;
+                    width: fit-content;
+                    border-radius: 2px;
+                  "
+                >
+                  <template
+                    v-for="visual in permissionDisplayOptions"
+                    :key="visual.value"
                   >
-                    {{ visual.label }}</q-btn
-                  >
-                </template>
+                    <q-btn
+                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                      :color="
+                        visual.value === filter.permissions ? 'primary' : ''
+                      "
+                      :flat="visual.value === filter.permissions ? false : true"
+                      dense
+                      no-caps
+                      size="11px"
+                      class="q-px-md visual-selection-btn"
+                      @click="updateTableData(visual.value)"
+                    >
+                      {{ visual.label }}</q-btn
+                    >
+                  </template>
+                </div>
+              </div>
+              <div data-test="edit-role-permissions-search-input">
+                <q-input
+                  v-model="filter.value"
+                  borderless
+                  :debounce="500"
+                  filled
+                  dense
+                  class="q-mb-xs no-border q-mr-md"
+                  :placeholder="t('common.search')"
+                  style="width: 300px"
+                  @update:model-value="onResourceChange"
+                >
+                  <template #prepend>
+                    <q-icon name="search" class="cursor-pointer" />
+                  </template>
+                </q-input>
+              </div>
+              <div data-test="edit-role-permissions-resource-select-input">
+                <q-select
+                  v-model="filter.resource"
+                  :options="filteredResources"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="q-mr-sm"
+                  placeholder="Select Resource"
+                  map-options
+                  use-input
+                  emit-value
+                  fill-input
+                  hide-selected
+                  outlined
+                  filled
+                  dense
+                  clearable
+                  style="width: 200px"
+                  @filter="filterResourceOptions"
+                  @update:model-value="onResourceChange"
+                />
               </div>
             </div>
-            <div data-test="edit-role-permissions-search-input">
-              <q-input
-                v-model="filter.value"
-                borderless
-                :debounce="500"
-                filled
-                dense
-                class="q-mb-xs no-border q-mr-md"
-                :placeholder="t('common.search')"
-                style="width: 300px"
-                @update:model-value="onResourceChange"
+            <div
+              data-test="edit-role-permissions-ui-type-toggle"
+              class="q-mr-md"
+              style="
+                border: 1px solid #d7d7d7;
+                width: fit-content;
+                border-radius: 2px;
+              "
+            >
+              <template
+                v-for="visual in permissionUiOptions"
+                :key="visual.value"
               >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-            <div data-test="edit-role-permissions-resource-select-input">
-              <q-select
-                v-model="filter.resource"
-                :options="filteredResources"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-mr-sm"
-                placeholder="Select Resource"
-                map-options
-                use-input
-                emit-value
-                fill-input
-                hide-selected
-                outlined
-                filled
-                dense
-                clearable
-                style="width: 200px"
-                @filter="filterResourceOptions"
-                @update:model-value="onResourceChange"
-              />
+                <q-btn
+                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                  :color="visual.value === permissionsUiType ? 'primary' : ''"
+                  :flat="visual.value === permissionsUiType ? false : true"
+                  dense
+                  no-caps
+                  size="11px"
+                  class="q-px-md visual-selection-btn"
+                  @click="updatePermissionsUi(visual.value)"
+                >
+                  {{ visual.label }}</q-btn
+                >
+              </template>
             </div>
           </div>
 
@@ -159,16 +190,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="edit-role-permissions-table-section"
             class="q-px-md q-my-sm"
           >
-            <permissions-table
-              ref="permissionTableRef"
-              :rows="permissionsState.permissions"
-              :customFilteredPermissions="filteredPermissions"
-              :filter="filter"
-              :visibleResourceCount="countOfVisibleResources"
-              :selected-permissions-hash="selectedPermissionsHash"
-              @updated:permission="handlePermissionChange"
-              @expand:row="expandPermission"
-            />
+            <div v-show="permissionsUiType === 'table'">
+              <permissions-table
+                ref="permissionTableRef"
+                :rows="permissionsState.permissions"
+                :customFilteredPermissions="filteredPermissions"
+                :filter="filter"
+                :visibleResourceCount="countOfVisibleResources"
+                :selected-permissions-hash="selectedPermissionsHash"
+                @updated:permission="handlePermissionChange"
+                @expand:row="expandPermission"
+              />
+            </div>
+            <div v-show="permissionsUiType === 'json'">
+              <div class="flex items-center justify-between">
+                <div class="q-mb-md text-bold">
+                  {{ selectedPermissionsHash.size }} Permission
+                </div>
+                <div class="flex items-center cursor-pointer">
+                  <q-icon name="help" size="17px" />
+                  <span class="q-ml-xs"> Help </span>
+                </div>
+              </div>
+              <div class="flex no-wrap">
+                <div style="width: calc(100% - 350px)">
+                  <PermissionsJSON
+                    ref="permissionJsonEditorRef"
+                    class="q-mt-sm"
+                    style="height: calc(100vh - 328px)"
+                  />
+                </div>
+                <div style="width: 350px" class="q-pa-sm">
+                  <div style="font-size: 16px">Quick Reference</div>
+                  <div class="q-mt-sm">
+                    <div>
+                      Configure access with JSON objects specifying "object"
+                      (resource) and "permission" (access level).
+                    </div>
+                    <pre style="font-size: 12px">
+{
+  "object": "MainResource:ChildResource",
+  "permission": "AccessType"
+}</pre
+                    >
+                    <div>
+                      <span class="text-bold">Child Resource:</span> <br />
+                      Specific instance or
+                      <span class="text-bold">organizationID</span> for all
+                      instances within a main resource.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -212,6 +286,7 @@ import { ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
+import PermissionsJSON from "@/components/iam/roles/PermissionsJSON.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useRouter } from "vue-router";
@@ -237,7 +312,6 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
-import { computed } from "vue";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -256,6 +330,8 @@ const router = useRouter();
 const q = useQuasar();
 
 const store = useStore();
+
+const permissionJsonEditorRef: any = ref(null);
 
 const activeTab = ref("permissions");
 
@@ -284,6 +360,8 @@ const removedUsers = ref(new Set());
 
 const roleUsers: Ref<string[]> = ref([]);
 
+const permissionsUiType = ref("table");
+
 const { getStreams } = useStreams();
 
 const tabs = [
@@ -305,6 +383,17 @@ const permissionDisplayOptions = [
   {
     label: "Selected",
     value: "selected",
+  },
+];
+
+const permissionUiOptions = [
+  {
+    label: "Table",
+    value: "table",
+  },
+  {
+    label: "JSON",
+    value: "json",
   },
 ];
 
@@ -660,6 +749,27 @@ const updateTableData = async (value: string = filter.value.permissions) => {
     updatePermissionVisibility(permissionsState.permissions);
     countVisibleResources(permissionsState.permissions);
   }, 0);
+};
+
+const updatePermissionsUi = async (value: string) => {
+  permissionsUiType.value = value;
+  if (value === "json") {
+    const permissions: {
+      object: string;
+      permission: string;
+    }[] = [];
+    selectedPermissionsHash.value.forEach((permission: any) => {
+      const [resource, entity, _permission] = permission.split(":");
+      permissions.push({
+        object: `${resource}:${entity}`,
+        permission: _permission,
+      });
+    });
+
+    permissionJsonEditorRef.value.setValue(JSON.stringify(permissions));
+    await nextTick();
+    permissionJsonEditorRef.value.formatDocument();
+  }
 };
 
 const updateExpandedResources = (resources: (Resource | Entity)[]) => {
