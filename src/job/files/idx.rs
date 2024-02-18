@@ -233,7 +233,7 @@ async fn upload_file(
         let record_batch = read_result.expect("should have read the recordbatch");
         batches.push(record_batch);
     }
-    // drop(file);
+    drop(file);
     write_to_disk(
         batches,
         file_size,
@@ -299,7 +299,7 @@ pub(crate) async fn write_to_disk(
 
     schema_evolution(org_id, stream_name, stream_type, schema, file_meta.min_ts).await;
 
-    let new_idx_file_name = if (caller == "upload_file") {
+    let new_idx_file_name = if caller == "upload_file" {
         generate_storage_file_name(org_id, stream_type, stream_name, file_name)
     } else {
         generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name)
