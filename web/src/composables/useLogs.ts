@@ -126,6 +126,8 @@ const defaultObject = {
     histogramQuery: <any>"",
     parsedQuery: {},
     errorMsg: "",
+    filterErrMsg: "",
+    missingStreamMessage: "",
     errorCode: 0,
     additionalErrorMsg: "",
     savedViewFilterFields: "",
@@ -141,6 +143,8 @@ const defaultObject = {
       streamType: "logs",
       interestingFieldList: <string[]>[],
       expandGroupRows: <any>{},
+      filteredField: <any>[],
+      missingStreamMultiStreamFilter: <any>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -470,9 +474,88 @@ const useLogs = () => {
     router.push({ query });
   };
 
+  function extractFilterColumns(expression: any) {
+    const columns: any[] = [];
+
+    function traverse(node: {
+      type: string;
+      column: any;
+      left: any;
+      right: any;
+      args: { type: string; value: any[] };
+    }) {
+      if (node.type === "column_ref") {
+        columns.push(node.column);
+      } else if (node.type === "binary_expr") {
+        traverse(node.left);
+        traverse(node.right);
+      } else if (node.type === "function") {
+        // Function expressions might contain columns as arguments
+        if (node.args && node.args.type === "expr_list") {
+          node.args.value.forEach((arg: any) => traverse(arg));
+        }
+      }
+    }
+
+    traverse(expression);
+    return columns;
+  }
+
+  const validateFilterForMultiStream = () => {
+    const filterCondition = searchObj.data.editorValue;
+    const parsedSQL = parser.astify(
+      "select * from stream where " + filterCondition
+    );
+    console.log(parsedSQL);
+    searchObj.data.stream.filteredField = extractFilterColumns(
+      parsedSQL?.where
+    );
+
+    searchObj.data.filterErrMsg = "";
+    searchObj.data.missingStreamMessage = "";
+    searchObj.data.stream.missingStreamMultiStreamFilter = [];
+    for (const fieldName of searchObj.data.stream.filteredField) {
+      const filteredFields = searchObj.data.stream.selectedStreamFields.filter(
+        (field: any) => field.name === fieldName
+      );
+      if (filteredFields.length > 0) {
+        const streamsCount = filteredFields[0].streams.length;
+        const allStreamsEqual = filteredFields.every(
+          (field: any) => field.streams.length === streamsCount
+        );
+        if (!allStreamsEqual) {
+          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
+        }
+      } else {
+        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
+      }
+
+      const fieldStreams = searchObj.data.stream.selectedStreamFields
+        .filter((field: { name: any }) => field.name === fieldName)
+        .map((field: { streams: any }) => field.streams)
+        .flat();
+
+      searchObj.data.stream.missingStreamMultiStreamFilter =
+        searchObj.data.stream.selectedStream.filter(
+          (stream: any) => !fieldStreams.includes(stream)
+        );
+
+      if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
+        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
+          ", "
+        )}", hence no search is performed in the mentioned stream.\n`;
+      }
+    }
+
+    return searchObj.data.filterErrMsg === "" ? true : false;
+  };
+
   function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
+      searchObj.data.filterErrMsg = "";
+      searchObj.data.missingStreamMessage = "";
+      searchObj.data.stream.missingStreamMultiStreamFilter = [];
       const req: any = {
         query: {
           sql: searchObj.meta.sqlMode
@@ -664,10 +747,37 @@ const useLogs = () => {
           queryFunctions
         );
 
+        // in the case of multi stream, we need to pass query for each selected stream in the form of array
+        // additional checks added for filter condition, 
+        // 1. all fields in filter condition should be present in same streams. 
+        // if one or more fields belongs to different stream then error will be shown
+        // 2. if multiple streams are selected but filter condition contains fields from only one stream
+        // then we need to send the search request for only matched stream
+        console.log(searchObj.data.stream)
         if (searchObj.data.stream.selectedStream.length > 1) {
+          let streams: any = searchObj.data.stream.selectedStream;
+          if (whereClause.trim() != "") {
+            const validationFlag = validateFilterForMultiStream();
+            if (!validationFlag) {
+              return false;
+            }
+
+            if (
+              searchObj.data.stream.missingStreamMultiStreamFilter.length > 0
+            ) {
+              streams = searchObj.data.stream.selectedStream.filter(
+                (streams: any) =>
+                  !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+                    streams
+                  )
+              );
+            }
+          }
+
           const preSQLQuery = req.query.sql;
           req.query.sql = [];
-          searchObj.data.stream.selectedStream
+
+          streams
             .join(",")
             .split(",")
             .forEach((item: any) => {
@@ -1041,6 +1151,7 @@ const useLogs = () => {
       if (queryReq == false) {
         throw new Error(notificationMsg.value || "Something went wrong.");
       }
+
       // reset query data and get partition detail for given query.
       if (!isPagination) {
         resetQueryData();
@@ -1347,9 +1458,10 @@ const useLogs = () => {
           }
 
           updateFieldValues();
-
           //extract fields from query response
           extractFields();
+
+          console.log(JSON.stringify(searchObj.data.stream.selectedStreamFields));
 
           //update grid columns
           updateGridColumns();
@@ -1788,6 +1900,25 @@ const useLogs = () => {
                   searchObj.data.stream.selectedStream.value
               ]
             : [...schemaInterestingFields];
+
+        // console.log(searchObj.data.stream.selectedStreamFields)
+        console.log(finalArray.common, searchObj.data.stream.selectedStream.length)
+        if (
+          finalArray.common.length > 0 &&
+          searchObj.data.stream.selectedStream.length > 1
+        ) {
+          searchObj.data.stream.selectedStreamFields.push({
+            name: "Common Fields Group",
+            label: true,
+            ftsKey: false,
+            isSchemaField: false,
+            showValues: false,
+            group: "common",
+            isExpanded: true,
+            streams: fieldToStreamsMap.hasOwnProperty("common")
+              ? fieldToStreamsMap["common"]
+              : [],
+          });
 
         let environmentInterestingFields = [];
         if (store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")) {
@@ -2615,6 +2746,7 @@ const useLogs = () => {
     getHistogramQueryData,
     fnParsedSQL,
     addOrderByToQuery,
+    validateFilterForMultiStream,
   };
 };
 

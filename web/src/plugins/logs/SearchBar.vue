@@ -950,6 +950,7 @@ export default defineComponent({
       fnParsedSQL,
       onStreamChange,
       moveItemsToTop,
+      validateFilterForMultiStream,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -1649,9 +1650,19 @@ export default defineComponent({
               // ----- Here we are explicitly handling stream change for multistream -----
               let selectedStreams = [];
               if (typeof extractedObj.data.stream.selectedStream == "object") {
-                selectedStreams.push(
-                  extractedObj.data.stream.selectedStream.value
-                );
+                if (
+                  extractedObj.data.stream.selectedStream.hasOwnProperty(
+                    "value"
+                  )
+                ) {
+                  selectedStreams.push(
+                    extractedObj.data.stream.selectedStream.value
+                  );
+                } else {
+                  selectedStreams.push(
+                    ...extractedObj.data.stream.selectedStream
+                  );
+                }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
               }
@@ -1703,7 +1714,7 @@ export default defineComponent({
                 clearInterval(store.state.refreshIntervalID);
               }
               searchObj.data.stream.selectedStream = selectedStreams;
-              
+
               await updatedLocalLogFilterField();
               await getStreams("logs", true);
             } else {
@@ -1774,6 +1785,7 @@ export default defineComponent({
               }
               await updatedLocalLogFilterField();
             }
+
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
               color: "positive",
@@ -2290,6 +2302,7 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       filterSavedViewFn,
+      validateFilterForMultiStream,
     };
   },
   computed: {
