@@ -260,20 +260,30 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .fts_terms
             .iter()
             .flat_map(|t| t.split_whitespace().collect::<Vec<_>>())
-            .map(|t| format!("'{}'", t.to_lowercase()))
+            .map(|t|  t.to_lowercase())
+            // .map(|t| format!("'{}'", t.to_lowercase()))
             .collect::<HashSet<String>>();
 
-        // Join the transformed terms with ", " and surround them with parentheses
-        let terms = format!("({})", terms.iter().join(", "));
+        let search_condition = terms
+            .iter()
+            .map(|x| format!("term ilike '%{x}%'"))
+            .collect::<Vec<String>>()
+            .join(" or ");
 
+        // Join the transformed terms with ", " and surround them with parentheses
+        // let terms = format!("({})", terms.iter().join(", "));
+
+        log::warn!("searching in terms {:?}", terms);
         idx_req.stream_type = StreamType::Index.to_string();
 
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
-            // "select distinct filename from {} where term ~* '({})'",
-            "select file_name from {} where term in {}",
-            meta.stream_name, terms
+            "select file_name from {} where {}",
+            meta.stream_name, search_condition
         );
+
+        log::warn!("searching in query {:?}", query);
+
         idx_req.query.as_mut().unwrap().sql = query;
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
 

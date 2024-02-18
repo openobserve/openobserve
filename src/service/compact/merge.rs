@@ -361,7 +361,10 @@ async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
-    log::error!("************ Merging the files now ************");
+    log::error!(
+        "************ Merging the files now for stream_type {} ************",
+        stream_type
+    );
     log::error!("files_with_size = {:?}", files_with_size);
 
     if files_with_size.len() <= 1 {
@@ -540,19 +543,30 @@ async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            let index_file_name = create_index_file_on_compactor(
-                &new_file_list,
-                buf,
-                new_file_key.clone(),
-                org_id,
-                stream_name,
-                new_file_schema.clone(),
-            )
-            .await?;
-            log::warn!(
-                "**************Created index file during compaction****************** {}",
-                index_file_name
-            );
+            if stream_type == StreamType::Logs {
+                log::warn!("Stream type is LOGS, lets please create a new index file");
+                let (index_file_name, filemeta) = create_index_file_on_compactor(
+                    &new_file_list,
+                    buf,
+                    new_file_key.clone(),
+                    org_id,
+                    stream_name,
+                    new_file_schema.clone(),
+                )
+                .await?;
+                log::warn!(
+                    "**************Created index file during compaction****************** {}",
+                    index_file_name
+                );
+                let ret = db::file_list::local::set(&index_file_name, Some(filemeta), false).await;
+                if let Err(e) = ret {
+                    log::error!(
+                        "[merge_files] failed to write to file list on compactor: {}, error: {}",
+                        index_file_name,
+                        e.to_string()
+                    );
+                }
+            }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
         Err(e) => Err(e),
