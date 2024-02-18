@@ -516,6 +516,7 @@ async fn merge_files(
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
+        stream_type,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -544,7 +545,7 @@ async fn merge_files(
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
             if stream_type == StreamType::Logs {
-                log::warn!("Stream type is LOGS, lets please create a new index file");
+                log::warn!("Stream type is LOGS, lets create a new index file");
                 let (index_file_name, filemeta) = create_index_file_on_compactor(
                     &new_file_list,
                     buf,
