@@ -47,8 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section @click="handleSingleStreamSelect(opt)">
               <q-item-label v-html="opt.label" />
             </q-item-section>
-            <q-item-section side>
+            <q-item-section side v-if="streamOptions.length > 1">
               <q-toggle
+                :data-test="`log-search-index-list-stream-toggle-${opt.label}`"
                 :model-value="selected"
                 size="20px"
                 @update:model-value="toggleOption(opt)"
@@ -261,7 +262,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="q-pl-md q-py-xs text-subtitle2"
                       >
-                        No values found
+                        {{
+                          fieldValues[props.row.name]?.errMsg ||
+                          "No values found"
+                        }}
                       </div>
                       <div
                         v-for="value in fieldValues[props.row.name]?.values ||
@@ -305,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     : ''
                                 "
                               >
-                                {{ value.count }}
+                                {{ formatLargeNumber(value.count) }}
                               </div>
                             </div>
                             <div
@@ -429,13 +433,6 @@ export default defineComponent({
       this.onStreamChange();
     },
   },
-  computed: {
-    sortedStreamFields() {
-      return this.searchObj.data.stream.selectedStreamFields.sort(
-        (a, b) => a.group - b.group
-      );
-    },
-  },
   setup() {
     const { t } = useI18n();
     const router = useRouter();
@@ -447,12 +444,14 @@ export default defineComponent({
       handleQueryData,
       onStreamChange,
       filterHitsColumns,
+      validateFilterForMultiStream,
     } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
         values: { key: string; count: string }[];
+        errMsg?: string;
       };
     }> = ref({});
     const parser = new Parser();
@@ -561,19 +560,23 @@ export default defineComponent({
       fieldValues.value[name] = {
         isLoading: true,
         values: [],
+        errMsg: "",
       };
       try {
         let query_context = "";
         let query = searchObj.data.query;
+        let whereClause = "";
+        searchObj.data.filterErrMsg = "";
+        searchObj.data.missingStreamMessage = "";
+        searchObj.data.stream.missingStreamMultiStreamFilter = [];
+
         if (searchObj.meta.sqlMode && query.trim().length) {
           const parsedSQL: any = parser.astify(query);
           //hack add time stamp column to parsedSQL if not already added
-          query_context =
-            b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')) || "";
+          query_context = parser.sqlify(parsedSQL).replace(/`/g, '"') || "";
         } else if (query.trim().length) {
           let parseQuery = query.split("|");
           let queryFunctions = "";
-          let whereClause = "";
           if (parseQuery.length > 1) {
             queryFunctions = "," + parseQuery[0].trim();
             whereClause = parseQuery[1].trim();
@@ -628,7 +631,30 @@ export default defineComponent({
         fieldValues.value[name] = {
           isLoading: true,
           values: [],
+          errMsg: "",
         };
+
+        if (whereClause.trim() != "") {
+          // validateFilterForMultiStream function called to get missingStreamMultiStreamFilter
+          const validationFlag = validateFilterForMultiStream();
+
+          if (!validationFlag) {
+            fieldValues.value[name]["isLoading"] = false;
+            fieldValues.value[name]["errMsg"] =
+              "Filter is not valid for selected streams.";
+            return;
+          }
+          if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
+            streams = searchObj.data.stream.selectedStream.filter(
+              (streams: any) =>
+                !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+                  streams
+                )
+            );
+          }
+        }
+
+        let countTotal = streams.length;
         streams.forEach(async (selectedStream: string) => {
           await streamService
             .fieldValues({
@@ -646,6 +672,7 @@ export default defineComponent({
               type: searchObj.data.stream.streamType,
             })
             .then((res: any) => {
+              countTotal--;
               if (res.data.hits.length) {
                 console.log("===", res.data.hits);
 
@@ -655,28 +682,48 @@ export default defineComponent({
                       let index = fieldValues.value[name]["values"].findIndex(
                         (value: any) => value.key == subItem.zo_sql_key
                       );
+                      console.log(
+                        index,
+                        fieldValues.value[name]["values"],
+                        subItem.zo_sql_num,
+                        fieldValues.value[name]["values"]
+                      );
                       if (index != -1) {
                         fieldValues.value[name]["values"][index].count =
-                          formatLargeNumber(
-                            parseInt(subItem.zo_sql_num) +
-                              parseInt(
-                                fieldValues.value[name]["values"][index].count
-                              )
+                          parseInt(subItem.zo_sql_num) +
+                          parseInt(
+                            fieldValues.value[name]["values"][index].count
                           );
+                        // formatLargeNumber(
+                        //   parseInt(subItem.zo_sql_num) +
+                        //     parseInt(
+                        //       fieldValues.value[name]["values"][index].count
+                        //     )
+                        // );
                       } else {
                         fieldValues.value[name]["values"].push({
                           key: subItem.zo_sql_key,
-                          count: formatLargeNumber(subItem.zo_sql_num),
+                          count: subItem.zo_sql_num,
                         });
                       }
                     } else {
                       fieldValues.value[name]["values"].push({
                         key: subItem.zo_sql_key,
-                        count: formatLargeNumber(subItem.zo_sql_num),
+                        count: subItem.zo_sql_num,
                       });
                     }
                   });
                 });
+
+                // fieldValues.value[name]["values"].forEach((item: any) => {
+                //   item.count = formatLargeNumber(item.count);
+                // });
+                if (fieldValues.value[name]["values"].length > 10) {
+                  fieldValues.value[name]["values"].sort(
+                    (a, b) => b.count - a.count
+                  ); // Sort the array based on count in descending order
+                  fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
+                }
 
                 // fieldValues.value[name]["values"] = res.data.hits
                 //   .find((field: any) => field.field === name)
@@ -699,7 +746,7 @@ export default defineComponent({
             })
             .finally(() => {
               console.log(fieldValues.value);
-              fieldValues.value[name]["isLoading"] = false;
+              if (countTotal == 0) fieldValues.value[name]["isLoading"] = false;
             });
         });
       } catch (err) {
@@ -728,6 +775,12 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
+    const sortedStreamFields = () => {
+      return searchObj.data.stream.selectedStreamFields.sort(
+        (a, b) => a.group - b.group
+      );
+    };
+
     return {
       t,
       store,
@@ -748,6 +801,8 @@ export default defineComponent({
       outlinedVisibility,
       handleQueryData,
       onStreamChange,
+      sortedStreamFields,
+      formatLargeNumber,
     };
   },
 });
