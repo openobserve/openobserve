@@ -558,7 +558,16 @@ async fn merge_files(
                     "**************Created index file during compaction****************** {}",
                     index_file_name
                 );
-                let ret = db::file_list::local::set(&index_file_name, Some(filemeta), false).await;
+                // Notify that we wrote the index file to the db.
+                let ret = write_file_list(
+                    org_id,
+                    &[FileKey {
+                        key: index_file_name.clone(),
+                        meta: filemeta,
+                        deleted: false,
+                    }],
+                )
+                .await;
                 if let Err(e) = ret {
                     log::error!(
                         "[merge_files] failed to write to file list on compactor: {}, error: {}",
@@ -566,6 +575,8 @@ async fn merge_files(
                         e.to_string()
                     );
                 }
+                // let ret = db::file_list::local::set(&index_file_name, Some(filemeta),
+                // false).await;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
