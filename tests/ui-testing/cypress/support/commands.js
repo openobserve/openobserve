@@ -86,3 +86,53 @@ Cypress.Commands.add('CallQueryFunction',()=>
   })
 })
 })
+
+
+Cypress.Commands.add('loginwithadmin', () => {
+    
+    cy.session('loginwithadmin', () => {
+      cy.visit('https://ent1.dev.zinclabs.dev/web/login')
+      cy.contains('Login with SSO').click({ force: true });
+      cy.wait(8000)
+      cy.get('[placeholder="email address"]').type(Cypress.env("ADMIN_EMAIL"));
+      cy.get('[placeholder="password"]').type(Cypress.env("ADMIN_PASSWORD"));
+      cy.get('#submit-login').click();
+      cy.wait(8000)
+     
+    });
+    cy.visit('https://ent1.dev.zinclabs.dev/')
+  });
+
+
+  Cypress.Commands.add('loginwithadmin', () => {
+    
+    cy.session('loginwithadmin', () => {
+      cy.visit('https://ent1.dev.zinclabs.dev/web/login')
+      cy.contains('Login with SSO').click({ force: true });
+      cy.wait(8000)
+      cy.get('[placeholder="email address"]').type(Cypress.env("ADMIN_EMAIL"));
+      cy.get('[placeholder="password"]').type(Cypress.env("ADMIN_PASSWORD"));
+      cy.get('#submit-login').click();
+      cy.wait(8000)
+     
+    });
+    cy.visit('https://ent1.dev.zinclabs.dev/')
+  });
+  
+
+  Cypress.Commands.add('loginwithuser', () => {
+    
+    cy.session('loginwithuser', () => {
+      cy.visit('https://ent1.dev.zinclabs.dev/web/login')
+      cy.contains('Login with SSO').click({ force: true });
+      cy.wait(8000)
+      cy.get('[placeholder="email address"]').type(Cypress.env("USER_EMAIL"));
+      cy.get('[placeholder="password"]').type(Cypress.env("USER_PASSWORD"));
+      cy.get('#submit-login').click();
+      cy.wait(8000)
+     
+    });
+    cy.visit('https://ent1.dev.zinclabs.dev/')
+  });
+  
+  
