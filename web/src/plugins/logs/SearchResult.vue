@@ -218,6 +218,22 @@ color="warning" size="30px"></q-icon> Error
                 </div>
               </td>
             </tr>
+            <tr
+              v-if="
+                searchObj.loading == false && searchObj.data.missingStreamMessage != ''
+              "
+            >
+              <td
+                :colspan="searchObj.data.resultGrid.columns.length"
+                class="text-bold"
+                style="opacity: 0.7"
+              >
+                <div class="text-subtitle2 text-weight-bold bg-warning">
+                  <q-icon size="xs" name="warning" class="q-mr-xs" />
+                  {{ searchObj.data.missingStreamMessage }}
+                </div>
+              </td>
+            </tr>
           </thead>
           <tr
             data-test="log-search-result-function-error"
