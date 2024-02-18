@@ -16,25 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div style="font-size: 18px; padding-top: 12px" class="q-mb-md q-px-md">
+    <div
+      data-test="iam-groups-section-title"
+      style="font-size: 18px; padding-top: 12px"
+      class="q-mb-md q-px-md"
+    >
       {{ t("iam.groups") }}
     </div>
 
     <div>
       <div class="q-px-md q-mb-sm q-pb-xs row items-center justify-between">
-        <q-input
-          v-model="filterQuery"
-          filled
-          dense
-          class="q-pr-sm"
-          style="width: 500px"
-          :placeholder="t('iam.searchGroup')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-
+        <div date-test="iam-groups-search-input">
+          <q-input
+            v-model="filterQuery"
+            filled
+            dense
+            class="q-pr-sm"
+            style="width: 500px"
+            :placeholder="t('iam.searchGroup')"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+        </div>
         <q-btn
           data-test="alert-list-add-alert-btn"
           class="q-ml-md q-mb-xs text-bold no-border q-mr-sm"
@@ -46,12 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        data-test="iam-groups-table-title"
         class="q-px-md q-pt-sm q-ml-xs text-bold"
         style="font-size: 14px; padding-bottom: 12px"
       >
         {{ rows.length }} {{ t("iam.groups") }}
       </div>
       <app-table
+        data-test="iam-groups-table-section"
         class="iam-table"
         :rows="rows"
         :columns="columns"
@@ -66,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:actions="slotProps: any">
           <div>
             <q-icon
+              :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
               size="14px"
               name="edit"
               class="cursor-pointer q-mr-md"
@@ -73,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="editGroup(slotProps.column.row)"
             />
             <q-icon
+              :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
               size="14px"
               name="delete"
               class="cursor-pointer"

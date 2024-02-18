@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="iam-roles-page-title"
+    data-test="iam-roles-section-title"
     style="font-size: 18px; padding-top: 12px"
     class="q-mb-md q-px-md"
   >
