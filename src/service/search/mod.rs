@@ -206,6 +206,7 @@ async fn get_file_list(
         }
     }
     files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
     files
 }
 
@@ -278,7 +279,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
-            "select file_name from {} where {}",
+            "select file_name from {} where deleted is false and {}",
             meta.stream_name, search_condition
         );
 

@@ -15,6 +15,10 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
+use arrow::{
+    array::{ArrayRef, BooleanArray, Int32Array, Int64Array, StringArray},
+    record_batch::RecordBatch,
+};
 use arrow_schema::{Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
@@ -357,6 +361,7 @@ async fn merge_files(
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
+        stream_type,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -449,7 +454,7 @@ pub(crate) async fn create_index_file_on_ingester(
                 ],
             )?
             .with_column("character_len", character_length(col("term")))?
-            .with_column("deleted", lit("false"))?
+            .with_column("deleted", lit(false))?
             .filter(col("character_len").gt_eq(lit(3)))?
             .select_columns(&["term", "file_name", "_timestamp", "count", "deleted"])?
             .collect()
@@ -501,10 +506,6 @@ pub(crate) async fn create_index_file_on_compactor(
         .build()
         .unwrap();
 
-    for f in file_list_to_invalidate.iter() {
-        log::warn!("Now creating index for files: {}", f.key);
-    }
-
     let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
     let ctx = SessionContext::new();
     let provider = MemTable::try_new(schema.clone(), vec![batches])?;
@@ -531,7 +532,7 @@ pub(crate) async fn create_index_file_on_compactor(
             .with_column("terms", split_arr)?
             .unnest_column("terms")?
             .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
+            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
             .with_column("file_name", lit(file_name_without_prefix))?
             .aggregate(
                 vec![col("term"), col("file_name")],
@@ -541,7 +542,7 @@ pub(crate) async fn create_index_file_on_compactor(
                 ],
             )?
             .with_column("character_len", character_length(col("term")))?
-            .with_column("deleted", lit("false"))?
+            .with_column("deleted", lit(false))?
             .filter(col("character_len").gt_eq(lit(3)))?
             .select_columns(&["term", "file_name", "_timestamp", "count", "deleted"])?
             .collect()
@@ -550,18 +551,42 @@ pub(crate) async fn create_index_file_on_compactor(
         indexed_record_batches_to_merge.push(record_batch);
     }
 
+    let schema = if let Some(first_batch) = indexed_record_batches_to_merge.first() {
+        first_batch[0].schema()
+    } else {
+        return Err(anyhow::anyhow!("No record batches found".to_string(),));
+    };
+
+    let len_of_columns_to_invalidate = file_list_to_invalidate.len();
+    let empty_terms: ArrayRef = Arc::new(StringArray::from(vec![
+        None::<String>;
+        len_of_columns_to_invalidate
+    ]));
+    let file_names: ArrayRef = Arc::new(StringArray::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.key.to_string())
+            .collect::<Vec<String>>(),
+    ));
+    let _timestamp: ArrayRef = Arc::new(Int64Array::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.meta.min_ts)
+            .collect::<Vec<i64>>(),
+    ));
+    let count: ArrayRef = Arc::new(Int64Array::from(vec![
+        None::<i64>;
+        len_of_columns_to_invalidate
+    ]));
+    let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
+    let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
+    let batch = RecordBatch::try_new(schema.into(), columns).unwrap();
+    indexed_record_batches_to_merge.push(vec![batch]);
+
     let record_batches: Vec<arrow::record_batch::RecordBatch> = indexed_record_batches_to_merge
         .into_iter()
         .flatten()
         .collect();
-
-    // let hour_key = get_wal_time_key(
-    //     min_ts,
-    //     &vec![],
-    //     config::meta::stream::PartitionTimeLevel::Hourly,
-    //     &serde_json::Map::new(),
-    //     None,
-    // );
 
     let original_file_size = 0; // The file never existed before this function was called
     let (filename, filemeta, _stream_type) = write_to_disk(
@@ -574,17 +599,7 @@ pub(crate) async fn create_index_file_on_compactor(
         "index_creator",
     )
     .await?;
-    // let arrow_file_name = write_file_parquet(
-    //     record_batches,
-    //     0,
-    //     &&StreamParams {
-    //         org_id: org_id.to_string().into(),
-    //         stream_name: stream_name.to_string().into(),
-    //         stream_type: StreamType::Index,
-    //     },
-    //     &hour_key,
-    // )
-    // .await?;
+
     ctx.deregister_table("_tbl_raw_data")?;
     log::warn!("[INGESTER:JOB] Written index file successfully");
     Ok((filename, filemeta))

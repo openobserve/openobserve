@@ -1246,6 +1246,7 @@ pub async fn merge_parquet_files(
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
     original_size: i64,
+    stream_type: StreamType,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     // query data
     let runtime_env = create_runtime_env(None)?;
@@ -1288,10 +1289,18 @@ pub async fn merge_parquet_files(
     };
 
     // get all sorted data
-    let query_sql = format!(
-        "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.column_timestamp
-    );
+    let query_sql = if stream_type == StreamType::Index {
+        format!(
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM TBL WHERE deleted=true) ORDER BY {} DESC",
+            CONFIG.common.column_timestamp
+        )
+    } else {
+        format!(
+            "SELECT * FROM tbl ORDER BY {} DESC",
+            CONFIG.common.column_timestamp
+        )
+    };
+
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
