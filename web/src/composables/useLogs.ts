@@ -1460,6 +1460,8 @@ const useLogs = () => {
           //extract fields from query response
           extractFields();
 
+          console.log(JSON.stringify(searchObj.data.stream.selectedStreamFields));
+
           //update grid columns
           updateGridColumns();
 
