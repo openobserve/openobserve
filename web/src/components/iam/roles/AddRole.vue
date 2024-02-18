@@ -14,44 +14,47 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="bg-white">
+  <div data-test="add-role-section" class="bg-white">
     <div class="flex justify-between items-center q-px-md q-py-sm">
-      <div style="font-size: 18px">
+      <div data-test="add-role-section-title" style="font-size: 18px">
         {{ t("iam.addRole") }}
       </div>
       <q-icon
+        data-test="add-role-close-dialog-btn"
         name="cancel"
         class="cursor-pointer"
         size="20px"
         @click="emits('cancel:hideform')"
-      ></q-icon>
+      />
     </div>
 
     <div class="full-width bg-grey-4" style="height: 1px" />
 
     <div class="q-px-md q-mt-md o2-input">
-      <q-input
-        v-model.trim="name"
-        :label="t('common.name') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
-        :rules="[
-          (val, rules) =>
-            !!val
-              ? isValidRoleName ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
+      <div data-test="add-role-rolename-input-btn">
+        <q-input
+          v-model.trim="name"
+          :label="t('common.name') + ' *'"
+          color="input-border"
+          bg-color="input-bg"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          :rules="[
+            (val, rules) =>
+              !!val
+                ? isValidRoleName ||
+                  `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                : t('common.nameRequired'),
+          ]"
+        >
+          <template v-slot:hint>
+            Use alphanumeric and '+=,.@-_' characters only, without spaces.
+          </template>
+        </q-input>
+      </div>
 
       <div class="flex justify-center q-mt-lg">
         <q-btn

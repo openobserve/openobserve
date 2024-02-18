@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col q-pr-xs">
+  <div data-test="iam-roles-selection-section" class="col q-pr-xs">
     <div
       class="flex justify-start bordered q-px-md q-py-sm"
       style="position: sticky; top: 0px; z-index: 2"
@@ -28,8 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <div class="q-mr-md">
-        <div class="flex items-center q-pt-xs">
-          <span style="font-size: 14px"> Show </span>
+        <div
+          data-test="iam-roles-selection-show-toggle"
+          class="flex items-center q-pt-xs"
+        >
+          <span
+            data-test="iam-roles-selection-show-text"
+            style="font-size: 14px"
+          >
+            Show
+          </span>
           <div
             class="q-ml-xs"
             style="
@@ -40,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-for="visual in usersDisplayOptions" :key="visual.value">
               <q-btn
+                :data-test="`iam-roles-selection-show-${visual.value}-btn`"
                 :color="visual.value === usersDisplay ? 'primary' : ''"
                 :flat="visual.value === usersDisplay ? false : true"
                 dense
@@ -54,7 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="o2-input q-mr-md" style="width: 400px">
+      <div
+        data-test="iam-roles-selection-search-input"
+        class="o2-input q-mr-md"
+        style="width: 400px"
+      >
         <q-input
           data-test="alert-list-search-input"
           v-model="userSearchKey"
@@ -70,8 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
       </div>
     </div>
-    <div class="q-px-md">
-      <div class="q-my-sm text-bold">{{ rows.length }} Roles</div>
+    <div data-test="iam-roles-selection-table" class="q-px-md">
+      <div
+        data-test="iam-roles-selection-table-title"
+        class="q-my-sm text-bold"
+      >
+        {{ rows.length }} Roles
+      </div>
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -85,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:select="slotProps">
             <q-checkbox
+              :data-test="`iam-roles-selection-table-body-row-${slotProps.column.row.role_name}-checkbox`"
               size="xs"
               v-model="slotProps.column.row.isInGroup"
               class="filter-check-box cursor-pointer"
@@ -93,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </app-table>
       </template>
-      <div v-if="!rows.length" class="q-mt-md text-bold q-pl-md">
+      <div
+        data-test="iam-roles-selection-table-no-users-text"
+        v-if="!rows.length"
+        class="q-mt-md text-bold q-pl-md"
+      >
         No users added
       </div>
     </div>

@@ -15,14 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative-position full-height">
-    <div style="font-size: 18px" class="q-py-sm q-px-md">
+  <div data-test="edit-group-section" class="relative-position full-height">
+    <div
+      data-test="edit-group-section-title"
+      style="font-size: 18px"
+      class="q-py-sm q-px-md"
+    >
       {{ groupDetails.group_name }}
     </div>
 
     <div class="full-width bg-grey-4" style="height: 1px" />
 
     <AppTabs
+      data-test="edit-group-tabs"
       :tabs="tabs"
       :active-tab="activeTab"
       @update:active-tab="updateActiveTab"
