@@ -495,7 +495,7 @@ pub(crate) async fn create_index_file_on_compactor(
     org_id: &str,
     stream_name: &str,
     schema: SchemaRef,
-) -> Result<String, anyhow::Error> {
+) -> Result<(String, FileMeta), anyhow::Error> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
         .unwrap()
         .build()
@@ -564,7 +564,7 @@ pub(crate) async fn create_index_file_on_compactor(
     // );
 
     let original_file_size = 0; // The file never existed before this function was called
-    let (filename, ..) = write_to_disk(
+    let (filename, filemeta, _stream_type) = write_to_disk(
         record_batches,
         original_file_size,
         org_id,
@@ -587,5 +587,5 @@ pub(crate) async fn create_index_file_on_compactor(
     // .await?;
     ctx.deregister_table("_tbl_raw_data")?;
     log::warn!("[INGESTER:JOB] Written index file successfully");
-    Ok(filename)
+    Ok((filename, filemeta))
 }
