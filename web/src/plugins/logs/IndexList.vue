@@ -433,13 +433,6 @@ export default defineComponent({
       this.onStreamChange();
     },
   },
-  computed: {
-    sortedStreamFields() {
-      return this.searchObj.data.stream.selectedStreamFields.sort(
-        (a, b) => a.group - b.group
-      );
-    },
-  },
   setup() {
     const { t } = useI18n();
     const router = useRouter();
@@ -687,6 +680,12 @@ export default defineComponent({
                       let index = fieldValues.value[name]["values"].findIndex(
                         (value: any) => value.key == subItem.zo_sql_key
                       );
+                      console.log(
+                        index,
+                        fieldValues.value[name]["values"],
+                        subItem.zo_sql_num,
+                        fieldValues.value[name]["values"]
+                      );
                       if (index != -1) {
                         fieldValues.value[name]["values"][index].count =
                           parseInt(subItem.zo_sql_num) +
@@ -735,6 +734,12 @@ export default defineComponent({
     const sortedStreamFields = () => {
       return searchObj.data.stream.selectedStreamFields.sort(
         (a: object, b: object) => (a as any).group - (b as any).group
+      );
+    };
+
+    const sortedStreamFields = () => {
+      return searchObj.data.stream.selectedStreamFields.sort(
+        (a, b) => a.group - b.group
       );
     };
 
