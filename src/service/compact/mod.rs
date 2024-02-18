@@ -54,6 +54,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             StreamType::Traces,
             StreamType::EnrichmentTables,
             StreamType::Metadata,
+            StreamType::Index,
         ];
         for org_id in orgs {
             // get the working node for the organization
