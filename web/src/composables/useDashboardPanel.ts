@@ -627,6 +627,9 @@ const useDashboardPanelData = () => {
           query.fields.target = null;
           query.fields.value = null;
         });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit = 0;
         break;
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
@@ -658,6 +661,9 @@ const useDashboardPanelData = () => {
           query.fields.longitude = null;
           query.fields.weight = null;
         });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit = 0;
       default:
         break;
     }
