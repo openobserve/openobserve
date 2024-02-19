@@ -201,7 +201,10 @@ impl FromRequest for AuthExtractor {
                 path_columns[url_len - 2]
             )
         } else if url_len == 3 {
-            if path_columns[2].starts_with("alerts") {
+            if path_columns[2].starts_with("alerts")
+                || path_columns[2].starts_with("templates")
+                || path_columns[2].starts_with("destinations")
+            {
                 if method.eq("PUT") || method.eq("DELETE") {
                     format!(
                         "{}:{}",
