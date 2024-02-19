@@ -424,7 +424,7 @@ export default defineComponent({
       }
 
       // set drilldown array, to show list of drilldowns
-      drilldownArray.value = panelSchema.value.config.drilldown;
+      drilldownArray.value = panelSchema.value.config.drilldown ?? [];
 
       // temporarily show the popup to calculate its dimensions
       drilldownPopUpRef.value.style.display = "block";
