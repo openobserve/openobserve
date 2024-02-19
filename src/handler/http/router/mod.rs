@@ -185,7 +185,7 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/config")
             .wrap(cors)
             .service(status::zo_config)
-            .service(status::callback)
+            .service(status::redirect)
             .service(status::dex_login)
             .service(status::refresh_token_with_dex),
     );
