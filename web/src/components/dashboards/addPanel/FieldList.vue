@@ -479,7 +479,7 @@ export default defineComponent({
       addSource,
       addTarget,
       addValue,
-      cleanupDraggingFields,,
+      cleanupDraggingFields,
     } = useDashboardPanelData();
     const { getStreams, getStream } = useStreams();
 
