@@ -127,3 +127,33 @@ impl RecordBatchEntry {
         })
     }
 }
+
+#[derive(Default)]
+pub struct PersistStat {
+    pub json_size: i64,
+    pub arrow_size: usize,
+    pub file_num: usize,
+    pub batch_num: usize,
+}
+
+impl std::ops::Add for PersistStat {
+    type Output = PersistStat;
+
+    fn add(self, other: PersistStat) -> PersistStat {
+        PersistStat {
+            json_size: self.json_size + other.json_size,
+            arrow_size: self.arrow_size + other.arrow_size,
+            file_num: self.file_num + other.file_num,
+            batch_num: self.batch_num + other.batch_num,
+        }
+    }
+}
+
+impl std::ops::AddAssign for PersistStat {
+    fn add_assign(&mut self, other: PersistStat) {
+        self.json_size += other.json_size;
+        self.arrow_size += other.arrow_size;
+        self.file_num += other.file_num;
+        self.batch_num += other.batch_num;
+    }
+}

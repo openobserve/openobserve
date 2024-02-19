@@ -19,7 +19,7 @@ use arrow_schema::Schema;
 use config::metrics;
 
 use crate::{
-    entry::{Entry, RecordBatchEntry},
+    entry::{Entry, PersistStat, RecordBatchEntry},
     errors::Result,
     rwmap::RwMap,
     stream::Stream,
@@ -60,7 +60,7 @@ impl MemTable {
         thread_id: usize,
         org_id: &str,
         stream_type: &str,
-    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
+    ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::new();
         let r = self.streams.read().await;
