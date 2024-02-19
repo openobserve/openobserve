@@ -405,6 +405,14 @@ export default defineComponent({
     let drilldownParams: any = [];
 
     const onChartClick = async (params: any, ...args: any) => {
+      // check if drilldown data exists
+      if (
+        !panelSchema.value.config.drilldown ||
+        panelSchema.value.config.drilldown.length == 0
+      ) {
+        return;
+      }
+
       drilldownParams = [params, args];
 
       // drilldownarrayref offset values
