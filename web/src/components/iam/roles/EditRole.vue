@@ -231,7 +231,7 @@ import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
 import dashboardService from "@/services/dashboards";
-
+import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
@@ -282,6 +282,8 @@ const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
 const roleUsers: Ref<string[]> = ref([]);
+
+const { getStreams } = useStreams();
 
 const tabs = [
   {
@@ -489,7 +491,6 @@ const getDefaultResource = (): Resource => {
     childs: [],
     type: "Type",
     resourceName: "",
-    isSelected: false,
     entities: [],
     has_entities: false,
     is_loading: false,
@@ -881,7 +882,7 @@ const filterRowsByResourceName = (
   );
 };
 
-const onResourceChange = () => {
+const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
 };
@@ -978,13 +979,9 @@ const getResourceEntities = (resource: Resource | Entity) => {
 };
 
 const getEnrichmentTables = async () => {
-  const data = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "enrichment_tables",
-    false
-  );
+  const data = await getStreams("enrichment_tables", false);
 
-  updateResourceEntities("enrichment_table", ["name"], data.data.list);
+  updateResourceEntities("enrichment_table", ["name"], data.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1144,13 +1141,9 @@ const getAlerts = async () => {
 };
 
 const getLogs = async (resource: Resource | Entity) => {
-  const logs = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "logs",
-    false
-  );
+  const logs = await getStreams("logs", false);
 
-  updateEntityEntities(resource, ["name"], logs.data.list);
+  updateEntityEntities(resource, ["name"], logs.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1158,13 +1151,9 @@ const getLogs = async (resource: Resource | Entity) => {
 };
 
 const getMetrics = async (resource: Resource | Entity) => {
-  const metrics = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "metrics",
-    false
-  );
+  const metrics = await getStreams("metrics", false);
 
-  updateEntityEntities(resource, ["name"], metrics.data.list);
+  updateEntityEntities(resource, ["name"], metrics.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1172,13 +1161,9 @@ const getMetrics = async (resource: Resource | Entity) => {
 };
 
 const getTraces = async (resource: Resource | Entity) => {
-  const traces = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "traces",
-    false
-  );
+  const traces = await getStreams("traces", false);
 
-  updateEntityEntities(resource, ["name"], traces.data.list);
+  updateEntityEntities(resource, ["name"], traces.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1385,7 +1370,6 @@ const updateResourceEntities = (
       entities: [],
       type: "Resource",
       resourceName: resourceName,
-      isSelected: false,
       has_entities: hasEntities,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
       show: true,
@@ -1488,7 +1472,6 @@ const updateResourceResource = (
       entities: [],
       type: "Type",
       resourceName: resourceName,
-      isSelected: false,
       has_entities: hasEntities,
       childName: resourceName,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
@@ -1605,5 +1588,4 @@ const filterResourceOptions = (val: string, update: any) => {
   ) as any[];
 };
 </script>
-
 <style scoped></style>

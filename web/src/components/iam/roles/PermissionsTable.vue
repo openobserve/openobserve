@@ -22,7 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     {{ selectedPermissionsHash.size }} Permissions
   </div>
-  <div class="iam-permissions-table">
+  <div
+    :data-test="`iam-${
+      parent ? parent.name : 'main'
+    }-permissions-table-section`"
+    class="iam-permissions-table"
+  >
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
@@ -91,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         specific resource)
       </div>
       <q-virtual-scroll
-        data-test="edit-role-permissions-table"
+        :data-test="`edit-role-${
+          parent ? parent.name : 'main'
+        }-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
         style="max-height: 725px; overflow-x: hidden; overflow-y: auto"
         :style="{
@@ -107,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :items="rows"
         flat
         bordered
-        ref="qTableRef"
+        ref="permissionsTableRef"
         :rows="rows"
         :columns="(columns as [])"
         :table-colspan="9"
@@ -119,44 +126,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-bottom
         class="full-height"
       >
-        <template v-slot:header="props">
-          <q-tr
-            data-test="edit-role-permissions-table-header"
-            :props="props"
-            class="thead-sticky"
-          >
-            <q-th
-              :data-test="`edit-role-permissions-table-header-column-${col.name}`"
-              v-for="col in props.cols"
-              :key="col.name"
+        <template v-if="!level" v-slot:before>
+          <thead class="thead-sticky text-left">
+            <tr
+              data-test="edit-role-permissions-table-header"
               :props="props"
-              :style="col.style"
+              class="thead-sticky"
             >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-          <q-tr v-if="!visibleResourceCount">
-            <q-td
-              data-test="edit-role-permissions-table-no-permissions-title"
-              colspan="100%"
-              class="text-center text-bold text-grey-9"
-              style="padding-top: 16px; font-size: 16px"
-            >
-              No Permissions Selected</q-td
-            >
-          </q-tr>
+              <th
+                v-for="col in columns"
+                :data-test="`edit-role-permissions-table-header-column-${col.name}`"
+                :key="col.name"
+                :props="props"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </th>
+            </tr>
+            <tr v-if="!visibleResourceCount">
+              <q-td
+                data-test="edit-role-permissions-table-no-permissions-title"
+                colspan="100%"
+                class="text-center text-bold text-grey-9"
+                style="padding-top: 16px; font-size: 16px"
+              >
+                No Permissions Selected</q-td
+              >
+            </tr>
+          </thead>
         </template>
 
         <template v-slot="{ item: row }">
-          <tr v-if="row.show" :key="`m_${row.name}`">
+          <tr
+            :data-test="`edit-role-permissions-table-body-row-${row.name}`"
+            v-if="row.show"
+            :key="`m_${row.name}`"
+          >
             <td
               v-for="(col, index) in columns"
+              :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}`"
               :key="col.name"
               :props="props"
               :style="{
+                width: col.style?.width,
                 paddingLeft:
                   level && index === 0
-                    ? props.row.has_entities
+                    ? row.has_entities
                       ? 16 + level * 20 + 'px'
                       : 16 +
                         (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
@@ -164,58 +179,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : '',
               }"
             >
-              <template v-if="col.name === 'expand' && props.row.has_entities">
+              <template v-if="col.name === 'expand' && row.has_entities">
                 <q-icon
-                  :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}-icon`"
+                  :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-icon`"
                   :name="
-                    props.row.expand
-                      ? 'keyboard_arrow_up'
-                      : 'keyboard_arrow_down'
+                    row.expand ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
                   "
                   class="cursor-pointer"
                   :title="t('common.expand')"
-                  @click="() => expandPermission(props.row)"
+                  @click="() => expandPermission(row)"
                 />
               </template>
               <template v-else-if="col.field === 'permission'">
                 <q-checkbox
-                  :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}-checkbox`"
-                  v-if="props.row.permission[col.name]?.show"
+                  :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-checkbox`"
+                  v-if="row.permission[col.name]?.show"
                   size="xs"
-                  v-model="props.row.permission[col.name].value"
+                  v-model="row.permission[col.name].value"
                   :val="col.name"
                   class="filter-check-box cursor-pointer"
-                  @update:model-value="
-                    handlePermissionChange(props.row, col.name)
-                  "
+                  @update:model-value="handlePermissionChange(row, col.name)"
                 />
               </template>
               <template
                 v-else-if="col.name !== 'expand' && col.field !== 'permission'"
               >
                 <span
-                  :data-test="`edit-role-permissions-table-body-row-${props.row.name}-col-${col.name}-text`"
+                  :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-text`"
                   :title="
                     JSON.stringify({
-                      name: props.row.name,
-                      label: props.row.display_name,
+                      name: row.name,
+                      label: row.display_name,
                     })
                   "
                 >
-                  {{ col.value }}</span
+                  {{ row[col.field] }}</span
                 >
               </template>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-show="props.row.expand && props.row.show"
+            </td>
+          </tr>
+          <tr
+            v-show="row.expand && row.show"
             :props="props"
             :key="`e_${row.name + 'entity'}`"
             class="q-virtual-scroll--with-prev"
             style="transition: display 2s ease-in"
           >
-            <q-td colspan="100%" style="padding: 0; border-bottom: none">
-              <template v-if="props.row.entities">
+            <td colspan="100%" style="padding: 0; border-bottom: none">
+              <template v-if="row.entities">
                 <PermissionsTable
                   :level="level + 1"
                   :rows="row.entities"
@@ -225,15 +236,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @expand:row="expandPermission"
                 />
               </template>
-            </q-td>
-          </q-tr>
+            </td>
+          </tr>
         </template>
-      </q-table>
+      </q-virtual-scroll>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from "vue";
 import { defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -272,6 +284,8 @@ const emits = defineEmits(["updated:permission", "expand:row"]);
 
 const { t } = useI18n();
 
+const permissionsTableRef: any = ref(null);
+
 const columns: any = [
   {
     name: "expand",
@@ -280,7 +294,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "expand",
-    style: "width: 37px",
+    style: { width: "37px" },
   },
   {
     name: "display_name",
@@ -294,7 +308,7 @@ const columns: any = [
     field: "type",
     label: t("iam.object"),
     align: "left",
-    style: "width: 100px",
+    style: { width: "100px" },
   },
   {
     name: "AllowAll",
@@ -303,7 +317,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 80px",
+    style: { width: "80px" },
   },
   {
     name: "AllowList",
@@ -312,7 +326,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 80px",
+    style: { width: "80px" },
   },
   {
     name: "AllowGet",
@@ -321,7 +335,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 80px",
+    style: { width: "80px" },
   },
   {
     name: "AllowDelete",
@@ -330,7 +344,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 80px",
+    style: { width: "80px" },
   },
   {
     name: "AllowPost",
@@ -339,7 +353,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 80px",
+    style: { width: "80px" },
   },
   {
     name: "AllowPut",
@@ -348,7 +362,7 @@ const columns: any = [
     align: "center",
     slot: true,
     slotName: "permission",
-    style: "width: 80px",
+    style: { width: "80px" },
   },
 ];
 
@@ -359,6 +373,10 @@ const expandPermission = async (resource: any) => {
 const handlePermissionChange = (row: any, permission: string) => {
   emits("updated:permission", row, permission);
 };
+
+defineExpose({
+  permissionsTableRef,
+});
 </script>
 
 <style scoped></style>
@@ -366,6 +384,9 @@ const handlePermissionChange = (row: any, permission: string) => {
 .iam-permissions-table {
   .q-table--bordered {
     border: none;
+  }
+
+  .q-virtual-scroll__padding {
   }
 }
 </style>
