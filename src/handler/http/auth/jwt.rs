@@ -27,7 +27,7 @@ use o2_enterprise::enterprise::openfga::{
             get_user_role_creation_tuple, get_user_role_deletion_tuple, update_tuples,
         },
         roles::{
-            check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_add_tuples,
+            check_and_get_crole_tuple_for_new_user, get_roles_for_user,
             get_user_crole_removal_tuples,
         },
     },
@@ -432,7 +432,13 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         for new_role in custom_roles {
             if !existing_roles.contains(&new_role) {
                 // add role
-                get_user_crole_add_tuples(user_email, &new_role, &mut add_tuples);
+                check_and_get_crole_tuple_for_new_user(
+                    user_email,
+                    &O2_CONFIG.dex.default_org,
+                    vec![new_role],
+                    &mut add_tuples,
+                )
+                .await;
             }
         }
 

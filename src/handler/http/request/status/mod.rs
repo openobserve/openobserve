@@ -202,8 +202,8 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/callback")]
-pub async fn callback(req: HttpRequest) -> Result<HttpResponse, Error> {
+#[get("/redirect")]
+pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
         Some(code) => code,
