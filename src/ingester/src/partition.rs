@@ -31,7 +31,7 @@ use snafu::ResultExt;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 use crate::{
-    entry::{Entry, RecordBatchEntry},
+    entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
     rwmap::RwMap,
 };
@@ -79,7 +79,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
+    ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let r = self.files.read().await;
         let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
@@ -100,12 +100,17 @@ impl Partition {
                     file_meta.max_ts = r.max_ts;
                 }
             });
-            let mut arrow_size = 0;
+            let mut persist_stat = PersistStat {
+                json_size: file_meta.original_size,
+                arrow_size: 0,
+                file_num: 1,
+                batch_num: data.data.len(),
+            };
             // write into parquet buf
             let mut buf_parquet = Vec::new();
             let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
             for batch in data.data.iter() {
-                arrow_size += batch.data_arrow_size;
+                persist_stat.arrow_size += batch.data_arrow_size;
                 writer
                     .write(&batch.data)
                     .await
@@ -139,7 +144,7 @@ impl Partition {
                 .with_label_values(&[&org_id, stream_type])
                 .inc_by(buf_parquet.len() as u64);
 
-            paths.push((path, file_meta.original_size, arrow_size));
+            paths.push((path, persist_stat));
         }
         Ok((self.schema.size(), paths))
     }

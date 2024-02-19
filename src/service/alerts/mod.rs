@@ -64,6 +64,11 @@ pub async fn save(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
+    // default frequency is 60 seconds
+    if alert.trigger_condition.frequency == 0 {
+        alert.trigger_condition.frequency = std::cmp::max(10, CONFIG.limit.alert_schedule_interval);
+    }
+
     if alert.name.is_empty() || alert.stream_name.is_empty() {
         return Err(anyhow::anyhow!("Alert name is required"));
     }
@@ -134,13 +139,6 @@ pub async fn save(
 
     // test the alert
     _ = &alert.evaluate(None).await?;
-
-    // calulate the trigger frequency
-    // alert.trigger_condition.frequency = std::cmp::max(
-    //     1,
-    //     alert.trigger_condition.period / alert.trigger_condition.threshold,
-    // );
-    alert.trigger_condition.frequency = std::cmp::max(10, CONFIG.limit.alert_schedule_interval);
 
     // save the alert
     match db::alerts::set(org_id, stream_type, stream_name, &alert).await {
