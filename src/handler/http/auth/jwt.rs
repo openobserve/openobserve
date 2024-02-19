@@ -312,11 +312,11 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let mut role = "";
     let mut custom_role = None;
 
-    for part in dn.split(',') {
-        if O2_CONFIG.openfga.map_group_to_role {
-            custom_role = Some(part.to_owned());
-            org = &O2_CONFIG.dex.default_org;
-        } else {
+    if O2_CONFIG.openfga.map_group_to_role {
+        custom_role = Some(dn.to_owned());
+        org = &O2_CONFIG.dex.default_org;
+    } else {
+        for part in dn.split(',') {
             let parts: Vec<&str> = part.split('=').collect();
             if parts.len() == 2 {
                 if parts[0].eq(&O2_CONFIG.dex.group_attribute) && org.is_empty() {
@@ -351,7 +351,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
 
     if db_user.is_none() {
         let mut tuples = vec![];
-        log::info!("User does not exist in the database");
+        log::info!("group_to_custom_role: User does not exist in the database");
 
         if O2_CONFIG.openfga.enabled {
             get_org_creation_tuples(
@@ -364,14 +364,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                 NON_OWNING_ORG.to_vec(),
             )
             .await;
-            get_user_creation_tuples(
-                &O2_CONFIG.dex.default_org,
-                user_email,
-                &UserRole::from_str(&O2_CONFIG.dex.default_role)
-                    .unwrap()
-                    .to_string(),
-                &mut tuples,
-            );
+            tuples.push(get_user_org_tuple(&O2_CONFIG.dex.default_org, user_email));
             tuples.push(get_user_org_tuple(user_email, user_email));
 
             check_and_get_crole_tuple_for_new_user(
@@ -398,24 +391,30 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
 
         match users::update_db_user(updated_db_user).await {
             Ok(_) => {
-                log::info!("User added to the database");
+                log::info!("group_to_custom_role: User added to the database");
                 if O2_CONFIG.openfga.enabled {
                     match update_tuples(tuples, vec![]).await {
                         Ok(_) => {
-                            log::info!("User updated to the openfga");
+                            log::info!("group_to_custom_role: User updated to the openfga");
                         }
                         Err(e) => {
-                            log::error!("Error updating user to the openfga: {}", e);
+                            log::error!(
+                                "group_to_custom_role: Error updating user to the openfga: {}",
+                                e
+                            );
                         }
                     }
                 }
             }
             Err(e) => {
-                log::error!("Error adding user to the database: {}", e);
+                log::error!(
+                    "group_to_custom_role: Error adding user to the database: {}",
+                    e
+                );
             }
         }
     } else {
-        log::info!("User exists in the database");
+        log::info!("group_to_custom_role: User exists in the database");
         let mut add_tuples = vec![];
         let mut remove_tuples = vec![];
         // user exists in the db with default org hence skip org creation tuples
@@ -440,10 +439,13 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         if O2_CONFIG.openfga.enabled {
             match update_tuples(add_tuples, remove_tuples).await {
                 Ok(_) => {
-                    log::info!("User updated to the openfga");
+                    log::info!("group_to_custom_role: User updated to the openfga");
                 }
                 Err(e) => {
-                    log::error!("Error updating user to the openfga: {}", e);
+                    log::error!(
+                        "group_to_custom_role: Error updating user to the openfga: {}",
+                        e
+                    );
                 }
             }
         }
