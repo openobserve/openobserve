@@ -23,7 +23,7 @@ use snafu::ResultExt;
 use tokio::{sync::Semaphore, task};
 
 use crate::{
-    entry::RecordBatchEntry,
+    entry::{PersistStat, RecordBatchEntry},
     errors::{DeleteFileSnafu, RenameFileSnafu, Result, TokioJoinSnafu, WriteDataSnafu},
     memtable::MemTable,
     rwmap::RwIndexMap,
@@ -65,15 +65,14 @@ impl Immutable {
         }
     }
 
-    pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<(i64, usize)> {
-        let mut persist_json_size = 0;
-        let mut persist_arrow_size = 0;
+    pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
+        let mut persist_stat = PersistStat::default();
         // 1. dump memtable to disk
         let (schema_size, paths) = self
             .memtable
             .persist(self.thread_id, &self.key.org_id, &self.key.stream_type)
             .await?;
-        persist_arrow_size += schema_size;
+        persist_stat.arrow_size += schema_size;
         // 2. create a lock file
         let done_path = wal_path.with_extension("lock");
         let lock_data = paths
@@ -85,15 +84,14 @@ impl Immutable {
         // 3. delete wal file
         std::fs::remove_file(wal_path).context(DeleteFileSnafu { path: wal_path })?;
         // 4. rename the tmp files to parquet files
-        for (path, json_size, arrow_size) in paths {
-            persist_json_size += json_size;
-            persist_arrow_size += arrow_size;
+        for (path, stat) in paths {
+            persist_stat += stat;
             let parquet_path = path.with_extension("parquet");
             std::fs::rename(&path, &parquet_path).context(RenameFileSnafu { path: &path })?;
         }
         // 5. delete the lock file
         std::fs::remove_file(&done_path).context(DeleteFileSnafu { path: &done_path })?;
-        Ok((persist_json_size, persist_arrow_size))
+        Ok(persist_stat)
     }
 }
 
@@ -113,7 +111,7 @@ pub(crate) async fn persist() -> Result<()> {
     let semaphore = Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
     for path in paths {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: task::JoinHandle<Result<Option<(PathBuf, i64, usize)>>> =
+        let task: task::JoinHandle<Result<Option<(PathBuf, PersistStat)>>> =
             task::spawn(async move {
                 let r = IMMUTABLES.read().await;
                 let Some(immutable) = r.get(&path) else {
@@ -129,7 +127,7 @@ pub(crate) async fn persist() -> Result<()> {
                 drop(r);
                 let ret = immutable.persist(&path).await;
                 drop(permit);
-                ret.map(|size| Some((path, size.0, size.1)))
+                ret.map(|stat| Some((path, stat)))
             });
         tasks.push(task);
     }
@@ -142,12 +140,14 @@ pub(crate) async fn persist() -> Result<()> {
                 log::error!("[INGESTER:WAL] persist error: {}", e);
             }
             Ok(None) => {}
-            Ok(Some((path, json_size, arrow_size))) => {
+            Ok(Some((path, stat))) => {
                 log::info!(
-                    "[INGESTER:WAL] done  persist file: {}, json_size: {}, arrow_size: {}",
+                    "[INGESTER:WAL] done  persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}",
                     path.to_string_lossy(),
-                    json_size,
-                    arrow_size
+                    stat.json_size,
+                    stat.arrow_size,
+                    stat.file_num,
+                    stat.batch_num,
                 );
                 // remove entry
                 let mut rw = IMMUTABLES.write().await;
@@ -156,10 +156,10 @@ pub(crate) async fn persist() -> Result<()> {
                 // update metrics
                 metrics::INGEST_MEMTABLE_BYTES
                     .with_label_values(&[])
-                    .sub(json_size);
+                    .sub(stat.json_size);
                 metrics::INGEST_MEMTABLE_ARROW_BYTES
                     .with_label_values(&[])
-                    .sub(arrow_size as i64);
+                    .sub(stat.arrow_size as i64);
                 metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
             }
         }

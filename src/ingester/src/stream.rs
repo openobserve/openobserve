@@ -18,14 +18,14 @@ use std::{path::PathBuf, sync::Arc};
 use arrow_schema::Schema;
 
 use crate::{
-    entry::{Entry, RecordBatchEntry},
+    entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
     partition::Partition,
     rwmap::RwMap,
 };
 
 pub(crate) struct Stream {
-    partitions: RwMap<Arc<str>, Partition>, // key: schema version hash, val: partitions
+    partitions: RwMap<Arc<str>, Partition>, // key: schema hash, val: partitions
 }
 
 impl Stream {
@@ -61,7 +61,7 @@ impl Stream {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
-    ) -> Result<(usize, Vec<(PathBuf, i64, usize)>)> {
+    ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::new();
         let r = self.partitions.read().await;
