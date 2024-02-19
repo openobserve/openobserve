@@ -472,10 +472,9 @@ const useLogs = () => {
 
   const validateFilterForMultiStream = () => {
     const filterCondition = searchObj.data.editorValue;
-    const parsedSQL = parser.astify(
+    const parsedSQL: any = parser.astify(
       "select * from stream where " + filterCondition
     );
-    console.log(parsedSQL);
     searchObj.data.stream.filteredField = extractFilterColumns(
       parsedSQL?.where
     );
@@ -484,9 +483,10 @@ const useLogs = () => {
     searchObj.data.missingStreamMessage = "";
     searchObj.data.stream.missingStreamMultiStreamFilter = [];
     for (const fieldName of searchObj.data.stream.filteredField) {
-      const filteredFields = searchObj.data.stream.selectedStreamFields.filter(
-        (field: any) => field.name === fieldName
-      );
+      const filteredFields: any =
+        searchObj.data.stream.selectedStreamFields.filter(
+          (field: any) => field.name === fieldName
+        );
       if (filteredFields.length > 0) {
         const streamsCount = filteredFields[0].streams.length;
         const allStreamsEqual = filteredFields.every(
@@ -499,9 +499,9 @@ const useLogs = () => {
         searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
       }
 
-      const fieldStreams = searchObj.data.stream.selectedStreamFields
-        .filter((field: { name: any }) => field.name === fieldName)
-        .map((field: { streams: any }) => field.streams)
+      const fieldStreams: any = searchObj.data.stream.selectedStreamFields
+        .filter((field: any) => field.name === fieldName)
+        .map((field: any) => field.streams)
         .flat();
 
       searchObj.data.stream.missingStreamMultiStreamFilter =
@@ -691,12 +691,11 @@ const useLogs = () => {
         );
 
         // in the case of multi stream, we need to pass query for each selected stream in the form of array
-        // additional checks added for filter condition, 
-        // 1. all fields in filter condition should be present in same streams. 
+        // additional checks added for filter condition,
+        // 1. all fields in filter condition should be present in same streams.
         // if one or more fields belongs to different stream then error will be shown
         // 2. if multiple streams are selected but filter condition contains fields from only one stream
         // then we need to send the search request for only matched stream
-        console.log(searchObj.data.stream)
         if (searchObj.data.stream.selectedStream.length > 1) {
           let streams: any = searchObj.data.stream.selectedStream;
           if (whereClause.trim() != "") {
@@ -1300,8 +1299,6 @@ const useLogs = () => {
           //extract fields from query response
           extractFields();
 
-          console.log(JSON.stringify(searchObj.data.stream.selectedStreamFields));
-
           //update grid columns
           updateGridColumns();
 
@@ -1551,27 +1548,7 @@ const useLogs = () => {
             ...Object.values(stream.settings.full_text_search_keys),
           ];
 
-          stream.schema.forEach((schema: { name: string }) => {
-            // Check if the schema name exists in other streams
-            // const otherStreams = searchObj.data.streamResults.list.filter(
-            //   (otherStream: { schema: any[]; name: any }) => {
-            //     if (
-            //       selectedStreamValues.includes(otherStream.name) &&
-            //       otherStream.name !== stream.name
-            //     ) {
-            //       console.log(otherStream.name, stream.name);
-            //       console.log(otherStream.schema, schema.name);
-            //       console.log(otherStream.schema.some(
-            //         (otherSchema: { name: any }) =>
-            //           otherSchema.name === schema.name
-            //       ))
-            //       otherStream.schema.some(
-            //         (otherSchema: { name: any }) =>
-            //           otherSchema.name === schema.name
-            //       );
-            //     }
-            //   }
-            // );
+          stream.schema.forEach((schema: any) => {
             const otherStreams = searchObj.data.streamResults.list.filter(
               (otherStream: any) =>
                 otherStream.schema.some(
@@ -1663,18 +1640,8 @@ const useLogs = () => {
             }
           }
 
-          // Object.keys(recordwithMaxAttribute).forEach((key) => {
-          //   if (!tempFieldsName.includes(key)) {
-          //     queryResult.push({
-          //       name: key,
-          //       type: "Utf8",
-          //     });
-          //   }
-          // });
         }
 
-        // console.log(searchObj.data.stream.selectedStreamFields)
-        console.log(finalArray.common, searchObj.data.stream.selectedStream.length)
         if (
           finalArray.common.length > 0 &&
           searchObj.data.stream.selectedStream.length > 1
