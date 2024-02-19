@@ -392,6 +392,7 @@ async fn merge_files(
     if new_file_list.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
+
     let retain_file_list = new_file_list.clone();
 
     // write parquet files into tmpfs
@@ -547,7 +548,7 @@ async fn merge_files(
             if stream_type == StreamType::Logs {
                 log::warn!("Stream type is LOGS, lets create a new index file");
                 let (index_file_name, filemeta) = create_index_file_on_compactor(
-                    &new_file_list,
+                    &retain_file_list,
                     buf,
                     new_file_key.clone(),
                     org_id,
