@@ -21,23 +21,27 @@
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
     >
       <div class="flex items-center q-table__title q-mr-md">
-        <span data-test="dashboard-viewpanel-title" v-if="isEditMode"
+        <span data-test="dashboard-drilldown-title" v-if="isEditMode"
           >Edit Drilldown
         </span>
-        <span data-test="dashboard-viewpanel-title" v-else
+        <span data-test="dashboard-drilldown-title" v-else
           >Create Drilldown</span
         >
       </div>
-      <div class="flex q-gutter-sm items-center">
+      <div class="flex q-gutter-sm items-center" style="position: relative">
         <q-btn
           no-caps
-          @click="$emit('close')"
+          @click=""
           padding="xs"
           class="q-ml-md"
           flat
-          icon="close"
-          data-test="dashboard-viewpanel-close-btn"
-        />
+          icon="help"
+          data-test="dashboard-drilldown-help-btn"
+        >
+          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+            User Guide
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
     <q-input
@@ -274,9 +278,8 @@
         style="min-width: 60px"
         data-test="confirm-button"
         :disable="isFormValid"
-      >
-        Add
-      </q-btn>
+        :label="isEditMode ? 'Update' : 'Add'"
+      />
     </q-card-actions>
   </div>
 </template>
