@@ -867,6 +867,7 @@ export default defineComponent({
             ) {
               errors.push("Add one field for the longitude");
             }
+            break;
           }
 
           case "sankey": {
@@ -888,6 +889,7 @@ export default defineComponent({
             ) {
               errors.push("Add one field for the value");
             }
+            break;
           }
           default:
             break;
