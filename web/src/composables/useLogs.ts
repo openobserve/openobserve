@@ -672,7 +672,7 @@ const useLogs = () => {
         partitionTotal: [],
         paginations: [],
       };
-      
+
       searchObj.data.queryResults.partitionDetail.partitions = [
         [queryReq.query.start_time, queryReq.query.end_time],
       ];
@@ -922,10 +922,12 @@ const useLogs = () => {
         // based on pagination request, get the data
         await getPaginatedData(queryReq, histogramQueryReq);
         if (
-          searchObj.data.queryResults.aggs == undefined ||
+          (searchObj.data.queryResults.aggs == undefined &&
+            searchObj.data.resultGrid.currentPage == 1) ||
           (searchObj.loadingHistogram == false &&
-          searchObj.meta.showHistogram == true &&
-          searchObj.meta.sqlMode == false)
+            searchObj.meta.showHistogram == true &&
+            searchObj.meta.sqlMode == false &&
+            searchObj.data.resultGrid.currentPage == 1)
         ) {
           getHistogramQueryData(histogramQueryReq);
         }
