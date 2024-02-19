@@ -426,8 +426,8 @@ CREATE TABLE IF NOT EXISTS meta
     sqlx::query(
         r#"
 CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
-CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);
+CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module);
         "#,
     )
     .execute(&*client)

@@ -297,10 +297,10 @@ CREATE TABLE IF NOT EXISTS meta
 
     // create table index
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
+    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
         .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (module, key1, key2);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module);",
     )
     .await?;
 
