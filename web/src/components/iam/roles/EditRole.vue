@@ -116,14 +116,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div data-test="edit-role-permissions-search-input">
               <q-input
-                data-test="alert-list-search-input"
                 v-model="filter.value"
                 borderless
+                :debounce="500"
                 filled
                 dense
                 class="q-mb-xs no-border q-mr-md"
                 :placeholder="t('common.search')"
                 style="width: 300px"
+                @update:model-value="onResourceChange"
               >
                 <template #prepend>
                   <q-icon name="search" class="cursor-pointer" />
