@@ -26,6 +26,9 @@ function normalizeValue(value: any, minValue: any, maxValue: any) {
 
   return (value - minValue) / (maxValue - minValue);
 }
+
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+
 export const convertMapData = (panelSchema: any, mapData: any) => {
   //if no latitude and longitude than return it
   if (
@@ -94,6 +97,21 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
+      formatter: function (params: any) {
+        let formattedValue = params.value[2].toLocaleString();
+        if (getUnitValue && formatUnitValue) {
+          formattedValue = formatUnitValue(
+            getUnitValue(
+              formattedValue,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
+            )
+          );
+        }
+
+        return `${params.seriesName}: ${formattedValue}`;
+      },
     },
     visualMap: {
       left: "right",
@@ -174,8 +192,10 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       }),
       symbolSize: function (val: any) {
         const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-        const minSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.min;
-        const maxSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.max;
+        const minSymbolSize =
+          panelSchema.config?.map_symbol_style?.size_by_value?.min;
+        const maxSymbolSize =
+          panelSchema.config?.map_symbol_style?.size_by_value?.max;
         const mapSymbolStyleSelected =
           panelSchema.config?.map_symbol_style?.size;
 

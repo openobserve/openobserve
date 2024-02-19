@@ -153,7 +153,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         outlined
-        v-if="dashboardPanelData.data.type != 'geomap'"
         v-model="dashboardPanelData.data.config.unit"
         :options="unitOptions"
         dense
@@ -187,7 +186,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div class="space"></div>
       <q-input
-        v-if="dashboardPanelData.data.type != 'geomap'"
         type="number"
         v-model.number="dashboardPanelData.data.config.decimals"
         value="2"
