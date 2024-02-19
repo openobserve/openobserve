@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ value.key }}
                               </div>
                               <div
-                                :title="value.count"
+                                :title="value.count.toString()"
                                 class="ellipsis text-right q-pr-sm"
                                 :style="
                                   searchObj.data.stream.selectedStream.length ==
@@ -450,7 +450,7 @@ export default defineComponent({
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
-        values: { key: string; count: string }[];
+        values: { key: string; count: number }[];
         errMsg?: string;
       };
     }> = ref({});
@@ -674,32 +674,16 @@ export default defineComponent({
             .then((res: any) => {
               countTotal--;
               if (res.data.hits.length) {
-                console.log("===", res.data.hits);
-
                 res.data.hits.forEach((item: any) => {
                   item.values.forEach((subItem: any) => {
                     if (fieldValues.value[name]["values"].length) {
                       let index = fieldValues.value[name]["values"].findIndex(
                         (value: any) => value.key == subItem.zo_sql_key
                       );
-                      console.log(
-                        index,
-                        fieldValues.value[name]["values"],
-                        subItem.zo_sql_num,
-                        fieldValues.value[name]["values"]
-                      );
                       if (index != -1) {
                         fieldValues.value[name]["values"][index].count =
                           parseInt(subItem.zo_sql_num) +
-                          parseInt(
-                            fieldValues.value[name]["values"][index].count
-                          );
-                        // formatLargeNumber(
-                        //   parseInt(subItem.zo_sql_num) +
-                        //     parseInt(
-                        //       fieldValues.value[name]["values"][index].count
-                        //     )
-                        // );
+                          fieldValues.value[name]["values"][index].count;
                       } else {
                         fieldValues.value[name]["values"].push({
                           key: subItem.zo_sql_key,
@@ -715,37 +699,15 @@ export default defineComponent({
                   });
                 });
 
-                // fieldValues.value[name]["values"].forEach((item: any) => {
-                //   item.count = formatLargeNumber(item.count);
-                // });
                 if (fieldValues.value[name]["values"].length > 10) {
                   fieldValues.value[name]["values"].sort(
                     (a, b) => b.count - a.count
                   ); // Sort the array based on count in descending order
                   fieldValues.value[name]["values"].slice(0, 10); // Return the first 10 elements
                 }
-
-                // fieldValues.value[name]["values"] = res.data.hits
-                //   .find((field: any) => field.field === name)
-                //   .values.map((value: any) => {
-                //     let mergeCount = value.zo_sql_num;
-                //     if (fieldValues[name] != undefined) {
-                //       console.log(fieldValues.value[name]["values"])
-                //       mergeCount =
-                //         value.zo_sql_num +
-                //         fieldValues.value[name]["values"].count;
-                //     }
-                //     return {
-                //       key: value.zo_sql_key?.toString()
-                //         ? value.zo_sql_key
-                //         : "null",
-                //       count: formatLargeNumber(mergeCount),
-                //     };
-                //   });
               }
             })
             .finally(() => {
-              console.log(fieldValues.value);
               if (countTotal == 0) fieldValues.value[name]["isLoading"] = false;
             });
         });
@@ -763,21 +725,9 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = term;
     };
 
-    // const onStreamChange = () => {
-    //   alert("onStreamChange")
-    //   const query = searchObj.meta.sqlMode
-    //     ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
-    //     : "";
-
-    //   searchObj.data.editorValue = query;
-    //   searchObj.data.query = query;
-
-    //   handleQueryData();
-    // };
-
     const sortedStreamFields = () => {
       return searchObj.data.stream.selectedStreamFields.sort(
-        (a, b) => a.group - b.group
+        (a: object, b: object) => (a as any).group - (b as any).group
       );
     };
 
