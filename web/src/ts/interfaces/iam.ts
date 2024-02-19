@@ -53,7 +53,6 @@ export interface Resource {
   display_name: string;
   type: "Type";
   resourceName: string;
-  isSelected: boolean;
   parent: string;
   childs: Resource[];
   entities: Entity[];
@@ -99,12 +98,12 @@ export interface Entity {
   has_entities?: boolean;
   type: "Resource" | "Type";
   resourceName: string;
-  isSelected: boolean;
   expand?: boolean;
   show?: boolean;
   is_loading?: boolean;
   childName?: string;
   top_level: boolean;
+  parent?: string;
 }
 
 interface User {}

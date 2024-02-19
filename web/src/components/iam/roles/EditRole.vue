@@ -116,14 +116,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div data-test="edit-role-permissions-search-input">
               <q-input
-                data-test="alert-list-search-input"
                 v-model="filter.value"
                 borderless
+                :debounce="500"
                 filled
                 dense
                 class="q-mb-xs no-border q-mr-md"
                 :placeholder="t('common.search')"
                 style="width: 300px"
+                @update:model-value="onResourceChange"
               >
                 <template #prepend>
                   <q-icon name="search" class="cursor-pointer" />
@@ -161,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <permissions-table
               ref="permissionTableRef"
               :rows="permissionsState.permissions"
+              :customFilteredPermissions="filteredPermissions"
               :filter="filter"
               :visibleResourceCount="countOfVisibleResources"
               :selected-permissions-hash="selectedPermissionsHash"
@@ -230,7 +232,7 @@ import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
 import dashboardService from "@/services/dashboards";
-
+import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
@@ -273,10 +275,16 @@ const countOfVisibleResources = ref(0);
 
 const isFetchingIntitialRoles = ref(false);
 
+const filteredPermissions: Ref<{ [key: string]: Entity[] }> = ref({});
+
+const heavyResourceEntities: Ref<{ [key: string]: Entity[] }> = ref({});
+
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
 const roleUsers: Ref<string[]> = ref([]);
+
+const { getStreams } = useStreams();
 
 const tabs = [
   {
@@ -324,6 +332,7 @@ const getRoleDetails = () => {
       permissionsState.resources = res.data
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
+
       setDefaultPermissions();
 
       filteredResources.value = permissionsState.resources.map((r) => {
@@ -483,7 +492,6 @@ const getDefaultResource = (): Resource => {
     childs: [],
     type: "Type",
     resourceName: "",
-    isSelected: false,
     entities: [],
     has_entities: false,
     is_loading: false,
@@ -648,8 +656,10 @@ const updateTableData = async (value: string = filter.value.permissions) => {
 
   await nextTick();
 
-  updatePermissionVisibility(permissionsState.permissions);
-  countVisibleResources(permissionsState.permissions);
+  setTimeout(() => {
+    updatePermissionVisibility(permissionsState.permissions);
+    countVisibleResources(permissionsState.permissions);
+  }, 0);
 };
 
 const updateExpandedResources = (resources: (Resource | Entity)[]) => {
@@ -692,33 +702,150 @@ const countVisibleResources = (permissions: (Resource | Entity)[]): number => {
 };
 
 const updatePermissionVisibility = (
-  permissions: (Resource | Entity)[]
+  permissions: (Resource | Entity)[],
+  forceShow: boolean = false,
+  level: number = 0,
+  relations: string[] = []
 ): void => {
   permissions.forEach((permission: Entity | Resource) => {
     // Check if any permission value is true
+
+    const parentRelations = [...relations];
+
+    if (permission.type === "Type")
+      parentRelations.push(permission.resourceName);
+
     const showResource = Object.values(permission.permission).some(
       (permDetail) => permDetail.value
     );
 
-    // Recursively update the show property for entities
-    if (permission.entities?.length) {
-      updatePermissionVisibility(permission.entities);
-    }
+    let isResourceFiltered = true;
 
-    const showEntity = permission.entities?.some((entity) => entity.show);
-
-    // Update the permission object to add `show` property
-
-    let appliedFilter = true;
     if (filter.value.resource)
-      appliedFilter = filter.value.resource === permission.resourceName;
+      isResourceFiltered = parentRelations.includes(filter.value.resource);
+
+    if (filter.value.value) {
+      isResourceFiltered =
+        isResourceFiltered &&
+        (permission.display_name || permission.name)
+          .toLowerCase()
+          .includes(filter.value.value.toLowerCase());
+    }
 
     permission.show =
       filter.value.permissions === "all"
-        ? true && appliedFilter
-        : (showResource || showEntity) && appliedFilter;
+        ? isResourceFiltered
+        : showResource && isResourceFiltered;
+
+    if (forceShow) permission.show = true;
+
+    // Recursively update the show property for entities
+    if (!permission.entities?.length) return;
+
+    if (
+      permission.name === "logs" ||
+      permission.name === "metrics" ||
+      permission.name === "traces"
+    ) {
+      updatePermissionVisibility(
+        heavyResourceEntities.value[permission.name] || [],
+        permission.show,
+        level + 1,
+        parentRelations
+      );
+    } else {
+      if (permission.entities?.length)
+        updatePermissionVisibility(
+          permission.entities || [],
+          permission.show,
+          level + 1,
+          parentRelations
+        );
+    }
+
+    let filteredEntities: Entity[] = [];
+
+    if (
+      permission.name === "logs" ||
+      permission.name === "metrics" ||
+      permission.name === "traces"
+    ) {
+      filteredEntities =
+        heavyResourceEntities.value[permission.name]?.filter(
+          (entity: any) => entity.show
+        ) || [];
+    } else {
+      filteredEntities =
+        permission.entities?.filter((entity) => entity.show) || [];
+    }
+
+    // Update the permission object to add `show` property
+
+    // If we need to show child by default show parent
+
+    if (
+      permission.show &&
+      (permission.name === "logs" ||
+        permission.name === "metrics" ||
+        permission.name === "traces")
+    ) {
+      permission.entities =
+        filter.value.permissions === "all"
+          ? [...filteredEntities.slice(0, 50)]
+          : [...filteredEntities];
+    }
+
+    if (filteredEntities?.length) {
+      permission.show = true;
+    }
+
+    filteredEntities.length = 0;
   });
 };
+
+// const updateFilteredPermissions = (
+//   permissions: (Resource | Entity)[]
+// ): void => {
+//   permissions.forEach((permission: Entity | Resource) => {
+//     // Check if any permission value is true
+//     const showResource = Object.values(permission.permission).some(
+//       (permDetail) => permDetail.value
+//     );
+
+//     // Recursively update the show property for entities
+//     if (permission.entities?.length) {
+//       updatePermissionVisibility(permission.entities);
+//     }
+
+//     const filteredEntities = permission.entities?.filter(
+//       (entity) => entity.show
+//     );
+
+//     // Update the permission object to add `show` property
+
+//     let isResourceFiltered = true;
+//     if (filter.value.resource)
+//       isResourceFiltered = filter.value.resource === permission.resourceName;
+
+//     if (filter.value.value) {
+//       isResourceFiltered =
+//         isResourceFiltered &&
+//         (permission.display_name || permission.name)
+//           .toLowerCase()
+//           .includes(filter.value.value.toLowerCase());
+//     }
+
+//     // If we need to show child by default show parent
+//     if (filteredEntities) {
+//       permission.entities = [...filteredEntities];
+//     } else {
+//       permission.show =
+//         filter.value.permissions === "all"
+//           ? isResourceFiltered
+//           : showResource && isResourceFiltered;
+//     }
+//   });
+// };
 
 const filterRowsByResourceName = (
   rows: (Resource | Entity)[],
@@ -756,7 +883,7 @@ const filterRowsByResourceName = (
   );
 };
 
-const onResourceChange = () => {
+const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
 };
@@ -842,6 +969,9 @@ const getResourceEntities = (resource: Resource | Entity) => {
       } else {
         await listEntitiesFnMap[resource.resourceName](resource);
       }
+
+      // unncecessaryly we are updating the all resource entities, fix to update the current resource
+      updatePermissionVisibility(permissionsState.permissions);
       resource.is_loading = false;
     }
 
@@ -850,13 +980,9 @@ const getResourceEntities = (resource: Resource | Entity) => {
 };
 
 const getEnrichmentTables = async () => {
-  const data = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "enrichment_tables",
-    false
-  );
+  const data = await getStreams("enrichment_tables", false);
 
-  updateResourceEntities("enrichment_table", ["name"], data.data.list);
+  updateResourceEntities("enrichment_table", ["name"], data.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1016,13 +1142,9 @@ const getAlerts = async () => {
 };
 
 const getLogs = async (resource: Resource | Entity) => {
-  const logs = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "logs",
-    false
-  );
+  const logs = await getStreams("logs", false);
 
-  updateEntityEntities(resource, ["name"], logs.data.list);
+  updateEntityEntities(resource, ["name"], logs.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1030,13 +1152,9 @@ const getLogs = async (resource: Resource | Entity) => {
 };
 
 const getMetrics = async (resource: Resource | Entity) => {
-  const metrics = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "metrics",
-    false
-  );
+  const metrics = await getStreams("metrics", false);
 
-  updateEntityEntities(resource, ["name"], metrics.data.list);
+  updateEntityEntities(resource, ["name"], metrics.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1044,13 +1162,9 @@ const getMetrics = async (resource: Resource | Entity) => {
 };
 
 const getTraces = async (resource: Resource | Entity) => {
-  const traces = await streamService.nameList(
-    store.state.selectedOrganization.identifier,
-    "traces",
-    false
-  );
+  const traces = await getStreams("traces", false);
 
-  updateEntityEntities(resource, ["name"], traces.data.list);
+  updateEntityEntities(resource, ["name"], traces.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
@@ -1089,7 +1203,7 @@ const updateEntityEntities = (
 ) => {
   if (!entity) return;
 
-  data.forEach((_entity: any) => {
+  const entities: Entity[] = data.map((_entity: any) => {
     let entityName = "";
     if (typeof _entity === "string") entityName = _entity;
 
@@ -1103,83 +1217,90 @@ const updateEntityEntities = (
       }
     }
 
-    if (entity.entities)
-      entity.entities.push({
-        name: entityName,
-        permission: {
-          AllowAll: {
-            value: selectedPermissionsHash.value.has(
-              getPermissionHash(
-                entity.childName as string,
-                "AllowAll",
-                entityName
-              )
-            ),
-            show: true,
-          },
-          AllowGet: {
-            value: selectedPermissionsHash.value.has(
-              getPermissionHash(
-                entity.childName as string,
-                "AllowGet",
-                entityName
-              )
-            ),
-            show: true,
-          },
-          AllowDelete: {
-            value: selectedPermissionsHash.value.has(
-              getPermissionHash(
-                entity.childName as string,
-                "AllowDelete",
-                entityName
-              )
-            ),
-            show: true,
-          },
-          AllowPut: {
-            value: selectedPermissionsHash.value.has(
-              getPermissionHash(
-                entity.childName as string,
-                "AllowPut",
-                entityName
-              )
-            ),
-            show: true,
-          },
-          AllowList: {
-            value: selectedPermissionsHash.value.has(
-              getPermissionHash(
-                entity.childName as string,
-                "AllowList",
-                entityName
-              )
-            ),
-            show: hasEntities,
-          },
-          AllowPost: {
-            value: selectedPermissionsHash.value.has(
-              getPermissionHash(
-                entity.childName as string,
-                "AllowPost",
-                entityName
-              )
-            ),
-            show: hasEntities,
-          },
+    return {
+      name: entityName,
+      permission: {
+        AllowAll: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              entity.childName as string,
+              "AllowAll",
+              entityName
+            )
+          ),
+          show: true,
         },
-        entities: [],
-        type: "Resource",
-        resourceName: entity.childName as string,
-        isSelected: false,
-        has_entities: hasEntities,
-        display_name: displayNameKey ? _entity[displayNameKey] : entityName,
-        show: true,
-        top_level: false,
-      });
+        AllowGet: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              entity.childName as string,
+              "AllowGet",
+              entityName
+            )
+          ),
+          show: true,
+        },
+        AllowDelete: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              entity.childName as string,
+              "AllowDelete",
+              entityName
+            )
+          ),
+          show: true,
+        },
+        AllowPut: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              entity.childName as string,
+              "AllowPut",
+              entityName
+            )
+          ),
+          show: true,
+        },
+        AllowList: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              entity.childName as string,
+              "AllowList",
+              entityName
+            )
+          ),
+          show: hasEntities,
+        },
+        AllowPost: {
+          value: selectedPermissionsHash.value.has(
+            getPermissionHash(
+              entity.childName as string,
+              "AllowPost",
+              entityName
+            )
+          ),
+          show: hasEntities,
+        },
+      },
+      entities: [],
+      type: "Resource",
+      resourceName: entity.childName as string,
+      has_entities: hasEntities,
+      display_name: displayNameKey ? _entity[displayNameKey] : entityName,
+      show: true,
+      top_level: false,
+    };
   });
 
-  updatePermissionVisibility(permissionsState.permissions);
+  if (
+    entity.name === "logs" ||
+    entity.name === "metrics" ||
+    entity.name === "traces"
+  ) {
+    heavyResourceEntities.value[entity.name] = [...entities];
+    if (entity.entities) entity.entities.push(...entities.slice(0, 50));
+  } else {
+    if (entity.entities) entity.entities.push(...entities);
+  }
 };
 
 const updateResourceEntities = (
@@ -1250,7 +1371,6 @@ const updateResourceEntities = (
       entities: [],
       type: "Resource",
       resourceName: resourceName,
-      isSelected: false,
       has_entities: hasEntities,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
       show: true,
@@ -1259,8 +1379,6 @@ const updateResourceEntities = (
         ?.top_level,
     });
   });
-
-  updatePermissionVisibility(permissionsState.permissions);
 };
 
 const updateResourceResource = (
@@ -1355,7 +1473,6 @@ const updateResourceResource = (
       entities: [],
       type: "Type",
       resourceName: resourceName,
-      isSelected: false,
       has_entities: hasEntities,
       childName: resourceName,
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
@@ -1363,8 +1480,6 @@ const updateResourceResource = (
       top_level: true,
     });
   });
-
-  updatePermissionVisibility(permissionsState.permissions);
 };
 
 const saveRole = () => {
@@ -1474,5 +1589,4 @@ const filterResourceOptions = (val: string, update: any) => {
   ) as any[];
 };
 </script>
-
 <style scoped></style>
