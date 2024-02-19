@@ -29,7 +29,7 @@
         "
       >
         <div
-          @click="onDataLinkClick(index)"
+          @click="onDrilldownClick(index)"
           style="
             cursor: pointer;
             padding-left: 10px;
@@ -46,12 +46,12 @@
           size="15px"
           name="close"
           style="cursor: pointer"
-          @click="removeDataLink(index)"
+          @click="removeDrilldownByIndex(index)"
         />
       </div>
     </div>
     <q-btn
-      @click="addDataLink"
+      @click="addNewDrilldown"
       style="cursor: pointer; padding: 0px 5px"
       label="+ Add"
       no-caps
@@ -85,25 +85,25 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData();
 
     onBeforeMount(() => {
-      // Ensure that the drilldown is initialized
+      // Ensure that the drilldown object is initialized in config
       if (!dashboardPanelData.data.config.drilldown) {
         dashboardPanelData.data.config.drilldown = [];
       }
     });
 
-    const onDataLinkClick = (index: any) => {
+    const onDrilldownClick = (index: any) => {
       selectedDrilldownIndexToEdit.value = index;
       isDrilldownEditMode.value = true;
       showDrilldownPopUp.value = true;
     };
 
-    const addDataLink = () => {
+    const addNewDrilldown = () => {
       isDrilldownEditMode.value = false;
       selectedDrilldownIndexToEdit.value = null;
       showDrilldownPopUp.value = true;
     };
 
-    const removeDataLink = (index: any) => {
+    const removeDrilldownByIndex = (index: any) => {
       dashboardPanelData.data.config.drilldown.splice(index, 1);
     };
 
@@ -116,12 +116,12 @@ export default defineComponent({
     return {
       store,
       dashboardPanelData,
-      onDataLinkClick,
+      onDrilldownClick,
       showDrilldownPopUp,
-      removeDataLink,
+      removeDrilldownByIndex,
       selectedDrilldownIndexToEdit,
       saveDrilldownData,
-      addDataLink,
+      addNewDrilldown,
       isDrilldownEditMode,
     };
   },

@@ -150,11 +150,15 @@ export default defineComponent({
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
 
-    const changeInitialVariableValues = async (newInitialVariableValues: any) => {
+    // it is used to change/update initial variables values from outside the component
+    const changeInitialVariableValues = async (
+      newInitialVariableValues: any
+    ) => {
       // reset the values
       variablesData.values = [];
       variablesData.isVariablesLoading = false;
 
+      // set initial variables values
       props.initialVariableValues.value = newInitialVariableValues;
     };
 

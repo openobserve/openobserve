@@ -327,8 +327,11 @@ export default defineComponent({
       }
     };
 
+    // update initial variable values using the variable value selector ref
     const updateInitialVariableValues = async (...args: any) => {
+      // first, refresh the dashboard
       refreshDashboard();
+      // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
         ...args
       );

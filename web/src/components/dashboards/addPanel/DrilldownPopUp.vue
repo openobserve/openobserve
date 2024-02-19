@@ -61,11 +61,7 @@
         <q-btn
           :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
           size="sm"
-          @click="
-            () => {
-              drilldownData.type = 'byDashboard';
-            }
-          "
+          @click="changeTypeOfDrilldown('byDashboard')"
           ><q-icon
             class="q-mr-xs"
             :name="outlinedDashboard"
@@ -75,11 +71,7 @@
         <q-btn
           :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
           size="sm"
-          @click="
-            () => {
-              drilldownData.type = 'byUrl';
-            }
-          "
+          @click="changeTypeOfDrilldown('byUrl')"
           ><q-icon
             class="q-mr-xs"
             name="link"
@@ -357,14 +349,18 @@ export default defineComponent({
     const tabList: any = ref([]);
 
     onMounted(async () => {
+      // if no folders in organization, get folders
       if (
         !store.state.organizationData.folders ||
         (Array.isArray(store.state.organizationData.folders) &&
           store.state.organizationData.folders.length === 0)
       ) {
+        // get folders(will be api call)
         await getFoldersList(store);
       }
 
+      // get dashboard list
+      // get tab list
       await getDashboardList();
       await getTabList();
     });
@@ -396,10 +392,11 @@ export default defineComponent({
     );
 
     const folderList = computed(() => {
+      // if no folders in organization, return []
       if (!store.state.organizationData.folders) {
         return [];
       }
-
+      // make list of options from folders list
       return (
         store.state.organizationData.folders?.map((folder: any) => {
           return {
@@ -412,10 +409,12 @@ export default defineComponent({
 
     const getDashboardList = async () => {
       // get folder data
+      // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
         (folder: any) => folder.name === drilldownData.value.data.folder
       );
 
+      // if no folder with same forder name found, return
       if (!folderData) {
         dashboardList.value = [];
         return;
@@ -439,26 +438,31 @@ export default defineComponent({
 
     const getTabList = async () => {
       // get folder data
+      // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
         (folder: any) => folder.name === drilldownData.value.data.folder
       );
 
+      // if no folder with same forder name found, return
       if (!folderData) {
         dashboardList.value = [];
         return;
       }
 
+      // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
         folderData?.folderId
       );
 
       // get dashboard data
+      // by using dashboard name, find dashboard data
       const dashboardData = allDashboardList?.find(
         (dashboard: any) =>
           dashboard.title === drilldownData.value.data.dashboard
       );
 
+      // if no dashboard with same dashboard name found, return
       if (!dashboardData) {
         dashboardList.value = [];
         return;
@@ -475,6 +479,7 @@ export default defineComponent({
     };
 
     const isFormURLValid = computed(() => {
+      // check if url is valid with protocol only(will check only protocol)
       const urlRegex = /^(http|https|ftp|file|mailto|telnet|data|ws|wss):\/\//;
       return urlRegex.test(drilldownData.value.data.url.trim());
     });
@@ -520,6 +525,11 @@ export default defineComponent({
       emit("close");
     };
 
+    // change type of drilldown
+    const changeTypeOfDrilldown = (type: string) => {
+      drilldownData.value.type = type;
+    };
+
     return {
       t,
       outlinedDashboard,
@@ -533,6 +543,7 @@ export default defineComponent({
       isFormValid,
       saveDrilldown,
       isFormURLValid,
+      changeTypeOfDrilldown,
     };
   },
 });
