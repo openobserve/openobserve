@@ -433,6 +433,58 @@
           </div>
         </div>
       </div>
+      <div class="flex items-center q-mr-sm">
+        <div
+          data-test="scheduled-alert-frequency-title"
+          class="text-bold"
+          style="width: 180px"
+        >
+          {{ t("alerts.frequency") + " *" }}
+        </div>
+        <div style="min-height: 58px">
+          <div
+            class="flex items-center q-mr-sm"
+            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+          >
+            <div
+              data-test="scheduled-alert-frequency-input"
+              style="width: 87px; margin-left: 0 !important"
+              class="silence-notification-input"
+            >
+              <q-input
+                v-model="triggerData.frequency"
+                type="number"
+                dense
+                filled
+                min="1"
+                style="background: none"
+                @update:model-value="updateTrigger"
+              />
+            </div>
+            <div
+              data-test="scheduled-alert-frequency-unit"
+              style="
+                min-width: 90px;
+                margin-left: 0 !important;
+                height: 40px;
+                font-weight: normal;
+              "
+              :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
+              class="flex justify-center items-center"
+            >
+              {{ t("alerts.minutes") }}
+            </div>
+          </div>
+          <div
+            data-test="scheduled-alert-frequency-error-text"
+            v-if="!Number(triggerData.frequency)"
+            class="text-red-8 q-pt-xs"
+            style="font-size: 11px; line-height: 12px"
+          >
+            Field is required!
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

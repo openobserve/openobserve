@@ -371,7 +371,11 @@ export default defineComponent({
         queryParams.stream_type !== searchObj.data.stream.streamType ||
         queryParams.stream !== searchObj.data.stream.selectedStream.value;
 
-      if (isStreamChanged && queryParams.type === "stream_explorer") {
+      if (
+        isStreamChanged &&
+        queryParams.type === "stream_explorer" &&
+        seachObj.loading == false
+      ) {
         resetSearchObj();
         resetStreamData();
         restoreUrlQueryParams();
@@ -390,11 +394,10 @@ export default defineComponent({
     });
 
     onBeforeMount(() => {
-      // TODO OK : need to revisit this 394 line, this is hotfixfor 0.8.0v
+      searchObj.loading = true;
       searchObj.meta.pageType = "logs";
       resetSearchObj();
       resetStreamData();
-      searchObj.loading = true;
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       restoreUrlQueryParams();

@@ -922,10 +922,10 @@ const useLogs = () => {
         // based on pagination request, get the data
         await getPaginatedData(queryReq, histogramQueryReq);
         if (
-          searchObj.data.queryResults.aggs == undefined &&
-          searchObj.loadingHistogram == false &&
+          searchObj.data.queryResults.aggs == undefined ||
+          (searchObj.loadingHistogram == false &&
           searchObj.meta.showHistogram == true &&
-          searchObj.meta.sqlMode == false
+          searchObj.meta.sqlMode == false)
         ) {
           getHistogramQueryData(histogramQueryReq);
         }
