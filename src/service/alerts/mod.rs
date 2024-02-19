@@ -66,7 +66,7 @@ pub async fn save(
 
     // default frequency is 60 seconds
     if alert.trigger_condition.frequency == 0 {
-        alert.trigger_condition.frequency = 60;
+        alert.trigger_condition.frequency = std::cmp::max(10, CONFIG.limit.alert_schedule_interval);
     }
 
     if alert.name.is_empty() || alert.stream_name.is_empty() {
