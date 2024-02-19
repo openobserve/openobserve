@@ -93,6 +93,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
 
         // check the file is using for write
+        // TODO(ansrivas): while searching do we need to check in the index as well.
         if wal::check_in_use(
             StreamParams::new(&org_id, &stream_name, stream_type),
             &file_name,
@@ -105,6 +106,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         log::info!("[JOB] convert disk file: {}", file);
 
         // check if we are allowed to ingest or just delete the file
+        // TODO(ansrivas): it wont delete so this code in principle can be removed.
         if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
             log::info!(
                 "[JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
@@ -314,6 +316,8 @@ pub(crate) async fn write_to_disk(
         file_name,
         caller,
     );
+
+    // TODO(ansrivas): Check the generated file name again here.
     let store_file_name = new_idx_file_name.to_owned();
     match task::spawn_blocking(move || async move {
         storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await

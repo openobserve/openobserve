@@ -565,7 +565,7 @@ pub(crate) async fn create_index_file_on_compactor(
     let file_names: ArrayRef = Arc::new(StringArray::from(
         file_list_to_invalidate
             .iter()
-            .map(|x| x.key.to_string())
+            .map(|x| x.key.trim_start_matches(&prefix_to_remove).to_string())
             .collect::<Vec<String>>(),
     ));
     let _timestamp: ArrayRef = Arc::new(Int64Array::from(

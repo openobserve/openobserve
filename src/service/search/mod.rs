@@ -265,6 +265,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             // .map(|t| format!("'{}'", t.to_lowercase()))
             .collect::<HashSet<String>>();
 
+        // TODO(ansrivas): Do we need to use exact token match or partial match?
         let search_condition = terms
             .iter()
             .map(|x| format!("term ilike '%{x}%'"))
@@ -286,6 +287,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         log::warn!("searching in query {:?}", query);
 
         idx_req.query.as_mut().unwrap().sql = query;
+        idx_req.query.as_mut().unwrap().size = 10000;
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
 
         let unique_files = idx_resp
@@ -311,6 +313,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 });
             }
         }
+
+        // TODO(ansrivas): Tackled the OR queries with indexed files
+        // select * from tbl where match_all_indexed("Prabhat") or status=500;
+
         idx_file_list
     } else {
         let file_list = get_file_list(

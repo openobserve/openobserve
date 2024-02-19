@@ -414,6 +414,7 @@ impl Sql {
         for item in indexed_text.iter() {
             let mut indexed_search = Vec::new();
             for field in &schema_fields {
+                // TODO(ansrivas): Review this again
                 if !CONFIG.common.feature_fulltext_on_all_fields
                     && !match_all_fields.contains(&field.name().to_lowercase())
                 {
