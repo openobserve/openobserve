@@ -303,7 +303,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.config.map_symbol_style.size ===
               'by Value'
             "
-            v-model.number="dashboardPanelData.data.config.map_symbol_style.size_by_value.min"
+            v-model.number="
+              dashboardPanelData.data.config.map_symbol_style.size_by_value.min
+            "
             :label="t('dashboard.minimum')"
             color="input-border"
             bg-color="input-bg"
@@ -315,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label-slot
             :type="'number'"
             data-test="dashboard-config-map-symbol-min"
+            :min="0"
           >
           </q-input>
 
@@ -323,7 +326,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.config.map_symbol_style.size ===
               'by Value'
             "
-            v-model.number="dashboardPanelData.data.config.map_symbol_style.size_by_value.max"
+            v-model.number="
+              dashboardPanelData.data.config.map_symbol_style.size_by_value.max
+            "
             :label="t('dashboard.maximum')"
             color="input-border"
             bg-color="input-bg"
@@ -335,6 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label-slot
             :type="'number'"
             data-test="dashboard-config-map-symbol-max"
+            :min="0"
           >
           </q-input>
         </div>
@@ -342,7 +348,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.config.map_symbol_style.size === 'fixed'
           "
-          v-model.number="dashboardPanelData.data.config.map_symbol_style.size_fixed"
+          v-model.number="
+            dashboardPanelData.data.config.map_symbol_style.size_fixed
+          "
           :label="t('dashboard.fixedValue')"
           color="input-border"
           bg-color="input-bg"
@@ -688,6 +696,18 @@ export default defineComponent({
 
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
+      }
+
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.map_symbol_style) {
+        dashboardPanelData.data.config.map_symbol_style = {
+          size: "by Value",
+          size_by_value: {
+            min: 1,
+            max: 100,
+          },
+          size_fixed: 2,
+        };
       }
     });
 
