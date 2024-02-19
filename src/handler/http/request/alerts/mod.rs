@@ -60,7 +60,12 @@ pub async fn save_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::save(&org_id, stream_type, &stream_name, "", alert.into_inner()).await {
+
+    // Hack for frequency: convert minutes to seconds
+    let mut alert = alert.into_inner();
+    alert.trigger_condition.frequency *= 60;
+
+    match alerts::save(&org_id, stream_type, &stream_name, "", alert).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -99,8 +104,13 @@ pub async fn update_alert(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
+
+    // Hack for frequency: convert minutes to seconds
+    let mut alert = alert.into_inner();
+    alert.trigger_condition.frequency *= 60;
+
     let name = name.trim();
-    match alerts::save(&org_id, stream_type, &stream_name, name, alert.into_inner()).await {
+    match alerts::save(&org_id, stream_type, &stream_name, name, alert).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -137,7 +147,12 @@ async fn list_stream_alerts(
         }
     };
     match alerts::list(&org_id, stream_type, Some(stream_name.as_str())).await {
-        Ok(data) => {
+        Ok(mut data) => {
+            // Hack for frequency: convert seconds to minutes
+            for alert in data.iter_mut() {
+                alert.trigger_condition.frequency /= 60;
+            }
+
             let mut mapdata = HashMap::new();
             mapdata.insert("list", data);
             Ok(MetaHttpResponse::json(mapdata))
@@ -165,7 +180,12 @@ async fn list_stream_alerts(
 async fn list_alerts(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     match alerts::list(&org_id, None, None).await {
-        Ok(data) => {
+        Ok(mut data) => {
+            // Hack for frequency: convert seconds to minutes
+            for alert in data.iter_mut() {
+                alert.trigger_condition.frequency /= 60;
+            }
+
             let mut mapdata = HashMap::new();
             mapdata.insert("list", data);
             Ok(MetaHttpResponse::json(mapdata))
@@ -206,7 +226,13 @@ async fn get_alert(
         }
     };
     match alerts::get(&org_id, stream_type, &stream_name, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(mut data) => {
+            // Hack for frequency: convert seconds to minutes
+            if let Some(ref mut data) = data {
+                data.trigger_condition.frequency /= 60;
+            }
+            Ok(MetaHttpResponse::json(data))
+        }
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
