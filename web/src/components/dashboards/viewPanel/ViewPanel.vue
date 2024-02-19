@@ -408,7 +408,8 @@ export default defineComponent({
           variableObj[`${variable.name}`] = variable.value;
         }
       });
-      return variableObj;
+      // pass initial variable values in value property
+      return { value: variableObj };
     };
 
     return {
