@@ -107,7 +107,7 @@ Cypress.Commands.add('loginwithadmin', () => {
   Cypress.Commands.add('loginwithadmin', () => {
     
     cy.session('loginwithadmin', () => {
-      cy.visit('https://ent1.dev.zinclabs.dev/web/login')
+      cy.visit(Cypress.env("LOGINURL"))
       cy.contains('Login with SSO').click({ force: true });
       cy.wait(8000)
       cy.get('[placeholder="email address"]').type(Cypress.env("ADMIN_EMAIL"));
@@ -116,14 +116,14 @@ Cypress.Commands.add('loginwithadmin', () => {
       cy.wait(8000)
      
     });
-    cy.visit('https://ent1.dev.zinclabs.dev/')
+    cy.visit(Cypress.env("BASEURL"))
   });
   
 
   Cypress.Commands.add('loginwithuser', () => {
     
     cy.session('loginwithuser', () => {
-      cy.visit('https://ent1.dev.zinclabs.dev/web/login')
+      cy.visit(Cypress.env("LOGINURL"))
       cy.contains('Login with SSO').click({ force: true });
       cy.wait(8000)
       cy.get('[placeholder="email address"]').type(Cypress.env("USER_EMAIL"));
@@ -132,7 +132,7 @@ Cypress.Commands.add('loginwithadmin', () => {
       cy.wait(8000)
      
     });
-    cy.visit('https://ent1.dev.zinclabs.dev/')
+    cy.visit(Cypress.env("BASEURL"))
   });
   
   

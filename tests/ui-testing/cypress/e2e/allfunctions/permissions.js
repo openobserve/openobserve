@@ -21,7 +21,7 @@ export function performRolePermissionsSetup() {
   cy.get('[data-test="alert-list-add-alert-btn"]').click({ force: true });
   cy.wait(2000);
   
-  cy.get(".q-mt-md>>>> .q-field__control-container").type(role);
+  cy.get('[data-test="add-role-rolename-input-btn"]').type(role);
   cy.get('[data-test="add-alert-submit-btn"]').click({ force: true });
   cy.get(".text-center > div > .q-mr-md").click({ force: true });
   cy.wait("@allroles");
