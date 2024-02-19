@@ -453,6 +453,7 @@ const defaultValue: any = () => {
     trigger_condition: {
       period: 10,
       operator: ">=",
+      frequency: 1,
       threshold: 3,
       silence: 10,
     },
@@ -892,6 +893,10 @@ export default defineComponent({
 
       payload.trigger_condition.period = parseInt(
         formData.value.trigger_condition.period
+      );
+
+      payload.trigger_condition.frequency = parseInt(
+        formData.value.trigger_condition.frequency
       );
 
       payload.trigger_condition.silence = parseInt(

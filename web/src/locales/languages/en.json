@@ -696,6 +696,7 @@
     "condition": "Condition",
     "trigger": "Trigger",
     "period": "Period",
+    "frequency": "Frequency",
     "threshold": "Threshold",
     "interval": "Frequency",
     "silenceNotification": "Silence notification for",
