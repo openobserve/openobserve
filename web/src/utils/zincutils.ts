@@ -98,7 +98,7 @@ export const getUserInfo = (loginString: string) => {
 
         useLocalUserInfo(encodedSessionData);
         useLocalToken("Bearer " + propArr[1]);
-      } else if (propArr[0] == "access_token" && useLocalToken().value == "") {
+      } else if (propArr[0] == "access_token" && useLocalToken()?.value == "") {
         useLocalStorage("access_token", "Bearer " + propArr[1], false, false);
       }
       if (propArr[0] == "refresh_token") {
