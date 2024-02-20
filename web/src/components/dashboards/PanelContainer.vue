@@ -177,6 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :variablesData="props.variablesData"
       @metadata-update="metaDataValue"
       @updated:data-zoom="$emit('updated:data-zoom', $event)"
+      @update:initial-variable-values="
+        (...args) => $emit('update:initial-variable-values', ...args)
+      "
       ref="PanleSchemaRendererRef"
     ></PanelSchemaRenderer>
     <q-dialog v-model="showViewPanel">
@@ -223,6 +226,7 @@ export default defineComponent({
     "updated:data-zoom",
     "onMovePanel",
     "refresh",
+    "update:initial-variable-values",
   ],
   props: [
     "data",
