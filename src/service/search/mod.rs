@@ -272,7 +272,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
             // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            "SELECT file_name, _count FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
+            "SELECT file_name, _count, _timestamp FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
             meta.stream_name, search_condition
         );
 
