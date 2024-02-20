@@ -31,10 +31,6 @@ pub struct Node {
     pub scheduled: bool,
     #[serde(default)]
     pub broadcasted: bool,
-    #[serde(default)]
-    pub has_sidecar: bool,
-    #[serde(default)]
-    pub is_sidecar: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

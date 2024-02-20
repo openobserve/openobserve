@@ -236,10 +236,6 @@ pub struct Common {
     pub web_url: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
-    #[env_config(name = "ZO_INGESTER_SIDECAR_ENABLED", default = false)]
-    pub ingester_sidecar_enabled: bool,
-    #[env_config(name = "ZO_INGESTER_SIDECAR_QUERIER", default = false)]
-    pub ingester_sidecar_querier: bool,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
     pub data_dir: String,
     #[env_config(name = "ZO_DATA_WAL_DIR", default = "")] // ./data/openobserve/wal/

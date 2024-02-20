@@ -198,10 +198,6 @@ pub async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
-        has_sidecar: CONFIG.common.ingester_sidecar_enabled
-            && !CONFIG.common.ingester_sidecar_querier,
-        is_sidecar: CONFIG.common.ingester_sidecar_enabled
-            && CONFIG.common.ingester_sidecar_querier,
     };
     // cache local node
     if is_querier(&node.role) {
@@ -259,10 +255,6 @@ pub async fn set_online() -> Result<()> {
             status: NodeStatus::Online,
             scheduled: true,
             broadcasted: false,
-            has_sidecar: CONFIG.common.ingester_sidecar_enabled
-                && !CONFIG.common.ingester_sidecar_querier,
-            is_sidecar: CONFIG.common.ingester_sidecar_enabled
-                && CONFIG.common.ingester_sidecar_querier,
         },
     };
 
@@ -344,10 +336,7 @@ pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
 #[inline]
 pub fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
-        node.status == NodeStatus::Online
-            && node.scheduled
-            && is_ingester(&node.role)
-            && !node.is_sidecar
+        node.status == NodeStatus::Online && node.scheduled && is_ingester(&node.role)
     })
 }
 
@@ -364,7 +353,6 @@ pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
         node.status == NodeStatus::Online
             && node.scheduled
             && (is_querier(&node.role) || is_ingester(&node.role))
-            && !node.has_sidecar
     })
 }
 
@@ -484,8 +472,6 @@ pub fn load_local_mode_node() -> Node {
         status: NodeStatus::Online,
         scheduled: true,
         broadcasted: false,
-        has_sidecar: false,
-        is_sidecar: false,
     }
 }
 
