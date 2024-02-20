@@ -549,8 +549,11 @@ const useLogs = () => {
           //     }
           //   });
           // });
-          for (const field of searchObj.data.stream.selectedStreamFields) {
-            for (const [node, index] of parsedSQL) {
+          let field: any;
+          let node: any;
+          let index: any;
+          for (field of searchObj.data.stream.selectedStreamFields) {
+            for ([node, index] of parsedSQL) {
               if (node === field.name) {
                 parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
               }
@@ -1263,6 +1266,8 @@ const useLogs = () => {
   function extractFields() {
     try {
       searchObj.data.stream.selectedStreamFields = [];
+      let ftsKeys: Set<any> = new Set();
+      let schemaFields: Set<any> = new Set();
       if (searchObj.data.streamResults.list.length > 0) {
         const queryResult: {
           name: string;
@@ -1270,8 +1275,6 @@ const useLogs = () => {
         }[] = [];
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
-        let ftsKeys: Set<any>;
-        let schemaFields: Set<any>;
         const timestampField = store.state.zoConfig.timestamp_column;
 
         // searchObj.data.streamResults.list.forEach((stream: any) => {
@@ -1326,7 +1329,7 @@ const useLogs = () => {
             fields[row.name] = {};
             searchObj.data.stream.selectedStreamFields.push({
               name: row.name,
-              ftsKey: ftsKeys.has(row.name),
+              ftsKey: ftsKeys?.has(row.name),
               isSchemaField: schemaFields.has(row.name),
               showValues: row.name !== timestampField,
             });
