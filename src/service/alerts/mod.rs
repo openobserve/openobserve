@@ -1012,12 +1012,22 @@ async fn process_dest_template(
             alert.org_id,
         )
     } else {
-        if let Some(conditions) = &alert.query_condition.conditions {
-            if let Ok(v) = build_sql(alert, conditions).await {
-                alert_query = v;
+        match alert.query_condition.query_type {
+            QueryType::SQL => {
+                if let Some(sql) = &alert.query_condition.sql {
+                    alert_query = sql.clone();
+                }
             }
-        }
-        // http://localhost:5080/web/logs?stream_type=logs&stream=default&from=1705248000000000&to=1705334340000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAiZGVmYXVsdCIg&org_identifier=default
+            QueryType::Custom => {
+                if let Some(conditions) = &alert.query_condition.conditions {
+                    if let Ok(v) = build_sql(alert, conditions).await {
+                        alert_query = v;
+                    }
+                }
+            }
+            _ => unreachable!(),
+        };
+        // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
             "{}{}/web/logs?stream_type={}&stream={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}",
             CONFIG.common.web_url,
