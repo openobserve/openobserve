@@ -54,6 +54,7 @@
           :class="drilldownData.type == 'byDashboard' ? 'selected' : ''"
           size="sm"
           @click="changeTypeOfDrilldown('byDashboard')"
+          data-test="dashboard-drilldown-by-dashboard-btn"
           ><q-icon
             class="q-mr-xs"
             :name="outlinedDashboard"
@@ -64,6 +65,7 @@
           :class="drilldownData.type === 'byUrl' ? 'selected' : ''"
           size="sm"
           @click="changeTypeOfDrilldown('byUrl')"
+          data-test="dashboard-drilldown-by-url-btn"
           ><q-icon
             class="q-mr-xs"
             name="link"
@@ -80,10 +82,12 @@
           style="min-width: 100%; max-width: 100%; resize: vertical"
           v-model="drilldownData.data.url"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+          data-test="dashboard-drilldown-url"
         ></textarea>
         <div
           style="color: red; font-size: 12px"
           v-if="!isFormURLValid && drilldownData.data.url.trim()"
+          data-test="dashboard-drilldown-url-error-message"
         >
           Invalid URL
         </div>
@@ -106,6 +110,7 @@
             filled
             dense
             style="width: 100%"
+            data-test="dashboard-drilldown-folder-select"
           >
             <!-- template when on options -->
             <template v-slot:no-option>
@@ -131,6 +136,7 @@
             filled
             dense
             style="width: 100%"
+            data-test="dashboard-drilldown-dashboard-select"
           >
             <!-- template when on options -->
             <template v-slot:no-option>
@@ -158,6 +164,7 @@
             filled
             dense
             style="width: 100%"
+            data-test="dashboard-drilldown-tab-select"
           >
             <!-- template when on options -->
             <template v-slot:no-option>
@@ -193,6 +200,7 @@
                     value: '',
                   })
               "
+              data-test="dashboard-drilldown-add-variable"
               >Add</q-btn
             >
           </div>
@@ -208,6 +216,7 @@
                 outlined
                 filled
                 dense
+                :data-test="`dashboard-drilldown-variable-name-${index}`"
               />
               <q-input
                 v-model="variable.value"
@@ -216,6 +225,7 @@
                 outlined
                 filled
                 dense
+                :data-test="`dashboard-drilldown-variable-value-${index}`"
               />
               <q-icon
                 class="q-mr-xs"
@@ -223,6 +233,7 @@
                 name="close"
                 style="cursor: pointer; height: 35px; display: flex !important"
                 @click="() => drilldownData.data.variables.splice(index, 1)"
+                :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
             </div>
           </div>
@@ -234,6 +245,7 @@
           :label="`Pass all current variables : `"
           left-label
           v-model="drilldownData.data.passAllVariables"
+          data-test="dashboard-drilldown-pass-all-variables"
         />
       </div>
     </div>
@@ -244,6 +256,7 @@
         :label="`Open in new tab : `"
         left-label
         v-model="drilldownData.targetBlank"
+        data-test="dashboard-drilldown-open-in-new-tab"
       />
     </div>
 

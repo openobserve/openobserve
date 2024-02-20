@@ -18,7 +18,15 @@
   <div>
     <div class="q-mb-sm" style="font-weight: 600">
       <span>Drilldown</span>
-      <q-btn no-caps padding="xs" class="" size="sm" flat icon="info_outline">
+      <q-btn
+        no-caps
+        padding="xs"
+        class=""
+        size="sm"
+        flat
+        icon="info_outline"
+        data-test="dashboard-addpanel-config-drilldown-info"
+      >
         <q-tooltip
           class="bg-grey-8"
           anchor="bottom middle"
@@ -51,6 +59,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
           "
+          :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ index + 1 }}. {{ data.name }}
         </div>
@@ -60,6 +69,7 @@
           name="close"
           style="cursor: pointer"
           @click="removeDrilldownByIndex(index)"
+          :data-test="`dashboard-addpanel-config-drilldown-remove-${index}`"
         />
       </div>
     </div>
@@ -68,6 +78,7 @@
       style="cursor: pointer; padding: 0px 5px"
       label="+ Add"
       no-caps
+      data-test="dashboard-addpanel-config-drilldown-add-btn"
     />
     <q-dialog v-model="showDrilldownPopUp">
       <drilldown-pop-up

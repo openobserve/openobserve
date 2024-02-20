@@ -143,7 +143,6 @@ ul,
 li,
 p,
 div {
-  // padding-top: 0;
   margin: 0;
 }
 

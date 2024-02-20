@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
-          @click="onChartClick"
+          @row-click="onChartClick"
           ref="tableRendererRef"
         />
         <div
