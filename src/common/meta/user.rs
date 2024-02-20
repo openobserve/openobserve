@@ -311,6 +311,7 @@ pub struct TokenValidationResponse {
 pub struct RoleOrg {
     pub role: UserRole,
     pub org: String,
+    pub custom_role: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
