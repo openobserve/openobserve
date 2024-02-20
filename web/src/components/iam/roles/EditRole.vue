@@ -336,6 +336,7 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
+import { r } from "msw/lib/SetupApi-8ab693f7";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -453,12 +454,14 @@ const getRoleDetails = () => {
 
       setDefaultPermissions();
 
-      filteredResources.value = permissionsState.resources.map((r) => {
-        return {
-          label: r.display_name,
-          value: r.key,
-        };
-      });
+      filteredResources.value = permissionsState.resources
+        .map((r) => {
+          return {
+            label: r.display_name,
+            value: r.key,
+          };
+        })
+        .filter((r) => r.value !== "dashboard");
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
