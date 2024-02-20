@@ -28,20 +28,8 @@
           >Create Drilldown</span
         >
       </div>
-      <div class="flex q-gutter-sm items-center" style="position: relative">
-        <q-btn
-          no-caps
-          @click=""
-          padding="xs"
-          class="q-ml-md"
-          flat
-          icon="help"
-          data-test="dashboard-drilldown-help-btn"
-        >
-          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-            User Guide
-          </q-tooltip>
-        </q-btn>
+      <div class="flex q-gutter-sm items-center">
+        <DrilldownUserGuide />
       </div>
     </div>
     <q-input
@@ -301,10 +289,13 @@ import {
 } from "../../../utils/commons";
 import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 
 export default defineComponent({
   name: "DrilldownPopUp",
-  components: {},
+  components: {
+    DrilldownUserGuide,
+  },
   props: {
     isEditMode: {
       type: Boolean,
