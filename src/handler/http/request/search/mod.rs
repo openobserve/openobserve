@@ -380,11 +380,14 @@ pub async fn around(
     // get a local search queue lock
     let locker = SearchService::QUEUE_LOCKER.clone();
     let _locker = locker.lock().await;
-    let query_context = if uses_fn {
-        Some(around_sql.clone())
-    } else {
-        None
-    };
+
+    // We don't need query_context now
+    // let query_context = if uses_fn {
+    //     Some(around_sql.clone())
+    // } else {
+    //     None
+    // };
+    let query_context: Option<String> = None;
 
     let timeout = query
         .get("timeout")
@@ -676,7 +679,7 @@ async fn values_v1(
         }
     };
 
-    let query_context = match query.get("sql") {
+    let mut query_context = match query.get("sql") {
         None => None,
         Some(v) => match base64::decode(v) {
             Err(_) => None,
@@ -692,6 +695,8 @@ async fn values_v1(
 
     if query_context.is_some() {
         query_sql = query_context.clone().unwrap();
+        // We don't need query_context now
+        query_context = None;
     }
 
     let size = query
