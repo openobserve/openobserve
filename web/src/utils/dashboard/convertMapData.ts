@@ -21,9 +21,6 @@
  * @return {Object} - the option object for rendering the map chart
  */
 function normalizeValue(value: any, minValue: any, maxValue: any) {
-  // console.log("normalizeValueeeeeeeee", value, minValue, maxValue);
-  // console.log("======", (value - minValue) / (maxValue - minValue));
-
   return (value - minValue) / (maxValue - minValue);
 }
 
