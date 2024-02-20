@@ -71,9 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark'
                   ? 'rgb(45 45 45) 0px 4px 7px 0px'
                   : 'rgb(240 240 240) 0px 4px 7px 0px',
+              height: '56px',
             }"
           >
             <div
+              v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
               class="o2-input flex items-start q-px-md q-py-sm justify-start"
               style="position: sticky; top: 0px; z-index: 2"
@@ -157,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+            <div></div>
             <div
               data-test="edit-role-permissions-ui-type-toggle"
               class="q-mr-md"
@@ -216,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div style="width: calc(100% - 350px)">
                   <PermissionsJSON
                     ref="permissionJsonEditorRef"
+                    v-model:query="permissionsJsonValue"
                     class="q-mt-sm"
                     style="height: calc(100vh - 328px)"
                   />
@@ -345,6 +349,8 @@ const selectedPermissionsHash = ref(new Set()); // Saved + new added permission 
 
 const addedPermissions: any = ref({});
 
+const resourceMapper: Ref<{ [key: string]: Resource }> = ref({});
+
 const removedPermissions: any = ref({});
 
 const countOfVisibleResources = ref(0);
@@ -354,6 +360,7 @@ const isFetchingIntitialRoles = ref(false);
 const filteredPermissions: Ref<{ [key: string]: Entity[] }> = ref({});
 
 const heavyResourceEntities: Ref<{ [key: string]: Entity[] }> = ref({});
+const permissionsJsonValue = ref("");
 
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
@@ -435,7 +442,8 @@ const getRoleDetails = () => {
 
       await getResourcePermissions();
       await getUsers();
-      await updateRolePermissions();
+      savePermissionHash();
+      await updateRolePermissions(permissions.value);
       isFetchingIntitialRoles.value = false;
 
       updateTableData();
@@ -490,6 +498,8 @@ const setDefaultPermissions = () => {
     if (resource.has_entities) resourcePermission.has_entities = true;
 
     resourcePermission.parent = resource.parent;
+
+    resourceMapper.value[resourcePermission.name] = resourcePermission;
 
     if (resource.parent) {
       const parentResource = getResourceByName(
@@ -603,19 +613,17 @@ const savePermissionHash = () => {
   });
 };
 
-const updateRolePermissions = async () => {
-  savePermissionHash();
-
+const updateRolePermissions = async (permissions: Permission[]) => {
   let resourceMapper: { [key: string]: Resource } = {};
 
-  for (let i = 0; i < permissions.value.length; i++) {
+  for (let i = 0; i < permissions.length; i++) {
     let {
       resource,
       entity,
     }: {
       resource: string;
       entity: string;
-    } = decodePermission(permissions.value[i].object);
+    } = decodePermission(permissions[i].object);
 
     if (!resourceMapper[resource]) {
       resourceMapper[resource] = getResourceByName(
@@ -637,9 +645,8 @@ const updateRolePermissions = async () => {
     }
 
     if (entity === getOrgId()) {
-      resourceMapper[resource].permission[
-        permissions.value[i].permission
-      ].value = true;
+      resourceMapper[resource].permission[permissions[i].permission].value =
+        true;
 
       continue;
     }
@@ -700,9 +707,16 @@ const handlePermissionChange = (row: any, permission: string) => {
   }
 
   const permissionHash = `${resourceName}:${entity}:${permission}`;
-  const object = `${resourceName}:${entity}`;
 
   // Add permission to addedPermissions if not present
+  updatePermissionMappings(permissionHash);
+};
+
+const updatePermissionMappings = (permissionHash: string) => {
+  const permissionSplit = permissionHash.split(":");
+  const object = permissionSplit[0] + ":" + permissionSplit[1];
+  const permission = permissionSplit[2];
+
   if (
     !addedPermissions.value[permissionHash] &&
     !permissionsHash.value.has(permissionHash)
@@ -712,6 +726,17 @@ const handlePermissionChange = (row: any, permission: string) => {
       object,
       permission: permission,
     };
+    return;
+  }
+
+  // Remove permission from removedPermissions if present
+  if (
+    removedPermissions.value[permissionHash] &&
+    permissionsHash.value.has(permissionHash) &&
+    !selectedPermissionsHash.value.has(permissionHash)
+  ) {
+    delete removedPermissions.value[permissionHash];
+    selectedPermissionsHash.value.add(permissionHash);
     return;
   }
 
@@ -766,9 +791,109 @@ const updatePermissionsUi = async (value: string) => {
       });
     });
 
-    permissionJsonEditorRef.value.setValue(JSON.stringify(permissions));
+    permissionsJsonValue.value = JSON.stringify(permissions);
+    permissionJsonEditorRef.value.setValue(permissionsJsonValue.value);
     await nextTick();
     permissionJsonEditorRef.value.formatDocument();
+  } else if (value === "table") {
+    const permissions = JSON.parse(permissionsJsonValue.value);
+
+    const permissionsHash = new Set(
+      permissions.map((p: any) => p.object + ":" + p.permission)
+    );
+    let hash = "";
+    let permission;
+    let resource = "";
+    let entity = "";
+    let resourceDetails: Entity | Resource;
+
+    // Update added permissions
+    permissions.forEach((permission: any) => {
+      [resource, entity] = permission.object.split(":");
+      hash = permission.object + ":" + permission.permission;
+      if (!selectedPermissionsHash.value.has(hash)) {
+        updatePermissionMappings(hash);
+
+        resourceDetails = resourceMapper.value[resource];
+
+        if (resource === "dashboard") {
+          const [folderId] = entity.split("/");
+
+          resourceDetails = resourceMapper.value["dfolder"].entities.find(
+            (e: Entity) => e.name === folderId
+          ) as Entity;
+        } else if (entity === getOrgId()) {
+          resourceDetails.permission[
+            permission.permission as "AllowAll"
+          ].value = selectedPermissionsHash.value.has(
+            getPermissionHash(resource, permission.permission, entity)
+          );
+        } else if (
+          resource === "logs" ||
+          resource === "metrics" ||
+          resource === "traces"
+        ) {
+          resourceDetails = resourceMapper.value["stream"].entities.find(
+            (e: Entity) => e.name === resource
+          ) as Entity;
+        }
+
+        updateEntityPermission(
+          resourceDetails,
+          resource,
+          entity,
+          permission.permission
+        );
+      }
+    });
+
+    // Update removed permissions
+    selectedPermissionsHash.value.forEach(async (permissionHash: any) => {
+      permission = permissionHash.split(":");
+      resource = permission[0];
+      entity = permission[1];
+      permission = {
+        object: permission[0] + ":" + permission[1],
+        permission: permission[2] as "AllowAll",
+      };
+
+      if (!permissionsHash.has(permissionHash)) {
+        updatePermissionMappings(permissionHash);
+
+        resourceDetails = resourceMapper.value[resource];
+
+        if (resource === "dashboard") {
+          const [folderId, dashboardId] = entity.split("/");
+
+          resourceDetails = resourceMapper.value["dfolder"].entities.find(
+            (e: Entity) => e.name === folderId
+          ) as Entity;
+        } else if (entity === getOrgId()) {
+          resourceDetails.permission[
+            permission.permission as "AllowAll"
+          ].value = selectedPermissionsHash.value.has(
+            getPermissionHash(resource, permission.permission, entity)
+          );
+        } else if (
+          resource === "logs" ||
+          resource === "metrics" ||
+          resource === "traces"
+        ) {
+          resourceDetails = resourceMapper.value["stream"].entities.find(
+            (e: Entity) => e.name === resource
+          ) as Entity;
+        }
+
+        updateEntityPermission(
+          resourceDetails,
+          resource,
+          entity,
+          permission.permission
+        );
+      }
+    });
+
+    updateRolePermissions(permissions);
   }
 };
 
@@ -1697,6 +1822,27 @@ const filterResourceOptions = (val: string, update: any) => {
     val,
     update
   ) as any[];
+};
+
+const updateEntityPermission = (
+  resource: Resource | Entity,
+  resourceName: string,
+  entityName: string,
+  permission:
+    | "AllowAll"
+    | "AllowList"
+    | "AllowGet"
+    | "AllowDelete"
+    | "AllowPost"
+) => {
+  if (resource.entities)
+    resource.entities.forEach((entity: Entity) => {
+      if (entity.name === entityName) {
+        entity.permission[permission].value = selectedPermissionsHash.value.has(
+          getPermissionHash(resourceName, permission, entityName)
+        );
+      }
+    });
 };
 </script>
 <style scoped></style>
