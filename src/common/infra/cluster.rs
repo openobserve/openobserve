@@ -60,10 +60,19 @@ pub async fn register_and_keepalive() -> Result<()> {
 
     // keep alive
     tokio::task::spawn(async move {
+        let mut need_online_again = false;
         loop {
             if is_offline() {
                 break;
             }
+
+            if need_online_again {
+                if let Err(e) = set_online().await {
+                    log::error!("[CLUSTER] Set node online failed: {}", e);
+                    continue;
+                }
+            }
+
             let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
             let ret =
                 etcd::keepalive_lease_id(lease_id, CONFIG.etcd.node_heartbeat_ttl, is_offline)
@@ -83,27 +92,8 @@ pub async fn register_and_keepalive() -> Result<()> {
                 break;
             }
             log::error!("[CLUSTER] keepalive lease id expired or revoked, set node online again.");
-            // get new lease id
-            let mut client = etcd::get_etcd_client().await.clone();
-            let resp = match client
-                .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
-                .await
-            {
-                Ok(resp) => resp,
-                Err(e) => {
-                    log::error!("[CLUSTER] lease grant failed: {}", e);
-                    continue;
-                }
-            };
-            let id = resp.id();
-            // update local node key lease id
-            unsafe {
-                LOCAL_NODE_KEY_LEASE_ID = id;
-            }
-            if let Err(e) = set_online().await {
-                log::error!("[CLUSTER] set node online failed: {}", e);
-                continue;
-            }
+            // set node online again
+            need_online_again = true;
         }
     });
 
@@ -222,7 +212,17 @@ pub async fn set_online() -> Result<()> {
     NODES.insert(LOCAL_NODE_UUID.clone(), val.clone());
     let val = json::to_string(&val).unwrap();
 
+    // get new lease id
     let mut client = etcd::get_etcd_client().await.clone();
+    let resp = client
+        .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
+        .await?;
+    let lease_id = resp.id();
+    // update local node key lease id
+    unsafe {
+        LOCAL_NODE_KEY_LEASE_ID = lease_id;
+    }
+
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
