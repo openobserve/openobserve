@@ -6,7 +6,7 @@
       padding="xs"
       class="q-ml-md"
       flat
-      icon="help"
+      icon="help_outline"
       data-test="dashboard-drilldown-help-btn"
     >
       <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
@@ -41,7 +41,12 @@
     <div class="header">Use current dashboard's variable</div>
     <p>You can reference a variable with the following format:</p>
     <ul>
-      <li><span class="bg-highlight">${var-variable_name}</span></li>
+      <li>
+        <span class="bg-highlight">${var-variable_name}</span>
+        <br />
+        (For Example, if your variable name is "test", you can use
+        <span class="bg-highlight">${var-test}</span>)
+      </li>
     </ul>
 
     <div class="header">Use Series name and value</div>
@@ -62,6 +67,10 @@
         <span class="bg-highlight"
           >${row.field["field_label"]} or ${row.field.field_label}</span
         >
+        <br />
+        (For Example, if your want to use "test" column's value of clicked row,
+        you can use <span class="bg-highlight">${row.field.test} </span> or
+        <span class="bg-highlight">${row.field["test"]}</span>)
       </li>
       <li><span class="bg-highlight">${row.index}</span></li>
     </ul>
