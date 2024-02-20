@@ -28,3 +28,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     memory::init().await?;
     Ok(())
 }
+
+pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error> {
+    if config::CONFIG.memory_cache.enabled {
+        memory::download(session_id, file).await
+    } else if config::CONFIG.disk_cache.enabled {
+        disk::download(session_id, file).await
+    } else {
+        Ok(())
+    }
+}
