@@ -168,7 +168,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // let node online
-    let _ = cluster::set_online().await;
+    let _ = cluster::set_online(false).await;
 
     // This is specifically for enrichment tables, as caching is happening using
     // search service
