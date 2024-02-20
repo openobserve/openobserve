@@ -126,7 +126,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     }))
 }
 
-#[get("/cache/status")]
+#[get("/status")]
 pub async fn cache_status() -> Result<HttpResponse, Error> {
     let mut stats: HashMap<&str, json::Value> = HashMap::default();
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
@@ -279,7 +279,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     }
 }
 
-#[put("/node/enable")]
+#[put("/enable")]
 async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE_UUID.clone();
     let Some(mut node) = cluster::get_node_by_uuid(&node_id) else {
@@ -298,7 +298,7 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
     }
 }
 
-#[put("/node/flush")]
+#[put("/flush")]
 async fn flush_node() -> Result<HttpResponse, Error> {
     if !is_ingester(&LOCAL_NODE_ROLE) {
         return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
