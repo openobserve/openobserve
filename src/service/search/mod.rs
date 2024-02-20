@@ -285,9 +285,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         );
 
         log::warn!("searching in query {:?}", query);
+        log::warn!("Incoming request {:?}", idx_req);
 
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().size = 10000;
+        idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
 
         let unique_files = idx_resp
@@ -298,7 +300,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         log::warn!("searching in unique_files_len {:?}", unique_files.len());
         for f in unique_files.iter() {
-            log::warn!("searching in get_file_list {:?}", f);
+            log::warn!("[{}] searching in get_file_list {:?}", stream_type, f);
         }
         for filename in unique_files {
             let prefixed_filename = format!(
@@ -327,7 +329,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             &stream_settings.partition_keys,
         )
         .await;
-        log::warn!("searching in get_file_list_len {:?}", file_list.len());
+        log::warn!("searching in get_file_list_len for STREAM_TYPE {} {:?}", stream_type, file_list.len());
         for f in file_list.iter() {
             log::warn!("searching in get_file_list {:?}", f.key);
         }
