@@ -93,7 +93,7 @@ import { useStore } from "vuex";
 
 export default {
   name: "DrilldownUserGuide",
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const showUserGuide = ref(false);
 
