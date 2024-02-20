@@ -111,7 +111,8 @@ pub async fn post_user(
 pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
     if db_user.password.is_empty() {
         let salt = ider::uuid();
-        let password = get_hash(&db_user.password, &salt);
+        let generated_pass = generate_random_string(8);
+        let password = get_hash(&generated_pass, &salt);
         db_user.password = password;
         db_user.salt = salt;
     }
