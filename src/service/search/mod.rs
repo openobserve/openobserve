@@ -261,41 +261,47 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .fts_terms
             .iter()
             .flat_map(|t| t.split_whitespace().collect::<Vec<_>>())
-            .map(|t|  t.to_lowercase())
-            // .map(|t| format!("'{}'", t.to_lowercase()))
+            .map(|t| t.to_lowercase())
             .collect::<HashSet<String>>();
 
-        // TODO(ansrivas): Do we need to use exact token match or partial match?
         let search_condition = terms
             .iter()
             .map(|x| format!("term ilike '%{x}%'"))
             .collect::<Vec<String>>()
             .join(" or ");
 
-        // Join the transformed terms with ", " and surround them with parentheses
-        // let terms = format!("({})", terms.iter().join(", "));
-
-        log::warn!("searching in terms {:?}", terms);
-        idx_req.stream_type = StreamType::Index.to_string();
-
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
-            "select file_name from {} where deleted is false and {}",
+            "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
+            // "SELECT file_name, _count FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
             meta.stream_name, search_condition
         );
 
         log::warn!("searching in query {:?}", query);
         log::warn!("Incoming request {:?}", idx_req);
 
+        // Check if this is the first page i.e. first request, from will always be `0` in that case
+        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+
+        log::warn!("searching in terms {:?}", terms);
+        idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
 
+        // if this is the first page, then for each term, get the first file_name where for each
+        // term the _count is > 250
+
         let unique_files = idx_resp
             .hits
             .iter()
-            .map(|hit| hit.get("file_name").unwrap().as_str().unwrap())
+            .map(|hit| {
+                hit.get("file_name").unwrap().as_str().unwrap().to_string()
+                // let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
+                // let count = hit.get("_count").unwrap().as_u64().unwrap();
+                // (file_name, count)
+            })
             .collect::<HashSet<_>>();
 
         log::warn!("searching in unique_files_len {:?}", unique_files.len());
@@ -335,7 +341,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             file_list.len()
         );
         for f in file_list.iter() {
-            log::warn!("searching in get_file_list {:?}", f.key);
+            log::warn!("[{}] get_file_list: searching in get_file_list {:?}", stream_type, f.key);
         }
 
         file_list

@@ -555,13 +555,13 @@ async fn prepare_index_record_batches(
                 vec![col("term"), col("file_name")],
                 vec![
                     min(col("_timestamp")).alias("_timestamp"),
-                    count(col("term")).alias("count"),
+                    count(col("term")).alias("_count"),
                 ],
             )?
             .with_column("character_len", character_length(col("term")))?
             .with_column("deleted", lit(false))?
             .filter(col("character_len").gt_eq(lit(3)))?
-            .select_columns(&["term", "file_name", "_timestamp", "count", "deleted"])?
+            .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
             .collect()
             .await?;
 
