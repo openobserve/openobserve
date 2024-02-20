@@ -302,11 +302,13 @@ const useLogs = () => {
         let selectedStream = { label: "", value: "" };
 
         searchObj.data.stream.streamLists = [];
-        searchObj.data.streamResults.list.forEach((item: any) => {
-          const itemObj: {
-            label: string;
-            value: string;
-          } = {
+        let itemObj: {
+          label: string;
+          value: string;
+        };
+        // searchObj.data.streamResults.list.forEach((item: any) => {
+        for (const item of searchObj.data.streamResults.list) {
+          itemObj = {
             label: item.name,
             value: item.name,
           };
@@ -324,7 +326,7 @@ const useLogs = () => {
             lastUpdatedStreamTime = item.stats.doc_time_max;
             selectedStream = itemObj;
           }
-        });
+        }
         searchObj.data.stream.selectedStream = selectedStream;
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -539,14 +541,21 @@ const useLogs = () => {
 
           //remove everything after -- in where clause
           const parsedSQL = whereClause.split(" ");
-          searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
-            parsedSQL.forEach((node: any, index: any) => {
-              if (node == field.name) {
-                node = node.replaceAll('"', "");
-                parsedSQL[index] = '"' + node + '"';
+          // searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+          //   parsedSQL.forEach((node: any, index: any) => {
+          //     if (node == field.name) {
+          //       node = node.replaceAll('"', "");
+          //       parsedSQL[index] = '"' + node + '"';
+          //     }
+          //   });
+          // });
+          for (const field of searchObj.data.stream.selectedStreamFields) {
+            for (const [node, index] of parsedSQL) {
+              if (node === field.name) {
+                parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
               }
-            });
-          });
+            }
+          }
 
           whereClause = parsedSQL.join(" ");
 
@@ -651,8 +660,23 @@ const useLogs = () => {
 
           searchObj.data.queryResults.partitionDetail.partitions = partitions;
 
-          partitions.forEach((item: any, index: number) => {
-            const pageObject = [
+          let pageObject: any = [];
+          // partitions.forEach((item: any, index: number) => {
+          //   pageObject = [
+          //     {
+          //       startTime: item[0],
+          //       endTime: item[1],
+          //       from: 0,
+          //       size: searchObj.meta.resultGrid.rowsPerPage,
+          //     },
+          //   ];
+          //   searchObj.data.queryResults.partitionDetail.paginations.push(
+          //     pageObject
+          //   );
+          //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+          // });
+          for (const [index, item] of partitions.entries()) {
+            pageObject = [
               {
                 startTime: item[0],
                 endTime: item[1],
@@ -664,7 +688,7 @@ const useLogs = () => {
               pageObject
             );
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          });
+          }
         });
     } else {
       searchObj.data.queryResults.partitionDetail = {
@@ -677,22 +701,40 @@ const useLogs = () => {
         [queryReq.query.start_time, queryReq.query.end_time],
       ];
 
-      searchObj.data.queryResults.partitionDetail.partitions.forEach(
-        (item: any, index: number) => {
-          const pageObject = [
-            {
-              startTime: item[0],
-              endTime: item[1],
-              from: 0,
-              size: searchObj.meta.resultGrid.rowsPerPage,
-            },
-          ];
-          searchObj.data.queryResults.partitionDetail.paginations.push(
-            pageObject
-          );
-          searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-        }
-      );
+      let pageObject: any = [];
+      // searchObj.data.queryResults.partitionDetail.partitions.forEach(
+      //   (item: any, index: number) => {
+      //     pageObject = [
+      //       {
+      //         startTime: item[0],
+      //         endTime: item[1],
+      //         from: 0,
+      //         size: searchObj.meta.resultGrid.rowsPerPage,
+      //       },
+      //     ];
+      //     searchObj.data.queryResults.partitionDetail.paginations.push(
+      //       pageObject
+      //     );
+      //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+      //   }
+      // );
+      for (const [
+        index,
+        item,
+      ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+        pageObject = [
+          {
+            startTime: item[0],
+            endTime: item[1],
+            from: 0,
+            size: searchObj.meta.resultGrid.rowsPerPage,
+          },
+        ];
+        searchObj.data.queryResults.partitionDetail.paginations.push(
+          pageObject
+        );
+        searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+      }
     }
   };
 
@@ -710,30 +752,39 @@ const useLogs = () => {
       partitionDetail.paginations = [];
 
       let pageNumber = 0;
-      partitionDetail.partitions.forEach((item: any, index: number) => {
-        const total = partitionDetail.partitionTotal[index];
-        const totalPages = Math.ceil(total / rowsPerPage);
+      let partitionFrom = 0;
+      let total = 0;
+      let totalPages = 0;
+      let recordSize = 0;
+      let from = 0;
+      let lastPage = 0;
+      // partitionDetail.partitions.forEach((item: any, index: number) => {
+      for (const [index, item] of partitionDetail.partitions.entries()) {
+        total = partitionDetail.partitionTotal[index];
+        totalPages = Math.ceil(total / rowsPerPage);
         if (!partitionDetail.paginations[pageNumber]) {
           partitionDetail.paginations[pageNumber] = [];
         }
         if (totalPages > 0) {
-          let partitionFrom = 0;
+          partitionFrom = 0;
           for (let i = 0; i < totalPages; i++) {
             remainingRecords = rowsPerPage;
-            let recordSize =
+            recordSize =
               i === totalPages - 1
                 ? total - partitionFrom || rowsPerPage
                 : rowsPerPage;
-            const from = partitionFrom;
+            from = partitionFrom;
 
             // if (i === 0 && partitionDetail.paginations.length > 0) {
             lastPartitionSize = 0;
             if (pageNumber > 0) {
-              const lastPage = partitionDetail.paginations.length - 1;
+              lastPage = partitionDetail.paginations.length - 1;
 
-              partitionDetail.paginations[lastPage].forEach((item: any) => {
+              // partitionDetail.paginations[lastPage].forEach((item: any) => {
+              for (const item of partitionDetail.paginations[lastPage]) {
                 lastPartitionSize += item.size;
-              });
+              }
+
               if (lastPartitionSize != rowsPerPage) {
                 recordSize = rowsPerPage - lastPartitionSize;
               }
@@ -767,16 +818,18 @@ const useLogs = () => {
           }
         } else {
           lastPartitionSize = 0;
-          let recordSize = rowsPerPage;
-          const lastPage = partitionDetail.paginations.length - 1;
+          recordSize = rowsPerPage;
+          lastPage = partitionDetail.paginations.length - 1;
 
-          partitionDetail.paginations[lastPage].forEach((item: any) => {
+          // partitionDetail.paginations[lastPage].forEach((item: any) => {
+          for (const item of partitionDetail.paginations[lastPage]) {
             lastPartitionSize += item.size;
-          });
+          }
+
           if (lastPartitionSize != rowsPerPage) {
             recordSize = rowsPerPage - lastPartitionSize;
           }
-          const from = 0;
+          from = 0;
 
           if (total == 0) {
             recordSize = 0;
@@ -804,7 +857,7 @@ const useLogs = () => {
         ) {
           return true;
         }
-      });
+      }
 
       searchObj.data.queryResults.partitionDetail = partitionDetail;
     }
@@ -967,20 +1020,23 @@ const useLogs = () => {
         })
         .then(async (res) => {
           // check for total records update for the partition and update pagination accordingly
-          searchObj.data.queryResults.partitionDetail.partitions.forEach(
-            (item: any, index: number) => {
-              if (
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] == -1 &&
-                queryReq.query.start_time == item[0]
-              ) {
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] = res.data.total;
-              }
+          // searchObj.data.queryResults.partitionDetail.partitions.forEach(
+          //   (item: any, index: number) => {
+          for (const [
+            index,
+            item,
+          ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+            if (
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] == -1 &&
+              queryReq.query.start_time == item[0]
+            ) {
+              searchObj.data.queryResults.partitionDetail.partitionTotal[
+                index
+              ] = res.data.total;
             }
-          );
+          }
 
           let regeratePaginationFlag = false;
           if (res.data.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
@@ -1064,6 +1120,8 @@ const useLogs = () => {
           //update grid columns
           updateGridColumns();
 
+          filterHitsColumns();
+
           // disabled histogram case, generate histogram histogram title
           searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
@@ -1095,6 +1153,27 @@ const useLogs = () => {
           reject(false);
         });
     });
+  };
+
+  const filterHitsColumns = () => {
+    searchObj.data.queryResults.filteredHit = [];
+    let itemHits: any = {};
+    if (searchObj.data.stream.selectedFields.length > 0) {
+      searchObj.data.queryResults.hits.map((hit: any) => {
+        itemHits = {};
+        // searchObj.data.stream.selectedFields.forEach((field) => {
+        for (const field of searchObj.data.stream.selectedFields) {
+          if (hit.hasOwnProperty(field)) {
+            itemHits[field] = hit[field];
+          }
+        }
+        itemHits["_timestamp"] = hit["_timestamp"];
+        searchObj.data.queryResults.filteredHit.push(itemHits);
+      });
+    } else {
+      searchObj.data.queryResults.filteredHit =
+        searchObj.data.queryResults.hits;
+    }
   };
 
   const getHistogramQueryData = (queryReq: any) => {
@@ -1154,9 +1233,11 @@ const useLogs = () => {
         "log",
         "msg",
       ];
-      searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
+      // searchObj.data.queryResults.hits.forEach((item: { [x: string]: any }) => {
+      for (const item of searchObj.data.queryResults.hits) {
         // Create set for each field values and add values to corresponding set
-        Object.keys(item).forEach((key) => {
+        // Object.keys(item).forEach((key) => {
+        for (const key of Object.keys(item)) {
           if (excludedFields.includes(key)) {
             return;
           }
@@ -1168,8 +1249,8 @@ const useLogs = () => {
           if (!fieldValues.value[key].has(item[key])) {
             fieldValues.value[key].add(item[key]);
           }
-        });
-      });
+        }
+      }
     } catch (e: any) {
       console.log("Error while updating field values", e);
     }
@@ -1193,17 +1274,19 @@ const useLogs = () => {
         let schemaFields: Set<any>;
         const timestampField = store.state.zoConfig.timestamp_column;
 
-        searchObj.data.streamResults.list.forEach((stream: any) => {
+        // searchObj.data.streamResults.list.forEach((stream: any) => {
+        for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
             queryResult.push(...stream.schema);
             ftsKeys = new Set([...stream.settings.full_text_search_keys]);
             schemaFields = new Set([...stream.schema.map((e: any) => e.name)]);
           }
-        });
+        }
 
-        queryResult.forEach((field: any) => {
+        // queryResult.forEach((field: any) => {
+        for (const field of queryResult) {
           tempFieldsName.push(field.name);
-        });
+        }
 
         if (searchObj.data.queryResults.hits.length > 0) {
           // Find the index of the record with max attributes
@@ -1223,18 +1306,20 @@ const useLogs = () => {
           const recordwithMaxAttribute =
             searchObj.data.queryResults.hits[maxAttributesIndex];
 
-          Object.keys(recordwithMaxAttribute).forEach((key) => {
+          // Object.keys(recordwithMaxAttribute).forEach((key) => {
+          for (const key of Object.keys(recordwithMaxAttribute)) {
             if (!tempFieldsName.includes(key)) {
               queryResult.push({
                 name: key,
                 type: "Utf8",
               });
             }
-          });
+          }
         }
 
         const fields: any = {};
-        queryResult.forEach((row: any) => {
+        // queryResult.forEach((row: any) => {
+        for (const row of queryResult) {
           // let keys = deepKeys(row);
           // for (let i in row) {
           if (fields[row.name] == undefined) {
@@ -1247,7 +1332,7 @@ const useLogs = () => {
             });
           }
           // }
-        });
+        }
       }
     } catch (e: any) {
       console.log("Error while extracting fields");
@@ -1306,7 +1391,8 @@ const useLogs = () => {
           });
         }
       } else {
-        searchObj.data.stream.selectedFields.forEach((field: any) => {
+        // searchObj.data.stream.selectedFields.forEach((field: any) => {
+        for (const field of searchObj.data.stream.selectedFields) {
           searchObj.data.resultGrid.columns.push({
             name: field,
             field: (row: { [x: string]: any; source: any }) => {
@@ -1320,7 +1406,7 @@ const useLogs = () => {
             sortable: true,
             closable: true,
           });
-        });
+        }
       }
       extractFTSFields();
       evaluateWrapContentFlag();
@@ -1522,11 +1608,13 @@ const useLogs = () => {
     ) {
       clearInterval(store.state.refreshIntervalID);
       const refreshIntervalID = setInterval(async () => {
-        searchObj.loading = true;
-        await getQueryData(false);
-        generateHistogramData();
-        updateGridColumns();
-        searchObj.meta.histogramDirtyFlag = true;
+        if (searchObj.loading == false && searchObj.loadingHistogram == false) {
+          searchObj.loading = true;
+          await getQueryData(false);
+          generateHistogramData();
+          updateGridColumns();
+          searchObj.meta.histogramDirtyFlag = true;
+        }
       }, searchObj.meta.refreshInterval * 1000);
       store.dispatch("setRefreshIntervalID", refreshIntervalID);
       $q.notify({
@@ -1757,6 +1845,7 @@ const useLogs = () => {
     buildSearch,
     loadStreamLists,
     refreshPartitionPagination,
+    filterHitsColumns,
   };
 };
 

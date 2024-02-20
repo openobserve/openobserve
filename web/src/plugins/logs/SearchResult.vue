@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-sticky-size-end="0"
         :virtual-scroll-slice-size="100"
         :virtual-scroll-slice-ratio-before="100"
-        :items="searchObj.data.queryResults.hits"
+        :items="searchObj.data.queryResults.filteredHit"
         :wrap-cells="
           searchObj.meta.toggleSourceWrap && searchObj.meta.flagWrapContent
             ? true
@@ -168,11 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="text-subtitle2 text-weight-bold bg-warning">
                 <q-btn
-                  :icon="
-                    expandedLogs['-1']
-                      ? 'expand_more'
-                      : 'chevron_right'
-                  "
+                  :icon="expandedLogs['-1'] ? 'expand_more' : 'chevron_right'"
                   dense
                   size="xs"
                   flat
@@ -313,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr v-if="expandedLogs[index.toString()]">
             <td :colspan="searchObj.data.resultGrid.columns.length">
               <json-preview
-                :value="row"
+                :value="searchObj.data.queryResults.hits[index]"
                 show-copy-button
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
@@ -356,7 +352,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onMounted, onUpdated, onRenderTracked } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onMounted,
+  onUpdated,
+  onRenderTracked,
+} from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -490,6 +493,7 @@ export default defineComponent({
       extractFTSFields,
       evaluateWrapContentFlag,
       refreshPartitionPagination,
+      filterHitsColumns,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -580,6 +584,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
       evaluateWrapContentFlag();
+      filterHitsColumns();
     }
 
     const copyLogToClipboard = (log: any) => {
