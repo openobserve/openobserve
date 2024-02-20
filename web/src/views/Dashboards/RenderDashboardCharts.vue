@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selectedTimeDate="currentTimeObj"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
+      ref="variablesValueSelectorRef"
     />
     <TabList
       v-if="showTabs && selectedTabId !== null"
@@ -78,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refresh="refreshDashboard"
+              @update:initial-variable-values="updateInitialVariableValues"
             >
             </PanelContainer>
           </div>
@@ -136,7 +138,7 @@ export default defineComponent({
     viewOnly: {},
     dashboardData: {},
     currentTimeObj: {},
-    initialVariableValues: {},
+    initialVariableValues: { value: {} },
     selectedDateForViewPanel: {},
     showTabs: {
       type: Boolean,
@@ -160,6 +162,7 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const gridLayoutRef = ref(null);
+    const variablesValueSelectorRef = ref(null);
 
     const showViewPanel = ref(false);
     // holds the view panel id
@@ -324,6 +327,16 @@ export default defineComponent({
       }
     };
 
+    // update initial variable values using the variable value selector ref
+    const updateInitialVariableValues = async (...args: any) => {
+      // first, refresh the dashboard
+      refreshDashboard();
+      // then, update the initial variable values
+      await variablesValueSelectorRef.value.changeInitialVariableValues(
+        ...args
+      );
+    };
+
     return {
       store,
       addPanelData,
@@ -344,6 +357,8 @@ export default defineComponent({
       panels,
       refreshDashboard,
       onMovePanel,
+      variablesValueSelectorRef,
+      updateInitialVariableValues,
     };
   },
   methods: {

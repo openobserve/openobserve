@@ -176,6 +176,47 @@ pub struct PanelConfig {
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
     map_view: Option<MapView>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    drilldown: Option<Vec<DrillDown>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DrillDown {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    type_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target_blank: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    find_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<DrillDownData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DrillDownData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dashboard: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tab: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pass_all_variables: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variables: Option<Vec<DrillDownVariables>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct DrillDownVariables {
+    name: Option<String>,
+    value: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

@@ -250,11 +250,11 @@ export default defineComponent({
 
     // ======= [START] default variable values
 
-    const initialVariableValues = {};
+    const initialVariableValues = { value: {} };
     Object.keys(route.query).forEach((key) => {
       if (key.startsWith("var-")) {
         const newKey = key.slice(4);
-        initialVariableValues[newKey] = route.query[key];
+        initialVariableValues.value[newKey] = route.query[key];
       }
     });
     // ======= [END] default variable values

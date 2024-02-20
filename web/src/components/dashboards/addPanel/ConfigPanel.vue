@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="" style="max-width: 300px">
-      <div class="q-mb-sm">{{ t("dashboard.description") }}</div>
+      <div class="q-mb-sm" style="font-weight: 600">
+        {{ t("dashboard.description") }}
+      </div>
       <q-input
         outlined
         v-model="dashboardPanelData.data.description"
@@ -286,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
         class="q-py-md showLabelOnTop"
+        style="font-weight: 600"
       >
         Query
         <q-tabs
@@ -565,6 +568,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.showBorder')"
         data-test="dashboard-config-axis-border"
       />
+
+      <div class="space"></div>
+      <Drilldown
+        v-if="
+          !['html', 'markdown', 'geomap', 'maps'].includes(
+            dashboardPanelData.data.type
+          )
+        "
+      />
     </div>
   </div>
 </template>
@@ -573,8 +585,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
+import Drilldown from "./Drilldown.vue";
 
 export default defineComponent({
+  components: { Drilldown },
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
