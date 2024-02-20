@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'">
+    <q-header
+      :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+      class="no-print"
+    >
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
@@ -207,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
       mini-to-overlay
+      class="no-print"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -873,7 +877,11 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
-
+@media print {
+  .no-print {
+    display: none;
+  }
+}
 .warning-msg {
   background-color: var(--q-warning);
   padding: 5px;

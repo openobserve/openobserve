@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
+    <div ref="printscreenDiv">
     <div
       ref="fullscreenDiv"
       :class="`${isFullscreen ? 'fullscreen' : ''}  ${
@@ -27,18 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
-        } stickyHeader ${isFullscreen ? 'fullscreenHeader' : ''}`"
+        } stickyHeader ${isFullscreen || isPrintscreen ? 'fullscreenHeader' : ''}`"
       >
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
             <q-btn
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && !isPrintscreen"
               no-caps
               @click="goBackToDashboardList"
               padding="xs"
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
+              class="no-print"
             />
             <span class="q-table__title q-mx-md q-mt-xs">{{
               currentDashboardData.data.title
@@ -46,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex">
             <q-btn
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && !isPrintscreen"
               outline
-              class="dashboard-icons q-px-sm"
+              class="dashboard-icons no-print q-px-sm"
               size="sm"
               no-caps
               icon="add"
@@ -69,15 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
             />
             <AutoRefreshInterval
+              v-if="!isPrintscreen"
               v-model="refreshInterval"
               trigger
               @trigger="refreshData"
-              class="dashboard-icons"
+              class="dashboard-icons no-print"
               size="sm"
             />
             <q-btn
+              v-if="!isPrintscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons no-print q-px-sm q-ml-sm"
               size="sm"
               no-caps
               icon="refresh"
@@ -87,13 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
             <ExportDashboard
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && !isPrintscreen"
+              class="no-print"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && !isPrintscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons no-print q-px-sm q-ml-sm"
               size="sm"
               no-caps
               icon="share"
@@ -102,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
             >
             <q-btn
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && !isPrintscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons no-print q-px-sm q-ml-sm"
               size="sm"
               no-caps
               icon="settings"
@@ -115,7 +120,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons no-print q-px-sm q-ml-sm"
+                size="sm"
+                no-caps
+                :icon="isPrintscreen ? 'close' : 'print'"
+                @click="printDashboard"
+                data-test="dashboard-print-btn"
+                ><q-tooltip>{{
+                  isPrintscreen ? t("common.close") : t("dashboard.print")
+                }}</q-tooltip></q-btn
+              >
+              <q-btn
+                v-if="!isPrintscreen"
+                outline
+                class="dashboard-icons no-print q-px-sm q-ml-sm"
               size="sm"
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
@@ -135,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RenderDashboardCharts
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
-        :viewOnly="false"
+        :viewOnly="isPrintscreen ? true : false"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
@@ -155,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DashboardSettings @refresh="loadDashboard" />
       </q-dialog>
     </div>
+  </div>
   </q-page>
 </template>
 
@@ -205,6 +224,17 @@ export default defineComponent({
       data: {},
     });
 
+    const printscreenDiv = ref(null);
+    const isPrintscreen = ref(false);
+    const printDashboard = () => {
+      if (!isPrintscreen.value) {
+        // Enter printscreen mode
+        isPrintscreen.value = true;
+      } else {
+        // Exit printscreen mode
+        isPrintscreen.value = false;
+      }
+    };
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
@@ -531,13 +561,19 @@ export default defineComponent({
         isFullscreen.value = false;
       }
     };
-
+    const onPrintscreenChange = () => {
+      if (!document.printscreenElement) {
+        isPrintscreen.value = false;
+      }
+    };
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
+      document.addEventListener("printscreenchange", onPrintscreenChange);
     });
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener("printscreenchange", onPrintscreenChange);
     });
 
     onActivated(() => {
@@ -549,6 +585,8 @@ export default defineComponent({
       toggleFullscreen,
       fullscreenDiv,
       isFullscreen,
+      printscreenDiv,
+      isPrintscreen,
       goBackToDashboardList,
       addPanelData,
       t,
@@ -573,12 +611,18 @@ export default defineComponent({
       shareLink,
       selectedTabId,
       onMovePanel,
+      printDashboard,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+@media print {
+  .no-print {
+    display: none;
+  }
+}
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
