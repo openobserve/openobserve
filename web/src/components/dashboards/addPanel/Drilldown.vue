@@ -16,7 +16,20 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">Drilldown</div>
+    <div class="q-mb-sm" style="font-weight: 600">
+      <span>Drilldown</span>
+      <q-btn no-caps padding="xs" class="" size="sm" flat icon="info_outline">
+        <q-tooltip
+          class="bg-grey-8"
+          anchor="bottom middle"
+          self="top middle"
+          max-width="250px"
+        >
+          Navigate to a another dashboard or specified URL, carrying over all
+          current variables for seamless data exploration.
+        </q-tooltip>
+      </q-btn>
+    </div>
     <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
