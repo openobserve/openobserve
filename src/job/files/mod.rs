@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster, ider, meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
+use config::{cluster, ider, meta::stream::StreamType, FILE_EXT_PARQUET};
 
 pub mod broadcast;
 pub mod json;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) || CONFIG.common.ingester_sidecar_querier {
+    if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         return Ok(()); // not an ingester, no need to init job
     }
 
