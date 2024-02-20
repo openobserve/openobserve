@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page :key="store.state.selectedOrganization.identifier">
-    <div ref="printscreenDiv">
     <div
       ref="fullscreenDiv"
       :class="`${isFullscreen ? 'fullscreen' : ''}  ${
@@ -28,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
-        } stickyHeader ${isFullscreen || isPrintscreen ? 'fullscreenHeader' : ''}`"
+        } stickyHeader ${
+          isFullscreen || isPrintscreen ? 'fullscreenHeader' : ''
+        }`"
       >
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
@@ -121,19 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               outline
               class="dashboard-icons no-print q-px-sm q-ml-sm"
-                size="sm"
-                no-caps
-                :icon="isPrintscreen ? 'close' : 'print'"
-                @click="printDashboard"
-                data-test="dashboard-print-btn"
-                ><q-tooltip>{{
-                  isPrintscreen ? t("common.close") : t("dashboard.print")
-                }}</q-tooltip></q-btn
-              >
-              <q-btn
-                v-if="!isPrintscreen"
-                outline
-                class="dashboard-icons no-print q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              :icon="isPrintscreen ? 'close' : 'print'"
+              @click="printDashboard"
+              data-test="dashboard-print-btn"
+              ><q-tooltip>{{
+                isPrintscreen ? t("common.close") : t("dashboard.print")
+              }}</q-tooltip></q-btn
+            >
+            <q-btn
+              v-if="!isPrintscreen"
+              outline
+              class="dashboard-icons no-print q-px-sm q-ml-sm"
               size="sm"
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
@@ -173,7 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DashboardSettings @refresh="loadDashboard" />
       </q-dialog>
     </div>
-  </div>
   </q-page>
 </template>
 
@@ -224,17 +224,26 @@ export default defineComponent({
       data: {},
     });
 
-    const printscreenDiv = ref(null);
     const isPrintscreen = ref(false);
     const printDashboard = () => {
-      if (!isPrintscreen.value) {
-        // Enter printscreen mode
-        isPrintscreen.value = true;
-      } else {
-        // Exit printscreen mode
-        isPrintscreen.value = false;
-      }
+      isPrintscreen.value = !isPrintscreen.value;
+
+      const query = {
+        ...route.query,
+        print: isPrintscreen.value ? "true" : "false",
+      };
+      router.replace({ query });
+
+      document.body.style.overflow = isPrintscreen.value ? "hidden" : "";
     };
+
+    watch(
+      () => route.query.print,
+      (newValue) => {
+        isPrintscreen.value = newValue === "true";
+      }
+    );
+
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
@@ -585,7 +594,6 @@ export default defineComponent({
       toggleFullscreen,
       fullscreenDiv,
       isFullscreen,
-      printscreenDiv,
       isPrintscreen,
       goBackToDashboardList,
       addPanelData,
