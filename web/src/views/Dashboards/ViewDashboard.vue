@@ -235,13 +235,6 @@ export default defineComponent({
       router.replace({ query });
     };
 
-    watch(
-      () => route.query.print,
-      (newValue) => {
-        isPrintscreen.value = newValue === "true";
-      }
-    );
-
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
@@ -281,6 +274,7 @@ export default defineComponent({
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
+          print: isPrintscreen.value ? "true" : "false",
         },
       });
     };
@@ -436,6 +430,16 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
 
+      if (params.print !== undefined) {
+        isPrintscreen.value = params.print === "true" ? true : false;
+      } else {
+        router.replace({
+          query: {
+            ...route.query,
+            print: isPrintscreen.value ? "true" : "false",
+          },
+        });
+      }
       // This is removed due to the bug of the new date time component
       // and is now rendered when the setup method is called
       // instead of onActivated
@@ -458,6 +462,7 @@ export default defineComponent({
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          print: isPrintscreen.value ? "true" : "false",
         },
       });
     });
