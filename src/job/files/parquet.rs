@@ -389,7 +389,7 @@ async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            create_index_file_on_ingester(
+            generate_index_on_ingester(
                 buf,
                 new_file_key.clone(),
                 min_ts,
@@ -405,7 +405,7 @@ async fn merge_files(
 }
 
 /// Create an inverted index file for the given file
-pub(crate) async fn create_index_file_on_ingester(
+pub(crate) async fn generate_index_on_ingester(
     buf: Bytes,
     new_file_key: String,
     min_ts: i64,
@@ -413,60 +413,9 @@ pub(crate) async fn create_index_file_on_ingester(
     stream_name: &str,
     schema: SchemaRef,
 ) -> Result<String, anyhow::Error> {
-    let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
-        .unwrap()
-        .build()
-        .unwrap();
-
-    let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
-    let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema.clone(), vec![batches])?;
-    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
-
-    let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
-    let columns_to_index = if !fts_fields.is_empty() {
-        fts_fields
-    } else {
-        SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-    };
-
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
-    let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
-
-    let mut indexed_record_batches_to_merge = Vec::new();
-    for column in columns_to_index.iter() {
-        let index_df = ctx.table("_tbl_raw_data").await?;
-        if !index_df.schema().has_column_with_unqualified_name(column) {
-            continue;
-        }
-        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
-        let record_batch = index_df
-            .with_column("terms", split_arr)?
-            .unnest_column("terms")?
-            .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
-            .with_column("file_name", lit(file_name_without_prefix))?
-            .aggregate(
-                vec![col("term"), col("file_name")],
-                vec![
-                    min(col("_timestamp")).alias("_timestamp"),
-                    count(col("term")).alias("count"),
-                ],
-            )?
-            .with_column("character_len", character_length(col("term")))?
-            .with_column("deleted", lit(false))?
-            .filter(col("character_len").gt_eq(lit(3)))?
-            .select_columns(&["term", "file_name", "_timestamp", "count", "deleted"])?
-            .collect()
-            .await?;
-
-        indexed_record_batches_to_merge.push(record_batch);
-    }
-
-    let record_batches: Vec<arrow::record_batch::RecordBatch> = indexed_record_batches_to_merge
-        .into_iter()
-        .flatten()
-        .collect();
+    let index_record_batches =
+        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
+    let record_batches = index_record_batches.into_iter().flatten().collect();
 
     let hour_key = get_wal_time_key(
         min_ts,
@@ -487,13 +436,12 @@ pub(crate) async fn create_index_file_on_ingester(
         &hour_key,
     )
     .await?;
-    ctx.deregister_table("_tbl_raw_data")?;
     log::warn!("[INGESTER:JOB] Written index file successfully");
     Ok(arrow_file_name)
 }
 
 /// Create an inverted index file for the given file
-pub(crate) async fn create_index_file_on_compactor(
+pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &Vec<FileKey>,
     buf: Bytes,
     new_file_key: String,
@@ -501,26 +449,95 @@ pub(crate) async fn create_index_file_on_compactor(
     stream_name: &str,
     schema: SchemaRef,
 ) -> Result<(String, FileMeta), anyhow::Error> {
+    let mut index_record_batches =
+        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
+
+    let schema = if let Some(first_batch) = index_record_batches.first() {
+        first_batch[0].schema()
+    } else {
+        return Err(anyhow::anyhow!("No record batches found".to_string(),));
+    };
+
+    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let len_of_columns_to_invalidate = file_list_to_invalidate.len();
+    let empty_terms: ArrayRef = Arc::new(StringArray::from(vec![
+        None::<String>;
+        len_of_columns_to_invalidate
+    ]));
+    let file_names: ArrayRef = Arc::new(StringArray::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.key.trim_start_matches(&prefix_to_remove).to_string())
+            .collect::<Vec<String>>(),
+    ));
+    let _timestamp: ArrayRef = Arc::new(Int64Array::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.meta.min_ts)
+            .collect::<Vec<i64>>(),
+    ));
+    let count: ArrayRef = Arc::new(Int64Array::from(vec![
+        None::<i64>;
+        len_of_columns_to_invalidate
+    ]));
+    let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
+    let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
+    let batch = RecordBatch::try_new(schema.into(), columns).unwrap();
+    index_record_batches.push(vec![batch]);
+
+    let record_batches_flattened = index_record_batches.into_iter().flatten().collect();
+
+    let original_file_size = 0; // The file never existed before this function was called
+    let (filename, filemeta, _stream_type) = write_to_disk(
+        record_batches_flattened,
+        original_file_size,
+        org_id,
+        stream_name,
+        StreamType::Index,
+        &new_file_key,
+        "index_creator",
+    )
+    .await?;
+
+    log::warn!("[COMPACTOR:JOB] Written index file successfully");
+    Ok((filename, filemeta))
+}
+
+/// Prepares index record batches from the provided Parquet file buffer.
+///
+/// Reads the Parquet data into record batches. Registers the batches as a table.
+/// Generates an index record batch for each text column, by splitting into terms,
+/// filtering, aggregating, etc. Returns the generated index record batches.
+///
+/// # Arguments
+/// * `buf` - The Parquet file buffer with actual data.
+/// * `schema` - The schema of the Parquet file.
+/// * `org_id` - The organization ID.
+/// * `stream_name` - The stream name.
+/// * `new_file_key` - The new file key which is used to generate the index file.
+async fn prepare_index_record_batches(
+    buf: Bytes,
+    schema: Arc<Schema>,
+    org_id: &str,
+    stream_name: &str,
+    new_file_key: &String,
+) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
         .unwrap()
         .build()
         .unwrap();
-
     let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
     let ctx = SessionContext::new();
     let provider = MemTable::try_new(schema.clone(), vec![batches])?;
     ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
-
     let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
     let columns_to_index = if !fts_fields.is_empty() {
         fts_fields
     } else {
         SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
     };
-
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
-
     let mut indexed_record_batches_to_merge = Vec::new();
     for column in columns_to_index.iter() {
         let index_df = ctx.table("_tbl_raw_data").await?;
@@ -550,57 +567,6 @@ pub(crate) async fn create_index_file_on_compactor(
 
         indexed_record_batches_to_merge.push(record_batch);
     }
-
-    let schema = if let Some(first_batch) = indexed_record_batches_to_merge.first() {
-        first_batch[0].schema()
-    } else {
-        return Err(anyhow::anyhow!("No record batches found".to_string(),));
-    };
-
-    let len_of_columns_to_invalidate = file_list_to_invalidate.len();
-    let empty_terms: ArrayRef = Arc::new(StringArray::from(vec![
-        None::<String>;
-        len_of_columns_to_invalidate
-    ]));
-    let file_names: ArrayRef = Arc::new(StringArray::from(
-        file_list_to_invalidate
-            .iter()
-            .map(|x| x.key.trim_start_matches(&prefix_to_remove).to_string())
-            .collect::<Vec<String>>(),
-    ));
-    let _timestamp: ArrayRef = Arc::new(Int64Array::from(
-        file_list_to_invalidate
-            .iter()
-            .map(|x| x.meta.min_ts)
-            .collect::<Vec<i64>>(),
-    ));
-    let count: ArrayRef = Arc::new(Int64Array::from(vec![
-        None::<i64>;
-        len_of_columns_to_invalidate
-    ]));
-    let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
-    let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
-    let batch = RecordBatch::try_new(schema.into(), columns).unwrap();
-    indexed_record_batches_to_merge.push(vec![batch]);
-
-    let record_batches: Vec<arrow::record_batch::RecordBatch> = indexed_record_batches_to_merge
-        .into_iter()
-        .flatten()
-        .collect();
-
-    let original_file_size = 0; // The file never existed before this function was called
-    let (filename, filemeta, _stream_type) = write_to_disk(
-        record_batches,
-        original_file_size,
-        org_id,
-        stream_name,
-        StreamType::Index,
-        &new_file_key,
-        "index_creator",
-    )
-    .await?;
-
     ctx.deregister_table("_tbl_raw_data")?;
-    log::warn!("[INGESTER:JOB] Written index file successfully");
-    Ok((filename, filemeta))
+    Ok(indexed_record_batches_to_merge)
 }

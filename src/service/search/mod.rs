@@ -329,7 +329,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             &stream_settings.partition_keys,
         )
         .await;
-        log::warn!("searching in get_file_list_len for STREAM_TYPE {} {:?}", stream_type, file_list.len());
+        log::warn!(
+            "searching in get_file_list_len for STREAM_TYPE {} {:?}",
+            stream_type,
+            file_list.len()
+        );
         for f in file_list.iter() {
             log::warn!("searching in get_file_list {:?}", f.key);
         }
