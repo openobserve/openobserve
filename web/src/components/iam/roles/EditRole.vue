@@ -210,13 +210,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="q-mb-md text-bold">
                   {{ selectedPermissionsHash.size }} Permission
                 </div>
-                <div class="flex items-center cursor-pointer">
+                <div
+                  class="flex items-center cursor-pointer"
+                  :title="t('menu.help')"
+                  @click="toggleHelpSection"
+                >
                   <q-icon name="help" size="17px" />
                   <span class="q-ml-xs"> Help </span>
                 </div>
               </div>
               <div class="flex no-wrap">
-                <div style="width: calc(100% - 350px)">
+                <div
+                  :style="
+                    isHelpOpen
+                      ? { width: 'calc(100% - 350px)' }
+                      : { width: '100%' }
+                  "
+                >
                   <PermissionsJSON
                     ref="permissionJsonEditorRef"
                     v-model:query="permissionsJsonValue"
@@ -224,9 +234,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: calc(100vh - 328px)"
                   />
                 </div>
-                <div style="width: 350px" class="q-pa-sm">
-                  <div style="font-size: 16px">Quick Reference</div>
-                  <div class="q-mt-sm">
+                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
+                  <div class="flex justify-between items-center q-px-sm">
+                    <div style="font-size: 16px">Quick Reference</div>
+                    <q-icon
+                      class="cursor-pointer"
+                      name="close"
+                      size="14px"
+                      :title="t('common.close')"
+                      @click="toggleHelpSection"
+                    />
+                  </div>
+                  <q-separator class="q-mt-sm q-mb-md" />
+                  <div class="q-mt-sm q-px-sm">
                     <div>
                       Configure access with JSON objects specifying "object"
                       (resource) and "permission" (access level).
@@ -334,6 +354,8 @@ const router = useRouter();
 const q = useQuasar();
 
 const store = useStore();
+
+const isHelpOpen = ref(false);
 
 const permissionJsonEditorRef: any = ref(null);
 
@@ -1864,6 +1886,15 @@ const updateEntityPermission = (
         );
       }
     });
+};
+
+const toggleHelpSection = async () => {
+  isHelpOpen.value = !isHelpOpen.value;
+
+  await nextTick();
+  await nextTick();
+
+  permissionJsonEditorRef.value.resetEditorLayout();
 };
 </script>
 <style scoped></style>
