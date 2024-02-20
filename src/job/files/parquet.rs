@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use arrow::{
-    array::{ArrayRef, BooleanArray, Int32Array, Int64Array, StringArray},
+    array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
 };
 use arrow_schema::{Schema, SchemaRef};
@@ -47,10 +47,7 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
-        ingestion::{
-            get_wal_time_key,
-            index_writer::{write_file_arrow, write_file_parquet},
-        },
+        ingestion::{get_wal_time_key, index_writer::write_file_arrow},
         search::datafusion::exec::merge_parquet_files,
         stream::{self, get_stream_setting_fts_fields},
     },
