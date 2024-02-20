@@ -117,8 +117,19 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(status::healthz);
     cfg.service(
         web::scope("/auth")
-            .wrap(cors)
+            .wrap(cors.clone())
             .service(users::authentication),
+    );
+
+    cfg.service(
+        web::scope("/node")
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::oo_validator,
+            ))
+            .wrap(cors)
+            .service(status::cache_status)
+            .service(status::enable_node)
+            .service(status::flush_node),
     );
 
     cfg.service(
@@ -200,9 +211,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
-            .service(status::cache_status)
-            .service(status::enable_node)
-            .service(status::flush_node)
             .service(users::list)
             .service(users::save)
             .service(users::delete)

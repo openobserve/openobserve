@@ -20,14 +20,13 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::infra::cluster;
 
-const QUERIER_ROUTES: [&str; 13] = [
+const QUERIER_ROUTES: [&str; 12] = [
     "/summary",
     "/schema",
     "/streams",
     "/_search",
     "/_around",
     "/_values",
-    "/api/cache/status",
     "/prometheus/api/v1/series",
     "/prometheus/api/v1/query_range",
     "/prometheus/api/v1/query",
@@ -36,7 +35,7 @@ const QUERIER_ROUTES: [&str; 13] = [
     "/prometheus/api/v1/label/",
 ];
 
-const FIXED_QUERIER_ROUTES: [&str; 4] = ["/summary", "/schema", "/streams", "/api/cache/status"];
+const FIXED_QUERIER_ROUTES: [&str; 3] = ["/summary", "/schema", "/streams"];
 
 #[inline]
 fn check_querier_route(path: &str) -> bool {
