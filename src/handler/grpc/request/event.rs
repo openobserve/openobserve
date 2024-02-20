@@ -93,7 +93,7 @@ impl Event for Eventer {
                     continue; // not this node
                 }
                 // maybe load already merged file, no need report error
-                _ = infra::cache::file_data::memory::download("download", &item.key).await;
+                _ = infra::cache::file_data::download("download", &item.key).await;
             }
         }
 
