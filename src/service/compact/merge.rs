@@ -31,7 +31,7 @@ use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::{create_index_file_on_compactor, create_index_file_on_ingester},
+    job::files::parquet::{generate_index_on_compactor, generate_index_on_ingester},
     service::{db, file_list, search::datafusion, stream},
 };
 
@@ -547,7 +547,7 @@ async fn merge_files(
         Ok(_) => {
             if stream_type == StreamType::Logs {
                 log::warn!("Stream type is LOGS, lets create a new index file");
-                let (index_file_name, filemeta) = create_index_file_on_compactor(
+                let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
                     buf,
                     new_file_key.clone(),
