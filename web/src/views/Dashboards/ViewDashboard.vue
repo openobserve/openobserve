@@ -233,8 +233,6 @@ export default defineComponent({
         print: isPrintscreen.value ? "true" : "false",
       };
       router.replace({ query });
-
-      document.body.style.overflow = isPrintscreen.value ? "hidden" : "";
     };
 
     watch(
