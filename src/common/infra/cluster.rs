@@ -117,7 +117,7 @@ pub async fn register_and_keepalive() -> Result<()> {
             }
 
             if need_online_again {
-                if let Err(e) = set_online().await {
+                if let Err(e) = set_online(true).await {
                     log::error!("[CLUSTER] Set node online failed: {}", e);
                     continue;
                 }
@@ -232,7 +232,7 @@ pub async fn register() -> Result<()> {
 }
 
 /// set online to cluster
-pub async fn set_online() -> Result<()> {
+pub async fn set_online(new_lease_id: bool) -> Result<()> {
     if CONFIG.common.local_mode {
         return Ok(());
     }
@@ -272,17 +272,20 @@ pub async fn set_online() -> Result<()> {
     NODES.insert(LOCAL_NODE_UUID.clone(), node.clone());
     let val = json::to_string(&node).unwrap();
 
-    // get new lease id
-    let mut client = etcd::get_etcd_client().await.clone();
-    let resp = client
-        .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
-        .await?;
-    let lease_id = resp.id();
-    // update local node key lease id
-    unsafe {
-        LOCAL_NODE_KEY_LEASE_ID = lease_id;
+    if new_lease_id {
+        // get new lease id
+        let mut client = etcd::get_etcd_client().await.clone();
+        let resp = client
+            .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
+            .await?;
+        let lease_id = resp.id();
+        // update local node key lease id
+        unsafe {
+            LOCAL_NODE_KEY_LEASE_ID = lease_id;
+        }
     }
 
+    let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let _resp = client.put(key, val, Some(opt)).await?;
@@ -493,7 +496,7 @@ mod tests {
     #[tokio::test]
     async fn test_cluster() {
         register_and_keepalive().await.unwrap();
-        set_online().await.unwrap();
+        set_online(false).await.unwrap();
         leave().await.unwrap();
         assert!(get_cached_online_nodes().is_some());
         assert!(get_cached_online_query_nodes().is_some());
