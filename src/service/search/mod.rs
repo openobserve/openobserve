@@ -37,7 +37,6 @@ use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},
 };
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -272,8 +271,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
-            "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            // "SELECT file_name, _count FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
+            // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
+            "SELECT file_name, _count FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
             meta.stream_name, search_condition
         );
 
@@ -305,13 +304,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .collect::<HashSet<_>>();
 
         log::warn!("searching in unique_files_len {:?}", unique_files.len());
-        for f in unique_files.iter() {
-            log::warn!("[{}] searching in get_file_list {:?}", stream_type, f);
-        }
+
         for filename in unique_files {
             let prefixed_filename = format!(
                 "files/{}/logs/{}/{}",
                 meta.org_id, meta.stream_name, filename
+            );
+            log::warn!(
+                "[{}] searching in get_file_list {:?}",
+                stream_type,
+                prefixed_filename
             );
             if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
                 idx_file_list.push(FileKey {
@@ -341,7 +343,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             file_list.len()
         );
         for f in file_list.iter() {
-            log::warn!("[{}] get_file_list: searching in get_file_list {:?}", stream_type, f.key);
+            log::warn!(
+                "[{}] get_file_list: searching in get_file_list {:?}",
+                stream_type,
+                f.key
+            );
         }
 
         file_list

@@ -31,7 +31,7 @@ use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::{generate_index_on_compactor, generate_index_on_ingester},
+    job::files::parquet::generate_index_on_compactor,
     service::{db, file_list, search::datafusion, stream},
 };
 

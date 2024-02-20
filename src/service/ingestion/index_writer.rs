@@ -20,10 +20,7 @@ use chrono::Utc;
 use config::meta::stream::{PartitionTimeLevel, StreamType};
 
 use crate::{
-    common::{
-        infra::wal::{get_or_create, get_or_create_arrow},
-        meta::stream::StreamParams,
-    },
+    common::{infra::wal::get_or_create_arrow, meta::stream::StreamParams},
     service::{db, schema::stream_schema_exists},
 };
 
@@ -67,56 +64,6 @@ pub async fn write_file_arrow(
             Some(PartitionTimeLevel::Hourly),
             hour_key,
             Some(batch.schema().as_ref().clone()),
-        )
-        .await;
-        fname = rw_file.name().to_string();
-        // log::warn!("Multiple files: {}", fname);
-
-        rw_file.write_arrow(batch).await;
-    }
-    log::warn!("Wrote file: {}", fname);
-    Ok(fname.to_string())
-}
-
-pub async fn write_file_parquet(
-    buf: Vec<RecordBatch>,
-    thread_id: usize,
-    stream: &StreamParams,
-    hour_key: &str,
-) -> Result<String, anyhow::Error> {
-    let mut schema_map: HashMap<String, Schema> = HashMap::new();
-    let schema_chk = stream_schema_exists(
-        stream.org_id.as_str(),
-        stream.stream_name.as_str(),
-        StreamType::Index,
-        &mut schema_map,
-    )
-    .await;
-
-    let mut i = 0;
-
-    let mut fname = "".to_string();
-    for batch in buf {
-        if i == 0 {
-            if !schema_chk.has_fields {
-                db::schema::set(
-                    stream.org_id.as_str(),
-                    stream.stream_name.as_str(),
-                    StreamType::Index,
-                    batch.schema().as_ref(),
-                    Some(Utc::now().timestamp_micros()),
-                    false,
-                )
-                .await
-                .unwrap();
-            };
-        }
-        i += 1;
-        let rw_file = get_or_create(
-            thread_id,
-            stream.clone(),
-            Some(PartitionTimeLevel::Hourly),
-            hour_key,
         )
         .await;
         fname = rw_file.name().to_string();

@@ -25,7 +25,7 @@ use config::{
         file::{get_file_contents, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_bytes},
     },
-    CONFIG, FILE_EXT_ARROW, FILE_EXT_PARQUET,
+    CONFIG, FILE_EXT_ARROW,
 };
 use datafusion::{
     arrow::{datatypes::Schema, record_batch::RecordBatch},
