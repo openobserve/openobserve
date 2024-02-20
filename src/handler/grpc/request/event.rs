@@ -92,8 +92,7 @@ impl Event for Eventer {
                 if LOCAL_NODE_UUID.ne(&node) {
                     continue; // not this node
                 }
-                // maybe load already merged file, no need report error
-                _ = infra::cache::file_data::memory::download("download", &item.key).await;
+                _ = infra::cache::file_data::download("download", &item.key).await;
             }
         }
 
