@@ -336,7 +336,7 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
 
-        const streamTypes = ["logs", "metrics", "traces"];
+        const streamTypes = ["logs", "metrics", "traces", "metadata"];
         let counter = 1;
         streamTypes.forEach((type) => {
           getStreams(type, false)
