@@ -367,7 +367,7 @@ export default defineComponent({
                   };
                 })
               );
-              duplicateStreamList.value = cloneDeep(logStream.value);
+              duplicateStreamList.value = JSON.parse(JSON.stringify(logStream.value));
 
               logStream.value.forEach((element: any) => {
                 if (element.name == router.currentRoute.value.query.dialog) {
@@ -518,7 +518,7 @@ export default defineComponent({
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
       logStream.value = filterData(
-        cloneDeep(duplicateStreamList.value),
+        JSON.parse(JSON.stringify(duplicateStreamList.value)),
         filterQuery.value.toLowerCase()
       );
       resultTotal.value = logStream.value.length;
