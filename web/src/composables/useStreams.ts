@@ -16,6 +16,7 @@
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { reactive } from "vue";
+import { ref } from "vue";
 
 let streams: any = reactive({});
 
@@ -24,6 +25,8 @@ let streamsIndexMapping: any = reactive({
     stream1: 0,
   },
 });
+
+const areAllStreamsFetched = ref(false);
 
 const useStreams = () => {
   const store = useStore();
@@ -37,11 +40,7 @@ const useStreams = () => {
 
     let isStreamFetched = false;
     if (streamName === "all") {
-      isStreamFetched =
-        streams["logs"] &&
-        streams["metrics"] &&
-        streams["traces"] &&
-        streams["enrichment_tables"];
+      isStreamFetched = areAllStreamsFetched.value;
     } else {
       isStreamFetched = !!streams[streamName];
     }
@@ -54,6 +53,8 @@ const useStreams = () => {
           schema
         )
           .then((res: any) => {
+            if (streamName === "all") areAllStreamsFetched.value = true;
+
             if (
               !store.state.organizationData.isDataIngested &&
               !!res.data.list.length
@@ -67,13 +68,7 @@ const useStreams = () => {
 
             // If the stream name is all, then we need to store each type of stream separately manually
             if (streamName === "all") {
-              const streams: {
-                [key: string]: {
-                  name: string;
-                  list: any;
-                  schema: boolean;
-                };
-              } = {};
+              streams = reactive({});
 
               res.data.list.forEach((stream: any) => {
                 if (streams[stream.stream_type]) {
@@ -82,13 +77,9 @@ const useStreams = () => {
                   streams[stream.stream_type] = {
                     name: stream.stream_type,
                     list: [stream],
-                    schema: schema,
+                    schema: false,
                   };
                 }
-              });
-
-              Object.values(streams).forEach((stream: any) => {
-                streams[stream.name] = stream;
               });
             } else {
               streams[streamName] = streamObject;
@@ -232,6 +223,15 @@ const useStreams = () => {
   };
 
   const setStreams = (streamName: string = "all", streamList: any[] = []) => {
+    let isStreamFetched = false;
+    if (streamName === "all") {
+      isStreamFetched = areAllStreamsFetched.value;
+    } else {
+      isStreamFetched = !!streams[streamName];
+    }
+
+    if (isStreamFetched) return;
+
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
       store.dispatch("setIsDataIngested", !!streamList.length);
 
