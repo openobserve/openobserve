@@ -159,7 +159,10 @@ impl Writer {
     pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
-        if self.check_threshold(wal.size(), entry_bytes.len()).await {
+        let mut mem = self.memtable.write().await;
+        if self.check_wal_threshold(wal.size(), entry_bytes.len())
+            || self.check_mem_threshold(mem.size(), entry.data_size)
+        {
             // sync wal before rotation
             wal.sync().context(WalSnafu)?;
             // rotation wal
@@ -185,13 +188,11 @@ impl Writer {
             );
 
             // rotation memtable
-            let mut mem = self.memtable.write().await;
             let new_mem = MemTable::new();
             let old_mem = std::mem::replace(&mut *mem, new_mem);
             // update created_at
             self.created_at
                 .store(Utc::now().timestamp_micros(), Ordering::Release);
-            drop(mem);
 
             let thread_id = self.thread_id;
             let key = self.key.clone();
@@ -222,7 +223,7 @@ impl Writer {
         wal.write(&entry_bytes, false).context(WalSnafu)?;
 
         // write into memtable
-        self.memtable.write().await.write(schema, entry).await?;
+        mem.write(schema, entry).await?;
         Ok(())
     }
 
@@ -263,16 +264,23 @@ impl Writer {
     }
 
     /// Check if the wal file size is over the threshold or the file is too old
-    async fn check_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
-        let (compressed_size, uncompressed_size) = written_size;
+    fn check_wal_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
+        let (compressed_size, _uncompressed_size) = written_size;
         compressed_size > 0
             && (compressed_size + data_size > CONFIG.limit.max_file_size_on_disk
-                || uncompressed_size + data_size > CONFIG.limit.max_file_size_in_memory
                 || self.created_at.load(Ordering::Relaxed)
                     + Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
                         .num_microseconds()
                         .unwrap()
                     <= Utc::now().timestamp_micros())
+    }
+
+    /// Check if the memtable size is over the threshold
+    fn check_mem_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
+        let (json_size, arrow_size) = written_size;
+        json_size > 0
+            && (json_size + data_size > CONFIG.limit.max_file_size_in_memory
+                || arrow_size + data_size > CONFIG.limit.max_file_size_in_memory)
     }
 }
 
