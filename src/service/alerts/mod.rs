@@ -942,6 +942,27 @@ async fn process_dest_template(
             }
         }
     }
+
+    // Hack time range for alert url
+    alert_end_time = if alert_end_time == 0 {
+        Utc::now().timestamp_micros()
+    } else {
+        // the frontend will drop the second, so we add 1 minute to the end time
+        alert_end_time + Duration::minutes(1).num_microseconds().unwrap()
+    };
+    if alert_start_time == 0 {
+        alert_start_time = alert_end_time
+            - Duration::minutes(alert.trigger_condition.period)
+                .num_microseconds()
+                .unwrap();
+    }
+    if alert_end_time - alert_start_time < Duration::minutes(1).num_microseconds().unwrap() {
+        alert_start_time = alert_end_time
+            - Duration::minutes(alert.trigger_condition.period)
+                .num_microseconds()
+                .unwrap();
+    }
+
     let alert_start_time_str = if alert_start_time > 0 {
         Local
             .timestamp_nanos(alert_start_time * 1000)
@@ -964,26 +985,6 @@ async fn process_dest_template(
     } else {
         "scheduled"
     };
-
-    // Hack time range for alert url
-    alert_end_time = if alert_end_time == 0 {
-        Utc::now().timestamp_micros()
-    } else {
-        // the frontend will drop the second, so we add 1 minute to the end time
-        alert_end_time + Duration::minutes(1).num_microseconds().unwrap()
-    };
-    if alert_start_time == 0 {
-        alert_start_time = alert_end_time
-            - Duration::minutes(alert.trigger_condition.period)
-                .num_microseconds()
-                .unwrap();
-    }
-    if alert_end_time - alert_start_time < Duration::minutes(1).num_microseconds().unwrap() {
-        alert_start_time = alert_end_time
-            - Duration::minutes(alert.trigger_condition.period)
-                .num_microseconds()
-                .unwrap();
-    }
 
     let mut alert_query = String::new();
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
