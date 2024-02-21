@@ -249,7 +249,6 @@ impl RwFile {
         let (file, arrow_file) = if use_arrow {
             let file_path = format!("{dir_path}{file_name}");
             let file = std::fs::OpenOptions::new()
-                .write(true)
                 .create(true)
                 .append(true)
                 .open(file_path)

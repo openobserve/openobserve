@@ -425,7 +425,7 @@ pub(crate) async fn generate_index_on_ingester(
     let arrow_file_name = write_file_arrow(
         record_batches,
         0,
-        &&StreamParams {
+        &StreamParams {
             org_id: org_id.to_string().into(),
             stream_name: stream_name.to_string().into(),
             stream_type: StreamType::Index,
@@ -439,7 +439,7 @@ pub(crate) async fn generate_index_on_ingester(
 
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_compactor(
-    file_list_to_invalidate: &Vec<FileKey>,
+    file_list_to_invalidate: &[FileKey],
     buf: Bytes,
     new_file_key: String,
     org_id: &str,
@@ -479,7 +479,7 @@ pub(crate) async fn generate_index_on_compactor(
     ]));
     let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
     let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
-    let batch = RecordBatch::try_new(schema.into(), columns).unwrap();
+    let batch = RecordBatch::try_new(schema, columns).unwrap();
     index_record_batches.push(vec![batch]);
 
     let record_batches_flattened = index_record_batches.into_iter().flatten().collect();
@@ -517,7 +517,7 @@ async fn prepare_index_record_batches(
     schema: Arc<Schema>,
     org_id: &str,
     stream_name: &str,
-    new_file_key: &String,
+    new_file_key: &str,
 ) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
     let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
         .unwrap()
