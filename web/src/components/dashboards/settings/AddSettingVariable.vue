@@ -458,6 +458,10 @@ export default defineComponent({
       useSelectAutoComplete(toRef(data, "currentFieldsList"), "name");
 
     const streamTypeUpdated = async () => {
+      // reset the stream and field
+      variableData.query_data.stream = "";
+      variableData.query_data.field = "";
+
       const streamType = variableData?.query_data?.stream_type;
 
       // get all streams from current stream type
@@ -467,30 +471,25 @@ export default defineComponent({
     };
 
     const streamUpdated = async () => {
-      const stream = variableData?.query_data?.stream;
+      // reset field list value
+      variableData.query_data.field = "";
 
-      console.log(stream, "settings stream");
+      try {
+        // get schema of that field using getstream
+        const fieldWithSchema: any = await getStream(
+          variableData?.query_data?.stream,
+          variableData.query_data.stream_type,
+          true
+        );
 
-      // here need to get the fields from the stream using usestreams
-      // try {
-      //   // get schema of that field using getstream
-      //   const fieldWithSchema: any = await getStream(
-      //     fields.name,
-      //     fields.stream_type,
-      //     true
-      //   );
-
-      //   // assign the schema
-      //   data.currentFieldsList = fieldWithSchema?.schema ?? [];
-      // } catch (error: any) {
-      //   $q.notify({
-      //     type: "negative",
-      //     message: error ?? "Failed to get stream fields",
-      //   });
-      // }
-      // data.currentFieldsList =
-      //   data.schemaResponse.find((item: any) => item.name === stream)?.schema ||
-      //   [];
+        // assign the schema
+        data.currentFieldsList = fieldWithSchema?.schema ?? [];
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error ?? "Failed to get stream fields",
+        });
+      }
     };
 
     const close = () => {
