@@ -274,9 +274,9 @@ export default defineComponent({
     const formDirtyFlag = ref(false);
 
     const streamIndexType = [
-      { label: "Hash based partition", value: "fullTextSearchKey" },
+      { label: "Hash based partition", value: "hashPartition" },
       { label: "Key based partition", value: "partitionKey" },
-      { label: "Inverted index", value: "intertedIndex" },
+      { label: "Raw Full Text Search", value: "fullTextSearchKey" },
       { label: "Bloom filter", value: "bloomFilterKey" },
     ];
     const { getStream } = useStreams();
@@ -449,10 +449,20 @@ export default defineComponent({
             field: property.name,
             types: "value",
           });
+        } else if (property.level && property.index_type === "hashPartition") {
+          settings.partition_keys.push({
+            field: property.name,
+            types: "hash",
+          });
         } else if (property.index_type === "partitionKey") {
           added_part_keys.push({
             field: property.name,
             types: "value",
+          });
+        } else if (property.index_type === "hashPartition") {
+          added_part_keys.push({
+            field: property.name,
+            types: "hash",
           });
         }
 
