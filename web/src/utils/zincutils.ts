@@ -98,8 +98,8 @@ export const getUserInfo = (loginString: string) => {
         const encodedSessionData = b64EncodeUnicode(JSON.stringify(decToken));
 
         useLocalUserInfo(encodedSessionData);
-        useLocalToken(propArr[1]);
-      } else if (propArr[0] == "access_token") {
+        useLocalToken("Bearer " + propArr[1]);
+      } else if (propArr[0] == "access_token" && useLocalToken()?.value == "") {
         useLocalStorage("access_token", "Bearer " + propArr[1], false, false);
       }
       if (propArr[0] == "refresh_token") {

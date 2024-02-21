@@ -25,7 +25,7 @@ export const getDefaultOrganization = async (
   org_identifier: any
 ) => {
   await organizationsService
-    .os_list(0, 1000, "id", false, "", org_identifier)
+    .os_list(0, 100000, "id", false, "", org_identifier)
     .then((res: any) => {
       const localOrg: any = useLocalOrganization();
       if (

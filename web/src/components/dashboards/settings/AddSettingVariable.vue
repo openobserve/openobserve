@@ -281,6 +281,7 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useQuasar } from "quasar";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -303,6 +304,8 @@ export default defineComponent({
     });
     const route = useRoute();
     const title = ref("Add Variable");
+    const { getStreams } = useStreams();
+
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -341,7 +344,7 @@ export default defineComponent({
     const editMode = ref(false);
 
     onMounted(async () => {
-      getStreamList();
+      await getStreamList();
 
       if (props.variableName) {
         editMode.value = true;
@@ -433,13 +436,9 @@ export default defineComponent({
         });
       });
     };
-    const getStreamList = () => {
-      IndexService.nameList(
-        store.state.selectedOrganization.identifier,
-        "",
-        true
-      ).then((res) => {
-        data.schemaResponse = res.data?.list || [];
+    const getStreamList = async () => {
+      await getStreams("", false).then((res) => {
+        data.schemaResponse = res.list || [];
         if (editMode.value) {
           // set the dropdown values
           streamTypeUpdated();
@@ -466,6 +465,7 @@ export default defineComponent({
 
     const streamUpdated = () => {
       const stream = variableData?.query_data?.stream;
+      // here need to get the fields from the stream using usestreams
       data.currentFieldsList =
         data.schemaResponse.find((item: any) => item.name === stream)?.schema ||
         [];

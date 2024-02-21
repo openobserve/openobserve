@@ -53,7 +53,7 @@ export default defineComponent({
      */
     const getDefaultOrganization = () => {
       organizationsService
-        .os_list(0, 1000, "id", false, "")
+        .os_list(0, 100000, "id", false, "")
         .then((res: any) => {
           const localOrg: any = useLocalOrganization();
           if (
