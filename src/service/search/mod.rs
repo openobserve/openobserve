@@ -280,7 +280,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         log::warn!("Incoming request {:?}", idx_req);
 
         // Check if this is the first page i.e. first request, from will always be `0` in that case
-        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
 
         log::warn!("searching in terms {:?}", terms);
         idx_req.stream_type = StreamType::Index.to_string();
