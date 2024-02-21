@@ -409,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             clearable
             debounce="1"
+            :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
           >
             <template #prepend>
@@ -496,12 +497,38 @@ export default defineComponent({
       )?.metrics_meta?.metric_type;
     });
 
-    const streamDataLoading = useLoading(async () => {
-      await getStreamList();
+    const streamDataLoading = useLoading(async (stream_type: any) => {
+      console.log("stream_type streamDataLoading", stream_type);
+      await getStreamList(stream_type);
     });
+
+    const loadStreamsListBasedOnType = async () => {
+      streamDataLoading.execute(
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type
+      );
+    };
+
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
+      async () => {
+        loadStreamsListBasedOnType();
+      }
+    );
+
     onMounted(() => {
-      streamDataLoading.execute();
+      loadStreamsListBasedOnType();
     });
+
+    const getStreamFields = useLoading(
+      async (fieldName: string, streamType: string) => {
+        return await getStream(fieldName, streamType, true);
+      }
+    );
 
     // update the selected stream fields list
     watch(
@@ -532,7 +559,7 @@ export default defineComponent({
         if (fields) {
           try {
             // get schema of that field using getstream
-            const fieldWithSchema: any = await getStream(
+            const fieldWithSchema: any = await getStreamFields.execute(
               fields.name,
               fields.stream_type,
               true
@@ -630,8 +657,12 @@ export default defineComponent({
     );
 
     // get the stream list by making an API call
-    const getStreamList = async () => {
-      await getStreams("", false).then((res: any) => {
+    const getStreamList = async (stream_type: any) => {
+      await getStreams(stream_type, false).then((res: any) => {
+        console.log("stream typeeee", stream_type);
+
+        console.log(res, "streams");
+
         data.schemaList = res.list;
         dashboardPanelData.meta.stream.streamResults = res.list;
       });
@@ -709,6 +740,7 @@ export default defineComponent({
       addFilteredItem,
       data,
       getStreamList,
+      getStreamFields,
       dashboardPanelData,
       filterStreamFn,
       filteredStreams,
