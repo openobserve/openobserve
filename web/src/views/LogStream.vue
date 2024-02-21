@@ -34,12 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -177,8 +175,7 @@ size="sm" color="secondary" />
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -336,7 +333,13 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
 
-        const streamTypes = ["logs", "metrics", "traces", "metadata"];
+        const streamTypes = [
+          "logs",
+          "metrics",
+          "traces",
+          "enrichment_tables",
+          "metadata",
+        ];
         let counter = 1;
         streamTypes.forEach((type) => {
           getStreams(type, false)

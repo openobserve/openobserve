@@ -43,33 +43,59 @@ const useStreams = () => {
 
       try {
         if (!isStreamFetched(streamName || "all")) {
-          getStreamsPromise.value = StreamService.nameList(
-            store.state.selectedOrganization.identifier,
-            _streamName,
-            schema
-          );
-          getStreamsPromise.value
-            .then((res: any) => {
-              const streamData = setStreams(streamName, res.data.list);
-              areAllStreamsFetched.value = true;
-              getStreamsPromise.value = null;
-              resolve(streamData);
-            })
-            .catch((e: any) => {
-              getStreamsPromise.value = null;
-              reject(new Error(e.message));
-            });
+          // Added adddtional check to fetch all streamstype separately if streamName is all
+          if (streamName === "all") {
+            const streamList = [
+              "logs",
+              "metrics",
+              "traces",
+              "enrichment_tables",
+              "metadata",
+            ];
+            getStreamsPromise.value = Promise.all(
+              [...streamList].map((streamType) =>
+                StreamService.nameList(
+                  store.state.selectedOrganization.identifier,
+                  streamType,
+                  schema
+                )
+              )
+            );
+            getStreamsPromise.value
+              .then((res: any) => {
+                res.forEach((streamTypeData: any, index: number) => {
+                  setStreams(streamList[index], streamTypeData.data.list);
+                });
+
+                areAllStreamsFetched.value = true;
+                getStreamsPromise.value = null;
+                resolve(getAllStreamsPayload());
+              })
+              .catch((e: any) => {
+                getStreamsPromise.value = null;
+                reject(new Error(e.message));
+              });
+          } else {
+            getStreamsPromise.value = StreamService.nameList(
+              store.state.selectedOrganization.identifier,
+              _streamName,
+              schema
+            );
+            getStreamsPromise.value
+              .then((res: any) => {
+                const streamData = setStreams(streamName, res.data.list);
+                areAllStreamsFetched.value = true;
+                getStreamsPromise.value = null;
+                resolve(streamData);
+              })
+              .catch((e: any) => {
+                getStreamsPromise.value = null;
+                reject(new Error(e.message));
+              });
+          }
         } else {
           if (streamName === "all") {
-            const streamObject = getStreamPayload();
-            streamObject.name = streamName;
-            streamObject.schema = schema;
-
-            Object.keys(streams).forEach((key) => {
-              streamObject.list.push(...streams[key].list);
-            });
-
-            resolve(streamObject);
+            resolve(getAllStreamsPayload());
           } else {
             resolve(streams[streamName]);
           }
@@ -78,6 +104,18 @@ const useStreams = () => {
         reject(new Error(e.message));
       }
     });
+  };
+
+  const getAllStreamsPayload = () => {
+    const streamObject = getStreamPayload();
+    streamObject.name = "all";
+    streamObject.schema = false;
+
+    Object.keys(streams).forEach((key) => {
+      streamObject.list.push(...streams[key].list);
+    });
+
+    return streamObject;
   };
 
   const getStream = async (
@@ -90,10 +128,12 @@ const useStreams = () => {
         resolve(null);
       }
 
+      // Wait for the streams to be fetched if they are being fetched
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
 
+      // If the stream is not fetched, and trying to fetch the specific stream. First fetch all streams
       if (!isStreamFetched(streamType)) {
         try {
           await getStreams(streamType, false);
@@ -256,6 +296,7 @@ const useStreams = () => {
     streamsIndexMapping = reactive({});
     areAllStreamsFetched.value = false;
     getStreamsPromise.value = null;
+    store.dispatch("setIsDataIngested", false);
   };
 
   return { getStreams, getStream, setStreams, getMultiStreams, resetStreams };
