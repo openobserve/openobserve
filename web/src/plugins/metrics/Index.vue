@@ -437,7 +437,7 @@ export default defineComponent({
       try {
         searchObj.data.errorMsg = "";
         searchObj.loading = true;
-        getStreams("metrics", true)
+        getStreams("metrics", false)
           .then((res) => {
             searchObj.data.streamResults = res;
 
