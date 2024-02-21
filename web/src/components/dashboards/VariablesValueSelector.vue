@@ -104,6 +104,7 @@ import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import { isInvalidDate } from "@/utils/date";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -126,7 +127,7 @@ export default defineComponent({
       isVariablesLoading: false,
       values: [],
     });
-
+    const { getStreams } = useStreams();
     onMounted(async () => {
       await getVariablesData();
     });
@@ -340,14 +341,13 @@ export default defineComponent({
           case "dynamic_filters": {
             obj.isLoading = true; // Set loading state
 
-            return streamService
-              .nameList(store.state.selectedOrganization.identifier, "", true)
+            return getStreams("", true)
               .then((res) => {
                 obj.isLoading = false; // Reset loading state
 
                 const fieldsObj: any = {};
 
-                res.data.list.forEach((item: any) => {
+                res.list.forEach((item: any) => {
                   const name = item.name;
                   const stream_type = item.stream_type;
 

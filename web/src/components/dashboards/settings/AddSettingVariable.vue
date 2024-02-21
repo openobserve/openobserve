@@ -281,6 +281,7 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useQuasar } from "quasar";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -303,6 +304,8 @@ export default defineComponent({
     });
     const route = useRoute();
     const title = ref("Add Variable");
+    const { getStreams } = useStreams();
+
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -434,12 +437,8 @@ export default defineComponent({
       });
     };
     const getStreamList = () => {
-      IndexService.nameList(
-        store.state.selectedOrganization.identifier,
-        "",
-        true
-      ).then((res) => {
-        data.schemaResponse = res.data?.list || [];
+      getStreams("", true).then((res) => {
+        data.schemaResponse = res.list || [];
         if (editMode.value) {
           // set the dropdown values
           streamTypeUpdated();
