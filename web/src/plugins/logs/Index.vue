@@ -374,7 +374,7 @@ export default defineComponent({
       if (
         isStreamChanged &&
         queryParams.type === "stream_explorer" &&
-        seachObj.loading == false
+        searchObj.loading == false
       ) {
         resetSearchObj();
         resetStreamData();
