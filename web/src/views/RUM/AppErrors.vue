@@ -126,9 +126,9 @@ import DateTime from "@/components/DateTime.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import streamService from "@/services/stream";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
+import useStreams from "@/composables/useStreams";
 
 const { t } = useI18n();
 const dateTime = ref({
@@ -144,6 +144,7 @@ const { errorTrackingState } = useErrorTracking();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
+const { getStream } = useStreams();
 const columns = ref([
   {
     name: "error",
@@ -246,15 +247,10 @@ const handleSidebarEvent = (event: string, value: any) => {
 const getStreamFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
-    streamService
-      .schema(
-        store.state.selectedOrganization.identifier,
-        errorTrackingState.data.stream.errorStream,
-        "logs"
-      )
-      .then((res) => {
+    getStream(errorTrackingState.data.stream.errorStream, "logs", true)
+      .then((stream) => {
         streamFields.value = [];
-        res.data.schema.forEach((field: any) => {
+        stream.schema.forEach((field: any) => {
           if (userDataSet.has(field.name)) {
             streamFields.value.push({
               ...field,
