@@ -344,8 +344,6 @@ export default defineComponent({
     const editMode = ref(false);
 
     onMounted(async () => {
-      // await getStreamList();
-
       if (props.variableName) {
         editMode.value = true;
         title.value = "Edit Variable";
@@ -387,22 +385,35 @@ export default defineComponent({
           // need to get the stream list
           // and followed by the field list
           try {
-            const streamType = variableData?.query_data?.stream_type;
+            // if stream type is exists
+            if (variableData?.query_data?.stream_type) {
+              // get all streams from current stream type
+              const streamList: any = await getStreams(
+                variableData?.query_data?.stream_type,
+                false
+              );
+              data.streams = streamList.list ?? [];
 
-            // get all streams from current stream type
-            const streamList: any = await getStreams(streamType, false);
+              // if stream type and stream is exists
+              if (variableData?.query_data?.stream) {
+                // get schema of that field using getstream
+                const fieldWithSchema: any = await getStream(
+                  variableData?.query_data?.stream,
+                  variableData.query_data.stream_type,
+                  true
+                );
 
-            data.streams = streamList.list ?? [];
-
-            // get schema of that field using getstream
-            const fieldWithSchema: any = await getStream(
-              variableData?.query_data?.stream,
-              variableData.query_data.stream_type,
-              true
-            );
-
-            // assign the schema
-            data.currentFieldsList = fieldWithSchema?.schema ?? [];
+                // assign the schema
+                data.currentFieldsList = fieldWithSchema?.schema ?? [];
+              } else {
+                // reset field list array
+                data.currentFieldsList = [];
+              }
+            } else {
+              // reset stream and field list
+              data.streams = [];
+              data.currentFieldsList = [];
+            }
           } catch (error: any) {
             $q.notify({
               type: "negative",
@@ -484,18 +495,6 @@ export default defineComponent({
         });
       });
     };
-    // const getStreamList = async () => {
-    //   await getStreams("", false).then(async (res) => {
-    //     console.log(res, "streams");
-
-    //     data.schemaResponse = res.list || [];
-    //     if (editMode.value) {
-    //       // set the dropdown values
-    //       streamTypeUpdated();
-    //       await streamUpdated();
-    //     }
-    //   });
-    // };
 
     // select filters
     const {
@@ -510,12 +509,20 @@ export default defineComponent({
       variableData.query_data.stream = "";
       variableData.query_data.field = "";
 
-      const streamType = variableData?.query_data?.stream_type;
+      // if stream type is exists
+      if (variableData.query_data.stream_type) {
+        // get all streams from current stream type
+        const streamList: any = await getStreams(
+          variableData?.query_data?.stream_type,
+          false
+        );
 
-      // get all streams from current stream type
-      const streamList: any = await getStreams(streamType, false);
-
-      data.streams = streamList.list ?? [];
+        // assign the stream list
+        data.streams = streamList.list ?? [];
+      } else {
+        // reset stream list
+        data.streams = [];
+      }
     };
 
     const streamUpdated = async () => {
@@ -523,15 +530,24 @@ export default defineComponent({
       variableData.query_data.field = "";
 
       try {
-        // get schema of that field using getstream
-        const fieldWithSchema: any = await getStream(
-          variableData?.query_data?.stream,
-          variableData.query_data.stream_type,
-          true
-        );
+        // if stream type and stream is exists
+        if (
+          variableData.query_data.stream &&
+          variableData.query_data.stream_type
+        ) {
+          // get schema of that field using getstream
+          const fieldWithSchema: any = await getStream(
+            variableData?.query_data?.stream,
+            variableData.query_data.stream_type,
+            true
+          );
 
-        // assign the schema
-        data.currentFieldsList = fieldWithSchema?.schema ?? [];
+          // assign the schema
+          data.currentFieldsList = fieldWithSchema?.schema ?? [];
+        } else {
+          // reset field list
+          data.currentFieldsList = [];
+        }
       } catch (error: any) {
         $q.notify({
           type: "negative",
@@ -548,7 +564,6 @@ export default defineComponent({
     return {
       variableData,
       t,
-      // getStreamList,
       data,
       streamsFilterFn,
       fieldsFilterFn,
