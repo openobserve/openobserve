@@ -20,13 +20,11 @@ import { ref } from "vue";
 
 let streams: any = reactive({});
 
-let streamsIndexMapping: any = reactive({
-  logs: {
-    stream1: 0,
-  },
-});
+let streamsIndexMapping: any = reactive({});
 
 const areAllStreamsFetched = ref(false);
+
+const getStreamsPromise: any = ref(null);
 
 const useStreams = () => {
   const store = useStore();
@@ -38,73 +36,30 @@ const useStreams = () => {
     // So keeping it false, don't change this
     schema = false;
 
-    let isStreamFetched = false;
-    if (streamName === "all") {
-      isStreamFetched = areAllStreamsFetched.value;
-    } else {
-      isStreamFetched = !!streams[streamName];
-    }
+    // if (getStreamsPromise.value) {
+    //   await getStreamsPromise.value;
+    // }
 
     try {
-      if (!isStreamFetched) {
-        return await StreamService.nameList(
+      if (!isStreamFetched(streamName || "all")) {
+        getStreamsPromise.value = StreamService.nameList(
           store.state.selectedOrganization.identifier,
           _streamName,
           schema
-        )
+        );
+        getStreamsPromise.value
           .then((res: any) => {
-            if (streamName === "all") areAllStreamsFetched.value = true;
+            const streamData = setStreams(streamName, res.data.list);
 
-            if (
-              !store.state.organizationData.isDataIngested &&
-              !!res.data.list.length
-            )
-              store.dispatch("setIsDataIngested", !!res.data.list.length);
+            areAllStreamsFetched.value = true;
 
-            const streamObject = getStreamPayload();
-            streamObject.name = streamName;
-            streamObject.list = res.data.list;
-            streamObject.schema = schema;
-
-            // If the stream name is all, then we need to store each type of stream separately manually
-            if (streamName === "all") {
-              streams = reactive({});
-
-              res.data.list.forEach((stream: any) => {
-                if (streams[stream.stream_type]) {
-                  streams[stream.stream_type].list.push(stream);
-                } else {
-                  streams[stream.stream_type] = {
-                    name: stream.stream_type,
-                    list: [stream],
-                    schema: false,
-                  };
-                }
-              });
-            } else {
-              streams[streamName] = streamObject;
-            }
-
-            // Mapping stream index for each stream type
-            if (streamName === "all") {
-              streamsIndexMapping = reactive({});
-              Object.keys(streams).forEach((key) => {
-                streamsIndexMapping[key] = {};
-                streams[key].list.forEach((stream: any, index: number) => {
-                  streamsIndexMapping[stream.name] = index;
-                });
-              });
-            } else {
-              streamsIndexMapping[streamName] = {};
-              streams[streamName].list.forEach((stream: any, index: number) => {
-                streamsIndexMapping[streamName][stream.name] = index;
-              });
-            }
-
-            return streamObject;
+            return streamData;
           })
           .catch((e: any) => {
             throw new Error(e.message);
+          })
+          .finally(() => {
+            getStreamsPromise.value = null;
           });
       } else {
         if (streamName === "all") {
@@ -112,16 +67,11 @@ const useStreams = () => {
           streamObject.name = streamName;
           streamObject.schema = schema;
 
-          const keys = [
-            "logs",
-            "metrics",
-            "traces",
-            "enrichment_tables",
-            "metadata",
-          ];
-          keys.forEach((key) => {
+          Object.keys(streams).forEach((key) => {
             streamObject.list.push(...streams[key].list);
           });
+
+          return streamObject;
         } else {
           return streams[streamName];
         }
@@ -140,6 +90,10 @@ const useStreams = () => {
       if (!streamName || !streamType) {
         resolve(null);
       }
+
+      // if (getStreamsPromise.value) {
+      //   await getStreamsPromise.value;
+      // }
 
       try {
         if (
@@ -181,8 +135,6 @@ const useStreams = () => {
           return null;
         }
 
-        console.log("streamName", streamName);
-
         try {
           // Check if the stream exists and has been indexed.
           if (
@@ -204,8 +156,6 @@ const useStreams = () => {
                 streamType
               );
 
-              console.log("fetched data", streamName);
-
               streams[streamType].list[streamIndex] = fetchedStream.data;
             }
           }
@@ -222,15 +172,19 @@ const useStreams = () => {
     );
   };
 
-  const setStreams = (streamName: string = "all", streamList: any[] = []) => {
+  const isStreamFetched = (streamType: string) => {
     let isStreamFetched = false;
-    if (streamName === "all") {
+    if (streamType === "all") {
       isStreamFetched = areAllStreamsFetched.value;
     } else {
-      isStreamFetched = !!streams[streamName];
+      isStreamFetched = !!streams[streamType];
     }
 
-    if (isStreamFetched) return;
+    return isStreamFetched;
+  };
+
+  const setStreams = (streamName: string = "all", streamList: any[] = []) => {
+    if (isStreamFetched(streamName || "all")) return;
 
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
       store.dispatch("setIsDataIngested", !!streamList.length);
@@ -265,7 +219,7 @@ const useStreams = () => {
       Object.keys(streams).forEach((key) => {
         streamsIndexMapping[key] = {};
         streams[key].list.forEach((stream: any, index: number) => {
-          streamsIndexMapping[stream.name] = index;
+          streamsIndexMapping[key][stream.name] = index;
         });
       });
     } else {
@@ -274,6 +228,8 @@ const useStreams = () => {
         streamsIndexMapping[streamName][stream.name] = index;
       });
     }
+
+    return streamObject;
   };
 
   const getStreamPayload = () => {
