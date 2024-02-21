@@ -51,16 +51,13 @@ const useStreams = () => {
           getStreamsPromise.value
             .then((res: any) => {
               const streamData = setStreams(streamName, res.data.list);
-
               areAllStreamsFetched.value = true;
-
+              getStreamsPromise.value = null;
               resolve(streamData);
             })
             .catch((e: any) => {
+              getStreamsPromise.value = null;
               reject(new Error(e.message));
-            })
-            .finally(() => {
-              setTimeout(() => (getStreamsPromise.value = null), 5000);
             });
         } else {
           if (streamName === "all") {
@@ -94,10 +91,15 @@ const useStreams = () => {
       }
 
       if (getStreamsPromise.value) {
-        console.log(getStreamsPromise.value);
-        console.log("waiting for promise");
         await getStreamsPromise.value;
-        console.log("promise fullfilled");
+      }
+
+      if (!isStreamFetched(streamType)) {
+        try {
+          await getStreams(streamType, false);
+        } catch (e: any) {
+          reject(new Error(e.message));
+        }
       }
 
       try {
@@ -125,7 +127,7 @@ const useStreams = () => {
           reject(new Error("Stream not found"));
         }
       } catch (e: any) {
-        throw new Error(e.message);
+        reject(new Error(e.message));
       }
     });
   };
