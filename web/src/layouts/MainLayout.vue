@@ -566,6 +566,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1
@@ -604,7 +605,8 @@ export default defineComponent({
         store.state.zoConfig.hasOwnProperty(
           "restricted_routes_on_empty_data"
         ) &&
-        store.state.zoConfig.restricted_routes_on_empty_data == true
+        store.state.zoConfig.restricted_routes_on_empty_data == true &&
+        store.state.organizationData.isDataIngested == false
       ) {
         await verifyStreamExist(selectedOrg.value);
       }
@@ -617,6 +619,7 @@ export default defineComponent({
           ...selectedOrgData,
         });
         if (response.list.length == 0) {
+          store.dispatch("setIsDataIngested", false);
           $q.notify({
             type: "warning",
             message:
@@ -624,6 +627,8 @@ export default defineComponent({
             timeout: 5000,
           });
           router.push({ name: "ingestion" });
+        } else {
+          store.dispatch("setIsDataIngested", true);
         }
       });
     };
