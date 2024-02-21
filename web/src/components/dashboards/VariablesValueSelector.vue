@@ -341,7 +341,7 @@ export default defineComponent({
           case "dynamic_filters": {
             obj.isLoading = true; // Set loading state
 
-            return getStreams("", true)
+            return getStreams("", false)
               .then((res) => {
                 obj.isLoading = false; // Reset loading state
 

@@ -436,7 +436,6 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import IndexService from "../../../services/index";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 
@@ -515,7 +514,7 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
       ],
-      () => {
+      async () => {
         // get the selected stream fields based on the selected stream type
         const fields: any = data.schemaList.find(
           (it: any) =>
@@ -528,8 +527,31 @@ export default defineComponent({
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.stream_type
         );
-        dashboardPanelData.meta.stream.selectedStreamFields =
-          fields?.schema || [];
+        // dashboardPanelData.meta.stream.selectedStreamFields =
+        //   fields?.schema || [];
+
+        // if fields found
+        if (fields) {
+          // get schema of that field using getstream
+          const fieldWithSchema: any = await getStreams(fields.name, true);
+
+          console.log(fieldWithSchema, "fieldWithSchema");
+
+          // assign the schema
+          dashboardPanelData.meta.stream.selectedStreamFields =
+            fieldWithSchema?.schema ?? [];
+        }
+
+        // console.log(
+        //   dashboardPanelData.data.queries[
+        //     dashboardPanelData.layout.currentQueryIndex
+        //   ].fields.stream,
+        //   dashboardPanelData.data.queries[
+        //     dashboardPanelData.layout.currentQueryIndex
+        //   ].fields.stream_type,
+        //   fields,
+        //   "stream"
+        // );
       }
     );
     const selectedStreamForQueries: any = ref({});
@@ -613,7 +635,7 @@ export default defineComponent({
 
     // get the stream list by making an API call
     const getStreamList = async () => {
-      await getStreams("", true).then((res) => {
+      await getStreams("", false).then((res: any) => {
         data.schemaList = res.list;
         dashboardPanelData.meta.stream.streamResults = res.list;
       });
