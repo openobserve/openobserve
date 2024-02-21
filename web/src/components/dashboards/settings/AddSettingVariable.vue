@@ -344,7 +344,7 @@ export default defineComponent({
     const editMode = ref(false);
 
     onMounted(async () => {
-      getStreamList();
+      await getStreamList();
 
       if (props.variableName) {
         editMode.value = true;
@@ -436,8 +436,8 @@ export default defineComponent({
         });
       });
     };
-    const getStreamList = () => {
-      getStreams("", true).then((res) => {
+    const getStreamList = async () => {
+      await getStreams("", false).then((res) => {
         data.schemaResponse = res.list || [];
         if (editMode.value) {
           // set the dropdown values
@@ -465,6 +465,7 @@ export default defineComponent({
 
     const streamUpdated = () => {
       const stream = variableData?.query_data?.stream;
+      // here need to get the fields from the stream using usestreams
       data.currentFieldsList =
         data.schemaResponse.find((item: any) => item.name === stream)?.schema ||
         [];
