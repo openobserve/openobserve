@@ -368,7 +368,7 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 64)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]

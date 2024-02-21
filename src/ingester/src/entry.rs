@@ -18,9 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{array::Int64Array, record_batch::RecordBatch};
+use arrow::{array::Int64Array, json::ReaderBuilder, record_batch::RecordBatch};
+use arrow_schema::Schema;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use config::CONFIG;
+use config::{utils::record_batch_ext::RecordBatchExt, CONFIG};
 use snafu::ResultExt;
 
 use crate::errors::*;
@@ -84,6 +85,21 @@ impl Entry {
             data,
             data_size: data_len as usize,
         })
+    }
+
+    pub fn into_batch(&self, schema: Arc<Schema>) -> Result<Option<Arc<RecordBatchEntry>>> {
+        let mut decoder = ReaderBuilder::new(schema)
+            .with_batch_size(self.data.len())
+            .build_decoder()
+            .context(CreateArrowJsonEncoderSnafu)?;
+        decoder
+            .serialize(&self.data)
+            .context(ArrowJsonEncodeSnafu)?;
+        let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
+        Ok(batch.map(|b| {
+            let arrow_size = b.size();
+            RecordBatchEntry::new(b, self.data_size, arrow_size)
+        }))
     }
 }
 

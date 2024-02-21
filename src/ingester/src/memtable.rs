@@ -27,6 +27,8 @@ use crate::{
 
 pub(crate) struct MemTable {
     streams: RwMap<Arc<str>, Stream>, // key: schema name, val: stream
+    json_bytes_written: usize,
+    arrow_bytes_written: usize,
 }
 
 impl MemTable {
@@ -34,13 +36,19 @@ impl MemTable {
         metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).inc();
         Self {
             streams: RwMap::default(),
+            json_bytes_written: 0,
+            arrow_bytes_written: 0,
         }
     }
 
     pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
         let mut rw = self.streams.write().await;
         let partition = rw.entry(entry.stream.clone()).or_insert_with(Stream::new);
-        partition.write(schema, entry).await
+        let json_size = entry.data_size;
+        let arrow_size = partition.write(schema, entry).await?;
+        self.arrow_bytes_written += arrow_size;
+        self.json_bytes_written += json_size;
+        Ok(())
     }
 
     pub(crate) async fn read(
@@ -72,5 +80,10 @@ impl MemTable {
             paths.extend(partitions);
         }
         Ok((schema_size, paths))
+    }
+
+    // Return the number of bytes written (json format size, arrow format size)
+    pub(crate) fn size(&self) -> (usize, usize) {
+        (self.json_bytes_written, self.arrow_bytes_written)
     }
 }

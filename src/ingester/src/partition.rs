@@ -15,14 +15,12 @@
 
 use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
-use arrow::json::ReaderBuilder;
 use arrow_schema::Schema;
 use config::{
     meta::stream::FileMeta,
     metrics,
     utils::{
         parquet::{generate_filename_with_time_range, new_parquet_writer},
-        record_batch_ext::RecordBatchExt,
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -52,13 +50,12 @@ impl Partition {
         }
     }
 
-    pub(crate) async fn write(&mut self, entry: Entry) -> Result<()> {
+    pub(crate) async fn write(&mut self, entry: Entry) -> Result<usize> {
         let mut rw = self.files.write().await;
         let partition = rw
             .entry(entry.partition_key.clone())
             .or_insert_with(PartitionFile::new);
-        partition.write(self.schema.clone(), entry)?;
-        Ok(())
+        partition.write(self.schema.clone(), entry)
     }
 
     pub(crate) async fn read(
@@ -159,25 +156,19 @@ impl PartitionFile {
         Self { data: Vec::new() }
     }
 
-    fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
-        let mut decoder = ReaderBuilder::new(schema)
-            .with_batch_size(entry.data.len())
-            .build_decoder()
-            .context(CreateArrowJsonEncoderSnafu)?;
-        let _ = decoder.serialize(&entry.data);
-        let batch = decoder.flush().context(ArrowJsonEncodeSnafu)?;
-        if let Some(batch) = batch {
-            let arrow_size = batch.size();
-            metrics::INGEST_MEMTABLE_ARROW_BYTES
-                .with_label_values(&[])
-                .add(arrow_size as i64);
-            self.data
-                .push(RecordBatchEntry::new(batch, entry.data_size, arrow_size));
-        }
+    fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
+        let Some(batch) = entry.into_batch(schema)? else {
+            return Ok(0);
+        };
+        let arrow_size = batch.data_arrow_size;
+        self.data.push(batch);
+        metrics::INGEST_MEMTABLE_ARROW_BYTES
+            .with_label_values(&[])
+            .add(arrow_size as i64);
         metrics::INGEST_MEMTABLE_BYTES
             .with_label_values(&[])
             .add(entry.data_size as i64);
-        Ok(())
+        Ok(arrow_size)
     }
 
     fn read(&self, time_range: Option<(i64, i64)>) -> Result<Vec<Arc<RecordBatchEntry>>> {
