@@ -473,7 +473,7 @@ export default defineComponent({
       addValue,
       cleanupDraggingFields,
     } = useDashboardPanelData();
-    const { getStreams } = useStreams();
+    const { getStreams, getStream } = useStreams();
 
     const onDragEnd = () => {
       cleanupDraggingFields();
@@ -527,31 +527,27 @@ export default defineComponent({
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.stream_type
         );
-        // dashboardPanelData.meta.stream.selectedStreamFields =
-        //   fields?.schema || [];
 
         // if fields found
         if (fields) {
-          // get schema of that field using getstream
-          const fieldWithSchema: any = await getStreams(fields.name, true);
+          try {
+            // get schema of that field using getstream
+            const fieldWithSchema: any = await getStream(
+              fields.name,
+              fields.stream_type,
+              true
+            );
 
-          console.log(fieldWithSchema, "fieldWithSchema");
-
-          // assign the schema
-          dashboardPanelData.meta.stream.selectedStreamFields =
-            fieldWithSchema?.schema ?? [];
+            // assign the schema
+            dashboardPanelData.meta.stream.selectedStreamFields =
+              fieldWithSchema?.schema ?? [];
+          } catch (error: any) {
+            $q.notify({
+              type: "negative",
+              message: error ?? "Failed to get stream fields",
+            });
+          }
         }
-
-        // console.log(
-        //   dashboardPanelData.data.queries[
-        //     dashboardPanelData.layout.currentQueryIndex
-        //   ].fields.stream,
-        //   dashboardPanelData.data.queries[
-        //     dashboardPanelData.layout.currentQueryIndex
-        //   ].fields.stream_type,
-        //   fields,
-        //   "stream"
-        // );
       }
     );
     const selectedStreamForQueries: any = ref({});
