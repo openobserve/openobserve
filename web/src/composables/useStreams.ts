@@ -159,10 +159,8 @@ const useStreams = () => {
             streamName
           )
         ) {
-          const hasSchema =
-            !!streams[streamType].list[
-              streamsIndexMapping[streamType][streamName]
-            ]?.schema;
+          const streamIndex = streamsIndexMapping[streamType][streamName];
+          const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
 
           if (schema && !hasSchema) {
             const _stream: any = await StreamService.schema(
@@ -170,69 +168,68 @@ const useStreams = () => {
               streamName,
               streamType
             );
-            streams[streamType].list[
-              streamsIndexMapping[streamType][streamName]
-            ] = _stream.data;
+            streams[streamType].list[streamIndex] = _stream.data;
           }
+          return resolve(streams[streamType].list[streamIndex]);
+        } else {
+          reject(new Error("Stream not found"));
         }
-        return resolve(
-          streams[streamType].list[streamsIndexMapping[streamType][streamName]]
-        );
       } catch (e: any) {
         throw new Error(e.message);
       }
     });
   };
 
-  // const getStream = async (
-  //   streamNames: string[{
-  //     streamName: string;
-  //     streamType: string;
-  //     schema:
-  //   }],
-  //   streamType: string,
-  //   schema: boolean
-  // ): Promise<any[]> => {
-  //   return new Promise(async (resolve, reject) => {
-  //     if (!streamNames.length || !streamType) {
-  //       resolve([]);
-  //     }
+  const getMultiStreams = async (
+    _streams: Array<{ streamName: string; streamType: string; schema: boolean }>
+  ): Promise<any[]> => {
+    return Promise.all(
+      _streams.map(async ({ streamName, streamType, schema }) => {
+        // Return null immediately if either streamName or streamType is not provided.
+        if (!streamName || !streamType) {
+          return null;
+        }
 
-  //     const streamData: any[] = [];
-  //     let stream = null;
-  //     try {
-  //       for (let i = 0; i < streamNames.length; i++) {
-  //         if (
-  //           streams[streamType] &&
-  //           streams[streamType].list.length &&
-  //           Object.prototype.hasOwnProperty.call(
-  //             streamsIndexMapping[streamType],
-  //             streamNames[i]
-  //           )
-  //         ) {
-  //           stream =
-  //             streams[streamType].list[
-  //               streamsIndexMapping[streamType][streamNames[i]]
-  //             ];
-  //           if (schema && !stream.schema) {
-  //             let _stream: any = await StreamService.schema(
-  //               store.state.selectedOrganization.identifier,
-  //               streamNames[i],
-  //               streamType
-  //             );
-  //             stream = _stream.data;
-  //             _stream = null;
-  //           }
+        console.log("streamName", streamName);
 
-  //           streamData.push(cloneDeep(stream));
-  //         }
-  //       }
-  //       return resolve(streamData);
-  //     } catch (e: any) {
-  //       throw new Error(e.message);
-  //     }
-  //   });
-  // };
+        try {
+          // Check if the stream exists and has been indexed.
+          if (
+            streams[streamType] &&
+            streams[streamType].list.length &&
+            Object.prototype.hasOwnProperty.call(
+              streamsIndexMapping[streamType],
+              streamName
+            )
+          ) {
+            const streamIndex = streamsIndexMapping[streamType][streamName];
+            const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
+
+            // If schema is requested but not present, fetch and update it.
+            if (schema && !hasSchema) {
+              const fetchedStream = await StreamService.schema(
+                store.state.selectedOrganization.identifier,
+                streamName,
+                streamType
+              );
+
+              console.log("fetched data", streamName);
+
+              streams[streamType].list[streamIndex] = fetchedStream.data;
+            }
+          }
+
+          // Return the stream object (with or without updated schema).
+          return streams[streamType]?.list[
+            streamsIndexMapping[streamType][streamName]
+          ];
+        } catch (e: any) {
+          // Use reject in Promise.all to catch errors specifically.
+          throw new Error(e.message);
+        }
+      })
+    );
+  };
 
   const setStreams = (streamName: string = "all", streamList: any[] = []) => {
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
@@ -290,7 +287,7 @@ const useStreams = () => {
       schema: boolean;
     };
   };
-  return { getStreams, getStream, setStreams };
+  return { getStreams, getStream, setStreams, getMultiStreams };
 };
 
 export default useStreams;
