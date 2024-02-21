@@ -304,7 +304,7 @@ export default defineComponent({
     });
     const route = useRoute();
     const title = ref("Add Variable");
-    const { getStreams } = useStreams();
+    const { getStreams, getStream } = useStreams();
 
     // const model = ref(null)
     // const filteredStreams = ref([]);
@@ -344,7 +344,7 @@ export default defineComponent({
     const editMode = ref(false);
 
     onMounted(async () => {
-      await getStreamList();
+      // await getStreamList();
 
       if (props.variableName) {
         editMode.value = true;
@@ -436,16 +436,18 @@ export default defineComponent({
         });
       });
     };
-    const getStreamList = async () => {
-      await getStreams("", false).then((res) => {
-        data.schemaResponse = res.list || [];
-        if (editMode.value) {
-          // set the dropdown values
-          streamTypeUpdated();
-          streamUpdated();
-        }
-      });
-    };
+    // const getStreamList = async () => {
+    //   await getStreams("", false).then(async (res) => {
+    //     console.log(res, "streams");
+
+    //     data.schemaResponse = res.list || [];
+    //     if (editMode.value) {
+    //       // set the dropdown values
+    //       streamTypeUpdated();
+    //       await streamUpdated();
+    //     }
+    //   });
+    // };
 
     // select filters
     const {
@@ -455,20 +457,40 @@ export default defineComponent({
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete(toRef(data, "currentFieldsList"), "name");
 
-    const streamTypeUpdated = () => {
+    const streamTypeUpdated = async () => {
       const streamType = variableData?.query_data?.stream_type;
-      const filteredStreams = data.schemaResponse.filter(
-        (data: any) => data.stream_type === streamType
-      );
-      data.streams = filteredStreams;
+
+      // get all streams from current stream type
+      const streamList = await getStreams(streamType, false);
+
+      data.streams = streamList.list ?? [];
     };
 
-    const streamUpdated = () => {
+    const streamUpdated = async () => {
       const stream = variableData?.query_data?.stream;
+
+      console.log(stream, "settings stream");
+
       // here need to get the fields from the stream using usestreams
-      data.currentFieldsList =
-        data.schemaResponse.find((item: any) => item.name === stream)?.schema ||
-        [];
+      // try {
+      //   // get schema of that field using getstream
+      //   const fieldWithSchema: any = await getStream(
+      //     fields.name,
+      //     fields.stream_type,
+      //     true
+      //   );
+
+      //   // assign the schema
+      //   data.currentFieldsList = fieldWithSchema?.schema ?? [];
+      // } catch (error: any) {
+      //   $q.notify({
+      //     type: "negative",
+      //     message: error ?? "Failed to get stream fields",
+      //   });
+      // }
+      // data.currentFieldsList =
+      //   data.schemaResponse.find((item: any) => item.name === stream)?.schema ||
+      //   [];
     };
 
     const close = () => {
@@ -478,7 +500,7 @@ export default defineComponent({
     return {
       variableData,
       t,
-      getStreamList,
+      // getStreamList,
       data,
       streamsFilterFn,
       fieldsFilterFn,
