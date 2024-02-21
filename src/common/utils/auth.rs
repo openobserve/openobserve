@@ -344,8 +344,8 @@ impl FromRequest for AuthExtractor {
                         bypass_check: false,
                         parent_id: folder,
                     }));
-                } else if object_type.contains("dashboard") && !method.eq("LIST") {
-                    let object_type = if method.eq("POST") {
+                } else if object_type.contains("dashboard") {
+                    let object_type = if method.eq("POST") || method.eq("LIST") {
                         format!(
                             "{}:{}",
                             OFGA_MODELS
