@@ -176,7 +176,7 @@ const useLogs = () => {
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams();
+  const { getStreams, getStream } = useStreams();
   const router = useRouter();
   const parser = new Parser();
   const fieldValues = ref();
@@ -337,11 +337,30 @@ const useLogs = () => {
     }
   }
 
+  async function loadStreamFileds(streamName: string) {
+    try {
+      if (streamName != "") {
+        return await getStream(
+          streamName,
+          searchObj.data.stream.streamType || "logs",
+          true
+        ).then((res) => {
+          return res.schema;
+        });
+      } else {
+        searchObj.data.errorMsg = "No stream found in selected organization!";
+      }
+      return;
+    } catch (e: any) {
+      console.log("Error while loading stream fields");
+    }
+  }
+
   const getStreamList = async () => {
     try {
       resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
-      const streamData = await getStreams(streamType, true);
+      const streamData = await getStreams(streamType, false);
       searchObj.data.streamResults = streamData;
       await loadStreamLists();
       return;
@@ -1263,7 +1282,7 @@ const useLogs = () => {
     fieldValues.value = {};
   };
 
-  function extractFields() {
+  async function extractFields() {
     try {
       searchObj.data.stream.selectedStreamFields = [];
       let ftsKeys: Set<any> = new Set();
@@ -1280,9 +1299,18 @@ const useLogs = () => {
         // searchObj.data.streamResults.list.forEach((stream: any) => {
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.value == stream.name) {
-            queryResult.push(...stream.schema);
+            if (stream.hasOwnProperty("schema")) {
+              queryResult.push(...stream.schema);
+              schemaFields = new Set([
+                ...stream.schema.map((e: any) => e.name),
+              ]);
+            } else {
+              const streamSchema: any = await loadStreamFileds(stream.name);
+              queryResult.push(...streamSchema);
+              schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
+            }
+
             ftsKeys = new Set([...stream.settings.full_text_search_keys]);
-            schemaFields = new Set([...stream.schema.map((e: any) => e.name)]);
           }
         }
 

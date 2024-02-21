@@ -141,7 +141,7 @@ const useStreams = () => {
   };
 
   const getStream = async (
-    streamName: "",
+    streamName: string,
     streamType: string,
     schema: boolean
   ): Promise<any> => {
