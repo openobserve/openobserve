@@ -376,7 +376,7 @@ export default defineComponent({
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
-    const { getStreams } = useStreams();
+    const { getStreams, resetStreams } = useStreams();
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -827,6 +827,7 @@ export default defineComponent({
       setSelectedOrganization,
       redirectToParentRoute,
       getOrganizationSettings,
+      resetStreams,
     };
   },
   computed: {
@@ -851,6 +852,7 @@ export default defineComponent({
     },
     async changeOrganizationIdentifier() {
       this.isLoading = false;
+      this.resetStreams();
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
 
