@@ -163,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         :showTabs="true"
+        :forceLoad="true" 
       />
 
       <q-dialog
