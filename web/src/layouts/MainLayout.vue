@@ -566,6 +566,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1
@@ -849,7 +850,6 @@ export default defineComponent({
     },
     changeOrganization() {
       setTimeout(() => {
-        this.store.dispatch("setIsDataIngested", false);
         this.setSelectedOrganization();
       }, 500);
     },
