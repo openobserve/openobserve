@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-search-index-list-fields-table"
           :visible-columns="['name']"
           :rows="filteredMetricLabels"
-          :row-key="(row) => row.name"
+          :row-key="(row: { name: any; }) => row.name"
           :filter="searchMetricLabel"
           :filter-method="filterMetricLabels"
           :pagination="{ rowsPerPage: 10000 }"
@@ -296,7 +296,7 @@ import metricService from "@/services/metrics";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
-import { on } from "events";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "MetricsList",
@@ -328,6 +328,7 @@ export default defineComponent({
       counter: "pin",
     };
     const { parsePromQlQuery } = usePromqlSuggestions();
+    const { getStream } = useStreams();
     watch(
       () => searchObj.data.metrics.metricList,
       () => {
@@ -348,12 +349,25 @@ export default defineComponent({
         );
       });
     };
-    const updateMetricLabels = () => {
-      selectedMetricLabels.value = searchObj.data.streamResults.list.find(
-        (stream: any) =>
+    const updateMetricLabels = async () => {
+      const selectedStream = searchObj.data.streamResults.list.find(
+        (stream: { name: string | undefined }) =>
           stream.name === searchObj.data.metrics.selectedMetric?.value
-      ).schema;
+      );
 
+      let schema;
+      if (selectedStream.hasOwnProperty("schema")) {
+        schema = selectedStream.schema;
+      } else {
+        const streamData = await getStream(
+          searchObj.data.metrics.selectedMetric?.value || "",
+          "metrics",
+          true
+        );
+        schema = streamData.schema;
+      }
+
+      selectedMetricLabels.value = schema;
       if (Array.isArray(selectedMetricLabels.value))
         filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
