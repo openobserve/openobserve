@@ -1297,7 +1297,7 @@ const getDashboards = async (resource: Entity | Resource) => {
 };
 
 const getOrgs = async () => {
-  const orgs = await organizationsService.list(0, 10000, "name", false, "");
+  const orgs = await organizationsService.list(0, 100000, "name", false, "");
 
   updateResourceEntities("org", ["identifier"], [...orgs.data.data]);
 
