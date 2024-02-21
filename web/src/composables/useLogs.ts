@@ -1767,7 +1767,7 @@ const useLogs = () => {
   const updateStreams = async () => {
     if (searchObj.data.streamResults?.list?.length) {
       const streamType = searchObj.data.stream.streamType || "logs";
-      const streams = await getStreams(streamType, true);
+      const streams: any = await getStreams(streamType, false);
       searchObj.data.streamResults = streams;
       searchObj.data.stream.streamLists = [];
       streams.list.map((item: any) => {
