@@ -363,6 +363,7 @@ export default defineComponent({
       updatedLocalLogFilterField,
       handleQueryData,
       onStreamChange,
+      filterHitsColumns,
     } = useLogs();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
     const fieldValues: Ref<{
@@ -429,6 +430,7 @@ export default defineComponent({
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
+      filterHitsColumns();
     }
 
     const openFilterCreator = (
