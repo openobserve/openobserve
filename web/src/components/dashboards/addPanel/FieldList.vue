@@ -438,6 +438,7 @@ import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import IndexService from "../../../services/index";
 import { useLoading } from "@/composables/useLoading";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "FieldList",
@@ -473,6 +474,7 @@ export default defineComponent({
       addValue,
       cleanupDraggingFields,
     } = useDashboardPanelData();
+    const { getStreams } = useStreams();
 
     const onDragEnd = () => {
       cleanupDraggingFields();
@@ -611,13 +613,9 @@ export default defineComponent({
 
     // get the stream list by making an API call
     const getStreamList = async () => {
-      await IndexService.nameList(
-        store.state.selectedOrganization.identifier,
-        "",
-        true
-      ).then((res) => {
-        data.schemaList = res.data.list;
-        dashboardPanelData.meta.stream.streamResults = res.data.list;
+      await getStreams("", true).then((res) => {
+        data.schemaList = res.list;
+        dashboardPanelData.meta.stream.streamResults = res.list;
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
