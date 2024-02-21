@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod destinations;
+pub mod scripts;
 pub mod templates;
 pub mod triggers;
 
@@ -39,6 +40,8 @@ pub struct Alert {
     #[serde(default)]
     pub trigger_condition: TriggerCondition,
     pub destinations: Vec<String>,
+    #[serde(default)]
+    pub scripts: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
     #[serde(default)]
@@ -68,6 +71,7 @@ impl Default for Alert {
             query_condition: QueryCondition::default(),
             trigger_condition: TriggerCondition::default(),
             destinations: vec![],
+            scripts: vec![],
             context_attributes: None,
             row_template: "".to_string(),
             description: "".to_string(),

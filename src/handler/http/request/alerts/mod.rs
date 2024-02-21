@@ -26,6 +26,7 @@ use crate::{
 };
 
 pub mod destinations;
+pub mod scripts;
 pub mod templates;
 
 /// CreateAlert

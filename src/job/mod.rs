@@ -109,6 +109,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::functions::watch().await });
     tokio::task::spawn(async move { db::compact::retention::watch().await });
     tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
+    tokio::task::spawn(async move { db::alerts::scripts::watch().await });
     tokio::task::spawn(async move { db::alerts::templates::watch().await });
     tokio::task::spawn(async move { db::alerts::destinations::watch().await });
     tokio::task::spawn(async move { db::alerts::watch().await });
@@ -131,6 +132,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("prom cluster leader cache failed");
 
     // cache alerts
+    db::alerts::scripts::cache()
+        .await
+        .expect("alerts scripts cache failed");
     db::alerts::templates::cache()
         .await
         .expect("alerts templates cache failed");
