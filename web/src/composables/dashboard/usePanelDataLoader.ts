@@ -482,9 +482,12 @@ export const usePanelDataLoader = (
     if (queryType === "sql") {
       const queryStream = getStreamFromQuery(query);
 
-      const applicableAdHocVariables = adHocVariables.filter((it: any) => {
-        return it?.streams?.find((it: any) => it.name == queryStream);
-      });
+      const applicableAdHocVariables = adHocVariables
+      // .filter((it: any) => {
+      //   return it?.streams?.find((it: any) => it.name == queryStream);
+      // });
+
+      console.log(applicableAdHocVariables, "applicableAdHocVariables");
 
       applicableAdHocVariables.forEach((variable: any) => {
         metadata.push({
@@ -605,11 +608,11 @@ export const usePanelDataLoader = (
       ?.map((it: any) => it?.value)
       ?.flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value)
-      ?.filter((it: any) =>
-        panelSchema.value.queryType == "sql"
-          ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
-          : true
-      );
+      // ?.filter((it: any) =>
+      //   panelSchema.value.queryType == "sql"
+      //     ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
+      //     : true
+      // );
     log("getDynamicVariablesData: adHocVariables", adHocVariables);
     return adHocVariables;
   };
