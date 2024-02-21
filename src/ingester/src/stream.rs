@@ -16,6 +16,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
+use config::utils::schema_ext::SchemaExt;
 
 use crate::{
     entry::{Entry, PersistStat, RecordBatchEntry},
@@ -35,12 +36,15 @@ impl Stream {
         }
     }
 
-    pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<()> {
+    pub(crate) async fn write(&mut self, schema: Arc<Schema>, entry: Entry) -> Result<usize> {
+        let mut arrow_size = 0;
         let mut rw = self.partitions.write().await;
-        let partition = rw
-            .entry(entry.schema_key.clone())
-            .or_insert_with(|| Partition::new(schema));
-        partition.write(entry).await
+        let partition = rw.entry(entry.schema_key.clone()).or_insert_with(|| {
+            arrow_size += schema.size();
+            Partition::new(schema)
+        });
+        arrow_size += partition.write(entry).await?;
+        Ok(arrow_size)
     }
 
     pub(crate) async fn read(
