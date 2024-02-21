@@ -30,55 +30,57 @@ const useStreams = () => {
   const store = useStore();
 
   const getStreams = async (_streamName: string = "", schema: boolean) => {
-    const streamName = _streamName || "all";
+    return new Promise(async (resolve, reject) => {
+      const streamName = _streamName || "all";
 
-    // We don't fetch schema while fetching all streams or specific type all streams
-    // So keeping it false, don't change this
-    schema = false;
+      // We don't fetch schema while fetching all streams or specific type all streams
+      // So keeping it false, don't change this
+      schema = false;
 
-    // if (getStreamsPromise.value) {
-    //   await getStreamsPromise.value;
-    // }
-
-    try {
-      if (!isStreamFetched(streamName || "all")) {
-        getStreamsPromise.value = StreamService.nameList(
-          store.state.selectedOrganization.identifier,
-          _streamName,
-          schema
-        );
-        getStreamsPromise.value
-          .then((res: any) => {
-            const streamData = setStreams(streamName, res.data.list);
-
-            areAllStreamsFetched.value = true;
-
-            return streamData;
-          })
-          .catch((e: any) => {
-            throw new Error(e.message);
-          })
-          .finally(() => {
-            getStreamsPromise.value = null;
-          });
-      } else {
-        if (streamName === "all") {
-          const streamObject = getStreamPayload();
-          streamObject.name = streamName;
-          streamObject.schema = schema;
-
-          Object.keys(streams).forEach((key) => {
-            streamObject.list.push(...streams[key].list);
-          });
-
-          return streamObject;
-        } else {
-          return streams[streamName];
-        }
+      if (getStreamsPromise.value) {
+        await getStreamsPromise.value;
       }
-    } catch (e: any) {
-      throw new Error(e.message);
-    }
+
+      try {
+        if (!isStreamFetched(streamName || "all")) {
+          getStreamsPromise.value = StreamService.nameList(
+            store.state.selectedOrganization.identifier,
+            _streamName,
+            schema
+          );
+          getStreamsPromise.value
+            .then((res: any) => {
+              const streamData = setStreams(streamName, res.data.list);
+
+              areAllStreamsFetched.value = true;
+
+              resolve(streamData);
+            })
+            .catch((e: any) => {
+              reject(new Error(e.message));
+            })
+            .finally(() => {
+              setTimeout(() => (getStreamsPromise.value = null), 5000);
+            });
+        } else {
+          if (streamName === "all") {
+            const streamObject = getStreamPayload();
+            streamObject.name = streamName;
+            streamObject.schema = schema;
+
+            Object.keys(streams).forEach((key) => {
+              streamObject.list.push(...streams[key].list);
+            });
+
+            resolve(streamObject);
+          } else {
+            resolve(streams[streamName]);
+          }
+        }
+      } catch (e: any) {
+        reject(new Error(e.message));
+      }
+    });
   };
 
   const getStream = async (
@@ -91,9 +93,12 @@ const useStreams = () => {
         resolve(null);
       }
 
-      // if (getStreamsPromise.value) {
-      //   await getStreamsPromise.value;
-      // }
+      if (getStreamsPromise.value) {
+        console.log(getStreamsPromise.value);
+        console.log("waiting for promise");
+        await getStreamsPromise.value;
+        console.log("promise fullfilled");
+      }
 
       try {
         if (
@@ -243,7 +248,15 @@ const useStreams = () => {
       schema: boolean;
     };
   };
-  return { getStreams, getStream, setStreams, getMultiStreams };
+
+  const resetStreams = () => {
+    streams = reactive({});
+    streamsIndexMapping = reactive({});
+    areAllStreamsFetched.value = false;
+    getStreamsPromise.value = null;
+  };
+
+  return { getStreams, getStream, setStreams, getMultiStreams, resetStreams };
 };
 
 export default useStreams;
