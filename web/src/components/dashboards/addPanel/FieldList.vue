@@ -616,10 +616,10 @@ export default defineComponent({
 
         // set the first stream as the selected stream when the api loads the data
         if (
-          !props.editMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream &&
+          // !props.editMode &&
+          // !dashboardPanelData.data.queries[
+          //   dashboardPanelData.layout.currentQueryIndex
+          // ].fields.stream &&
           data.indexOptions.length > 0
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
