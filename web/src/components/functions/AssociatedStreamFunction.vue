@@ -389,7 +389,7 @@ export default defineComponent({
         });
 
         getStreams("", false)
-          .then((res) => {
+          .then((res: any) => {
             let counter = 1;
             let doc_num = "";
             let storage_size = "";

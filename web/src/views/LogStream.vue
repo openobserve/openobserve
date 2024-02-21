@@ -340,7 +340,7 @@ export default defineComponent({
         let counter = 1;
         streamTypes.forEach((type) => {
           getStreams(type, false)
-            .then((res) => {
+            .then((res: any) => {
               let doc_num = "";
               let storage_size = "";
               let compressed_size = "";

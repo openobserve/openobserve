@@ -614,7 +614,7 @@ export default defineComponent({
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
-      await getStreams("", false).then((response) => {
+      await getStreams("", false).then((response: any) => {
         store.dispatch("setSelectedOrganization", {
           ...selectedOrgData,
         });

@@ -205,7 +205,7 @@ export default defineComponent({
       });
 
       getStreams("enrichment_tables", false)
-        .then((res) => {
+        .then((res: any) => {
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {

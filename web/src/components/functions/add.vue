@@ -304,7 +304,7 @@ end`;
 
       isFetchingStreams.value = true;
       getStreams(formData.value.stream_type, true)
-        .then((res) => {
+        .then((res: any) => {
           streams.value[formData.value.stream_type] = res.list;
           indexOptions.value = res.list.map((data: any) => {
             return data.name;

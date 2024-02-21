@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-search-index-list-fields-table"
           :visible-columns="['name']"
           :rows="filteredMetricLabels"
-          :row-key="(row: { name: any; }) => row.name"
+          :row-key="(row: any) => row.name"
           :filter="searchMetricLabel"
           :filter-method="filterMetricLabels"
           :pagination="{ rowsPerPage: 10000 }"
