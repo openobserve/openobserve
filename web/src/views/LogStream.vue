@@ -34,10 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -175,7 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -333,54 +336,58 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
 
-        getStreams("", false)
-          .then((res) => {
-            let counter = 1;
-            let doc_num = "";
-            let storage_size = "";
-            let compressed_size = "";
-            resultTotal.value = res.list.length;
-            logStream.value = res.list.map((data: any) => {
-              doc_num = "--";
-              storage_size = "--";
-              if (data.stats) {
-                doc_num = data.stats.doc_num;
-                storage_size = data.stats.storage_size + " MB";
-                compressed_size = data.stats.compressed_size + " MB";
-              }
-              return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                name: data.name,
-                doc_num: doc_num,
-                storage_size: storage_size,
-                compressed_size: compressed_size,
-                storage_type: data.storage_type,
-                actions: "action buttons",
-                schema: data.schema ? data.schema : [],
-                stream_type: data.stream_type,
-              };
+        const streamTypes = ["logs", "metrics", "traces"];
+        let counter = 1;
+        streamTypes.forEach((type) => {
+          getStreams(type, false)
+            .then((res) => {
+              let doc_num = "";
+              let storage_size = "";
+              let compressed_size = "";
+              resultTotal.value += res.list.length;
+              logStream.value.push(
+                ...res.list.map((data: any) => {
+                  doc_num = "--";
+                  storage_size = "--";
+                  if (data.stats) {
+                    doc_num = data.stats.doc_num;
+                    storage_size = data.stats.storage_size + " MB";
+                    compressed_size = data.stats.compressed_size + " MB";
+                  }
+                  return {
+                    "#": counter <= 9 ? `0${counter++}` : counter++,
+                    name: data.name,
+                    doc_num: doc_num,
+                    storage_size: storage_size,
+                    compressed_size: compressed_size,
+                    storage_type: data.storage_type,
+                    actions: "action buttons",
+                    schema: data.schema ? data.schema : [],
+                    stream_type: data.stream_type,
+                  };
+                })
+              );
+              duplicateStreamList.value = cloneDeep(logStream.value);
+
+              logStream.value.forEach((element: any) => {
+                if (element.name == router.currentRoute.value.query.dialog) {
+                  listSchema({ row: element });
+                }
+              });
+
+              onChangeStreamFilter(selectedStreamType.value);
+
+              dismiss();
+            })
+            .catch((err) => {
+              dismiss();
+              $q.notify({
+                type: "negative",
+                message: "Error while pulling stream.",
+                timeout: 2000,
+              });
             });
-
-            duplicateStreamList.value = cloneDeep(logStream.value);
-
-            logStream.value.forEach((element: any) => {
-              if (element.name == router.currentRoute.value.query.dialog) {
-                listSchema({ row: element });
-              }
-            });
-
-            onChangeStreamFilter(selectedStreamType.value);
-
-            dismiss();
-          })
-          .catch((err) => {
-            dismiss();
-            $q.notify({
-              type: "negative",
-              message: "Error while pulling stream.",
-              timeout: 2000,
-            });
-          });
+        });
       }
 
       segment.track("Button Click", {
