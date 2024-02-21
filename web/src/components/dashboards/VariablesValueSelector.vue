@@ -339,6 +339,85 @@ export default defineComponent({
             // break;
           }
           case "dynamic_filters": {
+            // commented this because we don't want this to call stream api call
+
+            // obj.isLoading = true; // Set loading state
+
+            // return getStreams("", false)
+            //   .then((res) => {
+            //     obj.isLoading = false; // Reset loading state
+
+            //     const fieldsObj: any = {};
+
+            //     res.list.forEach((item: any) => {
+            //       const name = item.name;
+            //       const stream_type = item.stream_type;
+
+            //       (item.schema || []).forEach((schemaItem: any) => {
+            //         const fieldName = schemaItem.name;
+
+            //         if (!fieldsObj[fieldName]) {
+            //           fieldsObj[fieldName] = [];
+            //         }
+
+            //         const existingEntry = fieldsObj[fieldName].find(
+            //           (entry: any) =>
+            //             entry.name === name && entry.stream_type === stream_type
+            //         );
+
+            //         if (!existingEntry) {
+            //           fieldsObj[fieldName].push({
+            //             name: name,
+            //             stream_type: stream_type,
+            //           });
+            //         }
+            //       });
+            //     });
+            //     const fieldsArray = Object.entries(fieldsObj).map(
+            //       ([schemaName, entries]) => ({
+            //         name: schemaName,
+            //         streams: entries,
+            //       })
+            //     );
+            //     obj.options = fieldsArray;
+
+            //     let old = oldVariableValue.find(
+            //       (it2: any) => it2.name === it.name
+            //     );
+            //     if (old) {
+            //       obj.value = old.value.map((it2: any) => ({
+            //         ...it2,
+            //         streams: fieldsArray.find(
+            //           (it3: any) => it3.name === it2.name
+            //         )?.streams,
+            //       }));
+            //     } else {
+            //       obj.value = [];
+            //     }
+
+            //     variablesData.isVariablesLoading = variablesData.values.some(
+            //       (val: { isLoading: any }) => val.isLoading
+            //     );
+
+            //     // triggers rerendering in the current component
+            //     variablesData.values[index] = obj;
+            //     emitVariablesData();
+            //     return obj;
+            //   })
+            //   .catch((error) => {
+            //     obj.isLoading = false; // Reset loading state
+            //     // Handle error
+            //     variablesData.isVariablesLoading = variablesData.values.some(
+            //       (val: { isLoading: any }) => val.isLoading
+            //     );
+
+            //     // triggers rerendering in the current component
+            //     variablesData.values[index] = obj;
+
+            //     emitVariablesData();
+            //     return obj;
+            //   });
+
             obj.isLoading = false; // Set loading state
             let oldVariableObjectSelectedValue = oldVariableValue.find(
               (it2: any) => it2.name === it.name
@@ -349,7 +428,6 @@ export default defineComponent({
               obj.value = it.value;
             }
             emitVariablesData();
-            console.log("obj", obj);
             return obj;
           }
           default:

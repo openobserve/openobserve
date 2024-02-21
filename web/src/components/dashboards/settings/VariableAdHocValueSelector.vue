@@ -60,11 +60,7 @@ export default defineComponent({
         };
 
         const updateModelValueOfSelect = (index: number, value: any) => {
-            console.log("value", value);
-            
-            adhocVariables.value[index].name = value  
-            console.log("adhocVariables", adhocVariables.value);
-            
+            adhocVariables.value[index].name = value              
             emitValue()
         }
 
@@ -75,9 +71,7 @@ export default defineComponent({
         };
 
         const emitValue = () => {
-            emit('update:modelValue', JSON.parse(JSON.stringify(adhocVariables.value)));
-            console.log("adhocVariables.value", adhocVariables.value);
-            
+            emit('update:modelValue', JSON.parse(JSON.stringify(adhocVariables.value)));            
         };
 
         return {

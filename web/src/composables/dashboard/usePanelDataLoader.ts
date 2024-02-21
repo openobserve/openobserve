@@ -487,8 +487,6 @@ export const usePanelDataLoader = (
       //   return it?.streams?.find((it: any) => it.name == queryStream);
       // });
 
-      console.log(applicableAdHocVariables, "applicableAdHocVariables");
-
       applicableAdHocVariables.forEach((variable: any) => {
         metadata.push({
           type: "dynamicVariable",

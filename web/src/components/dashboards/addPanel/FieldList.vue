@@ -497,11 +497,12 @@ export default defineComponent({
       )?.metrics_meta?.metric_type;
     });
 
+    // get stream list
     const streamDataLoading = useLoading(async (stream_type: any) => {
-      console.log("stream_type streamDataLoading", stream_type);
       await getStreamList(stream_type);
     });
 
+    // get the stream list based on the selected stream type
     const loadStreamsListBasedOnType = async () => {
       streamDataLoading.execute(
         dashboardPanelData.data.queries[
@@ -510,6 +511,7 @@ export default defineComponent({
       );
     };
 
+    // watch the stream type and load the stream list
     watch(
       () =>
         dashboardPanelData.data.queries[
@@ -659,10 +661,6 @@ export default defineComponent({
     // get the stream list by making an API call
     const getStreamList = async (stream_type: any) => {
       await getStreams(stream_type, false).then((res: any) => {
-        console.log("stream typeeee", stream_type);
-
-        console.log(res, "streams");
-
         data.schemaList = res.list;
         dashboardPanelData.meta.stream.streamResults = res.list;
       });
