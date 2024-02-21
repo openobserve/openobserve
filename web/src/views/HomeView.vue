@@ -119,6 +119,8 @@ import { useStore } from "vuex";
 import orgService from "../services/organizations";
 import config from "../aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
+import useStreams from "@/composables/useStreams";
+
 export default defineComponent({
   name: "PageHome",
 
@@ -129,6 +131,8 @@ export default defineComponent({
     const $q = useQuasar();
     const no_data_ingest = ref(false);
     const isCloud = config.isCloud;
+    const { setStreams } = useStreams();
+
     const getSummary = (org_id: any) => {
       const dismiss = $q.notify({
         spinner: true,
@@ -137,6 +141,8 @@ export default defineComponent({
       orgService
         .get_organization_summary(org_id)
         .then((res) => {
+          setStreams("all", res.data.streams);
+
           if (
             res.data.streams.length == 0 &&
             res.data.functions.length == 0 &&

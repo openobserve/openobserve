@@ -527,7 +527,7 @@ export default defineComponent({
       formData.value.sql = e.target.value;
     };
 
-    const { getStreams } = useStreams();
+    const { getStreams, getStream } = useStreams();
 
     const previewQuery = ref("");
 
@@ -611,14 +611,16 @@ export default defineComponent({
       });
     };
 
-    const updateStreamFields = (stream_name: any) => {
+    const updateStreamFields = async (stream_name: any) => {
       let streamCols: any = [];
-      const column: any = schemaList.value.find(
-        (schema: any) => schema.name === stream_name
+      const streams: any = await getStream(
+        stream_name,
+        formData.value.stream_type,
+        true
       );
 
-      if (column && Array.isArray(column?.schema)) {
-        streamCols = column.schema.map((column: any) => ({
+      if (streams && Array.isArray(streams.schema)) {
+        streamCols = streams.schema.map((column: any) => ({
           label: column.name,
           value: column.name,
           type: column.type,
@@ -669,7 +671,7 @@ export default defineComponent({
       if (!formData.value.stream_type) return Promise.resolve();
 
       isFetchingStreams.value = true;
-      return getStreams(formData.value.stream_type, true)
+      return getStreams(formData.value.stream_type, false)
         .then((res) => {
           streams.value[formData.value.stream_type] = res.list;
           schemaList.value = res.list;
