@@ -13,24 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
+import { reactive } from "vue";
+
+let streams: any = reactive({});
+
+let streamsIndexMapping: any = reactive({
+  logs: {
+    stream1: 0,
+  },
+});
 
 const useStreams = () => {
   const store = useStore();
-  const $q = useQuasar();
 
-  const getStreams = async (streamName: string, schema: boolean) => {
+  const getStreams = async (_streamName: string = "", schema: boolean) => {
+    const streamName = _streamName || "all";
+
+    // We don't fetch schema while fetching all streams or specific type all streams
+    // So keeping it false, don't change this
+    schema = false;
+
+    let isStreamFetched = false;
+    if (streamName === "all") {
+      isStreamFetched =
+        streams["logs"] &&
+        streams["metrics"] &&
+        streams["traces"] &&
+        streams["enrichment_tables"];
+    } else {
+      isStreamFetched = !!streams[streamName];
+    }
+
     try {
-      if (
-        !store.state.organizationData.streams[streamName || "all"] ||
-        (schema &&
-          !store.state.organizationData.streams[streamName || "all"].schema)
-      ) {
+      if (!isStreamFetched) {
         return await StreamService.nameList(
           store.state.selectedOrganization.identifier,
-          streamName,
+          _streamName,
           schema
         )
           .then((res: any) => {
@@ -40,17 +60,13 @@ const useStreams = () => {
             )
               store.dispatch("setIsDataIngested", !!res.data.list.length);
 
-            const streamObject: {
-              name: string;
-              list: any;
-              schema: boolean;
-            } = {
-              name: streamName || "all",
-              list: res.data.list,
-              schema: schema,
-            };
+            const streamObject = getStreamPayload();
+            streamObject.name = streamName;
+            streamObject.list = res.data.list;
+            streamObject.schema = schema;
 
-            if (!streamName.trim()) {
+            // If the stream name is all, then we need to store each type of stream separately manually
+            if (streamName === "all") {
               const streams: {
                 [key: string]: {
                   name: string;
@@ -71,51 +87,52 @@ const useStreams = () => {
                 }
               });
 
-              streams["all"] = {
-                name: "all",
-                list: [],
-                schema: schema,
-              };
-
               Object.values(streams).forEach((stream: any) => {
-                store.dispatch("setStreams", stream);
+                streams[stream.name] = stream;
               });
             } else {
-              store.dispatch("setStreams", streamObject);
+              streams[streamName] = streamObject;
             }
+
+            // Mapping stream index for each stream type
+            if (streamName === "all") {
+              streamsIndexMapping = reactive({});
+              Object.keys(streams).forEach((key) => {
+                streamsIndexMapping[key] = {};
+                streams[key].list.forEach((stream: any, index: number) => {
+                  streamsIndexMapping[stream.name] = index;
+                });
+              });
+            } else {
+              streamsIndexMapping[streamName] = {};
+              streams[streamName].list.forEach((stream: any, index: number) => {
+                streamsIndexMapping[streamName][stream.name] = index;
+              });
+            }
+
             return streamObject;
           })
           .catch((e: any) => {
             throw new Error(e.message);
           });
       } else {
-        if (!streamName.trim()) {
-          const allstreams = [
+        if (streamName === "all") {
+          const streamObject = getStreamPayload();
+          streamObject.name = streamName;
+          streamObject.schema = schema;
+
+          const keys = [
             "logs",
             "metrics",
             "traces",
-            "enrichment_table",
+            "enrichment_tables",
             "metadata",
           ];
-
-          const allStreamsData = store.state.organizationData.streams["all"];
-
-          allStreamsData.list = allstreams.reduce(
-            (acc: any[], stream: string) => {
-              const streamData = store.state.organizationData.streams[stream];
-              if (streamData !== undefined) {
-                // Check if the stream data exists
-                return [...acc, ...streamData.list];
-              }
-              return acc; // If data is undefined, return the accumulator as is
-            },
-            []
-          );
-
-          console.log("allStreamsData", allStreamsData);
-          return allStreamsData;
+          keys.forEach((key) => {
+            streamObject.list.push(...streams[key].list);
+          });
         } else {
-          return store.state.organizationData.streams[streamName];
+          return streams[streamName];
         }
       }
     } catch (e: any) {
@@ -123,7 +140,157 @@ const useStreams = () => {
     }
   };
 
-  return { getStreams };
+  const getStream = async (
+    streamName: "",
+    streamType: string,
+    schema: boolean
+  ): Promise<any> => {
+    return new Promise(async (resolve, reject) => {
+      if (!streamName || !streamType) {
+        resolve(null);
+      }
+
+      try {
+        if (
+          streams[streamType] &&
+          streams[streamType].list.length &&
+          Object.prototype.hasOwnProperty.call(
+            streamsIndexMapping[streamType],
+            streamName
+          )
+        ) {
+          const hasSchema =
+            !!streams[streamType].list[
+              streamsIndexMapping[streamType][streamName]
+            ]?.schema;
+
+          if (schema && !hasSchema) {
+            const _stream: any = await StreamService.schema(
+              store.state.selectedOrganization.identifier,
+              streamName,
+              streamType
+            );
+            streams[streamType].list[
+              streamsIndexMapping[streamType][streamName]
+            ] = _stream.data;
+          }
+        }
+        return resolve(
+          streams[streamType].list[streamsIndexMapping[streamType][streamName]]
+        );
+      } catch (e: any) {
+        throw new Error(e.message);
+      }
+    });
+  };
+
+  // const getStream = async (
+  //   streamNames: string[{
+  //     streamName: string;
+  //     streamType: string;
+  //     schema:
+  //   }],
+  //   streamType: string,
+  //   schema: boolean
+  // ): Promise<any[]> => {
+  //   return new Promise(async (resolve, reject) => {
+  //     if (!streamNames.length || !streamType) {
+  //       resolve([]);
+  //     }
+
+  //     const streamData: any[] = [];
+  //     let stream = null;
+  //     try {
+  //       for (let i = 0; i < streamNames.length; i++) {
+  //         if (
+  //           streams[streamType] &&
+  //           streams[streamType].list.length &&
+  //           Object.prototype.hasOwnProperty.call(
+  //             streamsIndexMapping[streamType],
+  //             streamNames[i]
+  //           )
+  //         ) {
+  //           stream =
+  //             streams[streamType].list[
+  //               streamsIndexMapping[streamType][streamNames[i]]
+  //             ];
+  //           if (schema && !stream.schema) {
+  //             let _stream: any = await StreamService.schema(
+  //               store.state.selectedOrganization.identifier,
+  //               streamNames[i],
+  //               streamType
+  //             );
+  //             stream = _stream.data;
+  //             _stream = null;
+  //           }
+
+  //           streamData.push(cloneDeep(stream));
+  //         }
+  //       }
+  //       return resolve(streamData);
+  //     } catch (e: any) {
+  //       throw new Error(e.message);
+  //     }
+  //   });
+  // };
+
+  const setStreams = (streamName: string = "all", streamList: any[] = []) => {
+    if (!store.state.organizationData.isDataIngested && !!streamList.length)
+      store.dispatch("setIsDataIngested", !!streamList.length);
+
+    const streamObject = getStreamPayload();
+    streamObject.name = streamName;
+    streamObject.list = streamList;
+    streamObject.schema = false;
+
+    // If the stream name is all, then we need to store each type of stream separately manually
+    if (streamName === "all") {
+      streams = reactive({});
+
+      streamList.forEach((stream: any) => {
+        if (streams[stream.stream_type]) {
+          streams[stream.stream_type].list.push(stream);
+        } else {
+          streams[stream.stream_type] = {
+            name: stream.stream_type,
+            list: [stream],
+            schema: false,
+          };
+        }
+      });
+    } else {
+      streams[streamName] = streamObject;
+    }
+
+    // Mapping stream index for each stream type
+    if (streamName === "all") {
+      streamsIndexMapping = reactive({});
+      Object.keys(streams).forEach((key) => {
+        streamsIndexMapping[key] = {};
+        streams[key].list.forEach((stream: any, index: number) => {
+          streamsIndexMapping[stream.name] = index;
+        });
+      });
+    } else {
+      streamsIndexMapping[streamName] = {};
+      streams[streamName].list.forEach((stream: any, index: number) => {
+        streamsIndexMapping[streamName][stream.name] = index;
+      });
+    }
+  };
+
+  const getStreamPayload = () => {
+    return {
+      name: "",
+      list: [],
+      schema: false,
+    } as {
+      name: string;
+      list: any;
+      schema: boolean;
+    };
+  };
+  return { getStreams, getStream, setStreams };
 };
 
 export default useStreams;
