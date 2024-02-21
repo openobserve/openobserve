@@ -330,7 +330,7 @@ export default defineComponent({
     const variableData: any = reactive({
       name: "",
       label: "",
-      type: "query_values",
+      type: "",
       query_data: {
         stream_type: "",
         stream: "",
@@ -362,9 +362,57 @@ export default defineComponent({
         // Assign edit data to variableData
         Object.assign(variableData, edit);
       } else {
+        // default variable type will be query_values
+        variableData.type = "query_values";
         editMode.value = false;
       }
     });
+
+    // check if type is query_values then get stream list and field list
+    watch(
+      () => [variableData.type],
+      async () => {
+        if (variableData.type == "query_values") {
+          // add query_data object if not have
+          if (!variableData?.query_data) {
+            variableData.query_data = {
+              stream_type: "",
+              stream: "",
+              field: "",
+              max_record_size: null,
+            };
+          }
+
+          // if variable type is query_values
+          // need to get the stream list
+          // and followed by the field list
+          try {
+            const streamType = variableData?.query_data?.stream_type;
+
+            // get all streams from current stream type
+            const streamList: any = await getStreams(streamType, false);
+
+            data.streams = streamList.list ?? [];
+
+            // get schema of that field using getstream
+            const fieldWithSchema: any = await getStream(
+              variableData?.query_data?.stream,
+              variableData.query_data.stream_type,
+              true
+            );
+
+            // assign the schema
+            data.currentFieldsList = fieldWithSchema?.schema ?? [];
+          } catch (error: any) {
+            $q.notify({
+              type: "negative",
+              message: error ?? "Failed to get stream fields",
+              timeout: 2000,
+            });
+          }
+        }
+      }
+    );
 
     const addField = () => {
       variableData.options.push({ label: "", value: "" });
@@ -465,7 +513,7 @@ export default defineComponent({
       const streamType = variableData?.query_data?.stream_type;
 
       // get all streams from current stream type
-      const streamList = await getStreams(streamType, false);
+      const streamList: any = await getStreams(streamType, false);
 
       data.streams = streamList.list ?? [];
     };
@@ -488,6 +536,7 @@ export default defineComponent({
         $q.notify({
           type: "negative",
           message: error ?? "Failed to get stream fields",
+          timeout: 2000,
         });
       }
     };
