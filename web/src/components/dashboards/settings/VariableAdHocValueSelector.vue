@@ -2,19 +2,17 @@
     <div class="row items-center">
         <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
         <div class="row no-wrap items-center q-mb-xs" v-for="(item, index) in adhocVariables" :key="index">
-            <q-select filled outlined dense :model-value="adhocVariables[index].name"
-                :display-value="adhocVariables[index].name ? adhocVariables[index].name : variableItem.isLoading ? '(No Data Found)' : ''"
-                :options="fieldsFilteredOptions" input-debounce="0" behavior="menu" use-input stack-label option-label="name"
-                @update:model-value="updateModelValueOfSelect(index, $event)" data-test="dashboard-variable-adhoc-name-selector"
-                @filter="fieldsFilterFn" :placeholder="adhocVariables[index].name ? '' : 'Select Field'" class="textbox col no-case q-ml-sm" :loading="variableItem.isLoading">
-                <template v-slot:no-option>
-                    <q-item>
-                        <q-item-section class="text-italic text-grey">
-                            No Data Found
-                        </q-item-section>
-                    </q-item>
-                </template>
-            </q-select>
+            <q-input
+                filled
+                dense
+                v-model="adhocVariables[index].name"
+                debounce="1000"
+                data-test="dashboard-variable-adhoc-name-selector"
+                placeholder="Enter Name"
+                @update:model-value="updateModelValueOfSelect(index, $event)"
+                class="textbox col no-case q-ml-sm"
+            >
+            </q-input>
             <q-select dense filled v-model="adhocVariables[index].operator"
                 :display-value="adhocVariables[index].operator ? adhocVariables[index].operator : ''"
                 :options="operatorOptions" style="width: auto" class="operator" data-test="dashboard-variable-adhoc-operator-selector" />
@@ -62,8 +60,7 @@ export default defineComponent({
         };
 
         const updateModelValueOfSelect = (index: number, value: any) => {
-            adhocVariables.value[index].name = value.name
-            adhocVariables.value[index].streams = value.streams
+            adhocVariables.value[index].name = value              
             emitValue()
         }
 
@@ -74,7 +71,7 @@ export default defineComponent({
         };
 
         const emitValue = () => {
-            emit('update:modelValue', JSON.parse(JSON.stringify(adhocVariables.value)));
+            emit('update:modelValue', JSON.parse(JSON.stringify(adhocVariables.value)));            
         };
 
         return {

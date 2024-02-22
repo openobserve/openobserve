@@ -153,7 +153,6 @@ import {
 } from "@/utils/zincutils";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
-import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -164,6 +163,7 @@ import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import useStreams from "@/composables/useStreams";
 
 interface Session {
   timestamp: string;
@@ -199,6 +199,7 @@ const rumSessionStreamName = "_sessionreplay";
 const isMounted = ref(false);
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
+const { getStream } = useStreams();
 
 const userDataSet = new Set([
   "user_agent_device_family",
@@ -308,13 +309,8 @@ onMounted(async () => {
 const getStreamFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
-    streamService
-      .schema(
-        store.state.selectedOrganization.identifier,
-        rumSessionStreamName,
-        "logs"
-      )
-      .then((res) => {
+    getStream(rumSessionStreamName, "logs", true)
+      .then((stream) => {
         const fieldsToVerify = new Set([
           "geo_info_city",
           "geo_info_country",
@@ -331,7 +327,7 @@ const getStreamFields = () => {
           showValues: true,
         });
 
-        res.data.schema.forEach((field: any) => {
+        stream.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
             schemaMapping.value[field.name] = field;
 
@@ -353,9 +349,8 @@ const getStreamFields = () => {
 const getRumDataFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
-    streamService
-      .schema(store.state.selectedOrganization.identifier, "_rumdata", "logs")
-      .then((res) => {
+    getStream("_rumdata", "logs", true)
+      .then((stream) => {
         const fieldsToVerify = new Set([
           "geo_info_city",
           "geo_info_country",
@@ -363,7 +358,7 @@ const getRumDataFields = () => {
           "usr_id",
           "usr_name",
         ]);
-        res.data.schema.forEach((field: any) => {
+        stream.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
             schemaMapping.value[field.name] = field;
         });

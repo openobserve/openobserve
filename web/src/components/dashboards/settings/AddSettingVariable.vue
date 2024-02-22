@@ -281,6 +281,7 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useQuasar } from "quasar";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -303,6 +304,8 @@ export default defineComponent({
     });
     const route = useRoute();
     const title = ref("Add Variable");
+    const { getStreams, getStream } = useStreams();
+
     // const model = ref(null)
     // const filteredStreams = ref([]);
     const variableTypes = ref([
@@ -327,7 +330,7 @@ export default defineComponent({
     const variableData: any = reactive({
       name: "",
       label: "",
-      type: "query_values",
+      type: "",
       query_data: {
         stream_type: "",
         stream: "",
@@ -341,8 +344,6 @@ export default defineComponent({
     const editMode = ref(false);
 
     onMounted(async () => {
-      getStreamList();
-
       if (props.variableName) {
         editMode.value = true;
         title.value = "Edit Variable";
@@ -359,9 +360,70 @@ export default defineComponent({
         // Assign edit data to variableData
         Object.assign(variableData, edit);
       } else {
+        // default variable type will be query_values
+        variableData.type = "query_values";
         editMode.value = false;
       }
     });
+
+    // check if type is query_values then get stream list and field list
+    watch(
+      () => [variableData.type],
+      async () => {
+        if (variableData.type == "query_values") {
+          // add query_data object if not have
+          if (!variableData?.query_data) {
+            variableData.query_data = {
+              stream_type: "",
+              stream: "",
+              field: "",
+              max_record_size: null,
+            };
+          }
+
+          // if variable type is query_values
+          // need to get the stream list
+          // and followed by the field list
+          try {
+            // if stream type is exists
+            if (variableData?.query_data?.stream_type) {
+              // get all streams from current stream type
+              const streamList: any = await getStreams(
+                variableData?.query_data?.stream_type,
+                false
+              );
+              data.streams = streamList.list ?? [];
+
+              // if stream type and stream is exists
+              if (variableData?.query_data?.stream) {
+                // get schema of that field using getstream
+                const fieldWithSchema: any = await getStream(
+                  variableData?.query_data?.stream,
+                  variableData.query_data.stream_type,
+                  true
+                );
+
+                // assign the schema
+                data.currentFieldsList = fieldWithSchema?.schema ?? [];
+              } else {
+                // reset field list array
+                data.currentFieldsList = [];
+              }
+            } else {
+              // reset stream and field list
+              data.streams = [];
+              data.currentFieldsList = [];
+            }
+          } catch (error: any) {
+            $q.notify({
+              type: "negative",
+              message: error ?? "Failed to get stream fields",
+              timeout: 2000,
+            });
+          }
+        }
+      }
+    );
 
     const addField = () => {
       variableData.options.push({ label: "", value: "" });
@@ -371,10 +433,15 @@ export default defineComponent({
       variableData.options.splice(index, 1);
     };
 
-    const saveVariableApiCall = useLoading(() => saveData());
+    const saveVariableApiCall = useLoading(async () => await saveData());
 
     const saveData = async () => {
       const dashId = route.query.dashboard + "";
+
+      // remove query_data if type is not query_values
+      if (variableData.type !== "query_values") {
+        delete variableData["query_data"];
+      }
 
       if (editMode.value) {
         try {
@@ -394,10 +461,6 @@ export default defineComponent({
           });
         }
       } else {
-        if (variableData.type !== "query_values") {
-          delete variableData["query_data"];
-        }
-
         try {
           await addVariable(
             store,
@@ -433,20 +496,6 @@ export default defineComponent({
         });
       });
     };
-    const getStreamList = () => {
-      IndexService.nameList(
-        store.state.selectedOrganization.identifier,
-        "",
-        true
-      ).then((res) => {
-        data.schemaResponse = res.data?.list || [];
-        if (editMode.value) {
-          // set the dropdown values
-          streamTypeUpdated();
-          streamUpdated();
-        }
-      });
-    };
 
     // select filters
     const {
@@ -456,19 +505,57 @@ export default defineComponent({
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete(toRef(data, "currentFieldsList"), "name");
 
-    const streamTypeUpdated = () => {
-      const streamType = variableData?.query_data?.stream_type;
-      const filteredStreams = data.schemaResponse.filter(
-        (data: any) => data.stream_type === streamType
-      );
-      data.streams = filteredStreams;
+    const streamTypeUpdated = async () => {
+      // reset the stream and field
+      variableData.query_data.stream = "";
+      variableData.query_data.field = "";
+
+      // if stream type is exists
+      if (variableData.query_data.stream_type) {
+        // get all streams from current stream type
+        const streamList: any = await getStreams(
+          variableData?.query_data?.stream_type,
+          false
+        );
+
+        // assign the stream list
+        data.streams = streamList.list ?? [];
+      } else {
+        // reset stream list
+        data.streams = [];
+      }
     };
 
-    const streamUpdated = () => {
-      const stream = variableData?.query_data?.stream;
-      data.currentFieldsList =
-        data.schemaResponse.find((item: any) => item.name === stream)?.schema ||
-        [];
+    const streamUpdated = async () => {
+      // reset field list value
+      variableData.query_data.field = "";
+
+      try {
+        // if stream type and stream is exists
+        if (
+          variableData.query_data.stream &&
+          variableData.query_data.stream_type
+        ) {
+          // get schema of that field using getstream
+          const fieldWithSchema: any = await getStream(
+            variableData?.query_data?.stream,
+            variableData.query_data.stream_type,
+            true
+          );
+
+          // assign the schema
+          data.currentFieldsList = fieldWithSchema?.schema ?? [];
+        } else {
+          // reset field list
+          data.currentFieldsList = [];
+        }
+      } catch (error: any) {
+        $q.notify({
+          type: "negative",
+          message: error ?? "Failed to get stream fields",
+          timeout: 2000,
+        });
+      }
     };
 
     const close = () => {
@@ -478,7 +565,6 @@ export default defineComponent({
     return {
       variableData,
       t,
-      getStreamList,
       data,
       streamsFilterFn,
       fieldsFilterFn,

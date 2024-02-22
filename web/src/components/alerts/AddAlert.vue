@@ -419,6 +419,7 @@ import { getUUID } from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import PreviewAlert from "./PreviewAlert.vue";
+import useStreams from "@/composables/useStreams";
 
 const defaultValue: any = () => {
   return {
@@ -526,6 +527,8 @@ export default defineComponent({
       formData.value.sql = e.target.value;
     };
 
+    const { getStreams, getStream } = useStreams();
+
     const previewQuery = ref("");
 
     const addAlertFormRef = ref(null);
@@ -581,7 +584,7 @@ export default defineComponent({
 
     onMounted(async () => {});
 
-    const updateEditorContent = (stream_name: string) => {
+    const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
       if (!stream_name) return;
 
@@ -600,22 +603,26 @@ export default defineComponent({
         const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
       }
 
-      const selected_stream: any = schemaList.value.filter(
-        (stream) => stream["name"] === stream_name
+      const selected_stream: any = await getStream(
+        stream_name,
+        formData.value.stream_type,
+        true
       );
-      selected_stream[0].schema.forEach(function (item: any, index: any) {
+      selected_stream.schema.forEach(function (item: any) {
         triggerCols.value.push(item.name);
       });
     };
 
-    const updateStreamFields = (stream_name: any) => {
+    const updateStreamFields = async (stream_name: any) => {
       let streamCols: any = [];
-      const column: any = schemaList.value.find(
-        (schema: any) => schema.name === stream_name
+      const streams: any = await getStream(
+        stream_name,
+        formData.value.stream_type,
+        true
       );
 
-      if (column && Array.isArray(column?.schema)) {
-        streamCols = column.schema.map((column: any) => ({
+      if (streams && Array.isArray(streams.schema)) {
+        streamCols = streams.schema.map((column: any) => ({
           label: column.name,
           value: column.name,
           type: column.type,
@@ -666,16 +673,11 @@ export default defineComponent({
       if (!formData.value.stream_type) return Promise.resolve();
 
       isFetchingStreams.value = true;
-      return streamService
-        .nameList(
-          store.state.selectedOrganization.identifier,
-          formData.value.stream_type,
-          true
-        )
-        .then((res) => {
-          streams.value[formData.value.stream_type] = res.data.list;
-          schemaList.value = res.data.list;
-          indexOptions.value = res.data.list.map((data: any) => {
+      return getStreams(formData.value.stream_type, false)
+        .then((res: any) => {
+          streams.value[formData.value.stream_type] = res.list;
+          schemaList.value = res.list;
+          indexOptions.value = res.list.map((data: any) => {
             return data.name;
           });
 

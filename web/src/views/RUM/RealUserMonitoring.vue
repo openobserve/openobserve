@@ -88,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import AppTabs from "@/components/common/AppTabs.vue";
-import streamService from "@/services/stream";
 import { computed, nextTick, onActivated, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -99,6 +98,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
+import useStreams from "@/composables/useStreams";
 
 const route = useRoute();
 const router = useRouter();
@@ -122,6 +122,7 @@ const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
 const { rumState } = useRum();
+const { getStream, getStreams } = useStreams();
 
 const activeTab = ref<string>("performance");
 const tabs = [
@@ -212,16 +213,18 @@ const updateTabOnRouteChange = () => {
 
 const checkIfRumEnabled = async () => {
   await nextTick();
-  return new Promise((resolve) => {
-    streamService
-      .nameList(store.state.selectedOrganization.identifier, "logs", false)
+  return new Promise(async (resolve) => {
+    getStream("_rumdata", "logs", false)
       .then((response: any) => {
-        response.data.list.forEach((stream: any) => {
-          if (stream.name === "_rumdata") isRumEnabled.value = true;
-          if (stream.name === "_sessionreplay")
-            isSessionReplayEnabled.value = true;
-        });
+        if (response) isRumEnabled.value = true;
+      })
+      .finally(() => {
         resolve(true);
+      });
+
+    getStream("_sessionreplay", "logs", false)
+      .then((response: any) => {
+        if (response) isSessionReplayEnabled.value = true;
       })
       .finally(() => {
         resolve(true);
@@ -297,18 +300,13 @@ const getSchema = async () => {
 const getSessionReplayFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
-    streamService
-      .schema(
-        store.state.selectedOrganization.identifier,
-        "_sessionreplay",
-        "logs"
-      )
-      .then((res) => {
+    getStream("_sessionreplay", "logs", true)
+      .then((stream) => {
         performanceState.data.streams["_sessionreplay"] = {
           schema: {},
           name: "_sessionreplay",
         };
-        res.data.schema.forEach((field: any) => {
+        stream.schema.forEach((field: any) => {
           performanceState.data.streams["_sessionreplay"]["schema"][
             field.name
           ] = field;
@@ -324,14 +322,13 @@ const getSessionReplayFields = () => {
 const getRumDataFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
-    streamService
-      .schema(store.state.selectedOrganization.identifier, "_rumdata", "logs")
-      .then((res) => {
+    getStream("_rumdata", "logs", true)
+      .then((stream) => {
         performanceState.data.streams["_rumdata"] = {
           schema: {},
           name: "_rumdata",
         };
-        res.data.schema.forEach((field: any) => {
+        stream.schema.forEach((field: any) => {
           performanceState.data.streams["_rumdata"]["schema"][field.name] =
             field;
         });
