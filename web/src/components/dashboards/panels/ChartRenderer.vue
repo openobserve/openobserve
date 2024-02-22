@@ -271,6 +271,7 @@ export default defineComponent({
         // and hovered series is not -1
         // and chart is time series
         if (
+          isChartVisible &&
           props?.data?.extras?.panelId &&
           props?.data?.extras?.panelId != hoveredSeriesState?.value?.panelId &&
           hoveredSeriesState?.value?.panelId != -1 &&
@@ -378,6 +379,39 @@ export default defineComponent({
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
+    });
+
+    // observer for chart visibility
+    let isChartVisibleObserver: any;
+
+    // flag for chart visibility
+    let isChartVisible: any = false;
+
+    onMounted(() => {
+      // chart visibility observer
+      isChartVisibleObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // chart is visible
+            isChartVisible = true;
+          } else {
+            // chart is not visible
+            isChartVisible = false;
+          }
+        });
+      });
+
+      if (chartRef.value) {
+        // observe chart
+        isChartVisibleObserver.observe(chartRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      if (chartRef.value) {
+        // unobserve chart
+        isChartVisibleObserver.unobserve(chartRef.value);
+      }
     });
 
     //need to resize chart on activated
