@@ -31,6 +31,7 @@ use crate::{
 };
 
 pub mod folders;
+pub mod reports;
 
 #[tracing::instrument(skip(body))]
 pub async fn create_dashboard(

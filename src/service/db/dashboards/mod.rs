@@ -20,6 +20,7 @@ use infra::db as infra_db;
 use crate::common::meta::dashboards::{v1, v2, v3, Dashboard, DashboardVersion};
 
 pub mod folders;
+pub mod reports;
 
 #[tracing::instrument]
 pub(crate) async fn get(

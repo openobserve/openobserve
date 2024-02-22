@@ -84,6 +84,18 @@ pub async fn handle_triggers(
     is_silenced: bool,
 ) -> Result<(), anyhow::Error> {
     let columns = key.split('/').collect::<Vec<&str>>();
+    if columns.len() == 4 {
+        handle_alert_triggers(&columns, is_realtime, is_silenced).await
+    } else {
+        handle_report_triggers(&columns).await
+    }
+}
+
+async fn handle_alert_triggers(
+    columns: &Vec<&str>,
+    is_realtime: bool,
+    is_silenced: bool,
+) -> Result<(), anyhow::Error> {
     assert_eq!(columns.len(), 4);
     let org_id = columns[0];
     let stream_type: StreamType = columns[1].into();
@@ -97,7 +109,8 @@ pub async fn handle_triggers(
             is_realtime: true,
             is_silenced: false,
         };
-        super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
+        super::triggers::save_alert(org_id, stream_type, stream_name, alert_name, &new_trigger)
+            .await?;
         return Ok(());
     }
 
@@ -124,7 +137,8 @@ pub async fn handle_triggers(
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
         new_trigger.is_silenced = true;
-        super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
+        super::triggers::save_alert(org_id, stream_type, stream_name, alert_name, &new_trigger)
+            .await?;
         return Ok(());
     }
 
@@ -147,7 +161,14 @@ pub async fn handle_triggers(
     }
 
     // update trigger
-    super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
+    super::triggers::save_alert(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
 
+    Ok(())
+}
+
+async fn handle_report_triggers(columns: &Vec<&str>) -> Result<(), anyhow::Error> {
+    assert_eq!(columns.len(), 3);
+    assert_eq!(columns[0], "report");
+    // TODO
     Ok(())
 }

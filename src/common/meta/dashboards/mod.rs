@@ -39,6 +39,7 @@ pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,
 }
 
+pub mod reports;
 pub mod v1;
 pub mod v2;
 pub mod v3;

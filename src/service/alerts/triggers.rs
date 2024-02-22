@@ -18,21 +18,37 @@ use config::meta::stream::StreamType;
 use super::db;
 use crate::common::meta::alerts::triggers::Trigger;
 
-pub async fn save(
+/// Saves [`Trigger`] for `Alert`
+pub async fn save_alert(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     alert_name: &str,
     trigger: &Trigger,
 ) -> Result<(), anyhow::Error> {
-    db::alerts::triggers::set(org_id, stream_type, stream_name, alert_name, trigger).await
+    db::alerts::triggers::set_alert(org_id, stream_type, stream_name, alert_name, trigger).await
 }
 
-pub async fn delete(
+/// Deletes [`Trigger`] for `Alert`
+pub async fn delete_alert(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     alert_name: &str,
 ) -> Result<(), anyhow::Error> {
-    db::alerts::triggers::delete(org_id, stream_type, stream_name, alert_name).await
+    db::alerts::triggers::delete_alert(org_id, stream_type, stream_name, alert_name).await
+}
+
+/// Saves [`Trigger`] for `Report`
+pub async fn save_report(
+    org_id: &str,
+    report_name: &str,
+    trigger: &Trigger,
+) -> Result<(), anyhow::Error> {
+    db::alerts::triggers::set_report(org_id, report_name, trigger).await
+}
+
+/// Deletes [`Trigger`] for `Report`
+pub async fn delete_report(org_id: &str, report_name: &str) -> Result<(), anyhow::Error> {
+    db::alerts::triggers::delete_report(org_id, report_name).await
 }
