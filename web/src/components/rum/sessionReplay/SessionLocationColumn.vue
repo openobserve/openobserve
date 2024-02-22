@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div>
       <div class="row items-center no-wrap">
+        <span :class="`fi fi-${column.country_iso_code} q-mr-sm`" />
         <div style="font-size: 12px">{{ column.country }}</div>
       </div>
       <div class="row q-mt-xs items-center">
@@ -34,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { defineProps } from "vue";
+import "flag-icons/css/flag-icons.min.css";
+
 defineProps({
   column: {
     type: Object,

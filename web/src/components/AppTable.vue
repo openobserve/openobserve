@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tr :props="props" :key="`m_${props.row.index}`">
           <q-td
             v-for="col in props.cols"
+            :class="col.class || ''"
             :key="col.name"
             :props="props"
             @click="handleDataClick(col.name, props.row)"
