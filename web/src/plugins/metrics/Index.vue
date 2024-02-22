@@ -277,6 +277,7 @@ import useNotifications from "@/composables/useNotifications";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -330,6 +331,7 @@ export default defineComponent({
     const promqlKeywords = ref([]);
     const isMounted = ref(false);
     const logStreams = ref([]);
+    const { getStreams } = useStreams();
 
     const metricTypeMapping: any = {
       Summary: "summary",
@@ -347,25 +349,19 @@ export default defineComponent({
     const updateStreams = () => {
       if (searchObj.data.streamResults?.list?.length) {
         const streamType = "metrics";
-        streamService
-          .nameList(
-            store.state.selectedOrganization.identifier,
-            streamType,
-            true
-          )
-          .then((response: any) => {
-            searchObj.data.streamResults = response.data;
-            searchObj.data.metrics.metricList = [];
-            response.data.list.map((item: any) => {
-              let itemObj = {
-                label: item.name,
-                value: item.name,
-                type: metricTypeMapping[item.metrics_meta.metric_type] || "",
-                help: item.metrics_meta.help || "",
-              };
-              searchObj.data.metrics.metricList.push(itemObj);
-            });
+        getStreams(streamType, true).then((response: any) => {
+          searchObj.data.streamResults = response;
+          searchObj.data.metrics.metricList = [];
+          response.list.map((item: any) => {
+            let itemObj = {
+              label: item.name,
+              value: item.name,
+              type: metricTypeMapping[item.metrics_meta.metric_type] || "",
+              help: item.metrics_meta.help || "",
+            };
+            searchObj.data.metrics.metricList.push(itemObj);
           });
+        });
       } else {
         loadPageData();
       }
@@ -417,11 +413,10 @@ export default defineComponent({
     });
 
     const getLogStreams = () => {
-      streamService
-        .nameList(store.state?.selectedOrganization?.identifier, "logs", false)
+      getStreams("logs", false)
         .then(
           (res) =>
-            (logStreams.value = res.data.list.map((stream) => ({
+            (logStreams.value = res.list.map((stream) => ({
               name: stream.name,
             })))
         )
@@ -442,16 +437,11 @@ export default defineComponent({
       try {
         searchObj.data.errorMsg = "";
         searchObj.loading = true;
-        streamService
-          .nameList(
-            store.state.selectedOrganization.identifier,
-            "metrics",
-            true
-          )
+        getStreams("metrics", false)
           .then((res) => {
-            searchObj.data.streamResults = res.data;
+            searchObj.data.streamResults = res;
 
-            if (res.data.list.length > 0) {
+            if (res.list.length > 0) {
               //extract stream data from response
               loadStreamLists(isFirstLoad);
             } else {
@@ -753,7 +743,6 @@ export default defineComponent({
     const onMetricChange = async (metric) => {
       if (!searchObj.data.metrics.selectedMetric?.value) return;
 
-      console.log("metric", metric);
       const query = metric?.value + "{}";
       nextTick(() => {
         metricsQueryEditorRef.value.setValue(query);

@@ -170,7 +170,7 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading organizations...",
       });
-      organizationsService.list(0, 1000, "name", false, "").then((res) => {
+      organizationsService.list(0, 100000, "name", false, "").then((res) => {
         // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
 

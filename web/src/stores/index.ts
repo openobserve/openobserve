@@ -45,6 +45,7 @@ const organizationObj = {
   organizationSettings: {
     scrape_interval: 15,
   },
+  isDataIngested: false,
 };
 
 export default createStore({
@@ -74,7 +75,6 @@ export default createStore({
       if (payload) {
         state.loggedIn = payload.loginState;
         state.userInfo = payload.userInfo;
-        
       }
     },
     logout(state) {
@@ -168,6 +168,9 @@ export default createStore({
     setSavedFunctionDialog(state, payload) {
       state.savedFunctionDialog = payload;
     },
+    setIsDataIngested(state, payload) {
+      state.organizationData.isDataIngested = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -259,6 +262,9 @@ export default createStore({
     },
     setSavedFunctionDialog(context, payload) {
       context.commit("setSavedFunctionDialog", payload);
+    },
+    setIsDataIngested(context, payload) {
+      context.commit("setIsDataIngested", payload);
     },
   },
   modules: {},

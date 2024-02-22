@@ -1259,7 +1259,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
 };
 
 const getEnrichmentTables = async () => {
-  const data = await getStreams("enrichment_tables", false);
+  const data: any = await getStreams("enrichment_tables", false);
 
   updateResourceEntities("enrichment_table", ["name"], data.list);
 
@@ -1297,7 +1297,7 @@ const getDashboards = async (resource: Entity | Resource) => {
 };
 
 const getOrgs = async () => {
-  const orgs = await organizationsService.list(0, 10000, "name", false, "");
+  const orgs = await organizationsService.list(0, 100000, "name", false, "");
 
   updateResourceEntities("org", ["identifier"], [...orgs.data.data]);
 
@@ -1421,7 +1421,7 @@ const getAlerts = async () => {
 };
 
 const getLogs = async (resource: Resource | Entity) => {
-  const logs = await getStreams("logs", false);
+  const logs: any = await getStreams("logs", false);
 
   updateEntityEntities(resource, ["name"], logs.list);
 
@@ -1431,7 +1431,7 @@ const getLogs = async (resource: Resource | Entity) => {
 };
 
 const getMetrics = async (resource: Resource | Entity) => {
-  const metrics = await getStreams("metrics", false);
+  const metrics: any = await getStreams("metrics", false);
 
   updateEntityEntities(resource, ["name"], metrics.list);
 
@@ -1441,7 +1441,7 @@ const getMetrics = async (resource: Resource | Entity) => {
 };
 
 const getTraces = async (resource: Resource | Entity) => {
-  const traces = await getStreams("traces", false);
+  const traces: any = await getStreams("traces", false);
 
   updateEntityEntities(resource, ["name"], traces.list);
 

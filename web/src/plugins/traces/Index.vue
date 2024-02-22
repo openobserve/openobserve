@@ -192,6 +192,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "PageSearch",
@@ -269,6 +270,7 @@ export default defineComponent({
     const serviceColorIndex = ref(0);
     const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
     const indexListRef = ref(null);
+    const { getStreams, getStream } = useStreams();
 
     searchObj.organizationIdetifier =
       store.state.selectedOrganization.identifier;
@@ -315,12 +317,11 @@ export default defineComponent({
 
     function getStreamList() {
       try {
-        streamService
-          .nameList(store.state.selectedOrganization.identifier, "traces", true)
+        getStreams("traces", false)
           .then((res) => {
-            searchObj.data.streamResults = res.data;
+            searchObj.data.streamResults = res;
 
-            if (res.data.list.length > 0) {
+            if (res.list.length > 0) {
               if (config.isCloud == "true") {
                 getQueryTransform();
               }
@@ -364,6 +365,7 @@ export default defineComponent({
           });
       } catch (e) {
         searchObj.loading = false;
+        console.log(e);
         showErrorNotification("Error while getting streams");
       }
     }
@@ -865,7 +867,7 @@ export default defineComponent({
       return colors;
     }
 
-    function extractFields() {
+    async function extractFields() {
       try {
         searchObj.data.stream.selectedStreamFields = [];
         if (searchObj.data.streamResults.list.length > 0) {
@@ -873,12 +875,14 @@ export default defineComponent({
           const ignoreFields = [store.state.zoConfig.timestamp_column];
           let ftsKeys;
 
-          searchObj.data.streamResults.list.forEach((stream: any) => {
-            if (searchObj.data.stream.selectedStream.value == stream.name) {
-              schema.push(...stream.schema);
-              ftsKeys = new Set([...stream.settings.full_text_search_keys]);
-            }
-          });
+          const stream = await getStream(
+            searchObj.data.stream.selectedStream.value,
+            "traces",
+            true
+          );
+
+          schema.push(...stream.schema);
+          ftsKeys = new Set([...stream.settings.full_text_search_keys]);
 
           const idFields = {
             trace_id: 1,

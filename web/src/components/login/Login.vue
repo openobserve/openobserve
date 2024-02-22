@@ -255,7 +255,7 @@ export default defineComponent({
                   selectedOrg.value = localOrg.value;
                 } else {
                   await organizationsService
-                    .os_list(0, 1000, "id", false, "", "default")
+                    .os_list(0, 100000, "id", false, "", "default")
                     .then((res: any) => {
                       if (res.data.data.length) {
                         const firstOrg = res.data.data[0];

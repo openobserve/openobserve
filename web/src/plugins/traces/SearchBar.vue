@@ -173,6 +173,7 @@ import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -220,6 +221,8 @@ export default defineComponent({
     let streamName = "";
     const dateTimeRef = ref(null);
 
+    const { getStream } = useStreams();
+
     const {
       autoCompleteData,
       autoCompleteKeywords,
@@ -251,7 +254,7 @@ export default defineComponent({
       getSuggestions();
     };
 
-    const updateQueryValue = (value: string) => {
+    const updateQueryValue = async (value: string) => {
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
@@ -263,21 +266,21 @@ export default defineComponent({
           ) {
             let streamFound = false;
             streamName = searchObj.data.parsedQuery.from[0].table;
-            searchObj.data.streamResults.list.forEach((stream) => {
-              if (stream.name == searchObj.data.parsedQuery.from[0].table) {
+            await getStream(streamName, "traces", true).then(
+              (streamResponse) => {
                 streamFound = true;
                 let itemObj = {
-                  label: stream.name,
-                  value: stream.name,
+                  label: streamResponse.name,
+                  value: streamResponse.name,
                 };
                 searchObj.data.stream.selectedStream = itemObj;
-                stream.schema.forEach((field) => {
+                streamResponse.schema.forEach((field) => {
                   searchObj.data.stream.selectedStreamFields.push({
                     name: field.name,
                   });
                 });
               }
-            });
+            );
 
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
