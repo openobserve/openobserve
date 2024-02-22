@@ -584,7 +584,7 @@ export default defineComponent({
 
     onMounted(async () => {});
 
-    const updateEditorContent = (stream_name: string) => {
+    const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
       if (!stream_name) return;
 
@@ -603,10 +603,12 @@ export default defineComponent({
         const someCode = `${prefixCode.value} ${editorData.value} ${suffixCode.value}`;
       }
 
-      const selected_stream: any = schemaList.value.filter(
-        (stream) => stream["name"] === stream_name
+      const selected_stream: any = await getStream(
+        stream_name,
+        formData.value.stream_type,
+        true
       );
-      selected_stream[0].schema.forEach(function (item: any, index: any) {
+      selected_stream.schema.forEach(function (item: any) {
         triggerCols.value.push(item.name);
       });
     };
