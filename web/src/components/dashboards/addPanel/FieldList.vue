@@ -567,6 +567,12 @@ export default defineComponent({
               true
             );
 
+            // below line required for pass by reference
+            // if we don't set blank, then same object from cache is being set
+            // and that doesn't call the watchers,
+            // so it will not be updated when we switch to different chart types
+            // which doesn't have field list and coming back to field list
+            dashboardPanelData.meta.stream.selectedStreamFields = [];
             // assign the schema
             dashboardPanelData.meta.stream.selectedStreamFields =
               fieldWithSchema?.schema ?? [];
@@ -662,13 +668,12 @@ export default defineComponent({
     const getStreamList = async (stream_type: any) => {
       await getStreams(stream_type, false).then((res: any) => {
         data.schemaList = res.list;
-
         // below line required for pass by reference
         // if we don't set blank, then same object from cache is being set
         // and that doesn't call the watchers,
         // so it will not be updated when we switch to different chart types
         // which doesn't have field list and coming back to field list
-        dashboardPanelData.meta.stream.streamResults = [] 
+        dashboardPanelData.meta.stream.streamResults = [];
 
         dashboardPanelData.meta.stream.streamResults = res.list;
       });
