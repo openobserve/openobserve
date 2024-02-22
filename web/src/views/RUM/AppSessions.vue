@@ -47,12 +47,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
       </div>
-      <query-editor
-        editor-id="session-replay-query-editor"
-        class="monaco-editor"
-        v-model:query="sessionState.data.editorValue"
-        :debounce-time="300"
-      />
+      <div
+        style="
+          border-top: 1px solid rgb(219, 219, 219);
+          border-bottom: 1px solid rgb(219, 219, 219);
+        "
+      >
+        <query-editor
+          editor-id="session-replay-query-editor"
+          class="monaco-editor"
+          v-model:query="sessionState.data.editorValue"
+          :debounce-time="300"
+          style="height: 40px !important"
+        />
+      </div>
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -80,35 +88,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #after>
-          <template v-if="isLoading.length">
-            <div
-              class="q-pb-lg flex items-center justify-center text-center"
-              style="height: calc(100vh - 200px)"
-            >
-              <div>
-                <q-spinner-hourglass
-                  color="primary"
-                  size="40px"
-                  style="margin: 0 auto; display: block"
-                />
-                <div class="text-center full-width">
-                  Hold on tight, we're fetching your sessions.
+          <div class="q-mt-xs">
+            <template v-if="isLoading.length">
+              <div
+                class="q-pb-lg flex items-center justify-center text-center"
+                style="height: calc(100vh - 200px)"
+              >
+                <div>
+                  <q-spinner-hourglass
+                    color="primary"
+                    size="40px"
+                    style="margin: 0 auto; display: block"
+                  />
+                  <div class="text-center full-width">
+                    Hold on tight, we're fetching your sessions.
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
-          <template v-else>
-            <AppTable
-              :columns="columns"
-              :rows="rows"
-              class="app-table-container"
-              @event-emitted="handleTableEvents"
-            >
-              <template v-slot:session_location_column="slotProps">
-                <SessionLocationColumn :column="slotProps.column.row" />
-              </template>
-            </AppTable>
-          </template>
+            </template>
+            <template v-else>
+              <AppTable
+                :columns="columns"
+                :rows="rows"
+                class="app-table-container"
+                @event-emitted="handleTableEvents"
+              >
+                <template v-slot:session_location_column="slotProps">
+                  <SessionLocationColumn :column="slotProps.column.row" />
+                </template>
+              </AppTable>
+            </template>
+          </div>
         </template>
       </q-splitter>
     </template>
@@ -237,6 +247,7 @@ const columns = ref([
     label: "",
     type: "action",
     icon: "play_circle_filled",
+    class: "session-play-icon",
     style: { width: "56px" },
   },
   {
@@ -354,6 +365,7 @@ const getRumDataFields = () => {
         const fieldsToVerify = new Set([
           "geo_info_city",
           "geo_info_country",
+          "geo_info_country_iso_code",
           "usr_email",
           "usr_id",
           "usr_name",
@@ -441,6 +453,10 @@ const getSessionLogs = (req: any) => {
     geoFields += "min(geo_info_country) as country,";
   }
 
+  if (schemaMapping.value["geo_info_country_iso_code"]) {
+    geoFields += "min(geo_info_country_iso_code) as country_iso_code,";
+  }
+
   if (schemaMapping.value["usr_email"]) {
     geoFields += "min(usr_email) as user_email,";
   }
@@ -467,6 +483,8 @@ const getSessionLogs = (req: any) => {
             hit.user_email;
           sessionState.data.sessions[hit.session_id].country = hit.country;
           sessionState.data.sessions[hit.session_id].city = hit.city;
+          sessionState.data.sessions[hit.session_id].country_iso_code =
+            hit.country_iso_code.toLowerCase();
         }
       });
       rows.value = Object.values(sessionState.data.sessions);
@@ -607,7 +625,7 @@ const getStarted = () => {
   }
 
   .app-table-container {
-    height: calc(100vh - 224px) !important;
+    height: calc(100vh - 190px) !important;
   }
 }
 </style>
@@ -673,6 +691,16 @@ const getStarted = () => {
       .q-icon {
         font-size: 15px;
         color: #ffffff;
+      }
+    }
+  }
+
+  .app-table-container {
+    .session-play-icon {
+      .q-icon {
+        &:hover {
+          color: var(--q-primary);
+        }
       }
     }
   }
