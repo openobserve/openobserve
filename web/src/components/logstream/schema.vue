@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round
-flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -257,6 +256,7 @@ import segment from "../../services/segment_analytics";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import useStreams from "@/composables/useStreams";
 
 const defaultValue: any = () => {
   return {
@@ -290,6 +290,7 @@ export default defineComponent({
     const deleteFieldList = ref([]);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
+    const { getStream } = useStreams();
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -351,84 +352,82 @@ export default defineComponent({
         message: "Please wait while loading stats...",
       });
 
-      await streamService
-        .schema(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type
-        )
-        .then((res) => {
-          res.data.stats.doc_time_max = date.formatDate(
-            parseInt(res.data.stats.doc_time_max) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
-          res.data.stats.doc_time_min = date.formatDate(
-            parseInt(res.data.stats.doc_time_min) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
+      await getStream(
+        indexData.value.name,
+        indexData.value.stream_type,
+        true
+      ).then((streamResponse) => {
+        streamResponse.stats.doc_time_max = date.formatDate(
+          parseInt(streamResponse.stats.doc_time_max) / 1000,
+          "YYYY-MM-DDTHH:mm:ss:SSZ"
+        );
+        streamResponse.stats.doc_time_min = date.formatDate(
+          parseInt(streamResponse.stats.doc_time_min) / 1000,
+          "YYYY-MM-DDTHH:mm:ss:SSZ"
+        );
+        if (
+          streamResponse.settings.full_text_search_keys.length == 0 &&
+          (showFullTextSearchColumn.value || showPartitionColumn.value)
+        ) {
+          indexData.value.defaultFts = true;
+        } else {
+          indexData.value.defaultFts = false;
+        }
+
+        indexData.value.schema = streamResponse.schema;
+        indexData.value.stats = streamResponse.stats;
+
+        for (var property of streamResponse.schema) {
           if (
-            res.data.settings.full_text_search_keys.length == 0 &&
-            (showFullTextSearchColumn.value || showPartitionColumn.value)
+            (streamResponse.settings.full_text_search_keys.length > 0 &&
+              streamResponse.settings.full_text_search_keys.includes(
+                property.name
+              )) ||
+            (streamResponse.settings.full_text_search_keys.length == 0 &&
+              store.state.zoConfig.default_fts_keys.includes(property.name))
           ) {
-            indexData.value.defaultFts = true;
+            property.ftsKey = true;
           } else {
-            indexData.value.defaultFts = false;
+            property.ftsKey = false;
           }
 
-          indexData.value.schema = res.data.schema;
-          indexData.value.stats = res.data.stats;
-
-          for (var property of res.data.schema) {
-            if (
-              (res.data.settings.full_text_search_keys.length > 0 &&
-                res.data.settings.full_text_search_keys.includes(
-                  property.name
-                )) ||
-              (res.data.settings.full_text_search_keys.length == 0 &&
-                store.state.zoConfig.default_fts_keys.includes(property.name))
-            ) {
-              property.ftsKey = true;
-            } else {
-              property.ftsKey = false;
-            }
-
-            if (
-              res.data.settings.bloom_filter_fields.length > 0 &&
-              res.data.settings.bloom_filter_fields.includes(property.name)
-            ) {
-              property.bloomKey = true;
-            } else {
-              property.bloomKey = false;
-            }
-
-            property["delete"] = false;
-
-            if (
-              res.data.settings.partition_keys &&
-              Object.values(res.data.settings.partition_keys).some(
-                (v) => !v.disabled && v.field === property.name
-              )
-            ) {
-              property.partitionKey = true;
-              property.level = Object.keys(
-                res.data.settings.partition_keys
-              ).find(
-                (key) =>
-                  res.data.settings.partition_keys[key]["field"] ===
-                  property.name
-              );
-            } else {
-              property.partitionKey = false;
-            }
+          if (
+            streamResponse.settings.bloom_filter_fields.length > 0 &&
+            streamResponse.settings.bloom_filter_fields.includes(property.name)
+          ) {
+            property.bloomKey = true;
+          } else {
+            property.bloomKey = false;
           }
 
-          if (showDataRetention.value)
-            dataRetentionDays.value =
-              res.data.settings.data_retention ||
-              store.state.zoConfig.data_retention_days;
+          property["delete"] = false;
 
-          dismiss();
-        });
+          if (
+            streamResponse.settings.partition_keys &&
+            Object.values(streamResponse.settings.partition_keys).some(
+              (v) => !v.disabled && v.field === property.name
+            )
+          ) {
+            property.partitionKey = true;
+            property.level = Object.keys(
+              streamResponse.settings.partition_keys
+            ).find(
+              (key) =>
+                streamResponse.settings.partition_keys[key]["field"] ===
+                property.name
+            );
+          } else {
+            property.partitionKey = false;
+          }
+        }
+
+        if (showDataRetention.value)
+          dataRetentionDays.value =
+            streamResponse.settings.data_retention ||
+            store.state.zoConfig.data_retention_days;
+
+        dismiss();
+      });
     };
 
     const onSubmit = async () => {
