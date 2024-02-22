@@ -332,6 +332,7 @@ export default defineComponent({
           spinner: true,
           message: "Please wait while loading streams...",
         });
+        logStream.value = [];
 
         let counter = 1;
         getStreams("", false, false)
