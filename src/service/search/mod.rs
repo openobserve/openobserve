@@ -273,7 +273,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
             // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
+            // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
+            // ORDER BY _timestamp DESC",
+            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
             meta.stream_name, search_condition
         );
 
@@ -295,7 +297,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         // term the _count is > 250
         let unique_files = if _is_first_page {
             log::warn!("First page response {:?}", idx_resp);
-            let limit_count = 250;
+            let limit_count = 500;
             use itertools::Itertools;
             let sorted_data = idx_resp
                 .hits
@@ -308,14 +310,14 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     (term, file_name, count, timestamp)
                 })
-                .sorted_by_key(|x| x.3);
+                .sorted_by_key(|x| -x.3); // Descending order of timestamp
 
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, i64> = HashMap::new();
 
             for (term, filename, _, count) in sorted_data {
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
-                if *current_count < limit_count {
+                if *current_count < limit_count || *current_count == 0 {
                     term_map
                         .entry(term.clone())
                         .or_insert_with(Vec::new)
