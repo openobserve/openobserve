@@ -451,6 +451,20 @@ pub(crate) async fn check_permissions(
     true
 }
 
+#[cfg(feature = "enterprise")]
+pub(crate) async fn list_objects(
+    user_id: &str,
+    permission: &str,
+    object_type: &str,
+) -> Result<Vec<String>, anyhow::Error> {
+    o2_enterprise::enterprise::openfga::authorizer::authz::list_objects(
+        user_id,
+        permission,
+        object_type,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
