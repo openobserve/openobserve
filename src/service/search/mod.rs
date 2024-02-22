@@ -37,6 +37,7 @@ use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -272,36 +273,75 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
             // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            "SELECT file_name, _count, _timestamp FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
+            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
             meta.stream_name, search_condition
         );
 
+        let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+
         log::warn!("searching in query {:?}", query);
         log::warn!("Incoming request {:?}", idx_req);
-
-        // Check if this is the first page i.e. first request, from will always be `0` in that case
-        let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
 
         log::warn!("searching in terms {:?}", terms);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
+        idx_req.query.as_mut().unwrap().uses_zo_fn = false;
+
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
 
         // if this is the first page, then for each term, get the first file_name where for each
         // term the _count is > 250
+        let unique_files = if _is_first_page {
+            log::warn!("First page response {:?}", idx_resp);
+            let limit_count = 250;
+            use itertools::Itertools;
+            let sorted_data = idx_resp
+                .hits
+                .iter()
+                .map(|hit| {
+                    // hit.get("file_name").unwrap().as_str().unwrap().to_string()
+                    let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
+                    let term = hit.get("term").unwrap().as_str().unwrap().to_string();
+                    let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
+                    (term, file_name, count, timestamp)
+                })
+                .sorted_by_key(|x| x.3);
 
-        let unique_files = idx_resp
-            .hits
-            .iter()
-            .map(|hit| {
-                hit.get("file_name").unwrap().as_str().unwrap().to_string()
-                // let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-                // let count = hit.get("_count").unwrap().as_u64().unwrap();
-                // (file_name, count)
-            })
-            .collect::<HashSet<_>>();
+            let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
+            let mut term_counts: HashMap<String, i64> = HashMap::new();
+
+            for (term, filename, _, count) in sorted_data {
+                let current_count = term_counts.entry(term.clone()).or_insert(0);
+                if *current_count < limit_count {
+                    term_map
+                        .entry(term.clone())
+                        .or_insert_with(Vec::new)
+                        .push(filename);
+                    *current_count += count;
+                }
+            }
+
+            term_map
+                .into_iter()
+                .map(|(_term, filenames)| filenames)
+                .flatten()
+                .collect::<HashSet<_>>()
+        } else {
+            idx_resp
+                .hits
+                .iter()
+                .map(|hit| {
+                    hit.get("file_name").unwrap().as_str().unwrap().to_string()
+                    // let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
+                    // let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    // let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
+                    // (file_name, count, timestamp)
+                })
+                .collect::<HashSet<_>>()
+        };
 
         log::warn!("searching in unique_files_len {:?}", unique_files.len());
 
