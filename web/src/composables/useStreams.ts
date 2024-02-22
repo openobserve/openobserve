@@ -17,6 +17,7 @@ import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { reactive } from "vue";
 import { ref } from "vue";
+import { useQuasar } from "quasar";
 
 let streams: any = reactive({});
 
@@ -29,7 +30,13 @@ const getStreamsPromise: any = ref(null);
 const useStreams = () => {
   const store = useStore();
 
-  const getStreams = async (_streamName: string = "", schema: boolean) => {
+  const q = useQuasar();
+
+  const getStreams = async (
+    _streamName: string = "",
+    schema: boolean,
+    notify: boolean = true
+  ) => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
 
@@ -44,6 +51,13 @@ const useStreams = () => {
       try {
         if (!isStreamFetched(streamName || "all")) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
+          const dismiss = notify
+            ? q.notify({
+                spinner: true,
+                message: "Please wait while loading streams...",
+                timeout: 5000,
+              })
+            : () => {};
           if (streamName === "all") {
             const streamList = [
               "logs",
@@ -69,10 +83,12 @@ const useStreams = () => {
 
                 areAllStreamsFetched.value = true;
                 getStreamsPromise.value = null;
+                dismiss();
                 resolve(getAllStreamsPayload());
               })
               .catch((e: any) => {
                 getStreamsPromise.value = null;
+                dismiss();
                 reject(new Error(e.message));
               });
           } else {
@@ -86,10 +102,12 @@ const useStreams = () => {
                 const streamData = setStreams(streamName, res.data.list);
                 areAllStreamsFetched.value = true;
                 getStreamsPromise.value = null;
+                dismiss();
                 resolve(streamData);
               })
               .catch((e: any) => {
                 getStreamsPromise.value = null;
+                dismiss();
                 reject(new Error(e.message));
               });
           }
@@ -164,7 +182,7 @@ const useStreams = () => {
           }
           return resolve(streams[streamType].list[streamIndex]);
         } else {
-          reject(new Error("Stream not found"));
+          return reject("Stream Not Found");
         }
       } catch (e: any) {
         reject(new Error(e.message));
