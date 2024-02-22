@@ -425,7 +425,7 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        this.refreshPartitionPagination();
+        this.refreshPartitionPagination(true);
         this.$emit("update:scroll");
         this.searchTableRef.scrollTo(0);
       } else if (actionType == "pageChange") {

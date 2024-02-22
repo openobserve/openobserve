@@ -424,7 +424,6 @@ export default defineComponent({
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
     ];
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);

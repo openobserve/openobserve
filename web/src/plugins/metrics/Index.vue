@@ -743,7 +743,6 @@ export default defineComponent({
     const onMetricChange = async (metric) => {
       if (!searchObj.data.metrics.selectedMetric?.value) return;
 
-      console.log("metric", metric);
       const query = metric?.value + "{}";
       nextTick(() => {
         metricsQueryEditorRef.value.setValue(query);
