@@ -266,47 +266,40 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         },
         None => false,
     };
-    let mut stream_list_from_rbac = None;
-    // Check permissions on stream
+    let mut _stream_list_from_rbac = None;
+    // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::{infra::config::USERS, utils::auth::is_root_user};
-
         let user_id = req.headers().get("user_id").unwrap();
-
-        if !is_root_user(user_id.to_str().unwrap()) {
-            let user: meta::user::User = USERS
-                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
-                .unwrap()
-                .clone();
-
-            if user.is_external {
-                if let Some(s_type) = &stream_type {
-                    match crate::handler::http::auth::validator::list_objects(
-                        user_id.to_str().unwrap(),
-                        "GET",
-                        &s_type.to_string(),
-                    )
-                    .await
-                    {
-                        Ok(resp) => {
-                            stream_list_from_rbac = Some(resp);
-                        }
-                        Err(_) => {
-                            return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
-                        }
+        if let Some(s_type) = &stream_type {
+            if !s_type.eq(&StreamType::EnrichmentTables) && !s_type.eq(&StreamType::Metadata) {
+                match crate::handler::http::auth::validator::list_objects_for_user(
+                    &org_id,
+                    user_id.to_str().unwrap(),
+                    "GET",
+                    &s_type.to_string(),
+                )
+                .await
+                {
+                    Ok(stream_list) => {
+                        _stream_list_from_rbac = stream_list;
+                    }
+                    Err(e) => {
+                        return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                            e.to_string(),
+                        ));
                     }
                 }
             }
         }
-        // Check permissions on stream ends
+        // Get List of allowed objects ends
     }
 
     let mut indices = stream::get_streams(
         org_id.as_str(),
         stream_type,
         fetch_schema,
-        stream_list_from_rbac,
+        _stream_list_from_rbac,
     )
     .await;
     indices.sort_by(|a, b| a.name.cmp(&b.name));

@@ -465,6 +465,40 @@ pub(crate) async fn list_objects(
     .await
 }
 
+#[cfg(feature = "enterprise")]
+pub(crate) async fn list_objects_for_user(
+    org_id: &str,
+    user_id: &str,
+    permission: &str,
+    object_type: &str,
+) -> Result<Option<Vec<String>>, Error> {
+    use crate::common::infra::config::USERS;
+
+    if !is_root_user(user_id) {
+        let user: crate::common::meta::user::User =
+            USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+
+        if user.is_external {
+            match crate::handler::http::auth::validator::list_objects(
+                user_id,
+                permission,
+                object_type,
+            )
+            .await
+            {
+                Ok(resp) => Ok(Some(resp)),
+                Err(_) => {
+                    return Err(ErrorForbidden("Unauthorized Access"));
+                }
+            }
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
