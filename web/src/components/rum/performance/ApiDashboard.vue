@@ -63,6 +63,7 @@ import { useRoute } from "vue-router";
 import searchService from "@/services/search";
 import apiDashboard from "@/utils/rum/api.json";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
+import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 export default defineComponent({
   name: "ApiDashboard",
@@ -247,7 +248,7 @@ export default defineComponent({
     };
 
     const loadDashboard = async () => {
-      currentDashboardData.data = apiDashboard;
+      currentDashboardData.data = convertDashboardSchemaVersion(apiDashboard);
 
       // if variables data is null, set it to empty list
       if (

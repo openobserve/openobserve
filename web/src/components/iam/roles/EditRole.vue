@@ -336,7 +336,6 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
-import { r } from "msw/lib/SetupApi-8ab693f7";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
