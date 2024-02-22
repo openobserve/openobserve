@@ -20,30 +20,20 @@ use infra::db as infra_db;
 
 use crate::common::{infra::config::TRIGGERS, meta::alerts::triggers::Trigger};
 
-pub async fn get(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    alert_name: &str,
-) -> Result<Trigger, anyhow::Error> {
+async fn get(key: &str) -> Result<Trigger, anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
     let val = db.get(&key).await?;
     let trigger = json::from_slice(&val)?;
     Ok(trigger)
 }
 
-pub async fn set(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    alert_name: &str,
-    trigger: &Trigger,
-) -> Result<(), anyhow::Error> {
+async fn set(key: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
     // cache the trigger first
-    let cache_key = format!("{org_id}/{stream_type}/{stream_name}/{alert_name}");
-    let db_key = format!("/trigger/{cache_key}");
-    TRIGGERS.write().await.insert(cache_key, trigger.clone());
+    let db_key = format!("/trigger/{key}");
+    TRIGGERS
+        .write()
+        .await
+        .insert(key.to_string(), trigger.clone());
     // save the trigger
     let db = infra_db::get_db().await;
     match db
@@ -63,15 +53,65 @@ pub async fn set(
     Ok(())
 }
 
-pub async fn delete(
+async fn delete(key: &str) -> Result<(), anyhow::Error> {
+    let db = infra_db::get_db().await;
+    Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
+}
+
+/// Get [`Trigger`] for `Alert`
+pub async fn get_alert(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+) -> Result<Trigger, anyhow::Error> {
+    let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
+    get(&key).await
+}
+
+/// Set [`Trigger`] for `Alert`
+pub async fn set_alert(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert_name: &str,
+    trigger: &Trigger,
+) -> Result<(), anyhow::Error> {
+    let cache_key = format!("{org_id}/{stream_type}/{stream_name}/{alert_name}");
+    set(&cache_key, trigger).await
+}
+
+/// Delete [`Trigger`] for `Alert`
+pub async fn delete_alert(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     alert_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
-    Ok(db.delete(&key.clone(), false, infra_db::NEED_WATCH).await?)
+    delete(&key).await
+}
+
+/// Get [`Trigger`] for a `Report`
+pub async fn get_report(org_id: &str, report_name: &str) -> Result<Trigger, anyhow::Error> {
+    let key = format!("/trigger/report/{org_id}/{report_name}");
+    get(&key).await
+}
+
+/// Set [`Trigger`] for a `Report`
+pub async fn set_report(
+    org_id: &str,
+    report_name: &str,
+    trigger: &Trigger,
+) -> Result<(), anyhow::Error> {
+    let cache_key = format!("report/{org_id}/{report_name}");
+    set(&cache_key, trigger).await
+}
+
+/// Delete [`Trigger`] for a `Report`
+pub async fn delete_report(org_id: &str, report_name: &str) -> Result<(), anyhow::Error> {
+    let key = format!("/trigger/report/{org_id}/{report_name}");
+    delete(&key).await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
@@ -80,7 +120,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     for (item_key, item_value) in db.list(key).await? {
         let new_key = item_key.strip_prefix(key).unwrap();
-        if new_key.to_string().split('/').count() < 4 {
+        let key_count = new_key.to_string().split('/').count();
+        // Hack for Report triggers
+        if (key_count == 3 && !new_key.starts_with("report")) || key_count < 3 {
             _ = db.delete(&item_key, false, infra_db::NO_NEED_WATCH).await;
             continue;
         }

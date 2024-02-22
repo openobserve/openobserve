@@ -159,7 +159,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         is_realtime,
                         is_silenced: false,
                     };
-                    if let Err(e) = crate::service::alerts::triggers::save(
+                    if let Err(e) = crate::service::alerts::triggers::save_alert(
                         org_id,
                         stream_type,
                         stream_name,
@@ -195,7 +195,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let stream_type: StreamType = columns[1].into();
                     let stream_name = columns[2];
                     let alert_name = columns[3];
-                    _ = triggers::delete(org_id, stream_type, stream_name, alert_name).await;
+                    _ = triggers::delete_alert(org_id, stream_type, stream_name, alert_name).await;
                 }
             }
             infra_db::Event::Empty => {}

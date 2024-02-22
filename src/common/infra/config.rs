@@ -26,6 +26,7 @@ use vector_enrichment::TableRegistry;
 use crate::{
     common::meta::{
         alerts,
+        dashboards::reports,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
@@ -67,6 +68,8 @@ pub static TRIGGERS: Lazy<RwAHashMap<String, alerts::triggers::Trigger>> =
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
     Lazy::new(Default::default);
 pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, alerts::destinations::Destination>> =
+    Lazy::new(Default::default);
+pub static DASHBOARD_REPORTS: Lazy<RwHashMap<String, reports::Report>> =
     Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
