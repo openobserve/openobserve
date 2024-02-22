@@ -433,10 +433,15 @@ export default defineComponent({
       variableData.options.splice(index, 1);
     };
 
-    const saveVariableApiCall = useLoading(() => saveData());
+    const saveVariableApiCall = useLoading(async () => await saveData());
 
     const saveData = async () => {
       const dashId = route.query.dashboard + "";
+
+      // remove query_data if type is not query_values
+      if (variableData.type !== "query_values") {
+        delete variableData["query_data"];
+      }
 
       if (editMode.value) {
         try {
@@ -456,10 +461,6 @@ export default defineComponent({
           });
         }
       } else {
-        if (variableData.type !== "query_values") {
-          delete variableData["query_data"];
-        }
-
         try {
           await addVariable(
             store,

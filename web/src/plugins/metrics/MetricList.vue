@@ -350,24 +350,14 @@ export default defineComponent({
       });
     };
     const updateMetricLabels = async () => {
-      const selectedStream = searchObj.data.streamResults.list.find(
-        (stream: { name: string | undefined }) =>
-          stream.name === searchObj.data.metrics.selectedMetric?.value
+      const streamData = await getStream(
+        searchObj.data.metrics.selectedMetric?.value || "",
+        "metrics",
+        true
       );
 
-      let schema;
-      if (selectedStream.hasOwnProperty("schema")) {
-        schema = selectedStream.schema;
-      } else {
-        const streamData = await getStream(
-          searchObj.data.metrics.selectedMetric?.value || "",
-          "metrics",
-          true
-        );
-        schema = streamData.schema;
-      }
+      selectedMetricLabels.value = streamData.schema;
 
-      selectedMetricLabels.value = schema;
       if (Array.isArray(selectedMetricLabels.value))
         filteredMetricLabels.value = [...selectedMetricLabels.value];
     };
