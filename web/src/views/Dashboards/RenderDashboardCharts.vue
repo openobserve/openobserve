@@ -145,11 +145,6 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    forceLoad: {
-      type: Boolean,
-      default: false,
-      required: false,
-    },
   },
 
   components: {
@@ -225,8 +220,6 @@ export default defineComponent({
     // used provide and inject to share data between components
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
-
-    provide("forceLoad", { forceLoad: props.forceLoad });
 
     // save the dashboard value
     const saveDashboard = async () => {

@@ -101,8 +101,6 @@ export const usePanelDataLoader = (
 
   let abortController = new AbortController();
 
-  const forceLoad: any = inject("forceLoad", { forceLoad: false });
-
   // [START] --------- New Functions ------------------------------------------
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
@@ -346,11 +344,9 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema and selectedTimeObj
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.forceLoad],
+    () => [panelSchema?.value, selectedTimeObj?.value],
     async () => {
       console.log("PanelSchema/Time Wather: called");
-      console.log("forceLoad", forceLoad.forceLoad);
-
       loadData(); // Loading the data
     }
   );
