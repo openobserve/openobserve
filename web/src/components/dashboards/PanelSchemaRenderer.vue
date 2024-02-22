@@ -208,13 +208,14 @@ export default defineComponent({
 
     // get refs from props
     const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
-
+    const forceLoad: any = ref(true);
     // calls the apis to get the data based on the panel config
     let { data, loading, errorDetail, metadata } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
-      chartPanelRef
+      chartPanelRef,
+      forceLoad
     );
 
     // need tableRendererRef to access downloadTableAsCSV method

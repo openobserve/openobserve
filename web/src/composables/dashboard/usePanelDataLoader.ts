@@ -37,7 +37,8 @@ export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
   variablesData: any,
-  chartPanelRef: any
+  chartPanelRef: any,
+  forceLoad: any
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -106,7 +107,9 @@ export const usePanelDataLoader = (
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
       // Immediately resolve if isVisible is already true
-      if (isVisible.value) {
+      if (isVisible.value || forceLoad.value) {
+        console.log("forceLoad.value", forceLoad.value);
+
         resolve();
         return;
       }
@@ -344,7 +347,7 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema and selectedTimeObj
-    () => [panelSchema?.value, selectedTimeObj?.value],
+    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
     async () => {
       console.log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
@@ -490,7 +493,7 @@ export const usePanelDataLoader = (
     if (queryType === "sql") {
       const queryStream = getStreamFromQuery(query);
 
-      const applicableAdHocVariables = adHocVariables
+      const applicableAdHocVariables = adHocVariables;
       // .filter((it: any) => {
       //   return it?.streams?.find((it: any) => it.name == queryStream);
       // });
@@ -613,12 +616,12 @@ export const usePanelDataLoader = (
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
       ?.flat()
-      ?.filter((it: any) => it?.operator && it?.name && it?.value)
-      // ?.filter((it: any) =>
-      //   panelSchema.value.queryType == "sql"
-      //     ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
-      //     : true
-      // );
+      ?.filter((it: any) => it?.operator && it?.name && it?.value);
+    // ?.filter((it: any) =>
+    //   panelSchema.value.queryType == "sql"
+    //     ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
+    //     : true
+    // );
     log("getDynamicVariablesData: adHocVariables", adHocVariables);
     return adHocVariables;
   };
