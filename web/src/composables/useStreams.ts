@@ -59,15 +59,23 @@ const useStreams = () => {
               })
             : () => {};
           if (streamName === "all") {
+            // As in RBAC there can be permission on certain types of streams
+            // So here added some additional logic to handle those
+
             const streamList = [
               "logs",
               "metrics",
               "traces",
               "enrichment_tables",
-              "metadata",
+              "index",
             ];
-            getStreamsPromise.value = Promise.all(
-              [...streamList].map((streamType) =>
+
+            const streamsToFetch = streamList.filter(
+              (_stream) => !streams[_stream]
+            );
+
+            getStreamsPromise.value = Promise.allSettled(
+              [...streamsToFetch].map((streamType) =>
                 StreamService.nameList(
                   store.state.selectedOrganization.identifier,
                   streamType,
@@ -75,14 +83,21 @@ const useStreams = () => {
                 )
               )
             );
+
             getStreamsPromise.value
-              .then((res: any) => {
-                res.forEach((streamTypeData: any, index: number) => {
-                  setStreams(streamList[index], streamTypeData.data.list);
+              .then((results: any) => {
+                results.forEach((result: any, index: number) => {
+                  if (result.status === "fulfilled") {
+                    setStreams(streamsToFetch[index], result.value.data.list);
+                  }
                 });
 
-                areAllStreamsFetched.value = true;
+                areAllStreamsFetched.value = streamList.every(
+                  (stream) => !!streams[stream]
+                );
+
                 getStreamsPromise.value = null;
+
                 dismiss();
                 resolve(getAllStreamsPayload());
               })
@@ -100,7 +115,6 @@ const useStreams = () => {
             getStreamsPromise.value
               .then((res: any) => {
                 const streamData = setStreams(streamName, res.data.list);
-                areAllStreamsFetched.value = true;
                 getStreamsPromise.value = null;
                 dismiss();
                 resolve(streamData);
