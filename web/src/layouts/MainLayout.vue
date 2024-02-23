@@ -17,8 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
     <q-header
-      :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      class="no-print"
+      :class="[
+        store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white',
+        store.state.printMode === 'true' ? 'printscreen' : '',
+      ]"
     >
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
@@ -210,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
       mini-to-overlay
-      class="no-print"
+      :class="store.state.printMode === 'true' ? 'printscreen' : ''"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -221,6 +223,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-list>
     </q-drawer>
     <q-page-container
+      :style="{
+        'padding-left': store.state.printMode === 'true' ? '0px' : '57px',
+      }"
       :key="store.state.selectedOrganization?.identifier"
       v-if="isLoading"
     >
@@ -877,10 +882,8 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
-@media print {
-  .no-print {
-    display: none;
-  }
+.printscreen {
+  display: none;
 }
 .warning-msg {
   background-color: var(--q-warning);
@@ -923,9 +926,9 @@ export default defineComponent({
   }
 }
 
-.q-page-container {
-  padding-left: 57px;
-}
+// .q-page-container {
+//   padding-left: 57px;
+// }
 
 .q-drawer {
   @extend .border-right;
