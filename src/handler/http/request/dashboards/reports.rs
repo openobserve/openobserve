@@ -212,3 +212,35 @@ async fn enable_report(
         },
     }
 }
+
+/// TriggerReport
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "TriggerReport",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("name" = String, Path, description = "Report name"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/reports/{name}/trigger")]
+async fn trigger_report(
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
+    let (org_id, name) = path.into_inner();
+    match reports::trigger(&org_id, &name).await {
+        Ok(_) => Ok(MetaHttpResponse::ok("Report triggered")),
+        Err(e) => match e {
+            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
+    }
+}

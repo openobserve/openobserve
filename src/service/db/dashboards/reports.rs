@@ -108,6 +108,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     let org_id = columns[0];
                     let report_name = columns[1];
                     let trigger = Trigger {
+                        // In case of updates, it expects updated start time
                         next_run_at: start_time,
                         is_realtime: false,
                         is_silenced: false,

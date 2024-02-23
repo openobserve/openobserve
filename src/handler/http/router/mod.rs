@@ -293,6 +293,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(dashboards::reports::list_reports)
             .service(dashboards::reports::delete_report)
             .service(dashboards::reports::enable_report)
+            .service(dashboards::reports::trigger_report)
             .service(alerts::save_alert)
             .service(alerts::update_alert)
             .service(alerts::get_alert)

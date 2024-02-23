@@ -152,6 +152,8 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+headless_chrome = {git = "https://github.com/rust-headless-chrome/rust-headless-chrome", features = ["fetch"]}
+lettre = { version= "0.11", features = ["tokio1", "tokio1-native-tls"] }
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

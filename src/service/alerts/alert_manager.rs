@@ -22,7 +22,7 @@ use crate::{
         infra::{cluster::get_node_by_uuid, config::TRIGGERS},
         meta::alerts::triggers::Trigger,
     },
-    service::db,
+    service::{dashboards::reports, db},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -169,6 +169,23 @@ async fn handle_alert_triggers(
 async fn handle_report_triggers(columns: &Vec<&str>) -> Result<(), anyhow::Error> {
     assert_eq!(columns.len(), 3);
     assert_eq!(columns[0], "report");
-    // TODO
-    Ok(())
+    let org_id = columns[1];
+    let report_name = columns[2];
+
+    let report = reports::get(org_id, report_name).await?;
+    let mut new_trigger = Trigger {
+        next_run_at: Utc::now().timestamp_micros(),
+        is_realtime: false,
+        is_silenced: false,
+    };
+
+    if !report.enabled {
+        // update trigger, check on next week
+        new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        // new_trigger.is_silenced = true;
+        super::triggers::save_report(org_id, report_name, &new_trigger).await?;
+        return Ok(());
+    }
+
+    report.send_subscribers().await
 }

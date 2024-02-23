@@ -19,10 +19,44 @@ pub enum ReportDashboardTab {
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
+pub struct ReportDashboardVariable {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
 pub struct ReportDashboard {
     pub dashboard: String,
     pub folder: String,
     pub tabs: ReportDashboardTab,
+    variables: Vec<ReportDashboardVariable>,
+}
+
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema)]
+pub enum ReportTimerangeType {
+    #[default]
+    Relative,
+    Absolute,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
+pub struct ReportTimerange {
+    #[serde(rename = "type")]
+    pub range_type: ReportTimerangeType,
+    pub period: String, // 15m, 4M etc. For relative.
+    pub from: i64,      // For absolute, in microseconds
+    pub to: i64,        // For absolute, in microseconds
+}
+
+impl Default for ReportTimerange {
+    fn default() -> Self {
+        Self {
+            range_type: ReportTimerangeType::default(),
+            period: "1w".to_string(),
+            from: 0,
+            to: 0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -33,11 +67,11 @@ pub struct Report {
     pub org_id: String,
     /// The timerange of dashboard data.
     #[serde(default)]
-    pub timerange: i64,
+    pub timerange: ReportTimerange,
     /// Frequency of report generation. E.g. - Weekly.
     #[serde(default)]
     pub frequency: i64,
-    /// Start time of report generation.
+    /// Start time of report generation in UNIX microseconds.
     #[serde(default)]
     pub start: i64,
     pub dashboards: Vec<ReportDashboard>,
@@ -55,7 +89,7 @@ impl Default for Report {
         Self {
             name: "".to_string(),
             org_id: "".to_string(),
-            timerange: Duration::days(7).num_microseconds().unwrap(), // 1 week
+            timerange: ReportTimerange::default(),
             frequency: Duration::days(7).num_microseconds().unwrap(), // 1 week
             start: Utc::now().timestamp_micros(),                     // Now
             destinations: vec![],
