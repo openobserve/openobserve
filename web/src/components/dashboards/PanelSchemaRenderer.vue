@@ -597,14 +597,17 @@ export default defineComponent({
           if (drilldownData.targetBlank) {
             // get current origin
             const pos = window.location.pathname.indexOf("/web/");
+            // if there is /web/ in path
+            // url will be: origin from window.location.origin + pathname up to /web/ + /web/
             let currentUrl: any =
               pos > -1
                 ? window.location.origin +
-                  window.location.pathname.slice(0, pos)
+                  window.location.pathname.slice(0, pos) +
+                  "/web/"
                 : window.location.origin;
 
             // always, go to view dashboard page
-            currentUrl += "/dashboards/view?";
+            currentUrl += "dashboards/view?";
 
             // if pass all variables in url
             currentUrl += drilldownData.data.passAllVariables
