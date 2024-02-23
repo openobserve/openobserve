@@ -39,10 +39,8 @@ pub async fn write_file_arrow(
     )
     .await;
 
-    let mut i = 0;
-
     let mut fname = "".to_string();
-    for batch in buf {
+    for (i, batch) in buf.into_iter().enumerate(){
         if i == 0 && !schema_chk.has_fields {
             db::schema::set(
                 stream.org_id.as_str(),
@@ -55,7 +53,6 @@ pub async fn write_file_arrow(
             .await
             .unwrap();
         }
-        i += 1;
         let rw_file = get_or_create_arrow(
             thread_id,
             stream.clone(),
@@ -65,7 +62,6 @@ pub async fn write_file_arrow(
         )
         .await;
         fname = rw_file.name().to_string();
-        // log::warn!("Multiple files: {}", fname);
 
         rw_file.write_arrow(batch).await;
     }
