@@ -67,7 +67,7 @@ const useStreams = () => {
               "metrics",
               "traces",
               "enrichment_tables",
-              "metadata",
+              "index",
             ];
 
             const streamsToFetch = streamList.filter(
