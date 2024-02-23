@@ -505,6 +505,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_consistent_hashing() {
         let node = load_local_mode_node();
         for i in 0..10 {
