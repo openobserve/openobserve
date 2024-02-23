@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::config::CONFIG;
+
 pub mod cluster;
 pub mod config;
 pub mod ofga;
@@ -22,5 +24,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     wal::init().await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    // check imcomplete work group
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::search::queue::clean(CONFIG.limit.query_timeout as i64).await?;
+
     Ok(())
 }
