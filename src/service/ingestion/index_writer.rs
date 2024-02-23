@@ -40,7 +40,7 @@ pub async fn write_file_arrow(
     .await;
 
     let mut fname = "".to_string();
-    for (i, batch) in buf.into_iter().enumerate(){
+    for (i, batch) in buf.into_iter().enumerate() {
         if i == 0 && !schema_chk.has_fields {
             db::schema::set(
                 stream.org_id.as_str(),
