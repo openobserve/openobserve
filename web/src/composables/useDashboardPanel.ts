@@ -60,6 +60,14 @@ const getDefaultDashboardPanelData: any = () => ({
         lat: 0,
         lng: 0,
       },
+      map_symbol_style: {
+        size: "by Value",
+        size_by_value: {
+          min: 1,
+          max: 100,
+        },
+        size_fixed: 2,
+      },
       drilldown: [],
     },
     htmlContent: "",
@@ -618,9 +626,6 @@ const useDashboardPanelData = () => {
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.queries?.forEach((query: any) => {
