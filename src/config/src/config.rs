@@ -424,6 +424,8 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
     pub alert_schedule_interval: i64,
+    #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
+    pub starting_expect_querier_num: usize,
 }
 
 #[derive(EnvConfig)]
