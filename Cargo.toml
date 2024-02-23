@@ -154,6 +154,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+chromiumoxide.workspace = true
 lettre.workspace = true
 
 [build-dependencies]
@@ -216,6 +217,7 @@ getrandom = "0.2.11"
 gxhash = "~3.0.0"
 hashlink = "0.8.4"
 hashbrown = { version = "0.14", features = ["serde"] }
+chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = ["tokio-runtime", "_fetcher-rusttls-tokio"], default-features = false, branch = "main"}
 hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
