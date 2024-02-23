@@ -255,16 +255,20 @@ export const convertSQLData = (
           return "";
         if (name.length == 0) return "";
 
-        // get the current series index from name
-        const currentSeriesIndex = name.findIndex(
-          (it: any) =>
-            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-        );
+        // if hovered series is not null
+        // then swap the hovered series to top in tooltip
+        if (hoveredSeriesState?.value?.hoveredSeriesName) {
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) =>
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+          );
 
-        // swap current hovered series index to top in tooltip
-        const temp = name[0];
-        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+        }
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
@@ -536,16 +540,20 @@ export const convertSQLData = (
             return "";
           if (name.length == 0) return "";
 
-          // get the current series index from name
-          const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-          );
+          // if hovered series is not null
+          // then swap the hovered series to top in tooltip
+          if (hoveredSeriesState?.value?.hoveredSeriesName) {
+            // get the current series index from name
+            const currentSeriesIndex = name.findIndex(
+              (it: any) =>
+                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+            );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+            // swap current hovered series index to top in tooltip
+            const temp = name[0];
+            name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+            name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          }
 
           const hoverText: string[] = [];
           name.forEach((it: any) => {
@@ -1280,16 +1288,20 @@ export const convertSQLData = (
 
         const date = new Date(name[0].data[0]);
 
-        // get the current series index from name
-        const currentSeriesIndex = name.findIndex(
-          (it: any) =>
-            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-        );
+        // if hovered series is not null
+        // then swap the hovered series to top in tooltip
+        if (hoveredSeriesState?.value?.hoveredSeriesName) {
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) =>
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+          );
 
-        // swap current hovered series index to top in tooltip
-        const temp = name[0];
-        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+        }
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
@@ -1413,16 +1425,20 @@ export const convertSQLData = (
 
         const date = new Date(name[0].data[0]);
 
-        // get the current series index from name
-        const currentSeriesIndex = name.findIndex(
-          (it: any) =>
-            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-        );
+        // if hovered series is not null
+        // then swap the hovered series to top in tooltip
+        if (hoveredSeriesState?.value?.hoveredSeriesName) {
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) =>
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+          );
 
-        // swap current hovered series index to top in tooltip
-        const temp = name[0];
-        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+        }
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
