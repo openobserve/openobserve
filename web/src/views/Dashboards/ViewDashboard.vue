@@ -225,6 +225,10 @@ export default defineComponent({
     });
 
     const isPrintscreen = ref(false);
+    const setPrint = (printMode: any) => {
+      localStorage.setItem("printMode", printMode);
+      store.dispatch("setPrintMode", printMode);
+    };
     const printDashboard = () => {
       isPrintscreen.value = !isPrintscreen.value;
 
@@ -233,6 +237,7 @@ export default defineComponent({
         print: isPrintscreen.value ? "true" : "false",
       };
       router.replace({ query });
+      setPrint(isPrintscreen.value ? "true" : "false");
     };
 
     // boolean to show/hide settings sidebar
@@ -277,6 +282,7 @@ export default defineComponent({
           print: isPrintscreen.value ? "true" : "false",
         },
       });
+      setPrint(isPrintscreen.value ? "true" : "false");
     };
 
     // ======= [START] default variable values
@@ -451,6 +457,16 @@ export default defineComponent({
       await nextTick();
       window.dispatchEvent(new Event("resize"));
     });
+
+    watch(
+      () => route.query,
+      (newQuery, oldQuery) => {
+        if (newQuery.print !== oldQuery.print) {
+          isPrintscreen.value = newQuery.print === "true";
+          setPrint(isPrintscreen.value ? "true" : "false");
+        }
+      }
+    );
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
