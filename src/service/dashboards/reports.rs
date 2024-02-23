@@ -13,14 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::time::Duration;
+
 use actix_web::http;
+use config::{CHROME_LAUNCHER_OPTIONS, CONFIG, SMTP_CLIENT};
 use futures::future::try_join_all;
+use headless_chrome::{types::PrintToPdfOptions, Browser};
+use lettre::{
+    message::{header::ContentType, MultiPart, SinglePart},
+    AsyncTransport, Message,
+};
 
 use crate::{
     common::{
         meta::{
             authz::Authz,
-            dashboards::reports::{Report, ReportDashboardTab},
+            dashboards::reports::{
+                Report, ReportDashboard, ReportDestination, ReportTimerangeType,
+            },
         },
         utils::auth::{remove_ownership, set_ownership},
     },
@@ -28,12 +38,34 @@ use crate::{
 };
 
 pub async fn save(org_id: &str, name: &str, mut report: Report) -> Result<(), anyhow::Error> {
+    // Check if SMTP is enabled, otherwise don't save the report
+    if !CONFIG.smtp.smtp_enabled {
+        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+    }
+
+    // Check if Chrome is enabled, otherwise don't save the report
+    if !CONFIG.chrome.chrome_enabled {
+        return Err(anyhow::anyhow!("Chrome not enabled"));
+    }
+
+    // Atleast one `ReportDashboard` and `ReportDestination` needs to be present
+    if report.dashboards.is_empty() || report.destinations.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Atleast one dashboard/destination is required"
+        ));
+    }
+
     // Check if dashboards & tabs exist
     let mut tasks = Vec::with_capacity(report.dashboards.len());
     for dashboard in report.dashboards.iter() {
         let dash_id = &dashboard.dashboard;
         let folder = &dashboard.folder;
-        let ReportDashboardTab::One(tab_id) = &dashboard.tabs;
+        if dashboard.tabs.is_empty() {
+            return Err(anyhow::anyhow!("Atleast one tab is required"));
+        }
+
+        // Supports only one tab for now
+        let tab_id = &dashboard.tabs[0];
         tasks.push(async move {
             let dashboard = db::dashboards::get(org_id, dash_id, folder).await?;
             // Check if the tab_id exists
@@ -105,6 +137,22 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
     }
 }
 
+pub async fn trigger(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+    let report = match db::dashboards::reports::get(org_id, name).await {
+        Ok(report) => report,
+        _ => {
+            return Err((
+                http::StatusCode::NOT_FOUND,
+                anyhow::anyhow!("Report not found"),
+            ));
+        }
+    };
+    report
+        .send_subscribers()
+        .await
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
 pub async fn enable(
     org_id: &str,
     name: &str,
@@ -123,4 +171,143 @@ pub async fn enable(
     db::dashboards::reports::set(org_id, &report)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+impl Report {
+    /// Sends the report to subscribers
+    pub async fn send_subscribers(&self) -> Result<(), anyhow::Error> {
+        if self.dashboards.is_empty() {
+            return Err(anyhow::anyhow!("Atleast one dashboard is required"));
+        }
+
+        // Currently only one `ReportDashboard` can be captured and sent
+        let dashboard = &self.dashboards[0];
+        let report = generate_report(dashboard, &self.org_id, &self.user, &self.password).await?;
+        self.send_email(&report.0, report.1).await
+    }
+
+    /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
+    async fn send_email(&self, pdf_data: &[u8], dashb_url: String) -> Result<(), anyhow::Error> {
+        if !CONFIG.smtp.smtp_enabled {
+            return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+        }
+
+        let mut recepients = vec![];
+        for recepient in &self.destinations {
+            match recepient {
+                ReportDestination::Email(email) => recepients.push(email),
+            }
+        }
+
+        let mut email = Message::builder()
+            .from(CONFIG.smtp.smtp_from_email.parse()?)
+            .subject(format!("Openobserve Report - {}", &self.title));
+
+        for recepient in recepients {
+            email = email.to(recepient.parse()?);
+        }
+
+        let email = email
+            .multipart(
+                MultiPart::mixed()
+                    .singlepart(SinglePart::html(self.message.clone()))
+                    .singlepart(SinglePart::html(format!(
+                        "<p><a href='{dashb_url}' target='_blank'>Link to dashboard</a></p>"
+                    )))
+                    .singlepart(
+                        // Only supports PDF for now, attach the PDF
+                        lettre::message::Attachment::new(
+                            self.title.clone(), // Attachment filename
+                        )
+                        .body(pdf_data.to_owned(), ContentType::parse("application/pdf")?),
+                    ),
+            )
+            .unwrap();
+
+        // Send the email
+        match SMTP_CLIENT.as_ref().unwrap().send(email).await {
+            Ok(_) => {
+                log::debug!("Email sent successfully");
+                Ok(())
+            }
+            Err(e) => {
+                log::debug!("Email could not be sent: {e}");
+                Err(anyhow::anyhow!("Error sending email: {e}"))
+            }
+        }
+    }
+}
+
+async fn generate_report(
+    dashboard: &ReportDashboard,
+    org_id: &str,
+    user_id: &str,
+    user_pass: &str,
+) -> Result<(Vec<u8>, String), anyhow::Error> {
+    // Check if Chrome is enabled, otherwise don't save the report
+    if !CONFIG.chrome.chrome_enabled {
+        return Err(anyhow::anyhow!("Chrome not enabled"));
+    }
+
+    let dashboard_id = &dashboard.dashboard;
+    let folder_id = &dashboard.folder;
+
+    if dashboard.tabs.is_empty() {
+        return Err(anyhow::anyhow!("Atleast one tab is required"));
+    }
+    // Only one tab is supported for now
+    let tab_id = &dashboard.tabs[0];
+    let browser = Browser::new(CHROME_LAUNCHER_OPTIONS.as_ref().unwrap().clone())?;
+
+    let tab = browser.new_tab()?;
+    tab.disable_log()?;
+
+    let web_url = &CONFIG.common.web_url;
+    tab.navigate_to(&format!("{web_url}/login"))?
+        .wait_for_element("input[type='email']")?
+        .click()?;
+    tab.type_str(user_id)?;
+    tab.wait_for_element("input[type='password']")?.click()?;
+    tab.type_str(user_pass)?.press_key("Enter")?;
+    tab.wait_until_navigated()?;
+    tab.wait_for_element("aside")?;
+
+    let timerange = &dashboard.timerange;
+
+    let dashb_url = match timerange.range_type {
+        ReportTimerangeType::Relative => {
+            format!(
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={}&var-__dynamic_filters=%255B%255D&print=true",
+                &timerange.period
+            )
+        }
+        ReportTimerangeType::Absolute => {
+            format!(
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&var-__dynamic_filters=%255B%255D&print=true",
+                &timerange.from, &timerange.to
+            )
+        }
+    };
+
+    tab.navigate_to(&dashb_url)?.wait_until_navigated()?;
+    tab.wait_for_element("main")?;
+
+    tab.wait_for_element("div.displayDiv")?;
+
+    if let Err(e) = tab.wait_for_element_with_custom_timeout(
+        "span#dashboardVariablesAndPanelsDataLoaded",
+        Duration::from_secs(120), // wait for 2 minute
+    ) {
+        log::error!(
+            "[REPORT]: Data loader indicator span is not rendered for dashboard {dashboard_id}: {e}"
+        );
+    }
+
+    // Capture the loaded data till now and create a pdf
+    let pdf_data = tab.print_to_pdf(Some(PrintToPdfOptions {
+        landscape: Some(true),
+        ..Default::default()
+    }))?;
+
+    Ok((pdf_data, dashb_url))
 }

@@ -20,9 +20,9 @@ use infra::dist_lock;
 use crate::{
     common::{
         infra::{cluster::get_node_by_uuid, config::TRIGGERS},
-        meta::alerts::triggers::Trigger,
+        meta::{alerts::triggers::Trigger, dashboards::reports::ReportFrequencyType},
     },
-    service::db,
+    service::{dashboards::reports, db},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -92,7 +92,7 @@ pub async fn handle_triggers(
 }
 
 async fn handle_alert_triggers(
-    columns: &Vec<&str>,
+    columns: &[&str],
     is_realtime: bool,
     is_silenced: bool,
 ) -> Result<(), anyhow::Error> {
@@ -166,9 +166,76 @@ async fn handle_alert_triggers(
     Ok(())
 }
 
-async fn handle_report_triggers(columns: &Vec<&str>) -> Result<(), anyhow::Error> {
+async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
     assert_eq!(columns.len(), 3);
     assert_eq!(columns[0], "report");
-    // TODO
+    let org_id = columns[1];
+    let report_name = columns[2];
+
+    let mut report = reports::get(org_id, report_name).await?;
+    let mut new_trigger = Trigger {
+        next_run_at: Utc::now().timestamp_micros(),
+        is_realtime: false,
+        is_silenced: false,
+    };
+
+    if !report.enabled {
+        // update trigger, check on next week
+        new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        super::triggers::save_report(org_id, report_name, &new_trigger).await?;
+        return Ok(());
+    }
+
+    // Update trigger, set `next_run_at` to the
+    // frequency interval of this report
+    match report.frequency.frequency_type {
+        ReportFrequencyType::Hours => {
+            new_trigger.next_run_at += Duration::hours(report.frequency.interval)
+                .num_microseconds()
+                .unwrap();
+        }
+        ReportFrequencyType::Days => {
+            new_trigger.next_run_at += Duration::days(report.frequency.interval)
+                .num_microseconds()
+                .unwrap();
+        }
+        ReportFrequencyType::Weeks => {
+            new_trigger.next_run_at += Duration::weeks(report.frequency.interval)
+                .num_microseconds()
+                .unwrap();
+        }
+        ReportFrequencyType::Months => {
+            // For now, it assumes each month to be of 30 days.
+            // TODO: handle the case where users wants the report to be sent
+            // on the first/last day of each month.
+            new_trigger.next_run_at += Duration::days(report.frequency.interval * 30)
+                .num_microseconds()
+                .unwrap();
+        }
+        ReportFrequencyType::Once => {
+            // Check on next week
+            new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        }
+    }
+
+    // Report generation can take more than 30 seconds to complete
+    // So, to avoid multiple same report generation, save the trigger now.
+    // And then start processing the report.
+    super::triggers::save_report(org_id, report_name, &new_trigger).await?;
+    report.send_subscribers().await?;
+    // TODO: If the above operation fails, i.e. throws any error,
+    // should we trigger the same event again or just ignore it?
+
+    if report.frequency.frequency_type == ReportFrequencyType::Once {
+        // Disable the report
+        report.enabled = false;
+        // This will overwrite the trigger we just saved earlier, because
+        // saving report will create another trigger with this report's
+        // `start` as the `next_run_at` time. But since the frequency is
+        // "once", it is ok. Ultimately as the report is disabled, the
+        // new trigger will be processed after a week.
+        reports::save(org_id, "", report).await?;
+    }
+
     Ok(())
 }

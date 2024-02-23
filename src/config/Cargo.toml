@@ -23,6 +23,7 @@ dotenvy.workspace = true
 get_if_addrs.workspace = true
 gxhash.workspace = true
 hashbrown.workspace = true
+headless_chrome.workspace = true
 hex.workspace = true
 indexmap.workspace = true
 itertools.workspace = true

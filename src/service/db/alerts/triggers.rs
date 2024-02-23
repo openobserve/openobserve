@@ -22,7 +22,7 @@ use crate::common::{infra::config::TRIGGERS, meta::alerts::triggers::Trigger};
 
 async fn get(key: &str) -> Result<Trigger, anyhow::Error> {
     let db = infra_db::get_db().await;
-    let val = db.get(&key).await?;
+    let val = db.get(key).await?;
     let trigger = json::from_slice(&val)?;
     Ok(trigger)
 }
@@ -55,7 +55,7 @@ async fn set(key: &str, trigger: &Trigger) -> Result<(), anyhow::Error> {
 
 async fn delete(key: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
+    Ok(db.delete(key, false, infra_db::NEED_WATCH).await?)
 }
 
 /// Get [`Trigger`] for `Alert`
