@@ -18,7 +18,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use datafusion::arrow::datatypes::Schema;
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use infra::{cache, db as infra_db};
 
 use crate::{
@@ -453,6 +453,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     let r = STREAM_SCHEMAS.read().await;
+    let mut tables = HashMap::new();
     for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {
             continue;
@@ -464,12 +465,26 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             continue;
         }
-        ENRICHMENT_TABLES.insert(
+        tables.insert(
             schema_key.to_owned(),
             StreamTable {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                data: super::enrichment_table::get(org_id, stream_name).await?,
+                data: vec![],
+            },
+        );
+    }
+    drop(r);
+
+    // fill data
+    for (key, tbl) in tables {
+        let data = super::enrichment_table::get(&tbl.org_id, &tbl.stream_name).await?;
+        ENRICHMENT_TABLES.insert(
+            key,
+            StreamTable {
+                org_id: tbl.org_id,
+                stream_name: tbl.stream_name,
+                data,
             },
         );
     }
