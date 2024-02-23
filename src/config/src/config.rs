@@ -75,6 +75,7 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }),
     )
     .collect::<Vec<_>>();
+    fields.sort();
     fields.dedup();
     fields
 });
@@ -97,6 +98,7 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }),
     )
     .collect::<Vec<_>>();
+    fields.sort();
     fields.dedup();
     fields
 });
@@ -119,6 +121,7 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }),
     )
     .collect::<Vec<_>>();
+    fields.sort();
     fields.dedup();
     fields
 });
