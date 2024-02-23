@@ -279,6 +279,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         );
 
         let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        let _is_agg_query = idx_req.aggs.len() > 0;
 
         log::warn!("searching in query {:?}", query);
         log::warn!("Incoming request {:?}", idx_req);
@@ -294,7 +295,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         // if this is the first page, then for each term, get the first file_name where for each
         // term the _count is > 250
-        let unique_files = if _is_first_page {
+        let unique_files = if _is_first_page && !_is_agg_query {
             log::warn!("First page response {:?}", idx_resp);
             let limit_count = 500;
             use itertools::Itertools;
@@ -409,7 +410,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let work_group_str = if let Some(wg) = &work_group {
         wg.to_string()
     } else {
-        "global".to_string()    
+        "global".to_string()
     };
 
     let locker_key = "search/cluster_queue/".to_string() + work_group_str.as_str();
