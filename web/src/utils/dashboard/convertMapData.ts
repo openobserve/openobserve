@@ -20,6 +20,12 @@
  * @param {any} mapData - the map data
  * @return {Object} - the option object for rendering the map chart
  */
+function normalizeValue(value: any, minValue: any, maxValue: any) {
+  return (value - minValue) / (maxValue - minValue);
+}
+
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+
 export const convertMapData = (panelSchema: any, mapData: any) => {
   //if no latitude and longitude than return it
   if (
@@ -88,6 +94,21 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       },
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
+      formatter: function (params: any) {
+        let formattedValue = params.value[2].toLocaleString();
+        if (getUnitValue && formatUnitValue) {
+          formattedValue = formatUnitValue(
+            getUnitValue(
+              formattedValue,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals
+            )
+          );
+        }
+
+        return `${params.seriesName}: ${formattedValue}`;
+      },
     },
     visualMap: {
       left: "right",
@@ -167,7 +188,21 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
         }
       }),
       symbolSize: function (val: any) {
-        return val[2];
+        const normalizedSize = normalizeValue(val[2], minValue, maxValue);
+        const minSymbolSize =
+          panelSchema.config?.map_symbol_style?.size_by_value?.min;
+        const maxSymbolSize =
+          panelSchema.config?.map_symbol_style?.size_by_value?.max;
+        const mapSymbolStyleSelected =
+          panelSchema.config?.map_symbol_style?.size;
+
+        if (mapSymbolStyleSelected === "by Value") {
+          return (
+            minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
+          );
+        } else if (mapSymbolStyleSelected === "fixed") {
+          return panelSchema.config?.map_symbol_style?.size_fixed;
+        }
       },
       itemStyle: {
         color: "#b02a02",
@@ -178,6 +213,12 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
     };
   });
 
+  //min max for symbol size
+  const seriesDataaa = options.series.flatMap((series: any) => series.data);
+  const minValue = Math.min(...seriesDataaa.map((item: any) => item[2]));
+  const maxValue = Math.max(...seriesDataaa.map((item: any) => item[2]));
+
+  //min max for visual map
   const seriesData = options.series.flatMap((series: any) => series.data);
   if (seriesData.length > 0) {
     const minValue = Math.min(...seriesData.map((item: any) => item[2]));

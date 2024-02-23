@@ -335,6 +335,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>+W</div>
                   </q-btn>
+                  <q-btn
+                    padding="sm"
+                    @click="addFilteredItem(props.row.name)"
+                    data-test="dashboard-add-filter-geomap-data"
+                  >
+                    <div>+F</div>
+                  </q-btn>
                 </div>
                 <div
                   class="field_icons"

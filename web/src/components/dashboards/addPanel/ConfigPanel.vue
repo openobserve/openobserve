@@ -153,7 +153,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-select
         outlined
-        v-if="dashboardPanelData.data.type != 'geomap'"
         v-model="dashboardPanelData.data.config.unit"
         :options="unitOptions"
         dense
@@ -187,7 +186,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div class="space"></div>
       <q-input
-        v-if="dashboardPanelData.data.type != 'geomap'"
         type="number"
         v-model.number="dashboardPanelData.data.config.decimals"
         value="2"
@@ -235,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row">
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lat"
-            :label="t('dashboard.lattitudeLabel')"
+            :label="t('dashboard.latitudeLabel')"
             color="input-border"
             bg-color="input-bg"
             class="col-6 q-py-md showLabelOnTop"
@@ -245,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             label-slot
             :type="'number'"
-            data-test="dashboard-config-lattitude"
+            data-test="dashboard-config-latitude"
           >
           </q-input>
           <q-input
@@ -277,6 +275,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-slot
           :type="'number'"
           data-test="dashboard-config-zoom"
+        >
+        </q-input>
+
+        <!-- symbol size -->
+        <q-select
+          v-model="dashboardPanelData.data.config.map_symbol_style.size"
+          :label="t('dashboard.symbolsize')"
+          outlined
+          :options="symbolOptions"
+          dense
+          class="showLabelOnTop"
+          stack-label
+          emit-value
+          :display-value="`${dashboardPanelData.data.config.map_symbol_style.size}`"
+          data-test="dashboard-config-symbol"
+        >
+        </q-select>
+
+        <div class="space"></div>
+
+        <div class="row">
+          <q-input
+            v-if="
+              dashboardPanelData.data.config.map_symbol_style.size ===
+              'by Value'
+            "
+            v-model.number="
+              dashboardPanelData.data.config.map_symbol_style.size_by_value.min
+            "
+            :label="t('dashboard.minimum')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-6 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            label-slot
+            :type="'number'"
+            data-test="dashboard-config-map-symbol-min"
+            :min="0"
+          >
+          </q-input>
+
+          <q-input
+            v-if="
+              dashboardPanelData.data.config.map_symbol_style.size ===
+              'by Value'
+            "
+            v-model.number="
+              dashboardPanelData.data.config.map_symbol_style.size_by_value.max
+            "
+            :label="t('dashboard.maximum')"
+            color="input-border"
+            bg-color="input-bg"
+            class="col-6 q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            label-slot
+            :type="'number'"
+            data-test="dashboard-config-map-symbol-max"
+            :min="0"
+          >
+          </q-input>
+        </div>
+        <q-input
+          v-if="
+            dashboardPanelData.data.config.map_symbol_style.size === 'fixed'
+          "
+          v-model.number="
+            dashboardPanelData.data.config.map_symbol_style.size_fixed
+          "
+          :label="t('dashboard.fixedValue')"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-6 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          data-test="dashboard-config-map-symbol-fixed"
         >
         </q-input>
       </div>
@@ -612,6 +695,18 @@ export default defineComponent({
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
       }
+
+      // Ensure that the nested structure is initialized
+      if (!dashboardPanelData.data.config.map_symbol_style) {
+        dashboardPanelData.data.config.map_symbol_style = {
+          size: "by Value",
+          size_by_value: {
+            min: 1,
+            max: 100,
+          },
+          size_fixed: 2,
+        };
+      }
     });
 
     const legendWidthValue = computed({
@@ -654,6 +749,18 @@ export default defineComponent({
       {
         label: t("dashboard.heatmap"),
         value: "heatmap",
+      },
+    ];
+
+    //options for symbol
+    const symbolOptions = [
+      {
+        label: "Fixed",
+        value: "fixed",
+      },
+      {
+        label: "By Value",
+        value: "by Value",
       },
     ];
     // options for legends position
@@ -730,6 +837,7 @@ export default defineComponent({
       promqlMode,
       basemapTypeOptions,
       layerTypeOptions,
+      symbolOptions,
       legendsPositionOptions,
       unitOptions,
       isWeightFieldPresent,
