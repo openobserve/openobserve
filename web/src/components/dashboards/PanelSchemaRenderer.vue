@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 100%; height: 100%"
-    @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
-  >
+  <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
         <GeoMapRenderer
@@ -123,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         ref="drilldownPopUpRef"
-        @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
+        @mouseleave="hideDrilldownPopUp"
       >
         <div
           v-for="(drilldown, index) in drilldownArray"
@@ -372,6 +369,10 @@ export default defineComponent({
       emit("error", errorDetail);
     });
 
+    const hideDrilldownPopUp = () => {
+      drilldownPopUpRef.value.style.display = "none";
+    };
+
     // drilldown
     const replacePlaceholders = (str: any, obj: any) => {
       return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
@@ -466,11 +467,13 @@ export default defineComponent({
         drilldownPopUpRef.value.style.display = "block";
       } else {
         // hide the popup if there's no drilldown
-        drilldownPopUpRef.value.style.display = "none";
+        hideDrilldownPopUp();
       }
     };
 
     const openDrilldown = async (index: any) => {
+      // hide the drilldown pop up
+      hideDrilldownPopUp();
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists
@@ -691,6 +694,7 @@ export default defineComponent({
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
+      hideDrilldownPopUp,
     };
   },
 });
