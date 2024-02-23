@@ -37,7 +37,6 @@ use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},
 };
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -328,8 +327,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
             term_map
                 .into_iter()
-                .map(|(_term, filenames)| filenames)
-                .flatten()
+                .flat_map(|(_term, filenames)| filenames)
                 .collect::<HashSet<_>>()
         } else {
             idx_resp
@@ -402,11 +400,18 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
         Some(o2_enterprise::enterprise::search::queue::predict_work_group(&nodes, &file_list));
     // 2. check concurrency
-    let work_group_str = if work_group.is_none() {
-        "global".to_string()
+    // let work_group_str = if work_group.is_none() {
+    //     "global".to_string()
+    // } else {
+    //     work_group.as_ref().unwrap().to_string()
+    // };
+
+    let work_group_str = if let Some(wg) = &work_group {
+        wg.to_string()
     } else {
-        work_group.as_ref().unwrap().to_string()
+        "global".to_string()    
     };
+
     let locker_key = "search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
     let locker = dist_lock::lock(&locker_key, 0).await?;
