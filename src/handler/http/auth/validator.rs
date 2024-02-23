@@ -452,7 +452,7 @@ pub(crate) async fn check_permissions(
 }
 
 #[cfg(feature = "enterprise")]
-pub(crate) async fn list_objects(
+async fn list_objects(
     user_id: &str,
     permission: &str,
     object_type: &str,
@@ -472,9 +472,11 @@ pub(crate) async fn list_objects_for_user(
     permission: &str,
     object_type: &str,
 ) -> Result<Option<Vec<String>>, Error> {
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
     use crate::common::infra::config::USERS;
 
-    if !is_root_user(user_id) {
+    if !is_root_user(user_id) && O2_CONFIG.openfga.list_only_permitted {
         let user: crate::common::meta::user::User =
             USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
 
