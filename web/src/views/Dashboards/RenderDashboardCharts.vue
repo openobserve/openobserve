@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
+              :forceLoad="forceLoad"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refresh="refreshDashboard"
@@ -145,6 +146,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    forceLoad: {
+      type: Boolean,
+      default: true,
+    }
   },
 
   components: {

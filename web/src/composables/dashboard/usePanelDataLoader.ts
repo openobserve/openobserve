@@ -106,10 +106,15 @@ export const usePanelDataLoader = (
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
-      // Immediately resolve if isVisible is already true
-      if (isVisible.value || forceLoad.value) {
-        console.log("forceLoad.value", forceLoad.value);
+      console.log("forceLoad", forceLoad);
 
+      if (store.state.printMode && forceLoad.value == true) {
+        console.log("Skip waiting for loading");
+        resolve();
+        return;
+      }
+      // Immediately resolve if isVisible is already true
+      if (isVisible.value) {
         resolve();
         return;
       }

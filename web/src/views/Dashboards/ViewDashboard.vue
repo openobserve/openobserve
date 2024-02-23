@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         :showTabs="true"
+        :forceLoad="forceLoad"
       />
 
       <q-dialog
@@ -237,6 +238,9 @@ export default defineComponent({
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
     };
+    
+    const forceLoad: any = ref(true);
+
     const printDashboard = () => {
       console.log(store.state.printMode);
 
@@ -650,6 +654,7 @@ export default defineComponent({
       selectedTabId,
       onMovePanel,
       printDashboard,
+      forceLoad
     };
   },
 });
