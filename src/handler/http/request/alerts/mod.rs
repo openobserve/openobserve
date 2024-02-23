@@ -146,7 +146,7 @@ async fn list_stream_alerts(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
-    match alerts::list(&org_id, stream_type, Some(stream_name.as_str())).await {
+    match alerts::list(&org_id, stream_type, Some(stream_name.as_str()), None).await {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             for alert in data.iter_mut() {
@@ -205,7 +205,7 @@ async fn list_alerts(path: web::Path<String>, _req: HttpRequest) -> Result<HttpR
         // Get List of allowed objects ends
     }
 
-    match alerts::list(&org_id, None, None).await {
+    match alerts::list(&org_id, None, None, _alert_list_from_rbac).await {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
             for alert in data.iter_mut() {

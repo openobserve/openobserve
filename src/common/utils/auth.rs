@@ -205,6 +205,9 @@ impl FromRequest for AuthExtractor {
                 || path_columns[2].starts_with("templates")
                 || path_columns[2].starts_with("destinations")
             {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
                 if method.eq("PUT") || method.eq("DELETE") {
                     format!(
                         "{}:{}",
