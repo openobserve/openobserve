@@ -64,9 +64,9 @@ const useStreams = () => {
 
             const streamList = [
               "logs",
-              "metric",
+              "metrics",
               "traces",
-              "enrichment_table",
+              "enrichment_tables",
               "metadata",
             ];
 
