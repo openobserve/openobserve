@@ -79,11 +79,29 @@ pub fn new_parquet_writer<'a>(
         num_rows
     };
     if CONFIG.common.bloom_filter_enabled {
-        let fields = if bloom_filter_fields.is_empty() {
+        let mut fields = if bloom_filter_fields.is_empty() {
             BLOOM_FILTER_DEFAULT_FIELDS.as_slice()
         } else {
             bloom_filter_fields
         };
+        // if bloom_filter_on_all_fields is true, then use all string fields
+        let mut all_fields = None;
+        if CONFIG.common.bloom_filter_on_all_fields {
+            all_fields = Some(
+                schema
+                    .fields()
+                    .iter()
+                    .filter(|f| {
+                        f.data_type() == &arrow::datatypes::DataType::Utf8
+                            && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(f.name())
+                    })
+                    .map(|f| f.name().to_string())
+                    .collect::<Vec<_>>(),
+            );
+        }
+        if let Some(all_fields) = all_fields.as_ref() {
+            fields = all_fields.as_slice();
+        }
         for field in fields.iter() {
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
