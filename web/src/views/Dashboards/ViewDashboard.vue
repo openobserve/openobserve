@@ -226,7 +226,6 @@ export default defineComponent({
 
     const isPrintscreen = ref(false);
     const setPrint = (printMode: any) => {
-      localStorage.setItem("printMode", printMode);
       store.dispatch("setPrintMode", printMode);
     };
     const printDashboard = () => {
