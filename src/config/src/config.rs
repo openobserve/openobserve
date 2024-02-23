@@ -288,8 +288,8 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_FORCE_DISABLED", default = false)]
-    pub bloom_filter_force_disabled: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
+    pub bloom_filter_disabled_on_search: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ON_ALL_FIELDS", default = false)]
     pub bloom_filter_on_all_fields: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
