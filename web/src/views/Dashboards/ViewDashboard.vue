@@ -28,20 +28,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
         } stickyHeader ${
-          isFullscreen || isPrintscreen ? 'fullscreenHeader' : ''
+          isFullscreen || store.state.printMode === true
+            ? 'fullscreenHeader'
+            : ''
         }`"
       >
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
             <q-btn
-              v-if="!isFullscreen && !isPrintscreen"
+              v-if="!isFullscreen && !store.state.printMode"
               no-caps
               @click="goBackToDashboardList"
               padding="xs"
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
             />
             <span class="q-table__title q-mx-md q-mt-xs">{{
               currentDashboardData.data.title
@@ -49,10 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex">
             <q-btn
-              v-if="!isFullscreen && !isPrintscreen"
+              v-if="!isFullscreen && !store.state.printMode"
               outline
               class="dashboard-icons q-px-sm"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               size="sm"
               no-caps
               icon="add"
@@ -73,19 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
             />
             <AutoRefreshInterval
-              v-if="!isPrintscreen"
+              v-if="!store.state.printMode"
               v-model="refreshInterval"
               trigger
               @trigger="refreshData"
               class="dashboard-icons"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               size="sm"
             />
             <q-btn
-              v-if="!isPrintscreen"
+              v-if="!store.state.printMode"
               outline
               class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               size="sm"
               no-caps
               icon="refresh"
@@ -95,15 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
             <ExportDashboard
-              v-if="!isFullscreen && !isPrintscreen"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              v-if="!isFullscreen && !store.state.printMode"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
-              v-if="!isFullscreen && !isPrintscreen"
+              v-if="!isFullscreen && !store.state.printMode"
               outline
               class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               size="sm"
               no-caps
               icon="share"
@@ -112,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
             >
             <q-btn
-              v-if="!isFullscreen && !isPrintscreen"
+              v-if="!isFullscreen && !store.state.printMode"
               outline
               class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               size="sm"
               no-caps
               icon="settings"
@@ -129,18 +131,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dashboard-icons q-px-sm q-ml-sm"
               size="sm"
               no-caps
-              :icon="isPrintscreen ? 'close' : 'print'"
+              :icon="store.state.printMode === true ? 'close' : 'print'"
               @click="printDashboard"
               data-test="dashboard-print-btn"
               ><q-tooltip>{{
-                isPrintscreen ? t("common.close") : t("dashboard.print")
+                store.state.printMode === true
+                  ? t("common.close")
+                  : t("dashboard.print")
               }}</q-tooltip></q-btn
             >
             <q-btn
-              v-if="!isPrintscreen"
+              v-if="!store.state.printMode"
               outline
               class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === 'true' ? 'no-print' : ''"
+              :class="store.state.printMode === true ? 'no-print' : ''"
               size="sm"
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
@@ -160,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RenderDashboardCharts
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
-        :viewOnly="isPrintscreen ? true : false"
+        :viewOnly="store.state.printMode === true ? true : false"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
@@ -230,19 +234,22 @@ export default defineComponent({
       data: {},
     });
 
-    const isPrintscreen = ref(false);
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
     };
     const printDashboard = () => {
-      isPrintscreen.value = !isPrintscreen.value;
+      console.log(store.state.printMode);
+
+      setPrint(store.state.printMode == true ? false : true);
 
       const query = {
         ...route.query,
-        print: isPrintscreen.value ? "true" : "false",
+        print: store.state.printMode,
       };
+      console.log("query", query);
+
       router.replace({ query });
-      setPrint(isPrintscreen.value ? "true" : "false");
+      // setPrint(store.state.printMode === true ? "true" : "false");
     };
 
     // boolean to show/hide settings sidebar
@@ -284,10 +291,10 @@ export default defineComponent({
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
-          print: isPrintscreen.value ? "true" : "false",
+          print: store.state.printMode,
         },
       });
-      setPrint(isPrintscreen.value ? "true" : "false");
+      // setPrint(store.state.printMode === true ? "true" : "false");
     };
 
     // ======= [START] default variable values
@@ -442,12 +449,12 @@ export default defineComponent({
       }
 
       if (params.print !== undefined) {
-        isPrintscreen.value = params.print === "true" ? true : false;
+        setPrint(params.print == "true" ? true : false);
       } else {
         router.replace({
           query: {
             ...route.query,
-            print: isPrintscreen.value ? "true" : "false",
+            print: store.state.printMode,
           },
         });
       }
@@ -467,8 +474,8 @@ export default defineComponent({
       () => route.query,
       (newQuery, oldQuery) => {
         if (newQuery.print !== oldQuery.print) {
-          isPrintscreen.value = newQuery.print === "true";
-          setPrint(isPrintscreen.value ? "true" : "false");
+          store.state.printMode = newQuery.print === "true";
+          setPrint(store.state.printMode == true ? true : false);
         }
       }
     );
@@ -483,7 +490,7 @@ export default defineComponent({
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
-          print: isPrintscreen.value ? "true" : "false",
+          print: store.state.printMode,
         },
       });
     });
@@ -596,7 +603,7 @@ export default defineComponent({
     };
     const onPrintscreenChange = () => {
       if (!document.printscreenElement) {
-        isPrintscreen.value = false;
+        store.state.printMode = false;
       }
     };
     onMounted(() => {
@@ -618,7 +625,6 @@ export default defineComponent({
       toggleFullscreen,
       fullscreenDiv,
       isFullscreen,
-      isPrintscreen,
       goBackToDashboardList,
       addPanelData,
       t,

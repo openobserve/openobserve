@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-header
       :class="[
         store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white',
-        store.state.printMode === 'true' ? 'printscreen' : '',
+        store.state.printMode === true ? 'printscreen' : '',
       ]"
     >
       <q-toolbar>
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
       mini-to-overlay
-      :class="store.state.printMode === 'true' ? 'printscreen' : ''"
+      :class="store.state.printMode === true ? 'printscreen' : ''"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-drawer>
     <q-page-container
       :style="{
-        'padding-left': store.state.printMode === 'true' ? '0px' : '57px',
+        'padding-left': store.state.printMode === true ? '0px' : '57px',
       }"
       :key="store.state.selectedOrganization?.identifier"
       v-if="isLoading"
