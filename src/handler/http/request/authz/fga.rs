@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::dex::meta::auth::RoleRequest;
 
@@ -70,9 +70,34 @@ pub async fn delete_role(_path: web::Path<(String, String)>) -> Result<HttpRespo
 
 #[cfg(feature = "enterprise")]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn get_roles(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    match o2_enterprise::enterprise::openfga::authorizer::roles::get_all_roles(&org_id).await {
+    let permitted;
+    // Get List of allowed objects
+
+    let user_id = req.headers().get("user_id").unwrap();
+    match crate::handler::http::auth::validator::list_objects_for_user(
+        &org_id,
+        user_id.to_str().unwrap(),
+        "GET",
+        "function",
+    )
+    .await
+    {
+        Ok(list) => {
+            permitted = list;
+        }
+        Err(e) => {
+            return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                e.to_string(),
+            ));
+        }
+    }
+    // Get List of allowed objects ends
+
+    match o2_enterprise::enterprise::openfga::authorizer::roles::get_all_roles(&org_id, permitted)
+        .await
+    {
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => Ok(HttpResponse::InternalServerError().body(err.to_string())),
     }
@@ -80,7 +105,10 @@ pub async fn get_roles(org_id: web::Path<String>) -> Result<HttpResponse, Error>
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/{org_id}/roles")]
-pub async fn get_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn get_roles(
+    _org_id: web::Path<String>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 

@@ -104,15 +104,15 @@ pub async fn update_folder(
 #[get("/{org_id}/folders")]
 pub async fn list_folders(
     path: web::Path<String>,
-    req: HttpRequest,
+    _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
 
-    let mut _folder_list_from_rbac = None;
+    let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = req.headers().get("user_id").unwrap();
+        let user_id = _req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
             user_id.to_str().unwrap(),
@@ -122,7 +122,7 @@ pub async fn list_folders(
         .await
         {
             Ok(stream_list) => {
-                _folder_list_from_rbac = stream_list;
+                _permitted = stream_list;
             }
             Err(e) => {
                 return Ok(crate::common::meta::http::HttpResponse::forbidden(
@@ -133,7 +133,7 @@ pub async fn list_folders(
         // Get List of allowed objects ends
     }
 
-    folders::list_folders(&org_id, _folder_list_from_rbac).await
+    folders::list_folders(&org_id, _permitted).await
 }
 
 /// GetFolder
