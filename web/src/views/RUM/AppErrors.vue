@@ -46,12 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
       </div>
     </div>
-    <query-editor
-      editor-id="rum-errors-query-editor"
-      class="monaco-editor"
-      v-model:query="errorTrackingState.data.editorValue"
-      :debounce-time="300"
-    />
+    <div
+      style="
+        border-top: 1px solid rgb(219, 219, 219);
+        border-bottom: 1px solid rgb(219, 219, 219);
+      "
+    >
+      <query-editor
+        editor-id="rum-errors-query-editor"
+        class="monaco-editor"
+        v-model:query="errorTrackingState.data.editorValue"
+        style="height: 40px !important"
+        :debounce-time="300"
+      />
+    </div>
     <q-splitter
       class="logs-horizontal-splitter full-height"
       v-model="splitterModel"
@@ -79,34 +87,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #after>
-        <template v-if="isLoading.length">
-          <div
-            class="q-pb-lg flex items-center justify-center text-center"
-            style="height: calc(100vh - 200px)"
-          >
-            <div>
-              <q-spinner-hourglass
-                color="primary"
-                size="40px"
-                style="margin: 0 auto; display: block"
-              />
-              <div class="text-center full-width">
-                Hold on tight, we're fetching your application errors.
+        <div class="q-mt-xs">
+          <template v-if="isLoading.length">
+            <div
+              class="q-pb-lg flex items-center justify-center text-center"
+              style="height: calc(100vh - 200px)"
+            >
+              <div>
+                <q-spinner-hourglass
+                  color="primary"
+                  size="40px"
+                  style="margin: 0 auto; display: block"
+                />
+                <div class="text-center full-width">
+                  Hold on tight, we're fetching your application errors.
+                </div>
               </div>
             </div>
-          </div>
-        </template>
-        <AppTable
-          v-else
-          :columns="columns"
-          :rows="errorTrackingState.data.errors"
-          class="app-table-container"
-          @event-emitted="handleTableEvent"
-        >
-          <template v-slot:error_details="slotProps">
-            <ErrorDetail :column="slotProps.column.row" />
           </template>
-        </AppTable>
+          <AppTable
+            v-else
+            :columns="columns"
+            :rows="errorTrackingState.data.errors"
+            class="app-table-container"
+            @event-emitted="handleTableEvent"
+          >
+            <template v-slot:error_details="slotProps">
+              <ErrorDetail :column="slotProps.column.row" />
+            </template>
+          </AppTable>
+        </div>
       </template>
     </q-splitter>
   </div>
@@ -126,9 +136,9 @@ import DateTime from "@/components/DateTime.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import streamService from "@/services/stream";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
+import useStreams from "@/composables/useStreams";
 
 const { t } = useI18n();
 const dateTime = ref({
@@ -144,6 +154,7 @@ const { errorTrackingState } = useErrorTracking();
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
+const { getStream } = useStreams();
 const columns = ref([
   {
     name: "error",
@@ -246,15 +257,10 @@ const handleSidebarEvent = (event: string, value: any) => {
 const getStreamFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
-    streamService
-      .schema(
-        store.state.selectedOrganization.identifier,
-        errorTrackingState.data.stream.errorStream,
-        "logs"
-      )
-      .then((res) => {
+    getStream(errorTrackingState.data.stream.errorStream, "logs", true)
+      .then((stream) => {
         streamFields.value = [];
-        res.data.schema.forEach((field: any) => {
+        stream.schema.forEach((field: any) => {
           if (userDataSet.has(field.name)) {
             streamFields.value.push({
               ...field,
@@ -410,7 +416,7 @@ function updateUrlQueryParams() {
 }
 
 .app-table-container {
-  height: calc(100vh - 224px) !important;
+  height: calc(100vh - 190px) !important;
 }
 </style>
 <style lang="scss">

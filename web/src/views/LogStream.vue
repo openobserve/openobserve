@@ -220,6 +220,7 @@ import {
 import config from "@/aws-exports";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { cloneDeep } from "lodash-es";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -248,6 +249,7 @@ export default defineComponent({
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
     ];
+    const { getStreams } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -330,37 +332,38 @@ export default defineComponent({
           spinner: true,
           message: "Please wait while loading streams...",
         });
+        logStream.value = [];
 
-        streamService
-          .nameList(store.state.selectedOrganization.identifier, "", false)
-          .then((res) => {
-            let counter = 1;
+        let counter = 1;
+        getStreams("", false, false)
+          .then((res: any) => {
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
-            resultTotal.value = res.data.list.length;
-            logStream.value = res.data.list.map((data: any) => {
-              doc_num = "--";
-              storage_size = "--";
-              if (data.stats) {
-                doc_num = data.stats.doc_num;
-                storage_size = data.stats.storage_size + " MB";
-                compressed_size = data.stats.compressed_size + " MB";
-              }
-              return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                name: data.name,
-                doc_num: doc_num,
-                storage_size: storage_size,
-                compressed_size: compressed_size,
-                storage_type: data.storage_type,
-                actions: "action buttons",
-                schema: data.schema ? data.schema : [],
-                stream_type: data.stream_type,
-              };
-            });
-
-            duplicateStreamList.value = cloneDeep(logStream.value);
+            resultTotal.value += res.list.length;
+            logStream.value.push(
+              ...res.list.map((data: any) => {
+                doc_num = "--";
+                storage_size = "--";
+                if (data.stats) {
+                  doc_num = data.stats.doc_num;
+                  storage_size = data.stats.storage_size + " MB";
+                  compressed_size = data.stats.compressed_size + " MB";
+                }
+                return {
+                  "#": counter <= 9 ? `0${counter++}` : counter++,
+                  name: data.name,
+                  doc_num: doc_num,
+                  storage_size: storage_size,
+                  compressed_size: compressed_size,
+                  storage_type: data.storage_type,
+                  actions: "action buttons",
+                  schema: data.schema ? data.schema : [],
+                  stream_type: data.stream_type,
+                };
+              })
+            );
+            duplicateStreamList.value = logStream.value;
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {
@@ -413,7 +416,6 @@ export default defineComponent({
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
     ];
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
@@ -510,7 +512,7 @@ export default defineComponent({
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
       logStream.value = filterData(
-        cloneDeep(duplicateStreamList.value),
+        duplicateStreamList.value,
         filterQuery.value.toLowerCase()
       );
       resultTotal.value = logStream.value.length;

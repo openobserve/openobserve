@@ -4,12 +4,12 @@ export const useLoading = (asyncFunction: any) => {
   const isLoading = ref(false);
   const error: Ref<any> = ref(null);
 
-  const execute = async () => {
+  const execute = async (...params: any[]) => {
     isLoading.value = true;
     error.value = null;
 
     try {
-      await asyncFunction();
+      return await asyncFunction(...params);
     } catch (err) {
       error.value = err;
     } finally {

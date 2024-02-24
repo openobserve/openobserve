@@ -29,6 +29,8 @@ const stream = {
           ? "&fetchSchema=" + schema
           : "?fetchSchema=" + schema;
     }
+
+    console.log("url", url);
     return http().get(url);
   },
 
@@ -117,9 +119,12 @@ const stream = {
   },
 
   deleteFields: (org_identifier: string, stream_name: string, fields: []) => {
-    return http().put(`/api/${org_identifier}/streams/${stream_name}/delete_fields`, {
-      fields,
-    });
+    return http().put(
+      `/api/${org_identifier}/streams/${stream_name}/delete_fields`,
+      {
+        fields,
+      }
+    );
   },
 };
 

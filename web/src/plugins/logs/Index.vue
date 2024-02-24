@@ -374,7 +374,7 @@ export default defineComponent({
       if (
         isStreamChanged &&
         queryParams.type === "stream_explorer" &&
-        seachObj.loading == false
+        searchObj.loading == false
       ) {
         resetSearchObj();
         resetStreamData();
@@ -416,7 +416,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.type,
       (type, prev) => {
         if (
-          router.currentRoute.name === "logs" &&
+          router.currentRoute.value.name === "logs" &&
           prev === "stream_explorer" &&
           !type
         ) {

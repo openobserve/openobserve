@@ -228,10 +228,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     nodes.sort_by_key(|x| x.id);
     let nodes = nodes;
 
-    let querier_num = match nodes.iter().filter(|node| is_querier(&node.role)).count() {
-        0 => 1,
-        n => n,
-    };
+    let querier_num = nodes.iter().filter(|node| is_querier(&node.role)).count();
+    if querier_num == 0 {
+        return Err(Error::Message("no querier node online".to_string()));
+    }
 
     // partition request, here plus 1 second, because division is integer, maybe
     // lose some precision

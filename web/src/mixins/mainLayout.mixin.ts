@@ -28,7 +28,7 @@ const MainLayoutOpenSourceMixin = {
      */
     const getDefaultOrganization = async () => {
       await organizationService
-        .os_list(0, 1000, "id", false, "", "default")
+        .os_list(0, 100000, "id", false, "", "default")
         .then((res: any) => {
           store.dispatch("setOrganizations", res.data.data);
         });

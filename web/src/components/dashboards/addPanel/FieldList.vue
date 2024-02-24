@@ -335,6 +335,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div>+W</div>
                   </q-btn>
+                  <q-btn
+                    padding="sm"
+                    @click="addFilteredItem(props.row.name)"
+                    data-test="dashboard-add-filter-geomap-data"
+                  >
+                    <div>+F</div>
+                  </q-btn>
                 </div>
                 <div
                   class="field_icons"
@@ -409,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             clearable
             debounce="1"
+            :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
           >
             <template #prepend>
@@ -436,8 +444,8 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import IndexService from "../../../services/index";
 import { useLoading } from "@/composables/useLoading";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   name: "FieldList",
@@ -473,6 +481,7 @@ export default defineComponent({
       addValue,
       cleanupDraggingFields,
     } = useDashboardPanelData();
+    const { getStreams, getStream } = useStreams();
 
     const onDragEnd = () => {
       cleanupDraggingFields();
@@ -495,12 +504,40 @@ export default defineComponent({
       )?.metrics_meta?.metric_type;
     });
 
-    const streamDataLoading = useLoading(async () => {
-      await getStreamList();
+    // get stream list
+    const streamDataLoading = useLoading(async (stream_type: any) => {
+      await getStreamList(stream_type);
     });
+
+    // get the stream list based on the selected stream type
+    const loadStreamsListBasedOnType = async () => {
+      streamDataLoading.execute(
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type
+      );
+    };
+
+    // watch the stream type and load the stream list
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream_type,
+      async () => {
+        loadStreamsListBasedOnType();
+      }
+    );
+
     onMounted(() => {
-      streamDataLoading.execute();
+      loadStreamsListBasedOnType();
     });
+
+    const getStreamFields = useLoading(
+      async (fieldName: string, streamType: string) => {
+        return await getStream(fieldName, streamType, true);
+      }
+    );
 
     // update the selected stream fields list
     watch(
@@ -513,7 +550,7 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
       ],
-      () => {
+      async () => {
         // get the selected stream fields based on the selected stream type
         const fields: any = data.schemaList.find(
           (it: any) =>
@@ -526,8 +563,33 @@ export default defineComponent({
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.stream_type
         );
-        dashboardPanelData.meta.stream.selectedStreamFields =
-          fields?.schema || [];
+
+        // if fields found
+        if (fields) {
+          try {
+            // get schema of that field using getstream
+            const fieldWithSchema: any = await getStreamFields.execute(
+              fields.name,
+              fields.stream_type,
+              true
+            );
+
+            // below line required for pass by reference
+            // if we don't set blank, then same object from cache is being set
+            // and that doesn't call the watchers,
+            // so it will not be updated when we switch to different chart types
+            // which doesn't have field list and coming back to field list
+            dashboardPanelData.meta.stream.selectedStreamFields = [];
+            // assign the schema
+            dashboardPanelData.meta.stream.selectedStreamFields =
+              fieldWithSchema?.schema ?? [];
+          } catch (error: any) {
+            $q.notify({
+              type: "negative",
+              message: error ?? "Failed to get stream fields",
+            });
+          }
+        }
       }
     );
     const selectedStreamForQueries: any = ref({});
@@ -569,10 +631,10 @@ export default defineComponent({
 
         // set the first stream as the selected stream when the api loads the data
         if (
-          !props.editMode &&
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream &&
+          // !props.editMode &&
+          // !dashboardPanelData.data.queries[
+          //   dashboardPanelData.layout.currentQueryIndex
+          // ].fields.stream &&
           data.indexOptions.length > 0
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
@@ -610,14 +672,17 @@ export default defineComponent({
     );
 
     // get the stream list by making an API call
-    const getStreamList = async () => {
-      await IndexService.nameList(
-        store.state.selectedOrganization.identifier,
-        "",
-        true
-      ).then((res) => {
-        data.schemaList = res.data.list;
-        dashboardPanelData.meta.stream.streamResults = res.data.list;
+    const getStreamList = async (stream_type: any) => {
+      await getStreams(stream_type, false).then((res: any) => {
+        data.schemaList = res.list;
+        // below line required for pass by reference
+        // if we don't set blank, then same object from cache is being set
+        // and that doesn't call the watchers,
+        // so it will not be updated when we switch to different chart types
+        // which doesn't have field list and coming back to field list
+        dashboardPanelData.meta.stream.streamResults = [];
+
+        dashboardPanelData.meta.stream.streamResults = res.list;
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
@@ -693,6 +758,7 @@ export default defineComponent({
       addFilteredItem,
       data,
       getStreamList,
+      getStreamFields,
       dashboardPanelData,
       filterStreamFn,
       filteredStreams,

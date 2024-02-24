@@ -677,26 +677,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="layout-separator">:</span>
       <div
         class="axis-container droppable scroll row"
-        :class="{
-          'drop-target':
-            dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.dragSource == 'fieldList',
-          'drop-entered':
-            dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'f',
-        }"
-        @dragover="onDragOver($event, 'f')"
-        @drop="
-          onDrop(
-            $event,
-            'f',
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.filter?.length || 0
-          )
-        "
-        @dragenter="onDragEnter($event, 'f', null)"
-        @dragend="onDragEnd()"
         data-test="dashboard-filter-layout"
       >
         <q-btn-group

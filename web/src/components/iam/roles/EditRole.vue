@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <div style="min-height: calc(100% - (39px + 55px + 43px))">
+      <div style="min-height: calc(100% - (39px + 55px + 46px))">
         <GroupUsers
           data-test="edit-role-users-section"
           v-show="activeTab === 'users'"
@@ -64,94 +64,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="edit-role-permissions-section"
         >
           <div
-            data-test="edit-role-permissions-filters"
-            class="o2-input flex items-start q-px-md q-py-sm justify-start"
-            style="position: sticky; top: 0px; z-index: 2"
+            class="flex justify-between items-center"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
             :style="{
               'box-shadow':
                 store.state.theme === 'dark'
                   ? 'rgb(45 45 45) 0px 4px 7px 0px'
                   : 'rgb(240 240 240) 0px 4px 7px 0px',
+              height: '56px',
             }"
           >
             <div
-              data-test="edit-role-permissions-show-toggle"
-              class="flex items-center q-pt-xs q-mr-md"
+              v-show="permissionsUiType === 'table'"
+              data-test="edit-role-permissions-filters"
+              class="o2-input flex items-start q-px-md q-py-sm justify-start"
+              style="position: sticky; top: 0px; z-index: 2"
             >
-              <span
-                data-test="edit-role-permissions-show-text"
-                style="font-size: 14px"
-              >
-                Show
-              </span>
               <div
-                class="q-ml-xs"
-                style="
-                  border: 1px solid #d7d7d7;
-                  width: fit-content;
-                  border-radius: 2px;
-                "
+                data-test="edit-role-permissions-show-toggle"
+                class="flex items-center q-pt-xs q-mr-md"
               >
-                <template
-                  v-for="visual in permissionDisplayOptions"
-                  :key="visual.value"
+                <span
+                  data-test="edit-role-permissions-show-text"
+                  style="font-size: 14px"
                 >
-                  <q-btn
-                    :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                    :color="
-                      visual.value === filter.permissions ? 'primary' : ''
-                    "
-                    :flat="visual.value === filter.permissions ? false : true"
-                    dense
-                    no-caps
-                    size="11px"
-                    class="q-px-md visual-selection-btn"
-                    @click="updateTableData(visual.value)"
+                  Show
+                </span>
+                <div
+                  class="q-ml-xs"
+                  style="
+                    border: 1px solid #d7d7d7;
+                    width: fit-content;
+                    border-radius: 2px;
+                  "
+                >
+                  <template
+                    v-for="visual in permissionDisplayOptions"
+                    :key="visual.value"
                   >
-                    {{ visual.label }}</q-btn
-                  >
-                </template>
+                    <q-btn
+                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                      :color="
+                        visual.value === filter.permissions ? 'primary' : ''
+                      "
+                      :flat="visual.value === filter.permissions ? false : true"
+                      dense
+                      no-caps
+                      size="11px"
+                      class="q-px-md visual-selection-btn"
+                      @click="updateTableData(visual.value)"
+                    >
+                      {{ visual.label }}</q-btn
+                    >
+                  </template>
+                </div>
+              </div>
+              <div data-test="edit-role-permissions-search-input">
+                <q-input
+                  v-model="filter.value"
+                  borderless
+                  :debounce="500"
+                  filled
+                  dense
+                  class="q-mb-xs no-border q-mr-md"
+                  :placeholder="t('common.search')"
+                  style="width: 300px"
+                  @update:model-value="onResourceChange"
+                >
+                  <template #prepend>
+                    <q-icon name="search" class="cursor-pointer" />
+                  </template>
+                </q-input>
+              </div>
+              <div data-test="edit-role-permissions-resource-select-input">
+                <q-select
+                  v-model="filter.resource"
+                  :options="filteredResources"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="q-mr-sm"
+                  placeholder="Select Resource"
+                  map-options
+                  use-input
+                  emit-value
+                  fill-input
+                  hide-selected
+                  outlined
+                  filled
+                  dense
+                  clearable
+                  style="width: 200px"
+                  @filter="filterResourceOptions"
+                  @update:model-value="onResourceChange"
+                />
               </div>
             </div>
-            <div data-test="edit-role-permissions-search-input">
-              <q-input
-                v-model="filter.value"
-                borderless
-                :debounce="500"
-                filled
-                dense
-                class="q-mb-xs no-border q-mr-md"
-                :placeholder="t('common.search')"
-                style="width: 300px"
-                @update:model-value="onResourceChange"
+            <div></div>
+            <div
+              data-test="edit-role-permissions-ui-type-toggle"
+              class="q-mr-md"
+              style="
+                border: 1px solid #d7d7d7;
+                width: fit-content;
+                border-radius: 2px;
+              "
+            >
+              <template
+                v-for="visual in permissionUiOptions"
+                :key="visual.value"
               >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-            <div data-test="edit-role-permissions-resource-select-input">
-              <q-select
-                v-model="filter.resource"
-                :options="filteredResources"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-mr-sm"
-                placeholder="Select Resource"
-                map-options
-                use-input
-                emit-value
-                fill-input
-                hide-selected
-                outlined
-                filled
-                dense
-                clearable
-                style="width: 200px"
-                @filter="filterResourceOptions"
-                @update:model-value="onResourceChange"
-              />
+                <q-btn
+                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                  :color="visual.value === permissionsUiType ? 'primary' : ''"
+                  :flat="visual.value === permissionsUiType ? false : true"
+                  dense
+                  no-caps
+                  size="11px"
+                  class="q-px-md visual-selection-btn"
+                  @click="updatePermissionsUi(visual.value)"
+                >
+                  {{ visual.label }}</q-btn
+                >
+              </template>
             </div>
           </div>
 
@@ -159,16 +193,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="edit-role-permissions-table-section"
             class="q-px-md q-my-sm"
           >
-            <permissions-table
-              ref="permissionTableRef"
-              :rows="permissionsState.permissions"
-              :customFilteredPermissions="filteredPermissions"
-              :filter="filter"
-              :visibleResourceCount="countOfVisibleResources"
-              :selected-permissions-hash="selectedPermissionsHash"
-              @updated:permission="handlePermissionChange"
-              @expand:row="expandPermission"
-            />
+            <div v-show="permissionsUiType === 'table'">
+              <permissions-table
+                ref="permissionTableRef"
+                :rows="permissionsState.permissions"
+                :customFilteredPermissions="filteredPermissions"
+                :filter="filter"
+                :visibleResourceCount="countOfVisibleResources"
+                :selected-permissions-hash="selectedPermissionsHash"
+                @updated:permission="handlePermissionChange"
+                @expand:row="expandPermission"
+              />
+            </div>
+            <div v-show="permissionsUiType === 'json'">
+              <div class="flex items-center justify-between">
+                <div class="q-mb-md text-bold">
+                  {{ selectedPermissionsHash.size }} Permission
+                </div>
+                <div
+                  class="flex items-center cursor-pointer"
+                  :title="t('menu.help')"
+                  @click="toggleHelpSection"
+                >
+                  <q-icon name="help" size="17px" />
+                  <span class="q-ml-xs"> Help </span>
+                </div>
+              </div>
+              <div class="flex no-wrap">
+                <div
+                  :style="
+                    isHelpOpen
+                      ? { width: 'calc(100% - 350px)' }
+                      : { width: '100%' }
+                  "
+                >
+                  <PermissionsJSON
+                    ref="permissionJsonEditorRef"
+                    v-model:query="permissionsJsonValue"
+                    class="q-mt-sm"
+                    style="height: calc(100vh - 328px)"
+                  />
+                </div>
+                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
+                  <div class="flex justify-between items-center q-px-sm">
+                    <div style="font-size: 16px">Quick Reference</div>
+                    <q-icon
+                      class="cursor-pointer"
+                      name="close"
+                      size="14px"
+                      :title="t('common.close')"
+                      @click="toggleHelpSection"
+                    />
+                  </div>
+                  <q-separator class="q-mt-sm q-mb-md" />
+                  <div class="q-mt-sm q-px-sm">
+                    <div>
+                      Configure access with JSON objects specifying "object"
+                      (resource) and "permission" (access level).
+                    </div>
+                    <pre style="font-size: 12px">
+{
+  "object": "MainResource:ChildResource",
+  "permission": "AccessType"
+}</pre
+                    >
+                    <div>
+                      <span class="text-bold">Child Resource:</span> <br />
+                      Specific instance or
+                      <span class="text-bold">organizationID</span> for all
+                      instances within a main resource.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -212,6 +310,7 @@ import { ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
+import PermissionsJSON from "@/components/iam/roles/PermissionsJSON.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useRouter } from "vue-router";
@@ -237,7 +336,6 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
-import { computed } from "vue";
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -257,6 +355,10 @@ const q = useQuasar();
 
 const store = useStore();
 
+const isHelpOpen = ref(false);
+
+const permissionJsonEditorRef: any = ref(null);
+
 const activeTab = ref("permissions");
 
 const editingRole = ref("");
@@ -269,6 +371,8 @@ const selectedPermissionsHash = ref(new Set()); // Saved + new added permission 
 
 const addedPermissions: any = ref({});
 
+const resourceMapper: Ref<{ [key: string]: Resource }> = ref({});
+
 const removedPermissions: any = ref({});
 
 const countOfVisibleResources = ref(0);
@@ -278,11 +382,14 @@ const isFetchingIntitialRoles = ref(false);
 const filteredPermissions: Ref<{ [key: string]: Entity[] }> = ref({});
 
 const heavyResourceEntities: Ref<{ [key: string]: Entity[] }> = ref({});
+const permissionsJsonValue = ref("");
 
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
 const roleUsers: Ref<string[]> = ref([]);
+
+const permissionsUiType = ref("table");
 
 const { getStreams } = useStreams();
 
@@ -305,6 +412,17 @@ const permissionDisplayOptions = [
   {
     label: "Selected",
     value: "selected",
+  },
+];
+
+const permissionUiOptions = [
+  {
+    label: "Table",
+    value: "table",
+  },
+  {
+    label: "JSON",
+    value: "json",
   },
 ];
 
@@ -335,18 +453,21 @@ const getRoleDetails = () => {
 
       setDefaultPermissions();
 
-      filteredResources.value = permissionsState.resources.map((r) => {
-        return {
-          label: r.display_name,
-          value: r.key,
-        };
-      });
+      filteredResources.value = permissionsState.resources
+        .map((r) => {
+          return {
+            label: r.display_name,
+            value: r.key,
+          };
+        })
+        .filter((r) => r.value !== "dashboard");
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
       await getResourcePermissions();
       await getUsers();
-      await updateRolePermissions();
+      savePermissionHash();
+      await updateRolePermissions(permissions.value);
       isFetchingIntitialRoles.value = false;
 
       updateTableData();
@@ -401,6 +522,8 @@ const setDefaultPermissions = () => {
     if (resource.has_entities) resourcePermission.has_entities = true;
 
     resourcePermission.parent = resource.parent;
+
+    resourceMapper.value[resourcePermission.name] = resourcePermission;
 
     if (resource.parent) {
       const parentResource = getResourceByName(
@@ -514,25 +637,40 @@ const savePermissionHash = () => {
   });
 };
 
-const updateRolePermissions = async () => {
-  savePermissionHash();
-
+const updateRolePermissions = async (permissions: Permission[]) => {
   let resourceMapper: { [key: string]: Resource } = {};
-
-  for (let i = 0; i < permissions.value.length; i++) {
+  for (let i = 0; i < permissions.length; i++) {
     let {
       resource,
       entity,
     }: {
       resource: string;
       entity: string;
-    } = decodePermission(permissions.value[i].object);
+    } = decodePermission(permissions[i].object);
 
     if (!resourceMapper[resource]) {
       resourceMapper[resource] = getResourceByName(
         permissionsState.permissions,
         resource
       ) as Resource;
+    }
+
+    // Added it intentionally, as to get parent resource for dashboard, before getting dashboard permissions
+    if (!resourceMapper[resource] && resource === "dashboard") {
+      if (!resourceMapper["dfolder"])
+        resourceMapper["dfolder"] = getResourceByName(
+          permissionsState.permissions,
+          "dfolder"
+        ) as Resource;
+
+      await getResourceEntities(resourceMapper["dfolder"]);
+
+      if (!resourceMapper[resource]) {
+        resourceMapper[resource] = getResourceByName(
+          permissionsState.permissions,
+          resource
+        ) as Resource;
+      }
     }
 
     if (!resourceMapper[resource]) return;
@@ -548,9 +686,8 @@ const updateRolePermissions = async () => {
     }
 
     if (entity === getOrgId()) {
-      resourceMapper[resource].permission[
-        permissions.value[i].permission
-      ].value = true;
+      resourceMapper[resource].permission[permissions[i].permission].value =
+        true;
 
       continue;
     }
@@ -611,9 +748,16 @@ const handlePermissionChange = (row: any, permission: string) => {
   }
 
   const permissionHash = `${resourceName}:${entity}:${permission}`;
-  const object = `${resourceName}:${entity}`;
 
   // Add permission to addedPermissions if not present
+  updatePermissionMappings(permissionHash);
+};
+
+const updatePermissionMappings = (permissionHash: string) => {
+  const permissionSplit = permissionHash.split(":");
+  const object = permissionSplit[0] + ":" + permissionSplit[1];
+  const permission = permissionSplit[2];
+
   if (
     !addedPermissions.value[permissionHash] &&
     !permissionsHash.value.has(permissionHash)
@@ -623,6 +767,17 @@ const handlePermissionChange = (row: any, permission: string) => {
       object,
       permission: permission,
     };
+    return;
+  }
+
+  // Remove permission from removedPermissions if present
+  if (
+    removedPermissions.value[permissionHash] &&
+    permissionsHash.value.has(permissionHash) &&
+    !selectedPermissionsHash.value.has(permissionHash)
+  ) {
+    delete removedPermissions.value[permissionHash];
+    selectedPermissionsHash.value.add(permissionHash);
     return;
   }
 
@@ -660,6 +815,129 @@ const updateTableData = async (value: string = filter.value.permissions) => {
     updatePermissionVisibility(permissionsState.permissions);
     countVisibleResources(permissionsState.permissions);
   }, 0);
+};
+
+const updatePermissionsUi = async (value: string) => {
+  permissionsUiType.value = value;
+  if (value === "json") {
+    const permissions: {
+      object: string;
+      permission: string;
+    }[] = [];
+    selectedPermissionsHash.value.forEach((permission: any) => {
+      const [resource, entity, _permission] = permission.split(":");
+      permissions.push({
+        object: `${resource}:${entity}`,
+        permission: _permission,
+      });
+    });
+
+    permissionsJsonValue.value = JSON.stringify(permissions);
+    permissionJsonEditorRef.value.setValue(permissionsJsonValue.value);
+    await nextTick();
+    permissionJsonEditorRef.value.formatDocument();
+  } else if (value === "table") {
+    updateJsonInTable();
+  }
+};
+
+const updateJsonInTable = () => {
+  const permissions = JSON.parse(permissionsJsonValue.value);
+
+  const permissionsHash = new Set(
+    permissions.map((p: any) => p.object + ":" + p.permission)
+  );
+  let hash = "";
+  let permission;
+  let resource = "";
+  let entity = "";
+  let resourceDetails: Entity | Resource;
+
+  // Update added permissions
+  updateRolePermissions(permissions);
+
+  permissions.forEach((permission: any) => {
+    [resource, entity] = permission.object.split(":");
+    hash = permission.object + ":" + permission.permission;
+    if (!selectedPermissionsHash.value.has(hash)) {
+      updatePermissionMappings(hash);
+
+      resourceDetails = resourceMapper.value[resource];
+
+      if (resource === "dashboard") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["dfolder"].entities.find(
+          (e: Entity) => e.name === folderId
+        ) as Entity;
+      } else if (entity === getOrgId()) {
+        resourceDetails.permission[permission.permission as "AllowAll"].value =
+          selectedPermissionsHash.value.has(
+            getPermissionHash(resource, permission.permission, entity)
+          );
+      } else if (
+        resource === "logs" ||
+        resource === "metrics" ||
+        resource === "traces"
+      ) {
+        resourceDetails = resourceMapper.value["stream"].entities.find(
+          (e: Entity) => e.name === resource
+        ) as Entity;
+      }
+
+      updateEntityPermission(
+        resourceDetails,
+        resource,
+        entity,
+        permission.permission
+      );
+    }
+  });
+
+  // Update removed permissions
+  selectedPermissionsHash.value.forEach(async (permissionHash: any) => {
+    permission = permissionHash.split(":");
+    resource = permission[0];
+    entity = permission[1];
+    permission = {
+      object: permission[0] + ":" + permission[1],
+      permission: permission[2] as "AllowAll",
+    };
+
+    if (!permissionsHash.has(permissionHash)) {
+      updatePermissionMappings(permissionHash);
+
+      resourceDetails = resourceMapper.value[resource];
+
+      if (resource === "dashboard") {
+        const [folderId, dashboardId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["dfolder"].entities.find(
+          (e: Entity) => e.name === folderId
+        ) as Entity;
+      } else if (entity === getOrgId()) {
+        resourceDetails.permission[permission.permission as "AllowAll"].value =
+          selectedPermissionsHash.value.has(
+            getPermissionHash(resource, permission.permission, entity)
+          );
+      } else if (
+        resource === "logs" ||
+        resource === "metrics" ||
+        resource === "traces"
+      ) {
+        resourceDetails = resourceMapper.value["stream"].entities.find(
+          (e: Entity) => e.name === resource
+        ) as Entity;
+      }
+
+      updateEntityPermission(
+        resourceDetails,
+        resource,
+        entity,
+        permission.permission
+      );
+    }
+  });
 };
 
 const updateExpandedResources = (resources: (Resource | Entity)[]) => {
@@ -980,7 +1258,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
 };
 
 const getEnrichmentTables = async () => {
-  const data = await getStreams("enrichment_tables", false);
+  const data: any = await getStreams("enrichment_tables", false);
 
   updateResourceEntities("enrichment_table", ["name"], data.list);
 
@@ -1018,7 +1296,7 @@ const getDashboards = async (resource: Entity | Resource) => {
 };
 
 const getOrgs = async () => {
-  const orgs = await organizationsService.list(0, 10000, "name", false, "");
+  const orgs = await organizationsService.list(0, 100000, "name", false, "");
 
   updateResourceEntities("org", ["identifier"], [...orgs.data.data]);
 
@@ -1142,7 +1420,7 @@ const getAlerts = async () => {
 };
 
 const getLogs = async (resource: Resource | Entity) => {
-  const logs = await getStreams("logs", false);
+  const logs: any = await getStreams("logs", false);
 
   updateEntityEntities(resource, ["name"], logs.list);
 
@@ -1152,7 +1430,7 @@ const getLogs = async (resource: Resource | Entity) => {
 };
 
 const getMetrics = async (resource: Resource | Entity) => {
-  const metrics = await getStreams("metrics", false);
+  const metrics: any = await getStreams("metrics", false);
 
   updateEntityEntities(resource, ["name"], metrics.list);
 
@@ -1162,7 +1440,7 @@ const getMetrics = async (resource: Resource | Entity) => {
 };
 
 const getTraces = async (resource: Resource | Entity) => {
-  const traces = await getStreams("traces", false);
+  const traces: any = await getStreams("traces", false);
 
   updateEntityEntities(resource, ["name"], traces.list);
 
@@ -1483,6 +1761,8 @@ const updateResourceResource = (
 };
 
 const saveRole = () => {
+  if (permissionsUiType.value === "json") updateJsonInTable();
+
   const payload = {
     add: Object.values(addedPermissions.value),
     remove: Object.values(removedPermissions.value),
@@ -1587,6 +1867,36 @@ const filterResourceOptions = (val: string, update: any) => {
     val,
     update
   ) as any[];
+};
+
+const updateEntityPermission = (
+  resource: Resource | Entity,
+  resourceName: string,
+  entityName: string,
+  permission:
+    | "AllowAll"
+    | "AllowList"
+    | "AllowGet"
+    | "AllowDelete"
+    | "AllowPost"
+) => {
+  if (resource?.entities)
+    resource.entities.forEach((entity: Entity) => {
+      if (entity.name === entityName) {
+        entity.permission[permission].value = selectedPermissionsHash.value.has(
+          getPermissionHash(resourceName, permission, entityName)
+        );
+      }
+    });
+};
+
+const toggleHelpSection = async () => {
+  isHelpOpen.value = !isHelpOpen.value;
+
+  await nextTick();
+  await nextTick();
+
+  permissionJsonEditorRef.value.resetEditorLayout();
 };
 </script>
 <style scoped></style>

@@ -53,10 +53,11 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
-    ["log", "message", "msg", "content", "data", "events", "json"];
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
+    "log", "message", "msg", "content", "data", "body", "events", "json",
+];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    chain(
+    let mut fields = chain(
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string()),
@@ -73,12 +74,15 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
                 }
             }),
     )
-    .collect()
+    .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
 });
 
 const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
 pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    chain(
+    let mut fields = chain(
         _DEFAULT_DISTINCT_FIELDS.iter().map(|s| s.to_string()),
         CONFIG
             .common
@@ -93,12 +97,15 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
                 }
             }),
     )
-    .collect()
+    .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
 });
 
 const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    chain(
+    let mut fields = chain(
         _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
         CONFIG
             .common
@@ -113,7 +120,10 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
                 }
             }),
     )
-    .collect()
+    .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
 });
 
 pub static CONFIG: Lazy<Config> = Lazy::new(init);
@@ -278,10 +288,12 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
+    pub bloom_filter_disabled_on_search: bool,
+    #[env_config(name = "ZO_BLOOM_FILTER_ON_ALL_FIELDS", default = false)]
+    pub bloom_filter_on_all_fields: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
-    #[env_config(name = "ZO_BLOOM_FILTER_FORCE_DISABLED", default = false)]
-    pub bloom_filter_force_disabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
@@ -368,7 +380,7 @@ pub struct Limit {
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
-    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 64)]
+    #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 128)]
     pub max_file_size_on_disk: usize,
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 256)]
@@ -424,6 +436,8 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
     pub alert_schedule_interval: i64,
+    #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
+    pub starting_expect_querier_num: usize,
 }
 
 #[derive(EnvConfig)]

@@ -64,7 +64,7 @@ export default defineComponent({
      * redirect user to the page where user was redirected from
      */
     const getDefaultOrganization = () => {
-      organizationsService.list(0, 1000, "id", false, "").then((res: any) => {
+      organizationsService.list(0, 100000, "id", false, "").then((res: any) => {
         const localOrg: any = useLocalOrganization();
         if (
           localOrg.value != null &&

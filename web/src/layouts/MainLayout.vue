@@ -305,6 +305,7 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
+import useStreams from "@/composables/useStreams";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -372,6 +373,7 @@ export default defineComponent({
     const miniMode = ref(true);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
+    const { getStreams, resetStreams } = useStreams();
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier"
@@ -563,6 +565,8 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      resetStreams();
+      store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1
@@ -597,27 +601,36 @@ export default defineComponent({
       //       }
       //     });
       // } else {
-      await verifyStreamExist(selectedOrg.value);
+      if (
+        store.state.zoConfig.hasOwnProperty(
+          "restricted_routes_on_empty_data"
+        ) &&
+        store.state.zoConfig.restricted_routes_on_empty_data == true &&
+        store.state.organizationData.isDataIngested == false
+      ) {
+        await verifyStreamExist(selectedOrg.value);
+      }
       // }
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
-      await streamService
-        .nameList(selectedOrgData?.identifier, "", false)
-        .then((response) => {
-          store.dispatch("setSelectedOrganization", {
-            ...selectedOrgData,
-          });
-          if (response.data.list.length == 0) {
-            $q.notify({
-              type: "warning",
-              message:
-                "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
-              timeout: 5000,
-            });
-            router.push({ name: "ingestion" });
-          }
+      await getStreams("", false).then((response: any) => {
+        store.dispatch("setSelectedOrganization", {
+          ...selectedOrgData,
         });
+        if (response.list.length == 0) {
+          store.dispatch("setIsDataIngested", false);
+          $q.notify({
+            type: "warning",
+            message:
+              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+            timeout: 5000,
+          });
+          router.push({ name: "ingestion" });
+        } else {
+          store.dispatch("setIsDataIngested", true);
+        }
+      });
     };
 
     const setSelectedOrganization = async () => {
@@ -817,6 +830,7 @@ export default defineComponent({
       setSelectedOrganization,
       redirectToParentRoute,
       getOrganizationSettings,
+      resetStreams,
     };
   },
   computed: {
@@ -841,6 +855,7 @@ export default defineComponent({
     },
     async changeOrganizationIdentifier() {
       this.isLoading = false;
+      this.resetStreams();
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
 
