@@ -137,26 +137,35 @@ export const getAllDashboards = async (store: any, folderId: any) => {
     });
   } catch (error) {
     // handle error
+    throw error;
   }
 };
 
 //get all dashboards by folderId if not there then call api else return from store
 export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
-  if (!store.state.organizationData.allDashboardList[folderId]) {
-    await getAllDashboards(store, folderId);
+  try {
+    if (!store.state.organizationData.allDashboardList[folderId]) {
+      await getAllDashboards(store, folderId);
+    }
+    return store.state.organizationData.allDashboardList[folderId];
+  } catch (error) {
+    throw error;
   }
-  return store.state.organizationData.allDashboardList[folderId];
 };
 
 function findDashboard(dashboardId: string, store: any, folderId: any) {
-  const dashboards = store.state.organizationData.allDashboardList[folderId];
-  const dashboard = dashboards.find(
-    (it: any) => it.dashboardId === dashboardId
-  );
-  // return the deep cody of the dashboard object to prevent it from being modified
-  return dashboard && typeof dashboard === "object"
-    ? JSON.parse(JSON.stringify(dashboard))
-    : {};
+  try {
+    const dashboards = store.state.organizationData.allDashboardList[folderId];
+    const dashboard = dashboards.find(
+      (it: any) => it.dashboardId === dashboardId
+    );
+    // return the deep cody of the dashboard object to prevent it from being modified
+    return dashboard && typeof dashboard === "object"
+      ? JSON.parse(JSON.stringify(dashboard))
+      : {};
+  } catch (error) {
+    throw error;
+  }
 }
 
 export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
@@ -186,62 +195,66 @@ export const addPanel = async (
   folderId: any,
   tabId: any
 ) => {
-  // get the object of panel data
-  // find the dashboard and add the panel data to dashboard object
-  // call the update dashboard function
+  try {
+    // get the object of panel data
+    // find the dashboard and add the panel data to dashboard object
+    // call the update dashboard function
 
-  if (
-    !store.state.organizationData.allDashboardList[folderId] ||
-    store.state.organizationData.allDashboardList[folderId].length == 0
-  ) {
-    await getAllDashboards(store, folderId);
-  }
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
-
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  if (!tab.panels) {
-    tab.panels = [];
-  }
-
-  const { maxI, maxY, lastPanel } = getMaxIAndMaxYFromTab(tab);
-
-  const newLayoutObj = {
-    x: 0,
-    y: tab.panels?.length > 0 ? maxY + 10 : 0,
-    w: 24,
-    h: 9,
-    i: maxI + 1,
-    panelId: panelData.id,
-    static: false,
-  };
-
-  // check if last panel has enthough space to add new panel
-  if (tab.panels.length > 0) {
-    //check if new panel can be added
-    if (48 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
-      newLayoutObj.y = lastPanel.layout.y;
-      newLayoutObj.x = lastPanel.layout.x + lastPanel.layout.w;
+    if (
+      !store.state.organizationData.allDashboardList[folderId] ||
+      store.state.organizationData.allDashboardList[folderId].length == 0
+    ) {
+      await getAllDashboards(store, folderId);
     }
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
+
+    // find tab from tabId
+    const tab = getTabDataFromTabId(currentDashboard, tabId);
+
+    if (!tab.panels) {
+      tab.panels = [];
+    }
+
+    const { maxI, maxY, lastPanel } = getMaxIAndMaxYFromTab(tab);
+
+    const newLayoutObj = {
+      x: 0,
+      y: tab.panels?.length > 0 ? maxY + 10 : 0,
+      w: 24,
+      h: 9,
+      i: maxI + 1,
+      panelId: panelData.id,
+      static: false,
+    };
+
+    // check if last panel has enthough space to add new panel
+    if (tab.panels.length > 0) {
+      //check if new panel can be added
+      if (48 - (lastPanel.layout.x + lastPanel.layout.w) >= newLayoutObj.w) {
+        newLayoutObj.y = lastPanel.layout.y;
+        newLayoutObj.x = lastPanel.layout.x + lastPanel.layout.w;
+      }
+    }
+
+    // if (!currentDashboard.layouts) {
+    //   currentDashboard.layouts = [];
+    // }
+    // currentDashboard.layouts.push(newLayoutObj);
+
+    //set layout of new panel
+    panelData.layout = newLayoutObj;
+    tab.panels.push(panelData);
+
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default"
+    );
+  } catch (error) {
+    throw error;
   }
-
-  // if (!currentDashboard.layouts) {
-  //   currentDashboard.layouts = [];
-  // }
-  // currentDashboard.layouts.push(newLayoutObj);
-
-  //set layout of new panel
-  panelData.layout = newLayoutObj;
-  tab.panels.push(panelData);
-
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId ?? "default"
-  );
 };
 
 export const addVariable = async (
@@ -250,37 +263,41 @@ export const addVariable = async (
   variableData: any,
   folderId: any
 ) => {
-  if (
-    !store.state.organizationData.allDashboardList[folderId] ||
-    store.state.organizationData.allDashboardList[folderId].length == 0
-  ) {
-    await getAllDashboards(store, folderId);
+  try {
+    if (
+      !store.state.organizationData.allDashboardList[folderId] ||
+      store.state.organizationData.allDashboardList[folderId].length == 0
+    ) {
+      await getAllDashboards(store, folderId);
+    }
+
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    if (!currentDashboard.variables) {
+      currentDashboard.variables = {};
+      currentDashboard.variables.showDynamicFilters = false;
+      currentDashboard.variables.list = [];
+    }
+
+    const variableExists = currentDashboard.variables.list.filter(
+      (it: any) => it.name == variableData.name
+    );
+
+    if (variableExists.length) {
+      throw new Error("Variable with same name already exists");
+    }
+
+    currentDashboard.variables.list.push(variableData);
+
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default"
+    );
+  } catch (error) {
+    throw error;
   }
-
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
-  if (!currentDashboard.variables) {
-    currentDashboard.variables = {};
-    currentDashboard.variables.showDynamicFilters = false;
-    currentDashboard.variables.list = [];
-  }
-
-  const variableExists = currentDashboard.variables.list.filter(
-    (it: any) => it.name == variableData.name
-  );
-
-  if (variableExists.length) {
-    throw new Error("Variable with same name already exists");
-  }
-
-  currentDashboard.variables.list.push(variableData);
-
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId ?? "default"
-  );
 };
 
 export const deleteVariable = async (
@@ -289,25 +306,29 @@ export const deleteVariable = async (
   variableName: any,
   folderId: any
 ) => {
-  // get the object of panel id
-  // find the dashboard and remove the panel data to dashboard object
-  // call the update dashboard function
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
+  try {
+    // get the object of panel id
+    // find the dashboard and remove the panel data to dashboard object
+    // call the update dashboard function
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  //remove panel from current dashboard
-  const variableIndex = currentDashboard.variables.list.findIndex(
-    (variable: any) => variable.name == variableName
-  );
-  currentDashboard.variables.list.splice(variableIndex, 1);
-  currentDashboard.variables.list = currentDashboard.variables.list;
+    //remove panel from current dashboard
+    const variableIndex = currentDashboard.variables.list.findIndex(
+      (variable: any) => variable.name == variableName
+    );
+    currentDashboard.variables.list.splice(variableIndex, 1);
+    currentDashboard.variables.list = currentDashboard.variables.list;
 
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId ?? "default"
-  );
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default"
+    );
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const deletePanel = async (
@@ -317,33 +338,39 @@ export const deletePanel = async (
   folderId: any,
   tabId: any
 ) => {
-  // get the object of panel id
-  // find the dashboard and remove the panel data to dashboard object
-  // call the update dashboard function
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
+  try {
+    // get the object of panel id
+    // find the dashboard and remove the panel data to dashboard object
+    // call the update dashboard function
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
+    // find tab from tabId
+    const tab = getTabDataFromTabId(currentDashboard, tabId);
 
-  //remove panel from current dashboard
-  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelId);
-  tab.panels.splice(panelIndex, 1);
-  // currentDashboard.panels = currentDashboard.panels;
+    //remove panel from current dashboard
+    const panelIndex = tab.panels.findIndex(
+      (panel: any) => panel.id == panelId
+    );
+    tab.panels.splice(panelIndex, 1);
+    // currentDashboard.panels = currentDashboard.panels;
 
-  //remove layout from current dashboard
-  // const layoutIndex = currentDashboard.layouts.findIndex(
-  //   (layout: any) => layout.panelId == panelId
-  // );
-  // currentDashboard.layouts.splice(layoutIndex, 1);
-  // currentDashboard.layouts = currentDashboard.layouts;
+    //remove layout from current dashboard
+    // const layoutIndex = currentDashboard.layouts.findIndex(
+    //   (layout: any) => layout.panelId == panelId
+    // );
+    // currentDashboard.layouts.splice(layoutIndex, 1);
+    // currentDashboard.layouts = currentDashboard.layouts;
 
-  await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId
-  );
+    await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId
+    );
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const updateVariable = async (
@@ -353,34 +380,38 @@ export const updateVariable = async (
   variableData: any,
   folderId?: any
 ) => {
-  // get the object of panel id
-  // find the dashboard and remove the panel data to dashboard object
-  // call the update dashboard function
-  // Get the current dashboard from the store
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
-  // Find the index of the variable in the list
-  const variableIndex = currentDashboard.variables.list.findIndex(
-    (variable: any) => variable.name == variableName
-  );
-  //if name already exists
-  const variableExists = currentDashboard.variables.list.filter(
-    (it: any) => it.name == variableData.name
-  );
+  try {
+    // get the object of panel id
+    // find the dashboard and remove the panel data to dashboard object
+    // call the update dashboard function
+    // Get the current dashboard from the store
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
+    // Find the index of the variable in the list
+    const variableIndex = currentDashboard.variables.list.findIndex(
+      (variable: any) => variable.name == variableName
+    );
+    //if name already exists
+    const variableExists = currentDashboard.variables.list.filter(
+      (it: any) => it.name == variableData.name
+    );
 
-  if (variableName != variableData.name && variableExists.length) {
-    throw new Error("Variable with same name already exists");
+    if (variableName != variableData.name && variableExists.length) {
+      throw new Error("Variable with same name already exists");
+    }
+
+    // Update the variable data in the list
+    currentDashboard.variables.list[variableIndex] = variableData;
+    // Update the dashboard in the store
+    await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId
+    );
+  } catch (error) {
+    throw error;
   }
-
-  // Update the variable data in the list
-  currentDashboard.variables.list[variableIndex] = variableData;
-  // Update the dashboard in the store
-  await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId
-  );
 };
 
 export const updatePanel = async (
@@ -390,26 +421,30 @@ export const updatePanel = async (
   folderId: any,
   tabId: any
 ) => {
-  // get the object of panel id
-  // find the dashboard and remove the panel data to dashboard object
-  // call the update dashboard function
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
+  try {
+    // get the object of panel id
+    // find the dashboard and remove the panel data to dashboard object
+    // call the update dashboard function
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
+    // find tab from tabId
+    const tab = getTabDataFromTabId(currentDashboard, tabId);
 
-  const panelIndex = tab.panels.findIndex(
-    (panel: any) => panel.id == panelData.id
-  );
-  tab.panels[panelIndex] = panelData;
+    const panelIndex = tab.panels.findIndex(
+      (panel: any) => panel.id == panelData.id
+    );
+    tab.panels[panelIndex] = panelData;
 
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId
-  );
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId
+    );
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const updateDashboard = async (
@@ -438,13 +473,17 @@ export const getDashboard = async (
   dashboardId: any,
   folderId: any
 ) => {
-  if (
-    !store.state.organizationData.allDashboardList[folderId] ||
-    store.state.organizationData.allDashboardList[folderId].length == 0
-  ) {
-    await getAllDashboards(store, folderId);
+  try {
+    if (
+      !store.state.organizationData.allDashboardList[folderId] ||
+      store.state.organizationData.allDashboardList[folderId].length == 0
+    ) {
+      await getAllDashboards(store, folderId);
+    }
+    return findDashboard(dashboardId, store, folderId);
+  } catch (error) {
+    throw error;
   }
-  return findDashboard(dashboardId, store, folderId);
 };
 
 export const deleteDashboardById = async (
@@ -452,26 +491,30 @@ export const deleteDashboardById = async (
   dashboardId: any,
   folderId: any
 ) => {
-  // Delete the dashboard using the dashboardService
-  await dashboardService.delete(
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    folderId
-  );
+  try {
+    // Delete the dashboard using the dashboardService
+    await dashboardService.delete(
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      folderId
+    );
 
-  // Get list of all dashboard of all folders
-  const allDashboardList = store.state.organizationData.allDashboardList;
+    // Get list of all dashboard of all folders
+    const allDashboardList = store.state.organizationData.allDashboardList;
 
-  // Filter out the deleted dashboard from the list
-  const newDashboards = allDashboardList[folderId].filter(
-    (dashboard: any) => dashboard.dashboardId != dashboardId
-  );
+    // Filter out the deleted dashboard from the list
+    const newDashboards = allDashboardList[folderId].filter(
+      (dashboard: any) => dashboard.dashboardId != dashboardId
+    );
 
-  // Update the allDashboardList in the store with the new list
-  store.dispatch("setAllDashboardList", {
-    ...allDashboardList,
-    [folderId]: newDashboards,
-  });
+    // Update the allDashboardList in the store with the new list
+    store.dispatch("setAllDashboardList", {
+      ...allDashboardList,
+      [folderId]: newDashboards,
+    });
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const getPanel = async (
@@ -481,19 +524,23 @@ export const getPanel = async (
   folderId: any,
   tabId: any
 ) => {
-  if (
-    !store.state.organizationData.allDashboardList[folderId] ||
-    store.state.organizationData.allDashboardList[folderId].length == 0
-  ) {
-    await getAllDashboards(store, folderId);
+  try {
+    if (
+      !store.state.organizationData.allDashboardList[folderId] ||
+      store.state.organizationData.allDashboardList[folderId].length == 0
+    ) {
+      await getAllDashboards(store, folderId);
+    }
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
+
+    // find tab from tabId
+    const tab = getTabDataFromTabId(currentDashboard, tabId);
+
+    const paneldata = tab.panels?.find((it: any) => it.id == panelId);
+    return paneldata;
+  } catch (error) {
+    throw error;
   }
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
-
-  // find tab from tabId
-  const tab = getTabDataFromTabId(currentDashboard, tabId);
-
-  const paneldata = tab.panels?.find((it: any) => it.id == panelId);
-  return paneldata;
 };
 
 export const getPanelId = () => {
@@ -519,36 +566,40 @@ export const deleteTab = async (
   deleteTabId: any,
   moveToTabId?: any
 ) => {
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
+  try {
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  if (moveToTabId) {
-    const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
-    // move panels to other tab
-    const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
+    if (moveToTabId) {
+      const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
+      // move panels to other tab
+      const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
 
-    let { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
+      let { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
 
-    // for each panel, need to recalculate layout object
-    deleteTabData.panels.forEach((panel: any) => {
-      maxY += 10;
-      panel.layout.i = ++maxI;
-      panel.layout.y = maxY;
-    });
+      // for each panel, need to recalculate layout object
+      deleteTabData.panels.forEach((panel: any) => {
+        maxY += 10;
+        panel.layout.i = ++maxI;
+        panel.layout.y = maxY;
+      });
 
-    moveToTabData.panels.push(...deleteTabData.panels);
+      moveToTabData.panels.push(...deleteTabData.panels);
+    }
+    // delete the tab
+    currentDashboard.tabs = currentDashboard.tabs.filter(
+      (tab: any) => tab.tabId != deleteTabId
+    );
+
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default"
+    );
+  } catch (error) {
+    throw error;
   }
-  // delete the tab
-  currentDashboard.tabs = currentDashboard.tabs.filter(
-    (tab: any) => tab.tabId != deleteTabId
-  );
-
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId ?? "default"
-  );
 };
 
 export const editTab = async (
@@ -558,22 +609,26 @@ export const editTab = async (
   tabId: any,
   tabData: any
 ) => {
-  const currentDashboardData = findDashboard(dashboardId, store, folderId);
-  const tab = getTabDataFromTabId(currentDashboardData, tabId);
+  try {
+    const currentDashboardData = findDashboard(dashboardId, store, folderId);
+    const tab = getTabDataFromTabId(currentDashboardData, tabId);
 
-  // only name will change
-  tab.name = tabData.name;
+    // only name will change
+    tab.name = tabData.name;
 
-  await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboardData,
-    folderId ?? "default"
-  );
+    await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboardData,
+      folderId ?? "default"
+    );
 
-  // return updated tab
-  return tab;
+    // return updated tab
+    return tab;
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const addTab = async (
@@ -582,22 +637,26 @@ export const addTab = async (
   folderId: any,
   newTabData: any
 ) => {
-  // genereate tab id
-  newTabData.tabId = getTabId();
+  try {
+    // genereate tab id
+    newTabData.tabId = getTabId();
 
-  const currentDashboardData = findDashboard(dashboardId, store, folderId);
-  currentDashboardData.tabs.push(newTabData);
+    const currentDashboardData = findDashboard(dashboardId, store, folderId);
+    currentDashboardData.tabs.push(newTabData);
 
-  await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboardData,
-    folderId ?? "default"
-  );
+    await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboardData,
+      folderId ?? "default"
+    );
 
-  // return new tab data with new tab id
-  return newTabData;
+    // return new tab data with new tab id
+    return newTabData;
+  } catch (error) {
+    throw error;
+  }
 };
 
 // move panel to another tab
@@ -609,92 +668,112 @@ export const movePanelToAnotherTab = async (
   currentTabId: any,
   moveToTabId?: any
 ) => {
-  const currentDashboard = findDashboard(dashboardId, store, folderId);
+  try {
+    const currentDashboard = findDashboard(dashboardId, store, folderId);
 
-  const currentTabData = getTabDataFromTabId(currentDashboard, currentTabId);
-  const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
+    const currentTabData = getTabDataFromTabId(currentDashboard, currentTabId);
+    const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
 
-  // panel data
-  const panelData = currentTabData.panels.find((it: any) => it.id == panelId);
+    // panel data
+    const panelData = currentTabData.panels.find((it: any) => it.id == panelId);
 
-  // delete panel in currentTab
-  currentTabData.panels = currentTabData.panels.filter(
-    (panel: any) => panel.id != panelId
-  );
+    // delete panel in currentTab
+    currentTabData.panels = currentTabData.panels.filter(
+      (panel: any) => panel.id != panelId
+    );
 
-  // Now, add panel to moveToTab
-  if (!moveToTabData.panels) {
-    moveToTabData.panels = [];
+    // Now, add panel to moveToTab
+    if (!moveToTabData.panels) {
+      moveToTabData.panels = [];
+    }
+
+    // need to change layout object
+    const { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
+
+    //set layout of new panel
+    panelData.layout.i = maxI + 1;
+    panelData.layout.y = maxY + 10;
+    moveToTabData.panels.push(panelData);
+
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default"
+    );
+  } catch (error) {
+    throw error;
   }
-
-  // need to change layout object
-  const { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
-
-  //set layout of new panel
-  panelData.layout.i = maxI + 1;
-  panelData.layout.y = maxY + 10;
-  moveToTabData.panels.push(panelData);
-
-  return await updateDashboard(
-    store,
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    currentDashboard,
-    folderId ?? "default"
-  );
 };
 
 export const getFoldersList = async (store: any) => {
-  let folders = (
-    await dashboardService.list_Folders(
-      store.state.selectedOrganization.identifier
-    )
-  ).data.list;
+  try {
+    let folders = (
+      await dashboardService.list_Folders(
+        store.state.selectedOrganization.identifier
+      )
+    ).data.list;
 
-  // get default folder and append it to top
-  let defaultFolder = folders.find((it: any) => it.folderId == "default");
-  folders = folders.filter((it: any) => it.folderId != "default");
+    // get default folder and append it to top
+    let defaultFolder = folders.find((it: any) => it.folderId == "default");
+    folders = folders.filter((it: any) => it.folderId != "default");
 
-  if (!defaultFolder) {
-    defaultFolder = {
-      name: "default",
-      folderId: "default",
-      decription: "default",
-    };
+    if (!defaultFolder) {
+      defaultFolder = {
+        name: "default",
+        folderId: "default",
+        decription: "default",
+      };
+    }
+
+    store.dispatch("setFolders", [
+      defaultFolder,
+      ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
+    ]);
+
+    return store.state.organizationData.folders;
+  } catch (error) {
+    throw error;
   }
-
-  store.dispatch("setFolders", [
-    defaultFolder,
-    ...folders.sort((a: any, b: any) => a.name.localeCompare(b.name)),
-  ]);
-
-  return store.state.organizationData.folders;
 };
 
 export const deleteFolderById = async (store: any, folderId: any) => {
-  await dashboardService.delete_Folder(
-    store.state.selectedOrganization.identifier,
-    folderId
-  );
-  await getFoldersList(store);
+  try {
+    await dashboardService.delete_Folder(
+      store.state.selectedOrganization.identifier,
+      folderId
+    );
+    await getFoldersList(store);
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const createFolder = async (store: any, data: any) => {
-  const newFolder = await dashboardService.new_Folder(
-    store.state.selectedOrganization.identifier,
-    data
-  );
-  await getFoldersList(store);
-  return newFolder;
+  try {
+    const newFolder = await dashboardService.new_Folder(
+      store.state.selectedOrganization.identifier,
+      data
+    );
+    await getFoldersList(store);
+    return newFolder;
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const updateFolder = async (store: any, folderId: any, data: any) => {
-  await dashboardService.edit_Folder(
-    store.state.selectedOrganization.identifier,
-    folderId,
-    data
-  );
-  await getFoldersList(store);
+  try {
+    await dashboardService.edit_Folder(
+      store.state.selectedOrganization.identifier,
+      folderId,
+      data
+    );
+    await getFoldersList(store);
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const moveDashboardToAnotherFolder = async (
@@ -703,17 +782,21 @@ export const moveDashboardToAnotherFolder = async (
   from: any,
   to: any
 ) => {
-  //move dashboard
-  await dashboardService.move_Dashboard(
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    {
-      from: from,
-      to: to,
-    }
-  );
+  try {
+    //move dashboard
+    await dashboardService.move_Dashboard(
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      {
+        from: from,
+        to: to,
+      }
+    );
 
-  //update both folders dashboard
-  await getAllDashboards(store, to);
-  await getAllDashboards(store, from);
+    //update both folders dashboard
+    await getAllDashboards(store, to);
+    await getAllDashboards(store, from);
+  } catch (error) {
+    throw error;
+  }
 };
