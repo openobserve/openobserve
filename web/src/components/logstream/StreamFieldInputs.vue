@@ -74,8 +74,11 @@
             :popup-content-style="{ textTransform: 'capitalize' }"
             color="input-border"
             bg-color="input-bg"
-            class="q-py-sm"
+            class="q-py-sm stream-schema-index-select"
+            multiple
+            :max-values="2"
             map-options
+            :option-disable="(_option) => disableOptions(field, _option)"
             emit-value
             clearable
             stack-label
@@ -83,7 +86,7 @@
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 200px"
+            style="width: 300px"
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
@@ -143,10 +146,14 @@ defineProps({
 const emits = defineEmits(["add", "remove", "input:update"]);
 
 const streamIndexType = [
-  { label: "Hash based partition", value: "fullTextSearchKey" },
-  { label: "Key based partition", value: "partitionKey" },
-  { label: "Inverted index", value: "intertedIndex" },
+  { label: "Key Value partition", value: "keyPartition" },
   { label: "Bloom filter", value: "bloomFilterKey" },
+  { label: "Inverted Index", value: "fullTextSearchKey" },
+  { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
+  { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
+  { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
+  { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
+  { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
 ];
 
 const fieldTypes = [
@@ -175,6 +182,35 @@ const deleteApiHeader = (field: any, index: number) => {
 
 const addApiHeader = () => {
   emits("add");
+};
+
+const disableOptions = (schema, option) => {
+  let selectedHashPartition = "";
+
+  let selectedIndices = "";
+
+  for (let i = 0; i < (schema?.index_type || []).length; i++) {
+    if (schema.index_type[i].includes("hashPartition")) {
+      selectedHashPartition = schema.index_type[i];
+    }
+    selectedIndices += schema.index_type[i];
+  }
+
+  if (
+    selectedIndices.includes("hashPartition") &&
+    selectedHashPartition !== option.value &&
+    (option.value.includes("hashPartition") ||
+      option.value.includes("keyPartition"))
+  )
+    return true;
+
+  if (
+    selectedIndices.includes("keyPartition") &&
+    option.value.includes("hashPartition")
+  )
+    return true;
+
+  return false;
 };
 </script>
 

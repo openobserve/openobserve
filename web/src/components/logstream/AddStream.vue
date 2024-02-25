@@ -136,7 +136,7 @@ const q = useQuasar();
 const streamInputs = ref({
   name: "",
   stream_type: "",
-  index_type: "",
+  index_type: [],
   dataRetentionDays: 14,
 });
 
@@ -144,7 +144,7 @@ const getDefaultField = () => {
   return {
     name: "",
     type: "",
-    index_type: "",
+    index_type: [],
   };
 };
 
@@ -206,27 +206,32 @@ const getStreamPayload = () => {
   }
 
   fields.value.forEach((field) => {
-    if (field.index_type === "fullTextSearchKey") {
-      settings.full_text_search_keys.push(field.name);
-    }
+    field.index_type?.forEach((index: string) => {
+      if (index === "fullTextSearchKey") {
+        settings.full_text_search_keys.push(field.name);
+      }
 
-    if (field.index_type === "partitionKey") {
-      settings.partition_keys.push({
-        field: field.name,
-        types: "value",
-      });
-    }
+      if (index === "keyPartition") {
+        settings.partition_keys.push({
+          field: field.name,
+          types: "value",
+        });
+      }
 
-    // if (field.index_type === "intertedIndex") {
-    //   settings.partition_keys.push({
-    //     field: field.name,
-    //     types: "value",
-    //   });
-    // }
+      if (index.includes("hashPartition")) {
+        const [, buckets] = index.split("_");
+        settings.partition_keys.push({
+          field: field.name,
+          types: {
+            hash: Number(buckets),
+          },
+        });
+      }
 
-    if (field.index_type === "bloomFilterKey") {
-      settings.bloom_filter_fields.push(field.name);
-    }
+      if (index === "bloomFilterKey") {
+        settings.bloom_filter_fields.push(field.name);
+      }
+    });
   });
 
   return settings;

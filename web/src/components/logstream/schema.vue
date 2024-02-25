@@ -374,6 +374,7 @@ export default defineComponent({
         indexData.value.schema = streamResponse.schema;
         indexData.value.stats = streamResponse.stats;
 
+        const fieldIndices = [];
         for (var property of streamResponse.schema) {
           if (
             (streamResponse.settings.full_text_search_keys.length > 0 &&
@@ -383,18 +384,14 @@ export default defineComponent({
             (streamResponse.settings.full_text_search_keys.length == 0 &&
               store.state.zoConfig.default_fts_keys.includes(property.name))
           ) {
-            property.ftsKey = true;
-          } else {
-            property.ftsKey = false;
+            fieldIndices.push("fullTextSearchKey");
           }
 
           if (
             streamResponse.settings.bloom_filter_fields.length > 0 &&
             streamResponse.settings.bloom_filter_fields.includes(property.name)
           ) {
-            property.bloomKey = true;
-          } else {
-            property.bloomKey = false;
+            fieldIndices.push("bloomFilterKey");
           }
 
           property["delete"] = false;
@@ -405,17 +402,21 @@ export default defineComponent({
               (v) => !v.disabled && v.field === property.name
             )
           ) {
-            property.partitionKey = true;
-            property.level = Object.keys(
-              streamResponse.settings.partition_keys
-            ).find(
-              (key) =>
-                streamResponse.settings.partition_keys[key]["field"] ===
-                property.name
-            );
-          } else {
-            property.partitionKey = false;
+            const [level, partition] = Object.entries(
+              res.data.settings.partition_keys
+            ).find(([, partition]) => partition["field"] === property.name);
+
+            property.level = level;
+
+            if (partition.types === "values") fieldIndices.push("keyPartition");
+
+            if (partition.types?.hash)
+              fieldIndices.push(`hashPartition_${partition.types.hash}`);
           }
+
+          property.index_type = [...fieldIndices];
+
+          fieldIndices.length = 0;
         }
 
         if (showDataRetention.value)
@@ -450,34 +451,47 @@ export default defineComponent({
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
-        if (property.index_type === "fullTextSearchKey") {
-          settings.full_text_search_keys.push(property.name);
-        }
-        if (property.level && property.index_type === "keyPartition") {
-          settings.partition_keys.push({
-            field: property.name,
-            types: "value",
-          });
-        } else if (property.level && property.index_type === "hashPartition") {
-          settings.partition_keys.push({
-            field: property.name,
-            types: "hash",
-          });
-        } else if (property.index_type === "keyPartition") {
-          added_part_keys.push({
-            field: property.name,
-            types: "value",
-          });
-        } else if (property.index_type === "hashPartition") {
-          added_part_keys.push({
-            field: property.name,
-            types: "hash",
-          });
-        }
+        property.index_type?.forEach((index: string) => {
+          if (index === "fullTextSearchKey") {
+            settings.full_text_search_keys.push(property.name);
+          }
 
-        if (property.index_type === "bloomFilterKey") {
-          settings.bloom_filter_fields.push(property.name);
-        }
+          if (property.level && index === "keyPartition") {
+            settings.partition_keys.push({
+              field: property.name,
+              types: "value",
+            });
+          } else if (index === "keyPartition") {
+            added_part_keys.push({
+              field: property.name,
+              types: "value",
+            });
+          }
+
+          if (index?.includes("hashPartition")) {
+            const [, buckets] = index.split("_");
+
+            if (property.level) {
+              settings.partition_keys.push({
+                field: property.name,
+                types: {
+                  hash: Number(buckets),
+                },
+              });
+            } else {
+              added_part_keys.push({
+                field: property.name,
+                types: {
+                  hash: Number(buckets),
+                },
+              });
+            }
+          }
+
+          if (index === "bloomFilterKey") {
+            settings.bloom_filter_fields.push(property.name);
+          }
+        });
 
         if (property.delete) {
           deleteFieldList.value.push(property.name);
