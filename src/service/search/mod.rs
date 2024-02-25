@@ -295,7 +295,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
-        // idx_req.aggs.clear();
+        idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
         // if this is the first page, then for each term, get the first file_name where for each
