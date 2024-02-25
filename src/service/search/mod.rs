@@ -250,17 +250,17 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let mut idx_file_list = vec![];
-    let is_agg_query = !req.aggs.is_empty();
     let is_inverted_index = !meta.fts_terms.is_empty();
 
     log::warn!(
         "searching in is_agg_query {:?} is_inverted_index {:?}",
-        is_agg_query,
+        !req.aggs.is_empty(),
         is_inverted_index
     );
 
-    let file_list = if is_inverted_index && !is_agg_query {
+    let file_list = if is_inverted_index {
         let mut idx_req = req.clone();
+        let is_agg_query = !idx_req.aggs.is_empty();
 
         // Get all the unique terms which the user has searched.
         let terms = meta
@@ -276,7 +276,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .collect::<Vec<String>>()
             .join(" or ");
 
-        // TODO(ansrivas): distinct filename isn't supported.
         let query = format!(
             // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
             // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
@@ -296,12 +295,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
-        idx_req.aggs.clear();
+        // idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
         // if this is the first page, then for each term, get the first file_name where for each
         // term the _count is > 250
-        let unique_files = if _is_first_page {
+        let unique_files = if _is_first_page && !is_agg_query {
             log::warn!("First page response {:?}", idx_resp);
             let limit_count = 500;
             use itertools::Itertools;
