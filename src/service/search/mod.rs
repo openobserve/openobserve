@@ -249,11 +249,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let _is_agg_query = req.aggs.len() > 0;
     let mut idx_file_list = vec![];
 
     let is_inverted_index = !meta.fts_terms.is_empty();
-    let file_list = if is_inverted_index && !_is_agg_query {
+    let file_list = if is_inverted_index {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -279,6 +278,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             meta.stream_name, search_condition
         );
 
+        let _is_agg_query = idx_req.aggs.is_empty();
         let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
 
         log::warn!("searching in query {:?}", query);
@@ -290,12 +290,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
+        idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
-
         // if this is the first page, then for each term, get the first file_name where for each
         // term the _count is > 250
-        let unique_files = if _is_first_page {
+        let unique_files = if _is_first_page && !_is_agg_query {
             log::warn!("First page response {:?}", idx_resp);
             let limit_count = 500;
             use itertools::Itertools;
@@ -303,7 +303,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 .hits
                 .iter()
                 .map(|hit| {
-                    // hit.get("file_name").unwrap().as_str().unwrap().to_string()
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let term = hit.get("term").unwrap().as_str().unwrap().to_string();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
@@ -328,19 +327,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
             term_map
                 .into_iter()
-                .flat_map(|(_term, filenames)| filenames)
+                .flat_map(|(_, filenames)| filenames)
                 .collect::<HashSet<_>>()
         } else {
             idx_resp
                 .hits
                 .iter()
-                .map(|hit| {
-                    hit.get("file_name").unwrap().as_str().unwrap().to_string()
-                    // let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
-                    // let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    // let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
-                    // (file_name, count, timestamp)
-                })
+                .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
                 .collect::<HashSet<_>>()
         };
 
@@ -401,12 +394,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
         Some(o2_enterprise::enterprise::search::queue::predict_work_group(&nodes, &file_list));
     // 2. check concurrency
-    // let work_group_str = if work_group.is_none() {
-    //     "global".to_string()
-    // } else {
-    //     work_group.as_ref().unwrap().to_string()
-    // };
-
     let work_group_str = if let Some(wg) = &work_group {
         wg.to_string()
     } else {
