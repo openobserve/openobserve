@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
     utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
-    CONFIG, PARQUET_BATCH_SIZE,
+    FxIndexSet, CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::{
@@ -539,7 +539,7 @@ fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String>
     }
 
     let mut need_distinct = true;
-    let mut field_names = HashSet::new();
+    let mut field_names = FxIndexSet::<String>::default();
     for i in 0..fields.len() {
         let field = fields.get(i).unwrap();
 
@@ -556,7 +556,7 @@ fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String>
         let over_as = if field.to_lowercase().contains("over") && field.contains('(') {
             field[field.to_lowercase().find("over").unwrap()..].to_string()
         } else {
-            "AS \"".to_string() + field_name + "\""
+            "".to_string()
         };
 
         if fn_name == "count"
@@ -1541,5 +1541,81 @@ mod tests {
         .unwrap();
 
         assert!(!res.is_empty())
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase1() {
+        let sql = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = vec![
+            "SELECT DISTINCT \"a\"  FROM  tbl where a > 3 ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
+            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl where a > 3   ",
+            "SELECT  a, \"b\"  FROM  tbl where a > 3   ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
+        ];
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = rewrite_count_distinct_sql(sql, true).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase2() {
+        let sql = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = vec![
+            "SELECT DISTINCT \"a\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl ",
+            "SELECT  a, \"b\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
+        ];
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = rewrite_count_distinct_sql(sql, false).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase3() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Utf8, false),
+            Field::new("c", DataType::Utf8, false),
+        ]));
+
+        let sql = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl  limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl  group by a having cnt > 1 limit 10",
+        ];
+
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = merge_rewrite_sql(sql, schema.clone()).unwrap();
+            assert_eq!(res, **except);
+        }
     }
 }
