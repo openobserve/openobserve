@@ -543,6 +543,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             sql.meta.limit,
             &merge_sql,
             &batch,
+            true,
         )
         .await
         {

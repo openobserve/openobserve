@@ -175,16 +175,22 @@ pub async fn search(
                 .0
                 .clone()
         };
-        let batches =
-            match super::datafusion::exec::merge(&sql.org_id, offset, limit, &merge_sql, &batches)
-                .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    log::error!("[session_id {session_id}] datafusion merge error: {}", err);
-                    return Err(err.into());
-                }
-            };
+        let batches = match super::datafusion::exec::merge(
+            &sql.org_id,
+            offset,
+            limit,
+            &merge_sql,
+            &batches,
+            false,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                log::error!("[session_id {session_id}] datafusion merge error: {}", err);
+                return Err(err.into());
+            }
+        };
         merge_results.insert(name.to_string(), batches);
     }
 
