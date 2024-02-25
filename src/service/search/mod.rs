@@ -250,9 +250,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let mut idx_file_list = vec![];
-
+    let is_agg_query = !req.aggs.is_empty();
     let is_inverted_index = !meta.fts_terms.is_empty();
-    let file_list = if is_inverted_index {
+
+    log::warn!(
+        "searching in is_agg_query {:?} is_inverted_index {:?}",
+        is_agg_query,
+        is_inverted_index
+    );
+
+    let file_list = if is_inverted_index && !is_agg_query {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -278,7 +285,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             meta.stream_name, search_condition
         );
 
-        let _is_agg_query = idx_req.aggs.is_empty();
         let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
 
         log::warn!("searching in query {:?}", query);
@@ -295,7 +301,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
         // if this is the first page, then for each term, get the first file_name where for each
         // term the _count is > 250
-        let unique_files = if _is_first_page && !_is_agg_query {
+        let unique_files = if _is_first_page {
             log::warn!("First page response {:?}", idx_resp);
             let limit_count = 500;
             use itertools::Itertools;
