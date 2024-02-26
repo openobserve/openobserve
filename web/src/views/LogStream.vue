@@ -132,7 +132,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="refresh"
               :label="t(`logStream.refreshStats`)"
-              @click="getLogStream"
+              @click="getLogStream(true)"
+            />
+            <q-btn
+              data-test="log-stream-add-stream-btn"
+              class="q-ml-md q-mb-xs text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              :label="t(`logStream.add`)"
+              @click="addStream"
             />
           </div>
         </div>
@@ -165,6 +174,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <SchemaIndex v-model="schemaData" />
+    </q-dialog>
+
+    <q-dialog
+      v-model="addStreamDialog.show"
+      position="right"
+      full-height
+      maximized
+    >
+      <AddStream @streamAdded="getLogStream" />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -221,10 +239,11 @@ import config from "@/aws-exports";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
+import AddStream from "@/components/logstream/AddStream.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData },
+  components: { QTablePagination, SchemaIndex, NoData, AddStream },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -249,7 +268,7 @@ export default defineComponent({
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
     ];
-    const { getStreams } = useStreams();
+    const { getStreams, resetStreams, removeStream } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -309,6 +328,16 @@ export default defineComponent({
       columns.value?.splice(5, 1);
     }
 
+    const addStreamDialog = ref({
+      show: false,
+      data: {
+        name: "",
+        stream_type: "",
+        index_type: "",
+        retention_period: 14,
+      },
+    });
+
     let deleteStreamName = "";
     let deleteStreamType = "";
 
@@ -324,7 +353,7 @@ export default defineComponent({
       }
     });
 
-    const getLogStream = () => {
+    const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
@@ -333,6 +362,8 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
         logStream.value = [];
+
+        if (refresh) resetStreams();
 
         let counter = 1;
         getStreams("", false, false)
@@ -450,6 +481,7 @@ export default defineComponent({
               color: "positive",
               message: "Stream deleted successfully.",
             });
+            removeStream(deleteStreamName, deleteStreamType);
             getLogStream();
           }
         })
@@ -518,6 +550,16 @@ export default defineComponent({
       resultTotal.value = logStream.value.length;
     };
 
+    const addStream = () => {
+      addStreamDialog.value.show = true;
+      // router.push({
+      //   name: "addStream",
+      //   query: {
+      //     org_identifier: store.state.selectedOrganization.identifier,
+      //   },
+      // });
+    };
+
     return {
       t,
       qTable,
@@ -550,6 +592,8 @@ export default defineComponent({
       selectedStreamType,
       streamFilterValues,
       onChangeStreamFilter,
+      addStreamDialog,
+      addStream,
     };
   },
 });

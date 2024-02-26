@@ -1436,6 +1436,8 @@ const useLogs = () => {
             align: "left",
             sortable: true,
             closable: true,
+            showWrap: true,
+            wrapContent: false,
           });
         }
       }

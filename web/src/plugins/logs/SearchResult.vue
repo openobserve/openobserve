@@ -124,24 +124,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="'result_' + index"
                 class="table-header"
                 :data-test="`log-search-result-table-th-${col.label}`"
+                :style="col.wrapContent ? { 'max-width': '200px' } : {}"
               >
-                <q-chip
-                  v-if="col.closable"
-                  :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
-                  icon-remove="
-                    cancel
-                  "
-                  class="q-ma-none table-head-chip"
-                  removable
-                  square
-                  @remove="closeColumn(col)"
-                >
-                  {{ col.label }}
-                </q-chip>
+                <div class="flex items-center no-wrap table-head-chip q-dark">
+                  <span
+                    :class="
+                      store.state.theme === 'dark' ? 'text-white' : 'text-dark'
+                    "
+                    class="header-col-title"
+                  >
+                    {{ col.label }}</span
+                  >
+                  <div
+                    class="flex items-center no-wrap field_overlay"
+                    :class="
+                      store.state.theme === 'dark' ? 'field_overlay_dark' : ''
+                    "
+                    style="left: 0 !important"
+                    v-if="col.closable || col.showWrap"
+                  >
+                    <span
+                      v-if="col.showWrap"
+                      style="font-weight: normal"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-white'
+                          : 'text-grey-9'
+                      "
+                      >{{ t("common.wrap") }}</span
+                    >
+                    <q-toggle
+                      v-if="col.showWrap"
+                      class="text-normal q-ml-xs q-mr-sm"
+                      :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
+                      v-model="col.wrapContent"
+                      color="primary"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-white'
+                          : 'text-grey-7'
+                      "
+                      size="xs"
+                      dense
+                    />
 
-                <span v-else class="table-head-label">
-                  {{ col.label }}
-                </span>
+                    <q-icon
+                      v-if="col.closable"
+                      :data-test="`logs-search-result-table-th-remove-${col.label}-btn`"
+                      name="cancel"
+                      class="q-ma-none close-icon cursor-pointer"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'text-white'
+                          : 'text-grey-7'
+                      "
+                      :title="t('common.close')"
+                      size="18px"
+                      @click="closeColumn(col)"
+                    >
+                    </q-icon>
+                  </div>
+                </div>
               </th>
             </tr>
             <tr v-if="searchObj.loading == true">
@@ -213,8 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="column in searchObj.data.resultGrid.columns"
               :key="index + '-' + column.name"
               :data-test="'log-table-column-' + index + '-' + column.name"
-              class="field_list"
+              class="field_list ellipsis"
               style="cursor: pointer"
+              :style="column.wrapContent ? { 'max-width': '200px' } : {}"
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
@@ -255,7 +299,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : ''
                   "
                 ></high-light> -->
-                {{ column.prop(row, column.name) }}
+                <span class="ellipsis" :title="column.prop(row, column.name)">{{
+                  column.prop(row, column.name)
+                }}</span>
               </div>
               <div
                 v-if="column.closable && row[column.name]"
@@ -751,18 +797,13 @@ export default defineComponent({
       background-color: #f5f5f5;
       padding: 0px;
 
-      .q-chip__content {
+      .header-col-title {
         margin-right: 0.5rem;
-        font-size: 0.75rem;
+        font-size: 14px;
         color: $dark;
       }
 
-      .q-chip__icon--remove {
-        height: 1rem;
-        width: 1rem;
-        opacity: 1;
-        margin: 0;
-
+      .close-icon {
         &:hover {
           opacity: 0.7;
         }
@@ -783,8 +824,7 @@ export default defineComponent({
         transform: translateX(26px);
         position: absolute;
         margin-top: 2px;
-        color: grey;
-        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
+        color: #808080;
       }
     }
 
@@ -824,7 +864,8 @@ export default defineComponent({
   bottom: 0;
 }
 
-.field_list {
+.field_list,
+.table-head-chip {
   padding: 0px;
   margin-bottom: 0.125rem;
   position: relative;
@@ -834,6 +875,7 @@ export default defineComponent({
   font-family: monospace;
 
   .field_overlay {
+    width: fit-content;
     position: absolute;
     height: 100%;
     right: 0;
@@ -850,7 +892,8 @@ export default defineComponent({
       background-color: #181a1b;
     }
 
-    .q-icon {
+    .q-icon,
+    .q-toggle__inner {
       cursor: pointer;
       opacity: 0;
       transition: all 0.3s linear;
@@ -862,9 +905,21 @@ export default defineComponent({
     .field_overlay {
       visibility: visible;
 
-      .q-icon {
+      .q-icon,
+      .q-toggle__inner {
         opacity: 1;
       }
+    }
+  }
+}
+
+.table-head-chip {
+  font-family: "Nunito Sans", sans-serif;
+  .field_overlay {
+    background-color: #f5f5f5;
+
+    &.field_overlay_dark {
+      background-color: #565656;
     }
   }
 }
