@@ -37,6 +37,7 @@ use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -278,10 +279,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         let query = format!(
             // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
-            // ORDER BY _timestamp DESC",
-            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
-            meta.stream_name, search_condition
+            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
+            ORDER BY _timestamp DESC",
+            // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
+            meta.stream_name,
+            search_condition
         );
 
         let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
@@ -307,7 +309,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let unique_files = if _is_first_page {
             log::warn!("First page response {:?}", idx_resp);
             let limit_count = 500;
-            use itertools::Itertools;
+
             let sorted_data = idx_resp
                 .hits
                 .iter()
