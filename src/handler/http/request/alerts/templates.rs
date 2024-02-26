@@ -47,7 +47,7 @@ pub async fn save_template(
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner();
     // let name = name.trim();
-    match templates::save(&org_id, "", tmpl).await {
+    match templates::save(&org_id, "", tmpl, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -79,7 +79,7 @@ pub async fn update_template(
     let (org_id, name) = path.into_inner();
     let tmpl = tmpl.into_inner();
     let name = name.trim();
-    match templates::save(&org_id, name, tmpl).await {
+    match templates::save(&org_id, name, tmpl, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
