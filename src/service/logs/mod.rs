@@ -248,11 +248,11 @@ async fn add_valid_record(
                 // End check for alert trigger
             }
             let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-                let rec_schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
-                let schema_key = rec_schema.hash_key();
+                let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
+                let schema_key = schema.hash_key();
                 SchemaRecords {
                     schema_key,
-                    schema: rec_schema,
+                    schema,
                     records: vec![],
                     records_size: 0,
                 }
