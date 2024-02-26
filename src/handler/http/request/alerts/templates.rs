@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse},
@@ -128,9 +128,35 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
     )
 )]
 #[get("/{org_id}/alerts/templates")]
-async fn list_templates(path: web::Path<String>) -> Result<HttpResponse, Error> {
+async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    match templates::list(&org_id).await {
+
+    let mut _permitted = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = _req.headers().get("user_id").unwrap();
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id.to_str().unwrap(),
+            "GET",
+            "template",
+        )
+        .await
+        {
+            Ok(list) => {
+                _permitted = list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+        // Get List of allowed objects ends
+    }
+
+    match templates::list(&org_id, _permitted).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

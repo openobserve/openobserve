@@ -104,9 +104,29 @@ pub async fn update_folder(
 }
 
 #[tracing::instrument()]
-pub async fn list_folders(org_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_folders(
+    org_id: &str,
+    permitted_folders: Option<Vec<String>>,
+) -> Result<HttpResponse, Error> {
     if let Ok(folders) = db::dashboards::folders::list(org_id).await {
-        Ok(HttpResponse::Ok().json(FolderList { list: folders }))
+        let filtered = match permitted_folders {
+            Some(permitted_folders) => {
+                if permitted_folders.contains(&format!("{}:{}", "dfolder", org_id)) {
+                    folders
+                } else {
+                    folders
+                        .into_iter()
+                        .filter(|folder_loc| {
+                            permitted_folders
+                                .contains(&format!("{}:{}", "dfolder", folder_loc.folder_id))
+                        })
+                        .collect::<Vec<_>>()
+                }
+            }
+            None => folders,
+        };
+
+        Ok(HttpResponse::Ok().json(FolderList { list: filtered }))
     } else {
         Ok(HttpResponse::Ok().json(FolderList { list: vec![] }))
     }

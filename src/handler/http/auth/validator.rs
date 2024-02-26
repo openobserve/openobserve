@@ -451,6 +451,54 @@ pub(crate) async fn check_permissions(
     true
 }
 
+#[cfg(feature = "enterprise")]
+async fn list_objects(
+    user_id: &str,
+    permission: &str,
+    object_type: &str,
+) -> Result<Vec<String>, anyhow::Error> {
+    o2_enterprise::enterprise::openfga::authorizer::authz::list_objects(
+        user_id,
+        permission,
+        object_type,
+    )
+    .await
+}
+
+#[cfg(feature = "enterprise")]
+pub(crate) async fn list_objects_for_user(
+    org_id: &str,
+    user_id: &str,
+    permission: &str,
+    object_type: &str,
+) -> Result<Option<Vec<String>>, Error> {
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+
+    use crate::common::infra::config::USERS;
+
+    if !is_root_user(user_id) && O2_CONFIG.openfga.list_only_permitted {
+        let user: crate::common::meta::user::User =
+            USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+
+        if user.is_external {
+            match crate::handler::http::auth::validator::list_objects(
+                user_id,
+                permission,
+                object_type,
+            )
+            .await
+            {
+                Ok(resp) => Ok(Some(resp)),
+                Err(_) => Err(ErrorForbidden("Unauthorized Access")),
+            }
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
