@@ -324,8 +324,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, i64> = HashMap::new();
 
-            for (term, filename, _, count) in sorted_data {
-                log::warn!("Filename before fetching smaller dataset {:?}", filename);
+            for (term, filename, timestamp, count) in sorted_data {
+                log::warn!("Filename before fetching smaller dataset {:?} at {}", filename, timestamp);
 
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
                 if *current_count < limit_count || *current_count == 0 {
