@@ -403,7 +403,7 @@ export default defineComponent({
             )
           ) {
             const [level, partition] = Object.entries(
-              res.data.settings.partition_keys
+              streamResponse.settings.partition_keys
             ).find(([, partition]) => partition["field"] === property.name);
 
             property.level = level;
