@@ -19,19 +19,19 @@ use tokio::time;
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
-pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
+pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::debug!("[COMPACT] update stats from file_list is processing by {node}");
-        return Ok(());
+        return Ok(None);
     }
 
     // before starting, set current node to lock the job
-    if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
+    if CONFIG.common.meta_store_external && (node.is_empty() || LOCAL_NODE_UUID.ne(&node)) {
         offset = match update_stats_lock_node().await {
             Ok(Some(offset)) => offset,
-            Ok(None) => return Ok(()),
+            Ok(None) => return Ok(None),
             Err(e) => return Err(e),
         }
     }
@@ -57,7 +57,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     // update offset
     db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE_UUID.clone())).await?;
 
-    Ok(())
+    Ok(pk_value)
 }
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
