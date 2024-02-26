@@ -292,7 +292,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         log::warn!("searching in terms {:?}", terms);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
-        idx_req.query.as_mut().unwrap().sql_mode = "full";
+        idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
         idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
