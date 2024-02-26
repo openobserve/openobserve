@@ -648,7 +648,7 @@ export const convertSQLData = (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      options.yAxis.map((it: any) => {
+      options.yAxis.forEach((it: any) => {
         it.nameGap = calculateWidthText(
           xAxisKeys.reduce(
             (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
@@ -1248,7 +1248,7 @@ export const convertSQLData = (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      options?.series?.map((seriesObj: any) => {
+      options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1389,7 +1389,7 @@ export const convertSQLData = (
       // set timeseries flag as a true
       isTimeSeriesFlag = true;
 
-      options?.series?.map((seriesObj: any) => {
+      options?.series?.forEach((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
