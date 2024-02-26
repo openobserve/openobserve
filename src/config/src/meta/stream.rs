@@ -39,6 +39,7 @@ pub enum StreamType {
     #[serde(rename = "file_list")]
     Filelist,
     Metadata,
+    Index,
 }
 
 impl From<&str> for StreamType {
@@ -64,6 +65,7 @@ impl std::fmt::Display for StreamType {
             StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
             StreamType::Metadata => write!(f, "metadata"),
+            StreamType::Index => write!(f, "index"),
         }
     }
 }
