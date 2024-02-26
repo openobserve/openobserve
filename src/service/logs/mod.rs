@@ -165,22 +165,23 @@ async fn add_valid_record(
         .as_i64()
         .unwrap();
 
+    // get infer schema
+    let value_iter = [&record_val].into_iter();
+    let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Logs).unwrap();
+
     // check schema
     let schema_evolution = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
         stream_schema_map,
-        &record_val,
+        &infer_schema,
         timestamp,
     )
     .await?;
 
-    // get record schema 
+    // get record schema
     let schema_latest = stream_schema_map.get(&stream_meta.stream_name).unwrap();
-    // get infer schema
-    let value_iter = [&record_val].into_iter();
-    let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Logs).unwrap();
     // ensure schema is compatible
     let mut new_fields = vec![];
     for field in infer_schema.fields() {
