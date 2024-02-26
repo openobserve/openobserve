@@ -333,10 +333,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
                 if *current_count < limit_count || *current_count == 0 {
-                    term_map
-                        .entry(term.clone())
-                        .or_insert_with(Vec::new)
-                        .push(filename);
+                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
                     *current_count += count;
                 }
             }
