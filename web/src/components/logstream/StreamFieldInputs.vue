@@ -184,7 +184,7 @@ const addApiHeader = () => {
   emits("add");
 };
 
-const disableOptions = (schema, option) => {
+const disableOptions = (schema: any, option: any) => {
   let selectedHashPartition = "";
 
   let selectedIndices = "";
