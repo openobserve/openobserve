@@ -258,9 +258,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         is_inverted_index
     );
 
-    let file_list = if is_inverted_index {
+    let file_list = if is_inverted_index && req.aggs.is_empty() {
         let mut idx_req = req.clone();
-        let is_agg_query = !idx_req.aggs.is_empty();
+        // let is_agg_query = !idx_req.aggs.is_empty();
 
         // Get all the unique terms which the user has searched.
         let terms = meta
@@ -297,12 +297,14 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
         idx_req.query.as_mut().unwrap().track_total_hits = false;
+        idx_req.query.as_mut().unwrap().query_context = "".to_string();
+        idx_req.query.as_mut().unwrap().query_fn = "".to_string();
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
         // if this is the first page, then for each term, get the first file_name where for each
         // term the _count is > 250
-        let unique_files = if _is_first_page && !is_agg_query {
+        let unique_files = if _is_first_page {
             log::warn!("First page response {:?}", idx_resp);
             let limit_count = 500;
             use itertools::Itertools;
