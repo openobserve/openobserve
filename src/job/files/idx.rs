@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs, path::Path};
+use std::{
+    fs,
+    io::{self, BufRead, BufReader},
+    path::Path,
+};
 
 use arrow::ipc::reader::StreamReader;
 use config::{
@@ -204,6 +208,7 @@ async fn upload_file(
     let file = fs::File::open(path_str).unwrap();
     let file_meta = file.metadata().unwrap();
     let file_size = file_meta.len();
+
     log::info!("[JOB] File upload begin: disk: {}", path_str);
     if file_size == 0 {
         if let Err(e) = tokio::fs::remove_file(path_str).await {
@@ -222,16 +227,16 @@ async fn upload_file(
         .inc_by(file_size);
 
     let mut batches = vec![];
-
-    // let mut reader = BufReader::new(file);
-    //     let buf_reader = Cursor::new(file_data);
-
-    let stream_reader = StreamReader::try_new(&file, None).expect("should have read the data");
+    let reader = BufReader::new(file);
+    let stream_reader = StreamReader::try_new(reader, None).expect("should have read the data");
     for read_result in stream_reader {
-        let record_batch = read_result.expect("should have read the recordbatch");
-        batches.push(record_batch);
+        if let Ok(record_batch) = read_result {
+            batches.push(record_batch);
+        } else {
+            log::error!("[JOB] Error while upload_file disk file. Record batch was not readable");
+        };
     }
-    drop(file);
+    // drop(file);
     write_to_disk(
         batches,
         file_size,
