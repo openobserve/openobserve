@@ -88,6 +88,7 @@
                   :width="6"
                   @error="handleChartApiError"
                   @updated:data-zoom="onDataZoom"
+                  @update:initialVariableValues="onUpdateInitialVariableValues"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
                 />
               </div>
@@ -153,7 +154,7 @@ export default defineComponent({
       type: Object,
     },
   },
-  emits: ["closePanel"],
+  emits: ["closePanel", "update:initialVariableValues"],
   setup(props, { emit }) {
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
@@ -412,6 +413,10 @@ export default defineComponent({
       return { value: variableObj };
     };
 
+    const onUpdateInitialVariableValues = (...args: any[]) => {
+      emit("update:initialVariableValues", ...args);
+    };
+
     return {
       t,
       updateDateTime,
@@ -433,6 +438,7 @@ export default defineComponent({
       histogramFields,
       onDataZoom,
       getInitialVariablesData,
+      onUpdateInitialVariableValues,
     };
   },
 });

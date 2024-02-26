@@ -370,7 +370,9 @@ export default defineComponent({
     });
 
     const hideDrilldownPopUp = () => {
-      drilldownPopUpRef.value.style.display = "none";
+      if (drilldownPopUpRef.value) {
+        drilldownPopUpRef.value.style.display = "none";
+      }
     };
 
     // drilldown
