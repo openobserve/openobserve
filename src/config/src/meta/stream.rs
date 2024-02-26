@@ -51,6 +51,7 @@ impl From<&str> for StreamType {
             "enrichment_tables" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
+            "index" => StreamType::Index,
             _ => StreamType::Logs,
         }
     }
