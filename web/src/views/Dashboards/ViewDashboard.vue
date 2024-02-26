@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="hideOnPrintMode"
             />
             <span class="q-table__title q-mx-md q-mt-xs">{{
               currentDashboardData.data.title
@@ -53,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen && !store.state.printMode"
               outline
-              class="dashboard-icons q-px-sm"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="dashboard-icons q-px-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="add"
@@ -79,15 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="refreshInterval"
               trigger
               @trigger="refreshData"
-              class="dashboard-icons"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
             <q-btn
               v-if="!store.state.printMode"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="refresh"
@@ -98,14 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <ExportDashboard
               v-if="!isFullscreen && !store.state.printMode"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="hideOnPrintMode"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
               v-if="!isFullscreen && !store.state.printMode"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="share"
@@ -116,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen && !store.state.printMode"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="settings"
@@ -143,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!store.state.printMode"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
-              :class="store.state.printMode === true ? 'no-print' : ''"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
@@ -661,8 +655,10 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.no-print {
-  display: none;
+.printMode {
+  .hideOnPrintMode {
+    display: none;
+  }
 }
 
 .q-table {

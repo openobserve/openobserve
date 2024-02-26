@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
+  <q-layout
+    view="hHh lpR fFf"
+    :class="[
+      miniMode ? 'miniMode' : '',
+      store.state.printMode === true ? 'printMode' : '',
+    ]"
+  >
     <q-header
-      :class="[
-        store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white',
-        store.state.printMode === true ? 'printscreen' : '',
-      ]"
+      :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
     >
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
@@ -212,7 +215,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @mouseover="miniMode = false"
       @mouseout="miniMode = true"
       mini-to-overlay
-      :class="store.state.printMode === true ? 'printscreen' : ''"
     >
       <q-list class="leftNavList">
         <menu-link
@@ -882,9 +884,16 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
-.printscreen {
-  display: none;
+.printMode {
+  .q-header {
+    display: none;
+  }
+
+  .q-drawer {
+    display: none;
+  }
 }
+
 .warning-msg {
   background-color: var(--q-warning);
   padding: 5px;
