@@ -489,9 +489,7 @@ pub(crate) async fn list_objects_for_user(
             .await
             {
                 Ok(resp) => Ok(Some(resp)),
-                Err(_) => {
-                    return Err(ErrorForbidden("Unauthorized Access"));
-                }
+                Err(_) => Err(ErrorForbidden("Unauthorized Access")),
             }
         } else {
             Ok(None)
