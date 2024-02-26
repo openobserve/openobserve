@@ -343,16 +343,14 @@ impl RwFile {
 
     #[inline]
     pub async fn sync(&self) {
-        if !self.use_arrow {
-            self.file
-                .as_ref()
-                .unwrap()
-                .write()
-                .await
-                .sync_all()
-                .await
-                .unwrap()
-        };
+        self.file
+            .as_ref()
+            .unwrap()
+            .write()
+            .await
+            .sync_all()
+            .await
+            .unwrap()
     }
 
     #[inline]
