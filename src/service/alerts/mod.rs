@@ -165,8 +165,29 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
+    permitted: Option<Vec<String>>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    db::alerts::list(org_id, stream_type, stream_name).await
+    match db::alerts::list(org_id, stream_type, stream_name).await {
+        Ok(alerts) => {
+            let mut result = Vec::new();
+            for alert in alerts {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("alert:{}", alert.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("alert:{}", org_id))
+                {
+                    result.push(alert);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(

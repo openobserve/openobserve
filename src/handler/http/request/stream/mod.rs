@@ -266,8 +266,42 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         },
         None => false,
     };
+    let mut _stream_list_from_rbac = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = req.headers().get("user_id").unwrap();
+        if let Some(s_type) = &stream_type {
+            if !s_type.eq(&StreamType::EnrichmentTables) && !s_type.eq(&StreamType::Metadata) {
+                match crate::handler::http::auth::validator::list_objects_for_user(
+                    &org_id,
+                    user_id.to_str().unwrap(),
+                    "GET",
+                    &s_type.to_string(),
+                )
+                .await
+                {
+                    Ok(stream_list) => {
+                        _stream_list_from_rbac = stream_list;
+                    }
+                    Err(e) => {
+                        return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                            e.to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+        // Get List of allowed objects ends
+    }
 
-    let mut indices = stream::get_streams(org_id.as_str(), stream_type, fetch_schema).await;
+    let mut indices = stream::get_streams(
+        org_id.as_str(),
+        stream_type,
+        fetch_schema,
+        _stream_list_from_rbac,
+    )
+    .await;
     indices.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(HttpResponse::Ok().json(ListStream { list: indices }))
 }

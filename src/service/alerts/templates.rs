@@ -55,8 +55,31 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
         .map_err(|_| anyhow::anyhow!("Alert template not found"))
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
-    db::alerts::templates::list(org_id).await
+pub async fn list(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Template>, anyhow::Error> {
+    match db::alerts::templates::list(org_id).await {
+        Ok(templates) => {
+            let mut result = Vec::new();
+            for template in templates {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("template:{}", template.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("template:{}", org_id))
+                {
+                    result.push(template);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {

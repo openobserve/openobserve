@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{common::meta::dashboards::Folder, service::dashboards::folders};
 
@@ -102,9 +102,38 @@ pub async fn update_folder(
     ),
 )]
 #[get("/{org_id}/folders")]
-pub async fn list_folders(path: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn list_folders(
+    path: web::Path<String>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    folders::list_folders(&org_id).await
+
+    let mut _permitted = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = _req.headers().get("user_id").unwrap();
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id.to_str().unwrap(),
+            "GET",
+            "dfolder",
+        )
+        .await
+        {
+            Ok(stream_list) => {
+                _permitted = stream_list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+        // Get List of allowed objects ends
+    }
+
+    folders::list_folders(&org_id, _permitted).await
 }
 
 /// GetFolder
