@@ -54,15 +54,25 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    // should run it every 10 minutes
     let mut interval = time::interval(time::Duration::from_secs(
         CONFIG.limit.calculate_stats_interval,
     ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = update_stats_from_file_list().await {
-            log::error!("[STATS] run update stats from file list error: {}", e);
+        match update_stats_from_file_list().await {
+            Err(e) => {
+                log::error!(
+                    "[STATS] run update stream stats from file list error: {}",
+                    e
+                );
+            }
+            Ok(Some((offset, max_pk))) => {
+                log::debug!(
+                    "[STATS] run update stream stats success, offset: {offset}, max_pk: {max_pk}"
+                );
+            }
+            Ok(None) => {}
         }
     }
 }
@@ -81,7 +91,9 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = db::file_list::remote::cache_stats().await {
-            log::error!("[STATS] run cache stream stats error: {}", e);
+            log::error!("[STATS] run cache  stream stats error: {}", e);
+        } else {
+            log::debug!("[STATS] run cache  stream stats success");
         }
     }
 }
