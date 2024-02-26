@@ -197,25 +197,14 @@ impl Writer {
             let thread_id = self.thread_id;
             let key = self.key.clone();
             let path = old_wal.path().clone();
+            let path_str = path.display().to_string();
             tokio::task::spawn(async move {
-                log::info!(
-                    "[INGESTER:WAL] start add to IMMUTABLES, file: {}/{}/{}/{}.wal",
-                    thread_id,
-                    &key.org_id,
-                    &key.stream_type,
-                    wal_id
-                );
+                log::info!("[INGESTER:WAL] start add to IMMUTABLES, file: {}", path_str,);
                 IMMUTABLES.write().await.insert(
                     path,
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
-                log::info!(
-                    "[INGESTER:WAL] done  add to IMMUTABLES, file: {}/{}/{}/{}.wal",
-                    thread_id,
-                    &key.org_id,
-                    &key.stream_type,
-                    wal_id
-                );
+                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
             });
         }
 
