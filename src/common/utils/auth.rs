@@ -316,7 +316,8 @@ impl FromRequest for AuthExtractor {
                         bypass_check: true, // bypass check permissions
                         parent_id: folder,
                     }));
-                } else if object_type.starts_with("stream") {
+                }
+                if object_type.starts_with("stream") {
                     let object_type = match stream_type {
                         Some(stream_type) => {
                             if stream_type.eq(&StreamType::EnrichmentTables) {
@@ -347,7 +348,8 @@ impl FromRequest for AuthExtractor {
                         bypass_check: false,
                         parent_id: folder,
                     }));
-                } else if object_type.contains("dashboard") {
+                }
+                if object_type.contains("dashboard") {
                     let object_type = if method.eq("POST") || method.eq("LIST") {
                         format!(
                             "{}:{}",
