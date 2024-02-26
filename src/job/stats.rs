@@ -91,9 +91,9 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     loop {
         interval.tick().await;
         if let Err(e) = db::file_list::remote::cache_stats().await {
-            log::error!("[STATS] run cache  stream stats error: {}", e);
+            log::error!("[STATS] run cached stream stats error: {}", e);
         } else {
-            log::debug!("[STATS] run cache  stream stats success");
+            log::debug!("[STATS] run cached stream stats success");
         }
     }
 }

@@ -204,7 +204,7 @@ impl Writer {
                     path,
                     Arc::new(immutable::Immutable::new(thread_id, key.clone(), old_mem)),
                 );
-                log::info!("[INGESTER:WAL] done  add to IMMUTABLES, file: {}", path_str);
+                log::info!("[INGESTER:WAL] dones add to IMMUTABLES, file: {}", path_str);
             });
         }
 
