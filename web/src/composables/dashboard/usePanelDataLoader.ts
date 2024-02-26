@@ -52,6 +52,7 @@ export const usePanelDataLoader = (
     errorDetail: "",
     metadata: {},
   });
+  console.log("forceLoad===", forceLoad.value);
 
   // observer for checking if panel is visible on the screen
   let observer: any = null;
@@ -108,7 +109,7 @@ export const usePanelDataLoader = (
     return new Promise<void>((resolve, reject) => {
       console.log("forceLoad", forceLoad);
 
-      if (store.state.printMode && forceLoad.value == true) {
+      if (forceLoad.value == true) {
         console.log("Skip waiting for loading");
         resolve();
         return;
@@ -127,9 +128,23 @@ export const usePanelDataLoader = (
         }
       });
 
+      // Watch for changes in isVisible
+      // const stopWatchingOnPrintMode = watch(
+      //   () => store.state.printMode,
+      //   (newValue) => {
+      //     console.log("store.state.printMode usePanelDataLoader", newValue);
+
+      //     if (newValue) {
+      //       resolve();
+      //       stopWatchingOnPrintMode(); // Stop watching
+      //     }
+      //   }
+      // );
+
       // Listen to the abort signal
       signal.addEventListener("abort", () => {
         stopWatching(); // Stop watching on abort
+        // stopWatchingOnPrintMode(); // Stop watching on abort
         reject(new Error("Aborted waiting for loading"));
       });
     });
