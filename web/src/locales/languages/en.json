@@ -360,7 +360,12 @@
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
-    "labelTraces": "Traces"
+    "labelTraces": "Traces",
+    "add": "Add Stream",
+    "dataRetention": "Data Retention (in days)",
+    "indexing": "Indexing",
+    "createStream": "Create Stream",
+    "indexType": "Index Type"
   },
   "function": {
     "header": "Functions",
