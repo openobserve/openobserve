@@ -77,8 +77,31 @@ pub async fn get_with_template(
     Ok(dest.with_template(template))
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
-    db::alerts::destinations::list(org_id).await
+pub async fn list(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Destination>, anyhow::Error> {
+    match db::alerts::destinations::list(org_id).await {
+        Ok(destinations) => {
+            let mut result = Vec::new();
+            for dest in destinations {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("destination:{}", dest.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("destination:{}", org_id))
+                {
+                    result.push(dest);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {

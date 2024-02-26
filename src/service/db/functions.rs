@@ -109,7 +109,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             } else {
                                 let _ = std::mem::replace(&mut group.list[stream_name], stream_fn);
                             }
-                        } else {
+                        } else if !stream_fn.is_removed {
                             group.list.push(stream_fn);
                         }
                     }

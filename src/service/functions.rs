@@ -132,9 +132,28 @@ pub async fn update_function(
 }
 
 #[tracing::instrument]
-pub async fn list_functions(org_id: String) -> Result<HttpResponse, Error> {
+pub async fn list_functions(
+    org_id: String,
+    permitted: Option<Vec<String>>,
+) -> Result<HttpResponse, Error> {
     if let Ok(functions) = db::functions::list(&org_id).await {
-        Ok(HttpResponse::Ok().json(FunctionList { list: functions }))
+        let mut result = Vec::new();
+        for function in functions {
+            if permitted.is_none()
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("function:{}", function.name))
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("function:{}", org_id))
+            {
+                result.push(function);
+            }
+        }
+
+        Ok(HttpResponse::Ok().json(FunctionList { list: result }))
     } else {
         Ok(HttpResponse::Ok().json(FunctionList { list: vec![] }))
     }
@@ -375,7 +394,7 @@ mod tests {
         let res = save_function("nexus".to_owned(), trans).await;
         assert!(res.is_ok());
 
-        let list_resp = list_functions("nexus".to_string()).await;
+        let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
         assert!(
