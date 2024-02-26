@@ -31,6 +31,7 @@ pub async fn save(
     org_id: &str,
     name: &str,
     mut destination: Destination,
+    create: bool,
 ) -> Result<(), anyhow::Error> {
     if db::alerts::templates::get(org_id, &destination.template)
         .await
@@ -49,6 +50,19 @@ pub async fn save(
     }
     if destination.name.contains('/') {
         return Err(anyhow::anyhow!("Alert destination name cannot contain '/'"));
+    }
+
+    match db::alerts::destinations::get(org_id, &destination.name).await {
+        Ok(_) => {
+            if create {
+                return Err(anyhow::anyhow!("Alert destination already exists"));
+            }
+        }
+        Err(_) => {
+            if !create {
+                return Err(anyhow::anyhow!("Alert destination not found"));
+            }
+        }
     }
 
     match db::alerts::destinations::set(org_id, &destination).await {
