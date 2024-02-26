@@ -279,11 +279,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         let query = format!(
             // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
-            ORDER BY _timestamp DESC",
-            // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
-            meta.stream_name,
-            search_condition
+            // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
+            // ORDER BY _timestamp DESC",
+            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
+            meta.stream_name, search_condition
         );
 
         let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
@@ -326,6 +325,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_counts: HashMap<String, i64> = HashMap::new();
 
             for (term, filename, _, count) in sorted_data {
+                log::warn!("Filename before fetching smaller dataset {:?}", filename);
+
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
                 if *current_count < limit_count || *current_count == 0 {
                     term_map
