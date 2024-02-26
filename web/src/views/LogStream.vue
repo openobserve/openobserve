@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="getLogStream(true)"
             />
             <q-btn
-              data-test="alert-list-add-alert-btn"
+              data-test="log-stream-add-stream-btn"
               class="q-ml-md q-mb-xs text-bold no-border"
               padding="sm lg"
               color="secondary"

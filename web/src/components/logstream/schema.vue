@@ -149,7 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </td>
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
-                  <td v-if="showFullTextSearchColumn" class="text-center">
+                  <td
+                    v-if="showFullTextSearchColumn"
+                    data-test="schema-stream-index-select"
+                    class="text-center"
+                  >
                     <q-select
                       v-if="
                         schema.name !== store.state.zoConfig.timestamp_column

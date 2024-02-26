@@ -1,9 +1,9 @@
 <template>
-  <div>
+  <div data-test="add-stream-fields-section">
     <div data-test="alert-conditions-text" class="text-bold">Fields *</div>
     <template v-if="!fields.length">
       <q-btn
-        data-test="alert-conditions-add-btn"
+        data-test="add-stream-add-field-btn"
         color="primary"
         class="q-mt-sm text-bold add-field"
         label="Add Field"
@@ -25,10 +25,7 @@
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
         :data-test="`alert-conditions-${index + 1}`"
       >
-        <div
-          data-test="alert-conditions-select-column"
-          class="q-ml-none o2-input"
-        >
+        <div data-test="add-stream-field-name-input" class="q-ml-none o2-input">
           <q-input
             v-model="field.name"
             :placeholder="t('common.name') + ' *'"
@@ -65,7 +62,7 @@
           />
         </div> -->
         <div
-          data-test="alert-conditions-value-input"
+          data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
           <q-select
@@ -95,7 +92,7 @@
           style="margin-bottom: 12px"
         >
           <q-btn
-            data-test="alert-conditions-delete-condition-btn"
+            data-test="add-stream-delete-field-btn"
             :icon="outlinedDelete"
             class="q-ml-xs iconHoverBtn"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -109,7 +106,7 @@
             style="min-width: auto"
           />
           <q-btn
-            data-test="alert-conditions-add-condition-btn"
+            data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
             icon="add"
             class="q-ml-xs iconHoverBtn"
