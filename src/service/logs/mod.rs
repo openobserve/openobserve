@@ -21,6 +21,7 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamType},
     utils::{
         json::{estimate_json_bytes, Map, Value},
+        schema::infer_json_schema_from_map,
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -175,9 +176,22 @@ async fn add_valid_record(
     )
     .await?;
 
-    // get hour key
-    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    // get record schema 
+    let schema_latest = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    // get infer schema
+    let value_iter = [&record_val].into_iter();
+    let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Logs).unwrap();
+    // ensure schema is compatible
+    let mut new_fields = vec![];
+    for field in infer_schema.fields() {
+        match schema_latest.field_with_name(field.name()) {
+            Ok(f) => new_fields.push(Arc::new(f.clone())),
+            Err(e) => return Err(anyhow::Error::msg(e)),
+        }
+    }
+    let rec_schema = Schema::new(new_fields);
     let schema_key = rec_schema.hash_key();
+    // get hour key
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
@@ -234,11 +248,11 @@ async fn add_valid_record(
                 // End check for alert trigger
             }
             let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-                let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
-                let schema_key = schema.hash_key();
+                let rec_schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
+                let schema_key = rec_schema.hash_key();
                 SchemaRecords {
                     schema_key,
-                    schema,
+                    schema: rec_schema,
                     records: vec![],
                     records_size: 0,
                 }
