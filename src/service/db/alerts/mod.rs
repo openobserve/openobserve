@@ -49,11 +49,7 @@ pub async fn get(
             Err(_) => None,
         }
     };
-    if value.is_none() {
-        Err(anyhow::anyhow!("Alert not found"))
-    } else {
-        Ok(value)
-    }
+    if value.is_none() { Ok(None) } else { Ok(value) }
 }
 
 pub async fn set(

@@ -24,7 +24,12 @@ use crate::{
     service::db,
 };
 
-pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<(), anyhow::Error> {
+pub async fn save(
+    org_id: &str,
+    name: &str,
+    mut template: Template,
+    create: bool,
+) -> Result<(), anyhow::Error> {
     if template.body.is_empty() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
@@ -36,6 +41,19 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
     }
     if template.name.contains('/') {
         return Err(anyhow::anyhow!("Alert template name cannot contain '/'"));
+    }
+
+    match db::alerts::templates::get(org_id, &template.name).await {
+        Ok(_) => {
+            if create {
+                return Err(anyhow::anyhow!("Alert template already exists"));
+            }
+        }
+        Err(_) => {
+            if !create {
+                return Err(anyhow::anyhow!("Alert template not found"));
+            }
+        }
     }
 
     match db::alerts::templates::set(org_id, &mut template).await {

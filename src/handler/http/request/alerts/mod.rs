@@ -65,7 +65,7 @@ pub async fn save_alert(
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
 
-    match alerts::save(&org_id, stream_type, &stream_name, "", alert).await {
+    match alerts::save(&org_id, stream_type, &stream_name, "", alert, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -110,7 +110,7 @@ pub async fn update_alert(
     alert.trigger_condition.frequency *= 60;
 
     let name = name.trim();
-    match alerts::save(&org_id, stream_type, &stream_name, name, alert).await {
+    match alerts::save(&org_id, stream_type, &stream_name, name, alert, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
