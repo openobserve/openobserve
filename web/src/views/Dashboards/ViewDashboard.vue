@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
             <q-btn
-              v-if="!isFullscreen && !store.state.printMode"
+              v-if="!isFullscreen"
               no-caps
               @click="goBackToDashboardList"
               padding="xs"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex">
             <q-btn
-              v-if="!isFullscreen && !store.state.printMode"
+              v-if="!isFullscreen"
               outline
               class="dashboard-icons q-px-sm hideOnPrintMode"
               size="sm"
@@ -74,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
             />
             <AutoRefreshInterval
-              v-if="!store.state.printMode"
               v-model="refreshInterval"
               trigger
               @trigger="refreshData"
@@ -82,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             />
             <q-btn
-              v-if="!store.state.printMode"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -94,12 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tooltip>{{ t("dashboard.refresh") }}</q-tooltip>
             </q-btn>
             <ExportDashboard
-              v-if="!isFullscreen && !store.state.printMode"
+              v-if="!isFullscreen"
               class="hideOnPrintMode"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
-              v-if="!isFullscreen && !store.state.printMode"
+              v-if="!isFullscreen"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -110,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><q-tooltip>{{ t("dashboard.share") }}</q-tooltip></q-btn
             >
             <q-btn
-              v-if="!isFullscreen && !store.state.printMode"
+              v-if="!isFullscreen"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -136,7 +134,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip></q-btn
             >
             <q-btn
-              v-if="!store.state.printMode"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
@@ -232,13 +229,11 @@ export default defineComponent({
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
     };
-    
-    const forceLoad: any = ref(true);
 
     const printDashboard = () => {
       console.log(store.state.printMode);
 
-      setPrint(store.state.printMode == true ? false : true);
+      setPrint(store.state.printMode != true);
 
       const query = {
         ...route.query,
@@ -247,7 +242,6 @@ export default defineComponent({
       console.log("query", query);
 
       router.replace({ query });
-      // setPrint(store.state.printMode === true ? "true" : "false");
     };
 
     // boolean to show/hide settings sidebar
@@ -292,7 +286,6 @@ export default defineComponent({
           print: store.state.printMode,
         },
       });
-      // setPrint(store.state.printMode === true ? "true" : "false");
     };
 
     // ======= [START] default variable values
@@ -648,7 +641,6 @@ export default defineComponent({
       selectedTabId,
       onMovePanel,
       printDashboard,
-      forceLoad,
     };
   },
 });

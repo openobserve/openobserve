@@ -128,23 +128,9 @@ export const usePanelDataLoader = (
         }
       });
 
-      // Watch for changes in isVisible
-      // const stopWatchingOnPrintMode = watch(
-      //   () => store.state.printMode,
-      //   (newValue) => {
-      //     console.log("store.state.printMode usePanelDataLoader", newValue);
-
-      //     if (newValue) {
-      //       resolve();
-      //       stopWatchingOnPrintMode(); // Stop watching
-      //     }
-      //   }
-      // );
-
       // Listen to the abort signal
       signal.addEventListener("abort", () => {
         stopWatching(); // Stop watching on abort
-        // stopWatchingOnPrintMode(); // Stop watching on abort
         reject(new Error("Aborted waiting for loading"));
       });
     });

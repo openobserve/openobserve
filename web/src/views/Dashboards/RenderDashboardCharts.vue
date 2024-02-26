@@ -148,8 +148,8 @@ export default defineComponent({
     },
     forceLoad: {
       type: Boolean,
-      default: true,
-    }
+      default: false,
+    },
   },
 
   components: {

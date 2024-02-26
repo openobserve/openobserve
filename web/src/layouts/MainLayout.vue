@@ -225,9 +225,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-list>
     </q-drawer>
     <q-page-container
-      :style="{
-        'padding-left': store.state.printMode === true ? '0px' : '57px',
-      }"
       :key="store.state.selectedOrganization?.identifier"
       v-if="isLoading"
     >
@@ -892,6 +889,10 @@ export default defineComponent({
   .q-drawer {
     display: none;
   }
+
+  .q-page-container {
+    padding-left: 0px !important;
+  }
 }
 
 .warning-msg {
@@ -935,9 +936,9 @@ export default defineComponent({
   }
 }
 
-// .q-page-container {
-//   padding-left: 57px;
-// }
+.q-page-container {
+  padding-left: 57px;
+}
 
 .q-drawer {
   @extend .border-right;
