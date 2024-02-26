@@ -117,6 +117,7 @@ import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import { useQuasar } from "quasar";
+import useStreams from "@/composables/useStreams";
 
 const { t } = useI18n();
 
@@ -126,6 +127,10 @@ const streamTypes = [
   { label: "Traces", value: "traces" },
   { label: "Enrichment Table", value: "enrichment_tables" },
 ];
+
+const emits = defineEmits(["streamAdded"]);
+
+const { addStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 
@@ -169,6 +174,17 @@ const saveStream = () => {
         message: "Stream created successfully",
         timeout: 4000,
       });
+
+      streamService
+        .schema(
+          store.state.selectedOrganization.identifier,
+          streamInputs.value.name,
+          streamInputs.value.stream_type
+        )
+        .then((streamRes: any) => {
+          addStream(streamRes.data);
+          emits("streamAdded");
+        });
     })
     .catch((err) => {
       q.notify({

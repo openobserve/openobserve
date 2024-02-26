@@ -349,83 +349,89 @@ export default defineComponent({
         message: "Please wait while loading stats...",
       });
 
-      await getStream(
-        indexData.value.name,
-        indexData.value.stream_type,
-        true
-      ).then((streamResponse) => {
-        streamResponse.stats.doc_time_max = date.formatDate(
-          parseInt(streamResponse.stats.doc_time_max) / 1000,
-          "YYYY-MM-DDTHH:mm:ss:SSZ"
-        );
-        streamResponse.stats.doc_time_min = date.formatDate(
-          parseInt(streamResponse.stats.doc_time_min) / 1000,
-          "YYYY-MM-DDTHH:mm:ss:SSZ"
-        );
-        if (
-          streamResponse.settings.full_text_search_keys.length == 0 &&
-          (showFullTextSearchColumn.value || showPartitionColumn.value)
-        ) {
-          indexData.value.defaultFts = true;
-        } else {
-          indexData.value.defaultFts = false;
-        }
-
-        indexData.value.schema = streamResponse.schema;
-        indexData.value.stats = streamResponse.stats;
-
-        const fieldIndices = [];
-        for (var property of streamResponse.schema) {
+      await getStream(indexData.value.name, indexData.value.stream_type, true)
+        .then((streamResponse) => {
+          streamResponse.stats.doc_time_max = date.formatDate(
+            parseInt(streamResponse.stats.doc_time_max) / 1000,
+            "YYYY-MM-DDTHH:mm:ss:SSZ"
+          );
+          streamResponse.stats.doc_time_min = date.formatDate(
+            parseInt(streamResponse.stats.doc_time_min) / 1000,
+            "YYYY-MM-DDTHH:mm:ss:SSZ"
+          );
           if (
-            (streamResponse.settings.full_text_search_keys.length > 0 &&
-              streamResponse.settings.full_text_search_keys.includes(
+            streamResponse.settings.full_text_search_keys.length == 0 &&
+            (showFullTextSearchColumn.value || showPartitionColumn.value)
+          ) {
+            indexData.value.defaultFts = true;
+          } else {
+            indexData.value.defaultFts = false;
+          }
+
+          indexData.value.schema = streamResponse.schema || [];
+          indexData.value.stats = streamResponse.stats;
+
+          if (showDataRetention.value)
+            dataRetentionDays.value =
+              streamResponse.settings.data_retention ||
+              store.state.zoConfig.data_retention_days;
+
+          if (!streamResponse.schema) {
+            dismiss();
+            return;
+          }
+
+          const fieldIndices = [];
+          for (var property of streamResponse.schema) {
+            if (
+              (streamResponse.settings.full_text_search_keys.length > 0 &&
+                streamResponse.settings.full_text_search_keys.includes(
+                  property.name
+                )) ||
+              (streamResponse.settings.full_text_search_keys.length == 0 &&
+                store.state.zoConfig.default_fts_keys.includes(property.name))
+            ) {
+              fieldIndices.push("fullTextSearchKey");
+            }
+
+            if (
+              streamResponse.settings.bloom_filter_fields.length > 0 &&
+              streamResponse.settings.bloom_filter_fields.includes(
                 property.name
-              )) ||
-            (streamResponse.settings.full_text_search_keys.length == 0 &&
-              store.state.zoConfig.default_fts_keys.includes(property.name))
-          ) {
-            fieldIndices.push("fullTextSearchKey");
+              )
+            ) {
+              fieldIndices.push("bloomFilterKey");
+            }
+
+            property["delete"] = false;
+
+            if (
+              streamResponse.settings.partition_keys &&
+              Object.values(streamResponse.settings.partition_keys).some(
+                (v) => !v.disabled && v.field === property.name
+              )
+            ) {
+              const [level, partition] = Object.entries(
+                streamResponse.settings.partition_keys
+              ).find(([, partition]) => partition["field"] === property.name);
+
+              property.level = level;
+
+              if (partition.types === "values")
+                fieldIndices.push("keyPartition");
+
+              if (partition.types?.hash)
+                fieldIndices.push(`hashPartition_${partition.types.hash}`);
+            }
+
+            property.index_type = [...fieldIndices];
+
+            fieldIndices.length = 0;
           }
 
-          if (
-            streamResponse.settings.bloom_filter_fields.length > 0 &&
-            streamResponse.settings.bloom_filter_fields.includes(property.name)
-          ) {
-            fieldIndices.push("bloomFilterKey");
-          }
-
-          property["delete"] = false;
-
-          if (
-            streamResponse.settings.partition_keys &&
-            Object.values(streamResponse.settings.partition_keys).some(
-              (v) => !v.disabled && v.field === property.name
-            )
-          ) {
-            const [level, partition] = Object.entries(
-              streamResponse.settings.partition_keys
-            ).find(([, partition]) => partition["field"] === property.name);
-
-            property.level = level;
-
-            if (partition.types === "values") fieldIndices.push("keyPartition");
-
-            if (partition.types?.hash)
-              fieldIndices.push(`hashPartition_${partition.types.hash}`);
-          }
-
-          property.index_type = [...fieldIndices];
-
-          fieldIndices.length = 0;
-        }
-
-        if (showDataRetention.value)
-          dataRetentionDays.value =
-            streamResponse.settings.data_retention ||
-            store.state.zoConfig.data_retention_days;
-
-        dismiss();
-      });
+          dismiss();
+        })
+        .catch((err) => console.log(err));
     };
 
     const onSubmit = async () => {

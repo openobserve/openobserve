@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="refresh"
               :label="t(`logStream.refreshStats`)"
-              @click="getLogStream"
+              @click="getLogStream(true)"
             />
             <q-btn
               data-test="alert-list-add-alert-btn"
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       full-height
       maximized
     >
-      <AddStream />
+      <AddStream @streamAdded="getLogStream" />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
@@ -268,7 +268,7 @@ export default defineComponent({
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
     ];
-    const { getStreams } = useStreams();
+    const { getStreams, resetStreams, removeStream } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -353,7 +353,7 @@ export default defineComponent({
       }
     });
 
-    const getLogStream = () => {
+    const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
@@ -362,6 +362,8 @@ export default defineComponent({
           message: "Please wait while loading streams...",
         });
         logStream.value = [];
+
+        if (refresh) resetStreams();
 
         let counter = 1;
         getStreams("", false, false)
@@ -479,6 +481,7 @@ export default defineComponent({
               color: "positive",
               message: "Stream deleted successfully.",
             });
+            removeStream(deleteStreamName, deleteStreamType);
             getLogStream();
           }
         })

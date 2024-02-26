@@ -187,12 +187,16 @@ const useStreams = () => {
           const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
 
           if (schema && !hasSchema) {
-            const _stream: any = await StreamService.schema(
-              store.state.selectedOrganization.identifier,
-              streamName,
-              streamType
-            );
-            streams[streamType].list[streamIndex] = _stream.data;
+            try {
+              const _stream: any = await StreamService.schema(
+                store.state.selectedOrganization.identifier,
+                streamName,
+                streamType
+              );
+              streams[streamType].list[streamIndex] = _stream.data;
+            } catch (err) {
+              return reject("Error while fetching schema");
+            }
           }
           return resolve(streams[streamType].list[streamIndex]);
         } else {
@@ -323,6 +327,47 @@ const useStreams = () => {
     };
   };
 
+  const removeStream = (streamName: string, streamType: string) => {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        streamsIndexMapping[streamType],
+        streamName
+      )
+    ) {
+      const indexToRemove = streamsIndexMapping[streamType][streamName];
+
+      // Deleting stream index that was mapped
+      delete streamsIndexMapping[streamType][streamName];
+
+      if (
+        indexToRemove >= 0 &&
+        indexToRemove < streams[streamType].list.length
+      ) {
+        for (
+          let i = indexToRemove;
+          i < streams[streamType].list.length - 1;
+          i++
+        ) {
+          // Shift each element one position to the left
+          streams[streamType].list[i] = streams[streamType].list[i + 1];
+        }
+        // Remove the last element since it's now duplicated
+        streams[streamType].list.length = streams[streamType].list.length - 1;
+      }
+    }
+  };
+
+  const addStream = (stream: any) => {
+    // If that stream type is not present create that stream
+    if (!streams[stream.stream_type]) {
+      getStream(stream.name, stream.stream_type, true);
+    } else {
+      streams[stream.stream_type].list.push(stream);
+      streamsIndexMapping[stream.stream_type][stream.name] =
+        streams[stream.stream_type].list.length - 1;
+    }
+  };
+
   const resetStreams = () => {
     streams = reactive({});
     streamsIndexMapping = reactive({});
@@ -331,7 +376,15 @@ const useStreams = () => {
     store.dispatch("setIsDataIngested", false);
   };
 
-  return { getStreams, getStream, setStreams, getMultiStreams, resetStreams };
+  return {
+    getStreams,
+    getStream,
+    setStreams,
+    getMultiStreams,
+    resetStreams,
+    removeStream,
+    addStream,
+  };
 };
 
 export default useStreams;
