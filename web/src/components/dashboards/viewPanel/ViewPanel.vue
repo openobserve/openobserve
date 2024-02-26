@@ -90,6 +90,7 @@
                   @updated:data-zoom="onDataZoom"
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
+                  :forceLoad="forceLoad"
                 />
               </div>
               <DashboardErrorsComponent
@@ -153,6 +154,9 @@ export default defineComponent({
     initialVariableValues: {
       type: Object,
     },
+    forceLoad: {
+      type: Boolean,
+    }
   },
   emits: ["closePanel", "update:initialVariableValues"],
   setup(props, { emit }) {

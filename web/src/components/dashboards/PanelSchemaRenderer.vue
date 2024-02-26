@@ -191,7 +191,7 @@ export default defineComponent({
     forceLoad: {
       type: Boolean,
       default: false,
-      required: true,
+      required: false,
     },
   },
   emits: [
