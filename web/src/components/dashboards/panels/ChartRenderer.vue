@@ -167,8 +167,11 @@ export default defineComponent({
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
 
-      // set options with selected object
       if (legendOption) {
+        // set selected array
+        legendOption.selected = params.selected;
+
+        // set options with selected object
         chart?.setOption({ legend: [legendOption] });
       }
     };
