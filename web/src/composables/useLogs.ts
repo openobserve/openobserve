@@ -146,6 +146,7 @@ const defaultObject = {
       },
       errorMsg: "",
       errorCode: 0,
+      errorDetail: "",
     },
     editorValue: <any>"",
     datetime: <any>{
@@ -204,6 +205,7 @@ const useLogs = () => {
       },
       errorCode: 0,
       errorMsg: "",
+      errorDetail: "",
     };
     searchObj.data.tempFunctionContent = "";
     searchObj.data.query = "";
@@ -634,6 +636,7 @@ const useLogs = () => {
             },
             errorCode: 0,
             errorMsg: "",
+            errorDetail: "",
           };
           searchObj.meta.histogramDirtyFlag = true;
         } else {
@@ -1213,6 +1216,7 @@ const useLogs = () => {
       try {
         searchObj.data.histogram.errorMsg = "";
         searchObj.data.histogram.errorCode = 0;
+        searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
         queryReq.query.track_total_hits = true;
@@ -1242,6 +1246,8 @@ const useLogs = () => {
 
             const customMessage = logsErrorMessage(err?.response?.data.code);
             searchObj.data.histogram.errorCode = err?.response?.data.code;
+            searchObj.data.histogram.errorDetail =
+              err?.response?.data?.error_detail;
 
             if (customMessage != "") {
               searchObj.data.histogram.errorMsg = t(customMessage);
@@ -1520,6 +1526,7 @@ const useLogs = () => {
         chartParams,
         errorCode: 0,
         errorMsg: "",
+        errorDetail: "",
       };
     } catch (e: any) {
       console.log("Error while generating histogram data");

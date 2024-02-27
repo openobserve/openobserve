@@ -97,8 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h6 class="text-center">
           <q-icon name="warning"
 color="warning" size="30px"></q-icon> Error
-          while fetching histogram data. <br />
-          {{ searchObj.data.histogram.errorMsg }}
+          while fetching histogram data.
+          <q-btn @click="toggleErrorDetails" size="sm" data-test="logs-page-histogram-error-details-btn">{{t("search.histogramErrorBtnLabel")}}</q-btn><br />
+          <span v-if="disableMoreErrorDetails">
+            {{ searchObj.data.histogram.errorMsg }}
+            {{ searchObj.data.histogram.errorDetail }}
+          </span>
         </h6>
       </div>
       <q-virtual-scroll
@@ -530,6 +534,9 @@ export default defineComponent({
       // this.$emit("search:timeboxed", obj);
       this.searchAroundData(obj);
     },
+    toggleErrorDetails() {
+      this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
+    },
   },
   setup(props, { emit }) {
     // Accessing nested JavaScript objects and arrays by string path
@@ -541,6 +548,7 @@ export default defineComponent({
     const noOfRecordsTitle = ref("");
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100, 250, 500];
+    const disableMoreErrorDetails = ref(false);
 
     const {
       searchObj,
@@ -683,6 +691,7 @@ export default defineComponent({
       rowsPerPageOptions,
       pageNumberInput,
       refreshPartitionPagination,
+      disableMoreErrorDetails,
     };
   },
   computed: {
