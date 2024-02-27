@@ -259,9 +259,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         is_inverted_index
     );
 
-    let file_list = if is_inverted_index && req.aggs.is_empty() {
+    let file_list = if is_inverted_index {
         let mut idx_req = req.clone();
-        // let is_agg_query = !idx_req.aggs.is_empty();
+        let is_agg_query = !idx_req.aggs.is_empty();
 
         // Get all the unique terms which the user has searched.
         let terms = meta
@@ -278,19 +278,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .join(" or ");
 
         let query = format!(
-            // "SELECT file_name FROM {} WHERE deleted IS False AND {} ORDER BY _timestamp DESC",
-            // "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}
-            // ORDER BY _timestamp DESC",
             "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
             meta.stream_name, search_condition
         );
 
         let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
-
-        log::warn!("searching in query {:?}", query);
-        log::warn!("Incoming request {:?}", idx_req);
-
-        log::warn!("searching in terms {:?}", terms);
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -303,12 +295,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
-        // if this is the first page, then for each term, get the first file_name where for each
-        // term the _count is > 250
-        let unique_files = if _is_first_page {
-            log::warn!("First page response {:?}", idx_resp);
+        let unique_files = if _is_first_page && !is_agg_query {
             let limit_count = 500;
-
             let sorted_data = idx_resp
                 .hits
                 .iter()
@@ -319,7 +307,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
                     (term, file_name, count, timestamp)
                 })
-                .sorted_by_key(|x| -x.3); // Descending order of timestamp
+                .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
 
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
@@ -334,6 +322,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
                 if *current_count < limit_count || *current_count == 0 {
                     term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                    log::warn!(
+                        "Filename after fetching smaller dataset {:?} at {}",
+                        filename,
+                        timestamp
+                    );
                     *current_count += count;
                 }
             }
@@ -370,9 +363,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 });
             }
         }
-
-        // TODO(ansrivas): Tackled the OR queries with indexed files
-        // select * from tbl where match_all_indexed("Prabhat") or status=500;
 
         idx_file_list
     } else {
