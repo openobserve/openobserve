@@ -158,7 +158,9 @@ impl super::Db for DynamoDb {
         // event watch
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator.put(in_key, value, true).await?;
+            cluster_coordinator
+                .put(in_key, Bytes::from(""), true)
+                .await?;
         }
 
         Ok(())

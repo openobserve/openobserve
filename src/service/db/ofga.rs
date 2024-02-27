@@ -117,7 +117,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
-                let item_value: OFGAModel = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: OFGAModel = if config::CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = db.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 log::info!("[WATCH] Got store id {}", &item_value.store_id);
                 o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
                     .insert("store_id".to_owned(), item_value.store_id);

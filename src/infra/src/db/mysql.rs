@@ -134,7 +134,7 @@ impl super::Db for MysqlDb {
         // event watch
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator.put(key, value, true).await?;
+            cluster_coordinator.put(key, Bytes::from(""), true).await?;
         }
 
         Ok(())

@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{utils::json, CONFIG};
 use infra::db as infra_db;
 
 use crate::common::{
@@ -92,7 +92,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let org_id = &item_key[0..item_key.find('/').unwrap()];
-                let item_value: Transform = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Transform = if CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = db.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 if item_value.streams.is_some() {
                     for stream_fn in item_value.to_stream_transform() {
                         let mut group = STREAM_FUNCTIONS
