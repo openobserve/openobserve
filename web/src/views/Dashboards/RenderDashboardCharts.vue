@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    <span>{{ JSON.stringify(loadingValues) }}</span>
+    <span id="hiddenSpan" style="display: none">{{
+      JSON.stringify(loadingValues)
+    }}</span>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
