@@ -1612,6 +1612,7 @@ const useLogs = () => {
           generateHistogramData();
           //update grid columns
           updateGridColumns();
+          filterHitsColumns();
 
           if (searchObj.meta.showHistogram) {
             searchObj.meta.showHistogram = false;
