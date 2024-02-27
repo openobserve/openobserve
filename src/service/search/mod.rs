@@ -313,77 +313,35 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 .hits
                 .iter()
                 .map(|hit| {
-                    let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let term = hit.get("term").unwrap().as_str().unwrap().to_string();
+                    let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
-                    // let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    // (term, file_name, count, timestamp)
-                    (term, file_name, timestamp)
+                    let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    (term, file_name, count, timestamp)
                 })
-                // .sorted_by_key(|x| -x.3); // Descending order of timestamp
-                .sorted_by_key(|x| -x.2); // Descending order of timestamp
+                .sorted_by_key(|x| -x.3); // Descending order of timestamp
 
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-            let files_limit_count = 3;
-            let mut term_map_v2: HashMap<String, Vec<String>> = HashMap::new();
+            for (term, filename, count, timestamp) in sorted_data {
+                log::warn!(
+                    "Filename before fetching smaller dataset {:?} at {}",
+                    filename,
+                    timestamp
+                );
 
-            for (term, filename, _timestamp) in sorted_data {
-                let current_files = term_map_v2.entry(term.clone()).or_insert(vec![]);
-                if current_files.len() < files_limit_count {
-                    term_map_v2
-                        .entry(term.clone())
-                        .or_insert_with(Vec::new)
-                        .push(filename.clone());
+                let current_count = term_counts.entry(term.clone()).or_insert(0);
+                if *current_count < limit_count || *current_count == 0 {
+                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                    *current_count += count;
                 }
             }
-
-            term_map_v2
-                .values()
-                .flatten()
-                .map(|x| x.to_string())
+            log::warn!("term_map {:?}", term_map);
+            term_map
+                .into_iter()
+                .flat_map(|(_, filenames)| filenames)
                 .collect::<HashSet<_>>()
-
-            // for (term, filename, timestamp) in sorted_data {
-            // // for (term, filename, count, timestamp) in sorted_data {
-            //     log::warn!(
-            //         "Filename before fetching smaller dataset {:?} at {}",
-            //         filename,
-            //         timestamp
-            //     );
-
-            //     let current_count = term_counts.entry(term.clone()).or_insert(0);
-            //     if *current_count < limit_count || *current_count == 0 {
-            //         term_map.entry(term).or_insert_with(Vec::new).push(filename);
-            //         *current_count += count;
-            //     }
-            // }
-
-            // term_map
-            //     .into_iter()
-            //     .flat_map(|(_, filenames)| filenames)
-            //     .collect::<HashSet<_>>()
-
-            // for (term, filename, timestamp) in sorted_data {
-            // // for (term, filename, count, timestamp) in sorted_data {
-            //     log::warn!(
-            //         "Filename before fetching smaller dataset {:?} at {}",
-            //         filename,
-            //         timestamp
-            //     );
-
-            //     let current_count = term_counts.entry(term.clone()).or_insert(0);
-            //     if *current_count < limit_count || *current_count == 0 {
-            //         term_map.entry(term).or_insert_with(Vec::new).push(filename);
-            //         *current_count += count;
-            //     }
-            // }
-
-            // term_map
-            //     .into_iter()
-            //     .flat_map(|(_, filenames)| filenames)
-            //     .collect::<HashSet<_>>()
         } else {
             idx_resp
                 .hits
