@@ -28,7 +28,7 @@ profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
 
 [profile.release]
 debug = false
-#strip = true
+strip = true
 
 [profile.release-prod]
 inherits = "release"
