@@ -18,9 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    <span id="isAllDashboardPanelsLoaded" style="display: none">{{
-      JSON.stringify(loadingValues)
-    }}</span>
+    <span
+      v-if="isDashboardVariablesAndPanelsDataLoading"
+      id="isAllDashboardPanelsLoaded"
+      style="display: none"
+      >{{
+        JSON.stringify(isDashboardVariablesAndPanelsDataLoading)
+      }}</span
+    >
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -201,29 +206,49 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
       emit("variablesData", variablesData);
+
+      // update the loading state
+      variablesAndPanelsDataLoadingState.variablesData =
+        variablesData?.values?.reduce(
+          (obj: any, item: any) => ({
+            ...obj,
+            [item.name]: item.isLoading,
+          }),
+          {}
+        );
     };
 
     //create reactive obbject for variablesData and panels
-    const variablesDataAndPanels = reactive({
-      variablesData: [],
-      panels: [],
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
     });
 
     // provide and inject to share data between components
-    provide("variablesDataAndPanels", variablesDataAndPanels);
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState
+    );
 
     //want to create computed property based on panels and variables
-    const loadingValues = computed(() => {
+    const isDashboardVariablesAndPanelsDataLoading = computed(() => {
       const variablesDataValues = Object.values(
-        variablesDataAndPanels.variablesData
+        variablesAndPanelsDataLoadingState.variablesData
       );
-      const panelsValues = Object.values(variablesDataAndPanels.panels);
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels
+      );
 
       // Check if every value in both variablesData and panels is false
-      return (
+      const result =
         variablesDataValues.every((value) => value === false) &&
-        panelsValues.every((value) => value === false)
+        panelsValues.every((value) => value === false);
+      console.log(
+        "result",
+        JSON.stringify(variablesAndPanelsDataLoadingState),
+        result
       );
+      return result;
     });
 
     const hoveredSeriesState = ref({
@@ -394,7 +419,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
-      loadingValues,
+      isDashboardVariablesAndPanelsDataLoading
     };
   },
   methods: {

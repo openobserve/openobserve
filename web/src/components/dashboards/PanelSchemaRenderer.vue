@@ -230,28 +230,18 @@ export default defineComponent({
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
-    //inject variablesDataAndPanels from parent
-    const variablesDataAndPanels: any = inject("variablesDataAndPanels");
+    //inject variablesAndPanelsDataLoadingState from parent
+    const variablesAndPanelsDataLoadingState: any = inject("variablesAndPanelsDataLoadingState");
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(loading, (newLoading) => {
-
-      const variableNames = variablesData.value.values.map((item: any) => item.name);
-
-      variablesDataAndPanels.panels = {
-        ...variablesDataAndPanels.panels,
+      variablesAndPanelsDataLoadingState.panels = {
+        ...variablesAndPanelsDataLoadingState.panels,
         [panelSchema.value.id]: newLoading,
       };
-
-      const updatedVariablesData = { ...variablesDataAndPanels.variablesData };
-      variableNames.forEach((variableName: any) => {
-        updatedVariablesData[variableName] = newLoading;
-      });
-
-      // Update the variablesData object with the new isLoading values
-      variablesDataAndPanels.variablesData = updatedVariablesData;
+      // console.log("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState.panels);
     });
-
+  
     watch(
       [data, store?.state],
       async () => {
