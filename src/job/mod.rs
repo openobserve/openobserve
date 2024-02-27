@@ -24,7 +24,6 @@ use crate::{
         infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
-    job::files::idx,
     service::{compact::stats::update_stats_from_file_list, db, users},
 };
 

@@ -30,7 +30,7 @@ use super::{ider, FILE_EXT_PARQUET};
 use crate::{
     common::{infra::wal, meta::stream::StreamParams, utils::stream::populate_file_meta},
     job::files::generate_storage_file_name,
-    service::{db, schema::schema_evolution, usage::report_compression_stats},
+    service::{db, schema::schema_evolution},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -171,7 +171,6 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 return Ok(());
             }
 
-            // TODO(ansrivas): metrics
             // let columns = key.split('/').collect::<Vec<&str>>();
             // if columns[0] == "files" {
             //     metrics::INGEST_WAL_USED_BYTES
@@ -217,7 +216,6 @@ async fn upload_file(
         return Err(anyhow::anyhow!("file is empty: {}", path_str));
     }
 
-    // TODO(ansrivas): metrics should it be WAL or normal
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by(file_size);
@@ -232,7 +230,6 @@ async fn upload_file(
             log::error!("[JOB] Error while upload_file disk file. Record batch was not readable");
         };
     }
-    // drop(file);
     write_to_disk(
         batches,
         file_size,
@@ -314,7 +311,6 @@ pub(crate) async fn write_to_disk(
         caller,
     );
 
-    // TODO(ansrivas): Check the generated file name again here.
     let store_file_name = new_idx_file_name.to_owned();
     match task::spawn_blocking(move || async move {
         storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await
