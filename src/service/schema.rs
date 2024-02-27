@@ -318,8 +318,7 @@ pub async fn check_for_schema(
 
     let is_new = schema.fields().is_empty();
     if !is_new {
-        let (is_schema_changed, field_datatype_delta) =
-            get_schema_changes(schema, &inferred_schema);
+        let (is_schema_changed, field_datatype_delta) = get_schema_changes(schema, inferred_schema);
         if !is_schema_changed {
             return Ok(SchemaEvolution {
                 schema_compatible: true,
@@ -571,7 +570,10 @@ async fn handle_diff_schema_cluster_mode(
     })
 }
 
-fn get_merge_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>, Vec<Field>) {
+fn get_merge_schema_changes(
+    schema: &Schema,
+    inferred_schema: &Schema,
+) -> (bool, Vec<Field>, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<_> = vec![];
 
