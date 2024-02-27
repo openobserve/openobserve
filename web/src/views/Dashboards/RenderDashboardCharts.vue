@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    <span>{{ JSON.stringify(computedPanels) }}</span>
+    <span>{{ JSON.stringify(loadingValues) }}</span>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -211,7 +211,7 @@ export default defineComponent({
     provide("variablesDataAndPanels", variablesDataAndPanels);
 
     //want to create computed property based on panels and variables
-    const computedPanels = computed(() => {
+    const loadingValues = computed(() => {
       const variablesDataValues = Object.values(
         variablesDataAndPanels.variablesData
       );
@@ -224,7 +224,7 @@ export default defineComponent({
       );
     });
 
-    console.log("computedPanels", computedPanels.value);
+    console.log("loadingValues", loadingValues.value);
 
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
@@ -394,7 +394,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
-      computedPanels,
+      loadingValues,
     };
   },
   methods: {
