@@ -52,7 +52,6 @@ export const usePanelDataLoader = (
     errorDetail: "",
     metadata: {},
   });
-  console.log("forceLoad===", forceLoad.value);
 
   // observer for checking if panel is visible on the screen
   let observer: any = null;
@@ -107,10 +106,8 @@ export const usePanelDataLoader = (
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
-      console.log("forceLoad", forceLoad);
 
       if (forceLoad.value == true) {
-        console.log("Skip waiting for loading");
         resolve();
         return;
       }
@@ -355,7 +352,7 @@ export const usePanelDataLoader = (
     // Watching for changes in panelSchema and selectedTimeObj
     () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
     async () => {
-      console.log("PanelSchema/Time Wather: called");
+      // log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
     }
   );

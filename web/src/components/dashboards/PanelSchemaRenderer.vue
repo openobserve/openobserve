@@ -232,15 +232,11 @@ export default defineComponent({
 
     //inject variablesDataAndPanels from parent
     const variablesDataAndPanels: any = inject("variablesDataAndPanels");
-    console.log("variablesDataAndPanels", variablesDataAndPanels);
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(loading, (newLoading) => {
-      console.log("panels", variablesData.value);
-      console.log("panelSchema", panelSchema.value);
 
       const variableNames = variablesData.value.values.map((item: any) => item.name);
-      console.log("variableNames", variableNames);
 
       variablesDataAndPanels.panels = {
         ...variablesDataAndPanels.panels,
@@ -254,8 +250,6 @@ export default defineComponent({
 
       // Update the variablesData object with the new isLoading values
       variablesDataAndPanels.variablesData = updatedVariablesData;
-
-      console.log("panelInjectBasedOnLoading", updatedVariablesData);
     });
 
     watch(

@@ -231,15 +231,12 @@ export default defineComponent({
     };
 
     const printDashboard = () => {
-      console.log(store.state.printMode);
-
       setPrint(store.state.printMode != true);
 
       const query = {
         ...route.query,
         print: store.state.printMode,
       };
-      console.log("query", query);
 
       router.replace({ query });
     };
@@ -592,7 +589,7 @@ export default defineComponent({
         isFullscreen.value = false;
       }
     };
-    
+
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
     });

@@ -226,8 +226,6 @@ export default defineComponent({
       );
     });
 
-    console.log("loadingValues", loadingValues.value);
-
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
       panelId: -1,
