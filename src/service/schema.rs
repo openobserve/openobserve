@@ -23,11 +23,7 @@ use std::{
 use anyhow::Result;
 use config::{
     meta::stream::StreamType,
-    utils::{
-        json,
-        schema::{infer_json_schema, infer_json_schema_from_map},
-        schema_ext::SchemaExt,
-    },
+    utils::{json, schema::infer_json_schema, schema_ext::SchemaExt},
     CONFIG,
 };
 use datafusion::arrow::{
@@ -36,7 +32,6 @@ use datafusion::arrow::{
 };
 use infra::db::etcd;
 use itertools::Itertools;
-use serde_json::{Map, Value};
 
 use crate::{
     common::{
@@ -287,7 +282,7 @@ pub async fn check_for_schema(
     stream_name: &str,
     stream_type: StreamType,
     stream_schema_map: &mut HashMap<String, Schema>,
-    record_val: &Map<String, Value>,
+    inferred_schema: &Schema,
     record_ts: i64,
 ) -> Result<SchemaEvolution> {
     if !stream_schema_map.contains_key(stream_name) {
@@ -306,9 +301,6 @@ pub async fn check_for_schema(
             types_delta: None,
         });
     }
-
-    let value_iter = [record_val].into_iter();
-    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     // fast path
     if schema.fields.eq(&inferred_schema.fields) {
@@ -392,7 +384,7 @@ async fn handle_diff_schema(
     stream_name: &str,
     stream_type: StreamType,
     is_new: bool,
-    inferred_schema: Schema,
+    inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
@@ -426,7 +418,7 @@ async fn handle_diff_schema_local_mode(
     stream_name: &str,
     stream_type: StreamType,
     is_new: bool,
-    inferred_schema: Schema,
+    inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
@@ -452,7 +444,7 @@ async fn handle_diff_schema_local_mode(
     let lock_acquired = locker.write().await;
 
     let Some((field_datatype_delta, final_schema)) =
-        get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
+        get_merged_schema(org_id, stream_name, stream_type, inferred_schema).await
     else {
         drop(lock_acquired);
         return None;
@@ -498,7 +490,7 @@ async fn handle_diff_schema_cluster_mode(
     stream_name: &str,
     stream_type: StreamType,
     is_new: bool,
-    inferred_schema: Schema,
+    inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
@@ -518,7 +510,7 @@ async fn handle_diff_schema_cluster_mode(
     lock.lock(0).await.map_err(server_internal_error).unwrap();
 
     let Some((field_datatype_delta, final_schema)) =
-        get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
+        get_merged_schema(org_id, stream_name, stream_type, inferred_schema).await
     else {
         lock.unlock().await.map_err(server_internal_error).unwrap();
         return None;
@@ -783,6 +775,7 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
+    use config::utils::schema::infer_json_schema_from_map;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use super::*;
@@ -832,12 +825,14 @@ mod tests {
         ]);
         let mut map: HashMap<String, Schema> = HashMap::new();
         map.insert(stream_name.to_string(), schema);
+        let record = [record.as_object().unwrap()].into_iter();
+        let infer_schema = infer_json_schema_from_map(record, StreamType::Logs).unwrap();
         let result = check_for_schema(
             org_name,
             stream_name,
             StreamType::Logs,
             &mut map,
-            record.as_object().unwrap(),
+            &infer_schema,
             1234234234234,
         )
         .await

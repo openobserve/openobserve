@@ -21,6 +21,7 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamType},
     utils::{
         json::{estimate_json_bytes, Map, Value},
+        schema::infer_json_schema_from_map,
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -164,20 +165,34 @@ async fn add_valid_record(
         .as_i64()
         .unwrap();
 
+    // get infer schema
+    let value_iter = [&record_val].into_iter();
+    let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Logs).unwrap();
+
     // check schema
     let schema_evolution = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
         stream_schema_map,
-        &record_val,
+        &infer_schema,
         timestamp,
     )
     .await?;
 
-    // get hour key
-    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    // get record schema
+    let schema_latest = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+    // ensure schema is compatible
+    let mut new_fields = vec![];
+    for field in infer_schema.fields() {
+        match schema_latest.field_with_name(field.name()) {
+            Ok(f) => new_fields.push(Arc::new(f.clone())),
+            Err(e) => return Err(anyhow::Error::msg(e)),
+        }
+    }
+    let rec_schema = Schema::new(new_fields);
     let schema_key = rec_schema.hash_key();
+    // get hour key
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,

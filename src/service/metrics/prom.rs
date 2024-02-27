@@ -21,7 +21,10 @@ use config::{
     cluster,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{json, schema_ext::SchemaExt, time::parse_i64_to_timestamp_micros},
+    utils::{
+        json, schema::infer_json_schema_from_map, schema_ext::SchemaExt,
+        time::parse_i64_to_timestamp_micros,
+    },
     FxIndexMap, CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -322,6 +325,10 @@ pub async fn remote_write(
             );
             let value_str = config::utils::json::to_string(&val_map).unwrap();
 
+            // get infer schema
+            let value_iter = [val_map.clone()].into_iter();
+            let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Metrics).unwrap();
+
             // check for schema evolution
             if schema_evolved.get(&metric_name).is_none()
                 && check_for_schema(
@@ -329,7 +336,7 @@ pub async fn remote_write(
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    val_map,
+                    &infer_schema,
                     timestamp,
                 )
                 .await

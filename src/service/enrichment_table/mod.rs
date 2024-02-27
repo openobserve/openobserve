@@ -28,7 +28,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamType},
         usage::UsageType,
     },
-    utils::{json, schema_ext::SchemaExt},
+    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -143,6 +143,11 @@ pub async fn save_enrichment_data(
                     json::Value::Number(timestamp.into()),
                 );
 
+                // get infer schema
+                let value_iter = [&json_record].into_iter();
+                let infer_schema =
+                    infer_json_schema_from_map(value_iter, StreamType::EnrichmentTables).unwrap();
+
                 // check for schema evolution
                 if !schema_evolved
                     && check_for_schema(
@@ -150,7 +155,7 @@ pub async fn save_enrichment_data(
                         stream_name,
                         StreamType::EnrichmentTables,
                         &mut stream_schema_map,
-                        &json_record,
+                        &infer_schema,
                         timestamp,
                     )
                     .await
