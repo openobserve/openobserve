@@ -592,19 +592,13 @@ export default defineComponent({
         isFullscreen.value = false;
       }
     };
-    const onPrintscreenChange = () => {
-      if (!document.printscreenElement) {
-        store.state.printMode = false;
-      }
-    };
+    
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
-      document.addEventListener("printscreenchange", onPrintscreenChange);
     });
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
-      document.removeEventListener("printscreenchange", onPrintscreenChange);
     });
 
     onActivated(() => {

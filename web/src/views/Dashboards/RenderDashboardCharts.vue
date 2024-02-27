@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
+    <span>{{ JSON.stringify(computedPanels) }}</span>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -200,6 +201,31 @@ export default defineComponent({
       emit("variablesData", variablesData);
     };
 
+    //create reactive obbject for variablesData and panels
+    const variablesDataAndPanels = reactive({
+      variablesData: [],
+      panels: [],
+    });
+
+    // provide and inject to share data between components
+    provide("variablesDataAndPanels", variablesDataAndPanels);
+
+    //want to create computed property based on panels and variables
+    const computedPanels = computed(() => {
+      const variablesDataValues = Object.values(
+        variablesDataAndPanels.variablesData
+      );
+      const panelsValues = Object.values(variablesDataAndPanels.panels);
+
+      // Check if every value in both variablesData and panels is false
+      return (
+        variablesDataValues.every((value) => value === false) &&
+        panelsValues.every((value) => value === false)
+      );
+    });
+
+    console.log("computedPanels", computedPanels.value);
+
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
       panelId: -1,
@@ -368,6 +394,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
+      computedPanels,
     };
   },
   methods: {
