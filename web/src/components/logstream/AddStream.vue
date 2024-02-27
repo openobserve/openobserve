@@ -140,9 +140,9 @@ const streamTypes = [
   { label: "Enrichment Table", value: "enrichment_tables" },
 ];
 
-const emits = defineEmits(["streamAdded"]);
+const emits = defineEmits(["streamAdded", "close"]);
 
-const { addStream } = useStreams();
+const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 
@@ -171,7 +171,26 @@ const showDataRetention = computed(
     streamInputs.value.stream_type !== "enrichment_tables"
 );
 
-const saveStream = () => {
+const saveStream = async () => {
+  let isStreamPresent = false;
+
+  await getStream(
+    streamInputs.value.name,
+    streamInputs.value.stream_type,
+    false
+  )
+    .then(() => {
+      q.notify({
+        color: "negative",
+        message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
+        timeout: 4000,
+      });
+      isStreamPresent = true;
+    })
+    .catch(() => {});
+
+  if (isStreamPresent) return;
+
   const payload = getStreamPayload();
   streamService
     .updateSettings(
@@ -196,6 +215,7 @@ const saveStream = () => {
         .then((streamRes: any) => {
           addStream(streamRes.data);
           emits("streamAdded");
+          emits("close");
         });
     })
     .catch((err) => {
