@@ -15,7 +15,7 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref, toRaw } from "vue";
+import { reactive, ref, type Ref, toRaw, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -368,6 +368,7 @@ const useLogs = () => {
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData = await getStreams(streamType, false);
       searchObj.data.streamResults = streamData;
+      await nextTick();
       await loadStreamLists();
       return;
     } catch (e: any) {
