@@ -55,6 +55,10 @@ const ErrorsDashboard = () =>
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
 
+const ReportList = () => import("@/components/reports/ReportList.vue");
+
+const CreateReport = () => import("@/components/reports/CreateReport.vue");
+
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
@@ -183,6 +187,24 @@ const useRoutes = () => {
       meta: {
         // keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/reports",
+      name: "reports",
+      component: ReportList,
+      props: true,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/reports/create",
+      name: "createReport",
+      component: CreateReport,
+      props: true,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
