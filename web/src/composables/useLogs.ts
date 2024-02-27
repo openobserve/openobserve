@@ -144,6 +144,8 @@ const defaultObject = {
         unparsed_x_data: [],
         timezone: "",
       },
+      errorMsg: "",
+      errorCode: 0,
     },
     editorValue: <any>"",
     datetime: <any>{
@@ -200,6 +202,8 @@ const useLogs = () => {
         unparsed_x_data: [],
         timezone: "",
       },
+      errorCode: 0,
+      errorMsg: "",
     };
     searchObj.data.tempFunctionContent = "";
     searchObj.data.query = "";
@@ -628,6 +632,8 @@ const useLogs = () => {
               unparsed_x_data: [],
               timezone: "",
             },
+            errorCode: 0,
+            errorMsg: "",
           };
           searchObj.meta.histogramDirtyFlag = true;
         } else {
@@ -998,7 +1004,10 @@ const useLogs = () => {
         await getPaginatedData(queryReq, histogramQueryReq);
         if (
           (searchObj.data.queryResults.aggs == undefined &&
-            searchObj.data.resultGrid.currentPage == 1) ||
+            searchObj.data.resultGrid.currentPage == 1 &&
+            searchObj.loadingHistogram == false &&
+            searchObj.meta.showHistogram == true &&
+            searchObj.meta.sqlMode == false) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
@@ -1202,6 +1211,8 @@ const useLogs = () => {
     return new Promise((resolve, reject) => {
       const dismiss = () => {};
       try {
+        searchObj.data.histogram.errorMsg = "";
+        searchObj.data.histogram.errorCode = 0;
         searchObj.loadingHistogram = true;
         queryReq.query.size = 0;
         queryReq.query.track_total_hits = true;
@@ -1213,7 +1224,6 @@ const useLogs = () => {
           })
           .then((res) => {
             searchObj.loading = false;
-            searchObj.data.errorMsg = "";
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
             generateHistogramData();
@@ -1225,22 +1235,24 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loadingHistogram = false;
             if (err.response != undefined) {
-              searchObj.data.errorMsg = err.response.data.error;
+              searchObj.data.histogram.errorMsg = err.response.data.error;
             } else {
-              searchObj.data.errorMsg = err.message;
+              searchObj.data.histogram.errorMsg = err.message;
             }
 
             const customMessage = logsErrorMessage(err?.response?.data.code);
-            searchObj.data.errorCode = err?.response?.data.code;
+            searchObj.data.histogram.errorCode = err?.response?.data.code;
 
             if (customMessage != "") {
-              searchObj.data.errorMsg = t(customMessage);
+              searchObj.data.histogram.errorMsg = t(customMessage);
             }
 
             reject(false);
           });
       } catch (e: any) {
         dismiss();
+        searchObj.data.histogram.errorMsg = e.message;
+        searchObj.data.histogram.errorCode = e.code;
         searchObj.loadingHistogram = false;
         showErrorNotification("Error while fetching histogram data");
         reject(false);
@@ -1502,7 +1514,13 @@ const useLogs = () => {
         unparsed_x_data: unparsed_x_data,
         timezone: store.state.timezone,
       };
-      searchObj.data.histogram = { xData, yData, chartParams };
+      searchObj.data.histogram = {
+        xData,
+        yData,
+        chartParams,
+        errorCode: 0,
+        errorMsg: "",
+      };
     } catch (e: any) {
       console.log("Error while generating histogram data");
     }

@@ -73,23 +73,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <ChartRenderer
-        v-if="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
-        data-test="logs-search-result-bar-chart"
-        :data="plotChart"
-        style="max-height: 100px"
-        @updated:dataZoom="onChartUpdate"
-      />
-      <div
-        class="q-pb-lg"
-        style="top: 50px; position: absolute; left: 45%"
-        v-if="searchObj.loadingHistogram == true"
-      >
-        <q-spinner-hourglass
-          color="primary"
-          size="25px"
-          style="margin: 0 auto; display: block"
+      <div v-if="searchObj.data.histogram.errorMsg == ''">
+        <ChartRenderer
+          v-if="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
+          data-test="logs-search-result-bar-chart"
+          :data="plotChart"
+          style="max-height: 100px"
+          @updated:dataZoom="onChartUpdate"
         />
+        <div
+          class="q-pb-lg"
+          style="top: 50px; position: absolute; left: 45%"
+          v-if="searchObj.loadingHistogram == true"
+        >
+          <q-spinner-hourglass
+            color="primary"
+            size="25px"
+            style="margin: 0 auto; display: block"
+          />
+        </div>
+      </div>
+      <div v-else-if="searchObj.data.histogram.errorMsg != ''">
+        <h6 class="text-center">
+          <q-icon name="warning"
+color="warning" size="30px"></q-icon> Error
+          while fetching histogram data. <br />
+          {{ searchObj.data.histogram.errorMsg }}
+        </h6>
       </div>
       <q-virtual-scroll
         data-test="logs-search-result-logs-table"
