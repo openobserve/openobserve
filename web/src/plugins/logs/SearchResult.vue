@@ -98,7 +98,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="warning"
 color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
-          <q-btn @click="toggleErrorDetails" size="sm" data-test="logs-page-histogram-error-details-btn">{{t("search.histogramErrorBtnLabel")}}</q-btn><br />
+          <q-btn
+            @click="toggleErrorDetails"
+            size="sm"
+            data-test="logs-page-histogram-error-details-btn"
+            >{{ t("search.histogramErrorBtnLabel") }}</q-btn
+          ><br />
           <span v-if="disableMoreErrorDetails">
             {{ searchObj.data.histogram.errorMsg }}
             {{ searchObj.data.histogram.errorDetail }}
