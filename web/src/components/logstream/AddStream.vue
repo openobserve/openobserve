@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-white q-pt-md">
+  <div
+    class="q-pt-md"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
     <div class="row items-center no-wrap q-px-md">
       <div class="col">
         <div class="text-body1 text-bold" data-test="add-stream-title">
@@ -137,7 +140,6 @@ const streamTypes = [
   { label: "Logs", value: "logs" },
   { label: "Metrics", value: "metrics" },
   { label: "Traces", value: "traces" },
-  { label: "Enrichment Table", value: "enrichment_tables" },
 ];
 
 const emits = defineEmits(["streamAdded", "close"]);
