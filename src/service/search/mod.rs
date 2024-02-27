@@ -259,9 +259,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         is_inverted_index
     );
 
-    let file_list = if is_inverted_index {
+    // If the query is of type inverted index and this is not an aggregations request
+    let file_list = if is_inverted_index && req.aggs.is_empty() {
         let mut idx_req = req.clone();
-        let is_agg_query = !idx_req.aggs.is_empty();
 
         // Get all the unique terms which the user has searched.
         let terms = meta
@@ -282,7 +282,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             meta.stream_name, search_condition
         );
 
-        let _is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
@@ -295,7 +295,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
-        let unique_files = if _is_first_page && !is_agg_query {
+        let unique_files = if is_first_page {
             let limit_count = 500;
             let sorted_data = idx_resp
                 .hits
@@ -312,25 +312,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-            for (term, filename, count, timestamp) in sorted_data {
-                log::warn!(
-                    "Filename before fetching smaller dataset {:?} at {}",
-                    &filename,
-                    timestamp
-                );
-
+            for (term, filename, count, _timestamp) in sorted_data {
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
                 if *current_count < limit_count || *current_count == 0 {
-                    log::warn!(
-                        "Filename after fetching smaller dataset {:?} at {}",
-                        &filename,
-                        timestamp
-                    );
                     term_map.entry(term).or_insert_with(Vec::new).push(filename);
                     *current_count += count;
                 }
             }
-            log::warn!("term_map {:?}", term_map);
             term_map
                 .into_iter()
                 .flat_map(|(_, filenames)| filenames)
@@ -343,17 +331,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 .collect::<HashSet<_>>()
         };
 
-        log::warn!("searching in unique_files_len {:?}", unique_files.len());
-
         for filename in unique_files {
             let prefixed_filename = format!(
                 "files/{}/logs/{}/{}",
                 meta.org_id, meta.stream_name, filename
-            );
-            log::warn!(
-                "[{}] searching in get_file_list {:?}",
-                stream_type,
-                prefixed_filename
             );
             if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
                 idx_file_list.push(FileKey {
@@ -363,31 +344,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 });
             }
         }
-
         idx_file_list
     } else {
-        let file_list = get_file_list(
+        get_file_list(
             &session_id,
             &meta,
             stream_type,
             partition_time_level,
             &stream_settings.partition_keys,
         )
-        .await;
-        log::warn!(
-            "searching in get_file_list_len for STREAM_TYPE {} {:?}",
-            stream_type,
-            file_list.len()
-        );
-        for f in file_list.iter() {
-            log::warn!(
-                "[{}] get_file_list: searching in get_file_list {:?}",
-                stream_type,
-                f.key
-            );
-        }
-
-        file_list
+        .await
     };
 
     #[cfg(not(feature = "enterprise"))]
