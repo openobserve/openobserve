@@ -795,5 +795,16 @@
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *"
+  },
+  "reports": {
+    "add": "Add Report",
+    "search": "Search report",
+    "update": "Update Report",
+    "dashboardFolder": "Folder",
+    "dashboard": "Dashboard",
+    "dashboardTab": "Dashboard Tab",
+    "recipients": "Recipients",
+    "name": "Report name",
+    "replyTo": "Reply-to email address"
   }
 }

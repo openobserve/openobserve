@@ -488,6 +488,12 @@ export const timestampToTimezoneDate = (
   timezone: string = "UTC",
   format: string = "yyyy-MM-dd HH:mm:ss.SSS"
 ) => {
+  console.log(
+    unixMilliTimestamp,
+    DateTime.fromMillis(Math.floor(unixMilliTimestamp))
+      .setZone(timezone)
+      .toUTC()
+  );
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
     .toFormat(format);
@@ -549,6 +555,7 @@ export const localTimeSelectedTimezoneUTCTime = (
   // Convert the moment object to a Unix timestamp (in seconds)
   const unixTimestamp = convertedDate.unix() * 1000000;
 
+  console.log(unixTimestamp);
   return unixTimestamp;
 };
 
