@@ -153,7 +153,8 @@ const useStreams = () => {
   const getStream = async (
     streamName: string,
     streamType: string,
-    schema: boolean
+    schema: boolean,
+    force: boolean = false
   ): Promise<any> => {
     return new Promise(async (resolve, reject) => {
       if (!streamName || !streamType) {
@@ -186,7 +187,7 @@ const useStreams = () => {
           const streamIndex = streamsIndexMapping[streamType][streamName];
           const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
 
-          if (schema && !hasSchema) {
+          if ((schema && !hasSchema) || force) {
             try {
               const _stream: any = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
@@ -200,6 +201,17 @@ const useStreams = () => {
           }
           return resolve(streams[streamType].list[streamIndex]);
         } else {
+          // await StreamService.schema(
+          //   store.state.selectedOrganization.identifier,
+          //   streamName,
+          //   streamType
+          // )
+          //   .then((res: any) => {
+          //     addStream(res.data);
+          //     const streamIndex = streamsIndexMapping[streamType][streamName];
+          //     return resolve(streams[streamType].list[streamIndex]);
+          //   })
+          //   .catch(() => reject("Stream Not Found"));
           return reject("Stream Not Found");
         }
       } catch (e: any) {
@@ -327,6 +339,8 @@ const useStreams = () => {
     };
   };
 
+  // Don't add delete log here, it will create issue
+  // This method is to remove specific stream from cache
   const removeStream = (streamName: string, streamType: string) => {
     if (
       Object.prototype.hasOwnProperty.call(
@@ -350,6 +364,7 @@ const useStreams = () => {
         ) {
           // Shift each element one position to the left
           streams[streamType].list[i] = streams[streamType].list[i + 1];
+          streamsIndexMapping[streamType][streams[streamType].list[i].name] = i;
         }
         // Remove the last element since it's now duplicated
         streams[streamType].list.length = streams[streamType].list.length - 1;
@@ -357,7 +372,13 @@ const useStreams = () => {
     }
   };
 
-  const addStream = (stream: any) => {
+  const addStream = async (stream: any) => {
+    if (
+      !!streams[stream.stream_type] &&
+      streamsIndexMapping[stream.stream_type][stream.name] >= 0
+    )
+      return;
+
     // If that stream type is not present create that stream
     if (!streams[stream.stream_type]) {
       getStream(stream.name, stream.stream_type, true);

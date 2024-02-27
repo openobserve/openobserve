@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-white q-pt-md">
+  <div
+    class="q-pt-md"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
     <div class="row items-center no-wrap q-px-md">
       <div class="col">
         <div class="text-body1 text-bold" data-test="add-stream-title">
@@ -137,12 +140,11 @@ const streamTypes = [
   { label: "Logs", value: "logs" },
   { label: "Metrics", value: "metrics" },
   { label: "Traces", value: "traces" },
-  { label: "Enrichment Table", value: "enrichment_tables" },
 ];
 
-const emits = defineEmits(["streamAdded"]);
+const emits = defineEmits(["streamAdded", "close"]);
 
-const { addStream } = useStreams();
+const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 
@@ -171,7 +173,26 @@ const showDataRetention = computed(
     streamInputs.value.stream_type !== "enrichment_tables"
 );
 
-const saveStream = () => {
+const saveStream = async () => {
+  let isStreamPresent = false;
+
+  await getStream(
+    streamInputs.value.name,
+    streamInputs.value.stream_type,
+    false
+  )
+    .then(() => {
+      q.notify({
+        color: "negative",
+        message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
+        timeout: 4000,
+      });
+      isStreamPresent = true;
+    })
+    .catch(() => {});
+
+  if (isStreamPresent) return;
+
   const payload = getStreamPayload();
   streamService
     .updateSettings(
@@ -196,6 +217,7 @@ const saveStream = () => {
         .then((streamRes: any) => {
           addStream(streamRes.data);
           emits("streamAdded");
+          emits("close");
         });
     })
     .catch((err) => {

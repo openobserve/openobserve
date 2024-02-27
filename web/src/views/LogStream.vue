@@ -182,7 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       full-height
       maximized
     >
-      <AddStream @streamAdded="getLogStream" />
+      <AddStream
+        @close="addStreamDialog.show = false"
+        @streamAdded="getLogStream"
+      />
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">

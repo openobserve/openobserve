@@ -319,7 +319,7 @@ export default defineComponent({
           indexData.value.name,
           deleteFieldList.value
         )
-        .then((res) => {
+        .then(async (res) => {
           if (res.data.code == 200) {
             q.notify({
               color: "positive",
@@ -328,6 +328,12 @@ export default defineComponent({
             });
             confirmQueryModeChangeDialog.value = false;
             deleteFieldList.value = [];
+            await getStream(
+              indexData.value.name,
+              indexData.value.stream_type,
+              true,
+              true
+            );
             getSchema();
           } else {
             q.notify({
@@ -519,12 +525,19 @@ export default defineComponent({
           indexData.value.stream_type,
           settings
         )
-        .then((res) => {
+        .then(async (res) => {
           q.notify({
             color: "positive",
             message: "Stream settings updated successfully.",
             timeout: 2000,
           });
+
+          await getStream(
+            indexData.value.name,
+            indexData.value.stream_type,
+            true,
+            true
+          );
 
           segment.track("Button Click", {
             button: "Update Settings",
