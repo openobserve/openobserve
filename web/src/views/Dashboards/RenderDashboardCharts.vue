@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    <span id="hiddenSpan" style="display: none">{{
+    <span id="isAllDashboardPanelsLoaded" style="display: none">{{
       JSON.stringify(loadingValues)
     }}</span>
     <VariablesValueSelector
