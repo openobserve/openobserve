@@ -625,6 +625,81 @@ fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<F
     (is_schema_changed, field_datatype_delta, merged_fields)
 }
 
+fn _get_schema_changes_v1(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+    let mut is_schema_changed = false;
+    let mut field_datatype_delta: Vec<_> = vec![];
+
+    let merged_fields = schema
+        .fields()
+        .iter()
+        .map(|f| f.as_ref().to_owned())
+        .collect::<Vec<_>>();
+    let mut merged_fields_chk = hashbrown::HashMap::with_capacity(merged_fields.len());
+    for (i, f) in merged_fields.iter().enumerate() {
+        merged_fields_chk.insert(f.name(), i);
+    }
+
+    for item in inferred_schema.fields.iter() {
+        let item_name = item.name();
+        let item_data_type = item.data_type();
+
+        match merged_fields_chk.get(item_name) {
+            None => {
+                is_schema_changed = true;
+            }
+            Some(idx) => {
+                let existing_field = &merged_fields[*idx];
+                if existing_field.data_type() != item_data_type {
+                    if !CONFIG.common.widening_schema_evolution {
+                        field_datatype_delta.push(existing_field.clone());
+                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
+                        is_schema_changed = true;
+                        field_datatype_delta.push((**item).clone());
+                    } else {
+                        let mut meta = existing_field.metadata().clone();
+                        meta.insert("zo_cast".to_owned(), true.to_string());
+                        field_datatype_delta.push(existing_field.clone().with_metadata(meta));
+                    }
+                }
+            }
+        }
+    }
+
+    (is_schema_changed, field_datatype_delta)
+}
+
+fn _get_schema_changes_v2(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+    let mut is_schema_changed = false;
+    let mut field_datatype_delta: Vec<_> = vec![];
+
+    for item in inferred_schema.fields.iter() {
+        let item_name = item.name();
+        let item_data_type = item.data_type();
+
+        match schema.field_with_name(item_name) {
+            Err(_) => {
+                is_schema_changed = true;
+            }
+            Ok(f) => {
+                if f.data_type() != item_data_type {
+                    if !CONFIG.common.widening_schema_evolution {
+                        field_datatype_delta.push(f.clone());
+                    } else if is_widening_conversion(f.data_type(), item_data_type) {
+                        is_schema_changed = true;
+                        field_datatype_delta.push((**item).clone());
+                    } else {
+                        let mut meta = f.metadata().clone();
+                        meta.insert("zo_cast".to_owned(), true.to_string());
+                        field_datatype_delta.push(f.clone().with_metadata(meta));
+                    }
+                }
+            }
+        }
+    }
+
+    (is_schema_changed, field_datatype_delta)
+}
+
 pub async fn stream_schema_exists(
     org_id: &str,
     stream_name: &str,
