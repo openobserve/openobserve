@@ -336,6 +336,13 @@ pub struct Common {
     pub feature_query_queue_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]
     pub feature_query_partition_strategy: String,
+    #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
+    pub feature_query_infer_schema: bool,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_INFER_SCHEMA_IF_FIELDS_MORE_THAN",
+        default = 0
+    )]
+    pub feature_query_infer_schema_if_fields_more_than: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
