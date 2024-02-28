@@ -287,7 +287,9 @@ fn init_router_grpc_server(
     let gaddr: SocketAddr = format!("0.0.0.0:{}", CONFIG.grpc.port).parse()?;
     let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
     let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
@@ -365,7 +367,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         }
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id%10))
+            .app_data(web::Data::new(local_id))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,

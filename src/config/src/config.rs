@@ -257,6 +257,12 @@ pub struct Grpc {
     pub stream_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
+    #[env_config(
+        name = "ZO_GRPC_MAX_MESSAGE_SIZE",
+        default = 4,
+        help = "Max grpc message size in MB, default is 4 MB"
+    )]
+    pub max_message_size: usize,
 }
 
 #[derive(EnvConfig)]
