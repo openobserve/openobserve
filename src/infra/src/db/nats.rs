@@ -41,12 +41,11 @@ async fn get_bucket_by_key<'a>(prefix: &'a str, key: &'a str) -> Result<(kv::Sto
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
-        history: 10,
+        history: 3,
         ..Default::default()
     };
     if bucket_name == "node" {
-        bucket.history = 3;
-        bucket.max_age = Duration::from_secs(CONFIG.nats.node_heartbeat_ttl as u64);
+        bucket.max_age = Duration::from_secs(30);
     }
     let kv = jetstream.create_key_value(bucket).await?;
     Ok((kv, key.trim_start_matches(bucket_name)))
