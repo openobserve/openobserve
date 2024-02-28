@@ -808,6 +808,7 @@
     "customLogoText": "Custom Logo Text"
   },
   "reports": {
+    "header": "Reports",
     "add": "Add Report",
     "search": "Search report",
     "update": "Update Report",
@@ -816,6 +817,8 @@
     "dashboardTab": "Dashboard Tab",
     "recipients": "Recipients",
     "name": "Report name",
-    "replyTo": "Reply-to email address"
+    "replyTo": "Reply-to email address",
+    "title": "Title",
+    "description": "Description"
   }
 }
