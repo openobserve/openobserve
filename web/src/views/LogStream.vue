@@ -34,12 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -114,18 +112,20 @@ size="sm" color="secondary" />
                 </template>
               </div>
             </div>
-            <q-input
-              v-model="filterQuery"
-              borderless
-              filled
-              dense
-              class="q-ml-auto q-mb-xs no-border"
-              :placeholder="t('logStream.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
+            <div data-test="streams-search-stream-input">
+              <q-input
+                v-model="filterQuery"
+                borderless
+                filled
+                dense
+                class="q-ml-auto q-mb-xs no-border"
+                :placeholder="t('logStream.search')"
+              >
+                <template #prepend>
+                  <q-icon name="search" />
+                </template>
+              </q-input>
+            </div>
             <q-btn
               data-test="log-stream-refresh-stats-btn"
               class="q-ml-md q-mb-xs text-bold no-border"
@@ -198,8 +198,7 @@ size="sm" color="secondary" />
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
