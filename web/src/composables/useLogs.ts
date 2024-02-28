@@ -333,7 +333,10 @@ const useLogs = () => {
             selectedStream = itemObj;
           }
         }
-        searchObj.data.stream.selectedStream = selectedStream;
+
+        if (store.state.zoConfig.query_on_stream_selection == true) {
+          searchObj.data.stream.selectedStream = selectedStream;
+        }
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
       }
@@ -899,7 +902,10 @@ const useLogs = () => {
     try {
       searchObj.meta.showDetailTab = false;
 
-      if (!searchObj.data.stream.streamLists?.length) {
+      if (
+        !searchObj.data.stream.streamLists?.length ||
+        searchObj.data.stream.selectedStream.value == ""
+      ) {
         searchObj.loading = false;
         return;
       }
