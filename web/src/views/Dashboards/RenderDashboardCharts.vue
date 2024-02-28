@@ -18,14 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    <span
-      v-if="isDashboardVariablesAndPanelsDataLoading"
-      id="isAllDashboardPanelsLoaded"
-      style="display: none"
-      >{{
-        JSON.stringify(isDashboardVariablesAndPanelsDataLoading)
-      }}</span
-    >
+    <!-- v-if="isDashboardVariablesAndPanelsDataLoading" -->
+    <span id="isAllDashboardPanelsLoaded" style="display: none">{{
+      JSON.stringify(isDashboardVariablesAndPanelsDataLoading)
+    }}</span>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -203,23 +199,6 @@ export default defineComponent({
       emit("onMovePanel", panelId, newTabId);
     };
 
-    // variables data
-    const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-      emit("variablesData", variablesData);
-
-      // update the loading state
-      variablesAndPanelsDataLoadingState.variablesData =
-        variablesData?.values?.reduce(
-          (obj: any, item: any) => ({
-            ...obj,
-            [item.name]: item.isLoading,
-          }),
-          {}
-        );
-    };
-
     //create reactive obbject for variablesData and panels
     const variablesAndPanelsDataLoadingState = reactive({
       variablesData: {},
@@ -255,33 +234,43 @@ export default defineComponent({
 
     // Create debouncer
     const { value, setImmediate, setDebounce } = useDebouncer(
-      isDashboardVariablesAndPanelsDataLoading,
-      1000
+      isDashboardVariablesAndPanelsDataLoading.value,
+      3000
     );
 
     // Watch for changes in the computed property and update the debouncer accordingly
     watch(isDashboardVariablesAndPanelsDataLoading, (newValue) => {
-      let value = newValue;
+      console.log(
+        "isDashboardVariablesAndPanelsDataLoading watch:",
+        isDashboardVariablesAndPanelsDataLoading.value
+      );
       if (isDashboardVariablesAndPanelsDataLoading.value === false) {
-        console.log(
-          "isDashboardVariablesAndPanelsDataLoading setImmediate",
-          newValue
-        );
-
         setImmediate(newValue);
       } else {
-        console.log(
-          "isDashboardVariablesAndPanelsDataLoading setDebounce",
-          newValue
-        );
-
         setDebounce(newValue);
-        console.log(
-          "isDashboardVariablesAndPanelsDataLoading after setDebounce",
-          newValue
-        );
       }
     });
+
+    // variables data
+    const variablesData = reactive({});
+    const variablesDataUpdated = (data: any) => {
+      try {
+        Object.assign(variablesData, data);
+        emit("variablesData", variablesData);
+
+        // update the loading state
+        variablesAndPanelsDataLoadingState.variablesData =
+          variablesData?.values?.reduce(
+            (obj: any, item: any) => ({
+              ...obj,
+              [item.name]: item.isLoading,
+            }),
+            {}
+          );
+      } catch (error) {
+        console.log(error, "error--");
+      }
+    };
 
     // const isDashboardVariablesAndPanelsDataLoading = ref(false);
 

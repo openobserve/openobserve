@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from "vue";
+import { ref, onUnmounted, watch, onDeactivated } from "vue";
 
 /**
  * Custom hook to debounce a value
@@ -7,7 +7,7 @@ import { ref, onUnmounted } from "vue";
  * @returns {Object} - Object containing the debounced value and methods to set the value immediately or with debounce
  */
 export const useDebouncer = (initialValue: any, delay: any) => {
-  const value = ref(initialValue.value);
+  const value = ref(initialValue);
   let timeout: any = null;
 
   /**
@@ -15,20 +15,29 @@ export const useDebouncer = (initialValue: any, delay: any) => {
    * @param {any} newValue - The new value to set immediately
    */
   const setImmediate = (newValue: any) => {
-    clearTimeout(timeout);
+    resetTimeout();
     console.log("setImmediate", newValue);
 
     value.value = newValue;
   };
 
-  clearTimeout(timeout);
+  const resetTimeout = () => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+
+  watch(value, () => {
+    console.log('isDashboardVariablesAndPanelsDataLoading: useDebouncer: ', value.value)
+  })
+
 
   /**
    * Set the value with debounce
    * @param {any} newValue - The new value to set with debounce
    */
   const setDebounce = (newValue: any) => {
-    clearTimeout(timeout);
+    resetTimeout();
     console.log("setDebounce", newValue);
 
     timeout = setTimeout(() => {
@@ -37,11 +46,15 @@ export const useDebouncer = (initialValue: any, delay: any) => {
     console.log("timeout", timeout);
   };
 
-  onUnmounted(() => {
+  onDeactivated(() => {
     console.log("onUnmounted", value.value);
 
-    clearTimeout(timeout);
+    resetTimeout();
   });
+
+  onUnmounted(() => {
+    resetTimeout();
+  })
 
   return { value, setImmediate, setDebounce };
 };
