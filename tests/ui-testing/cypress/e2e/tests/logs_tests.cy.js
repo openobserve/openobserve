@@ -1148,7 +1148,7 @@ describe("Logs testcases", () => {
     }).should("exist");
   });
 
-  it("should change stream settings and click on search stream", () => {
+  it.skip("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });

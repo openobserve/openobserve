@@ -1367,9 +1367,15 @@ pub async fn register_table(
         }
     };
 
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema);
+    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
+    if CONFIG.common.feature_query_infer_schema
+        || (CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
+            && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than)
+    {
+        config = config.infer_schema(&ctx.state()).await?;
+    } else {
+        config = config.with_schema(schema);
+    }
     let table = ListingTable::try_new(config)?;
     ctx.register_table(table_name, Arc::new(table))?;
 
