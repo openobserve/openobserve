@@ -1,4 +1,4 @@
-import { Permission, Entity, setupRolesAndPermissions, deleteRole, performRolePermissionsSetup } from "../../allfunctions/permissions";
+import { Permission, Entity, setupRolesAndPermissions, deleteRole, performRolePermissionsSetup, templateCreation, createAlert,generateRandomRoleName, createDestination, switchOrg, createFolder} from "../../allfunctions/permissions";
 import {getRandomText } from "../../utils";
 
 describe('Visit a specific link test', () => {
@@ -33,18 +33,22 @@ describe('Visit a specific link test', () => {
     //     // cy.wait(5000)
     //     cy.get('.q-field__append > .q-icon').click()
     //     cy.get('[data-test="menu-link-/iam-item"]').click()
-    //     cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
-        
+    //     cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+    cy.intercept('GET', '**/api/test/roles/**').as('allroles')
+    cy.intercept('GET', '**/api/test/folders/**').as('folders');
+
+    
     });
   
     
     
   
     it('Roles:Display error on clicking Save button without entering name', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
         cy.get('[data-test="iam-roles-tab"]').click({force:true})
         cy.get('[data-test="alert-list-add-alert-btn"]').click({force:true})
         cy.wait(2000)
-        cy.get('.q-mt-md>>>> .q-field__control-container').type('   ');
+        cy.get('[data-test="add-role-rolename-input-btn"] > .q-field > .q-field__inner > .q-field__control').type('   ');
 
         cy.get('[data-test="add-alert-submit-btn"]').click({force:true})
         cy.contains('Name is required').should('be.visible')
@@ -52,28 +56,29 @@ describe('Visit a specific link test', () => {
     });
 
     it('Roles: Enter name and create role', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
         cy.get('[data-test="iam-roles-tab"]').click({force:true})
         cy.get('[data-test="alert-list-add-alert-btn"]').click({force:true})
+        const role = generateRandomRoleName(8);
         cy.wait(2000)
-        cy.get('.q-mt-md>>>> .q-field__control-container').type('admin1');
+        cy.get('[data-test="add-role-rolename-input-btn"] > .q-field > .q-field__inner > .q-field__control').type(role);
 
         cy.get('[data-test="add-alert-submit-btn"]').click({force:true})
-        cy.get('[title="Delete"]').click({force:true})
-        cy.get('[data-test="confirm-button"]').click({force:true})
+        // deleteRole(role)
+      
 
     });
 
     it('Roles: give functions delete and create role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
-      
-
-        const role = "admin1"
-
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+   
        setupRolesAndPermissions(role, [
             {
                 item: Entity.FUNCTIONS,
-                permissions: [Permission.CREATE, Permission.LIST, Permission.UPDATE]
+                permissions: [Permission.CREATE, Permission.LIST, Permission.UPDATE, Permission.DELETE]
             },
            
         ])
@@ -81,10 +86,7 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
-       cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
+        switchOrg()
         cy.wait(2000)
         cy.get('[data-test="menu-link-/functions-item"]').click()
         cy.wait(3000)
@@ -95,17 +97,18 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="confirm-button"]').click({ force: true }); 
         cy.loginwithadmin()
         cy.wait(2000) 
-        deleteRole(role)
+        // deleteRole(role)
         
     });
 
 
     it('Roles: give functions only list role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
       
 
-        const role = "admin1"
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
        setupRolesAndPermissions(role, [
             {
@@ -118,10 +121,7 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
-       cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
+        switchOrg()
         cy.wait(2000)
         cy.get('[data-test="menu-link-/functions-item"]').click()
         cy.wait(3000)
@@ -129,22 +129,18 @@ describe('Visit a specific link test', () => {
         cy.get('.q-pb-sm > .q-field > .q-field__inner > .q-field__control').type('testfunction')
         cy.contains('Save').click({force:true})
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
-        // cy.get('.q-pb-sm > .q-field > .q-field__inner > .q-field__control').type('testfunction')
-        // cy.contains('Save').click({force:true})
-        // cy.get('[title="Delete Function"]').click({force:true})
-        // cy.get('[data-test="confirm-button"]').click({ force: true }); 
         cy.loginwithadmin()
         cy.wait(2000) 
-        deleteRole(role)
+        // deleteRole(role)
         
     });
 
     it('Roles: give functions only GET role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
       
-
-        const role = "admin1"
 
        setupRolesAndPermissions(role, [
             {
@@ -157,10 +153,7 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
-       cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
+        switchOrg()
         cy.wait(2000)
         cy.get('[data-test="menu-link-/functions-item"]').click()
         cy.wait(3000)
@@ -168,10 +161,6 @@ describe('Visit a specific link test', () => {
         cy.get('.q-pb-sm > .q-field > .q-field__inner > .q-field__control').type('testfunction')
         cy.contains('Save').click({force:true})
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
-        // cy.get('.q-pb-sm > .q-field > .q-field__inner > .q-field__control').type('testfunction')
-        // cy.contains('Save').click({force:true})
-        // cy.get('[title="Delete Function"]').click({force:true})
-        // cy.get('[data-test="confirm-button"]').click({ force: true }); 
         cy.loginwithadmin()
         cy.wait(2000) 
         deleteRole(role)
@@ -182,11 +171,10 @@ describe('Visit a specific link test', () => {
 
     it('Roles: give functions only UPDATE role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
-      
-
-        const role = "admin1"
-
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+     
        setupRolesAndPermissions(role, [
             {
                 item: Entity.FUNCTIONS,
@@ -198,21 +186,14 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
         cy.get('[data-test="menu-link-/functions-item"]').click()
         cy.wait(3000)
         cy.contains('Create new function').click({force:true})
         cy.get('.q-pb-sm > .q-field > .q-field__inner > .q-field__control').type('testfunction')
         cy.contains('Save').click({force:true})
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
-        // cy.get('.q-pb-sm > .q-field > .q-field__inner > .q-field__control').type('testfunction')
-        // cy.contains('Save').click({force:true})
-        // cy.get('[title="Delete Function"]').click({force:true})
-        // cy.get('[data-test="confirm-button"]').click({ force: true }); 
         cy.loginwithadmin()
         cy.wait(2000) 
         deleteRole(role)
@@ -220,12 +201,13 @@ describe('Visit a specific link test', () => {
     });
 
 
-    it.only('Roles: give functions only UPDATE, LIST, ALL role', () => {
+    it('Roles: give functions UPDATE, LIST, ALL role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
       
 
-        const role = "admin1"
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
        setupRolesAndPermissions(role, [
             {
@@ -238,11 +220,8 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
         cy.get('[data-test="menu-link-/functions-item"]').click()
         cy.wait(3000)
         cy.contains('Create new function').click({force:true})
@@ -260,14 +239,18 @@ describe('Visit a specific link test', () => {
 
     it('Roles: give dashboard delete and create role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
 
        setupRolesAndPermissions(role, [
             {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
                 item: Entity.DASHBOARD_FOLDERS,
-                permissions: [Permission.CREATE, Permission.LIST, Permission.UPDATE]
+                permissions: [Permission.CREATE, Permission.LIST, Permission.UPDATE, Permission.DELETE]
             },
             {
                 item: Entity.ROLES,
@@ -278,11 +261,8 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
         cy.get('[data-test="menu-link-/dashboards-item"]').click()
        
         cy.wait(3000)
@@ -314,9 +294,10 @@ describe('Visit a specific link test', () => {
 
     it('Roles: give dashboard list role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+     
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
 
        setupRolesAndPermissions(role, [
             {
@@ -333,11 +314,8 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
         cy.get('[data-test="menu-link-/dashboards-item"]').click()
        
         cy.wait(3000)
@@ -367,7 +345,7 @@ describe('Visit a specific link test', () => {
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)
+        // deleteRole(role)
       
         
     });
@@ -375,9 +353,9 @@ describe('Visit a specific link test', () => {
 
     it('Roles: give dashboard list,create role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
-
-        const role = "admin1"
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
        setupRolesAndPermissions(role, [
             {
@@ -394,11 +372,8 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
         cy.get('[data-test="menu-link-/dashboards-item"]').click()
        
         cy.wait(3000)
@@ -428,15 +403,17 @@ describe('Visit a specific link test', () => {
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)   
+        // deleteRole(role)   
         
     });
 
     it('Roles: give dashboard list,create , delete dashboard role', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
+
 
        setupRolesAndPermissions(role, [
             {
@@ -453,11 +430,8 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
         cy.get('[data-test="menu-link-/dashboards-item"]').click()
        
         cy.wait(3000)
@@ -487,16 +461,17 @@ describe('Visit a specific link test', () => {
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('exist')
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)   
+        // deleteRole(role)   
         
     });
 
 
     it('Roles: give dashboard list,create, update dashboard', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
 
        setupRolesAndPermissions(role, [
             {
@@ -513,11 +488,9 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
+      
         cy.get('[data-test="menu-link-/dashboards-item"]').click()
        
         cy.wait(3000)
@@ -547,16 +520,18 @@ describe('Visit a specific link test', () => {
         cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('exist')
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)   
+        // deleteRole(role)   
         
     });
 
 
     it('Roles: give streams list and update streams permissions', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
+
 
        setupRolesAndPermissions(role, [
             {
@@ -573,11 +548,9 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
         cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
+    
         cy.get('[data-test="menu-link-/streams-item"]').click({force:true})
         cy.get('[title="Stream Detail"]').click({force:true})
         cy.get('tbody > :nth-child(2) > :nth-child(4)').click({force:true})
@@ -591,9 +564,10 @@ describe('Visit a specific link test', () => {
     // TODO: this testcase is failing run and check once bug fixed
     it('Roles: give only list streams permissions', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
 
-        const role = "admin1"
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
        setupRolesAndPermissions(role, [
             {
@@ -610,19 +584,18 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
-        cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
+        switchOrg()
         cy.wait(2000)
         cy.get('[data-test="menu-link-/streams-item"]').click({force:true})
-        cy.get('[title="Stream Detail"]').click({force:true})
-        cy.wait(2000)
-        cy.get('[data-test="schema-stream-job-field-bloom-key-checkbox"] > .q-checkbox__inner').click({force:true})
-        cy.get('[data-test="schema-update-settings-button"]').click({force:true})
-        cy.wait(300)
-        cy.get('.q-notification__message').contains('Stream settings updated').should('exist')
-        cy.wait(3000)
+        cy.wait(200)
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('exist')
+        // cy.get('[title="Stream Detail"]').click({force:true})
+        // cy.wait(2000)
+        // cy.get('[data-test="schema-stream-job-field-bloom-key-checkbox"] > .q-checkbox__inner').click({force:true})
+        // cy.get('[data-test="schema-update-settings-button"]').click({force:true})
+        // cy.wait(300)
+        // cy.get('.q-notification__message').contains('Stream settings updated').should('exist')
+        // cy.wait(3000)
         cy.loginwithadmin()
         deleteRole(role)   
         
@@ -630,9 +603,10 @@ describe('Visit a specific link test', () => {
 
     it('Roles: delete stream without permission', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
 
        setupRolesAndPermissions(role, [
             {
@@ -645,11 +619,9 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
         cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
+      
         cy.get('[data-test="menu-link-/streams-item"]').click({force:true})
         cy.get('[title="Delete"]').click({force:true})
         cy.get('.q-card__actions > .bg-primary').click({force:true})
@@ -658,16 +630,17 @@ describe('Visit a specific link test', () => {
         //  data-test="schema-stream-job-field-bloom-key-checkbox"] > .q-checkbox__inner').click({force:true})
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)   
+        // deleteRole(role)   
         
     });
 
 
     it('Roles: delete stream with GET permission', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
 
        setupRolesAndPermissions(role, [
             {
@@ -684,11 +657,9 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
         cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
+      
         cy.get('[data-test="menu-link-/streams-item"]').click({force:true})
         cy.get('[title="Delete"]:first').click({force:true})
         cy.get('.q-card__actions > .bg-primary').click({force:true})
@@ -697,15 +668,17 @@ describe('Visit a specific link test', () => {
         //  data-test="schema-stream-job-field-bloom-key-checkbox"] > .q-checkbox__inner').click({force:true})
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)   
+        // deleteRole(role)   
         
     });
 
     it.skip('Roles: delete stream with GET,ALL permission', () => {
         cy.get('[data-test="menu-link-/iam-item"]').click()
-        cy.intercept('GET', '**/api/team1/roles/**').as('allroles');
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
 
-        const role = "admin1"
+       
 
        setupRolesAndPermissions(role, [
             {
@@ -722,11 +695,9 @@ describe('Visit a specific link test', () => {
         cy.get('[data-test="edit-role-save-btn"]').click()
         cy.wait(2000)
         cy.loginwithuser()
+        switchOrg()
         cy.wait(2000)
-        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
-        cy.wait(2000)
-        cy.contains('team1').click({force:true})
-        cy.wait(2000)
+    
         cy.get('[data-test="menu-link-/streams-item"]').click({force:true})
         cy.get('[title="Delete"]:first').click({force:true})
         cy.get('.q-card__actions > .bg-primary').click({force:true})
@@ -735,9 +706,382 @@ describe('Visit a specific link test', () => {
         //  data-test="schema-stream-job-field-bloom-key-checkbox"] > .q-checkbox__inner').click({force:true})
         cy.wait(3000)
         cy.loginwithadmin()
-        deleteRole(role)   
+        // deleteRole(role)   
         
     });
+
+
+    it('Roles: give alerts  UPDATE, LIST, ALL role, user to get 403 for template creation', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+      
+
+
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.ALERTS,
+                permissions: [Permission.UPDATE, Permission.LIST,Permission.ALL]
+            },
+            
+        ])
+        cy.wait(2000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(2000)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(2000)
+      
+        templateCreation()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
+        cy.loginwithadmin()
+        cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+
+    it('Roles: give template UPDATE, LIST, ALL role', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+      
+
+
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.UPDATE, Permission.LIST,Permission.ALL]
+            },
+            
+        ])
+        cy.wait(2000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(2000)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(2000)
+     
+        templateCreation()
+        cy.get(".q-notification__message")
+        .contains("Template Saved Successfully")
+        .should("be.visible");
+        cy.get('tbody [data-test$="-delete-template"]').each(($button) => {
+            cy.wrap($button).click();
+            cy.get('[data-test="confirm-button"]').click({ force: true });
+          });
+      
+      
+        cy.loginwithadmin()
+        cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+    
+
+    it('Roles: give template  LIST', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+
+
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.LIST]
+            },
+            
+        ])
+        cy.wait(2000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(2000)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(2000)
+     
+        templateCreation()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
+        cy.loginwithadmin()
+        cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+    
+    it('Roles: give template  GET', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+      
+
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.GET]
+            },
+            
+        ])
+        cy.wait(2000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(2000)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(2000)
+        cy.get('.q-mx-sm > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native > span').click({force:true})
+        cy.wait(2000)
+        cy.contains('default').click({force:true})
+        cy.wait(2000)
+        templateCreation()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
+        cy.loginwithadmin()
+        cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+
+    it('Roles: give template  GET', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+      
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+    
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.ALL]
+            },
+            {
+                item: Entity.ALERTS,
+                permissions: [Permission.ALL]
+            },
+            {
+                item: Entity.DESTINATIONS,
+                permissions: [Permission.ALL]
+            }
+            
+        ])
+        cy.wait(3000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(200)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(4000)
+        cy.get('[data-test="menu-link-/alerts-item"]').click()
+        cy.wait(2000)
+        createAlert()
+        cy.loginwithadmin()
+        // cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+
+    it('Roles: give Destination LIST', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+      
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+    
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.ALL]
+            },
+            {
+                item: Entity.DESTINATIONS,
+                permissions: [Permission.LIST]
+            }
+            
+        ])
+        cy.wait(3000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(200)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(4000)
+        cy.get('[data-test="menu-link-/alerts-item"]').click()
+        cy.wait(2000)
+        createDestination()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
+        cy.get('[data-test="alert-templates-tab"]').click()
+        cy.get('[data-test="alert-template-list-automationalert-delete-template"]').click()
+        cy.get('[data-test="confirm-button"] > .q-btn__content').click()
+        cy.loginwithadmin()
+        cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+
+    it('Roles: give Destination GET', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+      
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+    
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.ALL]
+            },
+            {
+                item: Entity.DESTINATIONS,
+                permissions: [Permission.GET]
+            }
+            
+        ])
+        cy.wait(3000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(200)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(4000)
+        cy.get('[data-test="menu-link-/alerts-item"]').click()
+        cy.wait(2000)
+        createDestination()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
+        cy.get('[data-test="alert-templates-tab"]').click()
+        cy.get('[data-test="alert-template-list-automationalert-delete-template"]').click()
+        cy.get('[data-test="confirm-button"] > .q-btn__content').click()
+        cy.loginwithadmin()
+        cy.wait(2000) 
+        // deleteRole(role)
+        
+    });
+    
+    it('Roles: give Destination GET', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+      
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+    
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
+                item: Entity.TEMPLATES,
+                permissions: [Permission.ALL]
+            },
+            {
+                item: Entity.DESTINATIONS,
+                permissions: [Permission.UPDATE]
+            }
+            
+        ])
+        cy.wait(3000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(200)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(4000)
+        cy.get('[data-test="menu-link-/alerts-item"]').click()
+        cy.wait(2000)
+        createDestination()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('be.visible')
+        cy.get('[data-test="alert-templates-tab"]').click()
+        cy.get('[data-test="alert-template-list-automationalert-delete-template"]').click()
+        cy.get('[data-test="confirm-button"] > .q-btn__content').click()
+        cy.loginwithadmin()
+        cy.wait(2000)    
+        
+    });
+
+
+    it('Roles: give dashboard list,create, update dashboard', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+
+
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
+                item: Entity.DASHBOARD_FOLDERS,
+                permissions: [Permission.LIST]
+            }     
+        ])
+        cy.wait(2000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(2000)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(2000)
+      
+        cy.get('[data-test="menu-link-/dashboards-item"]').click()
+       
+        cy.wait(3000)
+        createFolder()
+        cy.get('.q-notifications__list--top.items-center >>>> .q-notification__message').contains('Unauthorized Access').should('exist')
+        cy.wait(3000)
+        cy.loginwithadmin()
+        // deleteRole(role)   
+        
+    });
+
+    it('Roles: give dashboard list,create, update dashboard', () => {
+        cy.get('[data-test="menu-link-/iam-item"]').click()
+        cy.intercept('GET', '**/api/default/roles/**').as('allroles');
+        const role = generateRandomRoleName(8);
+        cy.wait(4000);
+
+
+       setupRolesAndPermissions(role, [
+            {
+                item: Entity.STREAMS,
+                permissions: [Permission.LIST]
+            },
+            {
+                item: Entity.DASHBOARD_FOLDERS,
+                permissions: [Permission.LIST, Permission.CREATE, Permission.UPDATE, Permission.DELETE]
+            }     
+        ])
+        cy.wait(2000)
+        cy.get('[data-test="edit-role-save-btn"]').click()
+        cy.wait(2000)
+        cy.loginwithuser()
+        switchOrg()
+       cy.wait(2000)
+      
+        cy.get('[data-test="menu-link-/dashboards-item"]').click()
+       
+        cy.wait(3000)
+        createFolder()
+        // cy.wait("@folders");
+        cy.get('[data-test="dashboard-delete-folder-icon"]').each(($deleteIcon) => {
+        // Get the parent div and click the delete icon
+        cy.wrap($deleteIcon).parents('.q-tab').find('[data-test="dashboard-delete-folder-icon"]').click({ force: true });
+        cy.get('[data-test="confirm-button"]').click({ force: true });
+    });
+        cy.wait(3000)
+        cy.loginwithadmin()
+        // deleteRole(role)   
+        
+    });
+
+    
     
 
   });
