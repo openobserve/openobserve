@@ -97,21 +97,52 @@ pub async fn sql(
 
     let start = std::time::Instant::now();
     let session_id = session.id.clone();
-    let mut ctx = if !file_type.eq(&FileType::ARROW) {
-        register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?
+    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
+        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+    let (mut ctx, mut ctx_aggs) = if !file_type.eq(&FileType::ARROW) {
+        let ctx = register_table(
+            session,
+            schema.clone(),
+            "tbl",
+            files,
+            file_type.clone(),
+            without_optimizer,
+        )
+        .await?;
+        let mut ctx_aggs = None;
+        if without_optimizer {
+            ctx_aggs = Some(
+                register_table(
+                    session,
+                    schema.clone(),
+                    "tbl",
+                    files,
+                    file_type.clone(),
+                    false,
+                )
+                .await?,
+            );
+        };
+        (ctx, ctx_aggs)
     } else {
-        let ctx = prepare_datafusion_context(session.work_group.clone(), &session.search_type)?;
+        let ctx =
+            prepare_datafusion_context(session.work_group.clone(), &session.search_type, false)?;
 
         let record_batches = in_records_batches.unwrap();
         let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
 
         // Register the MemTable as a table in the DataFusion context
         ctx.register_table("tbl", mem_table)?;
-        ctx
+        (ctx, None)
     };
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
+    if let Some(ctx_aggs) = &mut ctx_aggs {
+        register_udf(ctx_aggs, &sql.org_id).await;
+    }
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
 
@@ -134,6 +165,11 @@ pub async fn sql(
     // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
 
+    let ctx_aggs = if let Some(ctx_aggs) = ctx_aggs {
+        ctx_aggs
+    } else {
+        ctx.clone()
+    };
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         if CONFIG.common.print_key_sql {
@@ -150,7 +186,7 @@ pub async fn sql(
             }
         }
 
-        let mut df = match ctx.sql(&agg_sql).await {
+        let mut df = match ctx_aggs.sql(&agg_sql).await {
             Ok(df) => df,
             Err(e) => {
                 log::error!(
@@ -197,6 +233,7 @@ pub async fn sql(
 
     // drop table
     ctx.deregister_table("tbl")?;
+    ctx_aggs.deregister_table("tbl")?;
     log::info!(
         "[session_id {session_id}] Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
@@ -220,7 +257,7 @@ async fn exec_query(
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
         fast_mode = true;
-        get_fast_mode_ctx(session, schema, sql, files, file_type).await?
+        get_fast_mode_ctx(session, schema, sql, files, file_type, true).await?
     } else {
         (ctx.clone(), schema.clone())
     };
@@ -631,6 +668,7 @@ async fn get_fast_mode_ctx(
     sql: &Arc<Sql>,
     files: &[FileKey],
     file_type: FileType,
+    without_optimizer: bool,
 ) -> Result<(SessionContext, Arc<Schema>)> {
     let mut files = files.to_vec();
     let desc = sql.meta.order_by.is_empty() || sql.meta.order_by[0].1;
@@ -657,8 +695,15 @@ async fn get_fast_mode_ctx(
         search_type: session.search_type.clone(),
         work_group: session.work_group.clone(),
     };
-    let mut ctx =
-        register_table(&fast_session, schema.clone(), "tbl", &new_files, file_type).await?;
+    let mut ctx = register_table(
+        &fast_session,
+        schema.clone(),
+        "tbl",
+        &new_files,
+        file_type,
+        without_optimizer,
+    )
+    .await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
@@ -729,7 +774,7 @@ pub async fn merge(
     }
 
     // query data
-    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal)?;
+    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, false)?;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -1060,7 +1105,7 @@ pub async fn convert_parquet_file(
 ) -> Result<()> {
     let start = std::time::Instant::now();
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal)?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, false)?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -1294,13 +1339,21 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
 pub fn prepare_datafusion_context(
     work_group: Option<String>,
     search_type: &SearchType,
+    without_optimizer: bool,
 ) -> Result<SessionContext, DataFusionError> {
     let session_config = create_session_config(search_type)?;
     let runtime_env = create_runtime_env(work_group)?;
-    let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
-        .with_optimizer_rules(vec![])
-        .with_analyzer_rules(vec![]);
-    Ok(SessionContext::new_with_state(state))
+    if without_optimizer {
+        let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
+            .with_optimizer_rules(vec![])
+            .with_analyzer_rules(vec![]);
+        Ok(SessionContext::new_with_state(state))
+    } else {
+        Ok(SessionContext::new_with_config_rt(
+            session_config,
+            Arc::new(runtime_env),
+        ))
+    }
 }
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
@@ -1325,8 +1378,13 @@ pub async fn register_table(
     table_name: &str,
     files: &[FileKey],
     file_type: FileType,
+    without_optimizer: bool,
 ) -> Result<SessionContext> {
-    let ctx = prepare_datafusion_context(session.work_group.clone(), &session.search_type)?;
+    let ctx = prepare_datafusion_context(
+        session.work_group.clone(),
+        &session.search_type,
+        without_optimizer,
+    )?;
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
