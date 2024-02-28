@@ -8,7 +8,6 @@
         :panelSchema="chartData"
         :selectedTimeObj="dashboardPanelData.meta.dateTime"
         :variablesData="{}"
-        :force-load="forceLoad"
       />
     </div>
   </div>
@@ -123,10 +122,6 @@ const props = defineProps({
     type: String,
     default: "",
   },
-  forceLoad: {
-    type: Boolean,
-    default: false,
-  }
 });
 
 onBeforeMount(() => {
