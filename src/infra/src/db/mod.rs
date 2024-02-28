@@ -26,6 +26,7 @@ use crate::errors::{DbError, Error, Result};
 pub mod dynamo;
 pub mod etcd;
 pub mod mysql;
+pub mod nats;
 pub mod postgres;
 pub mod sled;
 pub mod sqlite;
@@ -60,6 +61,7 @@ async fn default() -> Box<dyn Db> {
         MetaStore::Sled => Box::<sled::SledDb>::default(),
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
+        MetaStore::Nats => Box::<nats::Nats>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlDb>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),

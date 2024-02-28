@@ -42,7 +42,7 @@ use crate::{
 static ETCD_CLIENT: OnceCell<etcd_client::Client> = OnceCell::const_new();
 
 pub async fn get_etcd_client() -> &'static etcd_client::Client {
-    ETCD_CLIENT.get_or_init(connect_etcd).await
+    ETCD_CLIENT.get_or_init(connect).await
 }
 
 pub async fn init() {
@@ -323,9 +323,9 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect_etcd() -> etcd_client::Client {
+pub async fn connect() -> etcd_client::Client {
     if CONFIG.common.print_key_config {
-        log::info!("etcd init config: {:?}", CONFIG.etcd);
+        log::info!("Etcd init config: {:?}", CONFIG.etcd);
     }
 
     let mut opts = etcd_client::ConnectOptions::new()

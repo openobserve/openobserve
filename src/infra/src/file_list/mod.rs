@@ -40,6 +40,7 @@ pub fn connect() -> Box<dyn FileList> {
         MetaStore::Sled => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
+        MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoFileList>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),

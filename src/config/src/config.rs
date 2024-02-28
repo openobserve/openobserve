@@ -152,6 +152,7 @@ pub struct Config {
     pub disk_cache: DiskCache,
     pub log: Log,
     pub etcd: Etcd,
+    pub nats: Nats,
     pub sled: Sled,
     pub dynamo: Dynamo,
     pub s3: S3,
@@ -529,6 +530,14 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct Sled {
+    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
+    pub data_dir: String,
+    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
+    pub prefix: String,
+}
+
 #[derive(Debug, EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
@@ -561,12 +570,22 @@ pub struct Etcd {
     pub node_heartbeat_ttl: i64,
 }
 
-#[derive(EnvConfig)]
-pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
-    pub data_dir: String,
-    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
+#[derive(Debug, EnvConfig)]
+pub struct Nats {
+    #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
+    pub addr: String,
+    #[env_config(name = "ZO_NATS_PREFIX", default = "o2_")]
     pub prefix: String,
+    #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
+    pub connect_timeout: u64,
+    #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
+    pub command_timeout: u64,
+    #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
+    pub lock_wait_timeout: u64,
+    #[env_config(name = "ZO_NATS_LOAD_PAGE_SIZE", default = 1000)]
+    pub load_page_size: i64,
+    #[env_config(name = "ZO_NATS_NODE_HEARTBEAT_TTL", default = 30)]
+    pub node_heartbeat_ttl: i64,
 }
 
 #[derive(EnvConfig)]
