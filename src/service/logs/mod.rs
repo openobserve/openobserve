@@ -28,16 +28,17 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 
-use super::ingestion::{get_string_value, TriggerAlertData};
+use super::{
+    ingestion::{get_string_value, TriggerAlertData},
+    schema::check_for_schema_impl,
+};
 use crate::{
     common::meta::{
         alerts::Alert,
         ingestion::RecordStatus,
         stream::{SchemaRecords, StreamPartition},
     },
-    service::{
-        ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
-    },
+    service::{ingestion::get_wal_time_key, stream::unwrap_partition_time_level},
 };
 
 pub mod bulk;
@@ -170,7 +171,7 @@ async fn add_valid_record(
     let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Logs).unwrap();
 
     // check schema
-    let schema_evolution = check_for_schema(
+    let schema_evolution = check_for_schema_impl(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,

@@ -25,7 +25,7 @@ use config::{
         usage::UsageType,
     },
     metrics,
-    utils::{flatten, json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
+    utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG, DISTINCT_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -301,18 +301,13 @@ pub async fn handle_trace_request(
                     }
                 }
 
-                // get infer schema
-                let value_iter = [record_val.clone()].into_iter();
-                let infer_schema =
-                    infer_json_schema_from_map(value_iter, StreamType::Traces).unwrap();
-
                 // check schema
                 let _ = check_for_schema(
                     org_id,
                     &traces_stream_name,
                     StreamType::Traces,
                     &mut traces_schema_map,
-                    &infer_schema,
+                    &record_val,
                     timestamp.try_into().unwrap(),
                 )
                 .await;

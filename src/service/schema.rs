@@ -23,7 +23,11 @@ use std::{
 use anyhow::Result;
 use config::{
     meta::stream::StreamType,
-    utils::{json, schema::infer_json_schema, schema_ext::SchemaExt},
+    utils::{
+        json,
+        schema::{infer_json_schema, infer_json_schema_from_map},
+        schema_ext::SchemaExt,
+    },
     CONFIG,
 };
 use datafusion::arrow::{
@@ -32,6 +36,7 @@ use datafusion::arrow::{
 };
 use infra::db::etcd;
 use itertools::Itertools;
+use serde_json::{Map, Value};
 
 use crate::{
     common::{
@@ -278,6 +283,29 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
 }
 
 pub async fn check_for_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_schema_map: &mut HashMap<String, Schema>,
+    record_val: &Map<String, Value>,
+    record_ts: i64,
+) -> Result<SchemaEvolution> {
+    // get infer schema
+    let value_iter = [record_val].into_iter();
+    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
+
+    check_for_schema_impl(
+        org_id,
+        stream_name,
+        stream_type,
+        stream_schema_map,
+        &inferred_schema,
+        record_ts,
+    )
+    .await
+}
+
+pub async fn check_for_schema_impl(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -777,7 +805,6 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
-    use config::utils::schema::infer_json_schema_from_map;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use super::*;
@@ -827,14 +854,12 @@ mod tests {
         ]);
         let mut map: HashMap<String, Schema> = HashMap::new();
         map.insert(stream_name.to_string(), schema);
-        let record = [record.as_object().unwrap()].into_iter();
-        let infer_schema = infer_json_schema_from_map(record, StreamType::Logs).unwrap();
         let result = check_for_schema(
             org_name,
             stream_name,
             StreamType::Logs,
             &mut map,
-            &infer_schema,
+            record.as_object().unwrap(),
             1234234234234,
         )
         .await

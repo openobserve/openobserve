@@ -22,7 +22,7 @@ use config::{
     cluster,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{flatten, json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
+    utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -380,11 +380,6 @@ pub async fn metrics_json_handler(
 
                         let value_str = json::to_string(&val_map).unwrap();
 
-                        // get infer schema
-                        let value_iter = [val_map.clone()].into_iter();
-                        let infer_schema =
-                            infer_json_schema_from_map(value_iter, StreamType::Metrics).unwrap();
-
                         // check for schema evolution
                         if schema_evolved.get(local_metric_name).is_none()
                             && check_for_schema(
@@ -392,7 +387,7 @@ pub async fn metrics_json_handler(
                                 local_metric_name,
                                 StreamType::Metrics,
                                 &mut metric_schema_map,
-                                &infer_schema,
+                                val_map,
                                 timestamp,
                             )
                             .await

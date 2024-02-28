@@ -21,12 +21,7 @@ use config::{
     cluster,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{
-        flatten, json,
-        schema::{infer_json_schema, infer_json_schema_from_map},
-        schema_ext::SchemaExt,
-        time,
-    },
+    utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
     CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -220,17 +215,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_schema_map.insert(stream_name.clone(), schema);
         }
 
-        // get infer schema
-        let value_iter = [record.clone()].into_iter();
-        let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Metrics).unwrap();
-
         // check for schema evolution
         let _ = check_for_schema(
             org_id,
             &stream_name,
             StreamType::Metrics,
             &mut stream_schema_map,
-            &infer_schema,
+            record,
             timestamp,
         )
         .await;
