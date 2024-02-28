@@ -580,7 +580,7 @@ export default defineComponent({
         },
       });
       useLocalOrganization(selectedOrg.value);
-      // store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+      store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
 
       // if (
       //   config.isCloud &&
