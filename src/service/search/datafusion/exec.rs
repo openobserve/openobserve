@@ -36,7 +36,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     execution::{
-        context::SessionConfig,
+        context::{SessionConfig, SessionState},
         memory_pool::{FairSpillPool, GreedyMemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
@@ -1311,10 +1311,10 @@ pub fn prepare_datafusion_context(
 ) -> Result<SessionContext, DataFusionError> {
     let session_config = create_session_config(search_type)?;
     let runtime_env = create_runtime_env(work_group)?;
-    Ok(SessionContext::new_with_config_rt(
-        session_config,
-        Arc::new(runtime_env),
-    ))
+    let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
+        .with_optimizer_rules(vec![])
+        .with_analyzer_rules(vec![]);
+    Ok(SessionContext::new_with_state(state))
 }
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
