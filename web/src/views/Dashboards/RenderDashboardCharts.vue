@@ -18,10 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
-    <!-- v-if="isDashboardVariablesAndPanelsDataLoading" -->
-    <span id="isAllDashboardPanelsLoaded" style="display: none">{{
-      JSON.stringify(isDashboardVariablesAndPanelsDataLoading)
-    }}</span>
+    <span
+      v-if="isDashboardVariablesAndPanelsDataLoadingDebouncedValue"
+      id="dashboardVariablesAndPanelsDataLoaded"
+      style="display: none"
+    >
+    </span>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -225,7 +227,7 @@ export default defineComponent({
         variablesDataValues.every((value) => value === false) &&
         panelsValues.every((value) => value === false);
       console.log(
-        "result",
+        "isDashboardVariablesAndPanelsDataLoading: result: ",
         JSON.stringify(variablesAndPanelsDataLoadingState),
         result
       );
@@ -233,10 +235,11 @@ export default defineComponent({
     });
 
     // Create debouncer
-    const { value, setImmediate, setDebounce } = useDebouncer(
-      isDashboardVariablesAndPanelsDataLoading.value,
-      3000
-    );
+    const {
+      value: isDashboardVariablesAndPanelsDataLoadingDebouncedValue,
+      setImmediate,
+      setDebounce,
+    } = useDebouncer(false, 10);
 
     // Watch for changes in the computed property and update the debouncer accordingly
     watch(isDashboardVariablesAndPanelsDataLoading, (newValue) => {
@@ -254,19 +257,22 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
+      console.log("variables data updated!@!!!!");
       try {
         Object.assign(variablesData, data);
         emit("variablesData", variablesData);
 
         // update the loading state
-        variablesAndPanelsDataLoadingState.variablesData =
-          variablesData?.values?.reduce(
-            (obj: any, item: any) => ({
-              ...obj,
-              [item.name]: item.isLoading,
-            }),
-            {}
-          );
+        if (variablesAndPanelsDataLoadingState) {
+          variablesAndPanelsDataLoadingState.variablesData =
+            variablesData?.values?.reduce(
+              (obj: any, item: any) => ({
+                ...obj,
+                [item.name]: item.isLoading,
+              }),
+              {}
+            );
+        }
       } catch (error) {
         console.log(error, "error--");
       }
@@ -474,7 +480,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
-      isDashboardVariablesAndPanelsDataLoading,
+      isDashboardVariablesAndPanelsDataLoadingDebouncedValue,
     };
   },
   methods: {

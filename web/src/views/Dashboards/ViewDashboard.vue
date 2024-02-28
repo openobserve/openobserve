@@ -296,8 +296,8 @@ export default defineComponent({
     });
     // ======= [END] default variable values
 
-    onActivated(async () => {
-      await loadDashboard();
+    onActivated(() => {
+      loadDashboard();
     });
 
     const loadDashboard = async () => {

@@ -25,12 +25,14 @@ export const useDebouncer = (initialValue: any, delay: any) => {
     if (timeout) {
       clearTimeout(timeout);
     }
-  }
+  };
 
   watch(value, () => {
-    console.log('isDashboardVariablesAndPanelsDataLoading: useDebouncer: ', value.value)
-  })
-
+    console.log(
+      "isDashboardVariablesAndPanelsDataLoading: useDebouncer: ",
+      value.value
+    );
+  });
 
   /**
    * Set the value with debounce
@@ -47,14 +49,16 @@ export const useDebouncer = (initialValue: any, delay: any) => {
   };
 
   onDeactivated(() => {
-    console.log("onUnmounted", value.value);
+    console.log("onDeactivated", value.value);
 
     resetTimeout();
   });
 
   onUnmounted(() => {
+    console.log("onUnmounted", value.value);
+
     resetTimeout();
-  })
+  });
 
   return { value, setImmediate, setDebounce };
 };

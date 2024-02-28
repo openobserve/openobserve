@@ -238,10 +238,13 @@ export default defineComponent({
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(loading, (newLoading) => {
-      variablesAndPanelsDataLoadingState.panels = {
-        ...variablesAndPanelsDataLoadingState.panels,
-        [panelSchema.value.id]: newLoading,
-      };
+      if(variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState.panels,
+          [panelSchema.value.id]: newLoading,
+        };
+      }
+
       // console.log("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState.panels);
     });
 
