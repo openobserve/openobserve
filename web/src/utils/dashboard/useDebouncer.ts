@@ -1,38 +1,47 @@
-import { ref, watch, onUnmounted } from 'vue';
+import { ref, onUnmounted } from "vue";
 
-export const useDebouncer = (dependency: any, delay = 300) => {
-  const value = ref(dependency.value);
-  let timeoutId: any = null;
+/**
+ * Custom hook to debounce a value
+ * @param {any} initialValue - The initial value to debounce
+ * @param {number} delay - The delay in milliseconds for debouncing
+ * @returns {Object} - Object containing the debounced value and methods to set the value immediately or with debounce
+ */
+export const useDebouncer = (initialValue: any, delay: any) => {
+  const value = ref(initialValue.value);
+  let timeout: any = null;
 
-  const clearTimer = () => {
-    clearTimeout(timeoutId);
+  /**
+   * Set the value immediately without any delay
+   * @param {any} newValue - The new value to set immediately
+   */
+  const setImmediate = (newValue: any) => {
+    clearTimeout(timeout);
+    console.log("setImmediate", newValue);
+
+    value.value = newValue;
   };
 
-//   watch(dependency, () => {
-//     clearTimer();
-//     if (setImmediateValue) {
-//       value.value = dependency.value;
-//     } else {
-//       timeoutId = setTimeout(() => {
-//         value.value(dependency.value);
-//       }, delay);
-//     }
-//   });
+  clearTimeout(timeout);
 
-  const setImmediateValue = (newValue: any) => {
-    value.value = newValue;
-  }
+  /**
+   * Set the value with debounce
+   * @param {any} newValue - The new value to set with debounce
+   */
+  const setDebounce = (newValue: any) => {
+    clearTimeout(timeout);
+    console.log("setDebounce", newValue);
 
-  const setDebounceValue = (newValue: any) => {
-    clearTimer();
-    timeoutId = setTimeout(() => {
-        value.value(dependency.value);
-      }, delay);
-  }
+    timeout = setTimeout(() => {
+      value.value = newValue;
+    }, delay);
+    console.log("timeout", timeout);
+  };
 
   onUnmounted(() => {
-    clearTimer();
+    console.log("onUnmounted", value.value);
+
+    clearTimeout(timeout);
   });
 
-  return { value, setImmediateValue, setDebounceValue };
-}
+  return { value, setImmediate, setDebounce };
+};

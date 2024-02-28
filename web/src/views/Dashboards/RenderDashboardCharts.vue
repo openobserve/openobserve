@@ -128,6 +128,7 @@ import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
+import { useDebouncer } from "../../utils/dashboard/useDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
@@ -157,6 +158,7 @@ export default defineComponent({
     forceLoad: {
       type: Boolean,
       default: false,
+      required: false,
     },
   },
 
@@ -249,6 +251,36 @@ export default defineComponent({
         result
       );
       return result;
+    });
+
+    // Create debouncer
+    const { value, setImmediate, setDebounce } = useDebouncer(
+      isDashboardVariablesAndPanelsDataLoading,
+      1000
+    );
+
+    // Watch for changes in the computed property and update the debouncer accordingly
+    watch(isDashboardVariablesAndPanelsDataLoading, (newValue) => {
+      let value = newValue;
+      if (isDashboardVariablesAndPanelsDataLoading.value === false) {
+        console.log(
+          "isDashboardVariablesAndPanelsDataLoading setImmediate",
+          newValue
+        );
+
+        setImmediate(newValue);
+      } else {
+        console.log(
+          "isDashboardVariablesAndPanelsDataLoading setDebounce",
+          newValue
+        );
+
+        setDebounce(newValue);
+        console.log(
+          "isDashboardVariablesAndPanelsDataLoading after setDebounce",
+          newValue
+        );
+      }
     });
 
     const hoveredSeriesState = ref({
@@ -419,7 +451,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
-      isDashboardVariablesAndPanelsDataLoading
+      isDashboardVariablesAndPanelsDataLoading,
     };
   },
   methods: {
