@@ -367,7 +367,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         }
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id))
+            .app_data(web::Data::new(local_id%10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
