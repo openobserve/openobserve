@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #top="scope">
           <div class="q-table__title" data-test="report-list-title">
-            {{ t("alerts.header") }}
+            {{ t("reports.header") }}
           </div>
           <q-input
             data-test="report-list-search-input"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alerts.search')"
+            :placeholder="t('reports.search')"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <QTablePagination
             :scope="scope"
-            :pageTitle="t('alerts.header')"
+            :pageTitle="t('reports.header')"
             :position="'top'"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
@@ -182,9 +182,16 @@ import {
 import type { QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
-const reportsTableRows = ref([]);
+const reportsTableRows = ref([
+  {
+    "#": 1,
+    name: "report1",
+  },
+]);
 
 const { t } = useI18n();
+
+const router = useRouter();
 
 const confirmDelete = ref(false);
 
@@ -224,34 +231,6 @@ const columns: any = ref<QTableProps["columns"]>([
     sortable: true,
   },
   {
-    name: "alert_type",
-    field: "alert_type",
-    label: t("alerts.alertType"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "stream_type",
-    field: "stream_type",
-    label: t("alerts.streamType"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "stream_name",
-    field: "stream_name",
-    label: t("alerts.stream_name"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "conditions",
-    field: "conditions",
-    label: t("alerts.condition"),
-    align: "left",
-    sortable: false,
-  },
-  {
     name: "description",
     field: "description",
     label: t("alerts.description"),
@@ -263,6 +242,7 @@ const columns: any = ref<QTableProps["columns"]>([
     field: "actions",
     label: t("alerts.actions"),
     align: "center",
+    style: "width: 300px",
     sortable: false,
   },
 ]);
@@ -290,7 +270,9 @@ const editReport = () => {};
 
 const deleteReport = () => {};
 
-const createNewReport = () => {};
+const createNewReport = () => {
+  router.push({ name: "createReport" });
+};
 </script>
 
 <style scoped></style>
