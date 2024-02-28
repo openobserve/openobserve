@@ -254,10 +254,15 @@ async fn exec_query(
     let start = std::time::Instant::now();
     let session_id = session.id.clone();
 
+    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
+        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
         fast_mode = true;
-        get_fast_mode_ctx(session, schema, sql, files, file_type, true).await?
+        get_fast_mode_ctx(session, schema, sql, files, file_type, without_optimizer).await?
     } else {
         (ctx.clone(), schema.clone())
     };
@@ -746,6 +751,11 @@ pub async fn merge(
         return Ok(vec![]);
     }
 
+    let select_wildcard = sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
+        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+
     // rewrite sql
     let mut query_sql = match merge_rewrite_sql(sql, schema) {
         Ok(sql) => {
@@ -774,7 +784,7 @@ pub async fn merge(
     }
 
     // query data
-    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, false)?;
+    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -1105,8 +1115,19 @@ pub async fn convert_parquet_file(
     file_type: FileType,
 ) -> Result<()> {
     let start = std::time::Instant::now();
+
+    let query_sql = format!(
+        "SELECT * FROM tbl ORDER BY {} DESC",
+        CONFIG.common.column_timestamp
+    );
+
+    let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
+        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal, false)?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -1146,10 +1167,6 @@ pub async fn convert_parquet_file(
     ctx.register_table("tbl", Arc::new(table))?;
 
     // get all sorted data
-    let query_sql = format!(
-        "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.column_timestamp
-    );
     let mut df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
         Err(e) => {
