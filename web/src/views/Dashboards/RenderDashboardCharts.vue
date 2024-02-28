@@ -283,6 +283,40 @@ export default defineComponent({
       }
     });
 
+    // const isDashboardVariablesAndPanelsDataLoading = ref(false);
+
+    // const delayTimeout = [];
+
+    // const checkLoadingStatus = () => {
+    //   const variablesDataValues = Object.values(
+    //     variablesAndPanelsDataLoadingState.variablesData
+    //   );
+    //   const panelsValues = Object.values(
+    //     variablesAndPanelsDataLoadingState.panels
+    //   );
+
+    //   const result =
+    //     variablesDataValues.every((value) => value === false) &&
+    //     panelsValues.every((value) => value === false);
+
+    //   if (result) {
+    //     // return true after 1 second delay
+    //     delayTimeout.push(
+    //       setTimeout(() => {
+    //         isDashboardVariablesAndPanelsDataLoading.value = true;
+    //       }, 1000)
+    //     );
+    //   } else {
+    //     // If the previous result was true, clear the delay and set isDashboardVariablesAndPanelsDataLoading to false
+    //     isDashboardVariablesAndPanelsDataLoading.value = false;
+    //     delayTimeout.forEach((timeout) => clearTimeout(timeout));
+    //   }
+    // };
+
+    // watch(variablesAndPanelsDataLoadingState, checkLoadingStatus, {
+    //   deep: true,
+    // });
+
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
       panelId: -1,

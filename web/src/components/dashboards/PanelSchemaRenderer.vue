@@ -231,7 +231,10 @@ export default defineComponent({
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
     //inject variablesAndPanelsDataLoadingState from parent
-    const variablesAndPanelsDataLoadingState: any = inject("variablesAndPanelsDataLoadingState");
+    const variablesAndPanelsDataLoadingState: any = inject(
+      "variablesAndPanelsDataLoadingState",
+      { panels: {}, variablesData: {} }
+    );
 
     // when we get the new data from the apis, convert the data to render the panel
     watch(loading, (newLoading) => {
@@ -241,7 +244,7 @@ export default defineComponent({
       };
       // console.log("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState.panels);
     });
-  
+
     watch(
       [data, store?.state],
       async () => {
