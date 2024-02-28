@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
-                          :forceLoad="forceLoad"
                         />
                         <q-dialog v-model="showViewPanel">
                           <QueryInspector
@@ -325,7 +324,7 @@ import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdow
 
 export default defineComponent({
   name: "AddPanel",
-  props: ["metaData", "forceLoad"],
+  props: ["metaData"],
 
   components: {
     ChartSelection,
