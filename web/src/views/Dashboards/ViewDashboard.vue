@@ -28,8 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
         } stickyHeader ${
-          isFullscreen ? 'fullscreenHeader' : ''
-        } hideOnPrintMode`"
+          isFullscreen || store.state.printMode === true
+            ? 'fullscreenHeader'
+            : ''
+        }`"
       >
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
