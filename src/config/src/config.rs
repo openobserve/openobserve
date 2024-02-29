@@ -432,6 +432,12 @@ pub struct Common {
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,
+    #[env_config(
+        name = "ZO_ENABLE_INVERTED_INDEX",
+        default = false,
+        help = "Toggle inverted index generation."
+    )]
+    pub inverted_index_enabled: bool,
 }
 
 #[derive(EnvConfig)]

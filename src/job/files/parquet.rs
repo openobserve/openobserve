@@ -386,15 +386,17 @@ async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            generate_index_on_ingester(
-                buf,
-                new_file_key.clone(),
-                min_ts,
-                &org_id,
-                &stream_name,
-                new_file_schema,
-            )
-            .await?;
+            if CONFIG.common.inverted_index_enabled {
+                generate_index_on_ingester(
+                    buf,
+                    new_file_key.clone(),
+                    min_ts,
+                    &org_id,
+                    &stream_name,
+                    new_file_schema,
+                )
+                .await?;
+            }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
         Err(e) => Err(e),
