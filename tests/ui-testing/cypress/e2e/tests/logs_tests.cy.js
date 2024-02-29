@@ -1148,14 +1148,20 @@ describe("Logs testcases", () => {
     }).should("exist");
   });
 
-  it.skip("should change stream settings and click on search stream", () => {
+
+
+  // run tests from here on CICD
+  it.only("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type('e2e_automate')
     cy.get('[title="Stream Detail"]').click({ force: true });
-    cy.get(
-      '[data-test="schema-stream-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]'
-    ).click({ force: true });
+    cy.get(':nth-child(2) > [data-test="schema-stream-index-select"]').click()
+    cy.get('.q-virtual-scroll__content').within(() => {
+      cy.contains('Inverted Index').click()
+    })
+   
     cy.get('[data-test="schema-update-settings-button"]').click({
       force: true,
     });
@@ -1163,4 +1169,114 @@ describe("Logs testcases", () => {
     cy.get('[title="Explore"]').click({ force: true });
     cy.get('[data-test="log-table-column-0-@timestamp"]').should("exist");
   });
+
+
+  it.only("should display error if blank spaces added under stream name and clicked create stream ", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type('  ')
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.contains('Field is required').should('exist')
+    
+ 
+  });
+
+  it.only("should display error if create stream is clicked without adding name", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.contains('Field is required').should('exist')
+  });
+  
+  it.only("should create stream with logs stream type", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type('stream1')
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Logs').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+
+  it.only("should display error user creates stream with same name and stream type" , () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    logstests.logsStreamSelection();
+    cy.wait(2000)
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });;
+    logstests.logsStreamSelection();
+    cy.wait(200)
+    cy.get('.q-notification__message').contains('Stream "stream1" of type "logs" is already present.')
+    cy.get('[data-test="add-stream-cancel-btn"]').click()
+
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+
+  it.only("should create stream with metrics stream type and delete", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type('stream1')
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Metrics').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+
+  it.only("should create stream with metrics stream type and delete", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type('stream1')
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Traces').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+
+
+  it.only("should create a stream with a field", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type('stream1')
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Logs').click()
+    })
+    cy.get('[data-test="add-stream-add-field-btn"]').click()
+    cy.get('[data-test="add-stream-field-name-input"] > .q-field > .q-field__inner > .q-field__control').type('field1')
+    cy.get('[data-test="add-stream-field-type-select-input"] > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click()
+    cy.get('.q-virtual-scroll__content').within(() => {
+      cy.contains('Inverted Index').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+  
+ 
+
+
 });

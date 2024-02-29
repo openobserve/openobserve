@@ -278,3 +278,14 @@ export function deleteCreatedFunction() {
 export function confirmFunctionDeleteButton() {
   cy.get(function_delete_confirm,{timeout:2000}).click({ force: true });
 }
+
+
+export function logsStreamSelection() {
+  cy.get('[data-test="add-stream-name-input"]').type('stream1')
+  cy.get('[data-test="add-stream-type-input"]').click()
+  cy.get('.q-menu').within(() => {
+    // Use cy.contains() to find the option with the label "Logs" and click it
+    cy.contains('Logs').click()
+  })
+  cy.get('[data-test="save-stream-btn"]').click({ force: true })
+}
