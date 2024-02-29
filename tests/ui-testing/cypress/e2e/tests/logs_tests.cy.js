@@ -1231,7 +1231,7 @@ describe("Logs testcases", () => {
       cy.contains('Metrics').click()
     })
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
-    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1metrics')
     cy.wait(300)
     cy.get('[title="Delete"]').click()
     cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
@@ -1248,7 +1248,7 @@ describe("Logs testcases", () => {
       cy.contains('Traces').click()
     })
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
-    cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.get('[data-test="streams-search-stream-input"]').type('stream1traces')
     cy.wait(300)
     cy.get('[title="Delete"]').click()
     cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
@@ -1259,7 +1259,7 @@ describe("Logs testcases", () => {
   it.only("should create a stream with a field", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
-    cy.get('[data-test="add-stream-name-input"]').type('stream1')
+    cy.get('[data-test="add-stream-name-input"]').type('stream1logs')
     cy.get('[data-test="add-stream-type-input"]').click()
     cy.get('.q-menu').within(() => {
       // Use cy.contains() to find the option with the label "Logs" and click it
