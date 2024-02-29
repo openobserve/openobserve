@@ -533,12 +533,6 @@ export const timestampToTimezoneDate = (
   timezone: string = "UTC",
   format: string = "yyyy-MM-dd HH:mm:ss.SSS"
 ) => {
-  console.log(
-    unixMilliTimestamp,
-    DateTime.fromMillis(Math.floor(unixMilliTimestamp))
-      .setZone(timezone)
-      .toUTC()
-  );
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
     .toFormat(format);

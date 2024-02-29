@@ -102,128 +102,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="outlinedDashboard"
               :done="step > 1"
             >
-              <div class="q-my-sm q-px-sm flex items-center justify-start">
-                <div
-                  data-test="add-report-dashboard-select"
-                  class="o2-input q-mr-sm"
-                  style="padding-top: 0; width: 30%"
-                >
-                  <q-select
-                    v-model="formData.selected_dashboard.folder_id"
-                    :options="folderOptions"
-                    :label="t('reports.dashboardFolder') + ' *'"
-                    :loading="isFetchingFolders"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="q-py-sm showLabelOnTop no-case"
-                    filled
-                    stack-label
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input
-                    :input-debounce="400"
-                    @update:model-value="
-                      onFolderSelection(formData.selected_dashboard.folder_id)
-                    "
-                    behavior="menu"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    style="min-width: 250px !important; width: 100% !important"
-                  />
-                </div>
-                <div
-                  data-test="add-alert-stream-select"
-                  class="o2-input q-mr-sm"
-                  style="padding-top: 0; width: 30%"
-                >
-                  <q-select
-                    v-model="formData.selected_dashboard.dashboard_id"
-                    :options="dashboardOptions"
-                    :label="t('reports.dashboard') + ' *'"
-                    :loading="isFetchingDashboard"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="q-py-sm showLabelOnTop no-case"
-                    filled
-                    stack-label
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input
-                    :input-debounce="400"
-                    @update:model-value="
-                      onDashboardSelection(
-                        formData.selected_dashboard.dashboard_id
-                      )
-                    "
-                    behavior="menu"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    style="min-width: 250px !important; width: 100% !important"
-                  />
-                </div>
-                <div
-                  data-test="add-alert-stream-select"
-                  class="o2-input"
-                  style="padding-top: 0; width: 30%"
-                >
-                  <q-select
-                    v-model="formData.selected_dashboard.tab_id"
-                    :options="dashboardTabOptions"
-                    :label="t('reports.dashboardTab') + ' *'"
-                    :loading="isFetchingDashboard"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="q-py-sm showLabelOnTop no-case"
-                    filled
-                    stack-label
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input
-                    :input-debounce="400"
-                    behavior="menu"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    style="min-width: 250px !important; width: 100% !important"
-                  />
-                </div>
+              <template
+                v-for="dashboard in formData.dashboards"
+                :key="dashboard.folder + dashboard.dashboard"
+              >
+                <div class="q-my-sm q-px-sm flex items-center justify-start">
+                  <div
+                    data-test="add-report-dashboard-select"
+                    class="o2-input q-mr-sm"
+                    style="padding-top: 0; width: 30%"
+                  >
+                    <q-select
+                      v-model="dashboard.folder"
+                      :options="folderOptions"
+                      :label="t('reports.dashboardFolder') + ' *'"
+                      :loading="isFetchingFolders"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      filled
+                      stack-label
+                      map-options
+                      dense
+                      emit-value
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      @update:model-value="onFolderSelection(dashboard.folder)"
+                      behavior="menu"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      style="
+                        min-width: 250px !important;
+                        width: 100% !important;
+                      "
+                    />
+                  </div>
+                  <div
+                    data-test="add-alert-stream-select"
+                    class="o2-input q-mr-sm"
+                    style="padding-top: 0; width: 30%"
+                  >
+                    <q-select
+                      v-model="dashboard.dashboard"
+                      :options="dashboardOptions"
+                      :label="t('reports.dashboard') + ' *'"
+                      :loading="isFetchingDashboard || isFetchingFolders"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      filled
+                      map-options
+                      stack-label
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      @update:model-value="
+                        onDashboardSelection(dashboard.dashboard)
+                      "
+                      behavior="menu"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      style="
+                        min-width: 250px !important;
+                        width: 100% !important;
+                      "
+                    />
+                  </div>
+                  <div
+                    data-test="add-alert-stream-select"
+                    class="o2-input"
+                    style="padding-top: 0; width: 30%"
+                  >
+                    <q-select
+                      v-model="dashboard.tabs"
+                      :options="dashboardTabOptions"
+                      :label="t('reports.dashboardTab') + ' *'"
+                      :loading="isFetchingDashboard || isFetchingFolders"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="q-py-sm showLabelOnTop no-case"
+                      filled
+                      emit-value
+                      map-options
+                      stack-label
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      behavior="menu"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      style="
+                        min-width: 250px !important;
+                        width: 100% !important;
+                      "
+                    />
+                  </div>
 
-                <div class="full-width q-mt-sm">
-                  <div class="q-mb-sm">
+                  <div class="full-width q-mt-sm">
+                    <div class="q-mb-sm">
+                      <div
+                        style="font-size: 14px"
+                        class="text-bold text-grey-8"
+                      >
+                        Time Range*
+                      </div>
+                      <div style="font-size: 12px">
+                        Generates report with the data from specified time range
+                      </div>
+                    </div>
+                    <DateTime
+                      auto-apply
+                      :default-type="dashboard.timerange.type"
+                      :default-absolute-time="{
+                        startTime: dashboard.timerange.from,
+                        endTime: dashboard.timerange.to,
+                      }"
+                      :default-relative-time="dashboard.timerange.period"
+                      data-test="logs-search-bar-date-time-dropdown"
+                      @on:date-change="updateDateTime"
+                    />
+                  </div>
+
+                  <div class="full-width q-mt-md o2-input">
                     <div style="font-size: 14px" class="text-bold text-grey-8">
-                      Time Range*
+                      Variables
                     </div>
-                    <div style="font-size: 12px">
-                      Generates report with the data from specified time range
-                    </div>
+                    <VariablesInput
+                      :variables="dashboard.variables"
+                      @add:variable="addDashboardVariable"
+                      @remove:variable="removeDashboardVariable"
+                    />
                   </div>
-                  <DateTime
-                    auto-apply
-                    :default-type="formData.time_range.type"
-                    :default-absolute-time="{
-                      startTime: formData.time_range.from,
-                      endTime: formData.time_range.to,
-                    }"
-                    :default-relative-time="formData.time_range.period"
-                    data-test="logs-search-bar-date-time-dropdown"
-                    @on:date-change="updateDateTime"
-                  />
                 </div>
-
-                <div class="full-width q-mt-md o2-input">
-                  <div style="font-size: 14px" class="text-bold text-grey-8">
-                    Variables
-                  </div>
-                  <VariablesInput
-                    :variables="formData.selected_dashboard.variables"
-                    @add:variable="addDashboardVariable"
-                    @remove:variable="removeDashboardVariable"
-                  />
-                </div>
-              </div>
-
+              </template>
               <q-stepper-navigation>
                 <q-btn
                   @click="step = 2"
@@ -317,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-input
                       filled
-                      v-model="formData.custom_frequency.every"
+                      v-model="formData.custom_frequency.interval"
                       label="Repeat every"
                       color="input-border"
                       bg-color="input-bg"
@@ -361,11 +378,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="o2-input q-mr-sm">
                     <q-input
                       filled
-                      v-model="formData.scheduling.date"
+                      v-model="scheduling.date"
                       label="Start Date"
                       color="input-border"
                       bg-color="input-bg"
                       class="showLabelOnTop"
+                      :rules="[
+                        (val) =>
+                          /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
+                            val
+                          ) || 'Date format is incorrect!',
+                      ]"
                       stack-label
                       outlined
                       dense
@@ -378,10 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             transition-show="scale"
                             transition-hide="scale"
                           >
-                            <q-date
-                              v-model="formData.scheduling.date"
-                              mask="YYYY-MM-DD"
-                            >
+                            <q-date v-model="scheduling.date" mask="DD-MM-YYYY">
                               <div class="row items-center justify-end">
                                 <q-btn
                                   v-close-popup
@@ -399,11 +419,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="o2-input q-mr-sm">
                     <q-input
                       filled
-                      v-model="formData.scheduling.time"
-                      label="Start Date"
+                      v-model="scheduling.time"
+                      label="Start Time"
                       color="input-border"
                       bg-color="input-bg"
                       class="showLabelOnTop"
+                      mask="time"
+                      :rules="['time']"
                       stack-label
                       outlined
                       dense
@@ -416,10 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             transition-show="scale"
                             transition-hide="scale"
                           >
-                            <q-time
-                              v-model="formData.scheduling.time"
-                              mask="HH:MM"
-                            >
+                            <q-time v-model="scheduling.time">
                               <div class="row items-center justify-end">
                                 <q-btn
                                   v-close-popup
@@ -437,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="o2-input">
                     <q-select
                       data-test="datetime-timezone-select"
-                      v-model="formData.scheduling.timeZone"
+                      v-model="scheduling.timezone"
                       :options="filteredTimezone"
                       @blur="
                         timezone =
@@ -456,6 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('logStream.timezone')"
                       @update:modelValue="onTimezoneChange"
                       :display-value="`Timezone: ${timezone}`"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
                       class="timezone-select showLabelOnTop"
                       stack-label
                       outlined
@@ -496,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="report-name-input o2-input"
                 >
                   <q-input
-                    v-model="formData.email_content.title"
+                    v-model="formData.title"
                     :label="t('reports.title') + ' *'"
                     color="input-border"
                     bg-color="input-bg"
@@ -518,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="report-name-input o2-input"
                 >
                   <q-input
-                    v-model="formData.destination.recipients"
+                    v-model="formData.destinations.emails"
                     :label="t('reports.recipients') + ' *'"
                     color="input-border"
                     bg-color="input-bg"
@@ -540,11 +560,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div style="font-size: 14px" class="text-bold text-grey-8">
                     Message
                   </div>
-                  <q-input
-                    v-model="formData.email_content.message"
-                    filled
-                    type="textarea"
-                  />
+
+                  <q-input v-model="formData.message" filled type="textarea" />
                 </div>
               </div>
               <q-stepper-navigation>
@@ -640,6 +657,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         color="secondary"
         padding="sm xl"
         no-caps
+        @click="saveReport"
       />
     </div>
   </div>
@@ -655,6 +673,10 @@ import { getUUID, useLocalTimezone } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
+import dashboardService from "@/services/dashboards";
+import { onBeforeMount } from "vue";
+import type { Ref } from "vue";
+import { DateTime as _DateTime } from "luxon";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -662,50 +684,37 @@ const router = useRouter();
 const step = ref(1);
 
 const formData = ref({
-  name: "",
-  description: "",
-  selected_dashboard: {
-    folder_id: "",
-    dashboard_id: "",
-    tab_id: "",
-    variables: [
-      {
-        name: "",
-        value: "",
-        id: "abc",
+  dashboards: [
+    {
+      folder: "",
+      dashboard: "",
+      tabs: "",
+      variables: [],
+      timerange: {
+        type: "relative",
+        period: "30m",
+        from: 0,
+        to: 0,
       },
-    ],
+    },
+  ],
+  description: "",
+  destinations: {
+    emails: "",
   },
-  time_range: {
-    from: 0,
-    to: 0,
-    period: "15m",
-    type: "relative",
-  },
-  scheduling: {
-    frequency: "Monthly/Weekly/Daily/Hourly",
-    date: "",
-    time: "",
-    timeZone: "",
-  },
-  user_credentials: {
-    username: "",
-    password: "",
-  },
-  destination: {
-    type: "Email",
-    recipients: "",
-  },
-  email_content: {
-    title: "",
-    dashboard_link: "URL to Dashboard",
-    attachments: ["image", "csv", "pdf"],
-    message: "",
-  },
+  enabled: true,
+  media_type: "Pdf",
+  name: "MyReport",
+  title: "Report",
+  message: "",
+  org_id: "default",
+  start: 1708928905113829,
   frequency: "once",
+  user: "something",
+  password: "something",
   custom_frequency: {
-    every: 1,
-    frequency: "days",
+    interval: "",
+    frequency: "",
   },
 });
 
@@ -757,26 +766,19 @@ const store = useStore();
 
 const filteredTimezone: any = ref([]);
 
-const folderOptions = ref([
-  {
-    label: "Folder1",
-    value: "Folder1",
-  },
-]);
+const folderOptions = ref([]);
 
-const dashboardOptions = ref([
-  {
-    label: "Dashboard1",
-    value: "Dashboard1",
-  },
-]);
+const dashboardOptions: Ref<
+  { label: string; value: string; tabs: any[]; version: number }[]
+> = ref([]);
 
-const dashboardTabOptions = ref([
-  {
-    label: "Tab1",
-    value: "Tab1",
-  },
-]);
+const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
+
+onBeforeMount(() => {
+  getDashboaordFolders();
+});
+
+const reportPayload: Ref<any> = ref(formData.value);
 
 const isFetchingFolders = ref(false);
 
@@ -784,13 +786,60 @@ const isFetchingDashboard = ref(false);
 
 const onSubmit = () => {};
 
+const scheduling = ref({
+  date: "",
+  time: "",
+  timezone: "",
+});
+
 const filterFolders = () => {};
 
-const onFolderSelection = (id: string) => {};
+const onFolderSelection = (id: string) => {
+  dashboardOptions.value.length = 0;
+  isFetchingDashboard.value = true;
+  dashboardService
+    .list(
+      0,
+      10000,
+      "name",
+      false,
+      "",
+      store.state.selectedOrganization.identifier,
+      id
+    )
+    .then((response: any) => {
+      response.data.dashboards
+        .map((dash: any) => Object.values(dash).filter((dash) => dash)[0])
+        .forEach(
+          (dashboard: {
+            title: string;
+            dashboardId: string;
+            tabs: any[];
+            version: number;
+          }) => {
+            dashboardOptions.value.push({
+              label: dashboard.title,
+              value: dashboard.dashboardId,
+              tabs: dashboard.tabs || [],
+              version: dashboard.version,
+            });
+          }
+        );
+    })
+    .finally(() => (isFetchingDashboard.value = false));
+};
 
 const filterDashboard = () => {};
 
-const onDashboardSelection = (id: string) => {};
+const onDashboardSelection = (dashboard: any) => {
+  dashboardTabOptions.value.length = 0;
+  dashboard.tabs.forEach((tab: any) => {
+    dashboardTabOptions.value.push({
+      label: tab.name,
+      value: tab.tabId,
+    });
+  });
+};
 
 const filterTabs = () => {};
 
@@ -864,7 +913,7 @@ const onTimezoneChange = async (timezone) => {
 };
 
 const addDashboardVariable = () => {
-  formData.value.selected_dashboard.variables.push({
+  formData.value.dashboards[0].variables.push({
     name: "",
     value: "",
     id: getUUID(),
@@ -872,10 +921,69 @@ const addDashboardVariable = () => {
 };
 
 const removeDashboardVariable = (variable: any) => {
-  formData.value.selected_dashboard.variables =
-    formData.value.selected_dashboard.variables.filter(
+  formData.value.dashboards[0].variables =
+    formData.value.dashboards[0].variables.filter(
       (_variable: any) => _variable.id !== variable.id
     );
+};
+
+const getDashboaordFolders = () => {
+  isFetchingFolders.value = true;
+  dashboardService
+    .list_Folders(store.state.selectedOrganization.identifier)
+    .then((res) => {
+      res.data.list.forEach((folder: { name: string; folderId: string }) => {
+        folderOptions.value.push({
+          label: folder.name,
+          value: folder.folderId,
+        });
+      });
+    })
+    .finally(() => {
+      isFetchingFolders.value = false;
+    });
+};
+
+/**
+ * @param {string} date - date in DD-MM-YYYY format
+ * @param {string} time - time in HH:MM 24hr format
+ * @param {string} timezone - timezone
+ */
+const convertDateToTimestamp = (
+  date: string,
+  time: string,
+  timezone: string
+) => {
+  const [day, month, year] = date.split("-");
+  const [hour, minute] = time.split(":");
+
+  const _date = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour),
+    minute: Number(minute),
+  };
+
+  // Create a DateTime instance from date and time, then set the timezone
+  const dateTime = _DateTime.fromObject(_date, {
+    zone: timezone,
+  });
+
+  // Convert the DateTime to a Unix timestamp in milliseconds
+  const unixTimestampMillis = dateTime.toMillis();
+
+  return unixTimestampMillis * 1000; // timestamp in microseconds
+};
+
+const saveReport = () => {
+  formData.value.start = convertDateToTimestamp(
+    scheduling.value.date,
+    scheduling.value.time,
+    scheduling.value.timezone
+  );
+
+  console.log(formData.value);
 };
 </script>
 
