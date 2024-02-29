@@ -432,7 +432,7 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(schema_latest).unwrap();
-    let full_text_search_fields = stream::get_stream_setting_fts_fields(schema_latest).unwrap();
+    let fts_fields = stream::get_stream_setting_fts_fields(schema_latest).unwrap();
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
@@ -495,7 +495,7 @@ async fn merge_files(
                 &mut buf,
                 Arc::new(schema),
                 &bloom_filter_fields,
-                &full_text_search_fields,
+                &fts_fields,
                 diff_fields,
                 FileType::PARQUET,
             )
@@ -515,7 +515,7 @@ async fn merge_files(
         &mut buf,
         schema,
         &bloom_filter_fields,
-        &full_text_search_fields,
+        &fts_fields,
         new_file_size,
         stream_type,
     )
@@ -545,7 +545,7 @@ async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
+            if stream_type == StreamType::Logs {
                 log::warn!("Stream type is LOGS, lets create a new index file");
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
