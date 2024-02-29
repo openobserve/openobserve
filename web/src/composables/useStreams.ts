@@ -114,7 +114,12 @@ const useStreams = () => {
             );
             getStreamsPromise.value
               .then((res: any) => {
-                const streamData = setStreams(streamName, res.data.list);
+                setStreams(streamName, res.data.list);
+                const streamData = {
+                  name: streamName,
+                  list: res.data.list,
+                  schema: false,
+                };
                 getStreamsPromise.value = null;
                 dismiss();
                 resolve(streamData);
