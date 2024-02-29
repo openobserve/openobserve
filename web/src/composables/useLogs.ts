@@ -666,6 +666,19 @@ const useLogs = () => {
 
   const getQueryPartitions = async (queryReq: any) => {
     // const queryReq = buildSearch();
+    searchObj.data.queryResults.hits = [];
+    searchObj.data.histogram = {
+      xData: [],
+      yData: [],
+      chartParams: {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "",
+      },
+      errorCode: 0,
+      errorMsg: "",
+      errorDetail: "",
+    };
 
     if (!searchObj.meta.sqlMode) {
       const partitionQueryReq: any = {
