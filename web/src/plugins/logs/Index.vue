@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-8 q-mx-auto"
                   >
-                    <q-icon name="info" color="info"
+                    <q-icon name="info" color="primary"
 size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
@@ -153,7 +153,7 @@ size="md" /> Select a
                   <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-8">
                     <q-icon
                       name="info"
-                      color="info"
+                      color="primary"
                       size="md"
                     /> {{ t("search.noRecordFound") }}
                   </h6>
