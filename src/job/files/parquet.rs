@@ -36,8 +36,8 @@ use config::{
     FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::{
-    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable, prelude::*,
-    scalar::ScalarValue,
+    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable,
+    execution::context::SessionContext, prelude::*, scalar::ScalarValue,
 };
 use infra::{cache, storage};
 use parquet::arrow::{
@@ -50,7 +50,9 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
-        search::datafusion::exec::merge_parquet_files,
+        search::datafusion::{
+            exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
+        },
         stream::{self, get_stream_setting_fts_fields},
     },
 };
@@ -576,6 +578,10 @@ async fn _prepare_index_record_batches(
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
+
+    let split_chars = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+    let remove_chars_btrim = split_chars;
+
     for column in columns_to_index.iter() {
         let index_df = ctx.table("_tbl_raw_data").await?;
         let schema = index_df.schema();
@@ -647,16 +653,18 @@ async fn prepare_index_record_batches_v1(
             continue;
         }
 
-        let split_arr = array_distinct(string_to_array(
-            lower(concat(&[col(column.name()), lit("")])),
-            lit(" "),
-            lit(ScalarValue::Null),
-        ));
+        let column_name = column.name();
+        let split_chars = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+        let remove_chars_btrim = split_chars;
+        let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
+        let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
+        let distinct_terms = array_distinct(split_arr);
+
         let record_batch = index_df
-            .with_column("terms", split_arr)?
+            .with_column("terms", distinct_terms)?
             .unnest_column("terms")?
             .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
+            .with_column("term", btrim(vec![col("term"), lit(remove_chars_btrim)]))?
             .with_column("file_name", lit(file_name_without_prefix))?
             .aggregate(
                 vec![col("term"), col("file_name")],

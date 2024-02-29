@@ -480,6 +480,7 @@ impl Sql {
                     func = "ILIKE";
                 }
                 indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+
                 fts_terms.insert(item.1.clone());
             }
             if indexed_search.is_empty() {
