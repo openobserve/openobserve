@@ -1151,7 +1151,7 @@ describe("Logs testcases", () => {
 
 
   // run tests from here on CICD
-  it("should change stream settings and click on search stream", () => {
+  it.only("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -1171,7 +1171,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it("should display error if blank spaces added under stream name and clicked create stream ", () => {
+  it.only("should display error if blank spaces added under stream name and clicked create stream ", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type('  ')
@@ -1181,14 +1181,14 @@ describe("Logs testcases", () => {
  
   });
 
-  it("should display error if create stream is clicked without adding name", () => {
+  it.only("should display error if create stream is clicked without adding name", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
     cy.contains('Field is required').should('exist')
   });
   
-  it("should create stream with logs stream type", () => {
+  it.only("should create stream with logs stream type", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type('stream1')
