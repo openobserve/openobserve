@@ -1153,7 +1153,7 @@ describe("Logs testcases", () => {
 
 
   // run tests from here on CICD
-  it.only("should change stream settings and click on search stream", () => {
+  it("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -1173,7 +1173,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it.only("should display error if blank spaces added under stream name and clicked create stream ", () => {
+  it("should display error if blank spaces added under stream name and clicked create stream ", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type('  ')
@@ -1183,14 +1183,14 @@ describe("Logs testcases", () => {
  
   });
 
-  it.only("should display error if create stream is clicked without adding name", () => {
+  it("should display error if create stream is clicked without adding name", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
     cy.contains('Field is required').should('exist')
   });
   
-  it.only("should create stream with logs stream type", () => {
+  it("should create stream with logs stream type", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
@@ -1206,7 +1206,7 @@ describe("Logs testcases", () => {
     cy.get('.q-notification__message').contains('Stream deleted')
   });
 
-  it.only("should create stream with metrics stream type and delete", () => {
+  it("should create stream with metrics stream type and delete", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
@@ -1224,7 +1224,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it.only("should create stream with traces stream type and delete", () => {
+  it("should create stream with traces stream type and delete", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type(randomStreamName);
@@ -1240,7 +1240,7 @@ describe("Logs testcases", () => {
     cy.get('.q-notification__message').contains('Stream deleted');
   });
 
-  it.only("should create a stream with a field", () => {
+  it("should create a stream with a field", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
