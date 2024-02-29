@@ -248,7 +248,7 @@ export default defineComponent({
       valueRef: isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       setImmediateValue,
       setDebounceValue,
-    } = useCustomDebouncer(false, 10);
+    } = useCustomDebouncer(false, 3000);
 
     onActivated(() => {
       // set the initial value as false on component activated
