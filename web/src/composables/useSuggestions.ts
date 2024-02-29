@@ -105,6 +105,16 @@ const defaultSuggestions = [
     kind: "Text",
     insertText: (_keyword: string) => `match_all_ignore_case('${_keyword}')`,
   },
+  {
+    label: (_keyword: string) => `match_all_indexed('${_keyword}')`,
+    kind: "Text",
+    insertText: (_keyword: string) => `match_all_indexed('${_keyword}')`,
+  },
+  {
+    label: (_keyword: string) => `match_all_indexed_ignore_case('${_keyword}')`,
+    kind: "Text",
+    insertText: (_keyword: string) => `match_all_indexed_ignore_case('${_keyword}')`,
+  },
 ];
 
 const useSqlSuggestions = () => {

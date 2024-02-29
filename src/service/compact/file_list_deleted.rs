@@ -28,11 +28,29 @@ pub async fn delete(
     time_max: i64,
     batch_size: i64,
 ) -> Result<i64, anyhow::Error> {
+    log::warn!(
+        "[COMPACT] delete file_list_deleted from {} to {} and org_id {}",
+        time_min,
+        time_max,
+        org_id
+    );
+
     let files = query_deleted(org_id, time_min, time_max, batch_size).await?;
     if files.is_empty() {
+        log::warn!(
+            "[COMPACT] delete file_list_deleted from {} to {} and org_id {} no files found",
+            time_min,
+            time_max,
+            org_id
+        );
         return Ok(0);
     }
     let files_num = files.values().flatten().count() as i64;
+
+    log::warn!(
+        "[COMPACT] delete file_list_deleted files keys: {:?}",
+        files.keys()
+    );
 
     // delete files from storage
     if let Err(e) = storage::del(

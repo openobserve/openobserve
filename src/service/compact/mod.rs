@@ -54,6 +54,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             StreamType::Traces,
             StreamType::EnrichmentTables,
             StreamType::Metadata,
+            StreamType::Index,
         ];
         for org_id in orgs {
             // get the working node for the organization
@@ -95,6 +96,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             ret?;
 
             for stream_type in stream_types {
+                log::warn!("Running retention for {} {}", org_id, stream_type);
                 let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
                 for stream_name in streams {
                     let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
@@ -185,8 +187,10 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
         StreamType::Traces,
         StreamType::EnrichmentTables,
         StreamType::Metadata,
+        StreamType::Index,
     ];
     for org_id in orgs {
+        log::warn!("Running merge for {}", org_id);
         // check backlist
         if !db::file_list::BLOCKED_ORGS.is_empty()
             && db::file_list::BLOCKED_ORGS.contains(&org_id.as_str())
@@ -194,12 +198,14 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
             continue;
         }
         for stream_type in stream_types {
+            log::warn!("Running merge for {} {}", org_id, stream_type);
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 let Some(node) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor).await
                 else {
+                    log::warn!("No compactor node for stream {}", stream_name);
                     continue; // no compactor node
                 };
                 if LOCAL_NODE_UUID.ne(&node) {
@@ -221,9 +227,21 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                         )
                         .await?;
                     }
+                    log::warn!(
+                        "[COMPACTOR] the stream [{}/{}/{}] is processing by another node",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                    );
                     continue; // not this node
                 }
 
+                log::warn!(
+                    "After checking the node, the stream [{}/{}/{}] is processing by this node",
+                    &org_id,
+                    stream_type,
+                    &stream_name
+                );
                 // check if we are allowed to merge or just skip
                 if db::compact::retention::is_deleting_stream(
                     &org_id,
