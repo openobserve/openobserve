@@ -39,9 +39,12 @@ use parquet::arrow::{
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
-    common::infra::wal,
+    common::{infra::wal, meta::stream::StreamParams},
     service::{
-        db, schema::schema_evolution, search::datafusion::exec::merge_parquet_files, stream,
+        db,
+        ingestion::{get_wal_time_key, index_writer::write_file_arrow},
+        search::datafusion::exec::merge_parquet_files,
+        stream,
     },
 };
 
@@ -350,6 +353,7 @@ async fn merge_files(
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
+        stream_type,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -392,66 +396,65 @@ async fn merge_files(
     }
 }
 
-async fn upload_file(
+/// Create an inverted index file for the given file
+async fn create_index_file(
+    buf: Bytes,
+    new_file_key: String,
+    min_ts: i64,
     org_id: &str,
     stream_name: &str,
-    stream_type: StreamType,
-    wal_dir: &Path,
-    path_str: &str,
-    file_name: &str,
-) -> Result<(String, FileMeta), anyhow::Error> {
-    let file_path = wal_dir.join(path_str);
-    let mut file = std::fs::File::open(&file_path).unwrap();
-    let file_meta = file.metadata().unwrap();
-    let file_size = file_meta.len();
-    log::info!("[INGESTER:JOB] File upload begin: {}", path_str);
-    if file_size == 0 {
-        if let Err(e) = tokio::fs::remove_file(file_path).await {
-            log::error!(
-                "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
-                path_str,
-                e
-            );
-        }
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
-    }
+    schema: SchemaRef,
+) -> Result<(), anyhow::Error> {
+    let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
+        .unwrap()
+        .build()
+        .unwrap();
 
-    // write metadata
-    let mut buf_parquet: Vec<u8> = Vec::new();
-    file.read_to_end(&mut buf_parquet)?;
-    let buf_parquet = bytes::Bytes::from(buf_parquet);
-    let mut file_meta = read_metadata_from_bytes(&buf_parquet).await?;
-    file_meta.compressed_size = file_size as i64;
+    let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
+    let ctx = SessionContext::new();
+    let provider = MemTable::try_new(schema, vec![batches])?;
+    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
 
-    // read schema
-    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
-    let inferred_schema = arrow_reader
-        .schema()
-        .as_ref()
-        .clone()
-        .with_metadata(std::collections::HashMap::new());
+    let split_arr = string_to_array(lower(col("log")), lit(" "), lit(ScalarValue::Null));
+    let index_df = ctx.table("_tbl_raw_data").await?;
 
-    schema_evolution(
-        org_id,
-        stream_name,
-        stream_type,
-        Arc::new(inferred_schema),
-        file_meta.min_ts,
+    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
+    let index_df = index_df
+        .with_column("terms", split_arr)?
+        .unnest_column("terms")?
+        .with_column_renamed("terms", "term")?
+        .with_column("term", btrim(vec![col("term"), lit(",[]\"\\/:")]))?
+        .with_column("filename", lit(file_name_without_prefix))?
+        .aggregate(
+            vec![col("term"), col("filename")],
+            vec![min(col("_timestamp")).alias("_timestamp")],
+        )?
+        .with_column("character_len", character_length(col("term")))?
+        .filter(col("character_len").gt_eq(lit(3)))?
+        .select_columns(&["term", "filename", "_timestamp"])?;
+
+    let record_batches = index_df.collect().await?;
+
+    let hour_key = get_wal_time_key(
+        min_ts,
+        &vec![],
+        config::meta::stream::PartitionTimeLevel::Hourly,
+        &serde_json::Map::new(),
+        None,
+    );
+
+    write_file_arrow(
+        record_batches,
+        0,
+        &&StreamParams {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type: StreamType::Index,
+        },
+        &hour_key,
     )
     .await;
-
-    let new_file_name =
-        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
-    drop(file);
-    match storage::put(&new_file_name, buf_parquet).await {
-        Ok(_) => {
-            log::info!("[INGESTER:JOB] File upload succeeded: {}", new_file_name);
-            Ok((new_file_name, file_meta))
-        }
-        Err(err) => {
-            log::error!("[INGESTER:JOB] File upload error: {:?}", err);
-            Err(anyhow::anyhow!(err))
-        }
-    }
+    log::info!("[INGESTER:JOB] Written index file successfully");
+    Ok(())
 }
