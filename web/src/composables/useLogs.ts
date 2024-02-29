@@ -366,8 +366,8 @@ const useLogs = () => {
     try {
       resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
-      const streamData = await getStreams(streamType, false);
-      searchObj.data.streamResults = streamData;
+      const streamData: any = await getStreams(streamType, false);
+      searchObj.data.streamResults["list"] = streamData.list;
       await nextTick();
       await loadStreamLists();
       return;
@@ -1798,7 +1798,7 @@ const useLogs = () => {
     if (searchObj.data.streamResults?.list?.length) {
       const streamType = searchObj.data.stream.streamType || "logs";
       const streams: any = await getStreams(streamType, false);
-      searchObj.data.streamResults = streams;
+      searchObj.data.streamResults["list"] = streams.list;
       searchObj.data.stream.streamLists = [];
       streams.list.map((item: any) => {
         const itemObj = {
