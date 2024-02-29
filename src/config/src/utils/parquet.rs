@@ -30,6 +30,7 @@ pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
     schema: &'a Arc<Schema>,
     bloom_filter_fields: &'a [String],
+    full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
@@ -66,7 +67,7 @@ pub fn new_parquet_writer<'a>(
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }
-    for field in BLOOM_FILTER_DEFAULT_FIELDS.iter() {
+    for field in full_text_search_fields.iter() {
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }
@@ -79,11 +80,11 @@ pub fn new_parquet_writer<'a>(
         num_rows
     };
     if CONFIG.common.bloom_filter_enabled {
-        let mut fields = if bloom_filter_fields.is_empty() {
-            BLOOM_FILTER_DEFAULT_FIELDS.as_slice()
-        } else {
-            bloom_filter_fields
-        };
+        let mut fields = bloom_filter_fields.to_vec();
+        fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+        fields.sort();
+        fields.dedup();
+        let mut fields = fields.as_slice();
         // if bloom_filter_on_all_fields is true, then use all string fields
         let mut all_fields = None;
         if CONFIG.common.bloom_filter_on_all_fields {
@@ -94,6 +95,7 @@ pub fn new_parquet_writer<'a>(
                     .filter(|f| {
                         f.data_type() == &arrow::datatypes::DataType::Utf8
                             && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(f.name())
+                            && !full_text_search_fields.contains(f.name())
                     })
                     .map(|f| f.name().to_string())
                     .collect::<Vec<_>>(),
@@ -103,6 +105,8 @@ pub fn new_parquet_writer<'a>(
             fields = all_fields.as_slice();
         }
         for field in fields.iter() {
+            writer_props = writer_props
+                .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
             writer_props = writer_props
                 .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
             if metadata.records > 0 {

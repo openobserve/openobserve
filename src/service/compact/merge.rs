@@ -417,6 +417,7 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(schema_latest).unwrap();
+    let full_text_search_fields = stream::get_stream_setting_fts_fields(schema_latest).unwrap();
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
@@ -479,6 +480,7 @@ async fn merge_files(
                 &mut buf,
                 Arc::new(schema),
                 &bloom_filter_fields,
+                &full_text_search_fields,
                 diff_fields,
                 FileType::PARQUET,
             )
@@ -498,6 +500,7 @@ async fn merge_files(
         &mut buf,
         schema,
         &bloom_filter_fields,
+        &full_text_search_fields,
         new_file_size,
     )
     .await?;

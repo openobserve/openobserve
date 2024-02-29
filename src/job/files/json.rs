@@ -40,7 +40,9 @@ use tokio::{sync::Semaphore, task, time};
 use crate::{
     common::{infra::wal, meta::stream::StreamParams, utils::stream::populate_file_meta},
     service::{
-        db, schema::schema_evolution, stream::get_stream_setting_bloom_filter_fields,
+        db,
+        schema::schema_evolution,
+        stream::{get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields},
         usage::report_compression_stats,
     },
 };
@@ -319,6 +321,7 @@ async fn upload_file(
         Err(_) => Schema::empty(),
     };
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&db_schema).unwrap();
+    let full_text_search_fields = get_stream_setting_fts_fields(&db_schema).unwrap();
 
     // write parquet file
     let mut buf_parquet = Vec::new();
@@ -326,6 +329,7 @@ async fn upload_file(
         &mut buf_parquet,
         &arrow_schema,
         &bloom_filter_fields,
+        &full_text_search_fields,
         &file_meta,
     );
     for batch in batches {
