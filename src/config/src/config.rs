@@ -257,6 +257,12 @@ pub struct Grpc {
     pub stream_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
+    #[env_config(
+        name = "ZO_GRPC_MAX_MESSAGE_SIZE",
+        default = 4,
+        help = "Max grpc message size in MB, default is 4 MB"
+    )]
+    pub max_message_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -338,11 +344,8 @@ pub struct Common {
     pub feature_query_partition_strategy: String,
     #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
     pub feature_query_infer_schema: bool,
-    #[env_config(
-        name = "ZO_FEATURE_QUERY_INFER_SCHEMA_IF_FIELDS_MORE_THAN",
-        default = 0
-    )]
-    pub feature_query_infer_schema_if_fields_more_than: usize,
+    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
+    pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
