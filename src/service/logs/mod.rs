@@ -184,26 +184,41 @@ async fn add_valid_record(
     // get record schema
     let schema_latest = stream_schema_map.get(&stream_meta.stream_name).unwrap();
     // ensure schema is compatible
-    let mut new_fields = vec![];
+    let mut diff_fields = vec![];
     for field in infer_schema.fields() {
         match schema_latest.field_with_name(field.name()) {
-            Ok(f) => new_fields.push(Arc::new(f.clone())),
+            Ok(f) => {
+                if f.data_type() != field.data_type() {
+                    diff_fields.push(Arc::new(f.clone()));
+                }
+            }
             Err(e) => return Err(anyhow::Error::msg(e)),
         }
     }
-    let rec_schema = Schema::new(new_fields);
-    let schema_key = rec_schema.hash_key();
+    let infer_schema = if diff_fields.is_empty() {
+        infer_schema
+    } else {
+        Schema::new(diff_fields)
+    };
+    let infer_schema_key = infer_schema.hash_key();
+
     // get hour key
     let hour_key = get_wal_time_key(
         timestamp,
         stream_meta.partition_keys,
         unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         &record_val,
-        Some(&schema_key),
+        Some(&infer_schema_key),
     );
 
-    if schema_evolution.schema_compatible {
-        let valid_record = if let Some(delta) = schema_evolution.types_delta {
+    if !schema_evolution.schema_compatible {
+        status.failed += 1;
+        return Ok(None);
+    }
+
+    let valid_record = match schema_evolution.types_delta {
+        None => true,
+        Some(delta) => {
             let ret_val = if !CONFIG.common.widening_schema_evolution
                 || !schema_evolution.is_schema_changed
             {
@@ -227,47 +242,45 @@ async fn add_valid_record(
                     false
                 }
             }
-        } else {
-            true
-        };
-
-        if valid_record {
-            if need_trigger && !stream_meta.stream_alerts_map.is_empty() {
-                // Start check for alert trigger
-                let key = format!(
-                    "{}/{}/{}",
-                    &stream_meta.org_id,
-                    StreamType::Logs,
-                    &stream_meta.stream_name
-                );
-                if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
-                    for alert in alerts {
-                        if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
-                            trigger.push((alert.clone(), v));
-                        }
-                    }
-                }
-                // End check for alert trigger
-            }
-            let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-                let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
-                let schema_key = schema.hash_key();
-                SchemaRecords {
-                    schema_key,
-                    schema,
-                    records: vec![],
-                    records_size: 0,
-                }
-            });
-            let record_val = Value::Object(record_val);
-            let record_size = estimate_json_bytes(&record_val);
-            hour_buf.records.push(Arc::new(record_val));
-            hour_buf.records_size += record_size;
-            status.successful += 1;
-        };
-    } else {
-        status.failed += 1;
+        }
+    };
+    if !valid_record {
+        return Ok(None);
     }
+
+    if need_trigger && !stream_meta.stream_alerts_map.is_empty() {
+        // Start check for alert trigger
+        let key = format!(
+            "{}/{}/{}",
+            &stream_meta.org_id,
+            StreamType::Logs,
+            &stream_meta.stream_name
+        );
+        if let Some(alerts) = stream_meta.stream_alerts_map.get(&key) {
+            for alert in alerts {
+                if let Ok(Some(v)) = alert.evaluate(Some(&record_val)).await {
+                    trigger.push((alert.clone(), v));
+                }
+            }
+        }
+        // End check for alert trigger
+    }
+
+    let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
+        let schema = Arc::new(infer_schema.with_metadata(HashMap::new()));
+        SchemaRecords {
+            schema_key: infer_schema_key,
+            schema,
+            records: vec![],
+            records_size: 0,
+        }
+    });
+    let record_val = Value::Object(record_val);
+    let record_size = estimate_json_bytes(&record_val);
+    hour_buf.records.push(Arc::new(record_val));
+    hour_buf.records_size += record_size;
+    status.successful += 1;
+
     if trigger.is_empty() {
         Ok(None)
     } else {
