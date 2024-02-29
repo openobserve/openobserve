@@ -101,7 +101,7 @@ mod tests {
             ],
         )
         .unwrap();
-        write_file_arrow(
+        let _ = write_file_arrow(
             vec![batch],
             0,
             &StreamParams {
