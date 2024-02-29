@@ -1,5 +1,6 @@
 import { getTestId, getRandomText } from "../utils";
 import logData from "../../fixtures/log.json";
+const randomStreamName = "stream" + Math.random().toString(36).substring(7);
 
 function removeUTFCharacters(text) {
   // console.log(text, "tex");
@@ -281,7 +282,7 @@ export function confirmFunctionDeleteButton() {
 
 
 export function logsStreamSelection() {
-  cy.get('[data-test="add-stream-name-input"]').type('stream1')
+  cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
   cy.get('[data-test="add-stream-type-input"]').click()
   cy.get('.q-menu').within(() => {
     // Use cy.contains() to find the option with the label "Logs" and click it
