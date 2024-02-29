@@ -511,7 +511,7 @@ export default defineComponent({
         icon: "img:" + getImageURL("images/language_flags/ja.svg"),
       },
       {
-        label: "한국인",
+        label: "한국어",
         code: "ko",
         icon: "img:" + getImageURL("images/language_flags/ko.svg"),
       },
