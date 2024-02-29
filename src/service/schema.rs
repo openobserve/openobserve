@@ -289,55 +289,39 @@ pub async fn check_for_schema(
     stream_schema_map: &mut HashMap<String, Schema>,
     record_val: &Map<String, Value>,
     record_ts: i64,
-) -> Result<SchemaEvolution> {
-    // get infer schema
-    let value_iter = [record_val].into_iter();
-    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
-
-    check_for_schema_impl(
-        org_id,
-        stream_name,
-        stream_type,
-        stream_schema_map,
-        &inferred_schema,
-        record_ts,
-    )
-    .await
-}
-
-pub async fn check_for_schema_impl(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    stream_schema_map: &mut HashMap<String, Schema>,
-    inferred_schema: &Schema,
-    record_ts: i64,
-) -> Result<SchemaEvolution> {
+) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
         let schema = db::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
-
     let schema = stream_schema_map.get(stream_name).unwrap();
-
     if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
-        return Ok(SchemaEvolution {
-            schema_compatible: true,
-            is_schema_changed: false,
-            types_delta: None,
-        });
+        return Ok((
+            SchemaEvolution {
+                schema_compatible: true,
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        ));
     }
+
+    // get infer schema
+    let value_iter = [record_val].into_iter();
+    let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     // fast path
     if schema.fields.eq(&inferred_schema.fields) {
-        // return (true, None, schema.fields().to_vec());
-        return Ok(SchemaEvolution {
-            schema_compatible: true,
-            is_schema_changed: false,
-            types_delta: None,
-        });
+        return Ok((
+            SchemaEvolution {
+                schema_compatible: true,
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        ));
     }
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
@@ -346,23 +330,27 @@ pub async fn check_for_schema_impl(
 
     let is_new = schema.fields().is_empty();
     if !is_new {
-        let (is_schema_changed, field_datatype_delta) = get_schema_changes(schema, inferred_schema);
+        let (is_schema_changed, field_datatype_delta) =
+            get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
-            return Ok(SchemaEvolution {
-                schema_compatible: true,
-                is_schema_changed: false,
-                types_delta: Some(field_datatype_delta),
-            });
+            return Ok((
+                SchemaEvolution {
+                    schema_compatible: true,
+                    is_schema_changed: false,
+                    types_delta: Some(field_datatype_delta),
+                },
+                Some(inferred_schema),
+            ));
         }
     }
 
     // slow path
-    Ok(handle_diff_schema(
+    let ret = handle_diff_schema(
         org_id,
         stream_name,
         stream_type,
         is_new,
-        inferred_schema,
+        &inferred_schema,
         record_ts,
         stream_schema_map,
     )
@@ -371,7 +359,26 @@ pub async fn check_for_schema_impl(
         schema_compatible: true,
         is_schema_changed: false,
         types_delta: None,
-    }))
+    });
+
+    // get record schema
+    let schema_latest = stream_schema_map.get(stream_name).unwrap();
+    // ensure schema is compatible
+    let mut diff_fields = vec![];
+    for field in inferred_schema.fields() {
+        if let Ok(f) = schema_latest.field_with_name(field.name()) {
+            if f.data_type() != field.data_type() {
+                diff_fields.push(Arc::new(f.clone()));
+            }
+        }
+    }
+    let inferred_schema = if diff_fields.is_empty() {
+        inferred_schema.clone()
+    } else {
+        Schema::new(diff_fields)
+    };
+
+    Ok((ret, Some(inferred_schema)))
 }
 
 async fn get_merged_schema(
@@ -864,6 +871,6 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(result.schema_compatible);
+        assert!(result.0.schema_compatible);
     }
 }

@@ -21,7 +21,6 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamType},
     utils::{
         json::{estimate_json_bytes, Map, Value},
-        schema::infer_json_schema_from_map,
         schema_ext::SchemaExt,
     },
     CONFIG,
@@ -30,7 +29,7 @@ use datafusion::arrow::datatypes::Schema;
 
 use super::{
     ingestion::{get_string_value, TriggerAlertData},
-    schema::check_for_schema_impl,
+    schema::check_for_schema,
 };
 use crate::{
     common::meta::{
@@ -166,41 +165,24 @@ async fn add_valid_record(
         .as_i64()
         .unwrap();
 
-    // get infer schema
-    let value_iter = [&record_val].into_iter();
-    let infer_schema = infer_json_schema_from_map(value_iter, StreamType::Logs).unwrap();
-
     // check schema
-    let schema_evolution = check_for_schema_impl(
+    let (schema_evolution, infer_schema) = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
         stream_schema_map,
-        &infer_schema,
+        &record_val,
         timestamp,
     )
     .await?;
 
     // get record schema
     let schema_latest = stream_schema_map.get(&stream_meta.stream_name).unwrap();
-    // ensure schema is compatible
-    let mut diff_fields = vec![];
-    for field in infer_schema.fields() {
-        match schema_latest.field_with_name(field.name()) {
-            Ok(f) => {
-                if f.data_type() != field.data_type() {
-                    diff_fields.push(Arc::new(f.clone()));
-                }
-            }
-            Err(e) => return Err(anyhow::Error::msg(e)),
-        }
-    }
-    let infer_schema = if diff_fields.is_empty() {
-        infer_schema
-    } else {
-        Schema::new(diff_fields)
+    let rec_schema = match infer_schema.as_ref() {
+        Some(v) => v,
+        None => schema_latest,
     };
-    let infer_schema_key = infer_schema.hash_key();
+    let schema_key = rec_schema.hash_key();
 
     // get hour key
     let hour_key = get_wal_time_key(
@@ -208,7 +190,7 @@ async fn add_valid_record(
         stream_meta.partition_keys,
         unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         &record_val,
-        Some(&infer_schema_key),
+        Some(&schema_key),
     );
 
     if !schema_evolution.schema_compatible {
@@ -267,9 +249,10 @@ async fn add_valid_record(
     }
 
     let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-        let schema = Arc::new(infer_schema.with_metadata(HashMap::new()));
+        let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
+        let schema_key = schema.hash_key();
         SchemaRecords {
-            schema_key: infer_schema_key,
+            schema_key,
             schema,
             records: vec![],
             records_size: 0,
