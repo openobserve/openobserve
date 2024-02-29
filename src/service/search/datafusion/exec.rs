@@ -99,8 +99,8 @@ pub async fn sql(
     let session_id = session.id.clone();
     let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
-        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
     let (mut ctx, mut ctx_aggs) = if !file_type.eq(&FileType::ARROW) {
         let ctx = register_table(
             session,
@@ -256,8 +256,8 @@ async fn exec_query(
 
     let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
-        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
 
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
@@ -753,8 +753,8 @@ pub async fn merge(
 
     let select_wildcard = sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
-        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
 
     // rewrite sql
     let mut query_sql = match merge_rewrite_sql(sql, schema) {
@@ -1122,8 +1122,8 @@ pub async fn convert_parquet_file(
 
     let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
-        && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than;
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
 
     // query data
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
@@ -1444,8 +1444,8 @@ pub async fn register_table(
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
     if CONFIG.common.feature_query_infer_schema
-        || (CONFIG.common.feature_query_infer_schema_if_fields_more_than > 0
-            && schema.fields().len() > CONFIG.common.feature_query_infer_schema_if_fields_more_than)
+        || (CONFIG.common.query_optimization_num_fields > 0
+            && schema.fields().len() > CONFIG.common.query_optimization_num_fields)
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {
