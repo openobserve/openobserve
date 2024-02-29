@@ -112,7 +112,7 @@ pub async fn sql(
         )
         .await?;
         let mut ctx_aggs = None;
-        if without_optimizer {
+        if without_optimizer && !sql.aggs.is_empty() {
             ctx_aggs = Some(
                 register_table(
                     session,
@@ -127,15 +127,29 @@ pub async fn sql(
         };
         (ctx, ctx_aggs)
     } else {
-        let ctx =
-            prepare_datafusion_context(session.work_group.clone(), &session.search_type, false)?;
+        let ctx = prepare_datafusion_context(
+            session.work_group.clone(),
+            &session.search_type,
+            without_optimizer,
+        )?;
 
         let record_batches = in_records_batches.unwrap();
         let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
 
         // Register the MemTable as a table in the DataFusion context
-        ctx.register_table("tbl", mem_table)?;
-        (ctx, None)
+        ctx.register_table("tbl", mem_table.clone())?;
+
+        let mut ctx_aggs = None;
+        if without_optimizer && !sql.aggs.is_empty() {
+            let ctx_agg = prepare_datafusion_context(
+                session.work_group.clone(),
+                &session.search_type,
+                false,
+            )?;
+            ctx_agg.register_table("tbl", mem_table)?;
+            ctx_aggs = Some(ctx_agg);
+        }
+        (ctx, ctx_aggs)
     };
 
     // register UDF
