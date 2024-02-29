@@ -1148,19 +1148,4 @@ describe("Logs testcases", () => {
     }).should("exist");
   });
 
-  it.skip("should change stream settings and click on search stream", () => {
-    // Type the value of a variable into an input field
-
-    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
-    cy.get('[title="Stream Detail"]').click({ force: true });
-    cy.get(
-      '[data-test="schema-stream-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]'
-    ).click({ force: true });
-    cy.get('[data-test="schema-update-settings-button"]').click({
-      force: true,
-    });
-    cy.get(".col-auto > .q-btn > .q-btn__content").click({ force: true });
-    cy.get('[title="Explore"]').click({ force: true });
-    cy.get('[data-test="log-table-column-0-@timestamp"]').should("exist");
-  });
 });
