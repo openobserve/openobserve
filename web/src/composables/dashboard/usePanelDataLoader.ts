@@ -349,7 +349,7 @@ export const usePanelDataLoader = (
   };
 
   watch(
-    // Watching for changes in panelSchema and selectedTimeObj
+    // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
     async () => {
       log("PanelSchema/Time Wather: called");

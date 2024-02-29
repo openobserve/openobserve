@@ -28,10 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
         } stickyHeader ${
-          isFullscreen || store.state.printMode === true
-            ? 'fullscreenHeader'
-            : ''
-        }`"
+          isFullscreen ? 'fullscreenHeader' : ''
+        } hideOnPrintMode`"
       >
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
@@ -46,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="hideOnPrintMode"
             />
             <span class="q-table__title q-mx-md q-mt-xs">{{
-              currentDashboardData.data.title
+              currentDashboardData.data?.title
             }}</span>
           </div>
           <div class="flex">
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RenderDashboardCharts
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
-        :viewOnly="store.state.printMode === true ? true : false"
+        :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
@@ -164,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         :showTabs="true"
-        :forceLoad="store.state.printMode === true ? true : false"
+        :forceLoad="store.state.printMode"
       />
 
       <q-dialog
@@ -296,8 +294,8 @@ export default defineComponent({
     });
     // ======= [END] default variable values
 
-    onActivated(() => {
-      loadDashboard();
+    onActivated(async () => {
+      await loadDashboard();
     });
 
     const loadDashboard = async () => {

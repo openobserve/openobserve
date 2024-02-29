@@ -1,4 +1,4 @@
-import { ref, onUnmounted, watch, onDeactivated } from "vue";
+import { ref, onUnmounted, onDeactivated } from "vue";
 
 /**
  * Custom hook to debounce a value
@@ -6,59 +6,53 @@ import { ref, onUnmounted, watch, onDeactivated } from "vue";
  * @param {number} delay - The delay in milliseconds for debouncing
  * @returns {Object} - Object containing the debounced value and methods to set the value immediately or with debounce
  */
-export const useDebouncer = (initialValue: any, delay: any) => {
-  const value = ref(initialValue);
+export const useCustomDebouncer = (initialValue: any, delay: any) => {
+  const valueRef = ref(initialValue);
   let timeout: any = null;
 
   /**
    * Set the value immediately without any delay
    * @param {any} newValue - The new value to set immediately
    */
-  const setImmediate = (newValue: any) => {
+  const setImmediateValue = (newValue: any) => {
+    // Reset the timeout before setting the value
     resetTimeout();
-    console.log("setImmediate", newValue);
 
-    value.value = newValue;
+    // Immediately set the value
+    valueRef.value = newValue;
   };
 
   const resetTimeout = () => {
+    // Reset the timeout
     if (timeout) {
       clearTimeout(timeout);
+      timeout = null;
     }
   };
-
-  watch(value, () => {
-    console.log(
-      "isDashboardVariablesAndPanelsDataLoading: useDebouncer: ",
-      value.value
-    );
-  });
 
   /**
    * Set the value with debounce
    * @param {any} newValue - The new value to set with debounce
    */
-  const setDebounce = (newValue: any) => {
+  const setDebounceValue = (newValue: any) => {
+    // first, clear any existing timeout
     resetTimeout();
-    console.log("setDebounce", newValue);
 
+    // assign a new timeout
     timeout = setTimeout(() => {
-      value.value = newValue;
+      valueRef.value = newValue;
     }, delay);
-    console.log("timeout", timeout);
   };
 
+  // clear any existing timeout on deactivation
   onDeactivated(() => {
-    console.log("onDeactivated", value.value);
-
     resetTimeout();
   });
 
+  // clear any existing timeout on unmount
   onUnmounted(() => {
-    console.log("onUnmounted", value.value);
-
     resetTimeout();
   });
 
-  return { value, setImmediate, setDebounce };
+  return { valueRef, setImmediateValue, setDebounceValue };
 };

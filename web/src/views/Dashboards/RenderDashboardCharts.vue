@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
+    <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
     <span
-      v-if="isDashboardVariablesAndPanelsDataLoadingDebouncedValue"
+      v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
       id="dashboardVariablesAndPanelsDataLoaded"
       style="display: none"
     >
@@ -116,7 +117,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onMounted, provide, ref, watch } from "vue";
+import {
+  computed,
+  defineComponent,
+  onActivated,
+  provide,
+  ref,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -126,7 +134,7 @@ import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
-import { useDebouncer } from "../../utils/dashboard/useDebouncer";
+import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
@@ -201,20 +209,26 @@ export default defineComponent({
       emit("onMovePanel", panelId, newTabId);
     };
 
-    //create reactive obbject for variablesData and panels
+    // variables data
+    const variablesData = reactive({});
+
+    // ======= [START] dashboard PrintMode =======
+
+    //reactive object for loading state of variablesData and panels
     const variablesAndPanelsDataLoadingState = reactive({
       variablesData: {},
       panels: {},
     });
 
-    // provide and inject to share data between components
+    // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
       variablesAndPanelsDataLoadingState
     );
 
-    //want to create computed property based on panels and variables
-    const isDashboardVariablesAndPanelsDataLoading = computed(() => {
+    //computed property based on panels and variables loading state
+    const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
+      // Get values of variablesData and panels
       const variablesDataValues = Object.values(
         variablesAndPanelsDataLoadingState.variablesData
       );
@@ -223,43 +237,42 @@ export default defineComponent({
       );
 
       // Check if every value in both variablesData and panels is false
-      const result =
+      const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
         panelsValues.every((value) => value === false);
-      console.log(
-        "isDashboardVariablesAndPanelsDataLoading: result: ",
-        JSON.stringify(variablesAndPanelsDataLoadingState),
-        result
-      );
-      return result;
+      return isAllVariablesAndPanelsDataLoaded;
     });
 
-    // Create debouncer
-    const {
-      value: isDashboardVariablesAndPanelsDataLoadingDebouncedValue,
-      setImmediate,
-      setDebounce,
-    } = useDebouncer(false, 10);
+    // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
+    let {
+      valueRef: isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
+      setImmediateValue,
+      setDebounceValue,
+    } = useCustomDebouncer(false, 10);
+
+    onActivated(() => {
+      // set the initial value as false on component activated
+      // also, this function will clear the settimeout if previously set
+      setImmediateValue(false);
+    });
 
     // Watch for changes in the computed property and update the debouncer accordingly
-    watch(isDashboardVariablesAndPanelsDataLoading, (newValue) => {
-      console.log(
-        "isDashboardVariablesAndPanelsDataLoading watch:",
-        isDashboardVariablesAndPanelsDataLoading.value
-      );
-      if (isDashboardVariablesAndPanelsDataLoading.value === false) {
-        setImmediate(newValue);
+    watch(isDashboardVariablesAndPanelsDataLoaded, (newValue) => {
+      // if value is false, then immediately set the value
+      if (isDashboardVariablesAndPanelsDataLoaded.value === false) {
+        setImmediateValue(newValue);
       } else {
-        setDebounce(newValue);
+        // if value is true, then debounce the value
+        setDebounceValue(newValue);
       }
     });
 
-    // variables data
-    const variablesData = reactive({});
     const variablesDataUpdated = (data: any) => {
-      console.log("variables data updated!@!!!!");
       try {
+        // update the variables data
         Object.assign(variablesData, data);
+
+        // emit the variables data
         emit("variablesData", variablesData);
 
         // update the loading state
@@ -274,43 +287,11 @@ export default defineComponent({
             );
         }
       } catch (error) {
-        console.log(error, "error--");
+        console.log(error);
       }
     };
 
-    // const isDashboardVariablesAndPanelsDataLoading = ref(false);
-
-    // const delayTimeout = [];
-
-    // const checkLoadingStatus = () => {
-    //   const variablesDataValues = Object.values(
-    //     variablesAndPanelsDataLoadingState.variablesData
-    //   );
-    //   const panelsValues = Object.values(
-    //     variablesAndPanelsDataLoadingState.panels
-    //   );
-
-    //   const result =
-    //     variablesDataValues.every((value) => value === false) &&
-    //     panelsValues.every((value) => value === false);
-
-    //   if (result) {
-    //     // return true after 1 second delay
-    //     delayTimeout.push(
-    //       setTimeout(() => {
-    //         isDashboardVariablesAndPanelsDataLoading.value = true;
-    //       }, 1000)
-    //     );
-    //   } else {
-    //     // If the previous result was true, clear the delay and set isDashboardVariablesAndPanelsDataLoading to false
-    //     isDashboardVariablesAndPanelsDataLoading.value = false;
-    //     delayTimeout.forEach((timeout) => clearTimeout(timeout));
-    //   }
-    // };
-
-    // watch(variablesAndPanelsDataLoadingState, checkLoadingStatus, {
-    //   deep: true,
-    // });
+    // ======= [END] dashboard PrintMode =======
 
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
@@ -480,7 +461,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
-      isDashboardVariablesAndPanelsDataLoadingDebouncedValue,
+      isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
     };
   },
   methods: {

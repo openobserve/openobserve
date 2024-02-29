@@ -230,23 +230,27 @@ export default defineComponent({
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
+    // ======= [START] dashboard PrintMode =======
+
     //inject variablesAndPanelsDataLoadingState from parent
+    // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
       { panels: {}, variablesData: {} }
     );
 
-    // when we get the new data from the apis, convert the data to render the panel
-    watch(loading, (newLoading) => {
-      if(variablesAndPanelsDataLoadingState) {
+    // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
+    watch(loading, (updatedLoadingValue) => {
+      if (variablesAndPanelsDataLoadingState) {
+        // update the loading state of the current panel
         variablesAndPanelsDataLoadingState.panels = {
-          ...variablesAndPanelsDataLoadingState.panels,
-          [panelSchema.value.id]: newLoading,
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: updatedLoadingValue,
         };
       }
-
-      // console.log("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState.panels);
     });
+
+    // ======= [END] dashboard PrintMode =======
 
     watch(
       [data, store?.state],
