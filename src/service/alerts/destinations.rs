@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http;
+use config::CONFIG;
 
 use crate::{
     common::{
         infra::config::STREAM_ALERTS,
         meta::{
-            alerts::destinations::{Destination, DestinationWithTemplate},
+            alerts::destinations::{Destination, DestinationType, DestinationWithTemplate},
             authz::Authz,
         },
         utils::auth::{remove_ownership, set_ownership},
@@ -32,35 +33,74 @@ pub async fn save(
     name: &str,
     mut destination: Destination,
     create: bool,
-) -> Result<(), anyhow::Error> {
-    if db::alerts::templates::get(org_id, &destination.template)
-        .await
-        .is_err()
-    {
-        return Err(anyhow::anyhow!(
-            "Alert template {} not found",
-            destination.template
-        ));
+) -> Result<(), (http::StatusCode, anyhow::Error)> {
+    // First validate the `destination` according to its `destination_type`
+    match destination.destination_type {
+        DestinationType::Http => {
+            if destination.url.is_empty() {
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Alert destination URL needs to be specified"),
+                ));
+            }
+        }
+        DestinationType::Email => {
+            if destination.emails.is_empty() {
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Atleast one alert destination email is required"),
+                ));
+            }
+            if !CONFIG.smtp.smtp_enabled {
+                return Err((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    anyhow::anyhow!("SMTP not configured"),
+                ));
+            }
+        }
     }
+
     if !name.is_empty() {
         destination.name = name.to_string();
     }
     if destination.name.is_empty() {
-        return Err(anyhow::anyhow!("Alert destination name is required"));
+        return Err((
+            http::StatusCode::BAD_REQUEST,
+            anyhow::anyhow!("Alert destination name is required"),
+        ));
     }
     if destination.name.contains('/') {
-        return Err(anyhow::anyhow!("Alert destination name cannot contain '/'"));
+        return Err((
+            http::StatusCode::BAD_REQUEST,
+            anyhow::anyhow!("Alert destination name cannot contain '/'"),
+        ));
+    }
+
+    if db::alerts::templates::get(org_id, &destination.template)
+        .await
+        .is_err()
+    {
+        return Err((
+            http::StatusCode::BAD_REQUEST,
+            anyhow::anyhow!("Alert template {} not found", destination.template),
+        ));
     }
 
     match db::alerts::destinations::get(org_id, &destination.name).await {
         Ok(_) => {
             if create {
-                return Err(anyhow::anyhow!("Alert destination already exists"));
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Alert destination already exists"),
+                ));
             }
         }
         Err(_) => {
             if !create {
-                return Err(anyhow::anyhow!("Alert destination not found"));
+                return Err((
+                    http::StatusCode::BAD_REQUEST,
+                    anyhow::anyhow!("Alert destination not found"),
+                ));
             }
         }
     }
@@ -72,7 +112,7 @@ pub async fn save(
             }
             Ok(())
         }
-        Err(e) => Err(e),
+        Err(e) => Err((http::StatusCode::BAD_REQUEST, e)),
     }
 }
 
