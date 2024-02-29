@@ -1232,6 +1232,7 @@ describe("Logs testcases", () => {
     })
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
     cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.wait(300)
     cy.get('[title="Delete"]').click()
     cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
     cy.get('.q-notification__message').contains('Stream deleted')
@@ -1248,6 +1249,7 @@ describe("Logs testcases", () => {
     })
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
     cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.wait(300)
     cy.get('[title="Delete"]').click()
     cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
     cy.get('.q-notification__message').contains('Stream deleted')
@@ -1271,6 +1273,7 @@ describe("Logs testcases", () => {
     })
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
     cy.get('[data-test="streams-search-stream-input"]').type('stream1')
+    cy.wait(300)
     cy.get('[title="Delete"]').click()
     cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
     cy.get('.q-notification__message').contains('Stream deleted')
