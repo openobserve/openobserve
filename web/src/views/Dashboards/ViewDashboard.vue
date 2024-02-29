@@ -226,11 +226,13 @@ export default defineComponent({
       data: {},
     });
 
+    // dispatch setPrintMode, to set print mode
     const setPrint = (printMode: any) => {
       store.dispatch("setPrintMode", printMode);
     };
 
     const printDashboard = () => {
+      // set print mode as true
       setPrint(store.state.printMode != true);
 
       const query = {
@@ -238,6 +240,7 @@ export default defineComponent({
         print: store.state.printMode,
       };
 
+      // replace query params with print=true
       router.replace({ query });
     };
 
@@ -436,9 +439,12 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
 
+      // check if print query params exist
       if (params.print !== undefined) {
+        // set print mode
         setPrint(params.print == "true" ? true : false);
       } else {
+        // set print mode as false which is default in store
         router.replace({
           query: {
             ...route.query,
@@ -457,16 +463,6 @@ export default defineComponent({
       await nextTick();
       window.dispatchEvent(new Event("resize"));
     });
-
-    watch(
-      () => route.query,
-      (newQuery, oldQuery) => {
-        if (newQuery.print !== oldQuery.print) {
-          store.state.printMode = newQuery.print === "true";
-          setPrint(store.state.printMode == true ? true : false);
-        }
-      }
-    );
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {

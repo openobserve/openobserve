@@ -35,7 +35,7 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
    * @param {any} newValue - The new value to set with debounce
    */
   const setDebounceValue = (newValue: any) => {
-    // first, clear any existing timeout
+    // first, clear existing timeout
     resetTimeout();
 
     // assign a new timeout
@@ -44,12 +44,12 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
     }, delay);
   };
 
-  // clear any existing timeout on deactivation
+  // clear existing timeout on deactivation
   onDeactivated(() => {
     resetTimeout();
   });
 
-  // clear any existing timeout on unmount
+  // clear existing timeout on unmount
   onUnmounted(() => {
     resetTimeout();
   });
