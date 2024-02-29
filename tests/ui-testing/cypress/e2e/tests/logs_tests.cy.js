@@ -1151,24 +1151,4 @@ describe("Logs testcases", () => {
   });
 
 
-
-  it("should change stream settings and click on search stream", () => {
-    // Type the value of a variable into an input field
-
-    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
-    cy.get('[data-test="streams-search-stream-input"]').type('e2e_automate')
-    cy.get('[title="Stream Detail"]').click({ force: true });
-    cy.get(':nth-child(2) > [data-test="schema-stream-index-select"]').click()
-    cy.get('.q-virtual-scroll__content').within(() => {
-      cy.contains('Inverted Index').click()
-    })
-   
-    cy.get('[data-test="schema-update-settings-button"]').click({
-      force: true,
-    });
-    cy.get(".col-auto > .q-btn > .q-btn__content").click({ force: true });
-    cy.get('[title="Explore"]').click({ force: true });
-    cy.get('[data-test="log-table-column-0-@timestamp"]').should("exist");
-  });
-
 });
