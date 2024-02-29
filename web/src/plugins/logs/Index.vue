@@ -129,17 +129,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.stream.selectedStream.label == '' &&
                     searchObj.loading == false
                   "
+                  class="row"
                 >
-                  <h5
+                  <h6
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center"
+                    class="text-center col-8 q-mx-auto"
                   >
-                    <q-icon
-                      name="warning"
-                      color="warning"
-                      size="10rem"
-                    /><br />No stream selected.
-                  </h5>
+                    <q-icon name="info" color="info"
+size="md" /> Select a
+                    stream and press 'Run query' to continue. Additionally, you
+                    can apply additional filters and adjust the date range to
+                    enhance your search.
+                  </h6>
                 </div>
                 <div
                   v-else-if="
@@ -147,14 +148,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     searchObj.data.queryResults.hits.length == 0 &&
                     searchObj.loading == false
                   "
+                  class="row"
                 >
-                  <h5 data-test="logs-search-error-message" class="text-center">
+                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-8">
                     <q-icon
-                      name="warning"
-                      color="warning"
-                      size="10rem"
-                    /><br />{{ t("search.noRecordFound") }}
-                  </h5>
+                      name="info"
+                      color="info"
+                      size="md"
+                    /> {{ t("search.noRecordFound") }}
+                  </h6>
                 </div>
                 <div
                   v-else
@@ -680,6 +682,7 @@ export default defineComponent({
         this.searchObj.data.query = "";
         this.searchObj.data.editorValue = "";
       }
+      this.searchObj.loading = true;
       this.getQueryData();
       // this.searchResultRef.reDrawChart();
     },
