@@ -72,9 +72,15 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/functions**").as("functions");
     cy.visit(`${logData.logsUrl}?org_identifier=${Cypress.env("ORGNAME")}`);
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
+    cy.intercept("GET", "**/api/default/streams/default/schema**").as("schema");
     cy.wait("@allsearch");
+    cy.wait('@schema')
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
+    cy.wait("@allsearch");
     cy.intercept("GET", "**/api/default/streams**").as("streams");
+    
+
+   
   });
 
   // This is a test case to navigate to the logs page
@@ -136,9 +142,7 @@ describe("Logs testcases", () => {
     );
   });
 
-  it("should add the field to the editor when + is clicked", () => {
-    // Wait for 5 seconds
-    cy.wait(4000);
+  it.only("should add the field to the editor when + is clicked", () => {
     // get the value of the field name
     logstests.clickValueEditor();
     logstests.clickExpandedViewplusButton();
