@@ -15,18 +15,21 @@
 
 use std::{cmp::min, sync::Arc, time::Duration};
 
-use async_nats::{
-    jetstream::{self, kv},
-    Client, ServerAddr,
-};
+use async_nats::{jetstream, Client, ServerAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{utils::base64, CONFIG};
+use config::{cluster, utils::base64, CONFIG};
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
-use tokio::sync::{mpsc, OnceCell};
+use tokio::{
+    sync::{mpsc, OnceCell},
+    task::JoinHandle,
+};
 
-use crate::{db::Event, errors::*};
+use crate::{
+    db::{Event, EventData},
+    errors::*,
+};
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
@@ -34,12 +37,15 @@ pub async fn get_nats_client() -> &'static Client {
     NATS_CLIENT.get_or_init(connect).await
 }
 
-async fn get_bucket_by_key<'a>(prefix: &'a str, key: &'a str) -> Result<(kv::Store, &'a str)> {
+async fn get_bucket_by_key<'a>(
+    prefix: &'a str,
+    key: &'a str,
+) -> Result<(jetstream::kv::Store, &'a str)> {
     let client = get_nats_client().await.clone();
     let jetstream = jetstream::new(client);
     let key = key.trim_start_matches('/');
     let bucket_name = key.split('/').next().unwrap();
-    let mut bucket = kv::Config {
+    let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
         history: 3,
         ..Default::default()
@@ -227,8 +233,65 @@ impl super::Db for Nats {
         Ok(keys.len() as i64)
     }
 
-    async fn watch(&self, _prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
-        Err(Error::NotImplemented)
+    async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
+        let (tx, rx) = mpsc::channel(1024);
+        let prefix = prefix.to_string();
+        let self_prefix = self.prefix.to_string();
+        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            loop {
+                if cluster::is_offline() {
+                    break;
+                }
+                let (bucket, new_key) = get_bucket_by_key(&self_prefix, &prefix).await?;
+                let bucket_name = bucket.status().await?.bucket;
+                let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self_prefix);
+                let mut entries = bucket.watch_all().await?;
+                loop {
+                    match entries.next().await {
+                        None => {
+                            log::error!("watching prefix: {}, get message error", new_key);
+                            break;
+                        }
+                        Some(entry) => {
+                            let entry = match entry {
+                                Ok(entry) => entry,
+                                Err(e) => {
+                                    log::error!(
+                                        "watching prefix: {}, get message error: {}",
+                                        new_key,
+                                        e
+                                    );
+                                    break;
+                                }
+                            };
+                            let item_key = base64::decode_url(&entry.key).unwrap();
+                            if !item_key.starts_with(new_key) {
+                                continue;
+                            }
+                            match entry.operation {
+                                jetstream::kv::Operation::Put => tx
+                                    .send(Event::Put(EventData {
+                                        key: bucket_prefix.to_string() + &item_key,
+                                        value: Some(entry.value),
+                                    }))
+                                    .await
+                                    .unwrap(),
+                                jetstream::kv::Operation::Delete
+                                | jetstream::kv::Operation::Purge => tx
+                                    .send(Event::Delete(EventData {
+                                        key: bucket_prefix.to_string() + &item_key,
+                                        value: None,
+                                    }))
+                                    .await
+                                    .unwrap(),
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        });
+        Ok(Arc::new(rx))
     }
 
     async fn close(&self) -> Result<()> {

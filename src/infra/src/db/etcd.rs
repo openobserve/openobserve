@@ -259,7 +259,7 @@ impl super::Db for Etcd {
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
         let (tx, rx) = mpsc::channel(1024);
         let key = format!("{}{}", &self.prefix, prefix);
-        let prefix_key = self.prefix.to_string();
+        let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
             loop {
                 if cluster::is_offline() {
@@ -288,7 +288,7 @@ impl super::Db for Etcd {
                         for ev in ev.events() {
                             let kv = ev.kv().unwrap();
                             let item_key = kv.key_str().unwrap();
-                            let item_key = item_key.strip_prefix(&prefix_key).unwrap();
+                            let item_key = item_key.strip_prefix(&self_prefix).unwrap();
                             match ev.event_type() {
                                 EventType::Put => tx
                                     .send(Event::Put(EventData {
