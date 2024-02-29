@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Cursor, Read},
-    path::Path,
-    sync::Arc,
-    time::UNIX_EPOCH,
-};
+use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
@@ -30,7 +24,7 @@ use config::{
     utils::{
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files,
-        parquet::{read_metadata_from_bytes, read_metadata_from_file},
+        parquet::read_metadata_from_file,
     },
     FxIndexMap, CONFIG,
 };
@@ -40,9 +34,7 @@ use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
     common::infra::wal,
-    service::{
-        db, schema::schema_evolution, search::datafusion::exec::merge_parquet_files, stream,
-    },
+    service::{db, search::datafusion::exec::merge_parquet_files, stream},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -338,28 +330,17 @@ async fn merge_files(
     let stream_name = columns[3].to_string();
     let file_name = columns[4].to_string();
 
-    if new_file_list.len() == 1 {
-        let (new_file_name, file_meta) = upload_file(
-            &org_id,
-            &stream_name,
-            stream_type,
-            wal_dir,
-            &file.key,
-            &file_name,
-        )
-        .await?;
-        return Ok((new_file_name, file_meta, retain_file_list));
-    }
-
     // merge files
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
+    let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
     let mut new_file_meta = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
         &bloom_filter_fields,
+        &full_text_search_fields,
         new_file_size,
     )
     .await?;
@@ -388,69 +369,5 @@ async fn merge_files(
     match storage::put(&new_file_key, buf.into()).await {
         Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
         Err(e) => Err(e),
-    }
-}
-
-async fn upload_file(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    wal_dir: &Path,
-    path_str: &str,
-    file_name: &str,
-) -> Result<(String, FileMeta), anyhow::Error> {
-    let file_path = wal_dir.join(path_str);
-    let mut file = std::fs::File::open(&file_path).unwrap();
-    let file_meta = file.metadata().unwrap();
-    let file_size = file_meta.len();
-    log::info!("[INGESTER:JOB] File upload begin: {}", path_str);
-    if file_size == 0 {
-        if let Err(e) = tokio::fs::remove_file(file_path).await {
-            log::error!(
-                "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
-                path_str,
-                e
-            );
-        }
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
-    }
-
-    // write metadata
-    let mut buf_parquet: Vec<u8> = Vec::new();
-    file.read_to_end(&mut buf_parquet)?;
-    let buf_parquet = bytes::Bytes::from(buf_parquet);
-    let mut file_meta = read_metadata_from_bytes(&buf_parquet).await?;
-    file_meta.compressed_size = file_size as i64;
-
-    // read schema
-    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
-    let inferred_schema = arrow_reader
-        .schema()
-        .as_ref()
-        .clone()
-        .with_metadata(std::collections::HashMap::new());
-
-    schema_evolution(
-        org_id,
-        stream_name,
-        stream_type,
-        Arc::new(inferred_schema),
-        file_meta.min_ts,
-    )
-    .await;
-
-    let new_file_name =
-        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
-    drop(file);
-    match storage::put(&new_file_name, buf_parquet).await {
-        Ok(_) => {
-            log::info!("[INGESTER:JOB] File upload succeeded: {}", new_file_name);
-            Ok((new_file_name, file_meta))
-        }
-        Err(err) => {
-            log::error!("[INGESTER:JOB] File upload error: {:?}", err);
-            Err(anyhow::anyhow!(err))
-        }
     }
 }
