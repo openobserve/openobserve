@@ -150,12 +150,13 @@ size="md" /> Select a
                   "
                   class="row"
                 >
-                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-8">
-                    <q-icon
-                      name="info"
-                      color="primary"
-                      size="md"
-                    /> {{ t("search.noRecordFound") }}
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-8"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
                 <div
