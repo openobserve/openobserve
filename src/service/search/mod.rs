@@ -20,6 +20,7 @@ use std::{
 };
 
 use ::datafusion::arrow::{datatypes::Schema, ipc, json as arrow_json, record_batch::RecordBatch};
+use async_recursion::async_recursion;
 use chrono::Duration;
 use config::{
     cluster::{is_ingester, is_querier},
@@ -31,11 +32,12 @@ use config::{
     utils::{flatten, json, str::find},
     CONFIG,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, ErrorCodes},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -204,9 +206,11 @@ async fn get_file_list(
         }
     }
     files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
     files
 }
 
+#[async_recursion]
 #[tracing::instrument(
     name = "service:search:cluster",
     skip(req),
@@ -246,15 +250,111 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let file_list = get_file_list(
-        &session_id,
-        &meta,
-        stream_type,
-        partition_time_level,
-        &stream_settings.partition_keys,
-    )
-    .await;
-    let total_files = file_list.len();
+    let mut idx_file_list = vec![];
+    let is_inverted_index = !meta.fts_terms.is_empty();
+
+    log::warn!(
+        "searching in is_agg_query {:?} is_inverted_index {:?}",
+        !req.aggs.is_empty(),
+        is_inverted_index
+    );
+
+    // If the query is of type inverted index and this is not an aggregations request
+    let file_list = if is_inverted_index && req.aggs.is_empty() {
+        let mut idx_req = req.clone();
+
+        // Get all the unique terms which the user has searched.
+        let terms = meta
+            .fts_terms
+            .iter()
+            .flat_map(|t| t.split_whitespace().collect::<Vec<_>>())
+            .map(|t| t.to_lowercase())
+            .collect::<HashSet<String>>();
+
+        let search_condition = terms
+            .iter()
+            .map(|x| format!("term ilike '%{x}%'"))
+            .collect::<Vec<String>>()
+            .join(" or ");
+
+        let query = format!(
+            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
+            meta.stream_name, search_condition
+        );
+
+        let is_first_page = idx_req.query.as_ref().unwrap().from == 0;
+        idx_req.stream_type = StreamType::Index.to_string();
+        idx_req.query.as_mut().unwrap().sql = query;
+        idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
+        idx_req.query.as_mut().unwrap().size = 10000;
+        idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
+        idx_req.query.as_mut().unwrap().uses_zo_fn = false;
+        idx_req.query.as_mut().unwrap().track_total_hits = false;
+        idx_req.query.as_mut().unwrap().query_context = "".to_string();
+        idx_req.query.as_mut().unwrap().query_fn = "".to_string();
+        idx_req.aggs.clear();
+
+        let idx_resp: search::Response = search_in_cluster(idx_req).await?;
+        let unique_files = if is_first_page {
+            let limit_count = 500;
+            let sorted_data = idx_resp
+                .hits
+                .iter()
+                .map(|hit| {
+                    let term = hit.get("term").unwrap().as_str().unwrap().to_string();
+                    let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
+                    let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
+                    let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    (term, file_name, count, timestamp)
+                })
+                .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
+
+            let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
+            let mut term_counts: HashMap<String, u64> = HashMap::new();
+
+            for (term, filename, count, _timestamp) in sorted_data {
+                let current_count = term_counts.entry(term.clone()).or_insert(0);
+                if *current_count < limit_count || *current_count == 0 {
+                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                    *current_count += count;
+                }
+            }
+            term_map
+                .into_iter()
+                .flat_map(|(_, filenames)| filenames)
+                .collect::<HashSet<_>>()
+        } else {
+            idx_resp
+                .hits
+                .iter()
+                .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                .collect::<HashSet<_>>()
+        };
+
+        for filename in unique_files {
+            let prefixed_filename = format!(
+                "files/{}/logs/{}/{}",
+                meta.org_id, meta.stream_name, filename
+            );
+            if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
+                idx_file_list.push(FileKey {
+                    key: prefixed_filename.to_string(),
+                    meta: file_meta,
+                    deleted: false,
+                });
+            }
+        }
+        idx_file_list
+    } else {
+        get_file_list(
+            &session_id,
+            &meta,
+            stream_type,
+            partition_time_level,
+            &stream_settings.partition_keys,
+        )
+        .await
+    };
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
@@ -263,11 +363,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> =
         Some(o2_enterprise::enterprise::search::queue::predict_work_group(&nodes, &file_list));
     // 2. check concurrency
-    let work_group_str = if work_group.is_none() {
-        "global".to_string()
+    let work_group_str = if let Some(wg) = &work_group {
+        wg.to_string()
     } else {
-        work_group.as_ref().unwrap().to_string()
+        "global".to_string()
     };
+
     let locker_key = "search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
     let locker = dist_lock::lock(&locker_key, 0).await?;
@@ -328,7 +429,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
     };
     log::info!(
-        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {total_files}",
+        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
 
