@@ -133,13 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <h6
                     data-test="logs-search-no-stream-selected-text"
-                    class="text-center col-8 q-mx-auto"
+                    class="text-center col-10 q-mx-auto"
                   >
                     <q-icon name="info" color="primary"
 size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
-                    enhance your search.
+                    enhance search.
                   </h6>
                 </div>
                 <div
@@ -150,7 +150,7 @@ size="md" /> Select a
                   "
                   class="row"
                 >
-                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-8">
+                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-10">
                     <q-icon
                       name="info"
                       color="primary"
