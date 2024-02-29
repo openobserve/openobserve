@@ -1238,7 +1238,7 @@ describe("Logs testcases", () => {
     cy.get('.q-notification__message').contains('Stream deleted')
   });
 
-  it.only("should create stream with metrics stream type and delete", () => {
+  it.only("should create stream with traces stream type and delete", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type('stream1traces')
