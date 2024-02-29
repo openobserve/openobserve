@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
-    value   TEXT not null
+    value   LONGTEXT not null
 );
         "#,
     )
