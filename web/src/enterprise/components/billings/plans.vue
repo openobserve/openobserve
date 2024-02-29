@@ -343,51 +343,11 @@ export default defineComponent({
           });
         });
     },
-    onSubmit() {
-      this.frmPayment.validate().then((success: any) => {
-        if (success) {
-          const data = {
-            number: this.number,
-            expiry_month: parseInt(this.expiry_month),
-            expiry_year: parseInt(this.expiry_year),
-            cvv: this.cvv,
-          };
-          BillingService.create_payment_subscribe(
-            this.store.state.selectedOrganization.identifier,
-            data
-          )
-            .then((res) => {
-              this.loadSubscription();
-            })
-            .catch((e) => {
-              this.$q.notify({
-                type: "negative",
-                message: e.message,
-                timeout: 5000,
-              });
-            });
-        } else {
-          // oh no, user has filled in
-          // at least one invalid value
-        }
-      });
-    },
-    onReset() {
-      this.number = "";
-      this.expiry_month = "";
-      this.expiry_year = "";
-      this.cvv = "";
-      return false;
-    },
   },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
-    const number = ref("4344434343434343");
-    const cvv = ref("222");
-    const expiry_month = ref("01");
-    const expiry_year = ref("1000");
     const frmPayment = ref();
     const planType = ref("");
     const isActiveSubscription = ref(false);
@@ -419,10 +379,6 @@ export default defineComponent({
     return {
       t,
       store,
-      number,
-      cvv,
-      expiry_month,
-      expiry_year,
       frmPayment,
       planType,
       isActiveSubscription,
