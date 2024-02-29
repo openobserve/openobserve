@@ -545,7 +545,7 @@ async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if stream_type == StreamType::Logs {
+            if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 log::warn!("Stream type is LOGS, lets create a new index file");
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
