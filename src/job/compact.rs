@@ -44,6 +44,7 @@ async fn run_merge() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
+        log::warn!("Running merge");
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
         let ret = service::compact::run_merge().await;

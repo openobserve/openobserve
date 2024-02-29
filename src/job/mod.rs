@@ -116,6 +116,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
+
     tokio::task::yield_now().await; // yield let other tasks run
 
     // cache core metadata
@@ -181,6 +182,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
         // create wal dir
         if let Err(e) = std::fs::create_dir_all(&CONFIG.common.data_wal_dir) {
+            log::error!("Failed to create wal dir: {}", e);
+        }
+        if let Err(e) = std::fs::create_dir_all(&CONFIG.common.data_idx_dir) {
             log::error!("Failed to create wal dir: {}", e);
         }
         // clean empty sub dirs
