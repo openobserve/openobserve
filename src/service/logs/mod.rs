@@ -27,17 +27,16 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 
-use super::{
-    ingestion::{get_string_value, TriggerAlertData},
-    schema::check_for_schema,
-};
+use super::ingestion::{get_string_value, TriggerAlertData};
 use crate::{
     common::meta::{
         alerts::Alert,
         ingestion::RecordStatus,
         stream::{SchemaRecords, StreamPartition},
     },
-    service::{ingestion::get_wal_time_key, stream::unwrap_partition_time_level},
+    service::{
+        ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
+    },
 };
 
 pub mod bulk;
