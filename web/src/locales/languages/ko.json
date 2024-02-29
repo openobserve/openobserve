@@ -33,7 +33,7 @@
     "addFieldToTable": "테이블에 필드 추가",
     "removeFieldFromTable": "테이블에서 필드 제거",
     "excludeSearchTerm": "검색어 제외",
-    "noOfRecords": "레코드 수테이블:",
+    "noOfRecords": "레코드 수:",
     "attributes": "특성",
     "events": "이벤트",
     "goHome": "홈으로 이동"
