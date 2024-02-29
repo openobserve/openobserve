@@ -152,6 +152,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+lettre.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -217,6 +218,14 @@ hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.12"
+lettre = { version = "0.11", default-features = false, features = [
+  "builder",
+  "hostname",
+  "smtp-transport",
+  "pool",
+  "tokio1",
+  "tokio1-rustls-tls",
+] }
 log = "0.4"
 memchr = "2.5"
 murmur3 = "0.5"

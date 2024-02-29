@@ -112,18 +112,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </div>
             </div>
-            <q-input
-              v-model="filterQuery"
-              borderless
-              filled
-              dense
-              class="q-ml-auto q-mb-xs no-border"
-              :placeholder="t('logStream.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
+            <div data-test="streams-search-stream-input">
+              <q-input
+                v-model="filterQuery"
+                borderless
+                filled
+                dense
+                class="q-ml-auto q-mb-xs no-border"
+                :placeholder="t('logStream.search')"
+              >
+                <template #prepend>
+                  <q-icon name="search" />
+                </template>
+              </q-input>
+            </div>
             <q-btn
               data-test="log-stream-refresh-stats-btn"
               class="q-ml-md q-mb-xs text-bold no-border"
@@ -243,6 +245,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
+import { watch } from "vue";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -356,6 +359,17 @@ export default defineComponent({
       }
     });
 
+    // As filter data don't gets called when search input is cleared.
+    // So calling onChangeStreamFilter to filter again
+    watch(
+      () => filterQuery.value,
+      (value) => {
+        if (!value) {
+          onChangeStreamFilter(selectedStreamType.value);
+        }
+      }
+    );
+
     const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
         previousOrgIdentifier.value =
@@ -371,6 +385,7 @@ export default defineComponent({
         let counter = 1;
         getStreams("", false, false)
           .then((res: any) => {
+            logStream.value = [];
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
@@ -397,7 +412,7 @@ export default defineComponent({
                 };
               })
             );
-            duplicateStreamList.value = logStream.value;
+            duplicateStreamList.value = [...logStream.value];
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {
@@ -531,14 +546,18 @@ export default defineComponent({
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
       terms = terms.toLowerCase();
-      for (var i = 0; i < rows.length; i++) {
+
+      for (var i = 0; i < duplicateStreamList.value.length; i++) {
         if (
-          (selectedStreamType.value === rows[i]["stream_type"] ||
+          (selectedStreamType.value ===
+            duplicateStreamList.value[i]["stream_type"] ||
             selectedStreamType.value === "all") &&
-          (rows[i]["name"].toLowerCase().includes(terms) ||
-            rows[i]["stream_type"].toLowerCase().includes(terms))
+          (duplicateStreamList.value[i]["name"].toLowerCase().includes(terms) ||
+            duplicateStreamList.value[i]["stream_type"]
+              .toLowerCase()
+              .includes(terms))
         ) {
-          filtered.push(rows[i]);
+          filtered.push(duplicateStreamList.value[i]);
         }
       }
       return filtered;
