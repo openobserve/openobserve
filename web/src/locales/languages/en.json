@@ -101,7 +101,8 @@
     "btnDownload": "Download",
     "customDownloadMessage": "Enter the initial number and select the range for downloading data.",
     "noRecordFound": "No Record Found",
-    "functionErrorLabel": "Function not applied: (expand for more details)"
+    "functionErrorLabel": "Function not applied: (expand for more details)",
+    "histogramErrorBtnLabel": "Click for error details"
   },
   "menu": {
     "home": "Home",
@@ -360,7 +361,12 @@
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
-    "labelTraces": "Traces"
+    "labelTraces": "Traces",
+    "add": "Add Stream",
+    "dataRetention": "Data Retention (in days)",
+    "indexing": "Indexing",
+    "createStream": "Create Stream",
+    "indexType": "Index Type"
   },
   "function": {
     "header": "Functions",

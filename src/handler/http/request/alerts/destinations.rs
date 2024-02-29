@@ -15,7 +15,7 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::meta::{alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse},
@@ -46,7 +46,7 @@ pub async fn save_destination(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let dest = dest.into_inner();
-    match destinations::save(&org_id, "", dest).await {
+    match destinations::save(&org_id, "", dest, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -78,7 +78,7 @@ pub async fn update_destination(
     let (org_id, name) = path.into_inner();
     let dest = dest.into_inner();
     let name = name.trim();
-    match destinations::save(&org_id, name, dest).await {
+    match destinations::save(&org_id, name, dest, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -127,9 +127,38 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
     )
 )]
 #[get("/{org_id}/alerts/destinations")]
-async fn list_destinations(path: web::Path<String>) -> Result<HttpResponse, Error> {
+async fn list_destinations(
+    path: web::Path<String>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    match destinations::list(&org_id).await {
+
+    let mut _permitted = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = _req.headers().get("user_id").unwrap();
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id.to_str().unwrap(),
+            "GET",
+            "destination",
+        )
+        .await
+        {
+            Ok(list) => {
+                _permitted = list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+        // Get List of allowed objects ends
+    }
+
+    match destinations::list(&org_id, _permitted).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

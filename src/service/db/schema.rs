@@ -19,7 +19,10 @@ use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::{HashMap, HashSet};
-use infra::{cache, db as infra_db};
+use infra::{
+    cache,
+    db::{self as infra_db},
+};
 
 use crate::{
     common::{
@@ -346,7 +349,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Vec<Schema> = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = db.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 let settings = stream_settings(item_value.last().unwrap()).unwrap_or_default();
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.insert(item_key.to_string(), item_value.clone());

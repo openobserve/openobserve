@@ -31,6 +31,7 @@ pub async fn save(
     org_id: &str,
     name: &str,
     mut destination: Destination,
+    create: bool,
 ) -> Result<(), anyhow::Error> {
     if db::alerts::templates::get(org_id, &destination.template)
         .await
@@ -49,6 +50,19 @@ pub async fn save(
     }
     if destination.name.contains('/') {
         return Err(anyhow::anyhow!("Alert destination name cannot contain '/'"));
+    }
+
+    match db::alerts::destinations::get(org_id, &destination.name).await {
+        Ok(_) => {
+            if create {
+                return Err(anyhow::anyhow!("Alert destination already exists"));
+            }
+        }
+        Err(_) => {
+            if !create {
+                return Err(anyhow::anyhow!("Alert destination not found"));
+            }
+        }
     }
 
     match db::alerts::destinations::set(org_id, &destination).await {
@@ -77,8 +91,31 @@ pub async fn get_with_template(
     Ok(dest.with_template(template))
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
-    db::alerts::destinations::list(org_id).await
+pub async fn list(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Destination>, anyhow::Error> {
+    match db::alerts::destinations::list(org_id).await {
+        Ok(destinations) => {
+            let mut result = Vec::new();
+            for dest in destinations {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("destination:{}", dest.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("destination:{}", org_id))
+                {
+                    result.push(dest);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {

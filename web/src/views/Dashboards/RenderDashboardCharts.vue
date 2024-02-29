@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- view panel dialog -->
-    <q-dialog v-model="showViewPanel">
+    <q-dialog v-model="showViewPanel" :no-route-dismiss="true">
       <q-card style="min-width: 95vw; min-height: 90vh">
         <ViewPanel
           :panelId="viewPanelId"
@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :initialVariableValues="variablesData"
           @close-panel="() => (showViewPanel = false)"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+          @update:initial-variable-values="updateInitialVariableValues"
         />
       </q-card>
     </q-dialog>
@@ -329,6 +330,9 @@ export default defineComponent({
 
     // update initial variable values using the variable value selector ref
     const updateInitialVariableValues = async (...args: any) => {
+      // if view panel is open then close it
+      showViewPanel.value = false;
+
       // first, refresh the dashboard
       refreshDashboard();
       // then, update the initial variable values

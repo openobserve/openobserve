@@ -19,6 +19,13 @@ use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
 use itertools::chain;
+use lettre::{
+    transport::smtp::{
+        authentication::Credentials,
+        client::{Tls, TlsParameters},
+    },
+    AsyncSmtpTransport, Tokio1Executor,
+};
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use sysinfo::{DiskExt, SystemExt};
@@ -139,6 +146,34 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     )
 });
 
+pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy::new(|| {
+    if !CONFIG.smtp.smtp_enabled {
+        None
+    } else {
+        let tls_parameters = TlsParameters::new(CONFIG.smtp.smtp_host.clone()).unwrap();
+        let mut transport_builder =
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&CONFIG.smtp.smtp_host)
+                .port(CONFIG.smtp.smtp_port);
+
+        let option = &CONFIG.smtp.smtp_encryption;
+        transport_builder = if option == "starttls" {
+            transport_builder.tls(Tls::Required(tls_parameters))
+        } else if option == "ssltls" {
+            transport_builder.tls(Tls::Wrapper(tls_parameters))
+        } else {
+            transport_builder
+        };
+
+        if !CONFIG.smtp.smtp_username.is_empty() && !CONFIG.smtp.smtp_password.is_empty() {
+            transport_builder = transport_builder.credentials(Credentials::new(
+                CONFIG.smtp.smtp_username.clone(),
+                CONFIG.smtp.smtp_password.clone(),
+            ));
+        }
+        Some(transport_builder.build())
+    }
+});
+
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
@@ -158,6 +193,27 @@ pub struct Config {
     pub tcp: TCP,
     pub prom: Prometheus,
     pub profiling: Pyroscope,
+    pub smtp: Smtp,
+}
+
+#[derive(EnvConfig)]
+pub struct Smtp {
+    #[env_config(name = "ZO_SMTP_ENABLED", default = false)]
+    pub smtp_enabled: bool,
+    #[env_config(name = "ZO_SMTP_HOST", default = "localhost")]
+    pub smtp_host: String,
+    #[env_config(name = "ZO_SMTP_PORT", default = 25)]
+    pub smtp_port: u16,
+    #[env_config(name = "ZO_SMTP_USER_NAME", default = "")]
+    pub smtp_username: String,
+    #[env_config(name = "ZO_SMTP_PASSWORD", default = "")]
+    pub smtp_password: String,
+    #[env_config(name = "ZO_SMTP_REPLY_TO", default = "")]
+    pub smtp_reply_to: String,
+    #[env_config(name = "ZO_SMTP_FROM_EMAIL", default = "")]
+    pub smtp_from_email: String,
+    #[env_config(name = "ZO_SMTP_ENCRYPTION", default = "")]
+    pub smtp_encryption: String,
 }
 
 #[derive(EnvConfig)]
@@ -280,6 +336,13 @@ pub struct Common {
     pub feature_query_queue_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]
     pub feature_query_partition_strategy: String,
+    #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
+    pub feature_query_infer_schema: bool,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_INFER_SCHEMA_IF_FIELDS_MORE_THAN",
+        default = 0
+    )]
+    pub feature_query_infer_schema_if_fields_more_than: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -360,7 +423,7 @@ pub struct Common {
     pub memory_circuit_breaker_ratio: usize,
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
-        default = true,
+        default = false,
         help = "Control the redirection of a user to ingestion page in case there is no stream found."
     )]
     pub restricted_routes_on_empty_data: bool,

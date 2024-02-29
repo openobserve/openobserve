@@ -55,6 +55,7 @@ pub async fn save(
     stream_name: &str,
     name: &str,
     mut alert: Alert,
+    create: bool,
 ) -> Result<(), anyhow::Error> {
     if !name.is_empty() {
         alert.name = name.trim().to_string();
@@ -63,6 +64,22 @@ pub async fn save(
     alert.stream_type = stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
+
+    match db::alerts::get(org_id, stream_type, stream_name, &alert.name).await {
+        Ok(Some(_)) => {
+            if create {
+                return Err(anyhow::anyhow!("Alert already exists"));
+            }
+        }
+        Ok(None) => {
+            if !create {
+                return Err(anyhow::anyhow!("Alert not found"));
+            }
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
 
     // default frequency is 60 seconds
     if alert.trigger_condition.frequency == 0 {
@@ -165,8 +182,29 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
+    permitted: Option<Vec<String>>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    db::alerts::list(org_id, stream_type, stream_name).await
+    match db::alerts::list(org_id, stream_type, stream_name).await {
+        Ok(alerts) => {
+            let mut result = Vec::new();
+            for alert in alerts {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("alert:{}", alert.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("alert:{}", org_id))
+                {
+                    result.push(alert);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(
@@ -1147,7 +1185,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_alert_save() {
+    async fn test_alert_create() {
         let org_id = "default";
         let stream_type = StreamType::Logs;
         let stream_name = "default";
@@ -1156,7 +1194,7 @@ mod tests {
             name: alert_name.to_string(),
             ..Default::default()
         };
-        let ret = save(org_id, stream_type, stream_name, alert_name, alert).await;
+        let ret = save(org_id, stream_type, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
     }

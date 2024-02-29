@@ -71,12 +71,34 @@ pub async fn get_streams(
     org_id: &str,
     stream_type: Option<StreamType>,
     fetch_schema: bool,
+    permitted_streams: Option<Vec<String>>,
 ) -> Vec<Stream> {
     let indices = db::schema::list(org_id, stream_type, fetch_schema)
         .await
         .unwrap_or_default();
-    let mut indices_res = Vec::with_capacity(indices.len());
-    for stream_loc in indices {
+
+    let filtered_indices = if let Some(s_type) = stream_type {
+        match permitted_streams {
+            Some(permitted_streams) => {
+                if permitted_streams.contains(&format!("{}:{}", s_type, org_id)) {
+                    indices
+                } else {
+                    indices
+                        .into_iter()
+                        .filter(|stream_loc| {
+                            permitted_streams
+                                .contains(&format!("{}:{}", s_type, stream_loc.stream_name))
+                        })
+                        .collect::<Vec<_>>()
+                }
+            }
+            None => indices,
+        }
+    } else {
+        indices
+    };
+    let mut indices_res = Vec::with_capacity(filtered_indices.len());
+    for stream_loc in filtered_indices {
         let mut stats = stats::get_stream_stats(
             org_id,
             stream_loc.stream_name.as_str(),
