@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
+            loading="lazy"
             class="appLogo"
             :src="
               store?.state?.theme == 'dark'
@@ -27,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : getImageURL('images/common/open_observe_logo.svg')
             "
             @click="goToHome"
+            width="150px"
+            height="31px"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
             >Beta</span
