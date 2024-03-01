@@ -13,7 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, watch, reactive, toRefs, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  watch,
+  reactive,
+  toRefs,
+  onMounted,
+  onUnmounted,
+  inject,
+} from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
@@ -29,7 +37,8 @@ export const usePanelDataLoader = (
   panelSchema: any,
   selectedTimeObj: any,
   variablesData: any,
-  chartPanelRef: any
+  chartPanelRef: any,
+  forceLoad: any
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -97,6 +106,11 @@ export const usePanelDataLoader = (
   // an async function that waits for the panel to become visible
   const waitForThePanelToBecomeVisible = (signal: any) => {
     return new Promise<void>((resolve, reject) => {
+      // Immediately resolve if forceLoad is true
+      if (forceLoad.value == true) {
+        resolve();
+        return;
+      }
       // Immediately resolve if isVisible is already true
       if (isVisible.value) {
         resolve();
@@ -164,7 +178,7 @@ export const usePanelDataLoader = (
         log("loadData: there are no queries to execute");
         state.loading = false;
         state.data = [];
-        state.metadata = {}
+        state.metadata = {};
         return;
       }
 
@@ -335,8 +349,8 @@ export const usePanelDataLoader = (
   };
 
   watch(
-    // Watching for changes in panelSchema and selectedTimeObj
-    () => [panelSchema?.value, selectedTimeObj?.value],
+    // Watching for changes in panelSchema, selectedTimeObj and forceLoad
+    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
@@ -482,7 +496,7 @@ export const usePanelDataLoader = (
     if (queryType === "sql") {
       const queryStream = getStreamFromQuery(query);
 
-      const applicableAdHocVariables = adHocVariables
+      const applicableAdHocVariables = adHocVariables;
       // .filter((it: any) => {
       //   return it?.streams?.find((it: any) => it.name == queryStream);
       // });
@@ -605,12 +619,12 @@ export const usePanelDataLoader = (
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
       ?.flat()
-      ?.filter((it: any) => it?.operator && it?.name && it?.value)
-      // ?.filter((it: any) =>
-      //   panelSchema.value.queryType == "sql"
-      //     ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
-      //     : true
-      // );
+      ?.filter((it: any) => it?.operator && it?.name && it?.value);
+    // ?.filter((it: any) =>
+    //   panelSchema.value.queryType == "sql"
+    //     ? it.streams.find((it: any) => sqlQueryStreams.includes(it?.name))
+    //     : true
+    // );
     log("getDynamicVariablesData: adHocVariables", adHocVariables);
     return adHocVariables;
   };

@@ -15,8 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-layout view="hHh lpR fFf" :class="miniMode ? 'miniMode' : ''">
-    <q-header :class="store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white'">
+  <q-layout
+    view="hHh lpR fFf"
+    :class="[
+      miniMode ? 'miniMode' : '',
+      store.state.printMode === true ? 'printMode' : '',
+    ]"
+  >
+    <q-header
+      :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
+    >
       <q-toolbar>
         <div class="flex relative-position q-mr-sm">
           <img
@@ -875,6 +883,19 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
+.printMode {
+  .q-header {
+    display: none;
+  }
+
+  .q-drawer {
+    display: none;
+  }
+
+  .q-page-container {
+    padding-left: 0px !important;
+  }
+}
 
 .warning-msg {
   background-color: var(--q-warning);

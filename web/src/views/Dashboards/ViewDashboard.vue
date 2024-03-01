@@ -27,7 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="`${
           store.state.theme === 'light' ? 'bg-white' : 'dark-mode'
-        } stickyHeader ${isFullscreen ? 'fullscreenHeader' : ''}`"
+        } stickyHeader ${
+          isFullscreen || store.state.printMode === true
+            ? 'fullscreenHeader'
+            : ''
+        }`"
       >
         <div class="flex justify-between items-center q-pa-xs">
           <div class="flex">
@@ -39,16 +43,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outline
               icon="arrow_back_ios_new"
               data-test="dashboard-back-btn"
+              class="hideOnPrintMode"
             />
             <span class="q-table__title q-mx-md q-mt-xs">{{
-              currentDashboardData.data.title
+              currentDashboardData.data?.title
             }}</span>
           </div>
           <div class="flex">
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm"
+              class="dashboard-icons q-px-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="add"
@@ -72,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="refreshInterval"
               trigger
               @trigger="refreshData"
-              class="dashboard-icons"
+              class="dashboard-icons hideOnPrintMode"
               size="sm"
             />
             <q-btn
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="refresh"
@@ -88,12 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn>
             <ExportDashboard
               v-if="!isFullscreen"
+              class="hideOnPrintMode"
               :dashboardId="currentDashboardData.data?.dashboardId"
             />
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="share"
@@ -104,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               v-if="!isFullscreen"
               outline
-              class="dashboard-icons q-px-sm q-ml-sm"
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               icon="settings"
@@ -116,6 +122,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               outline
               class="dashboard-icons q-px-sm q-ml-sm"
+              size="sm"
+              no-caps
+              :icon="store.state.printMode === true ? 'close' : 'print'"
+              @click="printDashboard"
+              data-test="dashboard-print-btn"
+              ><q-tooltip>{{
+                store.state.printMode === true
+                  ? t("common.close")
+                  : t("dashboard.print")
+              }}</q-tooltip></q-btn
+            >
+            <q-btn
+              outline
+              class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
               no-caps
               :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
@@ -135,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <RenderDashboardCharts
         @variablesData="variablesDataUpdated"
         :initialVariableValues="initialVariableValues"
-        :viewOnly="false"
+        :viewOnly="store.state.printMode"
         :dashboardData="currentDashboardData.data"
         :currentTimeObj="currentTimeObj"
         :selectedDateForViewPanel="selectedDate"
@@ -144,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="onDataZoom"
         @refresh="loadDashboard"
         :showTabs="true"
+        :forceLoad="store.state.printMode"
       />
 
       <q-dialog
@@ -205,6 +226,24 @@ export default defineComponent({
       data: {},
     });
 
+    // dispatch setPrintMode, to set print mode
+    const setPrint = (printMode: any) => {
+      store.dispatch("setPrintMode", printMode);
+    };
+
+    const printDashboard = () => {
+      // set print mode as true
+      setPrint(store.state.printMode != true);
+
+      const query = {
+        ...route.query,
+        print: store.state.printMode,
+      };
+
+      // replace query params with print=true
+      router.replace({ query });
+    };
+
     // boolean to show/hide settings sidebar
     const showDashboardSettingsDialog = ref(false);
 
@@ -244,6 +283,7 @@ export default defineComponent({
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
+          print: store.state.printMode,
         },
       });
     };
@@ -399,6 +439,19 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
 
+      // check if print query params exist
+      if (params.print !== undefined) {
+        // set print mode
+        setPrint(params.print == "true" ? true : false);
+      } else {
+        // set print mode as false which is default in store
+        router.replace({
+          query: {
+            ...route.query,
+            print: store.state.printMode,
+          },
+        });
+      }
       // This is removed due to the bug of the new date time component
       // and is now rendered when the setup method is called
       // instead of onActivated
@@ -421,6 +474,7 @@ export default defineComponent({
           tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
+          print: store.state.printMode,
         },
       });
     });
@@ -573,12 +627,19 @@ export default defineComponent({
       shareLink,
       selectedTabId,
       onMovePanel,
+      printDashboard,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
+.printMode {
+  .hideOnPrintMode {
+    display: none;
+  }
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
