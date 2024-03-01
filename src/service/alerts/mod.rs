@@ -25,15 +25,16 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    CONFIG,
+    CONFIG, SMTP_CLIENT,
 };
+use lettre::{message::SinglePart, AsyncTransport, Message};
 
 use super::promql;
 use crate::{
     common::{
         meta::{
             alerts::{
-                destinations::{DestinationWithTemplate, HTTPType},
+                destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 AggFunction, Alert, Condition, Operator, QueryCondition, QueryType,
             },
             authz::Authz,
@@ -790,7 +791,18 @@ pub async fn send_notification(
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let msg = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
+    let msg: String = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
+
+    match dest.destination_type {
+        DestinationType::Http => send_http_notification(dest, msg.clone()).await,
+        DestinationType::Email => send_email_notification(&alert.name, dest, msg).await,
+    }
+}
+
+pub async fn send_http_notification(
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<(), anyhow::Error> {
     let client = if dest.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -829,6 +841,37 @@ pub async fn send_notification(
     }
 
     Ok(())
+}
+
+pub async fn send_email_notification(
+    alert_name: &str,
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<(), anyhow::Error> {
+    if !CONFIG.smtp.smtp_enabled {
+        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+    }
+
+    let mut recepients = vec![];
+    for recepient in &dest.emails {
+        recepients.push(recepient);
+    }
+
+    let mut email = Message::builder()
+        .from(CONFIG.smtp.smtp_from_email.parse()?)
+        .subject(format!("Openobserve Alert - {}", alert_name));
+
+    for recepient in recepients {
+        email = email.to(recepient.parse()?);
+    }
+
+    let email = email.singlepart(SinglePart::html(msg)).unwrap();
+
+    // Send the email
+    match SMTP_CLIENT.as_ref().unwrap().send(email).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
+    }
 }
 
 fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
