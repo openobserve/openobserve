@@ -333,6 +333,13 @@ pub async fn check_for_schema(
         let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
+            // generate new schema
+            let inferred_schema = if field_datatype_delta.is_empty() {
+                inferred_schema
+            } else {
+                let schema_latest = stream_schema_map.get(stream_name).unwrap();
+                inferred_schema.cloned_from(schema_latest)
+            };
             return Ok((
                 SchemaEvolution {
                     schema_compatible: true,
@@ -361,22 +368,9 @@ pub async fn check_for_schema(
         types_delta: None,
     });
 
-    // get record schema
+    // generate new schema
     let schema_latest = stream_schema_map.get(stream_name).unwrap();
-    // ensure schema is compatible
-    let mut diff_fields = vec![];
-    for field in inferred_schema.fields() {
-        if let Ok(f) = schema_latest.field_with_name(field.name()) {
-            if f.data_type() != field.data_type() {
-                diff_fields.push(Arc::new(f.clone()));
-            }
-        }
-    }
-    let inferred_schema = if diff_fields.is_empty() {
-        inferred_schema.clone()
-    } else {
-        Schema::new(diff_fields)
-    };
+    let inferred_schema = inferred_schema.cloned_from(schema_latest);
 
     Ok((ret, Some(inferred_schema)))
 }

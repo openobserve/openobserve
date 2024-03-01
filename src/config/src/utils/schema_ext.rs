@@ -16,6 +16,7 @@
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
+    sync::Arc,
 };
 
 use arrow_schema::{Field, Schema};
@@ -25,6 +26,7 @@ const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
 /// SchemaExt helper...
 pub trait SchemaExt {
     fn to_cloned_fields(&self) -> Vec<Field>;
+    fn cloned_from(&self, schema: &Schema) -> Schema;
     fn hash_key(&self) -> String;
     fn size(&self) -> usize;
 }
@@ -32,6 +34,22 @@ pub trait SchemaExt {
 impl SchemaExt for Schema {
     fn to_cloned_fields(&self) -> Vec<Field> {
         self.fields.iter().map(|x| (**x).clone()).collect()
+    }
+
+    // ensure schema is compatible
+    fn cloned_from(&self, schema: &Schema) -> Schema {
+        let mut fields = Vec::with_capacity(self.fields().len());
+        for field in self.fields() {
+            match schema.field_with_name(field.name()) {
+                Ok(f) => {
+                    fields.push(Arc::new(f.clone()));
+                }
+                Err(_) => {
+                    fields.push(field.clone());
+                }
+            }
+        }
+        Schema::new(fields)
     }
 
     fn hash_key(&self) -> String {
