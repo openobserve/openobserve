@@ -25,7 +25,7 @@ use config::{
     RwBTreeMap, RwHashMap, CONFIG, INSTANCE_ID,
 };
 use infra::{
-    db::{get_coordinator, Event, NEED_WATCH},
+    db::{get_coordinator, Event},
     errors::Result,
 };
 use once_cell::sync::Lazy;
@@ -134,16 +134,15 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
     }
 }
 
-pub async fn update_node(uuid: &str, node: &Node) -> Result<()> {
+pub async fn update_local_node(node: &Node) -> Result<()> {
     if CONFIG.common.local_mode {
         return Ok(());
     }
 
-    let client = get_coordinator().await;
-    let key = format!("/nodes/{}", uuid);
-    let val = json::to_vec(node).unwrap();
-    client.put(&key, val.into(), NEED_WATCH).await?;
-    Ok(())
+    match CONFIG.common.cluster_coordinator.as_str().into() {
+        MetaStore::Nats => nats::update_local_node(node).await,
+        _ => etcd::update_local_node(node).await,
+    }
 }
 
 pub async fn leave() -> Result<()> {

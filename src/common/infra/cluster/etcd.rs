@@ -225,3 +225,12 @@ pub async fn leave() -> Result<()> {
 
     Ok(())
 }
+
+pub async fn update_local_node(node: &Node) -> Result<()> {
+    let mut client = etcd::get_etcd_client().await.clone();
+    let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
+    let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
+    let val = json::to_string(&node).unwrap();
+    let _resp = client.put(key, val, Some(opt)).await?;
+    Ok(())
+}

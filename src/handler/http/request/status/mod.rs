@@ -292,7 +292,7 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
         None => false,
     };
     node.scheduled = enable;
-    match cluster::update_node(&node_id, &node).await {
+    match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }

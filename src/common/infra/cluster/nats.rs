@@ -21,7 +21,7 @@ use config::{
 };
 use etcd_client::PutOptions;
 use infra::{
-    db::etcd,
+    db::{etcd, get_coordinator, NEED_WATCH},
     errors::{Error, Result},
 };
 
@@ -220,8 +220,16 @@ pub async fn leave() -> Result<()> {
     }
 
     let mut client = etcd::get_etcd_client().await.clone();
-    let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
+    let key = format!("{}nodes/{}", &CONFIG.nats.prefix, *LOCAL_NODE_UUID);
     let _resp = client.delete(key, None).await?;
 
+    Ok(())
+}
+
+pub async fn update_local_node(node: &Node) -> Result<()> {
+    let client = get_coordinator().await;
+    let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
+    let val = json::to_vec(node).unwrap();
+    client.put(&key, val.into(), NEED_WATCH).await?;
     Ok(())
 }
