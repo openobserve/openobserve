@@ -70,6 +70,7 @@ export const getUnitValue = (
   customUnit: string,
   decimals: number = 2
 ) => {
+  console.time("convertDataIntoUnitValue:getUnitValue");
   switch (unit) {
     case "bytes": {
       for (let unitInfo of units[unit]) {
@@ -85,6 +86,8 @@ export const getUnitValue = (
         }
       }
 
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       // Handle both positive and negative values for PB
       const absValue: any = Math.abs(value)
         ? Math.abs(value / units[unit][units[unit].length - 1].divisor)
@@ -97,6 +100,7 @@ export const getUnitValue = (
       };
     }
     case "custom": {
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: `${customUnit ?? ""}`,
@@ -115,6 +119,8 @@ export const getUnitValue = (
           };
         }
       }
+
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
@@ -139,6 +145,8 @@ export const getUnitValue = (
         }
       }
 
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       // If the value is too small to fit in any unit, return in microseconds
       return {
         value: `${value < 0 ? "-" : ""}${parseFloat(
@@ -161,6 +169,8 @@ export const getUnitValue = (
           };
         }
       }
+
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
 
       // If the value is too small to fit in any unit, return in microseconds
       return {
@@ -185,6 +195,8 @@ export const getUnitValue = (
         value /= 1024;
       }
 
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       // Handle both positive and negative values for PB/s
       return {
         value: `${value < 0 ? "-" : ""}${
@@ -194,6 +206,8 @@ export const getUnitValue = (
       };
     }
     case "percent-1": {
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       return {
         value: `${(parseFloat(value) * 100)?.toFixed(decimals) ?? 0}`,
         unit: "%",
@@ -201,6 +215,8 @@ export const getUnitValue = (
       // `${parseFloat(value) * 100}`;
     }
     case "percent": {
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: "%",
@@ -224,6 +240,9 @@ export const getUnitValue = (
       const val: any = Math.abs(value)
         ? Math.abs(value / units[unit][units[unit].length - 1].divisor)
         : 0;
+
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       return {
         value: `${value < 0 ? "-" : ""}${
           parseFloat(val)?.toFixed(decimals) ?? 0
@@ -247,6 +266,9 @@ export const getUnitValue = (
       const val: any = Math.abs(value)
         ? Math.abs(value / units[unit][units[unit].length - 1].divisor)
         : 0;
+
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       return {
         value: `${value < 0 ? "-" : ""}${
           parseFloat(val)?.toFixed(decimals) ?? 0
@@ -255,12 +277,16 @@ export const getUnitValue = (
       };
     }
     case "default": {
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       return {
         value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
       };
     }
     default: {
+      console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+
       return {
         value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",

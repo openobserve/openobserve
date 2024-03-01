@@ -214,7 +214,7 @@ export const convertPromQLData = (
           }
         });
 
-        console.time("convertPromQLData: Tooltip:formatter");
+        console.timeEnd("convertPromQLData: Tooltip:formatter");
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
@@ -327,6 +327,7 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
+  console.time("convertPromQLData: make series array");
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -586,6 +587,8 @@ export const convertPromQLData = (
   });
 
   options.series = options.series.flat();
+
+  console.timeEnd("convertPromQLData: make series array");
 
   const calculateWidthText = (text: string): number => {
     if (!text) return 0;
