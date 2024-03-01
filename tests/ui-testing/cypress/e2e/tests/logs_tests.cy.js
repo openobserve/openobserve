@@ -353,6 +353,7 @@ describe("Logs testcases", () => {
       .find("tr")
       .eq(1)
       .click({ force: true });
+    cy.wait(300);
     cy.get(
       '[data-test="log-detail-json-content"] >>> [data-test="log-details-include-exclude-field-btn"] :first'
     ).click({ force: true });
@@ -393,6 +394,7 @@ describe("Logs testcases", () => {
       // Confirm that the text contains 'code' not equal to '200'
       expect(cleanedText).to.include("_timestamp!=");
       applyQueryButton();
+      cy.wait(200);
       //   cy.get('[data-test="[data-test="logs-search-bar-query-editor"]"]').type("{selectall}{del}");
       //   applyQueryButton();
       cy.get('[data-test="logs-search-result-logs-table"]')
@@ -400,6 +402,7 @@ describe("Logs testcases", () => {
         .find("tr")
         .eq(2)
         .click({ force: true });
+      cy.wait(2000);
       cy.get(
         '[data-test="log-detail-json-content"] >>> [data-test="log-details-include-exclude-field-btn"] :first'
       ).click({ force: true });
@@ -1148,19 +1151,36 @@ describe("Logs testcases", () => {
     }).should("exist");
   });
 
-  it.skip("should change stream settings and click on search stream", () => {
+  it("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type("e2e_automate");
     cy.get('[title="Stream Detail"]').click({ force: true });
-    cy.get(
-      '[data-test="schema-stream-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]'
-    ).click({ force: true });
+    cy.get(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
+    cy.get(".q-virtual-scroll__content").within(() => {
+      cy.contains("Inverted Index").click();
+    });
+
     cy.get('[data-test="schema-update-settings-button"]').click({
       force: true,
     });
     cy.get(".col-auto > .q-btn > .q-btn__content").click({ force: true });
     cy.get('[title="Explore"]').click({ force: true });
     cy.get('[data-test="log-table-column-0-@timestamp"]').should("exist");
+  });
+  it("should display error if blank spaces added under stream name and clicked create stream ", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type("  ");
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.contains("Field is required").should("exist");
+  });
+
+  it("should display error if create stream is clicked without adding name", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.contains("Field is required").should("exist");
   });
 });
