@@ -153,6 +153,7 @@ export const convertPromQLData = (
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
+        console.time("convertPromQLData: Tooltip:formatter");
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
@@ -213,6 +214,7 @@ export const convertPromQLData = (
           }
         });
 
+        console.time("convertPromQLData: Tooltip:formatter");
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
