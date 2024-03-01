@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               :title="t('alerts.edit')"
-              @click="editReport(props)"
+              @click="editReport(props.row)"
             ></q-btn>
             <q-btn
               :data-test="`report-list-${props.row.name}-delete-report`"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               round
               flat
               :title="t('alerts.delete')"
-              @click="deleteReport(props)"
+              @click="confirmDeleteReport(props.row)"
             ></q-btn>
           </q-td>
         </template>
@@ -151,11 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Report"
-      message="Are you sure you want to delete report?"
+      v-model="deleteDialog.show"
+      :title="deleteDialog.title"
+      :message="deleteDialog.message"
       @update:ok="deleteReport"
-      @update:cancel="confirmDelete = false"
-      v-model="confirmDelete"
+      @update:cancel="deleteDialog.show = false"
     />
   </div>
 </template>
@@ -179,8 +179,10 @@ import {
   getUUID,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
-import type { QTableProps } from "quasar";
+import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
+import reports from "@/services/reports";
+import { cloneDeep } from "lodash-es";
 
 const reportsTableRows = ref([
   {
@@ -194,6 +196,14 @@ const { t } = useI18n();
 const router = useRouter();
 
 const confirmDelete = ref(false);
+
+const store = useStore();
+
+const editingReport: any = ref(null);
+
+const q = useQuasar();
+
+const isLoadingReports = ref(false);
 
 const perPageOptions: any = [
   { label: "5", value: 5 },
@@ -213,6 +223,14 @@ const pagination: any = ref({
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const filterQuery = ref("");
+
+const showConfirmDeleteDialog = ref(false);
+
+const deleteDialog = ref({
+  show: false,
+  title: "Delete Report",
+  message: "Are you sure you want to delete report?",
+});
 
 const reportListTableRef = ref(null);
 
@@ -247,6 +265,25 @@ const columns: any = ref<QTableProps["columns"]>([
   },
 ]);
 
+onBeforeMount(() => {
+  isLoadingReports.value = true;
+  reports
+    .list(store.state.selectedOrganization.identifier)
+    .then((res) => {
+      reportsTableRows.value = res.data.map((report: any, index: number) => ({
+        "#": index + 1,
+        ...report,
+      }));
+    })
+    .catch((err) => {
+      q.notify({
+        message: err.data.message || "Error while fetching reports!",
+        timeout: 3000,
+      });
+    })
+    .finally(() => (isLoadingReports.value = false));
+});
+
 const changePagination = (val: { label: string; value: any }) => {
   selectedPerPage.value = val.value;
   pagination.value.rowsPerPage = val.value;
@@ -264,11 +301,57 @@ const filterData = (rows: any, terms: any) => {
   return filtered;
 };
 
-const toggleReportState = () => {};
+const toggleReportState = (report: any) => {
+  const state = report.enabled ? "Pausing" : "Resuming";
+  const dismiss = q.notify({
+    message: `${state} report "${report.name}"`,
+  });
+  reports
+    .toggleReportState(
+      store.state.selectedOrganization.identifier,
+      report.name,
+      !report.enabled
+    )
+    .then((res) => {})
+    .catch((err) => {
+      console.log(err);
+    })
+    .finally(() => dismiss());
+};
 
-const editReport = () => {};
+const editReport = (report: any) => {
+  editingReport.value = cloneDeep(report);
+  router.push({
+    name: "createReport",
+    query: {
+      name: report.name,
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
 
-const deleteReport = () => {};
+const confirmDeleteReport = (report: any) => {
+  console.log("Confirm delete report");
+  deleteDialog.value.show = true;
+  deleteDialog.value.message = `Are you sure you want to delete report "${report.name}"`;
+};
+
+const deleteReport = (report: any) => {
+  const dismiss = q.notify({
+    message: `Deleting report "${report.name}"`,
+  });
+  reports
+    .toggleReportState(
+      store.state.selectedOrganization.identifier,
+      report.name,
+      !report.enabled
+    )
+    .then((res) => {})
+    .catch((err) => {
+      console.log(err);
+    })
+    .finally(() => dismiss());
+};
 
 const createNewReport = () => {
   router.push({ name: "createReport" });
