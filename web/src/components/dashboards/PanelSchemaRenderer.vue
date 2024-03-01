@@ -255,6 +255,7 @@ export default defineComponent({
     watch(
       [data, store?.state],
       async () => {
+        console.time("PanelSchemaRenderer:convertPanelData");
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value) {
           try {
@@ -285,6 +286,7 @@ export default defineComponent({
             errorDetail.value = "";
           }
         }
+        console.timeEnd("PanelSchemaRenderer:convertPanelData");
       },
       { deep: true }
     );
