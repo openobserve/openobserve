@@ -25,106 +25,10 @@ import http from "./http";
 
 const reports = {
   list: (org_identifier: string) => {
-    return new Promise((resolve) => {
-      resolve({
-        data: [
-          {
-            dashboards: [
-              {
-                folder: "7146907899342770176VPxgzI",
-                dashboard: "71508289400960532486HWxIK",
-                tabs: ["default"],
-                variables: [
-                  {
-                    name: "",
-                    value: "var",
-                    id: "327e2981-02ab-4da8-a9cb-8f4c11218b88",
-                    key: "var",
-                  },
-                ],
-                timerange: {
-                  type: "relative",
-                  period: "45m",
-                  from: 1709272558251000,
-                  to: 1709275258251000,
-                },
-              },
-            ],
-            description: "Daily Report",
-            destinations: [
-              {
-                email: "hello",
-              },
-            ],
-            enabled: true,
-            media_type: "Pdf",
-            name: "report1",
-            title: "hello",
-            message: "hello",
-            org_id: "default",
-            start: 1711769400000000,
-            frequency: {
-              interval: 1,
-              type: "days",
-            },
-            user: "",
-            password: "",
-            timezone: "Asia/Calcutta",
-          },
-        ],
-      });
-    });
-    // return http().get(`/api/${org_identifier}/reports`);
+    return http().get(`/api/${org_identifier}/reports`);
   },
   getReport: (org_identifier: string, reportName: string) => {
-    return new Promise((resolve) => {
-      resolve({
-        data: {
-          dashboards: [
-            {
-              folder: "7146907899342770176VPxgzI",
-              dashboard: "71508289400960532486HWxIK",
-              tabs: ["default"],
-              variables: [
-                {
-                  name: "",
-                  value: "var",
-                  id: "327e2981-02ab-4da8-a9cb-8f4c11218b88",
-                  key: "var",
-                },
-              ],
-              timerange: {
-                type: "relative",
-                period: "45m",
-                from: 1709272558251000,
-                to: 1709275258251000,
-              },
-            },
-          ],
-          description: "Daily Report",
-          destinations: [
-            {
-              email: "hello",
-            },
-          ],
-          enabled: true,
-          media_type: "Pdf",
-          name: "report1",
-          title: "hello",
-          message: "hello",
-          org_id: "default",
-          start: 1711769400000000,
-          frequency: {
-            interval: 1,
-            type: "days",
-          },
-          user: "",
-          password: "",
-          timezone: "Asia/Calcutta",
-        },
-      });
-    });
-    // return http().get(`/api/${org_identifier}/reports/${reportName}`);
+    return http().get(`/api/${org_identifier}/reports/${reportName}`);
   },
   createReport: (org_identifier: string, payload: any) => {
     return http().post(`/api/${org_identifier}/reports`, payload);
