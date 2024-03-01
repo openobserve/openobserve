@@ -128,9 +128,8 @@ export default defineConfig({
     modulePreload: {
       resolveDependencies: (url, deps, context) => {
         return [];
-      }
+      },
     },
-    
     sourcemap: false,
     target: "es2020",
     rollupOptions: {
@@ -151,8 +150,15 @@ export default defineConfig({
         lodash: ["lodash-es", "lodash/lodash.js", "moment"],
       },
       output: {
-        scriptLoaders: {
-          async: 'async', // or 'defer' for defer attribute
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // If the module is from node_modules, put it into a vendor chunk
+            return 'vendor';
+          }
+        },
+        chunkFileNames: ({ name }) => {
+          // Dynamically generate chunk file names for lazy loading
+          return `chunks/${name}.[hash].js`;
         },
       },
     },
