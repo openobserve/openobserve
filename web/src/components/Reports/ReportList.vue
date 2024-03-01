@@ -232,7 +232,7 @@ const deleteDialog = ref({
   message: "Are you sure you want to delete report?",
 });
 
-const reportListTableRef = ref(null);
+const reportListTableRef: Ref<any> = ref(null);
 
 const columns: any = ref<QTableProps["columns"]>([
   {
