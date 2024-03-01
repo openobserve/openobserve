@@ -165,7 +165,7 @@ async fn add_valid_record(
         .unwrap();
 
     // check schema
-    let (schema_evolution, infer_schema) = check_for_schema(
+    let (schema_evolution, _) = check_for_schema(
         &stream_meta.org_id,
         &stream_meta.stream_name,
         StreamType::Logs,
@@ -175,12 +175,8 @@ async fn add_valid_record(
     )
     .await?;
 
-    // get record schema
-    let schema_latest = stream_schema_map.get(&stream_meta.stream_name).unwrap();
-    let rec_schema = match infer_schema.as_ref() {
-        Some(v) => v,
-        None => schema_latest,
-    };
+    // get schema
+    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
     let schema_key = rec_schema.hash_key();
 
     // get hour key
