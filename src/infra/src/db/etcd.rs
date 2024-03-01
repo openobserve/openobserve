@@ -439,7 +439,7 @@ pub struct Locker {
 
 impl Locker {
     pub fn new(key: &str) -> Self {
-        let key = format!("{}lock/{}", &CONFIG.etcd.prefix, key);
+        let key = format!("{}lock/{}", &CONFIG.etcd.prefix, key).replace("//", "/");
         Self {
             key,
             lock_id: "".to_string(),
@@ -477,7 +477,10 @@ impl Locker {
             };
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!("etcd lock error: {err}")));
+            return Err(Error::Message(format!(
+                "etcd lock for key: {}, error: {}",
+                self.key, err
+            )));
         }
         Ok(())
     }
@@ -487,12 +490,9 @@ impl Locker {
             return Ok(());
         }
         let mut client = get_etcd_client().await.clone();
-        match client.unlock(self.lock_id.as_str()).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("etcd unlock error: {}, key: {}", err, self.key);
-                return Err(Error::Message("etcd unlock error".to_string()));
-            }
+        if let Err(err) = client.unlock(self.lock_id.as_str()).await {
+            log::error!("etcd unlock for key: {}, error: {}", self.key, err);
+            return Err(Error::Message("etcd unlock error".to_string()));
         };
         self.state.store(2, Ordering::SeqCst);
         Ok(())

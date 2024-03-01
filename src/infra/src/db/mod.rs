@@ -76,7 +76,7 @@ async fn cluster_coordinator() -> Box<dyn Db> {
             _ => Box::<sqlite::SqliteDb>::default(),
         }
     } else {
-        match CONFIG.common.meta_store.as_str().into() {
+        match CONFIG.common.cluster_coordinator.as_str().into() {
             MetaStore::Nats => Box::<nats::NatsDb>::default(),
             _ => Box::<etcd::Etcd>::default(),
         }

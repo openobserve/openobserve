@@ -13,12 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, sync::Arc, time::Duration};
+use std::{
+    cmp::min,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use async_nats::{jetstream, Client, ServerAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, utils::base64, CONFIG};
+use config::{cluster, ider, utils::base64, CONFIG};
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use tokio::{
@@ -50,7 +57,7 @@ async fn get_bucket_by_key<'a>(
         history: 3,
         ..Default::default()
     };
-    if bucket_name == "node" {
+    if bucket_name == "nodes" {
         bucket.max_age = Duration::from_secs(30);
     }
     let kv = jetstream.create_key_value(bucket).await?;
@@ -309,7 +316,7 @@ pub async fn connect() -> async_nats::Client {
     }
 
     let opts = async_nats::ConnectOptions::new()
-        .connection_timeout(core::time::Duration::from_secs(CONFIG.nats.connect_timeout));
+        .connection_timeout(Duration::from_secs(CONFIG.nats.connect_timeout));
     let addrs = CONFIG
         .nats
         .addr
@@ -319,4 +326,95 @@ pub async fn connect() -> async_nats::Client {
     async_nats::connect_with_options(addrs, opts)
         .await
         .expect("Nats connect failed")
+}
+
+pub struct Locker {
+    key: String,
+    lock_id: String,
+    state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
+}
+
+impl Locker {
+    pub fn new(key: &str) -> Self {
+        Self {
+            key: format!("/lock/{key}"),
+            lock_id: format!("{}:{}", cluster::LOCAL_NODE_UUID.as_str(), ider::generate()),
+            state: Arc::new(AtomicU8::new(0)),
+        }
+    }
+
+    /// lock with timeout, 0 means use default timeout, unit: second
+    pub async fn lock(&mut self, timeout: u64) -> Result<()> {
+        let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
+        let mut last_err = None;
+        let timeout = if timeout == 0 {
+            CONFIG.nats.lock_wait_timeout
+        } else {
+            timeout
+        };
+        let mut n = timeout / CONFIG.nats.command_timeout;
+        if n < 1 {
+            n = 1;
+        }
+        let expiration =
+            chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
+        let value = Bytes::from(format!("{}:{}", self.lock_id, expiration));
+        // check if the locker already expired, clean it
+        if let Ok(Some(ret)) = bucket.get(new_key).await {
+            let ret = String::from_utf8_lossy(&ret).to_string();
+            let expiration = ret.split(':').last().unwrap();
+            let expiration = expiration.parse::<i64>().unwrap();
+            if expiration < chrono::Utc::now().timestamp_micros() {
+                if let Err(err) = bucket.purge(&new_key).await {
+                    log::error!("nats purge lock for key: {}, error: {}", self.key, err);
+                    return Err(Error::Message("nats lock error".to_string()));
+                };
+            }
+        }
+        for _ in 0..n {
+            match bucket.create(new_key, value.clone()).await {
+                Ok(_) => {
+                    self.state.store(1, Ordering::SeqCst);
+                    last_err = None;
+                    break;
+                }
+                Err(err) => {
+                    last_err = Some(err.to_string());
+                    println!("nats lock for key: {}, error: {}", self.key, err);
+                    // if !err.to_string().contains("Timeout expired") {
+                    //     break;
+                    // }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            };
+        }
+        if let Some(err) = last_err {
+            return Err(Error::Message(format!(
+                "nats lock or key: {}, error: {}",
+                self.key, err
+            )));
+        }
+        Ok(())
+    }
+
+    pub async fn unlock(&self) -> Result<()> {
+        if self.state.load(Ordering::SeqCst) != 1 {
+            return Ok(());
+        }
+        let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
+        let ret = bucket.get(new_key).await?;
+        let Some(ret) = ret else {
+            return Ok(());
+        };
+        let ret = String::from_utf8_lossy(&ret).to_string();
+        if !ret.starts_with(&self.lock_id) {
+            return Ok(());
+        }
+        if let Err(err) = bucket.purge(&new_key).await {
+            log::error!("nats unlock for key: {}, error: {}", self.key, err);
+            return Err(Error::Message("nats unlock error".to_string()));
+        };
+        self.state.store(2, Ordering::SeqCst);
+        Ok(())
+    }
 }

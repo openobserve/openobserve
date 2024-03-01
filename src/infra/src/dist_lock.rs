@@ -15,23 +15,43 @@
 
 use config::CONFIG;
 
-use crate::{db::etcd, errors::Result};
+use crate::{
+    db::{etcd, nats},
+    errors::Result,
+};
+
+pub enum Locker {
+    Etcd(etcd::Locker),
+    Nats(nats::Locker),
+}
 
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
-pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<etcd::Locker>> {
+pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
     if CONFIG.common.local_mode || !CONFIG.common.feature_query_queue_enabled {
         return Ok(None);
     }
-    let mut lock = etcd::Locker::new(key);
-    lock.lock(wait_ttl).await?;
-    Ok(Some(lock))
+    match CONFIG.common.cluster_coordinator.as_str() {
+        "nats" => {
+            let mut lock = nats::Locker::new(key);
+            lock.lock(wait_ttl).await?;
+            Ok(Some(Locker::Nats(lock)))
+        }
+        _ => {
+            let mut lock = etcd::Locker::new(key);
+            lock.lock(wait_ttl).await?;
+            Ok(Some(Locker::Etcd(lock)))
+        }
+    }
 }
 
 #[inline(always)]
-pub async fn unlock(locker: &Option<etcd::Locker>) -> Result<()> {
+pub async fn unlock(locker: &Option<Locker>) -> Result<()> {
     if let Some(locker) = locker {
-        locker.unlock().await
+        match locker {
+            Locker::Etcd(locker) => locker.unlock().await,
+            Locker::Nats(locker) => locker.unlock().await,
+        }
     } else {
         Ok(())
     }

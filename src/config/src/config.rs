@@ -292,8 +292,8 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
-    #[env_config(name = "ZO_FILE_LIST_STORE", default = "")]
-    pub file_list_store: String,
+    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
+    pub cluster_coordinator: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
