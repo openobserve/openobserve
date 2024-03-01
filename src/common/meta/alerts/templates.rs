@@ -16,6 +16,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use super::destinations::DestinationType;
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Template {
     #[serde(default)]
@@ -25,4 +27,9 @@ pub struct Template {
     #[serde(rename = "isDefault")]
     #[serde(default)]
     pub is_default: Option<bool>,
+    /// Indicates whether the body is
+    /// http or email body
+    #[serde(rename = "type")]
+    #[serde(default)]
+    pub template_type: DestinationType,
 }
