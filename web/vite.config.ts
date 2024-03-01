@@ -125,6 +125,12 @@ export default defineConfig({
     },
   },
   build: {
+    modulePreload: {
+      resolveDependencies: (url, deps, context) => {
+        return [];
+      }
+    },
+    
     sourcemap: false,
     target: "es2020",
     rollupOptions: {
@@ -143,6 +149,11 @@ export default defineConfig({
         "node-sql-parser": ["node-sql-parser/build/mysql"],
         d3: ["d3-hierarchy", "d3-selection"],
         lodash: ["lodash-es", "lodash/lodash.js", "moment"],
+      },
+      output: {
+        scriptLoaders: {
+          async: 'async', // or 'defer' for defer attribute
+        },
       },
     },
     outDir: path.resolve(__dirname, "dist"),
