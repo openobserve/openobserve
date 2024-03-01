@@ -348,6 +348,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
+                println!("event::Put: {:?}", ev);
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;

@@ -157,6 +157,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
+                println!("event::Put: {:?}", ev);
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: DBUser = json::from_slice(&ev.value.unwrap()).unwrap();
                 let users = item_value.get_all_users();

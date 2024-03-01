@@ -36,7 +36,12 @@ pub mod sqlite;
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
-    match CONFIG.common.meta_store.as_str().into() {
+    let file_list_store = if !CONFIG.common.file_list_store.is_empty() {
+        CONFIG.common.file_list_store.as_str()
+    } else {
+        CONFIG.common.meta_store.as_str()
+    };
+    match file_list_store.into() {
         MetaStore::Sled => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),

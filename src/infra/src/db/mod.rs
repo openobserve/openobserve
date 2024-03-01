@@ -61,7 +61,7 @@ async fn default() -> Box<dyn Db> {
         MetaStore::Sled => Box::<sled::SledDb>::default(),
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
-        MetaStore::Nats => Box::<nats::Nats>::default(),
+        MetaStore::Nats => Box::<nats::NatsDb>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlDb>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
@@ -72,10 +72,14 @@ async fn cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         match CONFIG.common.meta_store.as_str().into() {
             MetaStore::Sled => Box::<sled::SledDb>::default(),
+            MetaStore::Nats => Box::<nats::NatsDb>::default(),
             _ => Box::<sqlite::SqliteDb>::default(),
         }
     } else {
-        Box::<etcd::Etcd>::default()
+        match CONFIG.common.meta_store.as_str().into() {
+            MetaStore::Nats => Box::<nats::NatsDb>::default(),
+            _ => Box::<etcd::Etcd>::default(),
+        }
     }
 }
 

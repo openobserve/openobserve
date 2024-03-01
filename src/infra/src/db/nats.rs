@@ -59,27 +59,27 @@ async fn get_bucket_by_key<'a>(
 
 pub async fn init() {}
 
-pub struct Nats {
+pub struct NatsDb {
     prefix: String,
 }
 
-impl Nats {
-    pub fn new(prefix: &str) -> Nats {
+impl NatsDb {
+    pub fn new(prefix: &str) -> Self {
         let prefix = prefix.trim_end_matches(|v| v == '/');
-        Nats {
+        Self {
             prefix: prefix.to_string(),
         }
     }
 }
 
-impl Default for Nats {
+impl Default for NatsDb {
     fn default() -> Self {
         Self::new(&CONFIG.nats.prefix)
     }
 }
 
 #[async_trait]
-impl super::Db for Nats {
+impl super::Db for NatsDb {
     async fn create_table(&self) -> Result<()> {
         Ok(())
     }
