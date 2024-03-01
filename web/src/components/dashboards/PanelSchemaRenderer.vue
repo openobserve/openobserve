@@ -188,6 +188,11 @@ export default defineComponent({
       required: true,
       type: Object,
     },
+    forceLoad: {
+      type: Boolean,
+      default: false,
+      required: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -207,14 +212,15 @@ export default defineComponent({
     const drilldownPopUpRef: any = ref(null);
 
     // get refs from props
-    const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
-
+    const { panelSchema, selectedTimeObj, variablesData, forceLoad } =
+      toRefs(props);
     // calls the apis to get the data based on the panel config
     let { data, loading, errorDetail, metadata } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
-      chartPanelRef
+      chartPanelRef,
+      forceLoad
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -224,7 +230,28 @@ export default defineComponent({
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
-    // when we get the new data from the apis, convert the data to render the panel
+    // ======= [START] dashboard PrintMode =======
+
+    //inject variablesAndPanelsDataLoadingState from parent
+    // default values will be empty object of panels and variablesData
+    const variablesAndPanelsDataLoadingState: any = inject(
+      "variablesAndPanelsDataLoadingState",
+      { panels: {}, variablesData: {} }
+    );
+
+    // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
+    watch(loading, (updatedLoadingValue) => {
+      if (variablesAndPanelsDataLoadingState) {
+        // update the loading state of the current panel
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: updatedLoadingValue,
+        };
+      }
+    });
+
+    // ======= [END] dashboard PrintMode =======
+
     watch(
       [data, store?.state],
       async () => {

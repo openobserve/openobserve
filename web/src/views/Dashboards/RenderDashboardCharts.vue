@@ -18,6 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div>
+    <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
+    <span
+      v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
+      id="dashboardVariablesAndPanelsDataLoaded"
+      style="display: none"
+    >
+    </span>
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
@@ -76,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
+              :forceLoad="forceLoad"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refresh="refreshDashboard"
@@ -109,7 +117,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onMounted, provide, ref, watch } from "vue";
+import {
+  computed,
+  defineComponent,
+  onActivated,
+  provide,
+  ref,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -119,6 +134,7 @@ import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
+import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
@@ -144,6 +160,11 @@ export default defineComponent({
     showTabs: {
       type: Boolean,
       default: false,
+    },
+    forceLoad: {
+      type: Boolean,
+      default: false,
+      required: false,
     },
   },
 
@@ -190,10 +211,87 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
+
+    // ======= [START] dashboard PrintMode =======
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState
+    );
+
+    //computed property based on panels and variables loading state
+    const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
+      // Get values of variablesData and panels
+      const variablesDataValues = Object.values(
+        variablesAndPanelsDataLoadingState.variablesData
+      );
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels
+      );
+
+      // Check if every value in both variablesData and panels is false
+      const isAllVariablesAndPanelsDataLoaded =
+        variablesDataValues.every((value) => value === false) &&
+        panelsValues.every((value) => value === false);
+      return isAllVariablesAndPanelsDataLoaded;
+    });
+
+    // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
+    let {
+      valueRef: isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
+      setImmediateValue,
+      setDebounceValue,
+    } = useCustomDebouncer(false, 3000);
+
+    onActivated(() => {
+      // set the initial value as false on component activated
+      // also, this function will clear the settimeout if previously set
+      setImmediateValue(false);
+    });
+
+    // Watch for changes in the computed property and update the debouncer accordingly
+    watch(isDashboardVariablesAndPanelsDataLoaded, (newValue) => {
+      // if value is false, then immediately set the value
+      if (isDashboardVariablesAndPanelsDataLoaded.value === false) {
+        setImmediateValue(newValue);
+      } else {
+        // if value is true, then debounce the value
+        setDebounceValue(newValue);
+      }
+    });
+
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-      emit("variablesData", variablesData);
+      try {
+        // update the variables data
+        Object.assign(variablesData, data);
+
+        // emit the variables data
+        emit("variablesData", variablesData);
+
+        // update the loading state
+        if (variablesAndPanelsDataLoadingState) {
+          variablesAndPanelsDataLoadingState.variablesData =
+            variablesData?.values?.reduce(
+              (obj: any, item: any) => ({
+                ...obj,
+                [item.name]: item.isLoading,
+              }),
+              {}
+            );
+        }
+      } catch (error) {
+        console.log(error);
+      }
     };
+
+    // ======= [END] dashboard PrintMode =======
 
     const hoveredSeriesState = ref({
       hoveredSeriesName: "",
@@ -363,6 +461,7 @@ export default defineComponent({
       onMovePanel,
       variablesValueSelectorRef,
       updateInitialVariableValues,
+      isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
     };
   },
   methods: {
