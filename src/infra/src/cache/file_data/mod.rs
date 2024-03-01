@@ -17,6 +17,7 @@ pub mod disk;
 pub mod memory;
 
 use std::collections::{HashSet, VecDeque};
+
 use hashlink::lru_cache::LruCache;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -46,7 +47,6 @@ impl CacheStrategy {
                 cache.insert(key, value);
             }
             CacheStrategy::Fifo((queue, set)) => {
-                // If the key is already in the cache, we need to update the value
                 set.insert(key.clone());
                 queue.push_back((key, value));
             }
@@ -102,5 +102,36 @@ pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error>
         disk::download(session_id, file).await
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lru_cache_miss() {
+        let mut cache = CacheStrategy::new("lru");
+        let key1 = "a";
+        let key2 = "b";
+        cache.insert(key1.to_string(), 1);
+        cache.insert(key2.to_string(), 2);
+        cache.contains_key(key1);
+        cache.remove();
+        assert!(cache.contains_key(key1));
+        assert!(!cache.contains_key(key2));
+    }
+
+    #[test]
+    fn test_fifo_cache_miss() {
+        let mut cache = CacheStrategy::new("fifo");
+        let key1 = "a";
+        let key2 = "b";
+        cache.insert(key1.to_string(), 1);
+        cache.insert(key2.to_string(), 2);
+        cache.contains_key(key1);
+        cache.remove();
+        assert!(!cache.contains_key(key1));
+        assert!(cache.contains_key(key2));
     }
 }
