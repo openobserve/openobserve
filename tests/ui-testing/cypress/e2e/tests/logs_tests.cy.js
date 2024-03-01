@@ -3,6 +3,7 @@ import * as logstests from "../allfunctions/logs";
 import logsdata from "../../data/logs_data.json";
 // import { login } from "../../support/commons"
 // import { selectStreamAndStreamType } from "../../support/log-commons";
+const randomStreamName = "stream1traces_" + Cypress._.random(0, 9999); // Generate a unique name
 
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
@@ -1183,4 +1184,99 @@ describe("Logs testcases", () => {
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
     cy.contains("Field is required").should("exist");
   });
+
+
+
+  it("should display error if blank spaces added under stream name and clicked create stream ", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type('  ')
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.contains('Field is required').should('exist')
+    
+ 
+  });
+
+  it("should display error if create stream is clicked without adding name", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.contains('Field is required').should('exist')
+  });
+  
+  it.only("should create stream with logs stream type", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Logs').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type(randomStreamName)
+    cy.wait(1000)
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+
+  it.only("should create stream with metrics stream type and delete", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Metrics').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type(randomStreamName)
+    cy.wait(1000)
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+
+
+  it.only("should create stream with traces stream type and delete", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type(randomStreamName);
+    cy.get('[data-test="add-stream-type-input"]').click();
+    cy.get('.q-menu').within(() => {
+      cy.contains('Traces').click();
+    });
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type(randomStreamName);
+    cy.wait(1000)
+    cy.get('[title="Delete"]').click();
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({ force: true });
+    cy.get('.q-notification__message').contains('Stream deleted');
+  });
+
+  it.only("should create a stream with a field", () => {
+    cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
+    cy.get('[data-test="add-stream-name-input"]').type(randomStreamName)
+    cy.get('[data-test="add-stream-type-input"]').click()
+    cy.get('.q-menu').within(() => {
+      // Use cy.contains() to find the option with the label "Logs" and click it
+      cy.contains('Logs').click()
+    })
+    cy.get('[data-test="add-stream-add-field-btn"]').click()
+    cy.get('[data-test="add-stream-field-name-input"] > .q-field > .q-field__inner > .q-field__control').type('field1')
+    cy.get('[data-test="add-stream-field-type-select-input"] > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click()
+    cy.get('.q-virtual-scroll__content').within(() => {
+      cy.contains('Inverted Index').click()
+    })
+    cy.get('[data-test="save-stream-btn"]').click({ force: true });
+    cy.get('[data-test="streams-search-stream-input"]').type(randomStreamName)
+    cy.wait(1000)
+    cy.get('[title="Delete"]').click()
+    cy.get('.q-card__actions > .bg-primary > .q-btn__content').click({force:true})
+    cy.get('.q-notification__message').contains('Stream deleted')
+  });
+  
+ 
 });
