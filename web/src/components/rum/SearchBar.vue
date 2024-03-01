@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pa-none search-button bg-secondary"
             @click="searchData"
             :disable="
-              searchObj.loading || searchObj.data.streamResults.length == 0
+              searchObj.loading || searchObj.data.streamResults.list.length == 0
             "
             >{{ t("search.runQuery") }}</q-btn
           >
