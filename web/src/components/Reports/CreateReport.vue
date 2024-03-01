@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <div style="height: calc(100vh - 162px); overflow: auto">
+    <div class="flex" style="height: calc(100vh - 162px); overflow: auto">
       <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
         <q-form
           class="create-report-form"
@@ -154,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       bg-color="input-bg"
                       class="q-py-sm showLabelOnTop no-case"
                       filled
+                      emit-value
                       map-options
                       stack-label
                       dense
@@ -186,16 +187,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       color="input-border"
                       bg-color="input-bg"
                       class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      emit-value
+                      multiple
+                      :max-values="1"
                       map-options
+                      emit-value
+                      clearable
                       stack-label
+                      outlined
+                      filled
                       dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      behavior="menu"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       style="
                         min-width: 250px !important;
@@ -282,16 +282,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-for="visual in frequencyTabs" :key="visual.value">
                     <q-btn
                       :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                      :color="
-                        visual.value === formData.frequency ? 'primary' : ''
-                      "
-                      :flat="visual.value === formData.frequency ? false : true"
+                      :color="visual.value === frequency.type ? 'primary' : ''"
+                      :flat="visual.value === frequency.type ? false : true"
                       dense
                       no-caps
                       size="12px"
                       class="q-px-lg visual-selection-btn"
                       style="padding-top: 4px; padding-bottom: 4px"
-                      @click="formData.frequency = visual.value"
+                      @click="frequency.type = visual.value"
                     >
                       {{ visual.label }}</q-btn
                     >
@@ -324,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  v-if="formData.frequency === 'custom'"
+                  v-if="frequency.type === 'custom'"
                   class="flex items-center justify-start q-mt-md"
                 >
                   <div
@@ -334,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-input
                       filled
-                      v-model="formData.custom_frequency.interval"
+                      v-model="frequency.custom.interval"
                       label="Repeat every"
                       color="input-border"
                       bg-color="input-bg"
@@ -353,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="padding-top: 0; width: 160px"
                   >
                     <q-select
-                      v-model="formData.custom_frequency.frequency"
+                      v-model="frequency.custom.period"
                       :options="customFrequencyOptions"
                       :label="' '"
                       :popup-content-style="{ textTransform: 'capitalize' }"
@@ -538,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="report-name-input o2-input"
                 >
                   <q-input
-                    v-model="formData.destinations.emails"
+                    v-model="emails"
                     :label="t('reports.recipients') + ' *'"
                     color="input-border"
                     bg-color="input-bg"
@@ -677,18 +675,22 @@ import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
+import reports from "@/services/reports";
+import { cloneDeep } from "lodash-es";
 
-const { t } = useI18n();
-const router = useRouter();
+const props = defineProps({
+  report: {
+    type: Object,
+    default: null,
+  },
+});
 
-const step = ref(1);
-
-const formData = ref({
+const defaultReport = {
   dashboards: [
     {
       folder: "",
       dashboard: "",
-      tabs: "",
+      tabs: [],
       variables: [],
       timerange: {
         type: "relative",
@@ -699,24 +701,33 @@ const formData = ref({
     },
   ],
   description: "",
-  destinations: {
-    emails: "",
-  },
+  destinations: [
+    {
+      email: "",
+    },
+  ],
   enabled: true,
   media_type: "Pdf",
-  name: "MyReport",
-  title: "Report",
+  name: "",
+  title: "",
   message: "",
-  org_id: "default",
-  start: 1708928905113829,
-  frequency: "once",
-  user: "something",
-  password: "something",
-  custom_frequency: {
-    interval: "",
-    frequency: "",
+  org_id: "",
+  start: 0,
+  frequency: {
+    interval: 1,
+    type: "once",
   },
-});
+  user: "",
+  password: "",
+  timezone: "UTC",
+};
+
+const { t } = useI18n();
+const router = useRouter();
+
+const step = ref(1);
+
+const formData = ref(defaultReport);
 
 const timeTabs = [
   {
@@ -736,19 +747,19 @@ const frequencyTabs = [
   },
   {
     label: "Hourly",
-    value: "hourly",
+    value: "hours",
   },
   {
     label: "Daily",
-    value: "daily",
+    value: "days",
   },
   {
     label: "Weekly",
-    value: "weekly",
+    value: "weeks",
   },
   {
     label: "Monthly",
-    value: "monthly",
+    value: "months",
   },
   {
     label: "Custom",
@@ -768,6 +779,38 @@ const filteredTimezone: any = ref([]);
 
 const folderOptions = ref([]);
 
+const emails = ref("");
+
+const isEditingReport = ref(false);
+
+const isFetchingReport = ref(false);
+
+const frequency = ref({
+  type: "once",
+  custom: {
+    interval: 1,
+    period: "days",
+  },
+});
+
+onBeforeMount(() => {
+  isEditingReport.value = !!router.currentRoute.value.query?.name;
+
+  if (isEditingReport.value) {
+    isEditingReport.value = true;
+    isFetchingReport.value = true;
+
+    const reportName: string = (router.currentRoute.value.query?.name ||
+      "") as string;
+
+    reports
+      .getReport(store.state.selectedOrganization.identifier, reportName)
+      .then((res) => {
+        setupEditingReport(res.data);
+      });
+  }
+});
+
 const dashboardOptions: Ref<
   { label: string; value: string; tabs: any[]; version: number }[]
 > = ref([]);
@@ -777,8 +820,6 @@ const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
 onBeforeMount(() => {
   getDashboaordFolders();
 });
-
-const reportPayload: Ref<any> = ref(formData.value);
 
 const isFetchingFolders = ref(false);
 
@@ -792,59 +833,69 @@ const scheduling = ref({
   timezone: "",
 });
 
-const filterFolders = () => {};
-
 const onFolderSelection = (id: string) => {
+  console.log("on folder selection ", id);
   dashboardOptions.value.length = 0;
   isFetchingDashboard.value = true;
-  dashboardService
-    .list(
-      0,
-      10000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier,
-      id
-    )
-    .then((response: any) => {
-      response.data.dashboards
-        .map((dash: any) => Object.values(dash).filter((dash) => dash)[0])
-        .forEach(
-          (dashboard: {
-            title: string;
-            dashboardId: string;
-            tabs: any[];
-            version: number;
-          }) => {
-            dashboardOptions.value.push({
-              label: dashboard.title,
-              value: dashboard.dashboardId,
-              tabs: dashboard.tabs || [],
-              version: dashboard.version,
-            });
-          }
-        );
-    })
-    .finally(() => (isFetchingDashboard.value = false));
-};
-
-const filterDashboard = () => {};
-
-const onDashboardSelection = (dashboard: any) => {
-  dashboardTabOptions.value.length = 0;
-  dashboard.tabs.forEach((tab: any) => {
-    dashboardTabOptions.value.push({
-      label: tab.name,
-      value: tab.tabId,
-    });
+  return new Promise((resolve, reject) => {
+    dashboardService
+      .list(
+        0,
+        10000,
+        "name",
+        false,
+        "",
+        store.state.selectedOrganization.identifier,
+        id
+      )
+      .then((response: any) => {
+        response.data.dashboards
+          .map((dash: any) => Object.values(dash).filter((dash) => dash)[0])
+          .forEach(
+            (dashboard: {
+              title: string;
+              dashboardId: string;
+              tabs: any[];
+              version: number;
+            }) => {
+              dashboardOptions.value.push({
+                label: dashboard.title,
+                value: dashboard.dashboardId,
+                tabs: dashboard?.tabs?.map((tab) => ({
+                  label: tab.name,
+                  value: tab.tabId,
+                })) || [{ label: "Default", value: "default" }],
+                version: dashboard.version,
+              });
+              resolve(true);
+            }
+          );
+      })
+      .catch((err) => resolve(false))
+      .finally(() => (isFetchingDashboard.value = false));
   });
 };
 
+const onDashboardSelection = (dashboardId: any) => {
+  const defaultTabs = [{ label: "Default", value: "default" }];
+
+  dashboardTabOptions.value =
+    dashboardOptions.value.filter(
+      (dashboard) => dashboard.value === dashboardId
+    )[0].tabs || defaultTabs;
+};
+
+const filterFolders = () => {};
+
+const filterDashboard = () => {};
+
 const filterTabs = () => {};
 
-const updateDateTime = (datetime) => {
-  console.log(datetime);
+const updateDateTime = (datetime: any) => {
+  formData.value.dashboards[0].timerange.type = datetime.valueType;
+  formData.value.dashboards[0].timerange.from = datetime.startTime;
+  formData.value.dashboards[0].timerange.to = datetime.endTime;
+  formData.value.dashboards[0].timerange.period = datetime.relativeTimePeriod;
 };
 
 const scheduleInfoMapping = {
@@ -957,6 +1008,8 @@ const convertDateToTimestamp = (
   const [day, month, year] = date.split("-");
   const [hour, minute] = time.split(":");
 
+  console.log(date, time, timezone);
+
   const _date = {
     year: Number(year),
     month: Number(month),
@@ -966,9 +1019,7 @@ const convertDateToTimestamp = (
   };
 
   // Create a DateTime instance from date and time, then set the timezone
-  const dateTime = _DateTime.fromObject(_date, {
-    zone: timezone,
-  });
+  const dateTime = _DateTime.fromObject(_date, { zone: timezone });
 
   // Convert the DateTime to a Unix timestamp in milliseconds
   const unixTimestampMillis = dateTime.toMillis();
@@ -977,13 +1028,105 @@ const convertDateToTimestamp = (
 };
 
 const saveReport = () => {
+  if (selectedTimeTab.value === "sendNow") {
+    const now = new Date();
+
+    // Get the day, month, and year from the date object
+    const day = String(now.getDate()).padStart(2, "0");
+    const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+    const year = now.getFullYear();
+
+    // Combine them in the DD-MM-YYYY format
+    scheduling.value.date = `${day}-${month}-${year}`;
+
+    // Get the hours and minutes, ensuring they are formatted with two digits
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+
+    // Combine them in the HH:MM format
+    scheduling.value.time = `${hours}:${minutes}`;
+
+    scheduling.value.timezone = "UTC";
+  }
+
   formData.value.start = convertDateToTimestamp(
     scheduling.value.date,
     scheduling.value.time,
     scheduling.value.timezone
   );
 
-  console.log(formData.value);
+  formData.value.org_id = store.state.selectedOrganization.identifier;
+
+  formData.value.destinations = emails.value.split(/[,;]/).map((email) => ({
+    email,
+  }));
+
+  if (frequency.value.type === "custom") {
+    formData.value.frequency.type = frequency.value.custom.period;
+    formData.value.frequency.interval = Number(frequency.value.custom.interval);
+  } else {
+    formData.value.frequency.type = frequency.value.type;
+    formData.value.frequency.interval = 1;
+  }
+
+  formData.value.timezone = scheduling.value.timezone;
+
+  const reportAction = isEditingReport.value
+    ? reports.updateReport
+    : reports.createReport;
+
+  reportAction(store.state.selectedOrganization.identifier, formData.value)
+    .then((res) => {
+      console.log(res);
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+};
+
+const setupEditingReport = async (report: any) => {
+  formData.value = report;
+  // set date, time and timezone in scheduling
+  const date = new Date(report.start / 1000);
+
+  // Get the day, month, and year from the date object
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // January is 0!
+  const year = date.getFullYear();
+
+  // Combine them in the DD-MM-YYYY format
+  scheduling.value.date = `${day}-${month}-${year}`;
+
+  // Get the hours and minutes, ensuring they are formatted with two digits
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  // Combine them in the HH:MM format
+  scheduling.value.time = `${hours}:${minutes}`;
+
+  scheduling.value.timezone = report.timezone;
+
+  // set selectedTimeTab to sendLater
+  selectedTimeTab.value = "sendLater";
+
+  emails.value = report.destinations
+    .map((destination: { email: string }) => destination.email)
+    .join(";");
+
+  // set frequency
+  if (report.frequency.interval > 1) {
+    frequency.value.type = "custom";
+    frequency.value.custom.period = report.frequency.type;
+    frequency.value.custom.interval = report.frequency.interval;
+  } else {
+    frequency.value.type = report.frequency.type;
+  }
+
+  await onFolderSelection(formData.value.dashboards[0].folder);
+
+  onDashboardSelection(formData.value.dashboards[0].dashboard);
+
+  console.log(cloneDeep(formData.value));
 };
 </script>
 
