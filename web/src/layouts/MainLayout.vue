@@ -28,8 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : getImageURL('images/common/open_observe_logo.svg')
             "
             @click="goToHome"
-            width="150px"
-            height="31px"
+            style="width: 150px; height: 31px"
           />
           <span v-if="config.isCloud == 'true'" class="absolute beta-text"
             >Beta</span
