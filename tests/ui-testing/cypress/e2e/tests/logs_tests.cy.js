@@ -315,7 +315,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.only("should contain options to include, exclude and add field to table under Json", () => {
+  it("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -1151,7 +1151,7 @@ describe("Logs testcases", () => {
     }).should("exist");
   });
 
-  it.only("should change stream settings and click on search stream", () => {
+  it("should change stream settings and click on search stream", () => {
     // Type the value of a variable into an input field
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -1169,7 +1169,7 @@ describe("Logs testcases", () => {
     cy.get('[title="Explore"]').click({ force: true });
     cy.get('[data-test="log-table-column-0-@timestamp"]').should("exist");
   });
-  it.only("should display error if blank spaces added under stream name and clicked create stream ", () => {
+  it("should display error if blank spaces added under stream name and clicked create stream ", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="add-stream-name-input"]').type("  ");
@@ -1177,7 +1177,7 @@ describe("Logs testcases", () => {
     cy.contains("Field is required").should("exist");
   });
 
-  it.only("should display error if create stream is clicked without adding name", () => {
+  it("should display error if create stream is clicked without adding name", () => {
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="log-stream-add-stream-btn"]').click({ force: true });
     cy.get('[data-test="save-stream-btn"]').click({ force: true });
