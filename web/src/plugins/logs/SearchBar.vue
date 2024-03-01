@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disable="
                 searchObj.loading == 'true' ||
                 (searchObj.data.hasOwnProperty('streamResults') &&
-                  searchObj.data.streamResults.length == 0)
+                  searchObj.data.streamResults?.list?.length == 0)
               "
               >{{ t("search.runQuery") }}</q-btn
             >
