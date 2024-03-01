@@ -24,10 +24,10 @@ use config::{
     utils::{asynchronism::file::*, file::scan_files},
     CONFIG,
 };
-use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
+use super::CacheStrategy;
 use crate::storage;
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
@@ -36,7 +36,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
-    data: LruCache<String, usize>,
+    data: CacheStrategy,
 }
 
 impl Default for FileData {
@@ -55,7 +55,7 @@ impl FileData {
             max_size,
             cur_size: 0,
             root_dir: CONFIG.common.data_cache_dir.to_string(),
-            data: LruCache::new_unbounded(),
+            data: CacheStrategy::new(&CONFIG.disk_cache.cache_strategy),
         }
     }
 
@@ -113,7 +113,7 @@ impl FileData {
             );
             let mut release_size = 0;
             loop {
-                let item = self.data.remove_lru();
+                let item = self.data.remove();
                 if item.is_none() {
                     log::error!(
                         "[session_id {session_id}] File disk cache is corrupt, it shouldn't be none"

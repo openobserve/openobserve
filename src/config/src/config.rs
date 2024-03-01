@@ -555,6 +555,9 @@ pub struct MemoryCache {
     pub datafusion_max_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MEMORY_POOL", default = "")]
     pub datafusion_memory_pool: String,
+    // Memory data cache strategy, default is lru, other value is fifo
+    #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
+    pub cache_strategy: String,
 }
 
 #[derive(EnvConfig)]
@@ -571,6 +574,9 @@ pub struct DiskCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
+    // Disk data cache strategy, default is lru, other value is fifo
+    #[env_config(name = "ZO_DISK_CACHE_STRATEGY", default = "lru")]
+    pub cache_strategy: String,
 }
 
 #[derive(EnvConfig)]
