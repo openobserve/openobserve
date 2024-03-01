@@ -184,12 +184,7 @@ import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 
-const reportsTableRows = ref([
-  {
-    "#": 1,
-    name: "report1",
-  },
-]);
+const reportsTableRows = ref([]);
 
 const { t } = useI18n();
 
@@ -284,7 +279,7 @@ onBeforeMount(() => {
     })
     .catch((err) => {
       q.notify({
-        message: err.data.message || "Error while fetching reports!",
+        message: err?.data?.message || "Error while fetching reports!",
         timeout: 3000,
       });
     })
@@ -334,7 +329,7 @@ const toggleReportState = (report: any) => {
     .catch((err) => {
       q.notify({
         type: "negative",
-        message: err.data.message || "Error while changing report state!",
+        message: err?.data?.message || "Error while stopping report!",
         timeout: 4000,
       });
     })
@@ -359,15 +354,12 @@ const confirmDeleteReport = (report: any) => {
 };
 
 const deleteReport = (report: any) => {
+  console.log("delete report", report);
   const dismiss = q.notify({
     message: `Deleting report "${report.name}"`,
   });
   reports
-    .toggleReportState(
-      store.state.selectedOrganization.identifier,
-      report.name,
-      !report.enabled
-    )
+    .deleteReport(store.state.selectedOrganization.identifier, report.name)
     .then(() => {
       q.notify({
         type: "positive",
@@ -378,7 +370,7 @@ const deleteReport = (report: any) => {
     .catch((err: any) => {
       q.notify({
         type: "negative",
-        message: err.data.message || "Error while deleting report!",
+        message: err?.data?.message || "Error while deleting report!",
         timeout: 4000,
       });
     })

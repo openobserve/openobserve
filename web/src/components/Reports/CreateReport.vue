@@ -813,7 +813,7 @@ onBeforeMount(() => {
       .catch((err) => {
         q.notify({
           type: "negative",
-          message: err.data.message || "Error while fetching report!",
+          message: err?.data?.message || "Error while fetching report!",
           timeout: 4000,
         });
       })
