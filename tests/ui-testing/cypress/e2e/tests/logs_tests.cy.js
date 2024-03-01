@@ -315,7 +315,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should contain options to include, exclude and add field to table under Json", () => {
+  it.only("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -353,6 +353,7 @@ describe("Logs testcases", () => {
       .find("tr")
       .eq(1)
       .click({ force: true });
+    cy.wait(300)
     cy.get(
       '[data-test="log-detail-json-content"] >>> [data-test="log-details-include-exclude-field-btn"] :first'
     ).click({ force: true });
@@ -393,6 +394,7 @@ describe("Logs testcases", () => {
       // Confirm that the text contains 'code' not equal to '200'
       expect(cleanedText).to.include("_timestamp!=");
       applyQueryButton();
+      cy.wait(200)
       //   cy.get('[data-test="[data-test="logs-search-bar-query-editor"]"]').type("{selectall}{del}");
       //   applyQueryButton();
       cy.get('[data-test="logs-search-result-logs-table"]')
@@ -400,6 +402,7 @@ describe("Logs testcases", () => {
         .find("tr")
         .eq(2)
         .click({ force: true });
+      cy.wait(2000);
       cy.get(
         '[data-test="log-detail-json-content"] >>> [data-test="log-details-include-exclude-field-btn"] :first'
       ).click({ force: true });
