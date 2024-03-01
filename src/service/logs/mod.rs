@@ -175,7 +175,7 @@ async fn add_valid_record(
     )
     .await?;
 
-    // get record schema
+    // get schema
     let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
     let schema_key = rec_schema.hash_key();
 
