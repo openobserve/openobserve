@@ -30,7 +30,7 @@ use config::{
         stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
     },
     utils::{flatten, json, str::find},
-    CONFIG, INDEX_MIN_CHAR_LEN,
+    CONFIG, INDEX_MIN_CHAR_LEN, INSTANCE_ID,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -233,25 +233,65 @@ async fn search_in_cluster(req: cluster_rpc::SearchRequest) -> Result<search::Re
     let scan_stats = ScanStats::new();
     let mut took_wait = 0;
     let mut all_resp = vec![];
-    let resp = search_in_cluster_get_batches(req.clone(), scan_stats, start).await?;
-    took_wait += resp.took_wait;
-    all_resp.push(resp);
-    log::info!(
-        "[session_id {session_id}] search->cluster: took_wait: {took_wait}",
-        session_id = req.job.as_ref().unwrap().session_id,
-        took_wait = took_wait,
-    );
-    // call same cluster as follower
-    let cl_resp = make_inter_cluster_req(
-        &req,
-        "Basic YUBhLmNvbTph",
-        "http://localhost:5085/api/default/_search_follower",
-        60,
-    )
-    .await?;
-    log::info!("--------------------------------------------------------");
-    took_wait += cl_resp.took_wait;
-    all_resp.push(cl_resp);
+    let mut tasks = vec![];
+    let current_instance = INSTANCE_ID.get("instance_id").unwrap().to_string();
+    if CONFIG.federation.federation_enabled {
+        for i in 0..CONFIG.federation.num_clusters {
+            let cluster = format!("ZO_CLUSTER_{}", i);
+            // value format : instance_id,cluster_url,credentials , parse it to get details
+            let value = match std::env::var(&cluster) {
+                Ok(value) => value,
+                Err(e) => {
+                    log::error!("Error reading cluster variable {}: {}", cluster, e);
+                    continue;
+                }
+            };
+
+            let cluster_details: Vec<String> = value.split(',').map(|s| s.to_string()).collect();
+            if cluster_details.len() != 3 {
+                log::error!("Error reading cluster variable {}: invalid format", cluster);
+                continue;
+            }
+            let req_clone = req.clone();
+            if cluster_details[0].eq(&current_instance) {
+                let task = tokio::task::spawn(async move {
+                    search_in_cluster_get_batches(req_clone, scan_stats, start).await
+                });
+                tasks.push(task);
+            } else {
+                let task = tokio::task::spawn(async move {
+                    make_inter_cluster_req(
+                        &req_clone,
+                        &cluster_details[2],
+                        &format!("{}/api/default/_search_follower", &cluster_details[1]),
+                        60,
+                    )
+                    .await
+                });
+                tasks.push(task);
+            }
+        }
+    } else {
+        let req_clone = req.clone();
+        let task = tokio::task::spawn(async move {
+            search_in_cluster_get_batches(req_clone, scan_stats, start).await
+        });
+        tasks.push(task);
+    }
+
+    // Await all spawned tasks and process their results
+    let results = futures::future::join_all(tasks).await;
+    for result in results {
+        match result {
+            Ok(Ok(cl_resp)) => {
+                took_wait += cl_resp.took_wait;
+                all_resp.push(cl_resp);
+            }
+            Ok(Err(e)) => log::error!("Error in cluster request: {}", e),
+            Err(e) => log::error!("Task failed: {}", e),
+        }
+    }
+
     let final_res = federation::merge_cluster_responses(all_resp, &req).await?;
     record_batches_to_response(final_res, &req, scan_stats, start, took_wait).await
 }

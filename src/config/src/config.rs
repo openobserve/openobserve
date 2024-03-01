@@ -199,6 +199,15 @@ pub struct Config {
     pub profiling: Pyroscope,
     pub smtp: Smtp,
     pub rum: RUM,
+    pub federation: Federation,
+}
+
+#[derive(EnvConfig)]
+pub struct Federation {
+    #[env_config(name = "ZO_ENABLE_FEDERATION", default = false)]
+    pub federation_enabled: bool,
+    #[env_config(name = "ZO_NUM_CLUSTERS", default = 0)]
+    pub num_clusters: u16,
 }
 
 #[derive(EnvConfig)]

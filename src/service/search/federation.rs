@@ -112,9 +112,6 @@ pub async fn make_inter_cluster_req(
 ) -> Result<search::SearchFollowerResponse, infra::errors::Error> {
     let client = reqwest::Client::new();
     let req = serde_json::to_string(req).unwrap();
-    println!("make_inter_cluster_req req: {}", req);
-    println!("url : {}", url);
-    println!("url : {}", token);
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "Authorization",
@@ -131,12 +128,9 @@ pub async fn make_inter_cluster_req(
         .timeout(Duration::from_secs(timeout));
 
     match req_client.body(req).send().await {
-        Ok(res) => {
-            log::info!("make_inter_cluster_req res: {:?}", res);
-            de_serialize_response(res.bytes().await.unwrap().to_vec()).map_err(|e| {
-                infra::errors::Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string()))
-            })
-        }
+        Ok(res) => de_serialize_response(res.bytes().await.unwrap().to_vec()).map_err(|e| {
+            infra::errors::Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string()))
+        }),
         Err(err) => {
             log::error!("make_inter_cluster_req error: {}", err);
             Err(infra::errors::Error::ErrorCode(
@@ -152,13 +146,12 @@ pub async fn merge_cluster_responses(
 ) -> Result<hashbrown::HashMap<String, Vec<arrow::record_batch::RecordBatch>>, infra::errors::Error>
 {
     // merge multiple Cluster data
-    // let mut scan_stats = ScanStats::new();
-    let meta = super::sql::Sql::new(&req).await?;
+    let meta = super::sql::Sql::new(req).await?;
     let sql = Arc::new(meta);
     let mut final_data = HashMap::new();
     for response in responses {
         for (name, batches) in response.data {
-            let val = final_data.entry(name.clone()).or_insert_with(|| vec![]);
+            let val = final_data.entry(name.clone()).or_insert_with(Vec::new);
             val.extend(batches);
         }
     }
@@ -181,6 +174,7 @@ pub async fn merge_cluster_responses(
             sql.meta.limit,
             &merge_sql,
             &batch,
+            true,
         )
         .await
         {
