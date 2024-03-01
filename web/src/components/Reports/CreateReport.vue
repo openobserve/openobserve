@@ -471,7 +471,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       fill-input
                       hide-selected
                       :label="t('logStream.timezone')"
-                      @update:modelValue="onTimezoneChange"
                       :display-value="`Timezone: ${timezone}`"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       class="timezone-select showLabelOnTop"
@@ -677,6 +676,7 @@ import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
+import { useQuasar } from "quasar";
 
 const props = defineProps({
   report: {
@@ -691,7 +691,7 @@ const defaultReport = {
       folder: "",
       dashboard: "",
       tabs: [],
-      variables: [],
+      variables: [] as { key: string; value: string; id: string }[],
       timerange: {
         type: "relative",
         period: "30m",
@@ -728,6 +728,8 @@ const router = useRouter();
 const step = ref(1);
 
 const formData = ref(defaultReport);
+
+const q = useQuasar();
 
 const timeTabs = [
   {
@@ -777,7 +779,7 @@ const store = useStore();
 
 const filteredTimezone: any = ref([]);
 
-const folderOptions = ref([]);
+const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
 
 const emails = ref("");
 
@@ -805,8 +807,18 @@ onBeforeMount(() => {
 
     reports
       .getReport(store.state.selectedOrganization.identifier, reportName)
-      .then((res) => {
+      .then((res: any) => {
         setupEditingReport(res.data);
+      })
+      .catch((err) => {
+        q.notify({
+          type: "negative",
+          message: err.data.message || "Error while fetching report!",
+          timeout: 4000,
+        });
+      })
+      .finally(() => {
+        isFetchingReport.value = false;
       });
   }
 });
@@ -927,7 +939,7 @@ const currentTimezone =
   useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
-const timezoneFilterFn = (val, update) => {
+const timezoneFilterFn = (val: string, update: Function) => {
   filteredTimezone.value = filterColumns(timezoneOptions, val, update);
 };
 
@@ -959,13 +971,9 @@ const browserTime =
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
 
-const onTimezoneChange = async (timezone) => {
-  console.log(timezone);
-};
-
 const addDashboardVariable = () => {
   formData.value.dashboards[0].variables.push({
-    name: "",
+    key: "",
     value: "",
     id: getUUID(),
   });
@@ -1075,12 +1083,39 @@ const saveReport = () => {
     ? reports.updateReport
     : reports.createReport;
 
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Please wait...",
+    timeout: 2000,
+  });
+
   reportAction(store.state.selectedOrganization.identifier, formData.value)
-    .then((res) => {
-      console.log(res);
+    .then(() => {
+      q.notify({
+        type: "positive",
+        message: `Report ${
+          isEditingReport.value ? "updated" : "saved"
+        } successfully.`,
+        timeout: 3000,
+      });
+      router.replace({
+        name: "reports",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
     })
     .catch((error) => {
-      console.log(error);
+      q.notify({
+        type: "negative",
+        message: `Error while ${
+          isEditingReport.value ? "updating" : "saving"
+        } report.`,
+        timeout: 4000,
+      });
+    })
+    .finally(() => {
+      dismiss();
     });
 };
 

@@ -267,9 +267,16 @@ const columns: any = ref<QTableProps["columns"]>([
 
 onBeforeMount(() => {
   isLoadingReports.value = true;
+
+  const dismiss = q.notify({
+    spinner: true,
+    message: "Please wait while fetching reports...",
+    timeout: 2000,
+  });
+
   reports
     .list(store.state.selectedOrganization.identifier)
-    .then((res) => {
+    .then((res: any) => {
       reportsTableRows.value = res.data.map((report: any, index: number) => ({
         "#": index + 1,
         ...report,
@@ -281,7 +288,10 @@ onBeforeMount(() => {
         timeout: 3000,
       });
     })
-    .finally(() => (isLoadingReports.value = false));
+    .finally(() => {
+      isLoadingReports.value = false;
+      dismiss();
+    });
 });
 
 const changePagination = (val: { label: string; value: any }) => {
@@ -302,7 +312,7 @@ const filterData = (rows: any, terms: any) => {
 };
 
 const toggleReportState = (report: any) => {
-  const state = report.enabled ? "Pausing" : "Resuming";
+  const state = report.enabled ? "Stoping" : "Starting";
   const dismiss = q.notify({
     message: `${state} report "${report.name}"`,
   });
@@ -312,9 +322,21 @@ const toggleReportState = (report: any) => {
       report.name,
       !report.enabled
     )
-    .then((res) => {})
+    .then(() => {
+      q.notify({
+        type: "positive",
+        message: `${
+          report.enabled ? "Stopped" : "Started"
+        } report successfully.`,
+        timeout: 3000,
+      });
+    })
     .catch((err) => {
-      console.log(err);
+      q.notify({
+        type: "negative",
+        message: err.data.message || "Error while changing report state!",
+        timeout: 4000,
+      });
     })
     .finally(() => dismiss());
 };
@@ -346,9 +368,19 @@ const deleteReport = (report: any) => {
       report.name,
       !report.enabled
     )
-    .then((res) => {})
-    .catch((err) => {
-      console.log(err);
+    .then(() => {
+      q.notify({
+        type: "positive",
+        message: `Delete report successfully.`,
+        timeout: 3000,
+      });
+    })
+    .catch((err: any) => {
+      q.notify({
+        type: "negative",
+        message: err.data.message || "Error while deleting report!",
+        timeout: 4000,
+      });
     })
     .finally(() => dismiss());
 };
