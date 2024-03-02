@@ -24,10 +24,10 @@ use config::{
     utils::{asynchronism::file::*, file::scan_files},
     CONFIG,
 };
-use hashlink::lru_cache::LruCache;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
+use super::CacheStrategy;
 use crate::storage;
 
 static FILES: Lazy<RwLock<FileData>> = Lazy::new(|| RwLock::new(FileData::new()));
@@ -36,7 +36,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
-    data: LruCache<String, usize>,
+    data: CacheStrategy,
 }
 
 impl Default for FileData {
@@ -47,15 +47,18 @@ impl Default for FileData {
 
 impl FileData {
     pub fn new() -> FileData {
-        FileData::with_capacity(CONFIG.disk_cache.max_size)
+        FileData::with_capacity_and_cache_strategy(
+            CONFIG.disk_cache.max_size,
+            &CONFIG.disk_cache.cache_strategy,
+        )
     }
 
-    pub fn with_capacity(max_size: usize) -> FileData {
+    pub fn with_capacity_and_cache_strategy(max_size: usize, strategy: &str) -> FileData {
         FileData {
             max_size,
             cur_size: 0,
             root_dir: CONFIG.common.data_cache_dir.to_string(),
-            data: LruCache::new_unbounded(),
+            data: CacheStrategy::new(strategy),
         }
     }
 
@@ -113,7 +116,7 @@ impl FileData {
             );
             let mut release_size = 0;
             loop {
-                let item = self.data.remove_lru();
+                let item = self.data.remove();
                 if item.is_none() {
                     log::error!(
                         "[session_id {session_id}] File disk cache is corrupt, it shouldn't be none"
@@ -240,9 +243,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_cache_set_file() {
+    async fn test_lru_cache_set_file() {
         let session_id = "session_123";
-        let mut file_data = FileData::with_capacity(1024);
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
             let file_key = format!(
@@ -255,9 +258,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_get_file() {
+    async fn test_lru_cache_get_file() {
         let session_id = "session_123";
-        let mut file_data = FileData::default();
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(CONFIG.disk_cache.max_size, "lru");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
@@ -276,9 +280,69 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_miss() {
+    async fn test_lru_cache_miss() {
         let session_id = "session_456";
-        let mut file_data = FileData::with_capacity(10);
+        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
+        let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
+        let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
+        let content = Bytes::from("Some text");
+        // set one key
+        file_data
+            .set(session_id, file_key1, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key1).await);
+        // set another key, will release first key
+        file_data
+            .set(session_id, file_key2, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key2).await);
+        // get first key, should get error
+        assert!(!file_data.exist(file_key1).await);
+    }
+
+    #[tokio::test]
+    async fn test_fifo_cache_set_file() {
+        let session_id = "session_123";
+        let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
+        let content = Bytes::from("Some text Need to store in cache");
+        for i in 0..100 {
+            let file_key = format!(
+                "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
+                i
+            );
+            let resp = file_data.set(session_id, &file_key, content.clone()).await;
+            assert!(resp.is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fifo_cache_get_file() {
+        let session_id = "session_123";
+        let mut file_data =
+            FileData::with_capacity_and_cache_strategy(CONFIG.disk_cache.max_size, "fifo");
+        let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
+        let content = Bytes::from("Some text");
+
+        file_data
+            .set(session_id, file_key, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key).await);
+
+        file_data
+            .set(session_id, file_key, content.clone())
+            .await
+            .unwrap();
+        assert!(file_data.exist(file_key).await);
+        assert!(file_data.size().0 > 0);
+    }
+
+    #[tokio::test]
+    async fn test_fifo_cache_miss() {
+        let session_id = "session_456";
+        let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
