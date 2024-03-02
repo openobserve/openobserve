@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{Duration, Utc};
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType};
 use infra::dist_lock;
 
 use crate::{
@@ -37,7 +37,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // before start merging, set current node to lock the organization
     let lock_key = format!("/alert_manager/organization/{org_id}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     // check the working node for the organization again, maybe other node locked it
     // first
     let node = db::alerts::alert_manager::get_mark(org_id).await;

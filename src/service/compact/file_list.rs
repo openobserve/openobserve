@@ -194,7 +194,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let lock_key = format!("/compact/file_list/{offset}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.lock_wait_timeout).await?;
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::file_list::get_process(offset).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
         log::debug!("[COMPACT] list_list offset [{offset}] is processing by {node}");
