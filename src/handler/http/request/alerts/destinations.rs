@@ -48,7 +48,10 @@ pub async fn save_destination(
     let dest = dest.into_inner();
     match destinations::save(&org_id, "", dest, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => match e {
+            (http::StatusCode::BAD_REQUEST, e) => Ok(MetaHttpResponse::bad_request(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
     }
 }
 
@@ -80,7 +83,10 @@ pub async fn update_destination(
     let name = name.trim();
     match destinations::save(&org_id, name, dest, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => match e {
+            (http::StatusCode::BAD_REQUEST, e) => Ok(MetaHttpResponse::bad_request(e)),
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
     }
 }
 

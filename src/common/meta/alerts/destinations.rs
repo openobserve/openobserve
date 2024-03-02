@@ -25,13 +25,32 @@ use super::templates::Template;
 pub struct Destination {
     #[serde(default)]
     pub name: String,
+    /// Required for `Http` destination_type
+    #[serde(default)]
     pub url: String,
+    /// Required for `Http` destination_type
+    #[serde(default)]
     pub method: HTTPType,
     #[serde(default)]
     pub skip_tls_verify: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     pub template: String,
+    /// Required when `destination_type` is `Email`
+    #[serde(default)]
+    pub emails: Vec<String>,
+    #[serde(rename = "type")]
+    #[serde(default)]
+    pub destination_type: DestinationType,
+}
+
+#[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
+pub enum DestinationType {
+    #[default]
+    #[serde(rename = "http")]
+    Http,
+    #[serde(rename = "email")]
+    Email,
 }
 
 impl Destination {
@@ -43,6 +62,8 @@ impl Destination {
             skip_tls_verify: self.skip_tls_verify,
             headers: self.headers.clone(),
             template,
+            emails: self.emails.clone(),
+            destination_type: self.destination_type.clone(),
         }
     }
 }
@@ -57,6 +78,8 @@ pub struct DestinationWithTemplate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<HashMap<String, String>>,
     pub template: Template,
+    pub emails: Vec<String>,
+    pub destination_type: DestinationType,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
