@@ -16,8 +16,9 @@
 pub mod disk;
 pub mod memory;
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
+use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
