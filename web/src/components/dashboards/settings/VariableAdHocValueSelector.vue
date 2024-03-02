@@ -20,7 +20,7 @@
             <q-btn class="close" size="xs" :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-3'" padding="13px 2px" square flat dense @click="removeField(index)" icon="close" :data-test="`dashboard-variable-adhoc-close-${index}`"/>
             <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
         </div>
-        <q-btn class="text-bold no-border q-ml-xs q-mb-sm" no-caps no-outline rounded padding="xs" @click="addFields" data-test="dashboard-variable-adhoc-add-selector" >
+        <q-btn class="text-bold no-border q-ml-xs q-mb-sm hideOnPrintMode" no-caps no-outline rounded padding="xs" @click="addFields" data-test="dashboard-variable-adhoc-add-selector" >
             <DynamicFilterIcon />
             <q-tooltip>Add Dynamic Filter</q-tooltip>
         </q-btn>
@@ -116,5 +116,10 @@ export default defineComponent({
     // border-bottom: 1px solid $grey-4;
     // background-color: $grey-3;
     border-radius: 0 !important;
+}
+.printMode {
+  .hideOnPrintMode {
+    display: none;
+  }
 }
 </style>

@@ -278,7 +278,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .join(" or ");
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp FROM {} WHERE deleted IS False AND {}",
+            "SELECT file_name, term, _count, _timestamp FROM \"{}\" WHERE deleted IS False AND {}",
             meta.stream_name, search_condition
         );
 

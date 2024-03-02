@@ -16,11 +16,78 @@
 pub mod disk;
 pub mod memory;
 
+use std::collections::VecDeque;
+
+use hashbrown::HashSet;
+use hashlink::lru_cache::LruCache;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CacheType {
     Disk,
     Memory,
     None,
+}
+
+enum CacheStrategy {
+    Lru(LruCache<String, usize>),
+    Fifo((VecDeque<(String, usize)>, HashSet<String>)),
+}
+
+impl CacheStrategy {
+    fn new(name: &str) -> Self {
+        match name.to_lowercase().as_str() {
+            "lru" => CacheStrategy::Lru(LruCache::new_unbounded()),
+            "fifo" => CacheStrategy::Fifo((VecDeque::new(), HashSet::new())),
+            _ => CacheStrategy::Lru(LruCache::new_unbounded()),
+        }
+    }
+
+    fn insert(&mut self, key: String, value: usize) {
+        match self {
+            CacheStrategy::Lru(cache) => {
+                cache.insert(key, value);
+            }
+            CacheStrategy::Fifo((queue, set)) => {
+                set.insert(key.clone());
+                queue.push_back((key, value));
+            }
+        }
+    }
+
+    fn remove(&mut self) -> Option<(String, usize)> {
+        match self {
+            CacheStrategy::Lru(cache) => cache.remove_lru(),
+            CacheStrategy::Fifo((queue, set)) => {
+                if queue.is_empty() {
+                    return None;
+                }
+                let (key, size) = queue.pop_front().unwrap();
+                set.remove(&key);
+                Some((key, size))
+            }
+        }
+    }
+
+    fn contains_key(&mut self, key: &str) -> bool {
+        match self {
+            CacheStrategy::Lru(cache) => cache.contains_key(key),
+            CacheStrategy::Fifo((_, set)) => set.contains(key),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            CacheStrategy::Lru(cache) => cache.len(),
+            CacheStrategy::Fifo((queue, _)) => queue.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            CacheStrategy::Lru(cache) => cache.is_empty(),
+            CacheStrategy::Fifo((queue, _)) => queue.is_empty(),
+        }
+    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -36,5 +103,36 @@ pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error>
         disk::download(session_id, file).await
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lru_cache_miss() {
+        let mut cache = CacheStrategy::new("lru");
+        let key1 = "a";
+        let key2 = "b";
+        cache.insert(key1.to_string(), 1);
+        cache.insert(key2.to_string(), 2);
+        cache.contains_key(key1);
+        cache.remove();
+        assert!(cache.contains_key(key1));
+        assert!(!cache.contains_key(key2));
+    }
+
+    #[test]
+    fn test_fifo_cache_miss() {
+        let mut cache = CacheStrategy::new("fifo");
+        let key1 = "a";
+        let key2 = "b";
+        cache.insert(key1.to_string(), 1);
+        cache.insert(key2.to_string(), 2);
+        cache.contains_key(key1);
+        cache.remove();
+        assert!(!cache.contains_key(key1));
+        assert!(cache.contains_key(key2));
     }
 }
