@@ -95,7 +95,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         if let infra_db::Event::Put(ev) = ev {
             let item_key = ev.key;
             let item_value = ev.value.unwrap();
-            let json_val: OrganizationSetting = json::from_slice(&item_value).unwrap();
+            let json_val: OrganizationSetting = if config::CONFIG.common.meta_store_external {
+                let db = infra_db::get_db().await;
+                let ret = db.get(&item_key).await?;
+                json::from_slice(&ret).unwrap()
+            } else {
+                json::from_slice(&item_value).unwrap()
+            };
             ORGANIZATION_SETTING
                 .clone()
                 .write()

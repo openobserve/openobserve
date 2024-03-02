@@ -68,8 +68,36 @@ pub async fn save_function(
     )
 )]
 #[get("/{org_id}/functions")]
-async fn list_functions(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    crate::service::functions::list_functions(org_id.into_inner()).await
+async fn list_functions(
+    org_id: web::Path<String>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let mut _permitted = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = _req.headers().get("user_id").unwrap();
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id.to_str().unwrap(),
+            "GET",
+            "function",
+        )
+        .await
+        {
+            Ok(list) => {
+                _permitted = list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+        // Get List of allowed objects ends
+    }
+
+    crate::service::functions::list_functions(org_id.into_inner(), _permitted).await
 }
 
 /// DeleteFunction

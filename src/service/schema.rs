@@ -289,35 +289,39 @@ pub async fn check_for_schema(
     stream_schema_map: &mut HashMap<String, Schema>,
     record_val: &Map<String, Value>,
     record_ts: i64,
-) -> Result<SchemaEvolution> {
+) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
         let schema = db::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
-
     let schema = stream_schema_map.get(stream_name).unwrap();
-
     if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
-        return Ok(SchemaEvolution {
-            schema_compatible: true,
-            is_schema_changed: false,
-            types_delta: None,
-        });
+        return Ok((
+            SchemaEvolution {
+                schema_compatible: true,
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        ));
     }
 
+    // get infer schema
     let value_iter = [record_val].into_iter();
     let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     // fast path
     if schema.fields.eq(&inferred_schema.fields) {
-        // return (true, None, schema.fields().to_vec());
-        return Ok(SchemaEvolution {
-            schema_compatible: true,
-            is_schema_changed: false,
-            types_delta: None,
-        });
+        return Ok((
+            SchemaEvolution {
+                schema_compatible: true,
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        ));
     }
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
@@ -326,24 +330,34 @@ pub async fn check_for_schema(
 
     let is_new = schema.fields().is_empty();
     if !is_new {
-        let (is_schema_changed, field_datatype_delta, _) =
+        let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
         if !is_schema_changed {
-            return Ok(SchemaEvolution {
-                schema_compatible: true,
-                is_schema_changed: false,
-                types_delta: Some(field_datatype_delta),
-            });
+            // generate new schema
+            let inferred_schema = if field_datatype_delta.is_empty() {
+                inferred_schema
+            } else {
+                let schema_latest = stream_schema_map.get(stream_name).unwrap();
+                inferred_schema.cloned_from(schema_latest)
+            };
+            return Ok((
+                SchemaEvolution {
+                    schema_compatible: true,
+                    is_schema_changed: false,
+                    types_delta: Some(field_datatype_delta),
+                },
+                Some(inferred_schema),
+            ));
         }
     }
 
     // slow path
-    Ok(handle_diff_schema(
+    let ret = handle_diff_schema(
         org_id,
         stream_name,
         stream_type,
         is_new,
-        inferred_schema,
+        &inferred_schema,
         record_ts,
         stream_schema_map,
     )
@@ -352,7 +366,13 @@ pub async fn check_for_schema(
         schema_compatible: true,
         is_schema_changed: false,
         types_delta: None,
-    }))
+    });
+
+    // generate new schema
+    let schema_latest = stream_schema_map.get(stream_name).unwrap();
+    let inferred_schema = inferred_schema.cloned_from(schema_latest);
+
+    Ok((ret, Some(inferred_schema)))
 }
 
 async fn get_merged_schema(
@@ -366,7 +386,7 @@ async fn get_merged_schema(
         .unwrap();
 
     let (is_schema_changed, field_datatype_delta, merged_fields) =
-        get_schema_changes(&db_schema, inferred_schema);
+        get_merge_schema_changes(&db_schema, inferred_schema);
 
     if !is_schema_changed {
         return None;
@@ -392,7 +412,7 @@ async fn handle_diff_schema(
     stream_name: &str,
     stream_type: StreamType,
     is_new: bool,
-    inferred_schema: Schema,
+    inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
@@ -426,7 +446,7 @@ async fn handle_diff_schema_local_mode(
     stream_name: &str,
     stream_type: StreamType,
     is_new: bool,
-    inferred_schema: Schema,
+    inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
@@ -452,7 +472,7 @@ async fn handle_diff_schema_local_mode(
     let lock_acquired = locker.write().await;
 
     let Some((field_datatype_delta, final_schema)) =
-        get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
+        get_merged_schema(org_id, stream_name, stream_type, inferred_schema).await
     else {
         drop(lock_acquired);
         return None;
@@ -498,7 +518,7 @@ async fn handle_diff_schema_cluster_mode(
     stream_name: &str,
     stream_type: StreamType,
     is_new: bool,
-    inferred_schema: Schema,
+    inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, Schema>,
 ) -> Option<SchemaEvolution> {
@@ -518,7 +538,7 @@ async fn handle_diff_schema_cluster_mode(
     lock.lock(0).await.map_err(server_internal_error).unwrap();
 
     let Some((field_datatype_delta, final_schema)) =
-        get_merged_schema(org_id, stream_name, stream_type, &inferred_schema).await
+        get_merged_schema(org_id, stream_name, stream_type, inferred_schema).await
     else {
         lock.unlock().await.map_err(server_internal_error).unwrap();
         return None;
@@ -579,7 +599,10 @@ async fn handle_diff_schema_cluster_mode(
     })
 }
 
-fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>, Vec<Field>) {
+fn get_merge_schema_changes(
+    schema: &Schema,
+    inferred_schema: &Schema,
+) -> (bool, Vec<Field>, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<_> = vec![];
 
@@ -623,6 +646,38 @@ fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<F
     }
 
     (is_schema_changed, field_datatype_delta, merged_fields)
+}
+
+fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+    let mut is_schema_changed = false;
+    let mut field_datatype_delta: Vec<_> = vec![];
+
+    for item in inferred_schema.fields.iter() {
+        let item_name = item.name();
+        let item_data_type = item.data_type();
+
+        match schema.field_with_name(item_name) {
+            Err(_) => {
+                is_schema_changed = true;
+            }
+            Ok(f) => {
+                if f.data_type() != item_data_type {
+                    if !CONFIG.common.widening_schema_evolution {
+                        field_datatype_delta.push(f.clone());
+                    } else if is_widening_conversion(f.data_type(), item_data_type) {
+                        is_schema_changed = true;
+                        field_datatype_delta.push((**item).clone());
+                    } else {
+                        let mut meta = f.metadata().clone();
+                        meta.insert("zo_cast".to_owned(), true.to_string());
+                        field_datatype_delta.push(f.clone().with_metadata(meta));
+                    }
+                }
+            }
+        }
+    }
+
+    (is_schema_changed, field_datatype_delta)
 }
 
 pub async fn stream_schema_exists(
@@ -810,6 +865,6 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(result.schema_compatible);
+        assert!(result.0.schema_compatible);
     }
 }

@@ -664,7 +664,10 @@ export default defineComponent({
         } catch (err) {
           $q.notify({
             type: "negative",
-            message: err?.message ?? "Folder deletion failed",
+            message:
+              err?.response?.data?.message ||
+              err?.message ||
+              "Folder deletion failed",
             timeout: 2000,
           });
         } finally {

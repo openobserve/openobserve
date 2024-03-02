@@ -253,7 +253,18 @@ export default defineComponent({
             insertText: `match_all_ignore_case('${lastElement}')`,
             range: range,
           });
-
+          filteredSuggestions.push({
+            label: `match_all_indexed('${lastElement}')`,
+            kind: monaco.languages.CompletionItemKind.Text,
+            insertText: `match_all_indexed('${lastElement}')`,
+            range: range,
+          });
+          filteredSuggestions.push({
+            label: `match_all_indexed_ignore_case('${lastElement}')`,
+            kind: monaco.languages.CompletionItemKind.Text,
+            insertText: `match_all_indexed_ignore_case('${lastElement}')`,
+            range: range,
+          });
           return {
             suggestions: filteredSuggestions,
           };

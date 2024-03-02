@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 100%; height: 100%"
-    @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
-  >
+  <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
         <GeoMapRenderer
@@ -123,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         ref="drilldownPopUpRef"
-        @mouseleave="() => (drilldownPopUpRef.style.display = 'none')"
+        @mouseleave="hideDrilldownPopUp"
       >
         <div
           v-for="(drilldown, index) in drilldownArray"
@@ -191,6 +188,11 @@ export default defineComponent({
       required: true,
       type: Object,
     },
+    forceLoad: {
+      type: Boolean,
+      default: false,
+      required: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -210,14 +212,15 @@ export default defineComponent({
     const drilldownPopUpRef: any = ref(null);
 
     // get refs from props
-    const { panelSchema, selectedTimeObj, variablesData } = toRefs(props);
-
+    const { panelSchema, selectedTimeObj, variablesData, forceLoad } =
+      toRefs(props);
     // calls the apis to get the data based on the panel config
     let { data, loading, errorDetail, metadata } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
       variablesData,
-      chartPanelRef
+      chartPanelRef,
+      forceLoad
     );
 
     // need tableRendererRef to access downloadTableAsCSV method
@@ -227,7 +230,28 @@ export default defineComponent({
     // used to show tooltip axis for all charts
     const hoveredSeriesState: any = inject("hoveredSeriesState", null);
 
-    // when we get the new data from the apis, convert the data to render the panel
+    // ======= [START] dashboard PrintMode =======
+
+    //inject variablesAndPanelsDataLoadingState from parent
+    // default values will be empty object of panels and variablesData
+    const variablesAndPanelsDataLoadingState: any = inject(
+      "variablesAndPanelsDataLoadingState",
+      { panels: {}, variablesData: {} }
+    );
+
+    // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
+    watch(loading, (updatedLoadingValue) => {
+      if (variablesAndPanelsDataLoadingState) {
+        // update the loading state of the current panel
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: updatedLoadingValue,
+        };
+      }
+    });
+
+    // ======= [END] dashboard PrintMode =======
+
     watch(
       [data, store?.state],
       async () => {
@@ -372,6 +396,12 @@ export default defineComponent({
       emit("error", errorDetail);
     });
 
+    const hideDrilldownPopUp = () => {
+      if (drilldownPopUpRef.value) {
+        drilldownPopUpRef.value.style.display = "none";
+      }
+    };
+
     // drilldown
     const replacePlaceholders = (str: any, obj: any) => {
       return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
@@ -466,11 +496,13 @@ export default defineComponent({
         drilldownPopUpRef.value.style.display = "block";
       } else {
         // hide the popup if there's no drilldown
-        drilldownPopUpRef.value.style.display = "none";
+        hideDrilldownPopUp();
       }
     };
 
     const openDrilldown = async (index: any) => {
+      // hide the drilldown pop up
+      hideDrilldownPopUp();
       // if panelSchema exists
       if (panelSchema.value) {
         // check if drilldown data exists
@@ -597,14 +629,17 @@ export default defineComponent({
           if (drilldownData.targetBlank) {
             // get current origin
             const pos = window.location.pathname.indexOf("/web/");
+            // if there is /web/ in path
+            // url will be: origin from window.location.origin + pathname up to /web/ + /web/
             let currentUrl: any =
               pos > -1
                 ? window.location.origin +
-                  window.location.pathname.slice(0, pos)
+                  window.location.pathname.slice(0, pos) +
+                  "/web/"
                 : window.location.origin;
 
             // always, go to view dashboard page
-            currentUrl += "/dashboards/view?";
+            currentUrl += "dashboards/view?";
 
             // if pass all variables in url
             currentUrl += drilldownData.data.passAllVariables
@@ -688,6 +723,7 @@ export default defineComponent({
       drilldownArray,
       openDrilldown,
       drilldownPopUpRef,
+      hideDrilldownPopUp,
     };
   },
 });

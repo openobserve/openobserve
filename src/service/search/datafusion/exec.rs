@@ -19,7 +19,7 @@ use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
     utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
-    CONFIG, PARQUET_BATCH_SIZE,
+    FxIndexSet, CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::{
@@ -36,7 +36,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     execution::{
-        context::SessionConfig,
+        context::{SessionConfig, SessionState},
         memory_pool::{FairSpillPool, GreedyMemoryPool},
         runtime_env::{RuntimeConfig, RuntimeEnv},
     },
@@ -74,6 +74,11 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
 ];
 
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+static RE_GROUP_BY: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) group by (.*)").unwrap());
+static RE_LIMIT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) limit (.*)").unwrap());
+static RE_HAVING: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) having (.*)").unwrap());
+static RE_COUNT_DISTINCT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap());
 static RE_FIELD_FN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
@@ -92,21 +97,66 @@ pub async fn sql(
 
     let start = std::time::Instant::now();
     let session_id = session.id.clone();
-    let mut ctx = if !file_type.eq(&FileType::ARROW) {
-        register_table(session, schema.clone(), "tbl", files, file_type.clone()).await?
+    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+    let (mut ctx, mut ctx_aggs) = if !file_type.eq(&FileType::ARROW) {
+        let ctx = register_table(
+            session,
+            schema.clone(),
+            "tbl",
+            files,
+            file_type.clone(),
+            without_optimizer,
+        )
+        .await?;
+        let mut ctx_aggs = None;
+        if without_optimizer && !sql.aggs.is_empty() {
+            ctx_aggs = Some(
+                register_table(
+                    session,
+                    schema.clone(),
+                    "tbl",
+                    files,
+                    file_type.clone(),
+                    false,
+                )
+                .await?,
+            );
+        };
+        (ctx, ctx_aggs)
     } else {
-        let ctx = prepare_datafusion_context(session.work_group.clone(), &session.search_type)?;
+        let ctx = prepare_datafusion_context(
+            session.work_group.clone(),
+            &session.search_type,
+            without_optimizer,
+        )?;
 
         let record_batches = in_records_batches.unwrap();
         let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
 
         // Register the MemTable as a table in the DataFusion context
-        ctx.register_table("tbl", mem_table)?;
-        ctx
+        ctx.register_table("tbl", mem_table.clone())?;
+
+        let mut ctx_aggs = None;
+        if without_optimizer && !sql.aggs.is_empty() {
+            let ctx_agg = prepare_datafusion_context(
+                session.work_group.clone(),
+                &session.search_type,
+                false,
+            )?;
+            ctx_agg.register_table("tbl", mem_table)?;
+            ctx_aggs = Some(ctx_agg);
+        }
+        (ctx, ctx_aggs)
     };
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
+    if let Some(ctx_aggs) = &mut ctx_aggs {
+        register_udf(ctx_aggs, &sql.org_id).await;
+    }
 
     let mut result: HashMap<String, Vec<RecordBatch>> = HashMap::new();
 
@@ -129,6 +179,11 @@ pub async fn sql(
     // get alias from context query for agg sql
     let meta_sql = sql::Sql::new(&sql.query_context);
 
+    let ctx_aggs = if let Some(ctx_aggs) = ctx_aggs {
+        ctx_aggs
+    } else {
+        ctx.clone()
+    };
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         if CONFIG.common.print_key_sql {
@@ -145,7 +200,7 @@ pub async fn sql(
             }
         }
 
-        let mut df = match ctx.sql(&agg_sql).await {
+        let mut df = match ctx_aggs.sql(&agg_sql).await {
             Ok(df) => df,
             Err(e) => {
                 log::error!(
@@ -192,6 +247,7 @@ pub async fn sql(
 
     // drop table
     ctx.deregister_table("tbl")?;
+    ctx_aggs.deregister_table("tbl")?;
     log::info!(
         "[session_id {session_id}] Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
@@ -212,10 +268,15 @@ async fn exec_query(
     let start = std::time::Instant::now();
     let session_id = session.id.clone();
 
+    let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
         fast_mode = true;
-        get_fast_mode_ctx(session, schema, sql, files, file_type).await?
+        get_fast_mode_ctx(session, schema, sql, files, file_type, without_optimizer).await?
     } else {
         (ctx.clone(), schema.clone())
     };
@@ -261,6 +322,8 @@ async fn exec_query(
     } else {
         sql.origin_sql.clone()
     };
+
+    let query = rewrite_count_distinct_sql(&query, true)?;
 
     // Debug SQL
     if CONFIG.common.print_key_sql {
@@ -413,12 +476,218 @@ async fn exec_query(
     Ok(batches)
 }
 
+// rewrite count(distinct) sql
+fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String> {
+    if RE_COUNT_DISTINCT
+        .captures(sql.to_lowercase().as_str())
+        .is_none()
+    {
+        return Ok(sql.to_string());
+    }
+
+    let mut sql = sql.to_string();
+    let mut fields = Vec::new();
+    let mut from_pos = 0;
+    let sql_chars = sql.chars().collect::<Vec<char>>();
+    let sql_chars_len = sql_chars.len();
+    let mut start_pos = 0;
+    let mut in_word = false;
+    let mut brackets = 0;
+    let mut quotes = 0;
+    let mut quote_now = '\"';
+    for i in 0..sql_chars_len {
+        let c = sql_chars.get(i).unwrap();
+        if *c == '(' {
+            brackets += 1;
+            continue;
+        }
+        if *c == ')' {
+            brackets -= 1;
+            continue;
+        }
+        if *c == '"' || *c == '\'' {
+            if quotes == 0 {
+                quotes += 1;
+                quote_now = *c;
+                if !in_word {
+                    start_pos = i;
+                    in_word = true;
+                }
+                continue;
+            }
+            if quotes == 1 && quote_now == *c {
+                quotes = 0;
+                continue;
+            }
+        }
+        if *c == ',' || *c == ' ' {
+            if brackets > 0 || quotes > 0 {
+                continue;
+            }
+            if in_word {
+                let field = sql_chars[start_pos..i].iter().collect::<String>();
+                if field.to_lowercase().eq("from") {
+                    from_pos = i;
+                    break;
+                } else if field.to_lowercase().eq("over") {
+                    continue;
+                }
+                fields.push(field);
+            }
+            in_word = false;
+            continue;
+        }
+        if in_word {
+            continue;
+        }
+        start_pos = i;
+        in_word = true;
+    }
+
+    let mut new_fields = Vec::new();
+    let mut sel_fields_name = Vec::new();
+    let mut sel_fields_has_star = false;
+    let mut last_is_as = false;
+    let mut last_is_distinct = false;
+    for field in fields.iter() {
+        let field = if last_is_distinct {
+            last_is_distinct = false;
+            format!("DISTINCT {}", field.trim())
+        } else {
+            field.trim().to_string()
+        };
+        if field.to_lowercase().eq("select") {
+            continue;
+        }
+        if field.to_lowercase().eq("distinct") {
+            last_is_distinct = true;
+            continue;
+        }
+        if field.to_lowercase().eq("as") {
+            last_is_as = true;
+            continue;
+        }
+        if field.to_lowercase().starts_with("over") && field.contains('(') {
+            // replace previouse field with over
+            let prev_field = new_fields.pop().unwrap();
+            new_fields.push(format!("{} {}", prev_field, field));
+            continue;
+        }
+        if last_is_as {
+            let prev_field = new_fields.pop().unwrap();
+            new_fields.push(format!("{prev_field} AS {field}"));
+            sel_fields_name.remove(sel_fields_name.len() - 1);
+            sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
+            last_is_as = false;
+            continue;
+        }
+        if field.eq("*") {
+            sel_fields_has_star = true;
+        }
+        new_fields.push(field.to_string());
+        sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
+    }
+
+    let fields = new_fields;
+    // handle select *
+    if sel_fields_has_star {
+        return Ok(sql);
+    }
+
+    let mut need_distinct = true;
+    let mut field_names = FxIndexSet::<String>::default();
+    for i in 0..fields.len() {
+        let field = fields.get(i).unwrap();
+
+        let cap = match RE_FIELD_FN.captures(field) {
+            Some(caps) => caps,
+            None => {
+                field_names.insert(field.to_string());
+                continue;
+            }
+        };
+        let fn_name = cap.get(1).unwrap().as_str().to_lowercase();
+        let field_name = cap.get(2).unwrap().as_str().split(' ').last().unwrap();
+
+        let over_as = if field.to_lowercase().contains("over") && field.contains('(') {
+            field[field.to_lowercase().find("over").unwrap()..].to_string()
+        } else {
+            "".to_string()
+        };
+
+        if fn_name == "count"
+            && !cap
+                .get(2)
+                .unwrap()
+                .as_str()
+                .to_lowercase()
+                .contains("distinct")
+        {
+            need_distinct = false;
+        }
+        field_names.insert(format!("\"{}\" {}", field_name, over_as));
+    }
+
+    let field_names = field_names.into_iter().collect::<Vec<String>>();
+    let distinct_clause = if need_distinct { "DISTINCT" } else { "" };
+    sql = format!(
+        "SELECT {} {} FROM {}",
+        distinct_clause,
+        &field_names.join(", "),
+        &sql[from_pos..]
+    );
+
+    // delete group_by from sql
+    remove_clause(
+        &mut sql,
+        &RE_GROUP_BY,
+        &[" order by", " having", " limit", " offset"],
+    );
+
+    // delete having from sql
+    remove_clause(&mut sql, &RE_HAVING, &[" order by", " limit", " offset"]);
+
+    // delete limit from sql
+    remove_clause(&mut sql, &RE_LIMIT, &[]);
+
+    if !is_first_phase {
+        // delete where from sql
+        remove_clause(
+            &mut sql,
+            &RE_WHERE,
+            &[" order by", " group by", " offset", " limit"],
+        );
+    }
+
+    Ok(sql)
+}
+
+fn remove_clause(sql: &mut String, regex: &Lazy<Regex>, keywords: &[&str]) {
+    let mut clause_str = match regex.captures(sql) {
+        Some(caps) => caps[0].to_string(),
+        None => "".to_string(),
+    };
+
+    if !clause_str.is_empty() {
+        let mut clause_str_lower = clause_str.to_lowercase();
+        for keyword in keywords.iter() {
+            if let Some(pos) = clause_str_lower.find(keyword) {
+                clause_str = clause_str[..pos].to_string();
+                clause_str_lower = clause_str.to_lowercase();
+            }
+        }
+        let index = sql.find(&clause_str).unwrap();
+        sql.replace_range(index..index + clause_str.len(), " ");
+    }
+}
+
 async fn get_fast_mode_ctx(
     session: &SearchSession,
     schema: Arc<Schema>,
     sql: &Arc<Sql>,
     files: &[FileKey],
     file_type: FileType,
+    without_optimizer: bool,
 ) -> Result<(SessionContext, Arc<Schema>)> {
     let mut files = files.to_vec();
     let desc = sql.meta.order_by.is_empty() || sql.meta.order_by[0].1;
@@ -445,8 +714,15 @@ async fn get_fast_mode_ctx(
         search_type: session.search_type.clone(),
         work_group: session.work_group.clone(),
     };
-    let mut ctx =
-        register_table(&fast_session, schema.clone(), "tbl", &new_files, file_type).await?;
+    let mut ctx = register_table(
+        &fast_session,
+        schema.clone(),
+        "tbl",
+        &new_files,
+        file_type,
+        without_optimizer,
+    )
+    .await?;
 
     // register UDF
     register_udf(&mut ctx, &sql.org_id).await;
@@ -477,12 +753,10 @@ pub async fn merge(
     limit: usize,
     sql: &str,
     batches: &[RecordBatch],
+    is_final_phase: bool, // use to indicate if this is the final phase of merge
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
         return Ok(vec![]);
-    }
-    if offset == 0 && batches.len() == 1 {
-        return Ok(batches.to_owned());
     }
 
     // write temp file
@@ -491,8 +765,13 @@ pub async fn merge(
         return Ok(vec![]);
     }
 
+    let select_wildcard = sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+
     // rewrite sql
-    let query_sql = match merge_rewrite_sql(sql, schema) {
+    let mut query_sql = match merge_rewrite_sql(sql, schema) {
         Ok(sql) => {
             if offset > 0
                 && sql.to_uppercase().contains(" LIMIT ")
@@ -511,8 +790,15 @@ pub async fn merge(
         }
     };
 
+    if !is_final_phase {
+        let rewrite_sql = rewrite_count_distinct_sql(sql, false)?;
+        if rewrite_sql != sql {
+            query_sql = rewrite_sql;
+        }
+    }
+
     // query data
-    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal)?;
+    let mut ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
     // Configure listing options
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
@@ -546,7 +832,7 @@ pub async fn merge(
 
     // Debug SQL
     if CONFIG.common.print_key_sql {
-        log::info!("Merge sql: {query_sql}");
+        log::info!("Merge sql: {query_sql}, is_final_phase: {is_final_phase}");
     }
 
     let df = match ctx.sql(&query_sql).await {
@@ -591,6 +877,21 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Stri
 }
 
 fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
+    // special case for count distinct
+    if RE_COUNT_DISTINCT
+        .captures(sql.to_lowercase().as_str())
+        .is_some()
+    {
+        let mut sql = sql.to_string();
+        // delete where from sql
+        remove_clause(
+            &mut sql,
+            &RE_WHERE,
+            &[" order by", " group by", " offset", " limit"],
+        );
+        return Ok(sql);
+    }
+
     let mut sql = sql.to_string();
     let mut fields = Vec::new();
     let mut from_pos = 0;
@@ -809,20 +1110,11 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     // delete where from sql
-    let mut where_str = match RE_WHERE.captures(&sql) {
-        Some(caps) => caps[0].to_string(),
-        None => "".to_string(),
-    };
-    if !where_str.is_empty() {
-        let mut where_str_lower = where_str.to_lowercase();
-        for key in [" order by", " group by", " offset", " limit"].iter() {
-            if let Some(pos) = where_str_lower.find(key) {
-                where_str = where_str[..pos].to_string();
-                where_str_lower = where_str.to_lowercase();
-            }
-        }
-        sql = sql.replace(&where_str, " ");
-    }
+    remove_clause(
+        &mut sql,
+        &RE_WHERE,
+        &[" order by", " group by", " offset", " limit"],
+    );
 
     Ok(sql)
 }
@@ -832,12 +1124,24 @@ pub async fn convert_parquet_file(
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
+    full_text_search_fields: &[String],
     rules: HashMap<String, DataType>,
     file_type: FileType,
 ) -> Result<()> {
     let start = std::time::Instant::now();
+
+    let query_sql = format!(
+        "SELECT * FROM tbl ORDER BY {} DESC",
+        CONFIG.common.column_timestamp
+    );
+
+    let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.common.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+
     // query data
-    let ctx = prepare_datafusion_context(None, &SearchType::Normal)?;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
 
     // Configure listing options
     let listing_options = match file_type {
@@ -877,10 +1181,6 @@ pub async fn convert_parquet_file(
     ctx.register_table("tbl", Arc::new(table))?;
 
     // get all sorted data
-    let query_sql = format!(
-        "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.column_timestamp
-    );
     let mut df = match ctx.sql(&query_sql).await {
         Ok(df) => df,
         Err(e) => {
@@ -917,7 +1217,13 @@ pub async fn convert_parquet_file(
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
     let file_meta = FileMeta::default();
-    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
+    let mut writer = new_parquet_writer(
+        buf,
+        &schema,
+        bloom_filter_fields,
+        full_text_search_fields,
+        &file_meta,
+    );
     for batch in batches {
         writer.write(&batch).await?;
     }
@@ -938,8 +1244,10 @@ pub async fn merge_parquet_files(
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
+    full_text_search_fields: &[String],
     original_size: i64,
-) -> Result<FileMeta> {
+    stream_type: StreamType,
+) -> Result<(FileMeta, Arc<Schema>)> {
     // query data
     let runtime_env = create_runtime_env(None)?;
     let session_config = create_session_config(&SearchType::Normal)?;
@@ -981,16 +1289,30 @@ pub async fn merge_parquet_files(
     };
 
     // get all sorted data
-    let query_sql = format!(
-        "SELECT * FROM tbl ORDER BY {} DESC",
-        CONFIG.common.column_timestamp
-    );
+    let query_sql = if stream_type == StreamType::Index {
+        format!(
+            "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
+            CONFIG.common.column_timestamp
+        )
+    } else {
+        format!(
+            "SELECT * FROM tbl ORDER BY {} DESC",
+            CONFIG.common.column_timestamp
+        )
+    };
+
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
     let schema = Arc::new(schema);
     let batches = df.collect().await?;
 
-    let mut writer = new_parquet_writer(buf, &schema, bloom_filter_fields, &file_meta);
+    let mut writer = new_parquet_writer(
+        buf,
+        &schema,
+        bloom_filter_fields,
+        full_text_search_fields,
+        &file_meta,
+    );
     for batch in batches {
         writer.write(&batch).await?;
     }
@@ -998,7 +1320,7 @@ pub async fn merge_parquet_files(
     ctx.deregister_table("tbl")?;
     drop(ctx);
 
-    Ok(file_meta)
+    Ok((file_meta, schema))
 }
 
 pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> {
@@ -1016,7 +1338,7 @@ pub fn create_session_config(search_type: &SearchType) -> Result<SessionConfig> 
     if CONFIG.common.bloom_filter_enabled {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", true);
     }
-    if CONFIG.common.bloom_filter_force_disabled {
+    if CONFIG.common.bloom_filter_disabled_on_search {
         config = config.set_bool("datafusion.execution.parquet.bloom_filter_enabled", false);
     }
     Ok(config)
@@ -1071,13 +1393,21 @@ pub fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
 pub fn prepare_datafusion_context(
     work_group: Option<String>,
     search_type: &SearchType,
+    without_optimizer: bool,
 ) -> Result<SessionContext, DataFusionError> {
     let session_config = create_session_config(search_type)?;
     let runtime_env = create_runtime_env(work_group)?;
-    Ok(SessionContext::new_with_config_rt(
-        session_config,
-        Arc::new(runtime_env),
-    ))
+    if without_optimizer {
+        let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
+            .with_optimizer_rules(vec![])
+            .with_analyzer_rules(vec![]);
+        Ok(SessionContext::new_with_state(state))
+    } else {
+        Ok(SessionContext::new_with_config_rt(
+            session_config,
+            Arc::new(runtime_env),
+        ))
+    }
 }
 
 async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
@@ -1102,8 +1432,13 @@ pub async fn register_table(
     table_name: &str,
     files: &[FileKey],
     file_type: FileType,
+    without_optimizer: bool,
 ) -> Result<SessionContext> {
-    let ctx = prepare_datafusion_context(session.work_group.clone(), &session.search_type)?;
+    let ctx = prepare_datafusion_context(
+        session.work_group.clone(),
+        &session.search_type,
+        without_optimizer,
+    )?;
     // Configure listing options
     let listing_options = match file_type {
         FileType::PARQUET => {
@@ -1144,9 +1479,15 @@ pub async fn register_table(
         }
     };
 
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema);
+    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
+    if CONFIG.common.feature_query_infer_schema
+        || (CONFIG.common.query_optimization_num_fields > 0
+            && schema.fields().len() > CONFIG.common.query_optimization_num_fields)
+    {
+        config = config.infer_schema(&ctx.state()).await?;
+    } else {
+        config = config.with_schema(schema);
+    }
     let table = ListingTable::try_new(config)?;
     ctx.register_table(table_name, Arc::new(table))?;
 
@@ -1312,10 +1653,87 @@ mod tests {
             100,
             "select * from tbl limit 10",
             &[batch, batch2],
+            true,
         )
         .await
         .unwrap();
 
         assert!(!res.is_empty())
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase1() {
+        let sql = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = vec![
+            "SELECT DISTINCT \"a\"  FROM  tbl where a > 3 ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
+            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl where a > 3   ",
+            "SELECT  a, \"b\"  FROM  tbl where a > 3   ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
+        ];
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = rewrite_count_distinct_sql(sql, true).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase2() {
+        let sql = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = vec![
+            "SELECT DISTINCT \"a\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl ",
+            "SELECT  a, \"b\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
+        ];
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = rewrite_count_distinct_sql(sql, false).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase3() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Utf8, false),
+            Field::new("c", DataType::Utf8, false),
+        ]));
+
+        let sql = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = vec![
+            "SELECT COUNT(DISTINCT a) FROM tbl  limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl  group by a having cnt > 1 limit 10",
+        ];
+
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = merge_rewrite_sql(sql, schema.clone()).unwrap();
+            assert_eq!(res, **except);
+        }
     }
 }

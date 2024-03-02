@@ -18,12 +18,18 @@ use std::sync::Arc;
 use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use datafusion::arrow::datatypes::Schema;
-use hashbrown::HashSet;
-use infra::{cache, db as infra_db};
+use hashbrown::{HashMap, HashSet};
+use infra::{
+    cache,
+    db::{self as infra_db},
+};
 
 use crate::{
     common::{
-        infra::config::{ENRICHMENT_TABLES, STREAM_SCHEMAS, STREAM_SETTINGS},
+        infra::{
+            cluster::get_cached_online_querier_nodes,
+            config::{ENRICHMENT_TABLES, STREAM_SCHEMAS, STREAM_SETTINGS},
+        },
         meta::stream::{StreamSchema, StreamSettings},
     },
     service::{enrichment::StreamTable, stream::stream_settings},
@@ -343,7 +349,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Vec<Schema> = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = db.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 let settings = stream_settings(item_value.last().unwrap()).unwrap_or_default();
                 let mut w = STREAM_SCHEMAS.write().await;
                 w.insert(item_key.to_string(), item_value.clone());
@@ -453,6 +465,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     let r = STREAM_SCHEMAS.read().await;
+    let mut tables = HashMap::new();
     for schema_key in r.keys() {
         if !schema_key.contains(format!("/{}/", StreamType::EnrichmentTables).as_str()) {
             continue;
@@ -464,12 +477,41 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         if !stream_type.eq(&StreamType::EnrichmentTables) {
             continue;
         }
-        ENRICHMENT_TABLES.insert(
+        tables.insert(
             schema_key.to_owned(),
             StreamTable {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                data: super::enrichment_table::get(org_id, stream_name).await?,
+                data: vec![],
+            },
+        );
+    }
+    drop(r);
+    if tables.is_empty() {
+        log::info!("EnrichmentTables Cached");
+        return Ok(());
+    }
+
+    // waiting for querier to be ready
+    let expect_querier_num = CONFIG.limit.starting_expect_querier_num;
+    loop {
+        let nodes = get_cached_online_querier_nodes().unwrap_or_default();
+        if nodes.len() >= expect_querier_num {
+            break;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        log::info!("Waiting for querier to be ready");
+    }
+
+    // fill data
+    for (key, tbl) in tables {
+        let data = super::enrichment_table::get(&tbl.org_id, &tbl.stream_name).await?;
+        ENRICHMENT_TABLES.insert(
+            key,
+            StreamTable {
+                org_id: tbl.org_id,
+                stream_name: tbl.stream_name,
+                data,
             },
         );
     }

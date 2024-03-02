@@ -24,7 +24,12 @@ use crate::{
     service::db,
 };
 
-pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<(), anyhow::Error> {
+pub async fn save(
+    org_id: &str,
+    name: &str,
+    mut template: Template,
+    create: bool,
+) -> Result<(), anyhow::Error> {
     if template.body.is_empty() {
         return Err(anyhow::anyhow!("Alert template body empty"));
     }
@@ -36,6 +41,19 @@ pub async fn save(org_id: &str, name: &str, mut template: Template) -> Result<()
     }
     if template.name.contains('/') {
         return Err(anyhow::anyhow!("Alert template name cannot contain '/'"));
+    }
+
+    match db::alerts::templates::get(org_id, &template.name).await {
+        Ok(_) => {
+            if create {
+                return Err(anyhow::anyhow!("Alert template already exists"));
+            }
+        }
+        Err(_) => {
+            if !create {
+                return Err(anyhow::anyhow!("Alert template not found"));
+            }
+        }
     }
 
     match db::alerts::templates::set(org_id, &mut template).await {
@@ -55,8 +73,31 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
         .map_err(|_| anyhow::anyhow!("Alert template not found"))
 }
 
-pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
-    db::alerts::templates::list(org_id).await
+pub async fn list(
+    org_id: &str,
+    permitted: Option<Vec<String>>,
+) -> Result<Vec<Template>, anyhow::Error> {
+    match db::alerts::templates::list(org_id).await {
+        Ok(templates) => {
+            let mut result = Vec::new();
+            for template in templates {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("template:{}", template.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("template:{}", org_id))
+                {
+                    result.push(template);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {

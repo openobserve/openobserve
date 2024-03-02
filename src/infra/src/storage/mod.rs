@@ -26,6 +26,17 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
 pub static LOCAL_CACHE: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_cache);
 
+/// Returns the default object store based on the configuration.
+/// If the local disk storage is enabled, it creates a local object store.
+/// Otherwise, it creates a remote object store.
+///
+/// # Examples
+///
+/// ```
+/// use infra::storage::default;
+///
+/// let object_store = default();
+/// ```
 fn default() -> Box<dyn ObjectStore> {
     if is_local_disk_storage() {
         std::fs::create_dir_all(&CONFIG.common.data_stream_dir)

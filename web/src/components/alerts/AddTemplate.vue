@@ -341,7 +341,7 @@ const saveTemplate = () => {
         dismiss();
         q.notify({
           type: "negative",
-          message: err.response.data.error,
+          message: err.response?.data?.error || err.response?.data?.message,
         });
       });
   } else {
@@ -368,7 +368,7 @@ const saveTemplate = () => {
           dismiss();
           q.notify({
             type: "negative",
-            message: err.response.data.error,
+            message: err.response?.data?.error || err.response?.data?.message,
           });
         });
     }

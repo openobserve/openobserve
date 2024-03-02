@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disable="
                 searchObj.loading == 'true' ||
                 (searchObj.data.hasOwnProperty('streamResults') &&
-                  searchObj.data.streamResults.length == 0)
+                  searchObj.data.streamResults?.list?.length == 0)
               "
               >{{ t("search.runQuery") }}</q-btn
             >
@@ -1327,6 +1327,7 @@ export default defineComponent({
     };
 
     const applySavedView = (item) => {
+      searchObj.meta.sqlMode = false;
       savedviewsService
         .getViewDetail(
           store.state.selectedOrganization.identifier,
@@ -1335,13 +1336,8 @@ export default defineComponent({
         .then(async (res) => {
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
-            // const extractedObj = JSON.parse(b64DecodeUnicode(res.data.data));
             const extractedObj = res.data.data;
-            // alert(JSON.stringify(searchObj.data.stream.selectedStream))
-            // if (
-            //   extractedObj.data.stream.selectedStream.value !=
-            //   searchObj.data.stream.selectedStream.value
-            // ) {
+
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }

@@ -60,6 +60,7 @@ export default createStore({
     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
     theme: "",
+    printMode: false,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
     zoConfig: {},
     timezone: useLocalTimezone()
@@ -152,6 +153,9 @@ export default createStore({
     },
     appTheme(state, payload) {
       state.theme = payload;
+    },
+    setPrintMode(state, payload) {
+      state.printMode = payload;
     },
     setTimezone(state, payload) {
       state.timezone = payload;
@@ -247,6 +251,9 @@ export default createStore({
     },
     appTheme(context, payload) {
       context.commit("appTheme", payload);
+    },
+    setPrintMode(context, payload) {
+      context.commit("setPrintMode", payload);
     },
     setTimezone(context, payload) {
       context.commit("setTimezone", payload);

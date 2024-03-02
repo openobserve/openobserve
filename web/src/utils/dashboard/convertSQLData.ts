@@ -249,6 +249,7 @@ export const convertSQLData = (
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
+          panelSchema.id &&
           hoveredSeriesState?.value?.panelId != panelSchema.id
         )
           return "";
@@ -517,6 +518,7 @@ export const convertSQLData = (
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
             hoveredSeriesState?.value &&
+            panelSchema.id &&
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
@@ -645,6 +647,7 @@ export const convertSQLData = (
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
             hoveredSeriesState?.value &&
+            panelSchema.id &&
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
@@ -695,6 +698,7 @@ export const convertSQLData = (
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
             hoveredSeriesState?.value &&
+            panelSchema.id &&
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
@@ -867,6 +871,7 @@ export const convertSQLData = (
           // show tooltip for hovered panel only for other we only need axis so just return empty string
           if (
             hoveredSeriesState?.value &&
+            panelSchema.id &&
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
@@ -1243,6 +1248,7 @@ export const convertSQLData = (
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
+          panelSchema.id &&
           hoveredSeriesState?.value?.panelId != panelSchema.id
         )
           return "";
@@ -1367,6 +1373,7 @@ export const convertSQLData = (
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
+          panelSchema.id &&
           hoveredSeriesState?.value?.panelId != panelSchema.id
         )
           return "";

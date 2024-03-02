@@ -16,6 +16,7 @@
 use std::{collections::HashMap, io::Write, sync::Arc};
 
 use ::datafusion::{arrow::datatypes::Schema, common::FileType, error::DataFusionError};
+use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE_UUID,
@@ -30,6 +31,7 @@ use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
+    job::files::parquet::generate_index_on_compactor,
     service::{db, file_list, search::datafusion, stream},
 };
 
@@ -49,6 +51,9 @@ pub async fn merge_by_stream(
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
+
+    log::warn!("Inside merge_by_stream");
+    log::warn!("CHECKING THE STREAM TYPE: {:?}", stream_type);
 
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -150,6 +155,7 @@ pub async fn merge_by_stream(
                         .unwrap()
                         * 3))
     {
+        log::warn!("compactor merge: the time is not allowed, just wait");
         return Ok(()); // the time is future, just wait
     }
 
@@ -178,6 +184,7 @@ pub async fn merge_by_stream(
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
+    log::warn!("files = {:?}", files);
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
@@ -246,6 +253,7 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 };
+                log::warn!("new_file_name = {:?}", new_file_name);
                 if new_file_name.is_empty() {
                     if CONFIG.common.print_key_event {
                         log::info!(
@@ -353,6 +361,12 @@ async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
+    log::error!(
+        "************ Merging the files now for stream_type {} ************",
+        stream_type
+    );
+    log::error!("files_with_size = {:?}", files_with_size);
+
     if files_with_size.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
@@ -378,6 +392,7 @@ async fn merge_files(
     if new_file_list.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
+
     let retain_file_list = new_file_list.clone();
 
     // write parquet files into tmpfs
@@ -417,6 +432,7 @@ async fn merge_files(
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(schema_latest).unwrap();
+    let full_text_search_fields = stream::get_stream_setting_fts_fields(schema_latest).unwrap();
     if CONFIG.common.widening_schema_evolution && schema_versions.len() > 1 {
         for file in &new_file_list {
             // get the schema version of the file
@@ -479,6 +495,7 @@ async fn merge_files(
                 &mut buf,
                 Arc::new(schema),
                 &bloom_filter_fields,
+                &full_text_search_fields,
                 diff_fields,
                 FileType::PARQUET,
             )
@@ -493,12 +510,14 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let mut new_file_meta = datafusion::exec::merge_parquet_files(
+    let (mut new_file_meta, new_file_schema) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         schema,
         &bloom_filter_fields,
+        &full_text_search_fields,
         new_file_size,
+        stream_type,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -514,7 +533,6 @@ async fn merge_files(
 
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
-
     log::info!(
         "[COMPACT] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
         retain_file_list.len(),
@@ -523,9 +541,47 @@ async fn merge_files(
         new_file_meta.compressed_size,
     );
 
+    let buf = Bytes::from(buf);
     // upload file
-    match storage::put(&new_file_key, buf.into()).await {
-        Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
+    match storage::put(&new_file_key, buf.clone()).await {
+        Ok(_) => {
+            if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
+                log::warn!("Stream type is LOGS, lets create a new index file");
+                let (index_file_name, filemeta) = generate_index_on_compactor(
+                    &retain_file_list,
+                    buf,
+                    new_file_key.clone(),
+                    org_id,
+                    stream_name,
+                    new_file_schema.clone(),
+                )
+                .await?;
+                log::warn!(
+                    "**************Created index file during compaction****************** {}",
+                    index_file_name
+                );
+                // Notify that we wrote the index file to the db.
+                let ret = write_file_list(
+                    org_id,
+                    &[FileKey {
+                        key: index_file_name.clone(),
+                        meta: filemeta,
+                        deleted: false,
+                    }],
+                )
+                .await;
+                if let Err(e) = ret {
+                    log::error!(
+                        "[merge_files] failed to write to file list on compactor: {}, error: {}",
+                        index_file_name,
+                        e.to_string()
+                    );
+                }
+                // let ret = db::file_list::local::set(&index_file_name, Some(filemeta),
+                // false).await;
+            }
+            Ok((new_file_key, new_file_meta, retain_file_list))
+        }
         Err(e) => Err(e),
     }
 }

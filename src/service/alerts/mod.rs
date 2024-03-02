@@ -25,15 +25,16 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    CONFIG,
+    CONFIG, SMTP_CLIENT,
 };
+use lettre::{message::SinglePart, AsyncTransport, Message};
 
 use super::promql;
 use crate::{
     common::{
         meta::{
             alerts::{
-                destinations::{DestinationWithTemplate, HTTPType},
+                destinations::{DestinationType, DestinationWithTemplate, HTTPType},
                 AggFunction, Alert, Condition, Operator, QueryCondition, QueryType,
             },
             authz::Authz,
@@ -55,6 +56,7 @@ pub async fn save(
     stream_name: &str,
     name: &str,
     mut alert: Alert,
+    create: bool,
 ) -> Result<(), anyhow::Error> {
     if !name.is_empty() {
         alert.name = name.trim().to_string();
@@ -63,6 +65,22 @@ pub async fn save(
     alert.stream_type = stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
+
+    match db::alerts::get(org_id, stream_type, stream_name, &alert.name).await {
+        Ok(Some(_)) => {
+            if create {
+                return Err(anyhow::anyhow!("Alert already exists"));
+            }
+        }
+        Ok(None) => {
+            if !create {
+                return Err(anyhow::anyhow!("Alert not found"));
+            }
+        }
+        Err(e) => {
+            return Err(e);
+        }
+    }
 
     // default frequency is 60 seconds
     if alert.trigger_condition.frequency == 0 {
@@ -165,8 +183,29 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
+    permitted: Option<Vec<String>>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    db::alerts::list(org_id, stream_type, stream_name).await
+    match db::alerts::list(org_id, stream_type, stream_name).await {
+        Ok(alerts) => {
+            let mut result = Vec::new();
+            for alert in alerts {
+                if permitted.is_none()
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("alert:{}", alert.name))
+                    || permitted
+                        .as_ref()
+                        .unwrap()
+                        .contains(&format!("alert:{}", org_id))
+                {
+                    result.push(alert);
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn delete(
@@ -752,7 +791,18 @@ pub async fn send_notification(
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
-    let msg = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
+    let msg: String = process_dest_template(&dest.template.body, alert, rows, &rows_tpl_val).await;
+
+    match dest.destination_type {
+        DestinationType::Http => send_http_notification(dest, msg.clone()).await,
+        DestinationType::Email => send_email_notification(&alert.name, dest, msg).await,
+    }
+}
+
+pub async fn send_http_notification(
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<(), anyhow::Error> {
     let client = if dest.skip_tls_verify {
         reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
@@ -791,6 +841,37 @@ pub async fn send_notification(
     }
 
     Ok(())
+}
+
+pub async fn send_email_notification(
+    alert_name: &str,
+    dest: &DestinationWithTemplate,
+    msg: String,
+) -> Result<(), anyhow::Error> {
+    if !CONFIG.smtp.smtp_enabled {
+        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+    }
+
+    let mut recepients = vec![];
+    for recepient in &dest.emails {
+        recepients.push(recepient);
+    }
+
+    let mut email = Message::builder()
+        .from(CONFIG.smtp.smtp_from_email.parse()?)
+        .subject(format!("Openobserve Alert - {}", alert_name));
+
+    for recepient in recepients {
+        email = email.to(recepient.parse()?);
+    }
+
+    let email = email.singlepart(SinglePart::html(msg)).unwrap();
+
+    // Send the email
+    match SMTP_CLIENT.as_ref().unwrap().send(email).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
+    }
 }
 
 fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]) -> Vec<String> {
@@ -1147,7 +1228,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_alert_save() {
+    async fn test_alert_create() {
         let org_id = "default";
         let stream_type = StreamType::Logs;
         let stream_name = "default";
@@ -1156,7 +1237,7 @@ mod tests {
             name: alert_name.to_string(),
             ..Default::default()
         };
-        let ret = save(org_id, stream_type, stream_name, alert_name, alert).await;
+        let ret = save(org_id, stream_type, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());
     }

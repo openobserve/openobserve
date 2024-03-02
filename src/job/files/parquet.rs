@@ -13,15 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Cursor, Read},
-    path::Path,
-    sync::Arc,
-    time::UNIX_EPOCH,
-};
+use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use arrow_schema::Schema;
+use arrow::{
+    array::{ArrayRef, BooleanArray, Int64Array, StringArray},
+    record_batch::RecordBatch,
+};
+use arrow_schema::{Schema, SchemaRef};
+use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster,
@@ -30,18 +29,27 @@ use config::{
     utils::{
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files,
-        parquet::{read_metadata_from_bytes, read_metadata_from_file},
+        parquet::read_metadata_from_file,
     },
-    FxIndexMap, CONFIG,
+    FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
+};
+use datafusion::{
+    datasource::MemTable, execution::context::SessionContext, prelude::*, scalar::ScalarValue,
 };
 use infra::{cache, storage};
-use parquet::arrow::ParquetRecordBatchStreamBuilder;
+use parquet::arrow::{
+    arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
+};
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
-    common::infra::wal,
+    common::{infra::wal, meta::stream::StreamParams},
+    job::files::idx::write_to_disk,
     service::{
-        db, schema::schema_evolution, search::datafusion::exec::merge_parquet_files, stream,
+        db,
+        ingestion::{get_wal_time_key, index_writer::write_file_arrow},
+        search::datafusion::exec::merge_parquet_files,
+        stream::{self, get_stream_setting_fts_fields},
     },
 };
 
@@ -338,29 +346,19 @@ async fn merge_files(
     let stream_name = columns[3].to_string();
     let file_name = columns[4].to_string();
 
-    if new_file_list.len() == 1 {
-        let (new_file_name, file_meta) = upload_file(
-            &org_id,
-            &stream_name,
-            stream_type,
-            wal_dir,
-            &file.key,
-            &file_name,
-        )
-        .await?;
-        return Ok((new_file_name, file_meta, retain_file_list));
-    }
-
     // merge files
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
+    let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
-    let mut new_file_meta = merge_parquet_files(
+    let (mut new_file_meta, new_file_schema) = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
         &bloom_filter_fields,
+        &full_text_search_fields,
         new_file_size,
+        stream_type,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -373,7 +371,7 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-
+    let min_ts = new_file_meta.min_ts;
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
@@ -384,73 +382,190 @@ async fn merge_files(
         new_file_meta.compressed_size,
     );
 
+    let buf = Bytes::from(buf);
     // upload file
-    match storage::put(&new_file_key, buf.into()).await {
-        Ok(_) => Ok((new_file_key, new_file_meta, retain_file_list)),
+    match storage::put(&new_file_key, buf.clone()).await {
+        Ok(_) => {
+            if CONFIG.common.inverted_index_enabled {
+                generate_index_on_ingester(
+                    buf,
+                    new_file_key.clone(),
+                    min_ts,
+                    &org_id,
+                    &stream_name,
+                    new_file_schema,
+                )
+                .await?;
+            }
+            Ok((new_file_key, new_file_meta, retain_file_list))
+        }
         Err(e) => Err(e),
     }
 }
 
-async fn upload_file(
+/// Create an inverted index file for the given file
+pub(crate) async fn generate_index_on_ingester(
+    buf: Bytes,
+    new_file_key: String,
+    min_ts: i64,
     org_id: &str,
     stream_name: &str,
-    stream_type: StreamType,
-    wal_dir: &Path,
-    path_str: &str,
-    file_name: &str,
+    schema: SchemaRef,
+) -> Result<String, anyhow::Error> {
+    let index_record_batches =
+        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
+    let record_batches = index_record_batches.into_iter().flatten().collect();
+
+    let hour_key = get_wal_time_key(
+        min_ts,
+        &vec![],
+        config::meta::stream::PartitionTimeLevel::Hourly,
+        &serde_json::Map::new(),
+        None,
+    );
+
+    let arrow_file_name = write_file_arrow(
+        record_batches,
+        0,
+        &StreamParams {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type: StreamType::Index,
+        },
+        &hour_key,
+    )
+    .await?;
+    log::warn!("[INGESTER:JOB] Written index file successfully");
+    Ok(arrow_file_name)
+}
+
+/// Create an inverted index file for the given file
+pub(crate) async fn generate_index_on_compactor(
+    file_list_to_invalidate: &[FileKey],
+    buf: Bytes,
+    new_file_key: String,
+    org_id: &str,
+    stream_name: &str,
+    schema: SchemaRef,
 ) -> Result<(String, FileMeta), anyhow::Error> {
-    let file_path = wal_dir.join(path_str);
-    let mut file = std::fs::File::open(&file_path).unwrap();
-    let file_meta = file.metadata().unwrap();
-    let file_size = file_meta.len();
-    log::info!("[INGESTER:JOB] File upload begin: {}", path_str);
-    if file_size == 0 {
-        if let Err(e) = tokio::fs::remove_file(file_path).await {
-            log::error!(
-                "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
-                path_str,
-                e
-            );
-        }
-        return Err(anyhow::anyhow!("file is empty: {}", path_str));
-    }
+    let mut index_record_batches =
+        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
 
-    // write metadata
-    let mut buf_parquet: Vec<u8> = Vec::new();
-    file.read_to_end(&mut buf_parquet)?;
-    let buf_parquet = bytes::Bytes::from(buf_parquet);
-    let mut file_meta = read_metadata_from_bytes(&buf_parquet).await?;
-    file_meta.compressed_size = file_size as i64;
+    let schema = if let Some(first_batch) = index_record_batches.first() {
+        first_batch[0].schema()
+    } else {
+        return Err(anyhow::anyhow!("No record batches found".to_string(),));
+    };
 
-    // read schema
-    let schema_reader = std::io::Cursor::new(buf_parquet.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
-    let inferred_schema = arrow_reader
-        .schema()
-        .as_ref()
-        .clone()
-        .with_metadata(std::collections::HashMap::new());
+    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let len_of_columns_to_invalidate = file_list_to_invalidate.len();
+    let empty_terms: ArrayRef = Arc::new(StringArray::from(vec![
+        None::<String>;
+        len_of_columns_to_invalidate
+    ]));
+    let file_names: ArrayRef = Arc::new(StringArray::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.key.trim_start_matches(&prefix_to_remove).to_string())
+            .collect::<Vec<String>>(),
+    ));
+    let _timestamp: ArrayRef = Arc::new(Int64Array::from(
+        file_list_to_invalidate
+            .iter()
+            .map(|x| x.meta.min_ts)
+            .collect::<Vec<i64>>(),
+    ));
+    let count: ArrayRef = Arc::new(Int64Array::from(vec![
+        None::<i64>;
+        len_of_columns_to_invalidate
+    ]));
+    let deleted: ArrayRef = Arc::new(BooleanArray::from(vec![true; len_of_columns_to_invalidate]));
+    let columns = vec![empty_terms, file_names, _timestamp, count, deleted];
+    let batch = RecordBatch::try_new(schema, columns).unwrap();
+    index_record_batches.push(vec![batch]);
 
-    schema_evolution(
+    let record_batches_flattened = index_record_batches.into_iter().flatten().collect();
+
+    let original_file_size = 0; // The file never existed before this function was called
+    let (filename, filemeta, _stream_type) = write_to_disk(
+        record_batches_flattened,
+        original_file_size,
         org_id,
         stream_name,
-        stream_type,
-        Arc::new(inferred_schema),
-        file_meta.min_ts,
+        StreamType::Index,
+        &new_file_key,
+        "index_creator",
     )
-    .await;
+    .await?;
 
-    let new_file_name =
-        super::generate_storage_file_name(org_id, stream_type, stream_name, file_name);
-    drop(file);
-    match storage::put(&new_file_name, buf_parquet).await {
-        Ok(_) => {
-            log::info!("[INGESTER:JOB] File upload succeeded: {}", new_file_name);
-            Ok((new_file_name, file_meta))
+    log::warn!("[COMPACTOR:JOB] Written index file successfully");
+    Ok((filename, filemeta))
+}
+
+/// Prepares index record batches from the provided Parquet file buffer.
+///
+/// Reads the Parquet data into record batches. Registers the batches as a table.
+/// Generates an index record batch for each text column, by splitting into terms,
+/// filtering, aggregating, etc. Returns the generated index record batches.
+///
+/// # Arguments
+/// * `buf` - The Parquet file buffer with actual data.
+/// * `schema` - The schema of the Parquet file.
+/// * `org_id` - The organization ID.
+/// * `stream_name` - The stream name.
+/// * `new_file_key` - The new file key which is used to generate the index file.
+async fn prepare_index_record_batches(
+    buf: Bytes,
+    schema: Arc<Schema>,
+    org_id: &str,
+    stream_name: &str,
+    new_file_key: &str,
+) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
+    let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
+        .unwrap()
+        .build()
+        .unwrap();
+    let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
+    let ctx = SessionContext::new();
+    let provider = MemTable::try_new(schema.clone(), vec![batches])?;
+    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
+    let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
+    let columns_to_index = if !fts_fields.is_empty() {
+        fts_fields
+    } else {
+        SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+    };
+    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
+    let mut indexed_record_batches_to_merge = Vec::new();
+    for column in columns_to_index.iter() {
+        let index_df = ctx.table("_tbl_raw_data").await?;
+        if !index_df.schema().has_column_with_unqualified_name(column) {
+            continue;
         }
-        Err(err) => {
-            log::error!("[INGESTER:JOB] File upload error: {:?}", err);
-            Err(anyhow::anyhow!(err))
-        }
+        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
+        let record_batch = index_df
+            .with_column("terms", split_arr)?
+            .unnest_column("terms")?
+            .with_column_renamed("terms", "term")?
+            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
+            .with_column("file_name", lit(file_name_without_prefix))?
+            .aggregate(
+                vec![col("term"), col("file_name")],
+                vec![
+                    min(col("_timestamp")).alias("_timestamp"),
+                    count(col("term")).alias("_count"),
+                ],
+            )?
+            .with_column("character_len", character_length(col("term")))?
+            .with_column("deleted", lit(false))?
+            .filter(col("character_len").gt_eq(lit(3)))?
+            .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
+            .collect()
+            .await?;
+
+        indexed_record_batches_to_merge.push(record_batch);
     }
+    ctx.deregister_table("_tbl_raw_data")?;
+    Ok(indexed_record_batches_to_merge)
 }

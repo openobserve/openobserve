@@ -100,8 +100,9 @@
     "range": "No of Records",
     "btnDownload": "Download",
     "customDownloadMessage": "Enter the initial number and select the range for downloading data.",
-    "noRecordFound": "No Record Found",
-    "functionErrorLabel": "Function not applied: (expand for more details)"
+    "noRecordFound": "No records found. Please adjust filters and try again.",
+    "functionErrorLabel": "Function not applied: (expand for more details)",
+    "histogramErrorBtnLabel": "Click for error details"
   },
   "menu": {
     "home": "Home",
@@ -360,7 +361,12 @@
     "labelAll": "All",
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
-    "labelTraces": "Traces"
+    "labelTraces": "Traces",
+    "add": "Add Stream",
+    "dataRetention": "Data Retention (in days)",
+    "indexing": "Indexing",
+    "createStream": "Create Stream",
+    "indexType": "Index Type"
   },
   "function": {
     "header": "Functions",
@@ -463,6 +469,7 @@
     "goBackToDashboard": "Go back to dashboard",
     "import": "Import",
     "setting": "Dashboard Settings",
+    "print": "Print Dashboard",
     "refresh": "Refresh",
     "export": "Export Dashboard",
     "share": "Share",
@@ -516,9 +523,13 @@
     "unitLabel": "Unit",
     "basemapLabel": "Base Map",
     "customunitLabel": "Custom Unit",
-    "lattitudeLabel": "Lattitude",
+    "latitudeLabel": "Latitude",
     "longitudeLabel": "Longitude",
     "zoomLabel": "Zoom",
+    "symbolsize": "Symbol Size",
+    "minimum": "Minimum",
+    "maximum": "Maximum",
+    "fixedValue": "Fixed Value",
     "legendLabel": "Legend",
     "overrideMessage": "Series name overrides. For example, {endpoint} with be replaced with the label value for endpoint.",
     "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",

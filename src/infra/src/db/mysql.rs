@@ -134,7 +134,7 @@ impl super::Db for MysqlDb {
         // event watch
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator.put(key, value, true).await?;
+            cluster_coordinator.put(key, Bytes::from(""), true).await?;
         }
 
         Ok(())
@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
-    value   TEXT not null
+    value   LONGTEXT not null
 );
         "#,
     )

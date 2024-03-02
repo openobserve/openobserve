@@ -32,10 +32,11 @@ pub(crate) fn get_stream_type_from_request(
             "traces" => Some(StreamType::Traces),
             "enrichment_tables" => Some(StreamType::EnrichmentTables),
             "metadata" => Some(StreamType::Metadata),
+            "index" => Some(StreamType::Index),
             _ => {
                 return Err(Error::new(
                     ErrorKind::Other,
-                    "'type' query param with value 'logs', 'metrics', 'traces', 'enrichment_table' or 'metadata' allowed",
+                    "'type' query param with value 'logs', 'metrics', 'traces', 'enrichment_table', 'metadata' or 'index' allowed",
                 ));
             }
         },

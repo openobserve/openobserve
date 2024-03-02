@@ -105,7 +105,8 @@ impl Partition {
             };
             // write into parquet buf
             let mut buf_parquet = Vec::new();
-            let mut writer = new_parquet_writer(&mut buf_parquet, &self.schema, &[], &file_meta);
+            let mut writer =
+                new_parquet_writer(&mut buf_parquet, &self.schema, &[], &[], &file_meta);
             for batch in data.data.iter() {
                 persist_stat.arrow_size += batch.data_arrow_size;
                 writer

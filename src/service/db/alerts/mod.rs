@@ -49,11 +49,7 @@ pub async fn get(
             Err(_) => None,
         }
     };
-    if value.is_none() {
-        Err(anyhow::anyhow!("Alert not found"))
-    } else {
-        Ok(value)
-    }
+    if value.is_none() { Ok(None) } else { Ok(value) }
 }
 
 pub async fn set(
@@ -133,7 +129,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
-                let item_value: Alert = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Alert = if config::CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = db.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 let is_realtime = item_value.is_real_time;
                 let mut cacher = STREAM_ALERTS.write().await;
                 let group = cacher.entry(stream_key.to_string()).or_default();

@@ -108,7 +108,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Trigger = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: Trigger = if config::CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = db.get(&ev.key).await?;
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 TRIGGERS
                     .write()
                     .await

@@ -59,15 +59,23 @@ const useStreams = () => {
               })
             : () => {};
           if (streamName === "all") {
+            // As in RBAC there can be permission on certain types of streams
+            // So here added some additional logic to handle those
+
             const streamList = [
               "logs",
               "metrics",
               "traces",
               "enrichment_tables",
-              "metadata",
+              "index",
             ];
-            getStreamsPromise.value = Promise.all(
-              [...streamList].map((streamType) =>
+
+            const streamsToFetch = streamList.filter(
+              (_stream) => !streams[_stream]
+            );
+
+            getStreamsPromise.value = Promise.allSettled(
+              [...streamsToFetch].map((streamType) =>
                 StreamService.nameList(
                   store.state.selectedOrganization.identifier,
                   streamType,
@@ -75,14 +83,21 @@ const useStreams = () => {
                 )
               )
             );
+
             getStreamsPromise.value
-              .then((res: any) => {
-                res.forEach((streamTypeData: any, index: number) => {
-                  setStreams(streamList[index], streamTypeData.data.list);
+              .then((results: any) => {
+                results.forEach((result: any, index: number) => {
+                  if (result.status === "fulfilled") {
+                    setStreams(streamsToFetch[index], result.value.data.list);
+                  }
                 });
 
-                areAllStreamsFetched.value = true;
+                areAllStreamsFetched.value = streamList.every(
+                  (stream) => !!streams[stream]
+                );
+
                 getStreamsPromise.value = null;
+
                 dismiss();
                 resolve(getAllStreamsPayload());
               })
@@ -99,8 +114,12 @@ const useStreams = () => {
             );
             getStreamsPromise.value
               .then((res: any) => {
-                const streamData = setStreams(streamName, res.data.list);
-                areAllStreamsFetched.value = true;
+                setStreams(streamName, res.data.list);
+                const streamData = {
+                  name: streamName,
+                  list: res.data.list,
+                  schema: false,
+                };
                 getStreamsPromise.value = null;
                 dismiss();
                 resolve(streamData);
@@ -139,7 +158,8 @@ const useStreams = () => {
   const getStream = async (
     streamName: string,
     streamType: string,
-    schema: boolean
+    schema: boolean,
+    force: boolean = false
   ): Promise<any> => {
     return new Promise(async (resolve, reject) => {
       if (!streamName || !streamType) {
@@ -172,16 +192,31 @@ const useStreams = () => {
           const streamIndex = streamsIndexMapping[streamType][streamName];
           const hasSchema = !!streams[streamType].list[streamIndex]?.schema;
 
-          if (schema && !hasSchema) {
-            const _stream: any = await StreamService.schema(
-              store.state.selectedOrganization.identifier,
-              streamName,
-              streamType
-            );
-            streams[streamType].list[streamIndex] = _stream.data;
+          if ((schema && !hasSchema) || force) {
+            try {
+              const _stream: any = await StreamService.schema(
+                store.state.selectedOrganization.identifier,
+                streamName,
+                streamType
+              );
+              streams[streamType].list[streamIndex] = _stream.data;
+            } catch (err) {
+              return reject("Error while fetching schema");
+            }
           }
           return resolve(streams[streamType].list[streamIndex]);
         } else {
+          // await StreamService.schema(
+          //   store.state.selectedOrganization.identifier,
+          //   streamName,
+          //   streamType
+          // )
+          //   .then((res: any) => {
+          //     addStream(res.data);
+          //     const streamIndex = streamsIndexMapping[streamType][streamName];
+          //     return resolve(streams[streamType].list[streamIndex]);
+          //   })
+          //   .catch(() => reject("Stream Not Found"));
           return reject("Stream Not Found");
         }
       } catch (e: any) {
@@ -309,6 +344,56 @@ const useStreams = () => {
     };
   };
 
+  // Don't add delete log here, it will create issue
+  // This method is to remove specific stream from cache
+  const removeStream = (streamName: string, streamType: string) => {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        streamsIndexMapping[streamType],
+        streamName
+      )
+    ) {
+      const indexToRemove = streamsIndexMapping[streamType][streamName];
+
+      // Deleting stream index that was mapped
+      delete streamsIndexMapping[streamType][streamName];
+
+      if (
+        indexToRemove >= 0 &&
+        indexToRemove < streams[streamType].list.length
+      ) {
+        for (
+          let i = indexToRemove;
+          i < streams[streamType].list.length - 1;
+          i++
+        ) {
+          // Shift each element one position to the left
+          streams[streamType].list[i] = streams[streamType].list[i + 1];
+          streamsIndexMapping[streamType][streams[streamType].list[i].name] = i;
+        }
+        // Remove the last element since it's now duplicated
+        streams[streamType].list.length = streams[streamType].list.length - 1;
+      }
+    }
+  };
+
+  const addStream = async (stream: any) => {
+    if (
+      !!streams[stream.stream_type] &&
+      streamsIndexMapping[stream.stream_type][stream.name] >= 0
+    )
+      return;
+
+    // If that stream type is not present create that stream
+    if (!streams[stream.stream_type]) {
+      getStream(stream.name, stream.stream_type, true);
+    } else {
+      streams[stream.stream_type].list.push(stream);
+      streamsIndexMapping[stream.stream_type][stream.name] =
+        streams[stream.stream_type].list.length - 1;
+    }
+  };
+
   const resetStreams = () => {
     streams = reactive({});
     streamsIndexMapping = reactive({});
@@ -317,7 +402,15 @@ const useStreams = () => {
     store.dispatch("setIsDataIngested", false);
   };
 
-  return { getStreams, getStream, setStreams, getMultiStreams, resetStreams };
+  return {
+    getStreams,
+    getStream,
+    setStreams,
+    getMultiStreams,
+    resetStreams,
+    removeStream,
+    addStream,
+  };
 };
 
 export default useStreams;

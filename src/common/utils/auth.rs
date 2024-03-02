@@ -205,6 +205,9 @@ impl FromRequest for AuthExtractor {
                 || path_columns[2].starts_with("templates")
                 || path_columns[2].starts_with("destinations")
             {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
                 if method.eq("PUT") || method.eq("DELETE") {
                     format!(
                         "{}:{}",
@@ -313,7 +316,8 @@ impl FromRequest for AuthExtractor {
                         bypass_check: true, // bypass check permissions
                         parent_id: folder,
                     }));
-                } else if object_type.starts_with("stream") && !method.eq("LIST") {
+                }
+                if object_type.starts_with("stream") {
                     let object_type = match stream_type {
                         Some(stream_type) => {
                             if stream_type.eq(&StreamType::EnrichmentTables) {
@@ -330,6 +334,9 @@ impl FromRequest for AuthExtractor {
                                     )
                                     .as_str(),
                                 )
+                            } else if stream_type.eq(&StreamType::Index) {
+                                object_type
+                                    .replace("stream:", format!("{}:", StreamType::Logs).as_str())
                             } else {
                                 object_type.replace("stream:", format!("{}:", stream_type).as_str())
                             }
@@ -344,7 +351,8 @@ impl FromRequest for AuthExtractor {
                         bypass_check: false,
                         parent_id: folder,
                     }));
-                } else if object_type.contains("dashboard") {
+                }
+                if object_type.contains("dashboard") {
                     let object_type = if method.eq("POST") || method.eq("LIST") {
                         format!(
                             "{}:{}",
