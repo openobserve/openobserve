@@ -193,7 +193,6 @@ pub struct MetaRecord {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
 
     use super::*;
 

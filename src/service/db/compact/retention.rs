@@ -149,7 +149,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
-                println!("event::Put: {:?}", ev);
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 CACHE.insert(item_key.to_string());
             }
