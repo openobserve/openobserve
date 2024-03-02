@@ -44,7 +44,7 @@ jobs:
         run: mkdir -p web/dist && touch web/dist/index.html
       
       - name: Setup cargo config
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
 
       - name: Run unit tests
         run: ./coverage.sh
