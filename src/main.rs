@@ -191,7 +191,9 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // init http server
-    init_http_server().await?;
+    if let Err(e) = init_http_server().await {
+        log::error!("HTTP server runs failed: {}", e);
+    }
     log::info!("HTTP server stopped");
 
     // leave the cluster
