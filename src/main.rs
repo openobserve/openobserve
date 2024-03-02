@@ -12,13 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-// #![deny(
-//     unused_import_braces,
-//     unused_imports,
-//     unused_variables,
-//     unused_allocation,
-//     unused_extern_crates
-// )]
 
 use std::{
     collections::HashMap,
@@ -94,7 +87,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use tracing_subscriber::{
-    self, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
+    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
 
 #[tokio::main]

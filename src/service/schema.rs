@@ -817,7 +817,6 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     use super::*;
 

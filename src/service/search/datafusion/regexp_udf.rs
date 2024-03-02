@@ -203,12 +203,11 @@ fn clean_non_meta_escapes(pattern: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
 
     use datafusion::{
         arrow::{
             array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
+            datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         datasource::MemTable,

@@ -1663,7 +1663,7 @@ mod tests {
 
     #[test]
     fn test_count_distinct_rewrite_phase1() {
-        let sql = vec![
+        let sql = [
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
@@ -1671,7 +1671,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
         ];
 
-        let res = vec![
+        let res = [
             "SELECT DISTINCT \"a\"  FROM  tbl where a > 3 ",
             "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
             "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl where a > 3   ",
@@ -1686,7 +1686,7 @@ mod tests {
 
     #[test]
     fn test_count_distinct_rewrite_phase2() {
-        let sql = vec![
+        let sql = [
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
@@ -1694,7 +1694,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
         ];
 
-        let res = vec![
+        let res = [
             "SELECT DISTINCT \"a\"  FROM  tbl ",
             "SELECT DISTINCT a, \"b\"  FROM  tbl ",
             "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl ",
@@ -1715,7 +1715,7 @@ mod tests {
             Field::new("c", DataType::Utf8, false),
         ]));
 
-        let sql = vec![
+        let sql = [
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
@@ -1723,7 +1723,7 @@ mod tests {
             "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
         ];
 
-        let res = vec![
+        let res = [
             "SELECT COUNT(DISTINCT a) FROM tbl  limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl  group by a having cnt > 1 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl  group by a having cnt > 1 limit 10",

@@ -125,9 +125,7 @@ impl Manager {
             "{}/{}/{}/{key}",
             stream.org_id, stream.stream_type, stream.stream_name
         );
-        let Some(locker) = self.data.get(thread_id) else {
-            return None;
-        };
+        let locker = self.data.get(thread_id)?;
         let manager = locker.read().await;
         let file = match manager.get(&full_key) {
             Some(file) => file.clone(),

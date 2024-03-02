@@ -46,6 +46,7 @@ impl Writer {
         let mut f = OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(&path)
             .context(FileOpenSnafu { path: path.clone() })?;
 

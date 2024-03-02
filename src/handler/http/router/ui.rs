@@ -19,6 +19,7 @@ use actix_web_rust_embed_responder::{
 };
 use rust_embed_for_web::RustEmbed;
 
+#[allow(clippy::question_mark)]
 #[derive(RustEmbed)]
 #[folder = "web/dist/"]
 struct WebAssets;

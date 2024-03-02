@@ -87,10 +87,9 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     let hash = config::utils::hash::gxhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     loop {
-        if let Some(uuid) = iter.value() {
+        if let Some((_, uuid)) = iter.next() {
             return Some(uuid.clone());
         };
-        iter.move_next();
     }
 }
 
@@ -336,7 +335,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_consistent_hashing() {
         let node = load_local_mode_node();
         for i in 0..10 {
@@ -354,7 +352,7 @@ mod tests {
             add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
         }
 
-        for key in vec!["test", "test1", "test2", "test3"] {
+        for key in ["test", "test1", "test2", "test3"] {
             println!(
                 "{key}-q: {}",
                 get_node_from_consistent_hash(key, &Role::Querier)
@@ -370,28 +368,28 @@ mod tests {
         }
 
         // fnv hash
-        let _data = vec![
+        let _data = [
             ["test", "node-q-8", "node-c-8"],
             ["test1", "node-q-8", "node-c-8"],
             ["test2", "node-q-8", "node-c-8"],
             ["test3", "node-q-8", "node-c-8"],
         ];
         // murmur3 hash
-        let _data = vec![
+        let _data = [
             ["test", "node-q-2", "node-c-3"],
             ["test1", "node-q-5", "node-c-6"],
             ["test2", "node-q-4", "node-c-2"],
             ["test3", "node-q-0", "node-c-3"],
         ];
         // cityhash hash
-        let _data = vec![
+        let _data = [
             ["test", "node-q-6", "node-c-7"],
             ["test1", "node-q-5", "node-c-2"],
             ["test2", "node-q-2", "node-c-4"],
             ["test3", "node-q-2", "node-c-1"],
         ];
         // gxhash hash
-        let data = vec![
+        let data = [
             ["test", "node-q-8", "node-c-0"],
             ["test1", "node-q-9", "node-c-1"],
             ["test2", "node-q-9", "node-c-8"],
@@ -399,11 +397,11 @@ mod tests {
         ];
         for key in data {
             assert_eq!(
-                get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Querier).await,
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Querier).await,
                 Some(key.get(1).unwrap().to_string())
             );
             assert_eq!(
-                get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Compactor).await,
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Compactor).await,
                 Some(key.get(2).unwrap().to_string())
             );
         }

@@ -74,11 +74,9 @@ mod tests {
 
     use std::sync::Arc;
 
-    use chrono::Utc;
     use datafusion::arrow::{
         array::{Int64Array, StringArray},
-        datatypes::{DataType, Field, Schema},
-        record_batch::RecordBatch,
+        datatypes::{DataType, Field},
     };
 
     use super::*;

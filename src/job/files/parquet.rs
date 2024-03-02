@@ -33,9 +33,7 @@ use config::{
     },
     FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::{
-    datasource::MemTable, execution::context::SessionContext, prelude::*, scalar::ScalarValue,
-};
+use datafusion::{datasource::MemTable, prelude::*, scalar::ScalarValue};
 use infra::{cache, storage};
 use parquet::arrow::{
     arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
