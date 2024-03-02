@@ -32,8 +32,8 @@ use once_cell::sync::Lazy;
 
 use crate::service::db as db_service;
 
-pub mod etcd;
-pub mod nats;
+mod etcd;
+mod nats;
 
 const CONSISTENT_HASH_VNODES: usize = 3;
 
@@ -129,7 +129,7 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
     }
 
     match CONFIG.common.cluster_coordinator.as_str().into() {
-        MetaStore::Nats => nats::set_online(new_lease_id).await,
+        MetaStore::Nats => nats::set_online().await,
         _ => etcd::set_online(new_lease_id).await,
     }
 }
@@ -195,9 +195,10 @@ async fn watch_node_list() -> Result<()> {
                     Some(v) => (v.broadcasted, item_value.eq(v.value())),
                     None => (false, false),
                 };
-                if !exist {
-                    log::info!("[CLUSTER] join {:?}", item_value);
+                if exist {
+                    continue;
                 }
+                log::info!("[CLUSTER] join {:?}", item_value);
                 if !CONFIG.common.meta_store_external && !broadcasted {
                     // The ingester need broadcast local file list to the new node
                     if is_ingester(&LOCAL_NODE_ROLE)

@@ -20,7 +20,9 @@ use crate::{
     errors::Result,
 };
 
-pub enum Locker {
+pub struct Locker(LockerStore);
+
+enum LockerStore {
     Etcd(etcd::Locker),
     Nats(nats::Locker),
 }
@@ -35,12 +37,12 @@ pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
         "nats" => {
             let mut lock = nats::Locker::new(key);
             lock.lock(wait_ttl).await?;
-            Ok(Some(Locker::Nats(lock)))
+            Ok(Some(Locker(LockerStore::Nats(lock))))
         }
         _ => {
             let mut lock = etcd::Locker::new(key);
             lock.lock(wait_ttl).await?;
-            Ok(Some(Locker::Etcd(lock)))
+            Ok(Some(Locker(LockerStore::Etcd(lock))))
         }
     }
 }
@@ -48,9 +50,9 @@ pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
 #[inline(always)]
 pub async fn unlock(locker: &Option<Locker>) -> Result<()> {
     if let Some(locker) = locker {
-        match locker {
-            Locker::Etcd(locker) => locker.unlock().await,
-            Locker::Nats(locker) => locker.unlock().await,
+        match &locker.0 {
+            LockerStore::Etcd(locker) => locker.unlock().await,
+            LockerStore::Nats(locker) => locker.unlock().await,
         }
     } else {
         Ok(())

@@ -22,13 +22,14 @@ use config::{
 use etcd_client::PutOptions;
 use infra::{
     db::etcd,
+    dist_lock,
     errors::{Error, Result},
 };
 
 /// Register and keepalive the node to cluster
 pub(crate) async fn register_and_keepalive() -> Result<()> {
     if let Err(e) = register().await {
-        log::error!("[CLUSTER] Register to cluster failed: {}", e);
+        log::error!("[CLUSTER] register failed: {}", e);
         return Err(e);
     }
 
@@ -42,14 +43,14 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 
             if need_online_again {
                 if let Err(e) = set_online(true).await {
-                    log::error!("[CLUSTER] Set node online failed: {}", e);
+                    log::error!("[CLUSTER] keepalive failed: {}", e);
                     continue;
                 }
             }
 
             let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
             let ret =
-                etcd::keepalive_lease_id(lease_id, CONFIG.etcd.node_heartbeat_ttl, is_offline)
+                etcd::keepalive_lease_id(lease_id, CONFIG.limit.node_heartbeat_ttl, is_offline)
                     .await;
             if ret.is_ok() {
                 break;
@@ -77,11 +78,16 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 /// Register to cluster
 async fn register() -> Result<()> {
     // 1. create a cluster lock for node register
-    let mut locker = etcd::Locker::new("nodes/register");
-    locker.lock(0).await?;
+    let locker = dist_lock::lock("/nodes/register", CONFIG.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. get node list
-    let node_list = super::list_nodes().await?;
+    let node_list = match super::list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            dist_lock::unlock(&locker).await?;
+            return Err(e);
+        }
+    };
 
     // 3. calculate node_id
     let mut node_id = 1;
@@ -123,6 +129,8 @@ async fn register() -> Result<()> {
         scheduled: true,
         broadcasted: false,
     };
+    let val = json::to_string(&node).unwrap();
+
     // cache local node
     if is_querier(&node.role) {
         super::add_node_to_consistent_hash(&node, &Role::Querier).await;
@@ -131,32 +139,42 @@ async fn register() -> Result<()> {
         super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
     }
     super::NODES.insert(LOCAL_NODE_UUID.clone(), node.clone());
-    let val = json::to_string(&node).unwrap();
+
     // register node to cluster
     let mut client = etcd::get_etcd_client().await.clone();
-    let resp = client
-        .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
-        .await?;
+    let resp = match client
+        .lease_grant(CONFIG.limit.node_heartbeat_ttl, None)
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            dist_lock::unlock(&locker).await?;
+            return Err(Error::Message(e.to_string()));
+        }
+    };
     let id = resp.id();
     // update local node key lease id
     unsafe {
         LOCAL_NODE_KEY_LEASE_ID = id;
     }
     let opt = PutOptions::new().with_lease(id);
-    let _resp = client.put(key, val, Some(opt)).await?;
+    if let Err(e) = client.put(key, val, Some(opt)).await {
+        dist_lock::unlock(&locker).await?;
+        return Err(Error::Message(format!("register node error: {}", e)));
+    }
 
     // 5. watch node list
     tokio::task::spawn(async move { super::watch_node_list().await });
 
     // 7. register ok, release lock
-    locker.unlock().await?;
+    dist_lock::unlock(&locker).await?;
 
     log::info!("[CLUSTER] Register to cluster ok");
     Ok(())
 }
 
 /// set online to cluster
-pub async fn set_online(new_lease_id: bool) -> Result<()> {
+pub(crate) async fn set_online(new_lease_id: bool) -> Result<()> {
     // set node status to online
     let node = match super::NODES.get(LOCAL_NODE_UUID.as_str()) {
         Some(node) => {
@@ -177,26 +195,17 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
             broadcasted: false,
         },
     };
+    let val = json::to_string(&node).unwrap();
 
     unsafe {
         LOCAL_NODE_STATUS = NodeStatus::Online;
     }
 
-    // cache local node
-    if is_querier(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::Querier).await;
-    }
-    if is_compactor(&node.role) {
-        super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
-    }
-    super::NODES.insert(LOCAL_NODE_UUID.clone(), node.clone());
-    let val = json::to_string(&node).unwrap();
-
     if new_lease_id {
         // get new lease id
         let mut client = etcd::get_etcd_client().await.clone();
         let resp = client
-            .lease_grant(CONFIG.etcd.node_heartbeat_ttl, None)
+            .lease_grant(CONFIG.limit.node_heartbeat_ttl, None)
             .await?;
         let lease_id = resp.id();
         // update local node key lease id
@@ -205,32 +214,38 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
         }
     }
 
-    let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
-    let _resp = client.put(key, val, Some(opt)).await?;
+    let mut client = etcd::get_etcd_client().await.clone();
+    if let Err(e) = client.put(key, val, Some(opt)).await {
+        return Err(Error::Message(format!("online node error: {}", e)));
+    }
 
     Ok(())
 }
 
 /// Leave cluster
-pub async fn leave() -> Result<()> {
+pub(crate) async fn leave() -> Result<()> {
     unsafe {
         super::LOCAL_NODE_STATUS = NodeStatus::Offline;
     }
 
-    let mut client = etcd::get_etcd_client().await.clone();
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
-    let _resp = client.delete(key, None).await?;
+    let mut client = etcd::get_etcd_client().await.clone();
+    if let Err(e) = client.delete(key, None).await {
+        return Err(Error::Message(format!("leave node error: {}", e)));
+    }
 
     Ok(())
 }
 
-pub async fn update_local_node(node: &Node) -> Result<()> {
-    let mut client = etcd::get_etcd_client().await.clone();
+pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let val = json::to_string(&node).unwrap();
-    let _resp = client.put(key, val, Some(opt)).await?;
+    let mut client = etcd::get_etcd_client().await.clone();
+    if let Err(e) = client.put(key, val, Some(opt)).await {
+        return Err(Error::Message(format!("update node error: {}", e)));
+    }
     Ok(())
 }

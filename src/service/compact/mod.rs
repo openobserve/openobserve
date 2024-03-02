@@ -67,7 +67,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             }
 
             // before start processing, set current node to lock the organization
-            let lock_key = format!("compact/organization/{org_id}");
+            let lock_key = format!("/compact/organization/{org_id}");
             let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
             // check the working node for the organization again, maybe other node locked it
             // first
@@ -321,7 +321,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         }
 
         // before start processing, set current node to lock the organization
-        let lock_key = format!("compact/organization/{org_id}");
+        let lock_key = format!("/compact/organization/{org_id}");
         let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
         // check the working node for the organization again, maybe other node locked it
         // first

@@ -58,7 +58,9 @@ async fn get_bucket_by_key<'a>(
         ..Default::default()
     };
     if bucket_name == "nodes" {
-        bucket.max_age = Duration::from_secs(30);
+        // if changed ttl need recreate the bucket\
+        // CMD: nats kv del -f o2_nodes
+        bucket.max_age = Duration::from_secs(CONFIG.limit.node_heartbeat_ttl as u64);
     }
     let kv = jetstream.create_key_value(bucket).await?;
     Ok((kv, key.trim_start_matches(bucket_name)))
@@ -328,23 +330,23 @@ pub async fn connect() -> async_nats::Client {
         .expect("Nats connect failed")
 }
 
-pub struct Locker {
+pub(crate) struct Locker {
     key: String,
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
 }
 
 impl Locker {
-    pub fn new(key: &str) -> Self {
+    pub(crate) fn new(key: &str) -> Self {
         Self {
-            key: format!("/lock/{key}"),
+            key: format!("/locker{}", key),
             lock_id: format!("{}:{}", cluster::LOCAL_NODE_UUID.as_str(), ider::generate()),
             state: Arc::new(AtomicU8::new(0)),
         }
     }
 
     /// lock with timeout, 0 means use default timeout, unit: second
-    pub async fn lock(&mut self, timeout: u64) -> Result<()> {
+    pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
         let mut last_err = None;
         let timeout = if timeout == 0 {
@@ -397,7 +399,7 @@ impl Locker {
         Ok(())
     }
 
-    pub async fn unlock(&self) -> Result<()> {
+    pub(crate) async fn unlock(&self) -> Result<()> {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }

@@ -369,7 +369,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         "global".to_string()
     };
 
-    let locker_key = "search/cluster_queue/".to_string() + work_group_str.as_str();
+    let locker_key = "/search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
     let locker = dist_lock::lock(&locker_key, 0).await?;
     #[cfg(feature = "enterprise")]

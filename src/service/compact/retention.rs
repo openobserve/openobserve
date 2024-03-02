@@ -80,7 +80,7 @@ pub async fn delete_all(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
+    let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
@@ -180,7 +180,7 @@ pub async fn delete_by_date(
     stream_name: &str,
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
-    let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
+    let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     let node =
         db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))

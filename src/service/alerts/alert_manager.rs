@@ -36,7 +36,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // before start merging, set current node to lock the organization
-    let lock_key = format!("alert_manager/organization/{org_id}");
+    let lock_key = format!("/alert_manager/organization/{org_id}");
     let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
     // check the working node for the organization again, maybe other node locked it
     // first

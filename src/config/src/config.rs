@@ -380,6 +380,8 @@ pub struct Common {
     pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
     pub telemetry_url: String,
+    #[env_config(name = "ZO_TELEMETRY_HEARTBEAT", default = 1800)] // seconds
+    pub telemetry_heartbeat: i64,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
@@ -495,23 +497,23 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
-    pub hb_interval: i64,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
+    #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 15)] // seconds
+    pub node_heartbeat_ttl: i64,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)] // equals to 1024 if 0
     pub http_worker_max_blocking: usize,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
-    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
+    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
@@ -648,8 +650,6 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
-    pub node_heartbeat_ttl: i64,
 }
 
 #[derive(Debug, EnvConfig)]
@@ -666,8 +666,6 @@ pub struct Nats {
     pub lock_wait_timeout: u64,
     #[env_config(name = "ZO_NATS_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_NATS_NODE_HEARTBEAT_TTL", default = 30)]
-    pub node_heartbeat_ttl: i64,
 }
 
 #[derive(EnvConfig)]

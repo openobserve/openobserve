@@ -42,7 +42,9 @@ pub async fn get_db() -> &'static Box<dyn Db> {
 }
 
 pub async fn get_coordinator() -> &'static Box<dyn Db> {
-    CLUSTER_COORDINATOR.get_or_init(cluster_coordinator).await
+    CLUSTER_COORDINATOR
+        .get_or_init(init_cluster_coordinator)
+        .await
 }
 
 pub async fn init() -> Result<()> {
@@ -68,7 +70,7 @@ async fn default() -> Box<dyn Db> {
     }
 }
 
-async fn cluster_coordinator() -> Box<dyn Db> {
+async fn init_cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         match CONFIG.common.meta_store.as_str().into() {
             MetaStore::Sled => Box::<sled::SledDb>::default(),

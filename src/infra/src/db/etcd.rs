@@ -431,24 +431,23 @@ where
     Ok(())
 }
 
-pub struct Locker {
+pub(crate) struct Locker {
     key: String,
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
 }
 
 impl Locker {
-    pub fn new(key: &str) -> Self {
-        let key = format!("{}lock/{}", &CONFIG.etcd.prefix, key).replace("//", "/");
+    pub(crate) fn new(key: &str) -> Self {
         Self {
-            key,
+            key: format!("{}locker{}", &CONFIG.etcd.prefix, key),
             lock_id: "".to_string(),
             state: Arc::new(AtomicU8::new(0)),
         }
     }
 
     /// lock with timeout, 0 means use default timeout, unit: second
-    pub async fn lock(&mut self, timeout: u64) -> Result<()> {
+    pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
         let mut client = get_etcd_client().await.clone();
         let mut last_err = None;
         let timeout = if timeout == 0 {
@@ -485,7 +484,7 @@ impl Locker {
         Ok(())
     }
 
-    pub async fn unlock(&self) -> Result<()> {
+    pub(crate) async fn unlock(&self) -> Result<()> {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }
