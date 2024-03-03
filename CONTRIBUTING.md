@@ -99,7 +99,7 @@ npm run dev
 
 This will start UI server on port 8081, to change port specify it in vite.config.ts
 
-In order for you to effectively use the UI you would want to have the openobserve API server running in a seperate window that will accept requests from the UI.
+In order for you to effectively use the UI you would want to have the openobserve API server running in a separate window that will accept requests from the UI.
 
 ## Swagger
 
