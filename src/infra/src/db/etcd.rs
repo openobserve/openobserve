@@ -46,6 +46,9 @@ pub async fn get_etcd_client() -> &'static etcd_client::Client {
 }
 
 pub async fn init() {
+    if CONFIG.common.local_mode || CONFIG.common.cluster_coordinator.to_lowercase() == "nats" {
+        return;
+    }
     // enable keep alive for auth token
     tokio::task::spawn(async move { keepalive_connection().await });
 }
