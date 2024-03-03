@@ -31,9 +31,9 @@ jobs:
         with:
           toolchain: nightly-2024-03-02
           targets: x86_64-unknown-linux-gnu
-      # - uses: Swatinem/rust-cache@v2
-      #   with:
-      #     cache-on-failure: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -44,7 +44,9 @@ jobs:
         run: mkdir -p web/dist && touch web/dist/index.html
       
       - name: Setup cargo config
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
+        run: |
+            rustc --print target-features
+            cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
 
       - name: Run unit tests
         run: ./coverage.sh
