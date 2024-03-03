@@ -50,5 +50,5 @@ jobs:
         run: cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
 
       - name: Run unit tests
-        run: RUSTFLAGS="-C target-feature=+aes" ./coverage.sh
+        run: ./coverage.sh
        
