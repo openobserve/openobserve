@@ -30,7 +30,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2024-03-02
-          targets: x86_64-unknown-linux-musl
+          targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
