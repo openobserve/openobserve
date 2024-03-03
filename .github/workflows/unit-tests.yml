@@ -31,9 +31,9 @@ jobs:
         with:
           toolchain: nightly-2024-03-02
           targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
+      # - uses: Swatinem/rust-cache@v2
+      #   with:
+      #     cache-on-failure: true
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
