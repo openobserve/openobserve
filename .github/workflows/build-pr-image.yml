@@ -53,7 +53,9 @@ jobs:
           run: cd web && npm install && npm run build
         
         - name: Print rustc cfg
-          run: rustc --print cfg
+          run: |
+            cat ./cargo/config.toml
+            RUSTFLAGS="-C target-feature=+aes" rustc --print cfg
           
         - name: Build and run binary
           run: |
