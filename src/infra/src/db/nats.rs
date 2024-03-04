@@ -382,11 +382,11 @@ impl Locker {
                 }
                 Err(err) => {
                     last_err = Some(err.to_string());
-                    println!("nats lock for key: {}, error: {}", self.key, err);
+                    log::error!("nats lock for key: {}, error: {}", self.key, err);
                     // if !err.to_string().contains("Timeout expired") {
                     //     break;
                     // }
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             };
         }
