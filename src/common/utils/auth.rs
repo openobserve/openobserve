@@ -321,7 +321,7 @@ impl FromRequest for AuthExtractor {
                     let object_type = match stream_type {
                         Some(stream_type) => {
                             if stream_type.eq(&StreamType::EnrichmentTables) {
-                                // since enrichment tables have seperate permissions
+                                // since enrichment tables have separate permissions
                                 let stream_type_str = format!("{stream_type}");
 
                                 object_type.replace(
