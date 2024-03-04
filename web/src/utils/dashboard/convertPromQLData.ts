@@ -37,6 +37,7 @@ export const convertPromQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
+  console.time("convertPromQLData");
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -662,7 +663,7 @@ export const convertPromQLData = (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
-
+  console.timeEnd("convertPromQLData");
   // promql query will be always timeseries except gauge and metric text chart.
   return {
     options,
@@ -677,6 +678,7 @@ export const convertPromQLData = (
  * @param {string} label - The label template for the legend name. If null or empty, the metric object will be converted to a JSON string and returned.
  * @return {string} The legend name with the placeholders replaced by the corresponding values from the metric object.
  */
+console.time("convertPromQLData:Part2");
 const getPromqlLegendName = (metric: any, label: string) => {
   if (label) {
     let template = label || "";
@@ -828,3 +830,4 @@ const getPropsByChartTypeForSeries = (type: string) => {
       };
   }
 };
+console.timeEnd("convertPromQLData:Part2");
