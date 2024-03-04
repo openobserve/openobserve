@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.is_real_time"
                 :checked="formData.is_real_time"
                 val="false"
-                :label="t('alerts.scheduled')"
+                :label="t('alerts.standard')"
                 class="q-ml-none"
               />
               <q-radio
@@ -200,11 +200,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="col-12 flex justify-start items-center q-mt-xs">
               <div
-                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md"
+                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
                 data-test="add-alert-delay-title"
-                style="width: 180px"
+                style="width: 190px"
               >
                 {{ t("alerts.silenceNotification") + " *" }}
+                <q-icon
+                  :name="outlinedInfo"
+                  size="17px"
+                  class="q-ml-xs cursor-pointer"
+                  :class="
+                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  "
+                >
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                  >
+                    <span style="font-size: 14px">
+                      If the alert triggers then how long should it wait before
+                      sending another notification.
+                      <br />
+                      e.g. if the alert triggers at 4:00 PM and the silence
+                      notification is set to 10 minutes then it will not send
+                      another notification until 4:10 PM even if the alert is
+                      still after 1 minute. This is to avoid spamming the user
+                      with notifications.</span
+                    >
+                  </q-tooltip>
+                </q-icon>
               </div>
               <div style="min-height: 58px">
                 <div class="col-8 row justify-left align-center q-gutter-sm">
@@ -260,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="add-alert-destination-title"
                 class="text-bold q-pb-sm"
-                style="width: 180px"
+                style="width: 190px"
               >
                 {{ t("alerts.destination") + " *" }}
               </div>
@@ -420,6 +445,7 @@ import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import PreviewAlert from "./PreviewAlert.vue";
 import useStreams from "@/composables/useStreams";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
 const defaultValue: any = () => {
   return {
@@ -1038,6 +1064,7 @@ export default defineComponent({
       streamFieldsMap,
       previewQuery,
       previewAlertRef,
+      outlinedInfo,
     };
   },
 

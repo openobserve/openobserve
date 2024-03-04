@@ -617,6 +617,8 @@
     "seconds": "秒",
     "times": "次",
     "custom": "自定义",
+    "standard": "标准",
+    "quick": "快速",
     "sql": "SQL",
     "promql": "PromQL",
     "condition": "条件",
