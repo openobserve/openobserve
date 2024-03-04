@@ -131,6 +131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       fill-input
                       :input-debounce="400"
                       @update:model-value="onFolderSelection(dashboard.folder)"
+                      @filter="
+                        (...args) =>
+                          onFilterOptions('folders', args[0], args[1])
+                      "
                       behavior="menu"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       style="
@@ -165,6 +169,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="
                         onDashboardSelection(dashboard.dashboard)
                       "
+                      @filter="
+                        (...args) =>
+                          onFilterOptions('dashboards', args[0], args[1])
+                      "
                       behavior="menu"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       style="
@@ -196,7 +204,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       filled
                       dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
                       :rules="[(val: any) => !!val || 'Field is required!']"
+                      @filter="
+                        (...args) => onFilterOptions('tabs', args[0], args[1])
+                      "
                       style="
                         min-width: 250px !important;
                         width: 100% !important;
@@ -781,6 +796,14 @@ const filteredTimezone: any = ref([]);
 
 const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
 
+const dashboardOptions: Ref<
+  { label: string; value: string; tabs: any[]; version: number }[]
+> = ref([]);
+
+const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
+
+const options = ref({});
+
 const emails = ref("");
 
 const isEditingReport = ref(false);
@@ -822,12 +845,6 @@ onBeforeMount(() => {
       });
   }
 });
-
-const dashboardOptions: Ref<
-  { label: string; value: string; tabs: any[]; version: number }[]
-> = ref([]);
-
-const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
 
 onBeforeMount(() => {
   getDashboaordFolders();
@@ -879,6 +896,7 @@ const onFolderSelection = (id: string) => {
                 })) || [{ label: "Default", value: "default" }],
                 version: dashboard.version,
               });
+              options.value["dashboards"] = [...dashboardOptions.value];
               resolve(true);
             }
           );
@@ -895,6 +913,8 @@ const onDashboardSelection = (dashboardId: any) => {
     dashboardOptions.value.filter(
       (dashboard) => dashboard.value === dashboardId
     )[0].tabs || defaultTabs;
+
+  options.value["tabs"] = [...dashboardTabOptions.value];
 };
 
 const filterFolders = () => {};
@@ -996,6 +1016,7 @@ const getDashboaordFolders = () => {
           label: folder.name,
           value: folder.folderId,
         });
+        options.value["folders"] = [...folderOptions.value];
       });
     })
     .finally(() => {
@@ -1117,6 +1138,34 @@ const saveReport = () => {
     .finally(() => {
       dismiss();
     });
+};
+
+const onFilterOptions = (type, val: String, update: Function) => {
+  const optionsMapping = {
+    folders: folderOptions,
+    dashboards: dashboardOptions,
+    tabs: dashboardTabOptions,
+  };
+  optionsMapping[type].value = filterOptions(options.value[type], val, update);
+};
+
+const filterOptions = (options: any[], val: String, update: Function) => {
+  let filteredOptions = [];
+  if (val === "") {
+    update(() => {
+      filteredOptions = [...options];
+    });
+  }
+  update(() => {
+    const value = val.toLowerCase();
+    filteredOptions = options.filter((option: any) => {
+      return option.label.toLowerCase().indexOf(value) > -1;
+    });
+  });
+
+  console.log(filteredOptions);
+
+  return filteredOptions;
 };
 
 const setupEditingReport = async (report: any) => {
