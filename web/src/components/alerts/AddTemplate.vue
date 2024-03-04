@@ -175,6 +175,8 @@ import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
+import "monaco-editor/esm/vs/language/json/monaco.contribution.js";
+import "monaco-editor/esm/vs/language/json/jsonMode.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 import templateService from "@/services/alert_templates";
@@ -257,13 +259,14 @@ onMounted(async () => {
   });
   editorobj = monaco.editor.create(editorRef.value, {
     value: ``,
-    language: "sql",
+    language: "json",
     minimap: {
       enabled: false,
     },
     theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
     automaticLayout: true,
     suggestOnTriggerCharacters: false,
+    wordWrap: true,
   });
   editorobj.onKeyUp((e: any) => {
     editorData.value = editorobj.getValue();
