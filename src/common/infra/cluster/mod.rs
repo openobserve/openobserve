@@ -26,7 +26,7 @@ use config::{
 };
 use infra::{
     db::{get_coordinator, Event},
-    errors::{Error, Result},
+    errors::Result,
 };
 use once_cell::sync::Lazy;
 use tokio::time;
@@ -306,9 +306,8 @@ async fn check_nodes_status() -> Result<()> {
             .get(url)
             .timeout(HEALTH_CHECK_TIMEOUT)
             .send()
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-        if !resp.status().is_success() {
+            .await;
+        if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!("[CLUSTER] node {} health check failed", node.name);
             let mut w = NODES_HEALTH_CHECK.write().await;
             let entry = w.entry(node.uuid.clone()).or_insert(0);
