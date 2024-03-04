@@ -327,12 +327,13 @@ async fn check_nodes_status() -> Result<()> {
             }
         } else {
             let mut w = NODES_HEALTH_CHECK.write().await;
-            w.remove(&node.uuid);
+            if let Some(entry) = w.get_mut(&node.uuid) {
+                if *entry > 0 {
+                    *entry = 0;
+                }
+            }
         }
     }
-
-    let mut w = NODES_HEALTH_CHECK.write().await;
-    w.shrink_to_fit();
 
     Ok(())
 }
