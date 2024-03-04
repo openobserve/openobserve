@@ -328,7 +328,27 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
-  console.time("convertPromQLData: make series array");
+  console.time("convertPromQLData-map-1: searchQueryData");
+  const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
+    panelSchema.type
+  );
+
+  // date cache for converting milli seconds to date(local time)
+  const dateCache: any = {};
+  const convertMilliSecondsToDate = (milliseconds: number) => {
+    if (!dateCache[milliseconds]) {
+      const dateObj = new Date(milliseconds);
+
+      // if utc then simply return the values by removing z from string
+      // else convert time from utc to zoned
+      // used slice to remove Z from isostring to pass as a utc
+      dateCache[milliseconds] =
+        store.state.timezone === "UTC"
+          ? dateObj.toISOString().slice(0, -1)
+          : utcToZonedTime(dateObj, store.state.timezone);
+    }
+    return dateCache[milliseconds];
+  };
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -339,6 +359,7 @@ export const convertPromQLData = (
         switch (it?.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
+              // console.time("convertPromQLData-map-2: result");
 
               // Now, we are using xaxisData which will be sorted by the timestamp
               // const values = metric.values.sort(
@@ -364,7 +385,7 @@ export const convertPromQLData = (
                   value[1],
                   seriesDataObj[value[0]] ?? null,
                 ]),
-                ...getPropsByChartTypeForSeries(panelSchema.type),
+                ...seriesPropsBasedOnChartType,
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
@@ -586,10 +607,11 @@ export const convertPromQLData = (
       }
     }
   });
+  console.timeEnd("convertPromQLData-map-1: searchQueryData");
 
+  // console.time("convertPromQLData: options: flat options");
   options.series = options.series.flat();
-
-  console.timeEnd("convertPromQLData: make series array");
+  // console.timeEnd("convertPromQLData: options: flat options");
 
   const calculateWidthText = (text: string): number => {
     if (!text) return 0;
