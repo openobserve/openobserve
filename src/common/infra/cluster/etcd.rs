@@ -173,13 +173,21 @@ async fn register() -> Result<()> {
     Ok(())
 }
 
-/// set online to cluster
 pub(crate) async fn set_online(new_lease_id: bool) -> Result<()> {
+    set_status(NodeStatus::Online, new_lease_id).await
+}
+
+pub(crate) async fn set_offline(new_lease_id: bool) -> Result<()> {
+    set_status(NodeStatus::Offline, new_lease_id).await
+}
+
+/// set online to cluster
+pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result<()> {
     // set node status to online
     let node = match super::NODES.get(LOCAL_NODE_UUID.as_str()) {
         Some(node) => {
             let mut val = node.value().clone();
-            val.status = NodeStatus::Online;
+            val.status = status.clone();
             val
         }
         None => Node {
@@ -190,7 +198,7 @@ pub(crate) async fn set_online(new_lease_id: bool) -> Result<()> {
             grpc_addr: format!("http://{}:{}", get_local_node_ip(), CONFIG.grpc.port),
             role: LOCAL_NODE_ROLE.clone(),
             cpu_num: CONFIG.limit.cpu_num as u64,
-            status: NodeStatus::Online,
+            status: status.clone(),
             scheduled: true,
             broadcasted: false,
         },
@@ -198,7 +206,7 @@ pub(crate) async fn set_online(new_lease_id: bool) -> Result<()> {
     let val = json::to_string(&node).unwrap();
 
     unsafe {
-        LOCAL_NODE_STATUS = NodeStatus::Online;
+        LOCAL_NODE_STATUS = status;
     }
 
     if new_lease_id {

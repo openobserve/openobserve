@@ -133,6 +133,17 @@ pub async fn set_online(new_lease_id: bool) -> Result<()> {
     }
 }
 
+pub async fn set_offline(new_lease_id: bool) -> Result<()> {
+    if CONFIG.common.local_mode {
+        return Ok(());
+    }
+
+    match CONFIG.common.cluster_coordinator.as_str().into() {
+        MetaStore::Nats => nats::set_offline().await,
+        _ => etcd::set_offline(new_lease_id).await,
+    }
+}
+
 pub async fn update_local_node(node: &Node) -> Result<()> {
     if CONFIG.common.local_mode {
         return Ok(());
@@ -197,6 +208,17 @@ async fn watch_node_list() -> Result<()> {
                 if exist {
                     continue;
                 }
+                if item_value.status == NodeStatus::Offline {
+                    log::info!("[CLUSTER] offline {:?}", item_value);
+                    if is_querier(&item_value.role) {
+                        remove_node_from_consistent_hash(&item_value, &Role::Querier).await;
+                    }
+                    if is_compactor(&item_value.role) {
+                        remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
+                    }
+                    NODES.remove(item_key);
+                    continue;
+                }
                 log::info!("[CLUSTER] join {:?}", item_value);
                 if !CONFIG.common.meta_store_external && !broadcasted {
                     // The ingester need broadcast local file list to the new node
@@ -234,7 +256,12 @@ async fn watch_node_list() -> Result<()> {
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = NODES.get(item_key).unwrap().clone();
+                let item_value = match NODES.get(item_key) {
+                    Some(v) => v.clone(),
+                    None => {
+                        continue;
+                    }
+                };
                 log::info!("[CLUSTER] leave {:?}", item_value);
                 if is_querier(&item_value.role) {
                     remove_node_from_consistent_hash(&item_value, &Role::Querier).await;
