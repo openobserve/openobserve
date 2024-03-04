@@ -14,7 +14,7 @@
         <q-tab
           data-test="scheduled-alert-custom-tab"
           name="custom"
-          :label="t('alerts.custom')"
+          :label="t('alerts.quick')"
         />
         <q-tab
           data-test="scheduled-alert-sql-tab"

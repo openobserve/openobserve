@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="formData.is_real_time"
                 :checked="formData.is_real_time"
                 val="false"
-                :label="t('alerts.scheduled')"
+                :label="t('alerts.standard')"
                 class="q-ml-none"
               />
               <q-radio

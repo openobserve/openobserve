@@ -702,6 +702,8 @@
     "seconds": "Seconds",
     "times": "Times",
     "custom": "Custom",
+    "standard": "Standard",
+    "quick": "Quick",
     "sql": "SQL",
     "promql": "PromQL",
     "condition": "Condition",
