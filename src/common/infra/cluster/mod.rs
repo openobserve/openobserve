@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, ops::Bound, sync::Arc};
+use std::{cmp::min, ops::Bound, sync::Arc, time::Duration};
 
 use config::{
     cluster::*,
@@ -37,6 +37,8 @@ mod etcd;
 mod nats;
 
 const CONSISTENT_HASH_VNODES: usize = 3;
+const HEALTH_CHECK_FAILED_TIMES: usize = 3;
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(1);
 
 static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
@@ -297,7 +299,10 @@ async fn check_nodes_status() -> Result<()> {
     let nodes = get_cached_online_nodes().unwrap_or_default();
     for node in nodes {
         let url = format!("{}/healthz", node.http_addr);
-        let resp = reqwest::get(&url)
+        let resp = reqwest::Client::new()
+            .get(url)
+            .timeout(HEALTH_CHECK_TIMEOUT)
+            .send()
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         if !resp.status().is_success() {
@@ -305,7 +310,7 @@ async fn check_nodes_status() -> Result<()> {
             let mut w = NODES_HEALTH_CHECK.write().await;
             let entry = w.entry(node.uuid.clone()).or_insert(0);
             *entry += 1;
-            if *entry > 3 {
+            if *entry >= HEALTH_CHECK_FAILED_TIMES {
                 log::error!(
                     "[CLUSTER] node {} health check failed 3 times, remove it",
                     node.name
