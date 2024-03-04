@@ -74,7 +74,7 @@
         "
         class="flex justify-start items-center text-bold q-mb-lg o2-input"
       >
-        <div style="width: 180px">Trigger if the value is</div>
+        <div style="width: 190px">Trigger if the value is</div>
         <div class="flex justify-start items-center">
           <div data-test="scheduled-alert-promlq-condition-operator-select">
             <q-select
@@ -135,13 +135,13 @@
         <div
           data-test="scheduled-alert-group-by-title"
           class="text-bold"
-          style="width: 180px"
+          style="width: 190px"
         >
           {{ t("alerts.groupBy") }}
         </div>
         <div
           class="flex justify-start items-center flex-wrap"
-          style="width: calc(100% - 180px)"
+          style="width: calc(100% - 190px)"
         >
           <template
             v-for="(group, index) in aggregationData.group_by"
@@ -208,12 +208,33 @@
       <div class="flex justify-start items-center q-mb-xs no-wrap q-pb-md">
         <div
           data-test="scheduled-alert-threshold-title"
-          class="text-bold"
-          style="width: 180px"
+          class="text-bold flex items-center"
+          style="width: 190px"
         >
           {{ t("alerts.threshold") + " *" }}
+
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >The threshold above/below which the alert will trigger. <br />
+                e.g. if the threshold is >100 and the query returns a value of
+                101 then the alert will trigger.</span
+              >
+            </q-tooltip>
+          </q-icon>
         </div>
-        <div style="width: calc(100% - 180px)" class="position-relative">
+        <div style="width: calc(100% - 190px)" class="position-relative">
           <template v-if="_isAggregationEnabled && aggregationData">
             <div class="flex justify-start items-center">
               <div
@@ -384,10 +405,31 @@
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-period-title"
-          class="text-bold"
-          style="width: 180px"
+          class="text-bold flex items-center"
+          style="width: 190px"
         >
           {{ t("alerts.period") + " *" }}
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >Period for which the query should run.<br />
+                e.g. 10 minutes means that whenever the query will run it will
+                use the last 10 minutes of data. If the query runs at 4:00 PM
+                then it will use the data from 3:50 PM to 4:00 PM.</span
+              >
+            </q-tooltip>
+          </q-icon>
         </div>
         <div style="min-height: 58px">
           <div
@@ -436,10 +478,30 @@
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-frequency-title"
-          class="text-bold"
-          style="width: 180px"
+          class="text-bold flex items-center"
+          style="width: 190px"
         >
           {{ t("alerts.frequency") + " *" }}
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >How often the alert should be evaluated.<br />
+                e.g. 2 minutes means that the query will be run every 2 minutes
+                and evaluated based on the other parameters provided.</span
+              >
+            </q-tooltip>
+          </q-icon>
         </div>
         <div style="min-height: 58px">
           <div
@@ -494,7 +556,10 @@ import { ref, watch, computed, type Ref } from "vue";
 import FieldsInput from "./FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "@/components/QueryEditor.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedDelete,
+  outlinedInfo,
+} from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
 const props = defineProps([
