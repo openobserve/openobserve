@@ -64,6 +64,7 @@ pub async fn write_file_arrow(
         fname = rw_file.name().to_string();
 
         rw_file.write_arrow(batch).await;
+        drop(rw_file);
     }
     log::info!("[INGESTER:INDEX_WRITER] Wrote file: {}", fname);
     Ok(fname.to_string())
