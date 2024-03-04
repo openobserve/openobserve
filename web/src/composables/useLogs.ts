@@ -1777,6 +1777,7 @@ const useLogs = () => {
               }
             }
             console.log(finalArray);
+            searchObj.data.stream.selectedStreamFields = [];
             if (
               finalArray.common.length > 0 &&
               searchObj.data.stream.selectedStream.length > 1
