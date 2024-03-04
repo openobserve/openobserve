@@ -58,7 +58,8 @@ jobs:
             ls -la ./
             ls -la ./.cargo/
             cat ./.cargo/config.toml
-            RUSTFLAGS="-C target-feature=+aes" rustc --print cfg
+            rustc --print cfg
+            rustc -C target-feature=+aes --print cfg
           
         - name: Build and run binary
           run: |
