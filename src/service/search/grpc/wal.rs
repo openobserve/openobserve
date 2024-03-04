@@ -659,7 +659,7 @@ pub async fn search_arrow(
     let work_dir = format!("{}_arrow", session_id);
     for file in files.clone().iter() {
         let columns = file.key.splitn(5, '/').collect::<Vec<&str>>();
-        let file_name = columns[4].to_string();
+        let file_name = columns[4];
 
         if wal::check_in_use(
             meta::stream::StreamParams {
@@ -667,7 +667,7 @@ pub async fn search_arrow(
                 stream_name: sql.stream_name.clone().into(),
                 stream_type,
             },
-            &file_name,
+            file_name,
         )
         .await
         {
