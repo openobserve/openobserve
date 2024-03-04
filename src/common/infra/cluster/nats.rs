@@ -48,11 +48,11 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
         // after the node is online, keepalive
         let ttl_keep_alive = min(10, (CONFIG.limit.node_heartbeat_ttl / 2) as u64);
         loop {
-            if is_offline() {
-                break;
-            }
             time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
+                if is_offline() {
+                    break;
+                }
                 match set_online().await {
                     Ok(_) => {
                         break;
