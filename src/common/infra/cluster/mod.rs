@@ -298,6 +298,9 @@ async fn watch_node_list() -> Result<()> {
 async fn check_nodes_status() -> Result<()> {
     let nodes = get_cached_online_nodes().unwrap_or_default();
     for node in nodes {
+        if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
+            continue;
+        }
         let url = format!("{}/healthz", node.http_addr);
         let resp = reqwest::Client::new()
             .get(url)
