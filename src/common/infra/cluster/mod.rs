@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Bound, sync::Arc};
+use std::{cmp::min, ops::Bound, sync::Arc};
 
 use config::{
     cluster::*,
@@ -22,13 +22,14 @@ use config::{
         meta_store::MetaStore,
     },
     utils::{hash::Sum64, json},
-    RwBTreeMap, RwHashMap, CONFIG, INSTANCE_ID,
+    RwAHashMap, RwBTreeMap, RwHashMap, CONFIG, INSTANCE_ID,
 };
 use infra::{
     db::{get_coordinator, Event},
-    errors::Result,
+    errors::{Error, Result},
 };
 use once_cell::sync::Lazy;
+use tokio::time;
 
 use crate::service::db as db_service;
 
@@ -40,6 +41,7 @@ const CONSISTENT_HASH_VNODES: usize = 3;
 static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
 static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
+static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
 
 pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
     let mut nodes = match role {
@@ -117,9 +119,22 @@ pub async fn register_and_keepalive() -> Result<()> {
     }
 
     match CONFIG.common.cluster_coordinator.as_str().into() {
-        MetaStore::Nats => nats::register_and_keepalive().await,
-        _ => etcd::register_and_keepalive().await,
-    }
+        MetaStore::Nats => nats::register_and_keepalive().await?,
+        _ => etcd::register_and_keepalive().await?,
+    };
+
+    // check node heatbeat
+    tokio::task::spawn(async move {
+        let ttl_keep_alive = min(10, (CONFIG.limit.node_heartbeat_ttl / 2) as u64);
+        loop {
+            time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
+            if let Err(e) = check_nodes_status().await {
+                log::error!("[CLUSTER] check_nodes_status failed: {}", e);
+            }
+        }
+    });
+
+    Ok(())
 }
 
 pub async fn set_online(new_lease_id: bool) -> Result<()> {
@@ -274,6 +289,43 @@ async fn watch_node_list() -> Result<()> {
             Event::Empty => {}
         }
     }
+
+    Ok(())
+}
+
+async fn check_nodes_status() -> Result<()> {
+    let nodes = get_cached_online_nodes().unwrap_or_default();
+    for node in nodes {
+        let url = format!("{}/healthz", node.http_addr);
+        let resp = reqwest::get(&url)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+        if !resp.status().is_success() {
+            log::error!("[CLUSTER] node {} health check failed", node.name);
+            let mut w = NODES_HEALTH_CHECK.write().await;
+            let entry = w.entry(node.uuid.clone()).or_insert(0);
+            *entry += 1;
+            if *entry > 3 {
+                log::error!(
+                    "[CLUSTER] node {} health check failed 3 times, remove it",
+                    node.name
+                );
+                if is_querier(&node.role) {
+                    remove_node_from_consistent_hash(&node, &Role::Querier).await;
+                }
+                if is_compactor(&node.role) {
+                    remove_node_from_consistent_hash(&node, &Role::Compactor).await;
+                }
+                NODES.remove(&node.uuid);
+            }
+        } else {
+            let mut w = NODES_HEALTH_CHECK.write().await;
+            w.remove(&node.uuid);
+        }
+    }
+
+    let mut w = NODES_HEALTH_CHECK.write().await;
+    w.shrink_to_fit();
 
     Ok(())
 }
