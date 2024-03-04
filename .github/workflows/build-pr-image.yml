@@ -54,13 +54,15 @@ jobs:
         
         - name: Print rustc cfg
           run: |
+            pwd
+            ls -la ./
             cat ./cargo/config.toml
             RUSTFLAGS="-C target-feature=+aes" rustc --print cfg
           
         - name: Build and run binary
           run: |
-            RUSTFLAGS="-C target-feature=+aes" cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu && \
-            mkdir -p bin && \
+            RUSTFLAGS="-C target-feature=+aes" cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
+            mkdir -p bin
             mv target/x86_64-unknown-linux-gnu/release/openobserve bin/openobserve
      
         - name: Configure AWS Credentials
