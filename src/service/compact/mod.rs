@@ -59,7 +59,10 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         for org_id in orgs {
             // get the working node for the organization
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            if !node.is_empty()
+                && LOCAL_NODE_UUID.ne(&node)
+                && get_node_by_uuid(&node).await.is_some()
+            {
                 log::debug!(
                     "[COMPACT] run retention: organization {org_id} is processing by {node}"
                 );
@@ -72,7 +75,10 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             // check the working node for the organization again, maybe other node locked it
             // first
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            if !node.is_empty()
+                && LOCAL_NODE_UUID.ne(&node)
+                && get_node_by_uuid(&node).await.is_some()
+            {
                 log::debug!(
                     "[COMPACT] run retention: organization {org_id} is processing by {node}"
                 );
@@ -313,7 +319,8 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     for org_id in orgs {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             log::debug!(
                 "[COMPACT] run delay_deletion: organization {org_id} is processing by {node}"
             );
@@ -327,7 +334,8 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         // first
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             log::debug!(
                 "[COMPACT] run delay_deletion organization {org_id} is processing by {node}"
             );

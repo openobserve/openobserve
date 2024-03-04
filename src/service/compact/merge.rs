@@ -57,7 +57,7 @@ pub async fn merge_by_stream(
 
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
 
@@ -66,7 +66,8 @@ pub async fn merge_by_stream(
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
         }

@@ -62,7 +62,9 @@ pub async fn query(
 
     // cluster mode
     let start: std::time::Instant = std::time::Instant::now();
-    let nodes = cluster::get_cached_online_querier_nodes().unwrap_or_default();
+    let nodes = cluster::get_cached_online_querier_nodes()
+        .await
+        .unwrap_or_default();
     if nodes.is_empty() {
         return Ok(Vec::new());
     }

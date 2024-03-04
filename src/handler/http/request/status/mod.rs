@@ -132,7 +132,7 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&CONFIG.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&CONFIG.common.node_role));
-    let nodes = cluster::get_cached_online_nodes();
+    let nodes = cluster::get_cached_online_nodes().await;
     stats.insert("NODE_LIST", json::json!(nodes));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
@@ -282,7 +282,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 #[put("/enable")]
 async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE_UUID.clone();
-    let Some(mut node) = cluster::get_node_by_uuid(&node_id) else {
+    let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 

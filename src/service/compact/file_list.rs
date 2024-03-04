@@ -196,7 +196,7 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let lock_key = format!("/compact/file_list/{offset}");
     let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::file_list::get_process(offset).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[COMPACT] list_list offset [{offset}] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip

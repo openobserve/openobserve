@@ -165,13 +165,14 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
 
     let roles = load_local_node_role();
     if !is_single_node(&roles) {
-        match get_cached_online_nodes() {
+        match get_cached_online_nodes().await {
             Some(nodes) => {
                 data.insert("is_HA_mode".to_string(), json::Value::Bool(true));
                 data.insert("number_of_nodes".to_string(), nodes.len().into());
                 data.insert(
                     "querier_nodes".to_string(),
                     crate::common::infra::cluster::get_cached_online_querier_nodes()
+                        .await
                         .unwrap_or_default()
                         .len()
                         .into(),
@@ -179,6 +180,7 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
                 data.insert(
                     "ingester_nodes".to_string(),
                     crate::common::infra::cluster::get_cached_online_ingester_nodes()
+                        .await
                         .unwrap_or_default()
                         .len()
                         .into(),

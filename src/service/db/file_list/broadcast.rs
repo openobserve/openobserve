@@ -42,6 +42,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
     }
     let nodes = if let Some(node_uuid) = node_uuid {
         cluster::get_node_by_uuid(&node_uuid)
+            .await
             .map(|node| vec![node])
             .unwrap_or_default()
     } else {
@@ -50,6 +51,7 @@ pub async fn send(items: &[FileKey], node_uuid: Option<String>) -> Result<(), an
                 && (node.status == NodeStatus::Prepare || node.status == NodeStatus::Online)
                 && (is_querier(&node.role) || is_compactor(&node.role) || is_ingester(&node.role))
         })
+        .await
         .unwrap_or_default()
     };
     let local_node_uuid = LOCAL_NODE_UUID.clone();
@@ -123,7 +125,7 @@ async fn send_to_node(
     loop {
         // waiting for the node to be online
         loop {
-            match cluster::get_node_by_uuid(&node.uuid) {
+            match cluster::get_node_by_uuid(&node.uuid).await {
                 None => {
                     EVENTS.write().await.remove(&node.uuid);
                     log::error!(
@@ -199,7 +201,7 @@ async fn send_to_node(
                 match client.send_file_list(request).await {
                     Ok(_) => break,
                     Err(e) => {
-                        if cluster::get_node_by_uuid(&node.uuid).is_none() {
+                        if cluster::get_node_by_uuid(&node.uuid).await.is_none() {
                             EVENTS.write().await.remove(&node.uuid);
                             log::error!(
                                 "[broadcast] node[{}] leaved cluster, dropping events",

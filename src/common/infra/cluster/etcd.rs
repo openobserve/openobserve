@@ -92,6 +92,7 @@ async fn register() -> Result<()> {
     // 3. calculate node_id
     let mut node_id = 1;
     let mut node_ids = Vec::new();
+    let mut w = super::NODES.write().await;
     for node in node_list {
         if is_querier(&node.role) {
             super::add_node_to_consistent_hash(&node, &Role::Querier).await;
@@ -100,8 +101,10 @@ async fn register() -> Result<()> {
             super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
         }
         node_ids.push(node.id);
-        super::NODES.insert(node.uuid.clone(), node);
+        w.insert(node.uuid.clone(), node);
     }
+    drop(w);
+
     node_ids.sort();
     for id in &node_ids {
         if *id == node_id {
@@ -138,7 +141,10 @@ async fn register() -> Result<()> {
     if is_compactor(&node.role) {
         super::add_node_to_consistent_hash(&node, &Role::Compactor).await;
     }
-    super::NODES.insert(LOCAL_NODE_UUID.clone(), node.clone());
+
+    let mut w = super::NODES.write().await;
+    w.insert(LOCAL_NODE_UUID.clone(), node.clone());
+    drop(w);
 
     // register node to cluster
     let mut client = etcd::get_etcd_client().await.clone();
@@ -184,9 +190,9 @@ pub(crate) async fn set_offline(new_lease_id: bool) -> Result<()> {
 /// set online to cluster
 pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result<()> {
     // set node status to online
-    let node = match super::NODES.get(LOCAL_NODE_UUID.as_str()) {
+    let node = match super::NODES.read().await.get(LOCAL_NODE_UUID.as_str()) {
         Some(node) => {
-            let mut val = node.value().clone();
+            let mut val = node.clone();
             val.status = status.clone();
             val
         }

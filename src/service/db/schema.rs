@@ -495,7 +495,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     // waiting for querier to be ready
     let expect_querier_num = CONFIG.limit.starting_expect_querier_num;
     loop {
-        let nodes = get_cached_online_querier_nodes().unwrap_or_default();
+        let nodes = get_cached_online_querier_nodes().await.unwrap_or_default();
         if nodes.len() >= expect_querier_num {
             break;
         }

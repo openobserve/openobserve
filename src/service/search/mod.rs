@@ -118,7 +118,9 @@ pub async fn search_partition(
     )
     .await;
 
-    let nodes = cluster::get_cached_online_querier_nodes().unwrap_or_default();
+    let nodes = cluster::get_cached_online_querier_nodes()
+        .await
+        .unwrap_or_default();
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
     let (records, original_size, compressed_size) =
@@ -177,6 +179,7 @@ async fn get_file_list(
 ) -> Vec<FileKey> {
     let is_local = CONFIG.common.meta_store_external
         || cluster::get_cached_online_querier_nodes()
+            .await
             .unwrap_or_default()
             .len()
             <= 1;
@@ -225,7 +228,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let meta = sql::Sql::new(&req).await?;
 
     // get nodes from cluster
-    let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
+    let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);

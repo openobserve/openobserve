@@ -22,7 +22,7 @@ use config::{
         meta_store::MetaStore,
     },
     utils::{hash::Sum64, json},
-    RwAHashMap, RwBTreeMap, RwHashMap, CONFIG, INSTANCE_ID,
+    RwAHashMap, RwBTreeMap, CONFIG, INSTANCE_ID,
 };
 use infra::{
     db::{get_coordinator, Event},
@@ -40,7 +40,7 @@ const CONSISTENT_HASH_VNODES: usize = 3;
 const HEALTH_CHECK_FAILED_TIMES: usize = 3;
 const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(1);
 
-static NODES: Lazy<RwHashMap<String, Node>> = Lazy::new(Default::default);
+static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
 static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
 static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
@@ -57,9 +57,6 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         let hash = h.sum64(&key);
         nodes.insert(hash, node.uuid.clone());
     }
-    for (k, v) in nodes.iter() {
-        log::debug!("consistent hash[{}] {} {}", role, k, v);
-    }
 }
 
 pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
@@ -73,9 +70,6 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         let key = format!("{}{}", node.uuid, i);
         let hash = h.sum64(&key);
         nodes.remove(&hash);
-    }
-    for (k, v) in nodes.iter() {
-        log::debug!("consistent hash[{}] {} {}", role, k, v);
     }
 }
 
@@ -116,7 +110,7 @@ pub async fn register_and_keepalive() -> Result<()> {
         let node = load_local_mode_node();
         add_node_to_consistent_hash(&node, &Role::Querier).await;
         add_node_to_consistent_hash(&node, &Role::Compactor).await;
-        NODES.insert(LOCAL_NODE_UUID.clone(), node);
+        NODES.write().await.insert(LOCAL_NODE_UUID.clone(), node);
         return Ok(());
     }
 
@@ -218,8 +212,8 @@ async fn watch_node_list() -> Result<()> {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
-                let (broadcasted, exist) = match NODES.clone().get(item_key) {
-                    Some(v) => (v.broadcasted, item_value.eq(v.value())),
+                let (broadcasted, exist) = match NODES.read().await.get(item_key) {
+                    Some(v) => (v.broadcasted, item_value.eq(v)),
                     None => (false, false),
                 };
                 if exist {
@@ -233,7 +227,7 @@ async fn watch_node_list() -> Result<()> {
                     if is_compactor(&item_value.role) {
                         remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
                     }
-                    NODES.remove(item_key);
+                    NODES.write().await.remove(item_key);
                     continue;
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
@@ -269,11 +263,11 @@ async fn watch_node_list() -> Result<()> {
                 if is_compactor(&item_value.role) {
                     add_node_to_consistent_hash(&item_value, &Role::Compactor).await;
                 }
-                NODES.insert(item_key.to_string(), item_value);
+                NODES.write().await.insert(item_key.to_string(), item_value);
             }
             Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = match NODES.get(item_key) {
+                let item_value = match NODES.read().await.get(item_key) {
                     Some(v) => v.clone(),
                     None => {
                         continue;
@@ -286,7 +280,7 @@ async fn watch_node_list() -> Result<()> {
                 if is_compactor(&item_value.role) {
                     remove_node_from_consistent_hash(&item_value, &Role::Compactor).await;
                 }
-                NODES.remove(item_key);
+                NODES.write().await.remove(item_key);
             }
             Event::Empty => {}
         }
@@ -296,7 +290,7 @@ async fn watch_node_list() -> Result<()> {
 }
 
 async fn check_nodes_status() -> Result<()> {
-    let nodes = get_cached_online_nodes().unwrap_or_default();
+    let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
         if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
             continue;
@@ -323,7 +317,7 @@ async fn check_nodes_status() -> Result<()> {
                 if is_compactor(&node.role) {
                     remove_node_from_consistent_hash(&node, &Role::Compactor).await;
                 }
-                NODES.remove(&node.uuid);
+                NODES.write().await.remove(&node.uuid);
             }
         } else {
             let mut w = NODES_HEALTH_CHECK.write().await;
@@ -338,15 +332,15 @@ async fn check_nodes_status() -> Result<()> {
     Ok(())
 }
 
-pub fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
-    if NODES.is_empty() {
+pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
+    let r = NODES.read().await;
+    if r.is_empty() {
         return None;
     }
     Some(
-        NODES
-            .clone()
-            .iter()
-            .filter_map(|node| cond(&node).then(|| node.clone()))
+        r.iter()
+            .filter(|(_uuid, node)| cond(node))
+            .map(|(_uuid, node)| node.clone())
             .collect(),
     )
 }
@@ -368,36 +362,39 @@ pub fn load_local_mode_node() -> Node {
 }
 
 #[inline(always)]
-pub fn get_node_by_uuid(uuid: &str) -> Option<Node> {
-    NODES.get(uuid).map(|node| node.clone())
-}
-
-#[inline(always)]
-pub fn get_cached_online_nodes() -> Option<Vec<Node>> {
-    get_cached_nodes(|node| node.status == NodeStatus::Online && node.scheduled)
+pub async fn get_node_by_uuid(uuid: &str) -> Option<Node> {
+    NODES.read().await.get(uuid).cloned()
 }
 
 #[inline]
-pub fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
+pub async fn get_cached_online_nodes() -> Option<Vec<Node>> {
+    get_cached_nodes(|node| node.status == NodeStatus::Online && node.scheduled).await
+}
+
+#[inline]
+pub async fn get_cached_online_ingester_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
         node.status == NodeStatus::Online && node.scheduled && is_ingester(&node.role)
     })
+    .await
 }
 
 #[inline]
-pub fn get_cached_online_querier_nodes() -> Option<Vec<Node>> {
+pub async fn get_cached_online_querier_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
         node.status == NodeStatus::Online && node.scheduled && is_querier(&node.role)
     })
+    .await
 }
 
-#[inline(always)]
-pub fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
+#[inline]
+pub async fn get_cached_online_query_nodes() -> Option<Vec<Node>> {
     get_cached_nodes(|node| {
         node.status == NodeStatus::Online
             && node.scheduled
             && (is_querier(&node.role) || is_ingester(&node.role))
     })
+    .await
 }
 
 #[cfg(test)]
@@ -415,10 +412,10 @@ mod tests {
         register_and_keepalive().await.unwrap();
         set_online(false).await.unwrap();
         leave().await.unwrap();
-        assert!(get_cached_online_nodes().is_some());
-        assert!(get_cached_online_query_nodes().is_some());
-        assert!(get_cached_online_ingester_nodes().is_some());
-        assert!(get_cached_online_querier_nodes().is_some());
+        assert!(get_cached_online_nodes().await.is_some());
+        assert!(get_cached_online_query_nodes().await.is_some());
+        assert!(get_cached_online_ingester_nodes().await.is_some());
+        assert!(get_cached_online_querier_nodes().await.is_some());
     }
 
     #[tokio::test]
