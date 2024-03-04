@@ -361,12 +361,6 @@ async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
-    log::error!(
-        "************ Merging the files now for stream_type {} ************",
-        stream_type
-    );
-    log::error!("files_with_size = {:?}", files_with_size);
-
     if files_with_size.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
@@ -546,7 +540,6 @@ async fn merge_files(
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
             if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
-                log::warn!("Stream type is LOGS, lets create a new index file");
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
                     buf,
@@ -556,10 +549,7 @@ async fn merge_files(
                     new_file_schema.clone(),
                 )
                 .await?;
-                log::warn!(
-                    "**************Created index file during compaction****************** {}",
-                    index_file_name
-                );
+                log::info!(" Created index file during compaction  {}", index_file_name);
                 // Notify that we wrote the index file to the db.
                 let ret = write_file_list(
                     org_id,
