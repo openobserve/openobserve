@@ -301,6 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   dense
                   multiple
+                  use-input
+                  fill-input
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   style="width: 250px"
                 >

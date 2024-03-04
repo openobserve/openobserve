@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div
-              data-test="report-list-loading-reports"
               v-if="reportsStateLoadingMap[props.row.uuid]"
+              data-test="report-list-toggle-report-state-loader"
               style="display: inline-block; width: 33.14px; height: auto"
               class="flex justify-center items-center q-ml-xs"
               :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { defineComponent, ref, onBeforeMount, onActivated, watch } from "vue";
+import { ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -173,12 +173,6 @@ import {
   outlinedPause,
   outlinedPlayArrow,
 } from "@quasar/extras/material-icons-outlined";
-import config from "@/aws-exports";
-import {
-  getImageURL,
-  getUUID,
-  verifyOrganizationStatus,
-} from "@/utils/zincutils";
 import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
@@ -218,8 +212,6 @@ const pagination: any = ref({
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const filterQuery = ref("");
-
-const showConfirmDeleteDialog = ref(false);
 
 const deleteDialog = ref({
   show: false,
@@ -279,6 +271,7 @@ onBeforeMount(() => {
     })
     .catch((err) => {
       q.notify({
+        type: "negative",
         message: err?.data?.message || "Error while fetching reports!",
         timeout: 3000,
       });
@@ -311,6 +304,7 @@ const toggleReportState = (report: any) => {
   const dismiss = q.notify({
     message: `${state} report "${report.name}"`,
   });
+  reportsStateLoadingMap.value[report.name] = true;
   reports
     .toggleReportState(
       store.state.selectedOrganization.identifier,
@@ -333,7 +327,10 @@ const toggleReportState = (report: any) => {
         timeout: 4000,
       });
     })
-    .finally(() => dismiss());
+    .finally(() => {
+      reportsStateLoadingMap.value[report.name] = false;
+      dismiss();
+    });
 };
 
 const editReport = (report: any) => {
