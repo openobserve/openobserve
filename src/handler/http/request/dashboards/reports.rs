@@ -52,7 +52,7 @@ pub async fn create_report(
     report: web::Json<Report>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    match reports::save(&org_id, "", report.into_inner()).await {
+    match reports::save(&org_id, "", report.into_inner(), true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -86,7 +86,7 @@ async fn update_report(
     report: web::Json<Report>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    match reports::save(&org_id, &name, report.into_inner()).await {
+    match reports::save(&org_id, &name, report.into_inner(), false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -232,9 +232,7 @@ async fn enable_report(
     )
 )]
 #[put("/{org_id}/reports/{name}/trigger")]
-async fn trigger_report(
-    path: web::Path<(String, String)>,
-) -> Result<HttpResponse, Error> {
+async fn trigger_report(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match reports::trigger(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report triggered")),

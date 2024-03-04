@@ -215,6 +215,9 @@ async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
         ReportFrequencyType::Once => {
             // Check on next week
             new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+            // Disable the report
+            report.enabled = false;
+            db::dashboards::reports::set(org_id, &report).await?;
         }
     }
 
@@ -225,17 +228,6 @@ async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
     report.send_subscribers().await?;
     // TODO: If the above operation fails, i.e. throws any error,
     // should we trigger the same event again or just ignore it?
-
-    if report.frequency.frequency_type == ReportFrequencyType::Once {
-        // Disable the report
-        report.enabled = false;
-        // This will overwrite the trigger we just saved earlier, because
-        // saving report will create another trigger with this report's
-        // `start` as the `next_run_at` time. But since the frequency is
-        // "once", it is ok. Ultimately as the report is disabled, the
-        // new trigger will be processed after a week.
-        reports::save(org_id, "", report).await?;
-    }
 
     Ok(())
 }

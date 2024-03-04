@@ -37,7 +37,12 @@ use crate::{
     service::db,
 };
 
-pub async fn save(org_id: &str, name: &str, mut report: Report) -> Result<(), anyhow::Error> {
+pub async fn save(
+    org_id: &str,
+    name: &str,
+    mut report: Report,
+    create: bool,
+) -> Result<(), anyhow::Error> {
     // Check if SMTP is enabled, otherwise don't save the report
     if !CONFIG.smtp.smtp_enabled {
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
@@ -46,6 +51,29 @@ pub async fn save(org_id: &str, name: &str, mut report: Report) -> Result<(), an
     // Check if Chrome is enabled, otherwise don't save the report
     if !CONFIG.chrome.chrome_enabled {
         return Err(anyhow::anyhow!("Chrome not enabled"));
+    }
+
+    if !name.is_empty() {
+        report.name = name.to_string();
+    }
+    if report.name.is_empty() {
+        return Err(anyhow::anyhow!("Report name is required"));
+    }
+    if report.name.contains('/') {
+        return Err(anyhow::anyhow!("Report name cannot contain '/'"));
+    }
+
+    match db::dashboards::reports::get(org_id, &report.name).await {
+        Ok(_) => {
+            if create {
+                return Err(anyhow::anyhow!("Report already exists"));
+            }
+        }
+        Err(_) => {
+            if !create {
+                return Err(anyhow::anyhow!("Report not found"));
+            }
+        }
     }
 
     // Atleast one `ReportDashboard` and `ReportDestination` needs to be present
@@ -88,15 +116,6 @@ pub async fn save(org_id: &str, name: &str, mut report: Report) -> Result<(), an
     }
     if try_join_all(tasks).await.is_err() {
         return Err(anyhow::anyhow!("Some dashboards/tabs not found"));
-    }
-    if !name.is_empty() {
-        report.name = name.to_string();
-    }
-    if report.name.is_empty() {
-        return Err(anyhow::anyhow!("Report name is required"));
-    }
-    if report.name.contains('/') {
-        return Err(anyhow::anyhow!("Report name cannot contain '/'"));
     }
 
     match db::dashboards::reports::set(org_id, &report).await {
