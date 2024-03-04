@@ -36,10 +36,15 @@ pub fn new_parquet_writer<'a>(
     let sort_column_id = schema
         .index_of(&CONFIG.common.column_timestamp)
         .expect("Not found timestamp field");
+    let row_group_size = if CONFIG.limit.parquet_max_row_group_size > 0 {
+        CONFIG.limit.parquet_max_row_group_size
+    } else {
+        PARQUET_MAX_ROW_GROUP_SIZE
+    };
     let mut writer_props = WriterProperties::builder()
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
-        .set_max_row_group_size(PARQUET_MAX_ROW_GROUP_SIZE) // maximum number of rows in a row group
+        .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
         .set_compression(Compression::ZSTD(Default::default()))
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
@@ -71,11 +76,10 @@ pub fn new_parquet_writer<'a>(
         writer_props = writer_props
             .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
     }
-    // Bloom filter stored by row_group, so if the num_rows can limit to
-    // PARQUET_MAX_ROW_GROUP_SIZE,
+    // Bloom filter stored by row_group, so if the num_rows can limit to row_group_size
     let num_rows = metadata.records as u64;
-    let num_rows = if num_rows > PARQUET_MAX_ROW_GROUP_SIZE as u64 {
-        PARQUET_MAX_ROW_GROUP_SIZE as u64
+    let num_rows = if num_rows > row_group_size as u64 {
+        row_group_size as u64
     } else {
         num_rows
     };
