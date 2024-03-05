@@ -46,14 +46,10 @@ use parquet::arrow::{
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
-    common::{
-        infra::wal,
-        meta::stream::{SchemaRecords, StreamParams},
-    },
+    common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
         db,
-        ingestion::{get_wal_time_key, index_writer::write_file_arrow},
         search::datafusion::exec::merge_parquet_files,
         stream::{self, get_stream_setting_fts_fields},
     },
