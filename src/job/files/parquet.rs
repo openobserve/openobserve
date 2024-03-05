@@ -418,7 +418,7 @@ pub(crate) async fn generate_index_on_ingester(
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let partition_det = crate::service::ingestion::get_stream_partition_keys(
         org_id,
-        &StreamType::Index,
+        &StreamType::Logs,
         stream_name,
     )
     .await;
