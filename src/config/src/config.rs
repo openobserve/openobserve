@@ -438,8 +438,6 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
-    #[env_config(name = "ZO_INVERTED_INDEX_CRC", default = true)]
-    pub inverted_index_crc: bool,
 }
 
 #[derive(EnvConfig)]
