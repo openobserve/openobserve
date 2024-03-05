@@ -24,7 +24,7 @@ use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster,
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     metrics,
     utils::{
         asynchronism::file::{get_file_contents, get_file_meta},
@@ -412,14 +412,6 @@ pub(crate) async fn generate_index_on_ingester(
     schema: SchemaRef,
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-    let partition_det = crate::service::ingestion::get_stream_partition_keys(
-        org_id,
-        &StreamType::Logs,
-        stream_name,
-    )
-    .await;
-
-    let partition_time_level = partition_det.partition_time_level;
 
     let index_record_batches =
         prepare_index_record_batches(buf, schema.clone(), org_id, stream_name, &new_file_key)
@@ -452,7 +444,7 @@ pub(crate) async fn generate_index_on_ingester(
         .await
         .unwrap();
     }
-    let schema_key = idx_schema.clone().hash_key();
+    let schema_key = idx_schema.hash_key();
     let schema_key_str = schema_key.as_str();
 
     let json_rows = arrow_json::writer::record_batches_to_json_rows(&record_batches)?;
@@ -467,7 +459,7 @@ pub(crate) async fn generate_index_on_ingester(
         let hour_key = crate::service::ingestion::get_wal_time_key(
             timestamp,
             &Vec::new(),
-            partition_time_level.unwrap_or_default(),
+            PartitionTimeLevel::Hourly,
             &json::Map::new(),
             Some(schema_key_str),
         );

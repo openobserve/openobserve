@@ -21,10 +21,7 @@ use infra::storage;
 use tokio::task;
 
 use super::{ider, FILE_EXT_PARQUET};
-use crate::{
-    common::utils::stream::populate_file_meta, job::files::generate_storage_file_name,
-    service::schema::schema_evolution,
-};
+use crate::common::utils::stream::populate_file_meta;
 
 fn generate_index_file_name_from_compacted_file(
     org_id: &str,
@@ -77,14 +74,8 @@ pub(crate) async fn write_to_disk(
     writer.close().await?;
     file_meta.compressed_size = buf_parquet.len() as i64;
 
-    schema_evolution(org_id, stream_name, stream_type, schema, file_meta.min_ts).await;
-
-    let new_idx_file_name = if caller == "upload_file" {
-        generate_storage_file_name(org_id, stream_type, stream_name, file_name)
-    } else {
-        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name)
-    };
-
+    let new_idx_file_name =
+        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name);
     log::info!(
         "[JOB] IDX: write_to_disk: {} {} {} {} {} {}",
         org_id,
@@ -95,7 +86,7 @@ pub(crate) async fn write_to_disk(
         caller,
     );
 
-    let store_file_name = new_idx_file_name.to_owned();
+    let store_file_name = new_idx_file_name.clone();
     match task::spawn_blocking(move || async move {
         storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await
     })
