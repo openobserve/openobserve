@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
+            :disable="searchObj.loading == true"
             v-model="pageNumberInput"
             :key="
               searchObj.data.queryResults.total +
@@ -38,10 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                Math.ceil(
-                  searchObj.data.queryResults.total /
-                    searchObj.meta.resultGrid.rowsPerPage
-                )
+                searchObj.data.queryResults?.partitionDetail?.paginations
+                  ?.length || 0
               )
             "
             :input="false"
@@ -497,8 +496,7 @@ export default defineComponent({
         if (
           this.pageNumberInput >
           Math.ceil(
-            this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage
+            this.searchObj.data.queryResults.partitionDetail.paginations.length
           )
         ) {
           this.$q.notify({

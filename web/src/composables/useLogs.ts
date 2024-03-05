@@ -842,7 +842,7 @@ const useLogs = () => {
               startTime: item[0],
               endTime: item[1],
               from,
-              size: Math.min(recordSize, rowsPerPage),
+              size: Math.abs(Math.min(recordSize, rowsPerPage)),
             });
 
             partitionFrom += recordSize;
@@ -884,7 +884,7 @@ const useLogs = () => {
             startTime: item[0],
             endTime: item[1],
             from,
-            size: recordSize,
+            size: Math.abs(recordSize),
           });
 
           if (partitionDetail.paginations[pageNumber].size > 0) {
@@ -1094,14 +1094,16 @@ const useLogs = () => {
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
           refreshPartitionPagination(regeratePaginationFlag);
 
-          if (res.data.from > 0) {
-            searchObj.data.queryResults.from = res.data.from;
-            searchObj.data.queryResults.scan_size = res.data.scan_size;
-            searchObj.data.queryResults.took = res.data.took;
-
+          if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult) {
+              searchObj.data.queryResults.from += res.data.from;
+              searchObj.data.queryResults.scan_size += res.data.scan_size;
+              searchObj.data.queryResults.took += res.data.took;
               searchObj.data.queryResults.hits.push(...res.data.hits);
             } else {
+              searchObj.data.queryResults.from = res.data.from;
+              searchObj.data.queryResults.scan_size = res.data.scan_size;
+              searchObj.data.queryResults.took = res.data.took;
               searchObj.data.queryResults.hits = res.data.hits;
             }
           } else {
@@ -1171,7 +1173,20 @@ const useLogs = () => {
           filterHitsColumns();
 
           // disabled histogram case, generate histogram histogram title
-          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          // also calculate the total based on the partitions total
+          if (
+            searchObj.meta.showHistogram == false ||
+            searchObj.meta.sqlMode == true
+          ) {
+            searchObj.data.queryResults.total = 0;
+            for (const totalNumber of searchObj.data.queryResults
+              .partitionDetail.partitionTotal) {
+              if (totalNumber > 0) {
+                searchObj.data.queryResults.total += totalNumber;
+              }
+            }
+            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          }
 
           searchObj.data.functionError = "";
           if (
