@@ -1574,7 +1574,6 @@ export const convertSQLData = (
  * @param {string} legendPosition - The desired position of the legend. Possible values are "bottom" and "right".
  * @return {string} The format of the legend position. Possible values are "horizontal" and "vertical".
  */
-console.time("convertSQLData:Part2");
 const getLegendPosition = (legendPosition: string) => {
   switch (legendPosition) {
     case "bottom":
@@ -1808,4 +1807,3 @@ const getPropsByChartTypeForSeries = (type: string) => {
       };
   }
 };
-console.timeEnd("convertSQLData:Part2");
