@@ -248,7 +248,7 @@ describe("Alerts testcases", () => {
     cy.contains("Field is required").should("be.visible");
   });
 
-  it.only("should create template, destination, logs-alerts and then delete all successfully", () => {
+  it("should create template, destination, logs-alerts and then delete all successfully", () => {
     // cy.wait(2000);
     cy.wait("@templates");
     cy.get('[data-test="alert-template-list-add-alert-btn"]').click({
