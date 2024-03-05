@@ -204,9 +204,9 @@ const perPageOptions: any = [
 ];
 const resultTotal = ref<number>(0);
 const maxRecordToReturn = ref<number>(100);
-const selectedPerPage = ref<number>(20);
+const selectedPerPage = ref<number>(2);
 const pagination: any = ref({
-  rowsPerPage: 20,
+  rowsPerPage: 2,
 });
 
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
@@ -362,6 +362,22 @@ const deleteReport = (report: any) => {
       deleteDialog.value.data
     )
     .then(() => {
+      // Find the index of the row that matches the condition
+      const deleteIndex = reportsTableRows.value.findIndex(
+        (row) => row.name === deleteDialog.value.data
+      );
+
+      // Check if a matching row was found
+      if (deleteIndex !== -1) {
+        // Remove the row from the array
+        reportsTableRows.value.splice(deleteIndex, 1);
+
+        // Update the "#" property for the remaining rows
+        reportsTableRows.value.forEach((row, index) => {
+          row["#"] = index + 1;
+        });
+      }
+
       q.notify({
         type: "positive",
         message: `Delete report successfully.`,
