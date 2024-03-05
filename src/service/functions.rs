@@ -43,7 +43,7 @@ const FN_REMOVED: &str = "Function removed from stream";
 const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
-    "Function is used in streams , please remove it from the streams before deleting:";
+    "Function is associated with streams, please remove association from streams before deleting:";
 
 #[tracing::instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
@@ -186,7 +186,7 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             if !names.is_empty() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     StatusCode::BAD_REQUEST.into(),
-                    format!("{} {}", FN_IN_USE, fn_name),
+                    format!("{} {}", FN_IN_USE, names),
                 )));
             }
         }
