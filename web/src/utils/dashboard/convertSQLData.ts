@@ -443,6 +443,7 @@ export const convertSQLData = (
           panelSchema.type == "scatter") &&
           panelSchema.queries[0].fields.x.length == 2)
       ) {
+        console.time("convertSQLData: area double axis");
         options.xAxis = options.xAxis.slice(0, 1);
         options.tooltip.axisPointer.label = {
           show: true,
@@ -466,30 +467,37 @@ export const convertSQLData = (
         options.xAxis[0].axisLabel = {};
         options.xAxis[0].axisTick = {};
         options.xAxis[0].nameGap = 20;
+        console.timeEnd("convertSQLData: area double axis");
 
+        console.time("convertSQLData: area double axis series");
         // get the unique value of the first xAxis's key
         options.xAxis[0].data = Array.from(
           new Set(getAxisDataFromKey(xAxisKeys[0]))
         );
+        console.timeEnd("convertSQLData: area double axis series");
         // options.xAxis[0].data = Array.from(new Set(options.xAxis[0].data));
 
         // stacked with xAxis's second value
         // allow 2 xAxis and 1 yAxis value for stack chart
         // get second x axis key
+        console.time("convertSQLData: area double axis series 2");
         const key1 = xAxisKeys[1];
         // get the unique value of the second xAxis's key
         const stackedXAxisUniqueValue = [
           ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
-
+        console.timeEnd("convertSQLData: area double axis series 2");
         // create a trace based on second xAxis's unique values
+        console.time("convertSQLData: area double axis series 3");
         options.series = yAxisKeys
           .map((yAxis: any) => {
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == yAxis
             ).label;
-
+            console.timeEnd("convertSQLData: area double axis series 3");
+            console.time("convertSQLData: area double axis series 5");
             return stackedXAxisUniqueValue?.map((key: any) => {
+              console.time("convertSQLData: area double axis series 4");
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
@@ -506,13 +514,17 @@ export const convertSQLData = (
                     )?.[yAxis] ?? null
                 ),
               };
+              console.timeEnd("convertSQLData: area double axis series 4");
               return seriesObj;
             });
           })
           .flat();
+        console.timeEnd("convertSQLData: area double axis series 5");
       } else if (panelSchema.type == "line" || panelSchema.type == "area") {
         //if x and y length is not 2 and 1 respectively then do following
+        console.time("convertSQLData: area else if single axis");
         options.series = yAxisKeys?.map((key: any) => {
+          console.time("convertSQLData: area else if single axis 2");
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == key
@@ -527,8 +539,10 @@ export const convertSQLData = (
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
           };
+          console.timeEnd("convertSQLData: area else if single axis 2");
           return seriesObj;
         });
+        console.timeEnd("convertSQLData: area else if single axis");
         // scatter chart with single x and y axis(single or multiple)
       } else {
         options.tooltip.formatter = function (name: any) {
@@ -545,17 +559,18 @@ export const convertSQLData = (
           // then swap the hovered series to top in tooltip
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
             // get the current series index from name
+            console.time("convertSQLData: area else currentSeriesIndex");
             const currentSeriesIndex = name.findIndex(
               (it: any) =>
                 it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
             );
-
+            console.timeEnd("convertSQLData: area else currentSeriesIndex");
             // swap current hovered series index to top in tooltip
             const temp = name[0];
             name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
             name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
           }
-
+          console.time("convertSQLData: area else hoverText");
           const hoverText: string[] = [];
           name.forEach((it: any) => {
             if (it.data != null) {
@@ -588,9 +603,10 @@ export const convertSQLData = (
                 );
             }
           });
-
+          console.timeEnd("convertSQLData: area else hoverText");
           return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
         };
+        console.time("convertSQLData: area else");
         options.series = yAxisKeys?.map((key: any) => {
           const seriesObj = {
             name: panelSchema?.queries[0]?.fields?.y.find(
@@ -608,6 +624,7 @@ export const convertSQLData = (
           };
           return seriesObj;
         });
+        console.timeEnd("convertSQLData: area else");
       }
       break;
     }
