@@ -69,7 +69,10 @@ pub async fn remote_write(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow::anyhow!(
+            "Quota exceeded for this organization [{}]",
+            org_id
+        ));
     }
 
     // check memtable

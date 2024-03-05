@@ -52,9 +52,6 @@ pub async fn merge_by_stream(
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
-    log::warn!("Inside merge_by_stream");
-    log::warn!("CHECKING THE STREAM TYPE: {:?}", stream_type);
-
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
@@ -155,7 +152,6 @@ pub async fn merge_by_stream(
                         .unwrap()
                         * 3))
     {
-        log::warn!("compactor merge: the time is not allowed, just wait");
         return Ok(()); // the time is future, just wait
     }
 
@@ -184,7 +180,6 @@ pub async fn merge_by_stream(
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
-    log::warn!("files = {:?}", files);
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
@@ -253,7 +248,6 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 };
-                log::warn!("new_file_name = {:?}", new_file_name);
                 if new_file_name.is_empty() {
                     if CONFIG.common.print_key_event {
                         log::info!(

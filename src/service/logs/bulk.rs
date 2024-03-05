@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::web;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use chrono::{Duration, Utc};
 use config::{
     cluster,
@@ -61,11 +61,14 @@ pub async fn ingest(
 ) -> Result<BulkResponse, anyhow::Error> {
     let start = std::time::Instant::now();
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-        return Err(anyhow!("not an ingester"));
+        return Err(anyhow::anyhow!("not an ingester"));
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow::anyhow!(
+            "Quota exceeded for this organization [{}]",
+            org_id
+        ));
     }
 
     // check memtable
