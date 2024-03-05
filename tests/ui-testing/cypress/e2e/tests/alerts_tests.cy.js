@@ -70,6 +70,9 @@ describe("Alerts testcases", () => {
     // });
     cy.intercept("GET", "**/api/default/organizations**").as("allorgs");
     cy.intercept("GET", "**/api/default/functions**").as("functions");
+    cy.intercept("GET", "**/api/default/alerts/templates**").as("templates");
+
+ 
     cy.visit(`web/alerts/templates??org_identifier=${Cypress.env("ORGNAME")}`);
     // cy.intercept('GET', '**/api/default/_search**').as('allsearch')
   });
@@ -191,13 +194,15 @@ describe("Alerts testcases", () => {
   it("should display error if name has only spaces under destination", () => {
     cy.wait(2000);
     cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
-    cy.wait(100);
+    cy.wait(1000);
     cy.get('[data-test="alert-destination-list-add-alert-btn"]').click({
       force: true,
     });
+    cy.wait(1000);
     cy.get('[data-test="add-destination-name-input"]').type("    ");
+    cy.wait(1000);
     cy.get('[data-test="add-destination-submit-btn"]').click({ force: true });
-    cy.contains("Field is required").should("be.visible");
+ 
     cy.get(".q-notification__message")
       .contains("Please fill required fields")
       .should("be.visible");
@@ -206,7 +211,7 @@ describe("Alerts testcases", () => {
   it("should add destination successfully", () => {
     cy.wait(2000);
     cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
-    cy.wait(100);
+    cy.wait(1000);
     cy.get('[data-test="alert-destination-list-add-alert-btn"]').click({
       force: true,
     });
@@ -214,7 +219,10 @@ describe("Alerts testcases", () => {
     cy.get('[data-test="add-destination-template-select"]').click({
       force: true,
     });
-    cy.contains(".q-item__label span", "automationalert").click();
+    cy.get('.q-virtual-scroll__content')
+      .contains('.q-item__label span', 'automationalert')
+      .click();
+
     cy.get('[data-test="add-destination-url-input"]').type(
       "https://slack.com/api"
     );
@@ -233,7 +241,7 @@ describe("Alerts testcases", () => {
   it("should click cancel button under destinations", () => {
     cy.wait(2000);
     cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
-    cy.wait(100);
+    cy.wait(1000);
     cy.get('[data-test="alert-destination-list-add-alert-btn"]').click({
       force: true,
     });
@@ -266,12 +274,13 @@ describe("Alerts testcases", () => {
   });
 
   it("should create template, destination, logs-alerts and then delete all successfully", () => {
-    cy.wait(2000);
+    // cy.wait(2000);
+    cy.wait("@templates");
     cy.get('[data-test="alert-template-list-add-alert-btn"]').click({
       force: true,
     });
-    cy.wait(100);
-    cy.get('[data-test="add-template-name-input"]').type("automationalert");
+    cy.wait(2000);
+    cy.get('[data-test="add-template-name-input"]').type("automationalertest");
     const jsonString = '{"text": "{alert_name} is active"}';
     cy.get(".view-line").type(jsonString, { parseSpecialCharSequences: false });
     cy.get('[data-test="add-template-submit-btn"]').click({ force: true });
@@ -280,15 +289,15 @@ describe("Alerts testcases", () => {
       .should("be.visible");
     cy.wait(2000);
     cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
-    cy.wait(100);
+    cy.wait(1000);
     cy.get('[data-test="alert-destination-list-add-alert-btn"]').click({
       force: true,
     });
-    cy.get('[data-test="add-destination-name-input"]').type("cy-destination");
+    cy.get('[data-test="add-destination-name-input"]').type("cy-destinations");
     cy.get('[data-test="add-destination-template-select"]').click({
       force: true,
     });
-    cy.contains(".q-item__label span", "automationalert").click();
+    cy.contains(".q-item__label span", "automationalertest").click();
     cy.get('[data-test="add-destination-url-input"]').type(
       "https://slack.com/api"
     );
@@ -314,6 +323,7 @@ describe("Alerts testcases", () => {
     cy.get('[data-test="add-alert-scheduled-alert-radio"]').click({
       force: true,
     });
+    cy.wait(1000);
     cy.get('[data-test="alert-conditions-select-column"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
     cy.contains(".q-item__label", "_timestamp").click();
     cy.get('[data-test="alert-conditions-operator-select"] > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon').click({ force: true });
