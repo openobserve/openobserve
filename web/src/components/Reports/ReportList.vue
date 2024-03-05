@@ -268,6 +268,7 @@ onBeforeMount(() => {
         "#": index + 1,
         ...report,
       }));
+      resultTotal.value = reportsTableRows.value.length;
     })
     .catch((err) => {
       q.notify({
@@ -312,12 +313,13 @@ const toggleReportState = (report: any) => {
       !report.enabled
     )
     .then(() => {
+      report.enabled = !report.enabled;
       q.notify({
         type: "positive",
         message: `${
-          report.enabled ? "Stopped" : "Started"
+          report.enabled ? "Started" : "Stopped"
         } report successfully.`,
-        timeout: 3000,
+        timeout: 2000,
       });
     })
     .catch((err) => {
@@ -345,18 +347,20 @@ const editReport = (report: any) => {
 };
 
 const confirmDeleteReport = (report: any) => {
-  console.log("Confirm delete report");
   deleteDialog.value.show = true;
   deleteDialog.value.message = `Are you sure you want to delete report "${report.name}"`;
+  deleteDialog.value.data = report.name;
 };
 
 const deleteReport = (report: any) => {
-  console.log("delete report", report);
   const dismiss = q.notify({
-    message: `Deleting report "${report.name}"`,
+    message: `Deleting report "${deleteDialog.value.data}"`,
   });
   reports
-    .deleteReport(store.state.selectedOrganization.identifier, report.name)
+    .deleteReport(
+      store.state.selectedOrganization.identifier,
+      deleteDialog.value.data
+    )
     .then(() => {
       q.notify({
         type: "positive",

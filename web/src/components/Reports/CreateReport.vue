@@ -32,8 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-if="beingUpdated" class="text-h6" data-test="add-report-title">
-          {{ t("reports.updateTitle") }}
+        <div
+          v-if="isEditingReport"
+          class="text-h6"
+          data-test="add-report-title"
+        >
+          {{ t("reports.update") }}
         </div>
         <div v-else class="text-h6" data-test="add-report-title">
           {{ t("reports.add") }}
@@ -54,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="padding-top: 12px"
           >
             <q-input
-              v-model="formData.name"
+              v-model.trim="formData.name"
               :label="t('alerts.name') + ' *'"
               color="input-border"
               bg-color="input-bg"
@@ -63,12 +67,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+              v-bind:readonly="isEditingReport"
+              v-bind:disable="isEditingReport"
+              :rules="[
+                (val, rules) =>
+                  !!val
+                    ? isValidName ||
+                      `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
+                    : t('common.nameRequired'),
+              ]"
               tabindex="0"
               style="width: 400px"
-            />
+            >
+              <template v-slot:hint>
+                Use alphanumeric and '+=,.@-_' characters only, without spaces.
+              </template>
+            </q-input>
           </div>
           <div
             data-test="add-report-name-input"
@@ -205,10 +219,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       dense
                       use-input
-                      hide-selected
                       fill-input
                       :input-debounce="400"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
+                      :rules="[(val: any) => !!val.length || 'Field is required!']"
                       @filter="
                         (...args) => onFilterOptions('tabs', args[0], args[1])
                       "
@@ -537,8 +550,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outlined
                     filled
                     dense
-                    v-bind:readonly="beingUpdated"
-                    v-bind:disable="beingUpdated"
                     :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                     tabindex="0"
                     style="width: 400px"
@@ -559,9 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outlined
                     filled
                     dense
-                    v-bind:readonly="beingUpdated"
-                    v-bind:disable="beingUpdated"
-                    :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+                    :rules="[(val: any) => /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(val) || 'Add valid emails!']"
                     tabindex="0"
                     style="width: 100%"
                     borderless
@@ -609,8 +618,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   filled
                   dense
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
+                  v-bind:readonly="isEditingReport"
+                  v-bind:disable="isEditingReport"
                   :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                   tabindex="0"
                   style="width: 400px"
@@ -631,8 +640,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   type="password"
                   dense
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
+                  v-bind:readonly="isEditingReport"
+                  v-bind:disable="isEditingReport"
                   :rules="[(val: any) => !!val.trim() || 'Field is required!']"
                   tabindex="0"
                   style="width: 400px"
@@ -661,6 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         text-color="light-text"
         padding="sm md"
         no-caps
+        @click="openCancelDialog"
       />
       <q-btn
         data-test="edit-role-save-btn"
@@ -673,10 +683,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
   </div>
+  <ConfirmDialog
+    v-model="dialog.show"
+    :title="dialog.title"
+    :message="dialog.message"
+    @update:ok="dialog.okCallback"
+    @update:cancel="dialog.show = false"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, nextTick } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -692,6 +709,7 @@ import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
 import { useQuasar } from "quasar";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const props = defineProps({
   report: {
@@ -726,7 +744,7 @@ const defaultReport = {
   name: "",
   title: "",
   message: "",
-  org_id: "",
+  orgId: "",
   start: 0,
   frequency: {
     interval: 1,
@@ -740,11 +758,22 @@ const defaultReport = {
 const { t } = useI18n();
 const router = useRouter();
 
+const originalReportData = ref(defaultReport);
+
+const addReportFormRef = ref(null);
+
 const step = ref(1);
 
 const formData = ref(defaultReport);
 
 const q = useQuasar();
+
+const dialog = ref({
+  show: false,
+  title: "",
+  message: "",
+  okCallback: () => {},
+});
 
 const timeTabs = [
   {
@@ -786,10 +815,6 @@ const frequencyTabs = [
 
 const selectedTimeTab = ref("sendLater");
 
-const beingUpdated = computed(() => {
-  return false;
-});
-
 const store = useStore();
 
 const filteredTimezone: any = ref([]);
@@ -819,6 +844,8 @@ const frequency = ref({
 });
 
 onBeforeMount(() => {
+  getDashboaordFolders();
+
   isEditingReport.value = !!router.currentRoute.value.query?.name;
 
   if (isEditingReport.value) {
@@ -832,6 +859,7 @@ onBeforeMount(() => {
       .getReport(store.state.selectedOrganization.identifier, reportName)
       .then((res: any) => {
         setupEditingReport(res.data);
+        originalReportData.value = JSON.stringify(formData.value);
       })
       .catch((err) => {
         q.notify({
@@ -843,11 +871,9 @@ onBeforeMount(() => {
       .finally(() => {
         isFetchingReport.value = false;
       });
+  } else {
+    originalReportData.value = JSON.stringify(formData.value);
   }
-});
-
-onBeforeMount(() => {
-  getDashboaordFolders();
 });
 
 const isFetchingFolders = ref(false);
@@ -862,8 +888,13 @@ const scheduling = ref({
   timezone: "",
 });
 
+const isValidName = computed(() => {
+  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
+  // Check if the role name is valid
+  return roleNameRegex.test(formData.value.name);
+});
+
 const onFolderSelection = (id: string) => {
-  console.log("on folder selection ", id);
   dashboardOptions.value.length = 0;
   isFetchingDashboard.value = true;
   return new Promise((resolve, reject) => {
@@ -925,9 +956,12 @@ const filterTabs = () => {};
 
 const updateDateTime = (datetime: any) => {
   formData.value.dashboards[0].timerange.type = datetime.valueType;
-  formData.value.dashboards[0].timerange.from = datetime.startTime;
-  formData.value.dashboards[0].timerange.to = datetime.endTime;
   formData.value.dashboards[0].timerange.period = datetime.relativeTimePeriod;
+
+  if (datetime.relativeTimePeriod === "absolute") {
+    formData.value.dashboards[0].timerange.from = datetime.startTime;
+    formData.value.dashboards[0].timerange.to = datetime.endTime;
+  }
 };
 
 const scheduleInfoMapping = {
@@ -1037,8 +1071,6 @@ const convertDateToTimestamp = (
   const [day, month, year] = date.split("-");
   const [hour, minute] = time.split(":");
 
-  console.log(date, time, timezone);
-
   const _date = {
     year: Number(year),
     month: Number(month),
@@ -1056,7 +1088,7 @@ const convertDateToTimestamp = (
   return unixTimestampMillis * 1000; // timestamp in microseconds
 };
 
-const saveReport = () => {
+const saveReport = async () => {
   if (selectedTimeTab.value === "sendNow") {
     const now = new Date();
 
@@ -1084,7 +1116,7 @@ const saveReport = () => {
     scheduling.value.timezone
   );
 
-  formData.value.org_id = store.state.selectedOrganization.identifier;
+  formData.value.orgId = store.state.selectedOrganization.identifier;
 
   formData.value.destinations = emails.value.split(/[,;]/).map((email) => ({
     email,
@@ -1100,6 +1132,16 @@ const saveReport = () => {
 
   formData.value.timezone = scheduling.value.timezone;
 
+  // Check if all report input fields are valid
+  try {
+    validateReportData();
+    await nextTick();
+    await nextTick();
+    const isValidForm = await addReportFormRef.value.validate();
+    if (!isValidForm) return;
+  } catch (err) {
+    console.log(err);
+  }
   const reportAction = isEditingReport.value
     ? reports.updateReport
     : reports.createReport;
@@ -1119,12 +1161,7 @@ const saveReport = () => {
         } successfully.`,
         timeout: 3000,
       });
-      router.replace({
-        name: "reports",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      goToReports();
     })
     .catch((error) => {
       q.notify({
@@ -1140,13 +1177,84 @@ const saveReport = () => {
     });
 };
 
+const validateReportData = async () => {
+  if (!formData.value.dashboards[0].folder) {
+    step.value = 1;
+    return;
+  }
+
+  if (!formData.value.dashboards[0].dashboard) {
+    step.value = 1;
+    return;
+  }
+
+  if (!formData.value.dashboards[0].tabs.length) {
+    step.value = 1;
+    return;
+  }
+
+  if (formData.value.dashboards[0].timerange) {
+    if (
+      formData.value.dashboards[0].timerange.type === "relative" &&
+      !formData.value.dashboards[0].timerange.period
+    ) {
+      step.value = 1;
+      return;
+    }
+
+    if (
+      formData.value.dashboards[0].timerange.type === "absolute" &&
+      !(
+        formData.value.dashboards[0].timerange.to &&
+        formData.value.dashboards[0].timerange.from
+      )
+    ) {
+      step.value = 1;
+      return;
+    }
+  }
+
+  if (!formData.value.frequency.interval || !formData.value.frequency.type) {
+    step.value = 2;
+    return;
+  }
+
+  if (!formData.value.start || !formData.value.timezone) {
+    step.value = 2;
+    return;
+  }
+
+  if (
+    !formData.value.title ||
+    !/^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
+      emails.value
+    )
+  ) {
+    step.value = 3;
+    return;
+  }
+};
+
+const goToReports = () => {
+  router.replace({
+    name: "reports",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
 const onFilterOptions = (type, val: String, update: Function) => {
   const optionsMapping = {
     folders: folderOptions,
     dashboards: dashboardOptions,
     tabs: dashboardTabOptions,
   };
-  optionsMapping[type].value = filterOptions(options.value[type], val, update);
+  optionsMapping[type].value = filterOptions(
+    options.value[type] || [],
+    val,
+    update
+  );
 };
 
 const filterOptions = (options: any[], val: String, update: Function) => {
@@ -1162,8 +1270,6 @@ const filterOptions = (options: any[], val: String, update: Function) => {
       return option.label.toLowerCase().indexOf(value) > -1;
     });
   });
-
-  console.log(filteredOptions);
 
   return filteredOptions;
 };
@@ -1209,8 +1315,17 @@ const setupEditingReport = async (report: any) => {
   await onFolderSelection(formData.value.dashboards[0].folder);
 
   onDashboardSelection(formData.value.dashboards[0].dashboard);
+};
 
-  console.log(cloneDeep(formData.value));
+const openCancelDialog = () => {
+  if (originalReportData.value === JSON.stringify(formData.value)) {
+    goToReports();
+    return;
+  }
+  dialog.value.show = true;
+  dialog.value.title = "Discard Changes";
+  dialog.value.message = "Are you sure you want to cancel report changes?";
+  dialog.value.okCallback = goToReports;
 };
 </script>
 
