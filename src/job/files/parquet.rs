@@ -417,7 +417,7 @@ pub(crate) async fn generate_index_on_ingester(
     org_id: &str,
     stream_name: &str,
     schema: SchemaRef,
-) -> Result<String, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     if CONFIG.common.inverted_index_crc {
         let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
@@ -434,7 +434,10 @@ pub(crate) async fn generate_index_on_ingester(
             prepare_index_record_batches(buf, schema.clone(), org_id, stream_name, &new_file_key)
                 .await?;
         let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
-
+        if record_batches.is_empty() {
+            log::debug!("No record batches found");
+            return Ok(());
+        }
         let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
 
         let mut schema_map: HashMap<String, Schema> = HashMap::new();
@@ -495,7 +498,7 @@ pub(crate) async fn generate_index_on_ingester(
             log::error!("ingestion error while syncing writer: {}", e);
         }
         log::warn!("[INGESTER:JOB] Written index wal file successfully");
-        return Ok("dummy".to_string());
+        return Ok(());
     }
 
     let index_record_batches =
@@ -510,7 +513,7 @@ pub(crate) async fn generate_index_on_ingester(
         None,
     );
 
-    let arrow_file_name = write_file_arrow(
+    let _ = write_file_arrow(
         record_batches,
         0,
         &StreamParams {
@@ -521,8 +524,8 @@ pub(crate) async fn generate_index_on_ingester(
         &hour_key,
     )
     .await?;
-    log::debug!("[INGESTER:JOB] Written index file successfully");
-    Ok(arrow_file_name)
+    log::warn!("[INGESTER:JOB] Written index file successfully");
+    Ok(())
 }
 
 /// Create an inverted index file for the given file
