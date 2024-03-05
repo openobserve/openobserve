@@ -52,9 +52,6 @@ pub async fn merge_by_stream(
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
-    log::warn!("Inside merge_by_stream");
-    log::warn!("CHECKING THE STREAM TYPE: {:?}", stream_type);
-
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -156,7 +153,6 @@ pub async fn merge_by_stream(
                         .unwrap()
                         * 3))
     {
-        log::warn!("compactor merge: the time is not allowed, just wait");
         return Ok(()); // the time is future, just wait
     }
 
@@ -185,7 +181,6 @@ pub async fn merge_by_stream(
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
-    log::warn!("files = {:?}", files);
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
@@ -254,7 +249,6 @@ pub async fn merge_by_stream(
                         continue;
                     }
                 };
-                log::warn!("new_file_name = {:?}", new_file_name);
                 if new_file_name.is_empty() {
                     if CONFIG.common.print_key_event {
                         log::info!(
@@ -362,12 +356,6 @@ async fn merge_files(
     prefix: &str,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
-    log::error!(
-        "************ Merging the files now for stream_type {} ************",
-        stream_type
-    );
-    log::error!("files_with_size = {:?}", files_with_size);
-
     if files_with_size.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), Vec::new()));
     }
@@ -547,7 +535,6 @@ async fn merge_files(
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
             if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
-                log::warn!("Stream type is LOGS, lets create a new index file");
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
                     buf,
@@ -557,10 +544,7 @@ async fn merge_files(
                     new_file_schema.clone(),
                 )
                 .await?;
-                log::warn!(
-                    "**************Created index file during compaction****************** {}",
-                    index_file_name
-                );
+                log::info!("Created index file during compaction {}", index_file_name);
                 // Notify that we wrote the index file to the db.
                 let ret = write_file_list(
                     org_id,
@@ -578,8 +562,6 @@ async fn merge_files(
                         e.to_string()
                     );
                 }
-                // let ret = db::file_list::local::set(&index_file_name, Some(filemeta),
-                // false).await;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }

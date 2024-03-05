@@ -89,11 +89,11 @@ pub async fn search_parquet(
         return Ok((HashMap::new(), ScanStats::new()));
     }
 
-    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
     let mut scan_stats = ScanStats::new();
+    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
 
     // cache files
-    let work_dir = session_id.to_string();
+    let work_dir = format!("{}-parquet", session_id);
     for file in files.clone().iter() {
         let source_file = CONFIG.common.data_wal_dir.to_string() + file.key.as_str();
         match get_file_contents(&source_file) {
@@ -131,7 +131,7 @@ pub async fn search_parquet(
 
     scan_stats.files = files.len() as i64;
     if scan_stats.files == 0 {
-        tmpfs::delete(session_id, true).unwrap();
+        tmpfs::delete(&work_dir, true).unwrap();
         return Ok((HashMap::new(), scan_stats));
     }
 
@@ -173,11 +173,20 @@ pub async fn search_parquet(
     let is_single_group = files_group.len() == 1;
     for (ver, files) in files_group {
         // get schema of the file
-        let file_data = tmpfs::get(&files.first().unwrap().key).unwrap();
+        let first_file = files.first().unwrap().key.clone();
+        let file_data = tmpfs::get(&first_file).unwrap();
         let schema_reader = Cursor::new(file_data);
-        let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        let arrow_reader = match ParquetRecordBatchStreamBuilder::new(schema_reader).await {
+            Ok(reader) => reader,
+            Err(err) => {
+                log::error!(
+                    "[session_id {session_id}] reader parquet: {}, error: {}",
+                    first_file,
+                    err
+                );
+                continue;
+            }
+        };
         let mut inferred_schema = arrow_reader
             .schema()
             .as_ref()
@@ -212,9 +221,10 @@ pub async fn search_parquet(
         let schema = Arc::new(inferred_schema);
         let sql = sql.clone();
         let session = if is_single_group {
+            let id = format!("{}-0", work_dir);
             meta::search::Session {
                 // here must be session_id, because the files set within this prefix
-                id: session_id.to_string(),
+                id,
                 storage_type: StorageType::Tmpfs,
                 search_type: if !sql.meta.group_by.is_empty() {
                     SearchType::Aggregation
@@ -224,7 +234,7 @@ pub async fn search_parquet(
                 work_group: Some(work_group.to_string()),
             }
         } else {
-            let id = format!("{session_id}-parquet-{ver}");
+            let id = format!("{}-{ver}", work_dir);
             // move data to group tmpfs
             for file in files.iter() {
                 let file_data = tmpfs::get(&file.key).unwrap();
@@ -294,14 +304,14 @@ pub async fn search_parquet(
                     "[session_id {session_id}] datafusion execute error: {}",
                     err
                 );
-                tmpfs::delete(session_id, true).unwrap();
+                tmpfs::delete(&work_dir, true).unwrap();
                 return Err(err.into());
             }
         };
     }
 
     // clear tmpfs
-    tmpfs::delete(session_id, true).unwrap();
+    tmpfs::delete(&work_dir, true).unwrap();
 
     Ok((results, scan_stats))
 }
@@ -473,6 +483,247 @@ pub async fn search_memtable(
     Ok((results, scan_stats))
 }
 
+/// search in local arrow index, which haven't been sync to object storage
+#[tracing::instrument(name = "service:search_arrow:wal:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+pub async fn search_arrow(
+    session_id: &str,
+    sql: Arc<Sql>,
+    stream_type: StreamType,
+    work_group: &str,
+    timeout: u64,
+) -> super::SearchResult {
+    let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+        .await
+        .unwrap_or(Schema::empty());
+    let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
+    let partition_time_level =
+        unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
+
+    // get file list
+    let mut files = get_file_list_arrow(
+        session_id,
+        &sql,
+        stream_type,
+        &partition_time_level,
+        &schema_settings.partition_keys,
+    )
+    .await?;
+    if files.is_empty() {
+        return Ok((HashMap::new(), ScanStats::new()));
+    }
+
+    let mut scan_stats = ScanStats::new();
+    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
+
+    // cache files
+    let work_dir = format!("{}-arrow", session_id);
+    for file in files.clone().iter() {
+        let columns = file.key.splitn(5, '/').collect::<Vec<&str>>();
+        let file_name = columns[4];
+
+        if wal::check_in_use(
+            meta::stream::StreamParams {
+                org_id: sql.org_id.clone().into(),
+                stream_name: sql.stream_name.clone().into(),
+                stream_type,
+            },
+            file_name,
+        )
+        .await
+        {
+            log::info!("search_arrow : skip wal file: {} in use", &file.key);
+            continue;
+        }
+        let source_file = CONFIG.common.data_idx_dir.to_string() + file.key.as_str();
+        match get_file_contents(&source_file) {
+            Err(_) => {
+                log::error!("skip wal file: {} get file content error", &file.key);
+                files.retain(|x| x != file);
+            }
+            Ok(file_data) => {
+                scan_stats.original_size += file_data.len() as i64;
+                let file_name = format!("/{work_dir}/{}", file.key);
+                tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
+            }
+        }
+    }
+
+    // release all files
+    wal::release_files(&lock_files).await;
+
+    scan_stats.files = files.len() as i64;
+    if scan_stats.files == 0 {
+        return Ok((HashMap::new(), scan_stats));
+    }
+
+    log::info!(
+        "[session_id {session_id}] wal->arrow->search: load files {}, scan_size {}",
+        scan_stats.files,
+        scan_stats.original_size
+    );
+
+    // fetch all schema versions, get latest schema
+    let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(err) => {
+            log::error!("get schema error: {}", err);
+            tmpfs::delete(&work_dir, true).unwrap();
+            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
+                sql.stream_name.clone(),
+            )));
+        }
+    };
+    let schema_latest = Arc::new(
+        schema_latest
+            .to_owned()
+            .with_metadata(std::collections::HashMap::new()),
+    );
+
+    // check schema version
+    let tmpfs_files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
+
+    let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
+    if !CONFIG.common.widening_schema_evolution {
+        files_group.insert(
+            "latest".to_string(),
+            tmpfs_files
+                .iter()
+                .map(|f| FileKey::from_file_name(&f.location))
+                .collect(),
+        );
+    } else {
+        for file in tmpfs_files {
+            let schema_version = get_schema_version(&file.location)?;
+            let entry = files_group.entry(schema_version).or_default();
+            entry.push(FileKey::from_file_name(&file.location));
+        }
+    }
+
+    let mut tasks = Vec::new();
+    for (_ver, local_files) in files_group {
+        // get schema of the file
+        let meta = std::collections::HashMap::new();
+        let mut inferred_schema: Schema = Schema::empty();
+
+        let mut record_batches = Vec::<RecordBatch>::new();
+        for file in local_files.iter() {
+            let file_data = match tmpfs::get(&file.key) {
+                Ok(data) => data,
+                Err(err) => {
+                    log::error!("Error reading file {} from tmpfs: {:?}", file.key, err);
+                    continue;
+                }
+            };
+            let buf_reader = Cursor::new(file_data);
+            let stream_reader = StreamReader::try_new(buf_reader, None)?;
+            for read_result in stream_reader {
+                let record_batch = read_result?;
+                if record_batch.num_rows() > 0 {
+                    if inferred_schema.fields().is_empty() {
+                        inferred_schema = record_batch
+                            .schema()
+                            .as_ref()
+                            .clone()
+                            .with_metadata(meta.clone());
+                    }
+                    record_batches.push(record_batch);
+                }
+            }
+        }
+
+        // calulate schema diff
+        let mut diff_fields = HashMap::new();
+        let group_fields = inferred_schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema_latest.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+                }
+            }
+        }
+        // add not exists field for wal infered schema
+        let mut new_fields = Vec::new();
+        for field in schema_latest.fields() {
+            if inferred_schema.field_with_name(field.name()).is_err() {
+                new_fields.push(field.clone());
+            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            inferred_schema = Schema::try_merge(vec![inferred_schema, new_schema])?;
+        }
+        let schema = Arc::new(inferred_schema);
+        let sql = sql.clone();
+
+        let session = meta::search::Session {
+            id: work_dir.to_string(),
+            storage_type: StorageType::Tmpfs,
+            search_type: if !sql.meta.group_by.is_empty() {
+                SearchType::Aggregation
+            } else {
+                SearchType::Normal
+            },
+            work_group: Some(work_group.to_string()),
+        };
+
+        let datafusion_span = info_span!(
+            "service:search:grpc:wal:datafusion",
+            org_id = sql.org_id,
+            stream_name = sql.stream_name,
+            stream_type = ?stream_type
+        );
+
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &local_files,
+                    Some(record_batches),
+                    FileType::ARROW,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
+        tasks.push(task);
+    }
+
+    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let task_results = try_join_all(tasks)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    for ret in task_results {
+        match ret {
+            Ok(ret) => {
+                for (k, v) in ret {
+                    let v = v
+                        .into_iter()
+                        .filter(|r| r.num_rows() > 0)
+                        .collect::<Vec<_>>();
+                    if !v.is_empty() {
+                        let group = results.entry(k).or_default();
+                        group.extend(v);
+                    }
+                }
+            }
+            Err(err) => {
+                log::error!("datafusion execute error: {}", err);
+                tmpfs::delete(&work_dir, true).unwrap();
+                return Err(err.into());
+            }
+        };
+    }
+
+    // clear tmpfs
+    tmpfs::delete(&work_dir, true).unwrap();
+
+    Ok((results, scan_stats))
+}
+
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list_inner(
     session_id: &str,
@@ -621,261 +872,4 @@ pub fn adapt_batch(table_schema: &Schema, batch: &RecordBatch) -> RecordBatch {
 
     let merged_schema = Arc::new(table_schema.clone());
     RecordBatch::try_new(merged_schema, cols).unwrap()
-}
-
-/// search in local arrow index, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search_arrow:wal:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
-pub async fn search_arrow(
-    session_id: &str,
-    sql: Arc<Sql>,
-    stream_type: StreamType,
-    work_group: &str,
-    timeout: u64,
-) -> super::SearchResult {
-    let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-        .await
-        .unwrap_or(Schema::empty());
-    let schema_settings = stream_settings(&schema_latest).unwrap_or_default();
-    let partition_time_level =
-        unwrap_partition_time_level(schema_settings.partition_time_level, stream_type);
-
-    // get file list
-    let mut files = get_file_list_arrow(
-        session_id,
-        &sql,
-        stream_type,
-        &partition_time_level,
-        &schema_settings.partition_keys,
-    )
-    .await?;
-    if files.is_empty() {
-        return Ok((HashMap::new(), ScanStats::new()));
-    }
-
-    let mut scan_stats = ScanStats::new();
-    let lock_files = files.iter().map(|f| f.key.clone()).collect::<Vec<_>>();
-
-    // cache files
-    let work_dir = format!("{}_arrow", session_id);
-    for file in files.clone().iter() {
-        let columns = file.key.splitn(5, '/').collect::<Vec<&str>>();
-        let file_name = columns[4];
-
-        if wal::check_in_use(
-            meta::stream::StreamParams {
-                org_id: sql.org_id.clone().into(),
-                stream_name: sql.stream_name.clone().into(),
-                stream_type,
-            },
-            file_name,
-        )
-        .await
-        {
-            log::info!("search_arrow : skip wal file: {} in use", &file.key);
-            continue;
-        }
-        let source_file = CONFIG.common.data_idx_dir.to_string() + file.key.as_str();
-        match get_file_contents(&source_file) {
-            Err(_) => {
-                log::error!("skip wal file: {} get file content error", &file.key);
-                files.retain(|x| x != file);
-            }
-            Ok(file_data) => {
-                scan_stats.original_size += file_data.len() as i64;
-                let file_name = format!("/{work_dir}/{}", file.key);
-                tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
-            }
-        }
-    }
-
-    // // check wal memory mode
-    // if CONFIG.common.wal_memory_mode_enabled {
-    //     let mem_files = wal::get_search_in_memory_files(&sql.org_id, &sql.stream_name,
-    // stream_type)         .await
-    //         .unwrap_or_default();
-    //     for (file_key, file_data) in mem_files {
-    //         scan_stats.original_size += file_data.len() as i64;
-    //         let file_name = format!("/{work_dir}/{file_key}");
-    //         tmpfs::set(&file_name, file_data.into()).expect("tmpfs set success");
-    //         files.push(FileKey::from_file_name(&file_name));
-    //     }
-    // }
-
-    scan_stats.files = files.len() as i64;
-    if scan_stats.files == 0 {
-        return Ok((HashMap::new(), scan_stats));
-    }
-    log::info!(
-        "wal->search: load files {}, scan_size {}",
-        scan_stats.files,
-        scan_stats.original_size
-    );
-
-    // fetch all schema versions, get latest schema
-    let schema_latest = match db::schema::get(&sql.org_id, &sql.stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(err) => {
-            log::error!("get schema error: {}", err);
-            // release all files
-            wal::release_files(&lock_files).await;
-            tmpfs::delete(session_id, true).unwrap();
-            return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-                sql.stream_name.clone(),
-            )));
-        }
-    };
-    let schema_latest = Arc::new(
-        schema_latest
-            .to_owned()
-            .with_metadata(std::collections::HashMap::new()),
-    );
-
-    // check schema version
-    let tmpfs_files = tmpfs::list(&work_dir, FILE_EXT_ARROW).unwrap_or_default();
-
-    let mut files_group: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(2);
-    if !CONFIG.common.widening_schema_evolution {
-        files_group.insert(
-            "latest".to_string(),
-            tmpfs_files
-                .iter()
-                .map(|f| FileKey::from_file_name(&f.location))
-                .collect(),
-        );
-    } else {
-        for file in tmpfs_files {
-            let schema_version = get_schema_version(&file.location)?;
-            let entry = files_group.entry(schema_version).or_default();
-            entry.push(FileKey::from_file_name(&file.location));
-        }
-    }
-
-    let mut tasks = Vec::new();
-    for (_ver, local_files) in files_group {
-        // get schema of the file
-        let meta = std::collections::HashMap::new();
-        let mut inferred_schema: Schema = Schema::empty();
-
-        let mut record_batches = Vec::<RecordBatch>::new();
-        for file in local_files.iter() {
-            let file_data = match tmpfs::get(&file.key) {
-                Ok(data) => data,
-                Err(err) => {
-                    log::error!("Error reading file {} from tmpfs: {:?}", file.key, err);
-                    continue;
-                }
-            };
-            let buf_reader = Cursor::new(file_data);
-            let stream_reader = StreamReader::try_new(buf_reader, None)?;
-            for read_result in stream_reader {
-                let record_batch = read_result?;
-                if record_batch.num_rows() > 0 {
-                    if inferred_schema.fields().is_empty() {
-                        inferred_schema = record_batch
-                            .schema()
-                            .as_ref()
-                            .clone()
-                            .with_metadata(meta.clone());
-                    }
-                    record_batches.push(record_batch);
-                }
-            }
-        }
-
-        // calulate schema diff
-        let mut diff_fields = HashMap::new();
-        let group_fields = inferred_schema.fields();
-        for field in group_fields {
-            if let Ok(v) = schema_latest.field_with_name(field.name()) {
-                if v.data_type() != field.data_type() {
-                    diff_fields.insert(v.name().clone(), v.data_type().clone());
-                }
-            }
-        }
-        // add not exists field for wal infered schema
-        let mut new_fields = Vec::new();
-        for field in schema_latest.fields() {
-            if inferred_schema.field_with_name(field.name()).is_err() {
-                new_fields.push(field.clone());
-            }
-        }
-        if !new_fields.is_empty() {
-            let new_schema = Schema::new(new_fields);
-            inferred_schema = Schema::try_merge(vec![inferred_schema, new_schema])?;
-        }
-        let schema = Arc::new(inferred_schema);
-        let sql = sql.clone();
-
-        let session = meta::search::Session {
-            // here must be session_id, because the files set within this prefix
-            id: session_id.to_string(),
-            storage_type: StorageType::Tmpfs,
-            search_type: if !sql.meta.group_by.is_empty() {
-                SearchType::Aggregation
-            } else {
-                SearchType::Normal
-            },
-            work_group: Some(work_group.to_string()),
-        };
-
-        let datafusion_span = info_span!(
-            "service:search:grpc:wal:datafusion",
-            org_id = sql.org_id,
-            stream_name = sql.stream_name,
-            stream_type = ?stream_type
-        );
-
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
-            async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &local_files,
-                    Some(record_batches),
-                    FileType::ARROW,
-                )
-                .await
-            }
-            .instrument(datafusion_span),
-        );
-        tasks.push(task);
-    }
-
-    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
-    let task_results = try_join_all(tasks)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-    for ret in task_results {
-        match ret {
-            Ok(ret) => {
-                for (k, v) in ret {
-                    let v = v
-                        .into_iter()
-                        .filter(|r| r.num_rows() > 0)
-                        .collect::<Vec<_>>();
-                    if !v.is_empty() {
-                        let group = results.entry(k).or_default();
-                        group.extend(v);
-                    }
-                }
-            }
-            Err(err) => {
-                log::error!("datafusion execute error: {}", err);
-                // release all files
-                wal::release_files(&lock_files).await;
-                tmpfs::delete(session_id, true).unwrap();
-                return Err(err.into());
-            }
-        };
-    }
-
-    // release all files
-    wal::release_files(&lock_files).await;
-    // clear tmpfs
-    tmpfs::delete(session_id, true).unwrap();
-
-    Ok((results, scan_stats))
 }

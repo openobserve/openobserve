@@ -72,7 +72,10 @@ pub async fn usage_ingest(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow::anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow::anyhow!(
+            "Quota exceeded for this organization [{}]",
+            org_id
+        ));
     }
 
     // check if we are allowed to ingest
@@ -256,7 +259,7 @@ pub async fn handle_grpc_request(
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
             http::StatusCode::FORBIDDEN.into(),
-            "Quota exceeded for this organization".to_string(),
+            format!("Quota exceeded for this organization [{}]", org_id),
         )));
     }
 

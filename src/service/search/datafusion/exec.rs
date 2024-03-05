@@ -856,7 +856,7 @@ pub async fn merge(
 
 fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, String)> {
     let mut i = 0;
-    let work_dir = format!("/tmp/merge/{}/", ider::generate());
+    let work_dir = format!("/tmp/merge/{}/", ider::uuid());
     let mut schema = Schema::empty();
     for row in batches.iter() {
         if row.num_rows() == 0 {

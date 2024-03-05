@@ -41,6 +41,7 @@
       stack-label
       outlined
       filled
+      data-test="dashboard-config-panel-drilldown-name"
       dense
       :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
       :lazy-rules="true"
@@ -82,7 +83,7 @@
           style="min-width: 100%; max-width: 100%; resize: vertical"
           v-model="drilldownData.data.url"
           :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-          data-test="dashboard-drilldown-url"
+          data-test="dashboard-drilldown-url-textarea"
         ></textarea>
         <div
           style="color: red; font-size: 12px"
