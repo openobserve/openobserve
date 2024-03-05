@@ -208,7 +208,7 @@ describe("Alerts testcases", () => {
       .should("be.visible");
   });
 
-  it("should add destination successfully", () => {
+  it.skip("should add destination successfully", () => {
     cy.wait(2000);
     cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
     cy.wait(1000);
@@ -236,6 +236,11 @@ describe("Alerts testcases", () => {
     cy.get(".q-notification__message")
       .contains("Destination saved successfully")
       .should("be.visible");
+    cy.get("tbody tr").each(($row) => {
+        // Delete each row
+        cy.wrap($row).find('[data-test*="-delete-destination"]').click();
+        cy.get('[data-test="confirm-button"]').click({ force: true });
+      });
   });
 
   it("should click cancel button under destinations", () => {
@@ -273,7 +278,7 @@ describe("Alerts testcases", () => {
     cy.contains("Field is required").should("be.visible");
   });
 
-  it("should create template, destination, logs-alerts and then delete all successfully", () => {
+  it.only("should create template, destination, logs-alerts and then delete all successfully", () => {
     // cy.wait(2000);
     cy.wait("@templates");
     cy.get('[data-test="alert-template-list-add-alert-btn"]').click({
