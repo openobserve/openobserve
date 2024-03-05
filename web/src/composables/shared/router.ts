@@ -46,6 +46,9 @@ const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 
+const ReportList = () => import("@/components/reports/ReportList.vue");
+const CreateReport = () => import("@/components/reports/CreateReport.vue");
+
 const PerformanceSummary = () =>
   import("@/components/rum/performance/PerformanceSummary.vue");
 const WebVitalsDashboard = () =>
@@ -54,10 +57,6 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
-
-const ReportList = () => import("@/components/reports/ReportList.vue");
-
-const CreateReport = () => import("@/components/reports/CreateReport.vue");
 
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
