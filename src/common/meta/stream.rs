@@ -248,7 +248,6 @@ pub struct SchemaEvolution {
     pub types_delta: Option<Vec<Field>>,
 }
 
-#[derive(Clone, Debug)]
 pub struct SchemaRecords {
     pub schema_key: String,
     pub schema: Arc<Schema>,
