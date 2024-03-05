@@ -489,7 +489,7 @@ pub(crate) async fn generate_index_on_ingester(
         log::error!("ingestion error while syncing writer: {}", e);
     }
     log::warn!("[INGESTER:JOB] Written index wal file successfully");
-    return Ok(());
+    Ok(())
 }
 
 /// Create an inverted index file for the given file

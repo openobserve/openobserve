@@ -52,7 +52,6 @@ use crate::{
 };
 
 pub mod grpc;
-pub mod index_writer;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
