@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width create-report-page">
+  <div data-test="add-report-section" class="full-width create-report-page">
     <div class="row items-center no-wrap q-mx-md q-my-sm">
       <div class="flex items-center">
         <div
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           </div>
           <div
-            data-test="add-report-name-input"
+            data-test="add-report-description-input"
             class="report-name-input o2-input q-px-sm"
           >
             <q-input
@@ -111,18 +111,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             header-nav
           >
             <q-step
+              data-test="add-report-select-dashboard-step"
               :name="1"
               title="Select Dashboard"
               :icon="outlinedDashboard"
               :done="step > 1"
             >
               <template
-                v-for="dashboard in formData.dashboards"
+                v-for="(dashboard, index) in formData.dashboards"
                 :key="dashboard.folder + dashboard.dashboard"
               >
-                <div class="q-my-sm q-px-sm flex items-center justify-start">
+                <div
+                  :data-test="`add-report-dashboard-${index}`"
+                  class="q-my-sm q-px-sm flex items-center justify-start"
+                >
                   <div
-                    data-test="add-report-dashboard-select"
+                    data-test="add-report-folder-select"
                     class="o2-input q-mr-sm"
                     style="padding-top: 0; width: 30%"
                   >
@@ -158,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div
-                    data-test="add-alert-stream-select"
+                    data-test="add-report-dashboard-select"
                     class="o2-input q-mr-sm"
                     style="padding-top: 0; width: 30%"
                   >
@@ -196,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div
-                    data-test="add-alert-stream-select"
+                    data-test="add-report-tab-select"
                     class="o2-input"
                     style="padding-top: 0; width: 30%"
                   >
@@ -232,7 +236,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <div class="full-width q-mt-sm">
+                  <div
+                    data-test="add-report-timerange-select"
+                    class="full-width q-mt-sm"
+                  >
                     <div class="q-mb-sm">
                       <div
                         style="font-size: 14px"
@@ -252,13 +259,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         endTime: dashboard.timerange.to,
                       }"
                       :default-relative-time="dashboard.timerange.period"
-                      data-test="logs-search-bar-date-time-dropdown"
+                      data-test="add-report-timerange-dropdown"
                       @on:date-change="updateDateTime"
                     />
                   </div>
 
-                  <div class="full-width q-mt-md o2-input">
-                    <div style="font-size: 14px" class="text-bold text-grey-8">
+                  <div
+                    data-test="add-report-variable-select"
+                    class="full-width q-mt-md o2-input"
+                  >
+                    <div
+                      data-test="add-report-variables-title"
+                      style="font-size: 14px"
+                      class="text-bold text-grey-8"
+                    >
                       Variables
                     </div>
                     <VariablesInput
@@ -271,6 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <q-stepper-navigation>
                 <q-btn
+                  data-test="add-report-step1-continue-btn"
                   @click="step = 2"
                   color="secondary"
                   label="Continue"
@@ -280,6 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
+              data-test="add-report-select-schedule-step"
               :name="2"
               title="Schedule"
               icon="schedule"
@@ -309,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template v-for="visual in frequencyTabs" :key="visual.value">
                     <q-btn
-                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                      :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
                       :color="visual.value === frequency.type ? 'primary' : ''"
                       :flat="visual.value === frequency.type ? false : true"
                       dense
@@ -334,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template v-for="visual in timeTabs" :key="visual.value">
                     <q-btn
-                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+                      :data-test="`add-report-schedule-${visual.value}-btn`"
                       :color="visual.value === selectedTimeTab ? 'primary' : ''"
                       :flat="visual.value === selectedTimeTab ? false : true"
                       dense
@@ -354,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center justify-start q-mt-md"
                 >
                   <div
-                    data-test="add-alert-stream-select"
+                    data-test="add-report-schedule-custom-interval-input"
                     class="o2-input q-mr-sm"
                     style="padding-top: 0; width: 160px"
                   >
@@ -374,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div
-                    data-test="add-alert-stream-select"
+                    data-test="add-report-schedule-custom-frequency-select"
                     class="o2-input"
                     style="padding-top: 0; width: 160px"
                   >
@@ -398,10 +414,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
+                  data-test="add-report-schedule-send-later-section"
                   v-if="selectedTimeTab === 'sendLater'"
                   class="flex items-center justify-start q-mt-md"
                 >
-                  <div class="o2-input q-mr-sm">
+                  <div
+                    data-test="add-report-schedule-start-date-input"
+                    class="o2-input q-mr-sm"
+                  >
                     <q-input
                       filled
                       v-model="scheduling.date"
@@ -442,7 +462,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </q-input>
                   </div>
-                  <div class="o2-input q-mr-sm">
+                  <div
+                    data-test="add-report-schedule-start-time-input"
+                    class="o2-input q-mr-sm"
+                  >
                     <q-input
                       filled
                       v-model="scheduling.time"
@@ -481,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="o2-input">
                     <q-select
-                      data-test="datetime-timezone-select"
+                      data-test="add-report-schedule-start-timezone-select"
                       v-model="scheduling.timezone"
                       :options="filteredTimezone"
                       @blur="
@@ -512,12 +535,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-stepper-navigation>
                 <q-btn
+                  data-test="add-report-step2-continue-btn"
                   @click="step = 3"
                   color="secondary"
                   label="Continue"
                   no-caps
                 />
                 <q-btn
+                  data-test="add-report-step2-back-btn"
                   flat
                   @click="step = 1"
                   color="primary"
@@ -529,6 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
+              data-test="add-report-share-step"
               :name="3"
               title="Share"
               icon="mail"
@@ -537,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="q-my-sm q-px-sm">
                 <div
-                  data-test="add-report-name-input"
+                  data-test="add-report-share-title-input"
                   class="report-name-input o2-input"
                 >
                   <q-input
@@ -557,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  data-test="add-report-name-input"
+                  data-test="add-report-share-recipients-input"
                   class="report-name-input o2-input"
                 >
                   <q-input
@@ -577,16 +603,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :placeholder="t('user.inviteByEmail')"
                   />
                 </div>
-                <div>
+                <div data-test="add-report-share-message-section">
                   <div style="font-size: 14px" class="text-bold text-grey-8">
                     Message
                   </div>
 
-                  <q-input v-model="formData.message" filled type="textarea" />
+                  <div data-test="add-report-share-message-input">
+                    <q-input
+                      v-model="formData.message"
+                      filled
+                      type="textarea"
+                    />
+                  </div>
                 </div>
               </div>
               <q-stepper-navigation>
                 <q-btn
+                  data-test="add-report-step3-back-btn"
                   flat
                   @click="step = 2"
                   color="primary"
@@ -664,7 +697,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <q-btn
-        data-test="edit-role-cancel-btn"
+        data-test="add-report-cancel-btn"
         class="text-bold"
         :label="t('alerts.cancel')"
         text-color="light-text"
@@ -673,7 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="openCancelDialog"
       />
       <q-btn
-        data-test="edit-role-save-btn"
+        data-test="add-report-save-btn"
         :label="t('alerts.save')"
         class="text-bold no-border q-ml-md"
         color="secondary"
