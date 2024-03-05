@@ -41,7 +41,7 @@
       stack-label
       outlined
       filled
-      data-test="dashboard-drilldown-name"
+      data-test="dashboard-config-panel-drilldown-name"
       dense
       :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
       :lazy-rules="true"
