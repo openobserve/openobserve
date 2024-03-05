@@ -19,7 +19,7 @@ use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
 };
-use arrow_schema::{Schema, SchemaRef};
+use arrow_schema::{DataType, Schema, SchemaRef};
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
@@ -36,8 +36,8 @@ use config::{
     FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::{
-    arrow::json as arrow_json, datasource::MemTable, execution::context::SessionContext,
-    prelude::*, scalar::ScalarValue,
+    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable,
+    execution::context::SessionContext, prelude::*, scalar::ScalarValue,
 };
 use infra::{cache, storage};
 use parquet::arrow::{
@@ -585,9 +585,20 @@ async fn prepare_index_record_batches(
     let mut indexed_record_batches_to_merge = Vec::new();
     for column in columns_to_index.iter() {
         let index_df = ctx.table("_tbl_raw_data").await?;
-        if !index_df.schema().has_column_with_unqualified_name(column) {
+        let schema = index_df.schema();
+
+        if !schema.has_column_with_unqualified_name(column) {
             continue;
         }
+
+        if schema.data_type(&Column::from_name(column)).unwrap() != &DataType::Utf8 {
+            log::warn!(
+                "[JOB]: Index column {} is not of type Utf8. Skipping indexing for this column.",
+                column
+            );
+            continue;
+        }
+
         let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
         let record_batch = index_df
             .with_column("terms", split_arr)?
