@@ -345,6 +345,8 @@ impl RwFile {
     pub async fn sync(&self) {
         if let Some(file) = self.file.as_ref() {
             file.write().await.sync_all().await.unwrap();
+        } else if let Some(arrow_file) = self.arrow_file.as_ref() {
+            arrow_file.write().await.finish().unwrap();
         } else {
             log::info!("Unable to sync file: {}", self.name)
         }
