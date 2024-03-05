@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 

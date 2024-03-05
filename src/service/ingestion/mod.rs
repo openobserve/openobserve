@@ -326,7 +326,7 @@ pub fn check_ingestion_allowed(org_id: &str, stream_name: Option<&str>) -> Resul
         return Err(anyhow!("not an ingester"));
     }
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow!("Quota exceeded for this organization [{}]", org_id));
     }
 
     // check if we are allowed to ingest
