@@ -82,10 +82,9 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     let hash = config::utils::hash::gxhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     loop {
-        if let Some(uuid) = iter.value() {
+        if let Some((_, uuid)) = iter.next() {
             return Some(uuid.clone());
         };
-        iter.move_next();
     }
 }
 
