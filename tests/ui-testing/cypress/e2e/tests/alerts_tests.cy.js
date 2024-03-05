@@ -352,7 +352,7 @@ describe("Alerts testcases", () => {
     });
     cy.get('[data-test="alert-templates-tab"]').click({ force: true });
     cy.get('tbody [data-test$="-delete-template"]').each(($button) => {
-      cy.wrap($button).click();
+      cy.wrap($button).click({force:true});
       cy.get('[data-test="confirm-button"]').click({ force: true });
     });
   });
