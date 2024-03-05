@@ -24,17 +24,20 @@ use bytes::Bytes;
 use chrono::{Duration, Utc};
 use config::{
     cluster,
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     metrics,
     utils::{
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files,
+        json,
         parquet::read_metadata_from_file,
+        schema_ext::SchemaExt,
     },
     FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::{
-    datasource::MemTable, execution::context::SessionContext, prelude::*, scalar::ScalarValue,
+    arrow::json as arrow_json, datasource::MemTable, execution::context::SessionContext,
+    prelude::*, scalar::ScalarValue,
 };
 use infra::{cache, storage};
 use parquet::arrow::{
@@ -43,11 +46,10 @@ use parquet::arrow::{
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
-    common::{infra::wal, meta::stream::StreamParams},
+    common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
         db,
-        ingestion::{get_wal_time_key, index_writer::write_file_arrow},
         search::datafusion::exec::merge_parquet_files,
         stream::{self, get_stream_setting_fts_fields},
     },
@@ -371,7 +373,6 @@ async fn merge_files(
             "merge_parquet_files error: compressed_size is 0"
         ));
     }
-    let min_ts = new_file_meta.min_ts;
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
@@ -386,11 +387,10 @@ async fn merge_files(
     // upload file
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
-            if CONFIG.common.inverted_index_enabled {
+            if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
                 generate_index_on_ingester(
                     buf,
                     new_file_key.clone(),
-                    min_ts,
                     &org_id,
                     &stream_name,
                     new_file_schema,
@@ -407,36 +407,81 @@ async fn merge_files(
 pub(crate) async fn generate_index_on_ingester(
     buf: Bytes,
     new_file_key: String,
-    min_ts: i64,
     org_id: &str,
     stream_name: &str,
     schema: SchemaRef,
-) -> Result<String, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
+    let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
+
     let index_record_batches =
-        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
-    let record_batches = index_record_batches.into_iter().flatten().collect();
+        prepare_index_record_batches(buf, schema.clone(), org_id, stream_name, &new_file_key)
+            .await?;
+    let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
+    if record_batches.is_empty() {
+        log::debug!("No record batches found");
+        return Ok(());
+    }
+    let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
 
-    let hour_key = get_wal_time_key(
-        min_ts,
-        &vec![],
-        config::meta::stream::PartitionTimeLevel::Hourly,
-        &serde_json::Map::new(),
-        None,
-    );
-
-    let arrow_file_name = write_file_arrow(
-        record_batches,
-        0,
-        &StreamParams {
-            org_id: org_id.to_string().into(),
-            stream_name: stream_name.to_string().into(),
-            stream_type: StreamType::Index,
-        },
-        &hour_key,
+    let mut schema_map: HashMap<String, Schema> = HashMap::new();
+    let schema_chk = crate::service::schema::stream_schema_exists(
+        org_id,
+        stream_name,
+        StreamType::Index,
+        &mut schema_map,
     )
-    .await?;
-    log::debug!("[INGESTER:JOB] Written index file successfully");
-    Ok(arrow_file_name)
+    .await;
+
+    if !schema_chk.has_fields {
+        db::schema::set(
+            org_id,
+            stream_name,
+            StreamType::Index,
+            idx_schema.as_ref(),
+            Some(Utc::now().timestamp_micros()),
+            false,
+        )
+        .await
+        .unwrap();
+    }
+    let schema_key = idx_schema.hash_key();
+    let schema_key_str = schema_key.as_str();
+
+    let json_rows = arrow_json::writer::record_batches_to_json_rows(&record_batches)?;
+    let recs: Vec<json::Value> = json_rows.into_iter().map(json::Value::Object).collect();
+    for record_val in recs {
+        let timestamp: i64 = record_val
+            .get(&CONFIG.common.column_timestamp)
+            .unwrap()
+            .as_i64()
+            .unwrap();
+
+        let hour_key = crate::service::ingestion::get_wal_time_key(
+            timestamp,
+            &Vec::new(),
+            PartitionTimeLevel::Hourly,
+            &json::Map::new(),
+            Some(schema_key_str),
+        );
+
+        let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema_key: schema_key.to_string(),
+            schema: idx_schema.clone(),
+            records: vec![],
+            records_size: 0,
+        });
+
+        let record_size = json::estimate_json_bytes(&record_val);
+        hour_buf.records.push(Arc::new(record_val));
+        hour_buf.records_size += record_size;
+    }
+    let writer = ingester::get_writer(0, org_id, &StreamType::Index.to_string()).await;
+    let _ = crate::service::ingestion::write_file(&writer, stream_name, data_buf).await;
+    if let Err(e) = writer.sync().await {
+        log::error!("ingestion error while syncing writer: {}", e);
+    }
+    log::warn!("[INGESTER:JOB] Written index wal file successfully");
+    Ok(())
 }
 
 /// Create an inverted index file for the given file
