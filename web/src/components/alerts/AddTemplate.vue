@@ -266,7 +266,7 @@ onMounted(async () => {
     theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
     automaticLayout: true,
     suggestOnTriggerCharacters: false,
-    wordWrap: true,
+    wordWrap: "on",
   });
   editorobj.onKeyUp((e: any) => {
     editorData.value = editorobj.getValue();

@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <q-date v-model="scheduling.date" mask="DD-MM-YYYY">
                               <div class="row items-center justify-end">
                                 <q-btn
-                                  v-close-popup
+                                  :v-close-popup="true"
                                   label="Close"
                                   color="primary"
                                   flat
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <q-time v-model="scheduling.time">
                               <div class="row items-center justify-end">
                                 <q-btn
-                                  v-close-popup
+                                  :v-close-popup="true"
                                   label="Close"
                                   color="primary"
                                   flat
@@ -758,9 +758,9 @@ const defaultReport = {
 const { t } = useI18n();
 const router = useRouter();
 
-const originalReportData = ref(defaultReport);
+const originalReportData: Ref<string> = ref("");
 
-const addReportFormRef = ref(null);
+const addReportFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
@@ -827,7 +827,7 @@ const dashboardOptions: Ref<
 
 const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
 
-const options = ref({});
+const options: Ref<{ [key: string]: any[] }> = ref({});
 
 const emails = ref("");
 
@@ -1014,7 +1014,8 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   return filteredOptions;
 };
 
-let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
+// @ts-ignore
+let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
@@ -1244,21 +1245,17 @@ const goToReports = () => {
   });
 };
 
-const onFilterOptions = (type, val: String, update: Function) => {
-  const optionsMapping = {
-    folders: folderOptions,
-    dashboards: dashboardOptions,
-    tabs: dashboardTabOptions,
+const onFilterOptions = (type: string, val: String, update: Function) => {
+  const optionsMapping: { [key: string]: any[] } = {
+    folders: folderOptions.value,
+    dashboards: dashboardOptions.value,
+    tabs: dashboardTabOptions.value,
   };
-  optionsMapping[type].value = filterOptions(
-    options.value[type] || [],
-    val,
-    update
-  );
+  optionsMapping[type] = filterOptions(options.value[type] || [], val, update);
 };
 
 const filterOptions = (options: any[], val: String, update: Function) => {
-  let filteredOptions = [];
+  let filteredOptions: any[] = [];
   if (val === "") {
     update(() => {
       filteredOptions = [...options];

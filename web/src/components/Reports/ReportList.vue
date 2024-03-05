@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #no-data>
           <NoData />
         </template>
+
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div
@@ -101,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
           </q-td>
         </template>
+
         <template #top="scope">
           <div class="q-table__title" data-test="report-list-title">
             {{ t("reports.header") }}
@@ -217,6 +219,7 @@ const deleteDialog = ref({
   show: false,
   title: "Delete Report",
   message: "Are you sure you want to delete report?",
+  data: "" as any,
 });
 
 const reportListTableRef: Ref<any> = ref(null);
@@ -364,7 +367,7 @@ const deleteReport = (report: any) => {
     .then(() => {
       // Find the index of the row that matches the condition
       const deleteIndex = reportsTableRows.value.findIndex(
-        (row) => row.name === deleteDialog.value.data
+        (row: any) => row.name === deleteDialog.value.data
       );
 
       // Check if a matching row was found
@@ -373,7 +376,7 @@ const deleteReport = (report: any) => {
         reportsTableRows.value.splice(deleteIndex, 1);
 
         // Update the "#" property for the remaining rows
-        reportsTableRows.value.forEach((row, index) => {
+        reportsTableRows.value.forEach((row: any, index: number) => {
           row["#"] = index + 1;
         });
       }
