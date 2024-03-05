@@ -208,40 +208,6 @@ describe("Alerts testcases", () => {
       .should("be.visible");
   });
 
-  it.skip("should add destination successfully", () => {
-    cy.wait(2000);
-    cy.get('[data-test="alert-destinations-tab"]').click({ force: true });
-    cy.wait(1000);
-    cy.get('[data-test="alert-destination-list-add-alert-btn"]').click({
-      force: true,
-    });
-    cy.get('[data-test="add-destination-name-input"]').type("cy-destination");
-    cy.get('[data-test="add-destination-template-select"]').click({
-      force: true,
-    });
-    cy.get('.q-virtual-scroll__content')
-      .contains('.q-item__label span', 'automationalert')
-      .click();
-
-    cy.get('[data-test="add-destination-url-input"]').type(
-      "https://slack.com/api"
-    );
-    cy.get('[data-test="add-destination-method-select"]').click({
-      force: true,
-    });
-    cy.get(".q-menu").should("be.visible");
-    cy.contains(".q-item__label span", "get").click();
-    cy.get(".q-toggle__inner").click({ force: true });
-    cy.get('[data-test="add-destination-submit-btn"]').click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Destination saved successfully")
-      .should("be.visible");
-    cy.get("tbody tr").each(($row) => {
-        // Delete each row
-        cy.wrap($row).find('[data-test*="-delete-destination"]').click();
-        cy.get('[data-test="confirm-button"]').click({ force: true });
-      });
-  });
 
   it("should click cancel button under destinations", () => {
     cy.wait(2000);
