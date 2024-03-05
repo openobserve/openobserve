@@ -435,7 +435,7 @@ pub(crate) async fn generate_index_on_ingester(
         &hour_key,
     )
     .await?;
-    log::warn!("[INGESTER:JOB] Written index file successfully");
+    log::debug!("[INGESTER:JOB] Written index file successfully");
     Ok(arrow_file_name)
 }
 
@@ -498,7 +498,7 @@ pub(crate) async fn generate_index_on_compactor(
     )
     .await?;
 
-    log::warn!("[COMPACTOR:JOB] Written index file successfully");
+    log::debug!("[COMPACTOR:JOB] Written index file successfully");
     Ok((filename, filemeta))
 }
 

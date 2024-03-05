@@ -14,18 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{TimeZone, Utc};
-use config::{meta::stream::FileKey, RwHashMap};
+use config::meta::stream::FileKey;
+use hashbrown::HashMap;
 use object_store::ObjectMeta;
 use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 
-pub static FILES: Lazy<RwHashMap<String, Vec<ObjectMeta>>> = Lazy::new(Default::default);
+pub static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
 
 pub fn get(session_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
-    let data = match FILES.get(session_id) {
-        Some(data) => data,
+    let data = match FILES.read().get(session_id) {
+        Some(data) => data.clone(),
         None => return Err(anyhow::anyhow!("session_id not found")),
     };
-    Ok(data.value().clone())
+    Ok(data)
 }
 
 pub async fn set(session_id: &str, files: &[FileKey]) {
@@ -41,16 +43,20 @@ pub async fn set(session_id: &str, files: &[FileKey]) {
             version: None,
         });
     }
-    FILES.insert(session_id.to_string(), values);
+    FILES.write().insert(session_id.to_string(), values);
 }
 
 pub fn clear(session_id: &str) {
-    let keys = FILES
-        .iter()
-        .filter(|x| x.key().starts_with(session_id))
-        .map(|x| x.key().clone())
+    let r = FILES.read();
+    let keys = r
+        .keys()
+        .filter(|x| x.starts_with(session_id))
+        .cloned()
         .collect::<Vec<_>>();
+    drop(r);
+    let mut w = FILES.write();
     for key in keys {
-        FILES.remove(&key);
+        w.remove(&key);
     }
+    w.shrink_to_fit();
 }

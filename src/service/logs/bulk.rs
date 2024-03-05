@@ -65,7 +65,7 @@ pub async fn ingest(
     }
 
     if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id) {
-        return Err(anyhow!("Quota exceeded for this organization"));
+        return Err(anyhow!("Quota exceeded for this organization [{}]", org_id));
     }
 
     // check memtable
