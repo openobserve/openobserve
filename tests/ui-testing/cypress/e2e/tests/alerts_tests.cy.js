@@ -147,10 +147,6 @@ describe("Alerts testcases", () => {
     cy.get(".q-notification__message")
       .contains("Template Saved Successfully")
       .should("be.visible");
-    cy.get('tbody [data-test$="-delete-template"]').each(($button) => {
-        cy.wrap($button).click({force:true});
-        cy.get('[data-test="confirm-button"]').click({ force: true });
-      });
   });
 
   it("should display error when valid JSON not entered under template body", () => {
