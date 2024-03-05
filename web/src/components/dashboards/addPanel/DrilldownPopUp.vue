@@ -15,7 +15,11 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="padding: 0px 10px; min-width: 30%" class="scroll o2-input">
+  <div
+    style="padding: 0px 10px; min-width: 30%"
+    class="scroll o2-input"
+    data-test="dashboard-drilldown-popup"
+  >
     <div
       class="flex justify-between items-center q-pa-md"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
