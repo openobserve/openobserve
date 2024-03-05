@@ -15,10 +15,10 @@
 
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
+use chromiumoxide::browser::BrowserConfig;
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
-use headless_chrome::LaunchOptions;
 use itertools::chain;
 use lettre::{
     transport::smtp::{
@@ -147,27 +147,21 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     )
 });
 
-pub static CHROME_LAUNCHER_OPTIONS: Lazy<Option<LaunchOptions<'_>>> = Lazy::new(|| {
+pub static CHROME_LAUNCHER_OPTIONS: Lazy<Option<BrowserConfig>> = Lazy::new(|| {
     if !CONFIG.chrome.chrome_enabled {
         None
     } else {
-        let mut options = LaunchOptions::default_builder();
-        options
-            .window_size(Some((
-                CONFIG.chrome.chrome_window_width,
-                CONFIG.chrome.chrome_window_height,
-            )))
-            .enable_logging(CONFIG.chrome.chrome_enable_logging)
-            .idle_browser_timeout(Duration::from_secs(
-                CONFIG.chrome.chrome_idle_timeout.into(),
-            ));
-
-        if !CONFIG.chrome.chrome_path.is_empty() {
-            options.path(Some(CONFIG.chrome.chrome_path.clone().into()));
-        }
-
         // TODO if path is not specified install the chrome binary
-        Some(options.build().unwrap())
+        Some(
+            BrowserConfig::builder()
+                .chrome_executable(CONFIG.chrome.chrome_path.as_str())
+                .window_size(
+                    CONFIG.chrome.chrome_window_width,
+                    CONFIG.chrome.chrome_window_height,
+                )
+                .build()
+                .unwrap(),
+        )
     }
 });
 
@@ -229,10 +223,8 @@ pub struct Chrome {
     pub chrome_enabled: bool,
     #[env_config(name = "ZO_CHROME_PATH", default = "")]
     pub chrome_path: String,
-    #[env_config(name = "ZO_CHROME_ENABLE_LOGGING", default = false)]
-    pub chrome_enable_logging: bool,
-    #[env_config(name = "ZO_CHROME_IDLE_TIMEOUT_SECS", default = 180)]
-    pub chrome_idle_timeout: u32,
+    #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
+    pub chrome_sleep_secs: u16,
     #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
     pub chrome_window_width: u32,
     #[env_config(name = "ZO_CHROME_WINDOW_HEIGHT", default = 730)]

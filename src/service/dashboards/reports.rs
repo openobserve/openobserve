@@ -16,9 +16,9 @@
 use std::time::Duration;
 
 use actix_web::http;
+use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
 use config::{CHROME_LAUNCHER_OPTIONS, CONFIG, SMTP_CLIENT};
-use futures::future::try_join_all;
-use headless_chrome::{types::PrintToPdfOptions, Browser};
+use futures::{future::try_join_all, StreamExt};
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
@@ -276,20 +276,40 @@ async fn generate_report(
     }
     // Only one tab is supported for now
     let tab_id = &dashboard.tabs[0];
-    let browser = Browser::new(CHROME_LAUNCHER_OPTIONS.as_ref().unwrap().clone())?;
+    let (mut browser, mut handler) =
+        Browser::launch(CHROME_LAUNCHER_OPTIONS.as_ref().unwrap().clone()).await?;
 
-    let tab = browser.new_tab()?;
-    tab.disable_log()?;
+    let handle = tokio::task::spawn(async move {
+        while let Some(h) = handler.next().await {
+            match h {
+                Ok(_) => continue,
+                Err(_) => break,
+            }
+        }
+    });
 
     let web_url = &CONFIG.common.web_url;
-    tab.navigate_to(&format!("{web_url}/login"))?
-        .wait_for_element("input[type='email']")?
-        .click()?;
-    tab.type_str(user_id)?;
-    tab.wait_for_element("input[type='password']")?.click()?;
-    tab.type_str(user_pass)?.press_key("Enter")?;
-    tab.wait_until_navigated()?;
-    tab.wait_for_element("aside")?;
+    let page = browser.new_page(&format!("{web_url}/login")).await?;
+    page.disable_log().await?;
+    page.find_element("input[type='email']")
+        .await?
+        .click()
+        .await?
+        .type_str(user_id)
+        .await?;
+
+    page.find_element("input[type='password']")
+        .await?
+        .click()
+        .await?
+        .type_str(user_pass)
+        .await?
+        .press_key("Enter")
+        .await?;
+
+    // Does not seem to work for single page client application
+    page.wait_for_navigation().await?;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
 
@@ -308,25 +328,33 @@ async fn generate_report(
         }
     };
 
-    tab.navigate_to(&dashb_url)?.wait_until_navigated()?;
-    tab.wait_for_element("main")?;
+    page.goto(&dashb_url).await?;
+    // Wait for navigation does not really wait until it is fully loaded
+    page.wait_for_navigation().await?;
 
-    tab.wait_for_element("div.displayDiv")?;
+    // Sleep for specified time to let the dashboard load
+    tokio::time::sleep(Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into())).await;
 
-    if let Err(e) = tab.wait_for_element_with_custom_timeout(
-        "span#dashboardVariablesAndPanelsDataLoaded",
-        Duration::from_secs(120), // wait for 2 minute
-    ) {
+    page.find_element("main").await?;
+    page.find_element("div.displayDiv").await?;
+    if let Err(e) = page
+        .find_element("span#dashboardVariablesAndPanelsDataLoaded")
+        .await
+    {
         log::error!(
-            "[REPORT]: Data loader indicator span is not rendered for dashboard {dashboard_id}: {e}"
+            "[REPORT]: Data loading indicator span is not rendered for dashboard {dashboard_id}:{e}"
         );
     }
 
-    // Capture the loaded data till now and create a pdf
-    let pdf_data = tab.print_to_pdf(Some(PrintToPdfOptions {
-        landscape: Some(true),
-        ..Default::default()
-    }))?;
+    // Convert the page into pdf
+    let pdf_data = page
+        .pdf(PrintToPdfParams {
+            landscape: Some(true),
+            ..Default::default()
+        })
+        .await?;
 
+    browser.close().await?;
+    handle.await?;
     Ok((pdf_data, dashb_url))
 }
