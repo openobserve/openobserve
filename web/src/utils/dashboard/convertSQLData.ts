@@ -434,6 +434,7 @@ export const convertSQLData = (
     case "line":
     case "area":
     case "scatter": {
+      const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
       if (
@@ -489,6 +490,11 @@ export const convertSQLData = (
         console.timeEnd("convertSQLData: area double axis series 2");
         // create a trace based on second xAxis's unique values
         console.time("convertSQLData: area double axis series 3");
+
+        // queryData who has the xaxis[0] key.
+        const xAxisUniqueValue = Array.from(
+          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+        );
         options.series = yAxisKeys
           .map((yAxis: any) => {
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
@@ -498,20 +504,22 @@ export const convertSQLData = (
             console.time("convertSQLData: area double axis series 5");
             return stackedXAxisUniqueValue?.map((key: any) => {
               console.time("convertSQLData: area double axis series 4");
+
+              // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+              const data = searchQueryData[0].filter(
+                (it: any) => it[key1] == key
+              );
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
-                ...getPropsByChartTypeForSeries(panelSchema.type),
+                ...defaultSeriesProps,
                 // config to connect null values
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
-                data: Array.from(
-                  new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-                ).map(
+                data: xAxisUniqueValue.map(
                   (it: any) =>
-                    searchQueryData[0].find(
-                      (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-                    )?.[yAxis] ?? null
+                    data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
+                    null
                 ),
               };
               console.timeEnd("convertSQLData: area double axis series 4");
@@ -534,7 +542,7 @@ export const convertSQLData = (
                 (it: any) => it.alias == key
               )?.color || "#5960b2",
             opacity: 0.8,
-            ...getPropsByChartTypeForSeries(panelSchema.type),
+            ...defaultSeriesProps,
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -617,7 +625,7 @@ export const convertSQLData = (
                 (it: any) => it.alias == key
               )?.color || "#5960b2",
             opacity: 0.8,
-            ...getPropsByChartTypeForSeries(panelSchema.type),
+            ...defaultSeriesProps,
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
