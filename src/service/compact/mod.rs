@@ -232,12 +232,6 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                     continue; // not this node
                 }
 
-                log::warn!(
-                    "After checking the node, the stream [{}/{}/{}] is processing by this node",
-                    &org_id,
-                    stream_type,
-                    &stream_name
-                );
                 // check if we are allowed to merge or just skip
                 if db::compact::retention::is_deleting_stream(
                     &org_id,
