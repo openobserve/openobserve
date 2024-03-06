@@ -95,6 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
+        <q-toggle
+          data-test="logs-search-bar-fast-mode-toggle-btn"
+          v-model="searchObj.meta.fastMode"
+          :label="t('search.fastModeLabel')"
+        />
       </div>
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
