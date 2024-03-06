@@ -499,7 +499,7 @@ pub(crate) async fn generate_index_on_compactor(
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
-        return Err(anyhow::anyhow!("No record batches found".to_string(),));
+        return Ok((String::new(), FileMeta::default()));
     };
 
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);

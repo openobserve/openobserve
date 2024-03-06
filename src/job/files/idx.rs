@@ -52,7 +52,7 @@ pub(crate) async fn write_to_disk(
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
     } else {
-        return Err(anyhow::anyhow!("No record batches found".to_string(),));
+        return Err(anyhow::anyhow!("No record batches found"));
     };
 
     // write metadata
