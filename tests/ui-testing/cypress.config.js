@@ -21,7 +21,7 @@ module.exports = defineConfig({
     "experimentalRunAllSpecs": true,
     "projectId": '64nwum',
     "viewportHeight": 1024,
-    "viewportWidth": 1280
+    "viewportWidth": 1500
   },
   scrollBehavior:false
 });
