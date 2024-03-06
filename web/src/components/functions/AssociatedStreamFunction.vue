@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:body="props">
         <q-tr
+          :data-test="`stream-association-table-${props.row.name}-row`"
           :props="props"
           style="cursor: pointer"
           @click="toggleStreamRow(props)"
@@ -91,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-show="!loadingFunctions">
               <q-table
+                :data-test="`associated-functions-${props.row.name}-table`"
                 class="border"
                 hide-bottom
                 bordered
@@ -99,7 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('function.associatedFunctionHeader')"
               >
                 <template v-slot:body="props">
-                  <q-tr :props="props">
+                  <q-tr
+                    :data-test="`associated-function-table-${props.row.name}-row`"
+                    :props="props"
+                  >
                     <q-td key="#" :props="props">
                       {{ props.pageIndex + 1 }}
                     </q-td>
@@ -111,8 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-td>
                     <q-td key="actions" :props="props">
                       <q-btn
+                        data-test="stream-association-delete-function-btn"
                         :icon="outlinedDelete"
-                        :title="t('dashboard.delete')"
+                        :title="t('function.deleteAssociatedFunction')"
                         class="q-ml-xs"
                         padding="sm"
                         unelevated
@@ -127,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:bottom-row>
                   <q-tr v-if="addFunctionInProgress">
                     <q-td></q-td>
-                    <q-td>
+                    <q-td data-test="stream-association-functions-select-input">
                       <q-select
                         v-model="selectedFunction"
                         option-value="name"
@@ -165,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("function.associatedFunctionHeader") }}
                     </div>
                     <q-btn
+                      data-test="stream-association-associate-function-btn"
                       color="secondary"
                       class="q-ml-md q-mb-xs text-bold no-border"
                       @click="addFunctionInProgress = true"
@@ -198,18 +205,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-table__title" data-test="log-stream-title-text">
           {{ t("logStream.header") }}
         </div>
-        <q-input
-          v-model="filterQuery"
-          borderless
-          filled
-          dense
-          class="q-ml-auto q-mb-xs no-border"
-          :placeholder="t('logStream.search')"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
+        <div class="q-ml-auto" data-test="stream-association-search-input">
+          <q-input
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-mb-xs no-border"
+            :placeholder="t('logStream.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+        </div>
         <q-btn
           data-test="log-stream-refresh-stats-btn"
           class="q-ml-md q-mb-xs text-bold no-border"
