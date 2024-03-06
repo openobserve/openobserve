@@ -16,8 +16,10 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
+    sync::Arc,
 };
 
+use arrow_schema::Field;
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
@@ -371,14 +373,7 @@ impl Sql {
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let mut fields = schema_fields
-                .iter()
-                .take(CONFIG.limit.fast_mode_num_fields)
-                .map(|f| f.name().to_string())
-                .join(", ");
-            if !fields.contains(&CONFIG.common.column_timestamp) {
-                fields = CONFIG.common.column_timestamp.to_string() + ", " + &fields;
-            }
+            let fields = generate_fast_mode_fields(&schema_fields);
             let fields = "SELECT ".to_string() + &fields;
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &fields)
@@ -761,6 +756,53 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
         }
     }
     false
+}
+
+fn generate_fast_mode_fields(schema_fields: &[Arc<Field>]) -> String {
+    let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
+    let mut fields;
+    match strategy.as_str() {
+        "last" => {
+            let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
+            fields = schema_fields
+                .iter()
+                .skip(skip)
+                .map(|f| f.name().to_string())
+                .join(", ");
+        }
+        "both" => {
+            let mut inner_fields = schema_fields
+                .iter()
+                .take(CONFIG.limit.fast_mode_num_fields / 2)
+                .map(|f| f.name().to_string())
+                .collect::<Vec<_>>();
+            if schema_fields.len() > inner_fields.len() {
+                let skip = std::cmp::max(
+                    0,
+                    schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
+                );
+                inner_fields.extend(
+                    schema_fields
+                        .iter()
+                        .skip(skip)
+                        .map(|f| f.name().to_string()),
+                );
+            }
+            fields = inner_fields.join(", ");
+        }
+        _ => {
+            // default is first mode
+            fields = schema_fields
+                .iter()
+                .take(CONFIG.limit.fast_mode_num_fields)
+                .map(|f| f.name().to_string())
+                .join(", ");
+        }
+    }
+    if !fields.contains(&CONFIG.common.column_timestamp) {
+        fields = CONFIG.common.column_timestamp.to_string() + ", " + &fields;
+    }
+    fields
 }
 
 fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {

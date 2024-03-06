@@ -516,6 +516,8 @@ pub struct Limit {
     pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
     pub fast_mode_num_fields: usize,
+    #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
+    pub fast_mode_strategy: String, // first, last, both
 }
 
 #[derive(EnvConfig)]
