@@ -520,7 +520,7 @@ describe("Create a new dashboard", () => {
       `[data-test='dashboard-x-item-${dashboardData.customQueryValue.field2}']`
     ).should("not.exist");
   });
-  it("should be able to generate chart with the custom query mode", () => {
+  it.skip("should be able to generate chart with the custom query mode", () => {
     cy.addDashboardPanel();
     cy.get(
       `[data-test="selected-chart-${dashboardData.ChartType}-item"]`

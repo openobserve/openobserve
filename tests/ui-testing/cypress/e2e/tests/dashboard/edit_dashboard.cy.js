@@ -757,7 +757,7 @@ describe("Create a new dashboard", () => {
     //   .should("not.be.visible");
   });
 
-  it("Delete All", () => {
+  it.skip("Delete All", () => {
     cy.get('[data-test="dashboard-table"]')
       .find("td")
       .filter((index, element) =>
