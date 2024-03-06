@@ -36,8 +36,8 @@ use config::{
     FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::{
-    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable,
-    execution::context::SessionContext, prelude::*, scalar::ScalarValue,
+    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable, prelude::*,
+    scalar::ScalarValue,
 };
 use infra::{cache, storage};
 use parquet::arrow::{
@@ -418,7 +418,6 @@ pub(crate) async fn generate_index_on_ingester(
             .await?;
     let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
     if record_batches.is_empty() {
-        log::debug!("No record batches found");
         return Ok(());
     }
     let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
@@ -495,11 +494,10 @@ pub(crate) async fn generate_index_on_compactor(
 ) -> Result<(String, FileMeta), anyhow::Error> {
     let mut index_record_batches =
         prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
-
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
-        return Err(anyhow::anyhow!("No record batches found".to_string(),));
+        return Ok((String::new(), FileMeta::default()));
     };
 
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
