@@ -71,8 +71,14 @@ export const convertSQLData = (
       : [];
   };
 
+  // const cacheDataBasedOnKey: any = {};
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
+    // if (cacheDataBasedOnKey[key]) {
+    //   console.log("called from cache", key);
+
+    //   return cacheDataBasedOnKey[key];
+    // }
     let data =
       searchQueryData[0]?.filter((item: any) => {
         return (
@@ -106,6 +112,7 @@ export const convertSQLData = (
     if (field && field.alias == key) {
       // now we have the format, convert that format
       result = result.map((it: any) => new Date(it + "Z").getTime());
+      // cacheDataBasedOnKey[key] = result;
     }
     return result;
   };
@@ -306,64 +313,61 @@ export const convertSQLData = (
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
-    xAxis: xAxisKeys
-      ?.map((key: any, index: number) => {
-        const data = getAxisDataFromKey(key);
+    xAxis: xAxisKeys?.map((key: any, index: number) => {
+      const data = getAxisDataFromKey(key);
 
-        //unique value index array
-        const arr: any = [];
-        for (let i = 0; i < data.length; i++) {
-          if (i == 0 || data[i] != data[i - 1]) arr.push(i);
-        }
+      //unique value index array
+      const arr: any = [];
+      for (let i = 0; i < data.length; i++) {
+        if (i == 0 || data[i] != data[i - 1]) arr.push(i);
+      }
 
-        return {
-          type: "category",
-          position: panelSchema.type == "h-bar" ? "left" : "bottom",
-          name:
-            index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
-          nameLocation: "middle",
-          nameGap: 9 * (xAxisKeys.length - index + 1),
-          nameTextStyle: {
-            fontWeight: "bold",
-            fontSize: 14,
-          },
-          axisLabel: {
-            interval:
-              panelSchema.type == "h-stacked"
-                ? "auto"
-                : index == xAxisKeys.length - 1
-                ? "auto"
-                : function (i: any) {
-                    return arr.includes(i);
-                  },
-            overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
-            // hide axis label if overlaps
-            hideOverlap: true,
-            width: 100,
-            margin: 18 * (xAxisKeys.length - index - 1) + 5,
-          },
-          splitLine: {
-            show: true,
-          },
-          axisLine: {
-            show: panelSchema.config?.axis_border_show || false,
-          },
-          axisTick: {
-            show: xAxisKeys.length == 1 ? false : true,
-            align: "left",
-            alignWithLabel: false,
-            length: 20 * (xAxisKeys.length - index),
-            interval:
-              panelSchema.type == "h-stacked"
-                ? "auto"
-                : function (i: any) {
-                    return arr.includes(i);
-                  },
-          },
-          data: data,
-        };
-      })
-      .flat(),
+      return {
+        type: "category",
+        position: panelSchema.type == "h-bar" ? "left" : "bottom",
+        name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
+        nameLocation: "middle",
+        nameGap: 9 * (xAxisKeys.length - index + 1),
+        nameTextStyle: {
+          fontWeight: "bold",
+          fontSize: 14,
+        },
+        axisLabel: {
+          interval:
+            panelSchema.type == "h-stacked"
+              ? "auto"
+              : index == xAxisKeys.length - 1
+              ? "auto"
+              : function (i: any) {
+                  return arr.includes(i);
+                },
+          overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
+          // hide axis label if overlaps
+          hideOverlap: true,
+          width: 100,
+          margin: 18 * (xAxisKeys.length - index - 1) + 5,
+        },
+        splitLine: {
+          show: true,
+        },
+        axisLine: {
+          show: panelSchema.config?.axis_border_show || false,
+        },
+        axisTick: {
+          show: xAxisKeys.length == 1 ? false : true,
+          align: "left",
+          alignWithLabel: false,
+          length: 20 * (xAxisKeys.length - index),
+          interval:
+            panelSchema.type == "h-stacked"
+              ? "auto"
+              : function (i: any) {
+                  return arr.includes(i);
+                },
+        },
+        data: data,
+      };
+    }),
     yAxis: {
       type: "value",
       name:
@@ -488,6 +492,18 @@ export const convertSQLData = (
         const stackedXAxisUniqueValue = [
           ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
+
+        // let uniqueValues: any = {};
+        // let stackedXAxisUniqueValue: any = [];
+
+        // for (let obj of searchQueryData[0]) {
+        //   let value = obj[key1];
+        //   if (value && !uniqueValues[value]) {
+        //     stackedXAxisUniqueValue.push(value);
+        //     uniqueValues[value] = true; // mark as seen
+        //   }
+        // }
+
         console.timeEnd("convertSQLData: area double axis series 2");
         // create a trace based on second xAxis's unique values
         console.time("convertSQLData: area double axis series 3");
@@ -528,6 +544,36 @@ export const convertSQLData = (
             });
           })
           .flat();
+        // let seriesArray: any = [];
+
+        // yAxisKeys.forEach((yAxis: any) => {
+        //   const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
+        //     (it: any) => it.alias == yAxis
+        //   ).label;
+        //   console.timeEnd("convertSQLData: area double axis series 3");
+        //   console.time("convertSQLData: area double axis series 5");
+
+        //   stackedXAxisUniqueValue?.forEach((key: any) => {
+        //     console.time("convertSQLData: area double axis series 4");
+
+        //     // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+        //     const data = searchQueryData[0].filter(
+        //       (it: any) => it[key1] == key
+        //     );
+        //     const seriesObj = {
+        //       //only append if yaxiskeys length is more than 1
+        //       name: yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
+        //       ...defaultSeriesProps,
+        //       data: xAxisUniqueValue.map(
+        //         (it: any) =>
+        //           data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] || 0
+        //       ),
+        //     };
+        //     console.timeEnd("convertSQLData: area double axis series 4");
+        //     seriesArray.push(seriesObj);
+        //   });
+        // });
+        // options.series = seriesArray;
         console.timeEnd("convertSQLData: area double axis series 5");
       } else if (panelSchema.type == "line" || panelSchema.type == "area") {
         //if x and y length is not 2 and 1 respectively then do following
@@ -830,17 +876,33 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
+      // let uniqueValues: any = {};
+      // let stackedXAxisUniqueValue: any = [];
+
+      // for (let obj of searchQueryData[0]) {
+      //   let value = obj[key1];
+      //   if (value && !uniqueValues[value]) {
+      //     stackedXAxisUniqueValue.push(value);
+      //     uniqueValues[value] = true; // mark as seen
+      //   }
+      // }
+
+      // queryData who has the xaxis[0] key.
+      const xAxisUniqueValue = Array.from(
+        new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+      );
+
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
+        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+        const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
-          data: Array.from(
-            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-          ).map(
+          data: xAxisUniqueValue.map(
             (it: any) =>
-              searchQueryData[0].find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
+              data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
+                yAxisKeys[0]
+              ] || 0
           ),
         };
         return seriesObj;
@@ -864,12 +926,11 @@ export const convertSQLData = (
 
       const yAxisKey0 = zAxisKeys[0];
       const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
+        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+        const data = searchQueryData[0].filter((it: any) => it[key1] == first);
+
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
-          return (
-            searchQueryData[0].find(
-              (it: any) => it[key0] == zero && it[key1] == first
-            )?.[yAxisKey0] || "-"
-          );
+          return data.find((it: any) => it[key0] == zero)?.[yAxisKey0] || "-";
         });
       });
 
@@ -1030,17 +1091,21 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
+      // get the unique value of the first xAxis's key
+      const xAxisUniqueValue = Array.from(
+        new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+      );
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
+        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
+        const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
-          data: Array.from(
-            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-          ).map(
+          data: xAxisUniqueValue.map(
             (it: any) =>
-              searchQueryData[0].find(
-                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-              )?.[yAxisKeys[0]] || 0
+              data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
+                yAxisKeys[0]
+              ] || 0
           ),
         };
         return seriesObj;
