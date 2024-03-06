@@ -45,7 +45,7 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
-static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select \*").unwrap());
+static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
@@ -364,6 +364,33 @@ impl Sql {
         };
         let schema_fields = schema.fields().to_vec();
 
+        // fetch fts fields
+        let mut fts_terms = HashSet::new();
+        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
+        let match_all_fields = if !fts_fields.is_empty() {
+            fts_fields.iter().map(|v| v.to_lowercase()).collect()
+        } else {
+            SQL_FULL_TEXT_SEARCH_FIELDS
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+        };
+
+        // Hack for fast_mode
+        // replace `select *` to `select f1,f2,f3`
+        if req_query.fast_mode
+            && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
+            && RE_ONLY_SELECT.is_match(&origin_sql)
+        {
+            let fields = generate_fast_mode_fields(&schema, &match_all_fields);
+            let select_fields = "SELECT ".to_string() + &fields.join(",");
+            origin_sql = RE_ONLY_SELECT
+                .replace(origin_sql.as_str(), &select_fields)
+                .to_string();
+            // reset meta fields
+            meta.fields.extend(fields);
+        }
+
         // get sql where tokens
         let where_tokens = split_sql_token(&origin_sql);
         let where_pos = where_tokens
@@ -398,17 +425,6 @@ impl Sql {
                 }
             }
         }
-        // fetch fts fields
-        let mut fts_terms = HashSet::new();
-        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
-        let match_all_fields = if !fts_fields.is_empty() {
-            fts_fields.iter().map(|v| v.to_lowercase()).collect()
-        } else {
-            SQL_FULL_TEXT_SEARCH_FIELDS
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<String>()
-        };
 
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
@@ -742,6 +758,60 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
+fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> Vec<String> {
+    let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
+    let schema_fields = schema.fields();
+    let mut fields = match strategy.as_str() {
+        "last" => {
+            let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
+            schema_fields
+                .iter()
+                .skip(skip)
+                .map(|f| f.name().to_string())
+                .collect()
+        }
+        "both" => {
+            let mut inner_fields = schema_fields
+                .iter()
+                .take(CONFIG.limit.fast_mode_num_fields / 2)
+                .map(|f| f.name().to_string())
+                .collect::<Vec<_>>();
+            if schema_fields.len() > inner_fields.len() {
+                let skip = std::cmp::max(
+                    0,
+                    schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
+                );
+                inner_fields.extend(
+                    schema_fields
+                        .iter()
+                        .skip(skip)
+                        .map(|f| f.name().to_string()),
+                );
+            }
+            inner_fields
+        }
+        _ => {
+            // default is first mode
+            schema_fields
+                .iter()
+                .take(CONFIG.limit.fast_mode_num_fields)
+                .map(|f| f.name().to_string())
+                .collect()
+        }
+    };
+    // check _timestamp
+    if !fields.contains(&CONFIG.common.column_timestamp) {
+        fields.push(CONFIG.common.column_timestamp.to_string());
+    }
+    // check fts fields
+    for field in fts_fields {
+        if !fields.contains(field) && schema.field_with_name(field).is_ok() {
+            fields.push(field.to_string());
+        }
+    }
+    fields
+}
+
 fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
     if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
         return "1 hour".to_string();
@@ -885,6 +955,7 @@ mod tests {
             from: 0,
             size: 100,
             sql_mode: "full".to_owned(),
+            fast_mode: false,
             query_type: "".to_owned(),
             start_time: 1667978895416,
             end_time: 1667978900217,
@@ -992,6 +1063,7 @@ mod tests {
                 from: 0,
                 size: 100,
                 sql_mode: "context".to_owned(),
+                fast_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
@@ -1111,6 +1183,7 @@ mod tests {
                 from: 0,
                 size: 100,
                 sql_mode: "full".to_owned(),
+                fast_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,

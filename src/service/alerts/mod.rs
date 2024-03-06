@@ -443,6 +443,7 @@ impl QueryCondition {
                 end_time: now,
                 sort_by: None,
                 sql_mode: "full".to_string(),
+                fast_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
