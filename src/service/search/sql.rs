@@ -27,6 +27,7 @@ use config::{
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -45,7 +46,7 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
-static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select \*").unwrap());
+static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
@@ -363,6 +364,26 @@ impl Sql {
             Err(_) => Schema::empty(),
         };
         let schema_fields = schema.fields().to_vec();
+
+        // Hack for fast_mode
+        // replace `select *` to `select f1,f2,f3`
+        if req_query.fast_mode
+            && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
+            && RE_ONLY_SELECT.is_match(&origin_sql)
+        {
+            let mut fields = schema_fields
+                .iter()
+                .take(CONFIG.limit.fast_mode_num_fields)
+                .map(|f| f.name().to_string())
+                .join(", ");
+            if !fields.contains(&CONFIG.common.column_timestamp) {
+                fields = CONFIG.common.column_timestamp.to_string() + ", " + &fields;
+            }
+            let fields = "SELECT ".to_string() + &fields;
+            origin_sql = RE_ONLY_SELECT
+                .replace(origin_sql.as_str(), &fields)
+                .to_string();
+        }
 
         // get sql where tokens
         let where_tokens = split_sql_token(&origin_sql);
@@ -885,6 +906,7 @@ mod tests {
             from: 0,
             size: 100,
             sql_mode: "full".to_owned(),
+            fast_mode: false,
             query_type: "".to_owned(),
             start_time: 1667978895416,
             end_time: 1667978900217,
@@ -992,6 +1014,7 @@ mod tests {
                 from: 0,
                 size: 100,
                 sql_mode: "context".to_owned(),
+                fast_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
@@ -1111,6 +1134,7 @@ mod tests {
                 from: 0,
                 size: 100,
                 sql_mode: "full".to_owned(),
+                fast_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
