@@ -171,6 +171,12 @@ export default defineComponent({
       ) {
         return;
       }
+      console.time("getVariablesData:clone-variablesConfigList");
+      console.log(
+        "getVariablesData",
+        props.variablesConfig,
+        props.selectedTimeDate
+      );
 
       // do we have variables & date?
       if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
@@ -179,6 +185,7 @@ export default defineComponent({
         emitVariablesData();
         return;
       }
+      console.timeEnd("getVariablesData:clone-variablesConfigList");
 
       const variablesConfigList =
         JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
