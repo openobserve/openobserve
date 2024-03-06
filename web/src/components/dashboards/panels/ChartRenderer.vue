@@ -79,8 +79,92 @@ import {
   onActivated,
   inject,
 } from "vue";
-import * as echarts from "echarts";
 import { useStore } from "vuex";
+import * as echarts from "echarts/core";
+import {
+  BarChart,
+  LineChart,
+  CustomChart,
+  GaugeChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  SankeyChart,
+} from "echarts/charts";
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  ToolboxComponent,
+  DatasetComponent,
+  LegendComponent,
+  PolarComponent,
+  VisualMapComponent,
+} from "echarts/components";
+import { LabelLayout, UniversalTransition } from "echarts/features";
+import { CanvasRenderer } from "echarts/renderers";
+import type {
+  BarSeriesOption,
+  LineSeriesOption,
+  CustomSeriesOption,
+  GaugeSeriesOption,
+  PieSeriesOption,
+  ScatterSeriesOption,
+  HeatmapSeriesOption,
+  SankeySeriesOption,
+} from "echarts/charts";
+import type { ComposeOption } from "echarts/core";
+import type {
+  TitleComponentOption,
+  TooltipComponentOption,
+  GridComponentOption,
+  ToolboxComponentOption,
+  DatasetComponentOption,
+  LegendComponentOption,
+  PolarComponentOption,
+  VisualMapComponentOption,
+} from "echarts/components";
+
+type ECOption = ComposeOption<
+  | BarSeriesOption
+  | LineSeriesOption
+  | CustomSeriesOption
+  | GaugeSeriesOption
+  | PieSeriesOption
+  | ScatterSeriesOption
+  | HeatmapSeriesOption
+  | SankeySeriesOption
+  | TitleComponentOption
+  | TooltipComponentOption
+  | GridComponentOption
+  | ToolboxComponentOption
+  | DatasetComponentOption
+  | LegendComponentOption
+  | PolarComponentOption
+  | VisualMapComponentOption
+>;
+
+echarts.use([
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  ToolboxComponent,
+  DatasetComponent,
+  LegendComponent,
+  PolarComponent,
+  VisualMapComponent,
+  BarChart,
+  LineChart,
+  CustomChart,
+  GaugeChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  SankeyChart,
+  LabelLayout,
+  UniversalTransition,
+  CanvasRenderer,
+]);
 
 export default defineComponent({
   name: "ChartRenderer",
