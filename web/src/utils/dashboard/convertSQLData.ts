@@ -426,6 +426,7 @@ export const convertSQLData = (
     },
     series: [],
   };
+  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
@@ -434,7 +435,6 @@ export const convertSQLData = (
     case "line":
     case "area":
     case "scatter": {
-      const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
       //if area stacked then continue
       //or if area or line or scatter, then check x axis length
       if (
@@ -646,7 +646,7 @@ export const convertSQLData = (
             panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
               ?.color || "#5960b2",
           opacity: 0.8,
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -664,7 +664,7 @@ export const convertSQLData = (
             panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
               ?.color || "#5960b2",
           opacity: 0.8,
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -721,7 +721,7 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
@@ -772,7 +772,7 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
@@ -832,7 +832,7 @@ export const convertSQLData = (
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         const seriesObj = {
           name: key,
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           data: Array.from(
             new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
           ).map(
@@ -888,7 +888,7 @@ export const convertSQLData = (
       }),
         (options.series = [
           {
-            ...getPropsByChartTypeForSeries(panelSchema.type),
+            ...defaultSeriesProps,
             name: panelSchema?.queries[0]?.fields?.y[0].label,
             data: Zvalues.map((it: any, index: any) => {
               return xAxisZerothPositionUniqueValue.map((i: any, j: number) => {
@@ -1032,7 +1032,7 @@ export const convertSQLData = (
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         const seriesObj = {
           name: key,
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           data: Array.from(
             new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
           ).map(
@@ -1078,7 +1078,7 @@ export const convertSQLData = (
       options.yAxis = [];
       options.series = [
         {
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           renderItem: function (params: any) {
             return {
               type: "text",
@@ -1154,7 +1154,7 @@ export const convertSQLData = (
 
       options.series = yAxisValue.map((it: any, index: any) => {
         return {
-          ...getPropsByChartTypeForSeries(panelSchema.type),
+          ...defaultSeriesProps,
           min: panelSchema?.queries[0]?.config?.min || 0,
           max: panelSchema?.queries[0]?.config?.max || 100,
 
