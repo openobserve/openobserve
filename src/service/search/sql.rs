@@ -16,10 +16,8 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
-    sync::Arc,
 };
 
-use arrow_schema::Field;
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
@@ -29,7 +27,6 @@ use config::{
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -367,13 +364,25 @@ impl Sql {
         };
         let schema_fields = schema.fields().to_vec();
 
+        // fetch fts fields
+        let mut fts_terms = HashSet::new();
+        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
+        let match_all_fields = if !fts_fields.is_empty() {
+            fts_fields.iter().map(|v| v.to_lowercase()).collect()
+        } else {
+            SQL_FULL_TEXT_SEARCH_FIELDS
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+        };
+
         // Hack for fast_mode
         // replace `select *` to `select f1,f2,f3`
         if req_query.fast_mode
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let fields = generate_fast_mode_fields(&schema_fields);
+            let fields = generate_fast_mode_fields(&schema, &match_all_fields);
             let fields = "SELECT ".to_string() + &fields;
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &fields)
@@ -417,17 +426,6 @@ impl Sql {
                 }
             }
         }
-        // fetch fts fields
-        let mut fts_terms = HashSet::new();
-        let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
-        let match_all_fields = if !fts_fields.is_empty() {
-            fts_fields.iter().map(|v| v.to_lowercase()).collect()
-        } else {
-            SQL_FULL_TEXT_SEARCH_FIELDS
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<String>()
-        };
 
         // Iterator for indexed texts only
         for item in indexed_text.iter() {
@@ -761,17 +759,17 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
-fn generate_fast_mode_fields(schema_fields: &[Arc<Field>]) -> String {
+fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> String {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let mut fields;
-    match strategy.as_str() {
+    let schema_fields = schema.fields();
+    let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
-            fields = schema_fields
+            schema_fields
                 .iter()
                 .skip(skip)
                 .map(|f| f.name().to_string())
-                .join(", ");
+                .collect()
         }
         "both" => {
             let mut inner_fields = schema_fields
@@ -791,21 +789,28 @@ fn generate_fast_mode_fields(schema_fields: &[Arc<Field>]) -> String {
                         .map(|f| f.name().to_string()),
                 );
             }
-            fields = inner_fields.join(", ");
+            inner_fields
         }
         _ => {
             // default is first mode
-            fields = schema_fields
+            schema_fields
                 .iter()
                 .take(CONFIG.limit.fast_mode_num_fields)
                 .map(|f| f.name().to_string())
-                .join(", ");
+                .collect()
+        }
+    };
+    // check _timestamp
+    if !fields.contains(&CONFIG.common.column_timestamp) {
+        fields.push(CONFIG.common.column_timestamp.to_string());
+    }
+    // check fts fields
+    for field in fts_fields {
+        if !fields.contains(field) && schema.field_with_name(field).is_ok() {
+            fields.push(field.to_string());
         }
     }
-    if !fields.contains(&CONFIG.common.column_timestamp) {
-        fields = CONFIG.common.column_timestamp.to_string() + ", " + &fields;
-    }
-    fields
+    fields.join(",")
 }
 
 fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
