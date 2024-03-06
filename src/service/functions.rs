@@ -243,6 +243,7 @@ pub async fn delete_stream_function(
         for stream in val.iter_mut() {
             if stream.stream == stream_name {
                 stream.is_removed = true;
+                stream.order = 0;
                 break;
             }
         }
@@ -295,6 +296,7 @@ pub async fn add_function_to_stream(
     if let Some(mut val) = existing_fn.streams {
         if let Some(existing) = val.iter_mut().find(|x| x.stream == stream_order.stream) {
             existing.is_removed = false;
+            existing.order = stream_order.order;
         } else {
             val.push(stream_order);
         }
