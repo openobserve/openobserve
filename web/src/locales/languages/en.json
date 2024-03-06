@@ -401,7 +401,8 @@
     "searchEnrichmentTable": "Search Enrichment Table",
     "uploadCSVFile": "Upload CSV File",
     "selectFunction": "Select Function",
-    "appendData": "Append data to existing Enrichment Table"
+    "appendData": "Append data to existing Enrichment Table",
+    "deleteAssociatedFunction": "Delete Associated Function"
   },
   "confirmDialog": {
     "cancel": "Cancel",
