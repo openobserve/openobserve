@@ -92,6 +92,8 @@ pub struct Query {
     #[serde(default)]
     pub sql_mode: String,
     #[serde(default)]
+    pub fast_mode: bool,
+    #[serde(default)]
     pub query_type: String,
     #[serde(default)]
     pub track_total_hits: bool,
@@ -117,6 +119,7 @@ impl Default for Query {
             end_time: 0,
             sort_by: None,
             sql_mode: "".to_string(),
+            fast_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             query_context: None,

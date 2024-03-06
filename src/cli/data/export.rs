@@ -41,6 +41,7 @@ impl Context for Export {
             from: 0,
             size: 100,
             sql_mode: "full".to_owned(),
+            fast_mode: false,
             query_type: "".to_owned(),
             start_time: c.start_time,
             end_time: c.end_time,

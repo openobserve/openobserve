@@ -33,6 +33,7 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
         let req_query = cluster_rpc::SearchQuery {
             sql: req.query.sql.clone(),
             sql_mode: req.query.sql_mode.clone(),
+            fast_mode: req.query.fast_mode,
             query_type: req.query.query_type.clone(),
             from: req.query.from as i32,
             size: req.query.size as i32,
@@ -234,6 +235,7 @@ mod tests {
             query: meta::search::Query {
                 sql: "SELECT * FROM test".to_string(),
                 sql_mode: "default".to_string(),
+                fast_mode: false,
                 query_type: "".to_string(),
                 from: 0,
                 size: 100,
