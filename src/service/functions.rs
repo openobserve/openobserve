@@ -256,8 +256,8 @@ pub async fn delete_stream_function(
         } else {
             // cant be removed from watcher of function as stream name & type wont be
             // available , hence being removed here
-            let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-            remove_stream_fn_from_cache(&key, fn_name);
+            // let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+            // remove_stream_fn_from_cache(&key, fn_name);
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 FN_REMOVED.to_string(),
@@ -342,7 +342,7 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
     }
 }
 
-fn remove_stream_fn_from_cache(key: &str, fn_name: &str) {
+fn _remove_stream_fn_from_cache(key: &str, fn_name: &str) {
     if let Some(val) = STREAM_FUNCTIONS.clone().get(key) {
         if val.list.len() > 1 {
             let final_list = val
