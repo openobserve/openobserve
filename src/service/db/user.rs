@@ -282,7 +282,6 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::meta::user::UserOrg;
 
     #[tokio::test]
     async fn test_user() {

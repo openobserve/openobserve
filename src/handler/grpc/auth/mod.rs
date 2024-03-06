@@ -93,7 +93,6 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 #[cfg(test)]
 mod tests {
     use config::INSTANCE_ID;
-    use tonic::metadata::MetadataValue;
 
     use super::*;
     use crate::common::meta::user::User;
