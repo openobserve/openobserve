@@ -293,7 +293,11 @@ pub async fn add_function_to_stream(
     stream_order.stream_type = stream_type;
 
     if let Some(mut val) = existing_fn.streams {
-        val.push(stream_order);
+        if let Some(existing) = val.iter_mut().find(|x| x.stream == stream_order.stream) {
+            existing.is_removed = false;
+        } else {
+            val.push(stream_order);
+        }
         existing_fn.streams = Some(val);
     } else {
         existing_fn.streams = Some(vec![stream_order]);
