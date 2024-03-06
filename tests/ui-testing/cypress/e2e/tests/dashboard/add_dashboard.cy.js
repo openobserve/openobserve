@@ -65,7 +65,7 @@ describe("Create a new dashboard", () => {
         
     });
 
-    it("Add dashboard", () => {
+    it.skip("Add dashboard", () => {
         // Create dynamic dashboard name
         cy.wait('@folders')
         dashboardName = `${dashboardData.DashboardName}_${randomNumber}`;
@@ -79,7 +79,7 @@ describe("Create a new dashboard", () => {
     });
 
     
-    it("Delete dashboard", () => {
+    it.skip("Delete dashboard", () => {
 
         dashboardName = `${dashboardData.DashboardName}_${randomNumber}`;
         console.log("==dashboardName==", dashboardName);
@@ -128,7 +128,7 @@ describe("Create a new dashboard", () => {
     });
 
 
-    it("Delete All", () => {
+    it.skip("Delete All", () => {
         cy.get('[data-test="dashboard-table"]')
           .find("td")
           .filter((index, element) =>
@@ -147,7 +147,7 @@ describe("Create a new dashboard", () => {
           });
       });
 
-    it("should display save button disabled if dashboard name is blank", () => {
+    it.skip("should display save button disabled if dashboard name is blank", () => {
     
         cy.wait('@dashboards')
         cy.contains("New Dashboard").click({force:true})

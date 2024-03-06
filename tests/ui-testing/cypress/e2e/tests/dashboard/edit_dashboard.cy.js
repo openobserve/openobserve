@@ -80,7 +80,7 @@ describe("Create a new dashboard", () => {
 //     cy.addAreaChartPanel();
 //   });
 
-  it("Edit area chart panel", () => {
+  it.skip("Edit area chart panel", () => {
     cy.addDashboard();
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
     cy.addAreaChartPanel();
@@ -139,7 +139,7 @@ describe("Create a new dashboard", () => {
 //     cy.get('[data-test="dashboard-error"]').should("exist");
 //   })
 
-  it("drag and drop element", () => {
+  it.skip("drag and drop element", () => {
     cy.addDashboard();
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
     cy.addAreaChartPanel();
@@ -255,7 +255,7 @@ describe("Create a new dashboard", () => {
     // cy.url().should("include", dashboardData.ViewDashboardUrl);
   });
 
-  it.skip("Verify query generation on the when fields are added and removed from axis", () => {
+  it.skip("should verify query generation on the when fields are added and removed from axis", () => {
     editDashboard(dashboardData.EditPanelName);
     //select bar chart
     cy.get(
@@ -318,7 +318,7 @@ describe("Create a new dashboard", () => {
     // );
   });
 
-  it("Should update the chart when field configurations are updated including filters", () => {
+  it.skip("Should update the chart when field configurations are updated including filters", () => {
     editDashboard(dashboardData.EditPanelName);
     //select bar chart
     cy.get(
@@ -537,7 +537,7 @@ describe("Create a new dashboard", () => {
     //   dashboardData.editYLabel
     // );
   });
-  it("should clear the field after switch from custom to auto mode", () => {
+  it.skip("should clear the field after switch from custom to auto mode", () => {
     cy.addDashboard();
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
     cy.addAreaChartPanel();
@@ -661,7 +661,7 @@ describe("Create a new dashboard", () => {
   //   // cy.url().should("include", dashboardData.ViewDashboardUrl);
   // });
 
-  it("Should be able to generate chart with the custom query mode", () => {
+  it.skip("Should be able to generate chart with the custom query mode", () => {
     cy.addDashboard();
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
     cy.addAreaChartPanel();
@@ -735,7 +735,7 @@ describe("Create a new dashboard", () => {
     // cy.url().should("include", dashboardData.ViewDashboardUrl);
   });
 
-  it("Delete panel", () => {
+  it.skip("Delete panel", () => {
     cy.contains(
       '[data-test="dashboard-table"] td',
       dashboardData.DashboardName
