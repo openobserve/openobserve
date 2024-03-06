@@ -339,6 +339,7 @@ import {
   outlinedFormatListBulleted,
   outlinedSettings,
   outlinedManageAccounts,
+  outlinedDescription,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
@@ -479,6 +480,11 @@ export default defineComponent({
         title: t("menu.dashboard"),
         icon: outlinedDashboard,
         link: "/dashboards",
+      },
+      {
+        title: t("menu.report"),
+        icon: outlinedDescription,
+        link: "/reports",
       },
       {
         title: t("menu.index"),

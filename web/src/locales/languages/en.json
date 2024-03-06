@@ -131,7 +131,8 @@
     "billings": "Billing",
     "rum": "Real User Monitoring",
     "settings": "Settings",
-    "iam": "IAM"
+    "iam": "IAM",
+    "report": "Reports"
   },
   "rum": {
     "title": "Real User Monitoring",
