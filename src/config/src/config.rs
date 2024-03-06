@@ -15,7 +15,11 @@
 
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
-use chromiumoxide::browser::BrowserConfig;
+use chromiumoxide::{
+    browser::BrowserConfig,
+    detection::{default_executable, DetectionOptions},
+    fetcher::{BrowserFetcher, BrowserFetcherOptions},
+};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
@@ -151,17 +155,39 @@ pub static CHROME_LAUNCHER_OPTIONS: Lazy<Option<BrowserConfig>> = Lazy::new(|| {
     if !CONFIG.chrome.chrome_enabled {
         None
     } else {
-        // TODO if path is not specified install the chrome binary
-        Some(
-            BrowserConfig::builder()
-                .chrome_executable(CONFIG.chrome.chrome_path.as_str())
-                .window_size(
-                    CONFIG.chrome.chrome_window_width,
-                    CONFIG.chrome.chrome_window_height,
-                )
-                .build()
-                .unwrap(),
-        )
+        let mut browser_config = BrowserConfig::builder()
+            .window_size(
+                CONFIG.chrome.chrome_window_width,
+                CONFIG.chrome.chrome_window_height,
+            )
+            .incognito();
+        if !CONFIG.chrome.chrome_path.is_empty() {
+            browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
+        } else {
+            // Check if chrome is available on default paths
+            // 1. Check the CHROME env
+            // 2. Check usual chrome file names in user path
+            // 3. (Windows) Registry
+            // 4. (Windows & MacOS) Usual installations paths
+            let exec_path = default_executable(DetectionOptions::default()).unwrap();
+            browser_config = browser_config.chrome_executable(exec_path);
+
+            // TODO: if path is not specified install the chrome binary
+            // if Ok(exec_path) = default_executable(DetectionOptions::default()) {
+            //     browser_config = browser_config
+            //         .chrome_executable(exec_path);
+            // } else {
+            //     // Download known good chrome version
+            //     tokio::fs::create_dir_all(&CONFIG.chrome.chrome_download_path).await.unwrap();
+            //     let fetcher = BrowserFetcher::new(
+            //         BrowserFetcherOptions::builder()
+            //             .with_path(&download_path)
+            //             .build()?,
+            //     );
+            //     let info = fetcher.fetch().await.unwrap();
+            // }
+        }
+        Some(browser_config)
     }
 });
 
@@ -223,6 +249,8 @@ pub struct Chrome {
     pub chrome_enabled: bool,
     #[env_config(name = "ZO_CHROME_PATH", default = "")]
     pub chrome_path: String,
+    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
+    pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
     pub chrome_sleep_secs: u16,
     #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
