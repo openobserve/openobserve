@@ -90,6 +90,7 @@ import {
   ScatterChart,
   HeatmapChart,
   SankeyChart,
+  TreeChart
 } from "echarts/charts";
 import {
   TitleComponent,
@@ -100,6 +101,7 @@ import {
   LegendComponent,
   PolarComponent,
   VisualMapComponent,
+  DataZoomComponent
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
@@ -112,6 +114,7 @@ import type {
   ScatterSeriesOption,
   HeatmapSeriesOption,
   SankeySeriesOption,
+  TreeSeriesOption,
 } from "echarts/charts";
 import type { ComposeOption } from "echarts/core";
 import type {
@@ -123,6 +126,7 @@ import type {
   LegendComponentOption,
   PolarComponentOption,
   VisualMapComponentOption,
+  DataZoomComponentOption
 } from "echarts/components";
 
 type ECOption = ComposeOption<
@@ -134,6 +138,7 @@ type ECOption = ComposeOption<
   | ScatterSeriesOption
   | HeatmapSeriesOption
   | SankeySeriesOption
+  | TreeSeriesOption
   | TitleComponentOption
   | TooltipComponentOption
   | GridComponentOption
@@ -142,6 +147,7 @@ type ECOption = ComposeOption<
   | LegendComponentOption
   | PolarComponentOption
   | VisualMapComponentOption
+  | DataZoomComponentOption
 >;
 
 echarts.use([
@@ -153,6 +159,7 @@ echarts.use([
   LegendComponent,
   PolarComponent,
   VisualMapComponent,
+  DataZoomComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -161,6 +168,7 @@ echarts.use([
   ScatterChart,
   HeatmapChart,
   SankeyChart,
+  TreeChart,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,
