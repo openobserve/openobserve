@@ -63,6 +63,7 @@ impl FileData {
     }
 
     async fn load(&mut self) -> Result<(), anyhow::Error> {
+        log::info!("Loading disk cache start");
         let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
         let files = scan_files(&self.root_dir, "parquet");
         for file in files {
@@ -88,6 +89,7 @@ impl FileData {
                     .sub(data_size as i64);
             }
         }
+        log::info!("Loading disk cache done");
         Ok(())
     }
 
