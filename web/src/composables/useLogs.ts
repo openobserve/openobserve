@@ -522,13 +522,13 @@ const useLogs = () => {
           .join("\n");
         const parsedSQL: any = parser.astify(query);
         if (parsedSQL.limit != null) {
-          req.query.size = parsedSQL.limit.value[0].value;
+          // req.query.size = parsedSQL.limit.value[0].value;
 
-          if (parsedSQL.limit.seperator == "offset") {
-            req.query.from = parsedSQL.limit.value[1].value || 0;
-          }
+          // if (parsedSQL.limit.seperator == "offset") {
+          //   req.query.from = parsedSQL.limit.value[1].value || 0;
+          // }
 
-          parsedSQL.limit = null;
+          // parsedSQL.limit = null;
 
           query = parser.sqlify(parsedSQL);
 
