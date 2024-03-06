@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn-dropdown>
         </q-btn-group>
       </div>
+      
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
