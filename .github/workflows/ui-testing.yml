@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         browser: [chrome]
-
+        testfilename: ["functions_tests.cy.js","logs_tests.cy.js","menu_tests.cy.js","alerts_tests.cy.js", "dashboard"]
     steps:
       - name: Remove unused tools
         run: |
@@ -78,4 +78,6 @@ jobs:
       #       browser: ${{ matrix.browser }}
       #       spec: cypress/e2e/tests
       - name: Cypress run
-        run: cd tests/ui-testing && npm install && npx cypress run --record --key ${CYPRESS_CLOUD_TOKEN} --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests
+        run: cd tests/ui-testing && npm install && npx cypress run --record --key ${CYPRESS_CLOUD_TOKEN} --env EMAIL=${ZO_ROOT_USER_EMAIL},PASSWORD=${ZO_ROOT_USER_PASSWORD},BASEURL=${ZO_BASE_URL},ORGNAME=${CYPRESS_ORGNAME} --headless --browser ${{ matrix.browser }} --spec ./cypress/e2e/tests/${{ matrix.testfilename }}
+
+        
