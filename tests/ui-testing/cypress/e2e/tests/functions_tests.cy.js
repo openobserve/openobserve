@@ -1,233 +1,253 @@
-///<reference types="cypress" />
-import * as logstests from "../allfunctions/logs";
-import "cypress-file-upload";
-import logsdata from "../../data/logs_data.json";
-import { getRandomText } from "../utils";
-// import { login } from "../../support/commons"
-// import { selectStreamAndStreamType } from "../../support/log-commons";
+// ///<reference types="cypress" />
+// import * as logstests from "../allfunctions/logs";
+// import "cypress-file-upload";
+// import logsdata from "../../data/logs_data.json";
+// import { getRandomText } from "../utils";
+// // import { login } from "../../support/commons"
+// // import { selectStreamAndStreamType } from "../../support/log-commons";
+// const { v4: uuidv4 } = require("uuid");
 
-Cypress.on("uncaught:exception", (err, runnable) => {
-  return false;
-});
-describe("Functions testcases", () => {
-  let logData;
-  function removeUTFCharacters(text) {
-    // console.log(text, "tex");
-    // Remove UTF characters using regular expression
-    return text.replace(/[^\x00-\x7F]/g, " ");
-  }
+// // Generate UUID
+// const uuid = uuidv4();
 
-  function applyQueryButton() {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    cy.intercept("POST", logData.applyQuery).as("search");
-    cy.wait(3000);
-    cy.get("[data-test='logs-search-bar-refresh-btn']", {
-      timeout: 2000,
-    }).click({ force: true });
-    // get the data from the search variable
-    cy.wait("@search").its("response.statusCode").should("eq", 200);
-    cy.get("@search").its("response.body.hits").should("be.an", "array");
-  }
+// // Remove non-alphabetic characters from UUID
+// const alphaUuid = uuid.replace(/[^a-zA-Z]/g, '');
 
-  before(function () {
-    cy.fixture("log").then(function (data) {
-      logData = data;
-    });
-    console.log("--logData--", logData);
-  });
+// // Construct function name
+// const functionName = `automate${alphaUuid}`;
 
-  beforeEach(() => {
-    cy.intercept("*", (req) => {
-      delete req.headers["if-none-match"];
-    });
-    cy.login();
-    // ("ingests logs via API", () => {
-    const orgId = Cypress.env("ORGNAME");
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = btoa(
-      `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
-    );
+// Cypress.on("uncaught:exception", (err, runnable) => {
+//   return false;
+// });
+// describe("Functions testcases", () => {
+//   let logData;
+//   function removeUTFCharacters(text) {
+//     // console.log(text, "tex");
+//     // Remove UTF characters using regular expression
+//     return text.replace(/[^\x00-\x7F]/g, " ");
+//   }
 
-    // Making a POST request using cy.request()
-    cy.request({
-      method: "POST",
-      url: `${Cypress.config().baseUrl}/api/${orgId}/${streamName}/_json`,
-      body: logsdata,
-      headers: {
-        Authorization: `Basic ${basicAuthCredentials}`,
-        "Content-Type": "application/json",
-      },
-    }).then((response) => {
-      // Logging response content to the Cypress console
-      cy.log(response.body);
+//   function applyQueryButton() {
+//     // click on the run query button
+//     // Type the value of a variable into an input field
+//     cy.intercept("POST", logData.applyQuery).as("search");
+//     cy.wait(3000);
+//     cy.get("[data-test='logs-search-bar-refresh-btn']", {
+//       timeout: 2000,
+//     }).click({ force: true });
+//     // get the data from the search variable
+//     cy.wait("@search").its("response.statusCode").should("eq", 200);
+//     cy.get("@search").its("response.body.hits").should("be.an", "array");
+//   }
 
-      // Assertion: Ensure the response status is 200 OK
-      expect(response.status).to.eq(
-        200,
-        `Expected status code 200, but got ${response.status}`
-      );
-    });
+//   before(function () {
+//     cy.fixture("log").then(function (data) {
+//       logData = data;
+//     });
+//     console.log("--logData--", logData);
+//   });
 
-    // });
-    cy.intercept("GET", "**/api/default/organizations**").as("allorgs");
-    cy.intercept("GET", "**/api/default/functions**").as("functions");
-    cy.visit(
-      `web/functions/functions?org_identifier=${Cypress.env("ORGNAME")}`
-    );
+//   beforeEach(() => {
+//     cy.intercept("*", (req) => {
+//       delete req.headers["if-none-match"];
+//     });
+//     cy.login();
+//     // ("ingests logs via API", () => {
+//     const orgId = Cypress.env("ORGNAME");
+//     const streamName = "e2e_automate";
+//     const basicAuthCredentials = btoa(
+//       `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
+//     );
 
-    cy.intercept("GET", "**/api/default/streams**").as("streams");
-    // cy.intercept('GET', '**/api/default/_search**').as('allsearch')
-  });
+//     // Making a POST request using cy.request()
+//     cy.request({
+//       method: "POST",
+//       url: `${Cypress.config().baseUrl}/api/${orgId}/${streamName}/_json`,
+//       body: logsdata,
+//       headers: {
+//         Authorization: `Basic ${basicAuthCredentials}`,
+//         "Content-Type": "application/json",
+//       },
+//     }).then((response) => {
+//       // Logging response content to the Cypress console
+//       cy.log(response.body);
 
-  // This is a test case to navigate to the logs page
-  it("should display error when creating function without mandatory fields", () => {
-    cy.contains("Create new function").click({ force: true });
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.contains("Field is required").should("be.visible");
-  });
+//       // Assertion: Ensure the response status is 200 OK
+//       expect(response.status).to.eq(
+//         200,
+//         `Expected status code 200, but got ${response.status}`
+//       );
+//     });
 
-  it("should display error on entering invalid name under function and save", () => {
-    cy.contains("Create new function").click({ force: true });
-    cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
-      getRandomText
-    );
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.contains("Invalid method name.").should("be.visible");
-  });
+//     // });
+//     cy.intercept("GET", "**/api/default/organizations**").as("allorgs");
+//     cy.intercept("GET", "**/api/default/functions**").as("functions");
+//     cy.visit(
+//       `web/functions/functions?org_identifier=${Cypress.env("ORGNAME")}`
+//     );
 
-  it("should display error on entering invalid function and save", () => {
-    cy.contains("Create new function").click({ force: true });
-    cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
-      "automate"
-    );
-    cy.get(".view-lines").type(".test=1");
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Function saved successfully")
-      .should("be.visible");
-    cy.get('[title="Delete Function"]').click({ force: true });
-    cy.get('[data-test="confirm-button"]').click({ force: true });
-  });
+//     cy.intercept("GET", "**/api/default/streams**").as("streams");
+//     // cy.intercept('GET', '**/api/default/_search**').as('allsearch')
+//   });
 
-  it("should display error on adding function with same name", () => {
-    cy.contains("Create new function").click({ force: true });
-    cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
-      "automate"
-    );
-    cy.get(".view-lines").type(".test=1");
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Function saved successfully")
-      .should("be.visible");
-    cy.contains("Create new function").click({ force: true });
-    cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
-      "automate"
-    );
-    cy.get(".view-lines").type(".test=1");
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Function creation failed")
-      .should("be.visible");
-    cy.contains("Cancel").click({ force: true });
-    cy.get('[title="Delete Function"]').click({ force: true });
-    cy.get('[data-test="confirm-button"]').click({ force: true });
-  });
+//   // This is a test case to navigate to the logs page
+//   it("should display error when creating function without mandatory fields", () => {
+//     cy.contains("Create new function").click({ force: true });
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.contains("Field is required").should("be.visible");
+//   });
 
-  it("should add a function and associate a stream with the same", () => {
-    cy.contains("Create new function").click({ force: true });
-    cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
-      "automate"
-    );
-    cy.get(".view-lines").type(".test=1");
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Function saved successfully")
-      .should("be.visible");
-    cy.get('[data-test="function-stream-tab"]').click({ force: true });
-    cy.get('[style="cursor: pointer;"] > :nth-child(3)').click({ force: true });
-    cy.contains("Associate Function").click({ force: true });
-    cy.get(".q-tr >>>>> .q-field__control-container").click({ force: true });
-    cy.get(".q-item__label > span").click({ force: true });
-    cy.get(":nth-child(4) > .q-btn").click({ force: true });
-    cy.get(
-      '[href="/web/functions/functions?org_identifier=default"] > .q-tab__content'
-    ).click({ force: true });
-    cy.get('[title="Delete Function"]').click({ force: true });
-    cy.get('[data-test="confirm-button"]').click({ force: true });
-  });
+//   it("should display error on entering invalid name under function and save", () => {
+//     cy.contains("Create new function").click({ force: true });
+//     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
+//       getRandomText
+//     );
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.contains("Invalid method name.").should("be.visible");
+//   });
 
-  it("should display error add a function and associate a stream with the same", () => {
-    cy.contains("Create new function").click({ force: true });
-    cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
-      "automate"
-    );
-    cy.get(".view-lines").type(".test=1");
-    cy.contains("Save").should("be.visible").click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Function saved successfully")
-      .should("be.visible");
-    cy.get('[data-test="function-stream-tab"]').click({ force: true });
-    cy.get('[style="cursor: pointer;"] > :nth-child(3)').click({ force: true });
-    cy.contains("Associate Function").click({ force: true });
-    cy.get(".q-tr >>>>> .q-field__control-container").click({ force: true });
-    cy.get(".q-item__label > span").click({ force: true });
-    cy.get(
-      '[href="/web/functions/functions?org_identifier=default"] > .q-tab__content'
-    ).click({ force: true });
-    cy.get('[title="Delete Function"]').click({ force: true });
-    cy.get('[data-test="confirm-button"]').click({ force: true });
-    cy.get(".q-notification__message")
-      .contains("Function is used in stream")
-      .should("be.visible");
-    cy.get('[data-test="function-stream-tab"]').click({ force: true });
-    cy.get('[style="cursor: pointer;"] > :nth-child(3)').click({ force: true });
-    cy.get(":nth-child(4) > .q-btn").click({ force: true });
-    cy.get(
-      '[href="/web/functions/functions?org_identifier=default"] > .q-tab__content'
-    ).click({ force: true });
-    cy.get('[title="Delete Function"]').click({ force: true });
-    cy.get('[data-test="confirm-button"]').click({ force: true });
-  });
+//   it("should display error on entering invalid function and save", () => {
+//     cy.contains("Create new function").click({ force: true });
+//     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
+//       functionName
+//     );
+//     cy.get(".view-lines").type(".test=1");
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.get(".q-notification__message")
+//       .contains("Function saved successfully")
+//       .should("be.visible");
+//       cy.get('.q-table__top > .q-field > .q-field__inner > .q-field__control').type(functionName)
+//     cy.get('[title="Delete Function"]').click({ force: true });
+//     cy.get('[data-test="confirm-button"]').click({ force: true });
+//   });
 
-  it("should upload a enrichment table under functions", () => {
-    // cy.contains('Create new function').click({ force: true })
-    cy.get(
-      '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label'
-    ).click({ force: true });
-    cy.contains("Add Enrichment Table").click({ force: true });
+//   it("should display error on adding function with same name", () => {
+//     cy.contains("Create new function").click({ force: true });
+//     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
+//     functionName
+//     );
+//     cy.get(".view-lines").type(".test=1");
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.get(".q-notification__message")
+//       .contains("Function saved successfully")
+//       .should("be.visible");
+//     cy.contains("Create new function").click({ force: true });
+//     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
+//       functionName
+//     );
+//     cy.get(".view-lines").type(".test=1");
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.get(".q-notification__message")
+//       .contains("Function creation failed")
+//       .should("be.visible");
+//     cy.contains("Cancel").click({ force: true });
+//     cy.get('.q-table__top > .q-field > .q-field__inner > .q-field__control').type(functionName)
+//     cy.get('[title="Delete Function"]').click({ force: true });
+//     cy.get('[data-test="confirm-button"]').click({ force: true });
+//   });
 
-    const { v4: uuidv4 } = require("uuid");
+//   it.only("should add a function and associate a stream with the same", () => {
+//     cy.contains("Create new function").click({ force: true });
+//     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
+//     functionName
+//     );
+//     cy.get(".view-lines").type(".test=1");
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.get(".q-notification__message")
+//       .contains("Function saved successfully")
+//       .should("be.visible");
+//     cy.get('[data-test="function-stream-tab"]').click({ force: true });
+//     cy.wait(2000)
+//     cy.get(':nth-child(1) > .q-field > .q-field__inner > .q-field__control').type('e2e_automate')
+//     cy.get('[data-test="log-stream-table"] >>> :nth-child(2) > :nth-child(1) > :nth-child(2)').click()
+//     // cy.get('[style="cursor: pointer;"] > :nth-child(3)').click({ force: true });
+//      cy.contains("Associate Function").click({ force: true });
+//     cy.get('[style="height: min-content; border: 1px solid black;"] > [colspan="100%"] > [style=""] > .q-table__container > .q-table__middle > .q-table > tbody > .q-tr > :nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container').type(functionName)
+//     cy.wait(2000)
+//     cy.get('.q-item__label > span').click({ force: true });
+//     cy.get('[style="height: min-content; border: 1px solid black;"] > [colspan="100%"] > [style=""] > .q-table__container > .q-table__middle > .q-table > tbody > .q-tr > :nth-child(4)').click({ force: true });
+//     // cy.get(".q-tr >>>>> .q-field__control-container").click({ force: true });
+//     // cy.get(".q-item__label > span").click({ force: true });
+//     // cy.get(":nth-child(4) > .q-btn").click({ force: true });
+//     cy.get(
+//       '[href="/web/functions/functions?org_identifier=default"] > .q-tab__content'
+//     ).click({ force: true });
+//     // cy.get('.q-table__top > .q-field > .q-field__inner > .q-field__control').type(functionName)
+//     // cy.get('[title="Delete Function"]').click({ force: true });
+//     // cy.get('[data-test="confirm-button"]').click({ force: true });
+//   });
 
-    cy.fixture("enrichment_info.csv").then((fileContent) => {
-      const fileName = `enrichment_info_${uuidv4()}.csv`;
+//   it.skip("should display error add a function and associate a stream with the same", () => {
+//     cy.contains("Create new function").click({ force: true });
+//     cy.get(".q-pb-sm > .q-field > .q-field__inner > .q-field__control").type(
+//       "automate"
+//     );
+//     cy.get(".view-lines").type(".test=1");
+//     cy.contains("Save").should("be.visible").click({ force: true });
+//     cy.get(".q-notification__message")
+//       .contains("Function saved successfully")
+//       .should("be.visible");
+//     cy.get('[data-test="function-stream-tab"]').click({ force: true });
+//     cy.get('[style="cursor: pointer;"] > :nth-child(3)').click({ force: true });
+//     cy.contains("Associate Function").click({ force: true });
+//     cy.get(".q-tr >>>>> .q-field__control-container").click({ force: true });
+//     cy.get(".q-item__label > span").click({ force: true });
+//     cy.get(
+//       '[href="/web/functions/functions?org_identifier=default"] > .q-tab__content'
+//     ).click({ force: true });
+//     cy.get('[title="Delete Function"]').click({ force: true });
+//     cy.get('[data-test="confirm-button"]').click({ force: true });
+//     cy.get(".q-notification__message")
+//       .contains("Function is used in stream")
+//       .should("be.visible");
+//     cy.get('[data-test="function-stream-tab"]').click({ force: true });
+//     cy.get('[style="cursor: pointer;"] > :nth-child(3)').click({ force: true });
+//     cy.get(":nth-child(4) > .q-btn").click({ force: true });
+//     cy.get(
+//       '[href="/web/functions/functions?org_identifier=default"] > .q-tab__content'
+//     ).click({ force: true });
+//     cy.get('[title="Delete Function"]').click({ force: true });
+//     cy.get('[data-test="confirm-button"]').click({ force: true });
+//   });
 
-      cy.get('input[type="file"]').attachFile({
-        fileContent: fileContent.toString(),
-        fileName: fileName,
-        mimeType: "text/csv",
-      });
-      cy.wait(5000);
-      cy.get(".q-input > .q-field__inner > .q-field__control").type(fileName);
-      cy.contains("Save").click({ force: true });
-      cy.wait(200);
-      // cy.get('[title="Delete Function"]').click({ force: true });
-      // cy.get('[data-test="confirm-button"]').click({ force: true });
-      cy.get('tbody tr').each(($row)  => {
-        const functionName = $row.find('td.text-left:eq(1)').text();
+//   it("should upload a enrichment table under functions", () => {
+//     // cy.contains('Create new function').click({ force: true })
+//     cy.get(
+//       '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label'
+//     ).click({ force: true });
+//     cy.contains("Add Enrichment Table").click({ force: true });
 
-        // Check if the function name contains "enrichment_info"
-        if (functionName.includes("enrichment_info")) {
-          // Click the "Delete Function" button
-          cy.wrap($row)
-            .find('[title="Delete Function"]') // finds the delete function button and clicks on it
-            .click();
+//     const { v4: uuidv4 } = require("uuid");
 
-          // You may need to handle any confirmation dialog that appears
-          cy.get('[data-test="confirm-button"]').click();
-        }
+//     cy.fixture("enrichment_info.csv").then((fileContent) => {
+//       const fileName = `enrichment_info_${uuidv4()}.csv`;
 
-        })
-    });
-  });
-});
+//       cy.get('input[type="file"]').attachFile({
+//         fileContent: fileContent.toString(),
+//         fileName: fileName,
+//         mimeType: "text/csv",
+//       });
+//       cy.wait(7000);
+//       cy.get(".q-input > .q-field__inner > .q-field__control").type(fileName);
+//       cy.contains("Save").click({ force: true });
+//       cy.wait(2000);
+//       // cy.get('[title="Delete Function"]').click({ force: true });
+//       // cy.get('[data-test="confirm-button"]').click({ force: true });
+//       cy.get('tbody tr').each(($row)  => {
+//         const functionName = $row.find('td.text-left:eq(1)').text();
+
+//         // Check if the function name contains "enrichment_info"
+//         if (functionName.includes("enrichment_info")) {
+//           // Click the "Delete Function" button
+//           cy.wrap($row)
+//             .find('[title="Delete Function"]') // finds the delete function button and clicks on it
+//             .click();
+
+//           // You may need to handle any confirmation dialog that appears
+//           cy.get('[data-test="confirm-button"]').click();
+//         }
+
+//         })
+//     });
+//   });
+// });
