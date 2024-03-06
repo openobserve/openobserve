@@ -12,12 +12,11 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 use std::collections::HashMap;
 
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
-use regex::{self, Regex};
+use regex::Regex;
 
 use crate::common::meta::stream::StreamParams;
 

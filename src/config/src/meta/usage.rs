@@ -143,26 +143,26 @@ pub enum UsageType {
     EnrichmentTable,
 }
 
-impl ToString for UsageType {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for UsageType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UsageType::Bulk => "logs/_bulk".to_owned(),
-            UsageType::Json => "logs/_json".to_owned(),
-            UsageType::JsonMetrics => "metrics/_json".to_owned(),
-            UsageType::Multi => "logs/_multi".to_owned(),
-            UsageType::Traces => "/traces".to_owned(),
-            UsageType::Metrics => "/v1/write".to_owned(),
-            UsageType::Search => "/_search".to_owned(),
-            UsageType::Functions => "functions".to_owned(),
-            UsageType::Retention => "data_retention".to_owned(),
-            UsageType::KinesisFirehose => "_kinesis_firehose".to_owned(),
-            UsageType::Syslog => "syslog".to_owned(),
-            UsageType::EnrichmentTable => "enrichment_table".to_owned(),
-            UsageType::SearchAround => "/_around".to_owned(),
-            UsageType::SearchTopNValues => "/_values".to_owned(),
-            UsageType::GCPSubscription => "/gcp/_sub".to_owned(),
-            UsageType::MetricSearch => "/metrics/_search".to_owned(),
-            UsageType::Logs => "/v1/logs".to_owned(),
+            UsageType::Bulk => write!(f, "logs/_bulk"),
+            UsageType::Json => write!(f, "logs/_json"),
+            UsageType::JsonMetrics => write!(f, "metrics/_json"),
+            UsageType::Multi => write!(f, "logs/_multi"),
+            UsageType::Traces => write!(f, "/traces"),
+            UsageType::Metrics => write!(f, "/v1/write"),
+            UsageType::Search => write!(f, "/_search"),
+            UsageType::Functions => write!(f, "functions"),
+            UsageType::Retention => write!(f, "data_retention"),
+            UsageType::KinesisFirehose => write!(f, "_kinesis_firehose"),
+            UsageType::Syslog => write!(f, "syslog"),
+            UsageType::EnrichmentTable => write!(f, "enrichment_table"),
+            UsageType::SearchAround => write!(f, "/_around"),
+            UsageType::SearchTopNValues => write!(f, "/_values"),
+            UsageType::GCPSubscription => write!(f, "/gcp/_sub"),
+            UsageType::MetricSearch => write!(f, "/metrics/_search"),
+            UsageType::Logs => write!(f, "/v1/logs"),
         }
     }
 }

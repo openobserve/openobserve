@@ -36,8 +36,8 @@ use config::{
     FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::{
-    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable,
-    execution::context::SessionContext, prelude::*, scalar::ScalarValue,
+    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable, prelude::*,
+    scalar::ScalarValue,
 };
 use infra::{cache, storage};
 use parquet::arrow::{
