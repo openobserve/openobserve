@@ -95,6 +95,7 @@ const defaultObject = {
       : false,
     histogramDirtyFlag: false,
     sqlMode: false,
+    fastMode: true,
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
@@ -423,6 +424,7 @@ const useLogs = () => {
     }
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
+    query["fast_mode"] = searchObj.meta.fastMode;
     // query["timezone"] = store.state.timezone;
     return query;
   };
@@ -445,6 +447,7 @@ const useLogs = () => {
             searchObj.meta.resultGrid.rowsPerPage *
               (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
+          fast_mode: searchObj.meta.fastMode,
         },
         aggs: {
           histogram:
@@ -519,13 +522,13 @@ const useLogs = () => {
           .join("\n");
         const parsedSQL: any = parser.astify(query);
         if (parsedSQL.limit != null) {
-          req.query.size = parsedSQL.limit.value[0].value;
+          // req.query.size = parsedSQL.limit.value[0].value;
 
-          if (parsedSQL.limit.seperator == "offset") {
-            req.query.from = parsedSQL.limit.value[1].value || 0;
-          }
+          // if (parsedSQL.limit.seperator == "offset") {
+          //   req.query.from = parsedSQL.limit.value[1].value || 0;
+          // }
 
-          parsedSQL.limit = null;
+          // parsedSQL.limit = null;
 
           query = parser.sqlify(parsedSQL);
 
@@ -1793,6 +1796,7 @@ const useLogs = () => {
     if (queryParams.type) {
       searchObj.meta.pageType = queryParams.type;
     }
+    searchObj.meta.fastMode = queryParams.fast_mode == "false" ? false : true;
 
     router.push({
       query: {

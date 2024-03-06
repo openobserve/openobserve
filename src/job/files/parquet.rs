@@ -418,7 +418,6 @@ pub(crate) async fn generate_index_on_ingester(
             .await?;
     let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
     if record_batches.is_empty() {
-        log::debug!("No record batches found");
         return Ok(());
     }
     let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
@@ -495,7 +494,6 @@ pub(crate) async fn generate_index_on_compactor(
 ) -> Result<(String, FileMeta), anyhow::Error> {
     let mut index_record_batches =
         prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
-
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
@@ -599,7 +597,11 @@ async fn prepare_index_record_batches(
             continue;
         }
 
-        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
+        let split_arr = array_distinct(string_to_array(
+            lower(col(column)),
+            lit(" "),
+            lit(ScalarValue::Null),
+        ));
         let record_batch = index_df
             .with_column("terms", split_arr)?
             .unnest_column("terms")?
