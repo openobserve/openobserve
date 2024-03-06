@@ -47,21 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         padding="sm lg"
         outline
         no-caps
-        label="Reports"
-        @click="
-          router.push({
-            name: 'reports',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          })
-        "
-      />
-      <q-btn
-        class="q-ml-md text-bold"
-        padding="sm lg"
-        outline
-        no-caps
         :label="t(`dashboard.import`)"
         @click="importDashboard"
         data-test="dashboard-import"
