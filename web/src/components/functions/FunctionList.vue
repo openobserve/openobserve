@@ -73,18 +73,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-table__title">
             {{ t("function.header") }}
           </div>
-          <q-input
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('function.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
+          <div class="q-ml-auto" data-test="functions-list-search-input">
+            <q-input
+              v-model="filterQuery"
+              borderless
+              filled
+              dense
+              class="q-ml-auto q-mb-xs no-border"
+              :placeholder="t('function.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+          </div>
           <q-btn
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
