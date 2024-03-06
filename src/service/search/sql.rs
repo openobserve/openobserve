@@ -378,6 +378,9 @@ impl Sql {
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &fields)
                 .to_string();
+            // reset meta fields
+            meta.fields
+                .extend(fields.split(',').map(|v| v.trim().to_string()));
         }
 
         // get sql where tokens

@@ -1481,7 +1481,7 @@ pub async fn register_table(
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
     if CONFIG.common.feature_query_infer_schema
-        || (CONFIG.limit.query_optimization_num_fields > 0
+        && (CONFIG.limit.query_optimization_num_fields > 0
             && schema.fields().len() > CONFIG.limit.query_optimization_num_fields)
     {
         config = config.infer_schema(&ctx.state()).await?;
