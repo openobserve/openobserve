@@ -383,13 +383,12 @@ impl Sql {
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
             let fields = generate_fast_mode_fields(&schema, &match_all_fields);
-            let fields = "SELECT ".to_string() + &fields;
+            let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
-                .replace(origin_sql.as_str(), &fields)
+                .replace(origin_sql.as_str(), &select_fields)
                 .to_string();
             // reset meta fields
-            meta.fields
-                .extend(fields.split(',').map(|v| v.trim().to_string()));
+            meta.fields.extend(fields);
         }
 
         // get sql where tokens
@@ -759,7 +758,7 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
-fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> String {
+fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
     let schema_fields = schema.fields();
     let mut fields = match strategy.as_str() {
@@ -810,7 +809,7 @@ fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> String {
             fields.push(field.to_string());
         }
     }
-    fields.join(",")
+    fields
 }
 
 fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
