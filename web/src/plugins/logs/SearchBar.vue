@@ -26,9 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-toggle
           data-test="logs-search-bar-sql-mode-toggle-btn"
-          v-model="searchObj.meta.sqlMode"
-          :label="t('search.sqlModeLabel')"
-        />
+          v-model="searchObj.meta.sqlMode"        />
         <q-btn
           label="Reset Filters"
           no-caps
@@ -98,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-toggle
           data-test="logs-search-bar-fast-mode-toggle-btn"
           v-model="searchObj.meta.fastMode"
-          :label="t('search.fastModeLabel')"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">
