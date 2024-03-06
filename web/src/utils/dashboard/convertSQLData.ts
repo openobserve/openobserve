@@ -427,6 +427,7 @@ export const convertSQLData = (
     series: [],
   };
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
+  console.log("convertSQLData: defaultSeriesProps", defaultSeriesProps);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
