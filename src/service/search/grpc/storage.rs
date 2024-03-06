@@ -20,7 +20,10 @@ use config::{
     meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     CONFIG,
 };
-use datafusion::{arrow::record_batch::RecordBatch, common::FileType};
+use datafusion::{
+    arrow::{datatypes::Schema, record_batch::RecordBatch},
+    common::FileType,
+};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -185,11 +188,9 @@ pub async fn search(
 
     let mut tasks = Vec::new();
     for (ver, files) in files_group {
-        let schema = Arc::new(
-            schema_versions[ver]
-                .clone()
-                .with_metadata(std::collections::HashMap::new()),
-        );
+        let mut schema = schema_versions[ver]
+            .clone()
+            .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
         let session = meta::search::Session {
             id: format!("{session_id}-{ver}"),
@@ -217,6 +218,19 @@ pub async fn search(
                     diff_fields.insert(alias.to_string(), v.clone());
                 }
             }
+            // add not exists field for wal infered schema
+            let mut new_fields = Vec::new();
+            for field in sql.meta.fields.iter() {
+                if schema.field_with_name(field).is_err() {
+                    if let Ok(field) = schema_latest.field_with_name(field) {
+                        new_fields.push(field.clone());
+                    }
+                }
+            }
+            if !new_fields.is_empty() {
+                let new_schema = Schema::new(new_fields);
+                schema = Schema::try_merge(vec![schema, new_schema])?;
+            }
         }
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
@@ -225,6 +239,7 @@ pub async fn search(
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
         );
+        let schema = Arc::new(schema);
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
