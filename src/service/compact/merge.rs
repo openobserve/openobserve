@@ -543,23 +543,25 @@ async fn merge_files(
                     new_file_schema.clone(),
                 )
                 .await?;
-                log::info!("Created index file during compaction {}", index_file_name);
-                // Notify that we wrote the index file to the db.
-                let ret = write_file_list(
-                    org_id,
-                    &[FileKey {
-                        key: index_file_name.clone(),
-                        meta: filemeta,
-                        deleted: false,
-                    }],
-                )
-                .await;
-                if let Err(e) = ret {
-                    log::error!(
-                        "[merge_files] failed to write to file list on compactor: {}, error: {}",
-                        index_file_name,
-                        e.to_string()
-                    );
+                if !index_file_name.is_empty() {
+                    log::info!("Created index file during compaction {}", index_file_name);
+                    // Notify that we wrote the index file to the db.
+                    let ret = write_file_list(
+                        org_id,
+                        &[FileKey {
+                            key: index_file_name.clone(),
+                            meta: filemeta,
+                            deleted: false,
+                        }],
+                    )
+                    .await;
+                    if let Err(e) = ret {
+                        log::error!(
+                            "[merge_files] failed to write to file list on compactor: {}, error: {}",
+                            index_file_name,
+                            e.to_string()
+                        );
+                    }
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))

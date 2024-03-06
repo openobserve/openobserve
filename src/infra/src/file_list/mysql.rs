@@ -689,7 +689,7 @@ pub async fn create_table_index() -> Result<()> {
         ),
         (
             "file_list",
-            "CREATE INDEX file_list_stream_ts_idx on file_list (min_ts, max_ts, stream);",
+            "CREATE INDEX file_list_stream_ts_idx on file_list (stream, min_ts, max_ts);",
         ),
         // (
         //     "file_list",

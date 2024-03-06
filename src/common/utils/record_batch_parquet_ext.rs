@@ -69,7 +69,7 @@ impl RecordBatchParquetExt for Vec<RecordBatch> {
         let schema = if let Some(first_batch) = self.first() {
             first_batch.schema()
         } else {
-            return Err(anyhow::anyhow!("No record batches found".to_string(),));
+            return Err(anyhow::anyhow!("No record batches found"));
         };
 
         let mut file_meta = FileMeta {
