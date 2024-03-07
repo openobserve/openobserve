@@ -26,28 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
     >
       <q-toolbar>
-        <div class="flex relative-position q-mr-sm">
+        <div class="flex relative-position q-mr-sm"  v-if="store.state.zoConfig.custom_logo_text != ''">
           <!-- <span class="text-h6 text-bold">Open Log Search</span>
           <q-icon name="bolt" size="sm" class="q-pt-xs q-pl-xs"></q-icon> -->
 
           <!-- <span class="text-h6 text-bold">Open Log Search</span>
           <span class="text-caption q-ml-sm q-mt-sm"> powered by </span> -->
 
-          <div v-if="store.state.zoConfig.custom_logo_text != ''">
+          
             <span
-              class="text-h6 text-bold q-pa-none"
-              style="margin-top: -15px"
-              >{{ store.state.zoConfig.brandText }}</span
+              class="text-bold q-pa-none"
+              style="margin-top: -9px; font-size: 17px;"
+              >{{ store.state.zoConfig.custom_logo_text }}</span
             >
             <br />
-            <span class="text-caption q-ml-sm q-mt-sm text-powered-by">
+            <span class="text-caption text-powered-by">
               powered by </span
             ><img
               class="appLogo custom-text-logo"
               src="/src/assets/images/common/open_observe_logo.svg"
             />
           </div>
-          <div v-else>
+          <div v-else  class="flex relative-position q-mr-sm">
             <img
               class="appLogo"
               :src="
@@ -60,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-if="config.isCloud == 'true'" class="absolute beta-text"
               >Beta</span
             >
-          </div>
         </div>
 
         <q-toolbar-title></q-toolbar-title>
@@ -1182,8 +1181,8 @@ export default defineComponent({
   display: inline-block;
   float: left;
   position: absolute;
-  margin-left: 72px;
-  margin-top: 16px;
-  width: 100px;
+  margin-left: 72px !important;
+  margin-top: 16px !important;
+  width: 80px !important;
 }
 </style>
