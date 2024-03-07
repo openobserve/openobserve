@@ -1172,4 +1172,21 @@ export default defineComponent({
     padding: 4px 8px;
   }
 }
+
+.text-powered-by {
+  float: left;
+  display: inline-block;
+  position: absolute;
+  margin-top: 16px;
+  margin-left: 0px;
+}
+
+.custom-text-logo {
+  display: inline-block;
+  float: left;
+  position: absolute;
+  margin-left: 72px;
+  margin-top: 16px;
+  width: 100px;
+}
 </style>
