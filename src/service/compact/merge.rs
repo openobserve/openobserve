@@ -498,7 +498,8 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let (mut new_file_meta, new_file_schema) = datafusion::exec::merge_parquet_files(
+    let mut fts_buf = Vec::new();
+    let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         schema,
@@ -506,6 +507,7 @@ async fn merge_files(
         &full_text_search_fields,
         new_file_size,
         stream_type,
+        &mut fts_buf,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -536,11 +538,10 @@ async fn merge_files(
             if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
-                    buf,
+                    fts_buf,
                     new_file_key.clone(),
                     org_id,
                     stream_name,
-                    new_file_schema.clone(),
                 )
                 .await
                 .map_err(|e| anyhow::anyhow!("generate_index_on_compactor error: {}", e))?;
