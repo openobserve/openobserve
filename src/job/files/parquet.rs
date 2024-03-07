@@ -465,7 +465,7 @@ pub(crate) async fn generate_index_on_ingester(
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-    log::warn!("[INGESTER:JOB] Written index wal file successfully");
+    log::info!("[INGESTER:JOB] Written index wal file successfully");
     Ok(())
 }
 
@@ -576,10 +576,6 @@ async fn _prepare_index_record_batches(
         }
 
         if schema.data_type(&Column::from_name(column)).unwrap() != &DataType::Utf8 {
-            log::warn!(
-                "[JOB]: Index column {} is not of type Utf8. Skipping indexing for this column.",
-                column
-            );
             continue;
         }
 
@@ -631,10 +627,6 @@ async fn prepare_index_record_batches_v1(
         let index_df = ctx.table("_tbl_raw_data").await?;
 
         if column.data_type() != &DataType::Utf8 {
-            log::warn!(
-                "[JOB]: Index column {} is not of type Utf8. Skipping indexing for this column.",
-                column
-            );
             continue;
         }
 
