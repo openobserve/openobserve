@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use actix_web::http;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
-use config::{CHROME_LAUNCHER_OPTIONS, CONFIG, SMTP_CLIENT};
+use config::{get_chrome_launch_options, CONFIG, SMTP_CLIENT};
 use futures::{future::try_join_all, StreamExt};
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
@@ -246,13 +246,10 @@ impl Report {
         // Send the email
         match SMTP_CLIENT.as_ref().unwrap().send(email).await {
             Ok(_) => {
-                log::debug!("Email sent successfully");
+                log::info!("email sent successfully for the report {}", &self.name);
                 Ok(())
             }
-            Err(e) => {
-                log::debug!("Email could not be sent: {e}");
-                Err(anyhow::anyhow!("Error sending email: {e}"))
-            }
+            Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
         }
     }
 }
@@ -276,8 +273,10 @@ async fn generate_report(
     }
     // Only one tab is supported for now
     let tab_id = &dashboard.tabs[0];
+
+    log::info!("launching browser for dashboard {dashboard_id}");
     let (mut browser, mut handler) =
-        Browser::launch(CHROME_LAUNCHER_OPTIONS.as_ref().unwrap().clone()).await?;
+        Browser::launch(get_chrome_launch_options().await.as_ref().unwrap().clone()).await?;
 
     let handle = tokio::task::spawn(async move {
         while let Some(h) = handler.next().await {
@@ -332,11 +331,28 @@ async fn generate_report(
     // Wait for navigation does not really wait until it is fully loaded
     page.wait_for_navigation().await?;
 
+    log::info!("waiting for data to load for dashboard {dashboard_id}");
     // Sleep for specified time to let the dashboard load
     tokio::time::sleep(Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into())).await;
+    log::info!("data is assumed to be loaded for dashboard {dashboard_id}");
 
-    page.find_element("main").await?;
-    page.find_element("div.displayDiv").await?;
+    if let Err(e) = page.find_element("main").await {
+        browser.close().await?;
+        handle.await?;
+        return Err(anyhow::anyhow!(
+            "[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}"
+        ));
+    }
+    if let Err(e) = page.find_element("div.displayDiv").await {
+        browser.close().await?;
+        handle.await?;
+        return Err(anyhow::anyhow!(
+            "[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: {e}"
+        ));
+    }
+
+    // Last two elements loaded means atleast the metric components have loaded.
+    // If the span element is not rendered yet, capture whatever is loaded till now
     if let Err(e) = page
         .find_element("span#dashboardVariablesAndPanelsDataLoaded")
         .await
