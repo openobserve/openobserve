@@ -276,6 +276,7 @@ pub struct SearchPartitionRequest {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionResponse {
+    pub session_id: String,
     pub file_num: usize,
     pub records: usize,
     pub original_size: usize,

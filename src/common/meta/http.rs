@@ -32,6 +32,8 @@ pub struct HttpResponse {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,6 +49,7 @@ impl HttpResponse {
             code,
             message,
             error_detail: None,
+            session_id: None,
         }
     }
 
@@ -55,6 +58,7 @@ impl HttpResponse {
             code,
             message: error,
             error_detail: None,
+            session_id: None,
         }
     }
 
@@ -63,6 +67,16 @@ impl HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
             error_detail: Some(err.get_error_detail()),
+            session_id: None,
+        }
+    }
+
+    pub fn error_code_with_session_id(err: errors::ErrorCodes, session_id: Option<String>) -> Self {
+        HttpResponse {
+            code: err.get_code(),
+            message: err.get_message(),
+            error_detail: Some(err.get_error_detail()),
+            session_id,
         }
     }
 
