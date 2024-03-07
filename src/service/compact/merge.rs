@@ -498,6 +498,7 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
+    let mut fts_buf = Vec::new();
     let (mut new_file_meta, new_file_schema) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
@@ -506,6 +507,7 @@ async fn merge_files(
         &full_text_search_fields,
         new_file_size,
         stream_type,
+        &mut fts_buf,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
