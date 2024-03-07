@@ -221,6 +221,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let start = std::time::Instant::now();
     let session_id = req.job.as_ref().unwrap().session_id.clone();
 
+    let inverted_index_total_count: Option<usize>;
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
     let meta = sql::Sql::new(&req).await?;
@@ -261,7 +262,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     );
 
     // If the query is of type inverted index and this is not an aggregations request
-    let file_list = if is_inverted_index && req.aggs.is_empty() {
+    let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -296,7 +297,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
-        let unique_files = if is_first_page {
+        let mut total_count = 0;
+        let (unique_files, inverted_index_count) = if is_first_page {
             let limit_count = 500;
             let sorted_data = idx_resp
                 .hits
@@ -306,6 +308,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    total_count += count;
                     (term, file_name, count, timestamp)
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
@@ -319,16 +322,23 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     *current_count += count;
                 }
             }
-            term_map
-                .into_iter()
-                .flat_map(|(_, filenames)| filenames)
-                .collect::<HashSet<_>>()
+            inverted_index_total_count = Some(total_count as usize);
+            (
+                term_map
+                    .into_iter()
+                    .flat_map(|(_, filenames)| filenames)
+                    .collect::<HashSet<_>>(),
+                inverted_index_total_count,
+            )
         } else {
-            idx_resp
-                .hits
-                .iter()
-                .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                .collect::<HashSet<_>>()
+            (
+                idx_resp
+                    .hits
+                    .iter()
+                    .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                    .collect::<HashSet<_>>(),
+                None,
+            )
         };
 
         for filename in unique_files {
@@ -344,16 +354,19 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 });
             }
         }
-        idx_file_list
+        (idx_file_list, inverted_index_count)
     } else {
-        get_file_list(
-            &session_id,
-            &meta,
-            stream_type,
-            partition_time_level,
-            &stream_settings.partition_keys,
+        (
+            get_file_list(
+                &session_id,
+                &meta,
+                stream_type,
+                partition_time_level,
+                &stream_settings.partition_keys,
+            )
+            .await,
+            None,
         )
-        .await
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -798,7 +811,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     };
     result.aggs.remove("_count");
 
-    result.set_total(total);
+    if let Some(inverted_index_count) = inverted_index_count {
+        result.set_total(inverted_index_count);
+    } else {
+        result.set_total(total);
+    }
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
