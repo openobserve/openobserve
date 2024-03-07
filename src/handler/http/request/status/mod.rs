@@ -70,6 +70,8 @@ struct ConfigResponse<'a> {
     sso_enabled: bool,
     native_login_enabled: bool,
     rbac_enabled: bool,
+    query_on_stream_selection: bool,
+    custom_logo_text: String,
 }
 
 /// Healthz
@@ -123,6 +125,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
+        query_on_stream_selection: CONFIG.common.query_on_stream_selection,
+        custom_logo_text: CONFIG.common.custom_logo_text.clone(),
     }))
 }
 
