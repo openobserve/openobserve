@@ -221,7 +221,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let start = std::time::Instant::now();
     let session_id = req.job.as_ref().unwrap().session_id.clone();
 
-    let inverted_index_total_count: Option<usize>;
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
     let meta = sql::Sql::new(&req).await?;
@@ -252,7 +251,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let mut idx_file_list = vec![];
     let is_inverted_index = !meta.fts_terms.is_empty();
 
     log::warn!(
@@ -288,7 +286,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
-        idx_req.query.as_mut().unwrap().size = 10000;
+        idx_req.query.as_mut().unwrap().size = 99999;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
         idx_req.query.as_mut().unwrap().track_total_hits = false;
@@ -297,9 +295,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
-        let mut total_count = 0;
         let (unique_files, inverted_index_count) = if is_first_page {
-            let limit_count = 500;
+            // should be query size * 2
+            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+            let mut total_count = 0;
             let sorted_data = idx_resp
                 .hits
                 .iter()
@@ -317,18 +316,17 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
             for (term, filename, count, _timestamp) in sorted_data {
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
-                if *current_count < limit_count || *current_count == 0 {
-                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                if *current_count < limit_count {
                     *current_count += count;
+                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
                 }
             }
-            inverted_index_total_count = Some(total_count as usize);
             (
                 term_map
                     .into_iter()
                     .flat_map(|(_, filenames)| filenames)
                     .collect::<HashSet<_>>(),
-                inverted_index_total_count,
+                Some(total_count),
             )
         } else {
             (
@@ -341,6 +339,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             )
         };
 
+        let mut idx_file_list: Vec<FileKey> = vec![];
         for filename in unique_files {
             let prefixed_filename = format!(
                 "files/{}/logs/{}/{}",
@@ -354,6 +353,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 });
             }
         }
+        // sorted by _timestamp
+        idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
         (idx_file_list, inverted_index_count)
     } else {
         (
@@ -811,7 +812,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     };
     result.aggs.remove("_count");
 
-    if let Some(inverted_index_count) = inverted_index_count {
+    let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
+    // Maybe inverted index count is wrong, we use the max value
+    if inverted_index_count > total {
         result.set_total(inverted_index_count);
     } else {
         result.set_total(total);
