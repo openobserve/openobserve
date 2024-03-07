@@ -26,7 +26,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
     >
       <q-toolbar>
-        <div class="flex relative-position q-mr-sm">
+        <div
+          class="flex relative-position q-mr-sm"
+          v-if="
+            config.isEnterprise == 'true' &&
+            store.state.zoConfig.custom_logo_text != ''
+          "
+        >
+          <span
+            class="text-h6 text-bold q-pa-none cursor-pointer"
+            @click="goToHome"
+            >{{ store.state.zoConfig.custom_logo_text }}</span
+          >
+          <br />
+          <q-icon name="bolt"
+size="sm" class="q-pt-xs q-pl-xs"></q-icon>
+          <img
+            class="appLogo"
+            :src="
+              store?.state?.theme == 'dark'
+                ? getImageURL('images/common/open_observe_logo_2.svg')
+                : getImageURL('images/common/open_observe_logo.svg')
+            "
+            @click="goToHome"
+          />
+        </div>
+        <div v-else class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
             :src="
@@ -52,7 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -139,10 +165,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
