@@ -125,9 +125,10 @@ pub async fn query(
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));
                     }
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        "search node error".to_string(),
-                    )));
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
+                        "search node response error: {}",
+                        err
+                    ))));
                 }
             };
             Ok((node, response.max_id))
@@ -200,9 +201,10 @@ pub async fn query(
                 &node.grpc_addr,
                 err
             );
-            Error::ErrorCode(ErrorCodes::ServerInternalError(
-                "connect search node error".to_string(),
-            ))
+            Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
+                "connect to search node error: {}",
+                err
+            )))
         })?;
     let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
         channel,
