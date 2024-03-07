@@ -1016,6 +1016,7 @@ describe("Logs testcases", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
+    cy.wait(1000)
     cy.get('[title="Explore"]:last').click({ force: true });
     cy.url().should("include", "logs");
   });
