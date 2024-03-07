@@ -157,7 +157,13 @@ pub async fn register() -> Result<()> {
     locker.lock(0).await?;
 
     // 2. get node list
-    let node_list = list_nodes().await?;
+    let node_list = match list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            locker.unlock().await?;
+            return Err(e);
+        }
+    };
 
     // 3. calculate node_id
     let mut node_id = 1;
@@ -219,7 +225,10 @@ pub async fn register() -> Result<()> {
         LOCAL_NODE_KEY_LEASE_ID = id;
     }
     let opt = PutOptions::new().with_lease(id);
-    let _resp = client.put(key, val, Some(opt)).await?;
+    if let Err(e) = client.put(key, val, Some(opt)).await {
+        locker.unlock().await?;
+        return Err(e.into());
+    }
 
     // 5. watch node list
     tokio::task::spawn(async move { watch_node_list().await });
