@@ -75,7 +75,7 @@
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
     "sqlModeLabel": "SQL Mode",
-    "fastModeLabel": "Fast Mode",
+    "fastModeLabel": "Quick Mode",
     "toggleFunctionLabel": "Function",
     "labelWrap": "Wrap Content",
     "messageWrapContent": "Wrap Table Content",
