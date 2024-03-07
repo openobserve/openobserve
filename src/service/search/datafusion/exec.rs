@@ -1243,12 +1243,15 @@ pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
-    bloom_filter_fields: &[String],
-    full_text_search_fields: &[String],
     original_size: i64,
     stream_type: StreamType,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
+    let bloom_filter_fields =
+        crate::service::stream::get_stream_setting_bloom_filter_fields(&schema).unwrap();
+    let full_text_search_fields =
+        crate::service::stream::get_stream_setting_fts_fields(&schema).unwrap();
+
     // query data
     let runtime_env = create_runtime_env(None)?;
     let session_config = create_session_config(&SearchType::Normal)?;
@@ -1310,8 +1313,8 @@ pub async fn merge_parquet_files(
     let mut writer = new_parquet_writer(
         buf,
         &schema,
-        bloom_filter_fields,
-        full_text_search_fields,
+        &bloom_filter_fields,
+        &full_text_search_fields,
         &file_meta,
     );
     for batch in batches {
