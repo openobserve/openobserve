@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ store.state.zoConfig.custom_logo_text }}
       </div>
 
-      <div class="text-caption full-width text-centered"><q-icon name="bolt" size="sm"></q-icon></div>
+      <div class="text-caption full-width text-centered"><img :src="getImageURL('images/common/spark-logo-connector.png')" class="q-mt-sm" style="width: 30px" /></div>
     </div>
     <div class="flex justify-center q-mb-lg">
       <img
