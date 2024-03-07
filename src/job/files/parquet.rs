@@ -37,7 +37,7 @@ use config::{
 };
 use datafusion::{
     arrow::json as arrow_json, common::ExprSchema, datasource::MemTable,
-    execution::context::SessionContext, prelude::*, scalar::ScalarValue,
+    execution::context::SessionContext, prelude::*,
 };
 use infra::{cache, storage};
 use parquet::arrow::{
