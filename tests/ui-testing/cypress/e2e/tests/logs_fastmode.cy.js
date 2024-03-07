@@ -136,11 +136,12 @@ describe("Logs testcases", () => {
   
   });
 
-  it.only("should display results for fast mode off", () => {
+  it("should display results for fast mode on and match all_indexed", () => {
    
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
       .type("match_all_indexed('provide_credentials')")
+    cy.get('[data-test="logs-search-bar-fast-mode-toggle-btn"]').click()
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
     cy.intercept("POST", logData.applyQuery).as("search");
     cy.wait(3000);
@@ -150,11 +151,11 @@ describe("Logs testcases", () => {
     // Type the value of a variable into an input field
     cy.intercept("POST", logData.applyQuery).as("search");
     cy.wait(3000);
-   applyQueryButton()
+   fastModeOff()
   
   });
 
-  it.only("should display results for fast mode off", () => {
+  it("should display results for fast mode on and match all ignore case", () => {
    
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
@@ -171,6 +172,43 @@ describe("Logs testcases", () => {
    applyQueryButton()
   
   });
+
+  it("should display results for fast mode on and match all ignore case", () => {
+   
+    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+      .click() // Click on the editor to focus
+      .type("match_all_indexed_ignore_case('provide_credentials')")
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
+    // Type the value of a variable into an input field
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    applyQueryButton()
+  });
+
+
+  it("should display results for fast mode on and match all ignore case", () => {
+   
+    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+      .click() // Click on the editor to focus
+      .type("match_all_indexed_ignore_case('provide_credentials')")
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
+    // Type the value of a variable into an input field
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    applyQueryButton()
+  });
+
+
 it("should display correct results when fast mode on", () => {
     // Wait for 2 seconds
     cy.wait(2000);
