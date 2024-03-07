@@ -90,6 +90,7 @@ const defaultObject = {
     showHistogram: true,
     showDetailTab: false,
     toggleFunction: true,
+    searchApplied: false,
     toggleSourceWrap: useLocalWrapContent()
       ? JSON.parse(useLocalWrapContent())
       : false,
@@ -335,7 +336,9 @@ const useLogs = () => {
             selectedStream = itemObj;
           }
         }
-        searchObj.data.stream.selectedStream = selectedStream;
+        if (store.state.zoConfig.query_on_stream_selection == false) {
+          searchObj.data.stream.selectedStream = selectedStream;
+        }
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
       }
@@ -915,6 +918,7 @@ const useLogs = () => {
   const getQueryData = async (isPagination = false) => {
     try {
       searchObj.meta.showDetailTab = false;
+      searchObj.meta.searchApplied = true;
 
       if (!searchObj.data.stream.streamLists?.length) {
         searchObj.loading = false;
@@ -1929,8 +1933,11 @@ const useLogs = () => {
     searchObj.data.editorValue = query;
     searchObj.data.query = query;
     searchObj.data.tempFunctionContent = "";
+    searchObj.meta.searchApplied = false;
 
-    handleQueryData();
+    if (store.state.zoConfig.query_on_stream_selection == false) {
+      handleQueryData();
+    }
   };
 
   return {
