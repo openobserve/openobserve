@@ -169,6 +169,7 @@ export default defineComponent({
         isInvalidDate(props.selectedTimeDate?.start_time) ||
         isInvalidDate(props.selectedTimeDate?.end_time)
       ) {
+        console.timeEnd("getVariablesData");
         return;
       }
       console.time("getVariablesData:clone-variablesConfigList");
@@ -183,6 +184,8 @@ export default defineComponent({
         variablesData.values = [];
         variablesData.isVariablesLoading = false;
         emitVariablesData();
+        console.timeEnd("getVariablesData:clone-variablesConfigList");
+        console.timeEnd("getVariablesData");
         return;
       }
       console.timeEnd("getVariablesData:clone-variablesConfigList");

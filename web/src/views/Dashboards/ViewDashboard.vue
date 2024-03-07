@@ -188,6 +188,10 @@ import {
   onActivated,
   nextTick,
   provide,
+  defineAsyncComponent,
+  reactive,
+  onMounted,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -195,16 +199,16 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
-import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
-import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue";
-import ExportDashboard from "../../components/dashboards/ExportDashboard.vue";
-import DashboardSettings from "./DashboardSettings.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
-import { onMounted } from "vue";
-import { onUnmounted } from "vue";
+
+const DashboardSettings = defineAsyncComponent(() => {
+  return import("./DashboardSettings.vue");
+});
 
 export default defineComponent({
   name: "ViewDashboard",
