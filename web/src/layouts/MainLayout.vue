@@ -26,40 +26,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
     >
       <q-toolbar>
-        <div class="flex relative-position q-mr-sm"  v-if="store.state.zoConfig.custom_logo_text != ''">
-          <!-- <span class="text-h6 text-bold">Open Log Search</span>
-          <q-icon name="bolt" size="sm" class="q-pt-xs q-pl-xs"></q-icon> -->
-
-          <!-- <span class="text-h6 text-bold">Open Log Search</span>
-          <span class="text-caption q-ml-sm q-mt-sm"> powered by </span> -->
-
-          
-            <span
-              class="text-bold q-pa-none"
-              style="margin-top: -9px; font-size: 17px;"
-              >{{ store.state.zoConfig.custom_logo_text }}</span
-            >
-            <br />
-            <span class="text-caption text-powered-by">
-              powered by </span
-            ><img
-              class="appLogo custom-text-logo"
-              src="/src/assets/images/common/open_observe_logo.svg"
-            />
-          </div>
-          <div v-else  class="flex relative-position q-mr-sm">
-            <img
-              class="appLogo"
-              :src="
-                store?.state?.theme == 'dark'
-                  ? getImageURL('images/common/open_observe_logo_2.svg')
-                  : getImageURL('images/common/open_observe_logo.svg')
-              "
-              @click="goToHome"
-            />
-            <span v-if="config.isCloud == 'true'" class="absolute beta-text"
-              >Beta</span
-            >
+        <div
+          class="flex relative-position q-mr-sm"
+          v-if="store.state.zoConfig.custom_logo_text != ''"
+        >
+          <span
+            class="text-bold q-pa-none cursor-pointer"
+            style="margin-top: -9px; font-size: 17px"
+            @click="goToHome"
+            >{{ store.state.zoConfig.custom_logo_text }}</span
+          >
+          <br />
+          <span
+            class="text-caption text-powered-by cursor-pointer"
+            @click="goToHome"
+          >
+            powered by </span
+          ><img
+            class="appLogo custom-text-logo"
+            :src="
+              store?.state?.theme == 'dark'
+                ? getImageURL('images/common/open_observe_logo_2.svg')
+                : getImageURL('images/common/open_observe_logo.svg')
+            "
+            @click="goToHome"
+          />
+        </div>
+        <div v-else class="flex relative-position q-mr-sm">
+          <img
+            class="appLogo"
+            :src="
+              store?.state?.theme == 'dark'
+                ? getImageURL('images/common/open_observe_logo_2.svg')
+                : getImageURL('images/common/open_observe_logo.svg')
+            "
+            @click="goToHome"
+          />
+          <span v-if="config.isCloud == 'true'" class="absolute beta-text"
+            >Beta</span
+          >
         </div>
 
         <q-toolbar-title></q-toolbar-title>
@@ -161,9 +166,7 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat
-unelevated no-caps
-padding="xs sm">
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"
