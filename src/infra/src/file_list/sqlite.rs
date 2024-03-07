@@ -772,7 +772,7 @@ pub async fn create_table_index() -> Result<()> {
     }
 
     // delete trigger for old version
-    // compitable for old version <= 0.6.4
+    // compatible for old version <= 0.6.4
     sqlx::query(r#"DROP TRIGGER IF EXISTS update_stream_stats_delete;"#)
         .execute(&*client)
         .await?;
