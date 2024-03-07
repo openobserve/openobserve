@@ -151,8 +151,7 @@ pub async fn search(
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     for task in tasks {
-        let (batches, stats) =
-            task.map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+        let (batches, stats) = task?;
         scan_stats.add(&stats);
         for (key, batch) in batches {
             if !batch.is_empty() {

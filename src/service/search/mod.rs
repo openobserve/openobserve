@@ -132,6 +132,7 @@ pub async fn search_partition(
                 )
             });
     let mut resp = search::SearchPartitionResponse {
+        session_id: session_id.to_string(),
         file_num: files.len(),
         records: records as usize,
         original_size: original_size as usize,
