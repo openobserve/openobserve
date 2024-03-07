@@ -395,7 +395,8 @@ async fn merge_files(
                     &stream_name,
                     new_file_schema,
                 )
-                .await?;
+                .await
+                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
