@@ -436,6 +436,18 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
+    #[env_config(
+        name = "ZO_QUERY_ON_STREAM_SELECTION",
+        default = true,
+        help = "Toggle search to be trigger based on button click event."
+    )]
+    pub query_on_stream_selection: bool,
+    #[env_config(
+        name = "ZO_CUSTOM_LOGO_TEXT",
+        default = "",
+        help = "Custom logo text."
+    )]
+    pub custom_logo_text: String,
 }
 
 #[derive(EnvConfig)]
