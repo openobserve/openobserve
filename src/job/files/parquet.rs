@@ -381,7 +381,7 @@ async fn merge_files(
     match storage::put(&new_file_key, buf.clone()).await {
         // data file
         Ok(_) => {
-            if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
+            if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 generate_index_on_ingester(fts_buf, new_file_key.clone(), &org_id, &stream_name)
                     .await
                     .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;

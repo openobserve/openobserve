@@ -1318,39 +1318,41 @@ pub async fn merge_parquet_files(
         &file_meta,
     );
     for batch in batches {
-        // for FTS
-        let mut columns_to_index = if !full_text_search_fields.is_empty() {
-            full_text_search_fields.to_vec()
-        } else {
-            config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-        };
+        if stream_type == StreamType::Logs {
+            // for FTS
+            let mut columns_to_index = if !full_text_search_fields.is_empty() {
+                full_text_search_fields.to_vec()
+            } else {
+                config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+            };
 
-        // add _timestamp column to columns_to_index
-        if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
-            columns_to_index.push(CONFIG.common.column_timestamp.to_string());
-        }
+            // add _timestamp column to columns_to_index
+            if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
+                columns_to_index.push(CONFIG.common.column_timestamp.to_string());
+            }
 
-        if !columns_to_index.is_empty() {
-            let selected_column_indices: Vec<usize> = columns_to_index
-                .iter()
-                .filter_map(|name| batch.schema().index_of(name).ok())
-                .collect();
+            if !columns_to_index.is_empty() {
+                let selected_column_indices: Vec<usize> = columns_to_index
+                    .iter()
+                    .filter_map(|name| batch.schema().index_of(name).ok())
+                    .collect();
 
-            // Use the found indices to select the columns
-            let selected_columns = selected_column_indices
-                .iter()
-                .map(|&i| batch.column(i).clone())
-                .collect();
+                // Use the found indices to select the columns
+                let selected_columns = selected_column_indices
+                    .iter()
+                    .map(|&i| batch.column(i).clone())
+                    .collect();
 
-            // Create a new schema for the new RecordBatch based on the selected columns
-            let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
-                .iter()
-                .map(|&i| batch.schema().field(i).clone())
-                .collect();
-            let new_schema = Arc::new(Schema::new(selected_fields));
+                // Create a new schema for the new RecordBatch based on the selected columns
+                let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
+                    .iter()
+                    .map(|&i| batch.schema().field(i).clone())
+                    .collect();
+                let new_schema = Arc::new(Schema::new(selected_fields));
 
-            // Create a new RecordBatch with the selected columns
-            fts_buf.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
+                // Create a new RecordBatch with the selected columns
+                fts_buf.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
+            }
         }
 
         writer.write(&batch).await?;
