@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
     <div
       class="flex justify-center text-center"
-      v-if="store.state.zoConfig.custom_logo_text != ''"
+      v-if="config.isEnterprise == 'true' && store.state.zoConfig.custom_logo_text != ''"
     >
       <div class="text-h5 text-bold q-pa-none text-centered full-width">
         {{ store.state.zoConfig.custom_logo_text }}
@@ -344,6 +344,7 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      config,
     };
   },
   methods: {
