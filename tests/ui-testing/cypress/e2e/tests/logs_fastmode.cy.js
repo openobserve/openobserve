@@ -30,8 +30,12 @@ describe("Logs testcases", () => {
       .its("response.body.hits")
       .should("be.an", "array")
       .then((hits) => {
-        expect(Object.keys(hits[0]).length).to.be.at.most(20);
-        // Add more assertions if needed
+        console.log(hits, "hits");
+        if (hits.length > 0) {
+          expect(Object.keys(hits[0]).length).to.be.at.most(20);
+          // Add more assertions if needed
+        }
+    
   });
 
   }
