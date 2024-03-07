@@ -103,6 +103,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let rbac_enabled = O2_CONFIG.openfga.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
+    #[cfg(feature = "enterprise")]
+    let custom_logo_text = &O2_CONFIG.common.custom_logo_text;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_logo_text = "";
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -126,7 +130,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         native_login_enabled,
         rbac_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
-        custom_logo_text: CONFIG.common.custom_logo_text.clone(),
+        custom_logo_text: custom_logo_text.to_string(),
     }))
 }
 
