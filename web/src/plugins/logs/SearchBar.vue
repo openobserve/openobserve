@@ -79,7 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete" color="grey" size="xs" />
+                    <q-icon name="delete"
+color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -196,7 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item"
+clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -915,7 +917,10 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
-      if (searchObj.loading == false) {
+      if (
+        searchObj.loading == false &&
+        store.state.zoConfig.query_on_stream_selection == false
+      ) {
         searchObj.loading = true;
         searchObj.runQuery = true;
       }
@@ -932,11 +937,17 @@ export default defineComponent({
         });
       }
 
-      if (value.valueType === "relative") emit("searchdata");
+      if (
+        value.valueType === "relative" &&
+        store.state.zoConfig.query_on_stream_selection == false
+      )
+        emit("searchdata");
     };
 
     const updateTimezone = () => {
-      emit("onChangeTimezone");
+      if (store.state.zoConfig.query_on_stream_selection == false) {
+        emit("onChangeTimezone");
+      }
     };
 
     const udpateQuery = () => {

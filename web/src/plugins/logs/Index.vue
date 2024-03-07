@@ -146,16 +146,36 @@ size="md" /> Select a
                   v-else-if="
                     searchObj.data.queryResults.hasOwnProperty('hits') &&
                     searchObj.data.queryResults.hits.length == 0 &&
-                    searchObj.loading == false
+                    searchObj.loading == false &&
+                    searchObj.meta.searchApplied == true
                   "
                   class="row"
                 >
-                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-10">
-                    <q-icon
-                      name="info"
-                      color="primary"
-                      size="md"
-                    /> {{ t("search.noRecordFound") }}
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-10"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.noRecordFound") }}
+                  </h6>
+                </div>
+                <div
+                  v-else-if="
+                    searchObj.data.queryResults.hasOwnProperty('hits') &&
+                    searchObj.data.queryResults.hits.length == 0 &&
+                    searchObj.loading == false &&
+                    searchObj.meta.searchApplied == false
+                  "
+                  class="row"
+                >
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-10"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.applySearch") }}
                   </h6>
                 </div>
                 <div
