@@ -293,25 +293,21 @@ import {
   ref,
   computed,
   toRaw,
-  onActivated,
   nextTick,
   watch,
   reactive,
-  onDeactivated,
   onUnmounted,
   onMounted,
+  defineAsyncComponent,
 } from "vue";
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
-import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
-import CustomHTMLEditor from "@/components/dashboards/addPanel/CustomHTMLEditor.vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar } from "quasar";
 
 import { useI18n } from "vue-i18n";
 import {
   addPanel,
-  getConsumableDateTime,
   getDashboard,
   getPanel,
   updatePanel,
@@ -327,9 +323,23 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
-import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import { provide } from "vue";
-import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
+
+const ConfigPanel = defineAsyncComponent(() => {
+  return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
+});
+
+const QueryInspector = defineAsyncComponent(() => {
+  return import("@/components/dashboards/QueryInspector.vue");
+});
+
+const CustomHTMLEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomHTMLEditor.vue");
+});
+
+const CustomMarkdownEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
+});
 
 export default defineComponent({
   name: "AddPanel",
