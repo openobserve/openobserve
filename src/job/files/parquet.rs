@@ -39,10 +39,7 @@ use datafusion::{
     arrow::json as arrow_json, common::ExprSchema, datasource::MemTable, prelude::*,
     scalar::ScalarValue,
 };
-use infra::{
-    cache,
-    storage::{self},
-};
+use infra::{cache, storage};
 use parquet::arrow::{
     arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
 };
