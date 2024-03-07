@@ -116,22 +116,8 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });
 
-  // This is a test case to navigate to the logs page
-  it("Navigate to the logs page", () => {
-    // Visit the base URL
-    // cy.visit("/");
-    // // Trigger a mouseover   event on the logs menu link
-    // cy.get('[data-test="menu-link-/logs-item"]').trigger("mouseover");
-    // // Click on the logs menu link that contains the module log data
-    // cy.get('[data-test="menu-link-/logs-item"]')
-    //   .contains(logData.moduleLog)
-    //   .click();
-  });
 
-  // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
-
-  // This test checks that clicking on the histogram toggle button in SQL mode does not toggle the chart
-  it("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
+  it("should display results for fast mode off for match all case", () => {
    
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
@@ -149,7 +135,43 @@ describe("Logs testcases", () => {
     fastModeOff()
   
   });
-it("should contain options to include, exclude and add field to table under Json", () => {
+
+  it.only("should display results for fast mode off", () => {
+   
+    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+      .click() // Click on the editor to focus
+      .type("match_all_indexed('provide_credentials')")
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
+    // Type the value of a variable into an input field
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+   applyQueryButton()
+  
+  });
+
+  it.only("should display results for fast mode off", () => {
+   
+    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+      .click() // Click on the editor to focus
+      .type("match_all_ignore_case('provide_credentials')")
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
+    // Type the value of a variable into an input field
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+   applyQueryButton()
+  
+  });
+it("should display correct results when fast mode on", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
