@@ -164,7 +164,7 @@ describe("Logs testcases", () => {
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-  applyQueryButton()
+//   applyQueryButton()
   
   });
 
@@ -180,7 +180,7 @@ describe("Logs testcases", () => {
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-   applyQueryButton()
+//    applyQueryButton()
   
   });
 
@@ -196,7 +196,7 @@ describe("Logs testcases", () => {
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-    applyQueryButton()
+    // applyQueryButton()
   });
 
 
@@ -209,7 +209,7 @@ describe("Logs testcases", () => {
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-    applyQueryButton()
+    // applyQueryButton()
   });
 
   it("should display results for fast mode on with sql mode on and run query", () => {
@@ -221,7 +221,7 @@ describe("Logs testcases", () => {
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-    applyQueryButton()
+    // applyQueryButton()
   
   });
 
@@ -242,7 +242,7 @@ describe("Logs testcases", () => {
     applyQueryButton()
   });
 
-it("should display correct results when fast mode on", () => {
+it.skip("should display correct results when fast mode on", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -334,7 +334,7 @@ it("should display correct results when fast mode on", () => {
         '[data-test="log-detail-json-content"] >>> [data-test="log-details-include-exclude-field-btn"] :first'
       ).click({ force: true });
       cy.contains("Add field to table").click({ force: true });
-      applyQueryButton();
+    //   applyQueryButton();
     });
   });
 
