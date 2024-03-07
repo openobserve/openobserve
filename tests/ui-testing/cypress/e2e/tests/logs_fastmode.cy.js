@@ -26,6 +26,14 @@ describe("Logs testcases", () => {
     // get the data from the search variable
     cy.wait("@search").its("response.statusCode").should("eq", 200);
     cy.get("@search").its("response.body.hits").should("be.an", "array");
+    cy.get("@search")
+      .its("response.body.hits")
+      .should("be.an", "array")
+      .then((hits) => {
+        expect(hits.length).to.be.at.most(20);
+        // Add more assertions if needed
+  });
+
   }
 
   before(function () {
