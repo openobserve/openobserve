@@ -52,9 +52,7 @@ use crate::{
     common::{infra::wal, meta::stream::SchemaRecords},
     job::files::idx::write_to_disk,
     service::{
-        db,
-        search::datafusion::exec::merge_parquet_files,
-        stream::{self, get_stream_setting_fts_fields},
+        db, search::datafusion::exec::merge_parquet_files, stream::get_stream_setting_fts_fields,
     },
 };
 
@@ -178,16 +176,13 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 }
             }
 
-            // get latest schema
-            let latest_schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
-
             // start merge files and upload to s3
             loop {
                 // yield to other tasks
                 tokio::task::yield_now().await;
                 // merge file and get the big file key
                 let (new_file_name, new_file_meta, new_file_list) =
-                    match merge_files(&latest_schema, &wal_dir, &files_with_size).await {
+                    match merge_files(&wal_dir, &files_with_size).await {
                         Ok(v) => v,
                         Err(e) => {
                             log::error!("[INGESTER:JOB] merge files failed: {}", e);
@@ -278,7 +273,6 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
 /// merge some small files into one big file, upload to storage, returns the big
 /// file key and merged files
 async fn merge_files(
-    latest_schema: &Schema,
     wal_dir: &Path,
     files_with_size: &[FileKey],
 ) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
@@ -351,18 +345,12 @@ async fn merge_files(
     let stream_name = columns[3].to_string();
     let file_name = columns[4].to_string();
 
-    // merge files
-    let bloom_filter_fields =
-        stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
-    let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
-    let (mut new_file_meta, new_file_schema) = merge_parquet_files(
+    let (mut new_file_meta, _) = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
-        &bloom_filter_fields,
-        &full_text_search_fields,
         new_file_size,
         stream_type,
         &mut fts_buf,
@@ -394,15 +382,9 @@ async fn merge_files(
         // data file
         Ok(_) => {
             if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
-                generate_index_on_ingester(
-                    fts_buf,
-                    new_file_key.clone(),
-                    &org_id,
-                    &stream_name,
-                    new_file_schema,
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
+                generate_index_on_ingester(fts_buf, new_file_key.clone(), &org_id, &stream_name)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -416,12 +398,10 @@ pub(crate) async fn generate_index_on_ingester(
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
-    schema: SchemaRef,
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
-
     let index_record_batches =
-        prepare_index_record_batches_for_ingester(buf, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
     if record_batches.is_empty() {
         return Ok(());
@@ -492,14 +472,13 @@ pub(crate) async fn generate_index_on_ingester(
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    buf: Bytes,
+    buf: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
-    schema: SchemaRef,
 ) -> Result<(String, FileMeta), anyhow::Error> {
     let mut index_record_batches =
-        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
@@ -563,7 +542,7 @@ pub(crate) async fn generate_index_on_compactor(
 /// * `org_id` - The organization ID.
 /// * `stream_name` - The stream name.
 /// * `new_file_key` - The new file key which is used to generate the index file.
-async fn prepare_index_record_batches(
+async fn _prepare_index_record_batches(
     buf: Bytes, // 10 fields index
     schema: Arc<Schema>,
     org_id: &str,
@@ -631,7 +610,7 @@ async fn prepare_index_record_batches(
     Ok(indexed_record_batches_to_merge)
 }
 
-async fn prepare_index_record_batches_for_ingester(
+async fn prepare_index_record_batches_v1(
     batches: Vec<RecordBatch>, // 10 fields index
     org_id: &str,
     stream_name: &str,
@@ -640,13 +619,10 @@ async fn prepare_index_record_batches_for_ingester(
     if batches.is_empty() {
         return Ok(vec![]);
     }
-
     let local = batches.first().unwrap().schema();
-
     let ctx = SessionContext::new();
     let provider = MemTable::try_new(local.clone(), vec![batches])?;
     ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
-
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
