@@ -173,7 +173,7 @@ describe("Logs testcases", () => {
   
   });
 
-  it("should display results for fast mode on and match all ignore case", () => {
+  it("should display results for fast mode on and match all indexed ignore case", () => {
    
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
@@ -191,11 +191,8 @@ describe("Logs testcases", () => {
   });
 
 
-  it("should display results for fast mode on and match all ignore case", () => {
+  it("should display results for fast mode on and run query", () => {
    
-    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
-      .click() // Click on the editor to focus
-      .type("match_all_indexed_ignore_case('provide_credentials')")
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
     cy.intercept("POST", logData.applyQuery).as("search");
     cy.wait(3000);
@@ -304,8 +301,6 @@ it("should display correct results when fast mode on", () => {
       applyQueryButton();
     });
   });
-
-
 
 
 });
