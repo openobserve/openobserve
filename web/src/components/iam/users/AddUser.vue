@@ -280,6 +280,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
   </q-card>
+  <q-dialog v-model="logout_confirm" persistent>
+    <q-card>
+      <q-card-section class="row items-center">
+        <q-avatar icon="info"
+color="primary" text-color="white" />
+        <span class="q-ml-sm"
+          >As you've chosen to change your password, you'll be automatically
+          logged out.</span
+        >
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <q-btn flat label="Ok"
+color="primary" @click="signout" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -289,7 +306,12 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import userServiece from "@/services/users";
-import { getImageURL } from "@/utils/zincutils";
+import {
+  getImageURL,
+  useLocalToken,
+  useLocalCurrentUser,
+  useLocalUserInfo,
+} from "@/utils/zincutils";
 
 const defaultValue: any = () => {
   return {
@@ -346,6 +368,7 @@ export default defineComponent({
     const isOldPwd: any = ref(true);
     let organizationOptions: any = ref([]);
     const loadingOrganizations = ref(true);
+    const logout_confirm = ref(false);
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -393,6 +416,7 @@ export default defineComponent({
       existingUser,
       getImageURL,
       loadingOrganizations,
+      logout_confirm,
     };
   },
   created() {
@@ -411,6 +435,13 @@ export default defineComponent({
     }
   },
   methods: {
+    signout() {
+      this.store.dispatch("logout");
+      useLocalToken("", true);
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
+      this.$router.push("/logout");
+    },
     onSubmit() {
       const dismiss = this.$q.notify({
         spinner: true,
@@ -434,9 +465,13 @@ export default defineComponent({
         userServiece
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-            dismiss();
-            this.formData.email = userEmail;
-            this.$emit("updated", res.data, this.formData, "updated");
+            if (this.formData.change_password == true) {
+              this.logout_confirm = true;
+            } else {
+              dismiss();
+              this.formData.email = userEmail;
+              this.$emit("updated", res.data, this.formData, "updated");
+            }
           })
           .catch((err: any) => {
             this.$q.notify({
