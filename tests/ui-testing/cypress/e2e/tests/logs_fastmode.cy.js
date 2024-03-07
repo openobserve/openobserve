@@ -35,11 +35,38 @@ describe("Logs testcases", () => {
           expect(Object.keys(hits[0]).length).to.be.at.most(20);
           // Add more assertions if needed
         }
-    
+       
   });
 
   }
 
+
+  function fastModeOff() {
+    // click on the run query button
+    // Type the value of a variable into an input field
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
+    // get the data from the search variable
+    cy.wait("@search").its("response.statusCode").should("eq", 200);
+    cy.get("@search").its("response.body.hits").should("be.an", "array");
+    cy.get("@search")
+      .its("response.body.hits")
+      .should("be.an", "array")
+      .then((hits) => {
+        console.log(hits, "hits");
+        if (hits.length > 0) {
+          expect(Object.keys(hits[0]).length).greaterThan(5)
+          // Add more assertions if needed
+        }
+       
+  });
+
+  
+
+  }
   before(function () {
     cy.fixture("log").then(function (data) {
       logData = data;
@@ -104,31 +131,46 @@ describe("Logs testcases", () => {
   // This test checks if the histogram toggle button works correctly by clicking it and verifying that the chart is hidden.
 
   // This test checks that clicking on the histogram toggle button in SQL mode does not toggle the chart
-//   it.only("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
+  it.only("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
    
-//     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
-//       .click() // Click on the editor to focus
-//       .type("match_all_indexed('provide_credentials')")
-//     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
-//     cy.intercept("POST", logData.applyQuery).as("search");
-//     cy.wait(3000);
-//     cy.get("[data-test='logs-search-bar-refresh-btn']", {
-//       timeout: 2000,
-//     }).click({ force: true });
-//     // Type the value of a variable into an input field
-//     cy.intercept("POST", logData.applyQuery).as("search");
-//     cy.wait(3000);
+    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+      .click() // Click on the editor to focus
+      .type("match_all_indexed('provide_credentials')")
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+    cy.get('[data-test="logs-search-bar-fast-mode-toggle-btn"]').click()
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
+    // Type the value of a variable into an input field
+    cy.intercept("POST", logData.applyQuery).as("search");
+    cy.wait(3000);
+    fastModeOff()
 
-//     // Get the data from the search variable
-//     cy.wait("@search").its("response.statusCode").should("eq", 200);
-//     cy.get("@search").its("response.body.hits").should("be.an", "array");
-//     cy.get("@search").its("response.body.took").should("be.greaterThan", 0);
+    // Get the data from the search variable
+    // cy.wait("@search").its("response.statusCode").should("eq", 200);
+    // cy.get("@search")
+    //   .its("response.body.hits")
+    //   .should("be.an", "array")
+    //   .then((hits) => {
+    //     console.log(hits, "hits");
+    //     cy.window().then((win) => {
+    //         cy.spy(win.console, 'log').as('consoleLog');
+    //       });
+    //     if (hits.length > 0) {
 
-
-//     // cy.get('[data-test="logs-search-bar-fast-mode-toggle-btn"]').click()
-  
+    //       expect(Object.keys(hits[0]).length).greaterThan(5);
+//     //       // Add more assertions if needed
+//         }
+       
 //   });
-it.only("should contain options to include, exclude and add field to table under Json", () => {
+
+
+    // cy.get('[data-test="logs-search-bar-fast-mode-toggle-btn"]').click()
+  
+  });
+it("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
