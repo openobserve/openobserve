@@ -139,8 +139,9 @@ pub async fn search(
         Ok(v) => v,
         Err(e) => {
             return Ok(match e {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     e.to_string(),
@@ -281,8 +282,9 @@ pub async fn search(
                 .inc();
             log::error!("search error: {:?}", err);
             Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -438,8 +440,9 @@ pub async fn around(
                 .inc();
             log::error!("search around error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -493,8 +496,9 @@ pub async fn around(
                 .inc();
             log::error!("search around error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -793,8 +797,9 @@ async fn values_v1(
                 .inc();
             log::error!("search values error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -929,40 +934,42 @@ async fn values_v2(
         encoding: meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_search =
-        match SearchService::search(&session_id, org_id, StreamType::Metadata, &req).await {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_values/v2",
-                        "500",
-                        org_id,
-                        stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_values/v2",
-                        "500",
-                        org_id,
-                        stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .inc();
-                log::error!("search values error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
+    let resp_search = match SearchService::search(&session_id, org_id, StreamType::Metadata, &req)
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_values/v2",
+                    "500",
+                    org_id,
+                    stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_values/v2",
+                    "500",
+                    org_id,
+                    stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search values error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
 
     let mut resp = meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
@@ -1116,8 +1123,9 @@ pub async fn search_partition(
                 .inc();
             log::error!("search error: {:?}", err);
             Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
