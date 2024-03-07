@@ -442,11 +442,7 @@ pub struct Common {
         help = "Toggle search to be trigger based on button click event."
     )]
     pub query_on_stream_selection: bool,
-    #[env_config(
-        name = "ZO_CUSTOM_LOGO_TEXT",
-        default = "",
-        help = "Custom logo text."
-    )]
+    #[env_config(name = "ZO_CUSTOM_LOGO_TEXT", default = "", help = "Custom logo text.")]
     pub custom_logo_text: String,
 }
 
@@ -529,7 +525,7 @@ pub struct Limit {
     #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
     pub fast_mode_num_fields: usize,
     #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
-    pub fast_mode_strategy: String, // first, last, both
+    pub fast_mode_strategy: String, // first, last, both, file_list
 }
 
 #[derive(EnvConfig)]
