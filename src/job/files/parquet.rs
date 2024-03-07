@@ -395,7 +395,8 @@ async fn merge_files(
                     &stream_name,
                     new_file_schema,
                 )
-                .await?;
+                .await
+                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -597,11 +598,7 @@ async fn prepare_index_record_batches(
             continue;
         }
 
-        let split_arr = array_distinct(string_to_array(
-            lower(col(column)),
-            lit(" "),
-            lit(ScalarValue::Null),
-        ));
+        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
         let record_batch = index_df
             .with_column("terms", split_arr)?
             .unnest_column("terms")?

@@ -542,11 +542,12 @@ async fn merge_files(
                     stream_name,
                     new_file_schema.clone(),
                 )
-                .await?;
+                .await
+                .map_err(|e| anyhow::anyhow!("generate_index_on_compactor error: {}", e))?;
                 if !index_file_name.is_empty() {
                     log::info!("Created index file during compaction {}", index_file_name);
                     // Notify that we wrote the index file to the db.
-                    let ret = write_file_list(
+                    if let Err(e) = write_file_list(
                         org_id,
                         &[FileKey {
                             key: index_file_name.clone(),
@@ -554,10 +555,10 @@ async fn merge_files(
                             deleted: false,
                         }],
                     )
-                    .await;
-                    if let Err(e) = ret {
+                    .await
+                    {
                         log::error!(
-                            "[merge_files] failed to write to file list on compactor: {}, error: {}",
+                            "generate_index_on_compactor write to file list: {}, error: {}",
                             index_file_name,
                             e.to_string()
                         );
