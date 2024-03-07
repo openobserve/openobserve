@@ -1199,8 +1199,8 @@ export default defineComponent({
   display: inline-block;
   float: left;
   position: absolute;
-  margin-left: 72px;
-  margin-top: 16px;
-  width: 100px;
+  margin-left: 72px !important;
+  margin-top: 16px !important;
+  width: 80px !important;
 }
 </style>
