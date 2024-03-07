@@ -442,8 +442,6 @@ pub struct Common {
         help = "Toggle search to be trigger based on button click event."
     )]
     pub query_on_stream_selection: bool,
-    #[env_config(name = "ZO_CUSTOM_LOGO_TEXT", default = "", help = "Custom logo text.")]
-    pub custom_logo_text: String,
 }
 
 #[derive(EnvConfig)]
