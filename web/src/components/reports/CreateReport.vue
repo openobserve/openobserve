@@ -1107,6 +1107,10 @@ const convertDateToTimestamp = (
     minute: Number(minute),
   };
 
+  if (timezone.toLowerCase() == browserTime.toLowerCase()) {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+
   // Create a DateTime instance from date and time, then set the timezone
   const dateTime = _DateTime.fromObject(_date, { zone: timezone });
 
@@ -1135,8 +1139,9 @@ const saveReport = async () => {
     // Combine them in the HH:MM format
     scheduling.value.time = `${hours}:${minutes}`;
 
-    scheduling.value.timezone = "UTC";
+    scheduling.value.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   }
+
 
   formData.value.start = convertDateToTimestamp(
     scheduling.value.date,
