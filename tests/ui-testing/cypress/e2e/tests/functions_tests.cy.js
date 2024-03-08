@@ -230,10 +230,12 @@ describe("Functions testcases", () => {
       cy.get(".q-input > .q-field__inner > .q-field__control").type(fileName);
       cy.contains("Save").click({ force: true });
       cy.wait(3000);
+      cy.reload();
       // cy.get('[title="Delete Function"]').click({ force: true });
       // cy.get('[data-test="confirm-button"]').click({ force: true });
       cy.get("tbody tr").each(($row) => {
         const functionName = $row.find("td.text-left:eq(1)").text();
+     
 
         // Check if the function name contains "enrichment_info"
         if (functionName.includes("enrichment_info")) {
