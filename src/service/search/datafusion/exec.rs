@@ -1022,7 +1022,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         }
         fields = new_fields;
     }
-    if fields.len() != schema.fields().len() {
+    if fields.len() > schema.fields().len() {
         log::error!(
             "in sql fields: {:?}",
             fields
