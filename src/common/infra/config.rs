@@ -45,6 +45,7 @@ pub static BUILD_DATE: &str = env!("GIT_BUILD_DATE");
 // global cache variables
 pub static KVS: Lazy<RwHashMap<String, bytes::Bytes>> = Lazy::new(Default::default);
 pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<Schema>>> = Lazy::new(Default::default);
+pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, Schema>> = Lazy::new(Default::default);
 pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new(Default::default);
 pub static STREAM_FUNCTIONS: Lazy<RwHashMap<String, StreamFunctionsList>> =
     Lazy::new(DashMap::default);
