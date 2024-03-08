@@ -522,11 +522,11 @@ const useLogs = () => {
           .join("\n");
         const parsedSQL: any = parser.astify(query);
         if (parsedSQL.limit != null) {
-          // req.query.size = parsedSQL.limit.value[0].value;
+          req.query.size = parsedSQL.limit.value[0].value;
 
-          // if (parsedSQL.limit.seperator == "offset") {
-          //   req.query.from = parsedSQL.limit.value[1].value || 0;
-          // }
+          if (parsedSQL.limit.seperator == "offset") {
+            req.query.from = parsedSQL.limit.value[1].value || 0;
+          }
 
           // parsedSQL.limit = null;
 
@@ -1063,6 +1063,23 @@ const useLogs = () => {
         delete queryReq.query.track_total_hits;
       }
 
+      if (searchObj.meta.sqlMode == true) {
+        const tempquery = searchObj.data.query
+          .split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
+        const parsedSQL: any = parser.astify(tempquery);
+        if (parsedSQL.limit != null) {
+          queryReq.query.size = parsedSQL.limit.value[0].value;
+          searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+
+          if (parsedSQL.limit.seperator == "offset") {
+            queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+          }
+        }
+        delete queryReq.query.track_total_hits;
+      }
+
       searchService
         .search({
           org_identifier: searchObj.organizationIdetifier,
@@ -1512,7 +1529,7 @@ const useLogs = () => {
       endCount +
       " out of " +
       searchObj.data.queryResults.total.toLocaleString() +
-      " hits in " +
+      " events in " +
       searchObj.data.queryResults.took +
       " ms. (Scan Size: " +
       formatSizeFromMB(searchObj.data.queryResults.scan_size) +
@@ -1547,8 +1564,7 @@ const useLogs = () => {
       }
 
       const chartParams = {
-        title:
-          searchObj.data.histogram.chartParams.title || getHistogramTitle(),
+        title: getHistogramTitle(),
         unparsed_x_data: unparsed_x_data,
         timezone: store.state.timezone,
       };
