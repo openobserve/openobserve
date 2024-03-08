@@ -523,7 +523,9 @@ pub struct Limit {
     #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
     pub fast_mode_num_fields: usize,
     #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
-    pub fast_mode_strategy: String, // first, last, both, file_list
+    pub fast_mode_strategy: String, // first, last, both
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
+    pub fast_mode_file_list_enabled: bool,
 }
 
 #[derive(EnvConfig)]

@@ -28,7 +28,7 @@ use crate::{
     common::{
         infra::{
             cluster::get_cached_online_querier_nodes,
-            config::{ENRICHMENT_TABLES, STREAM_SCHEMAS, STREAM_SETTINGS},
+            config::{ENRICHMENT_TABLES, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS},
         },
         meta::stream::{StreamSchema, StreamSettings},
     },
@@ -47,15 +47,20 @@ pub async fn get(
     let key = mk_key(org_id, stream_type, stream_name);
     let map_key = key.strip_prefix("/schema/").unwrap();
 
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(schema) = r.get(map_key) {
-        return Ok(schema.last().unwrap().clone());
+        return Ok(schema.clone());
     }
 
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
-        Err(_) => {
-            // REVIEW: shouldn't we report the error?
+        Err(err) => {
+            log::warn!("Schema doesn't exist: {} {}", key, err);
+            let r = STREAM_SCHEMAS_LATEST.read().await;
+            if let Some(schema) = r.get(map_key) {
+                return Ok(schema.clone());
+            }
+
             Schema::empty()
         }
         Ok(v) => {
@@ -356,10 +361,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
+
                 let settings = stream_settings(item_value.last().unwrap()).unwrap_or_default();
-                let mut w = STREAM_SCHEMAS.write().await;
-                w.insert(item_key.to_string(), item_value.clone());
-                drop(w);
+                if let Some(last) = item_value.last() {
+                    let mut sl = STREAM_SCHEMAS_LATEST.write().await;
+                    sl.insert(item_key.to_string(), last.clone());
+                    drop(sl);
+                }
+                let mut sa = STREAM_SCHEMAS.write().await;
+                sa.insert(item_key.to_string(), item_value.clone());
+                drop(sa);
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
@@ -387,9 +398,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = columns[0];
                 let stream_type = StreamType::from(columns[1]);
                 let stream_name = columns[2];
-                let mut w = STREAM_SCHEMAS.write().await;
-                w.remove(item_key);
-                drop(w);
+                let mut sa = STREAM_SCHEMAS.write().await;
+                sa.remove(item_key);
+                drop(sa);
+                let mut sl = STREAM_SCHEMAS_LATEST.write().await;
+                sl.remove(item_key);
+                drop(sl);
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
                 drop(w);
@@ -452,9 +466,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             }
         };
         let settings = stream_settings(json_val.last().unwrap()).unwrap_or_default();
-        let mut w = STREAM_SCHEMAS.write().await;
-        w.insert(item_key_str.to_string(), json_val);
-        drop(w);
+        if let Some(last) = json_val.last() {
+            let mut sl = STREAM_SCHEMAS_LATEST.write().await;
+            sl.insert(item_key_str.to_string(), last.clone());
+            drop(sl);
+        }
+        let mut sa = STREAM_SCHEMAS.write().await;
+        sa.insert(item_key_str.to_string(), json_val);
+        drop(sa);
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key_str.to_string(), settings);
         drop(w);
