@@ -236,6 +236,16 @@ async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
             report.enabled = false;
             db::dashboards::reports::set(org_id, &report).await?;
         }
+        ReportFrequencyType::Cron => {
+            let schedule = Schedule::from_str(&report.frequency.cron)?;
+            // tz_offset is in minutes
+            let tz_offset = FixedOffset::east_opt(report.tz_offset * 60).unwrap();
+            new_trigger.next_run_at = schedule
+                .upcoming(tz_offset)
+                .next()
+                .unwrap()
+                .timestamp_micros();
+        }
     }
 
     // Report generation can take more than 30 seconds to complete

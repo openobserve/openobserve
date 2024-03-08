@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
 use config::{get_chrome_launch_options, CONFIG, SMTP_CLIENT};
+use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
@@ -29,7 +30,8 @@ use crate::{
         meta::{
             authz::Authz,
             dashboards::reports::{
-                Report, ReportDashboard, ReportDestination, ReportTimerangeType,
+                Report, ReportDashboard, ReportDestination, ReportFrequencyType,
+                ReportTimerangeType,
             },
         },
         utils::auth::{remove_ownership, set_ownership},
@@ -61,6 +63,13 @@ pub async fn save(
     }
     if report.name.contains('/') {
         return Err(anyhow::anyhow!("Report name cannot contain '/'"));
+    }
+
+    if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        // Check if the cron expression is valid
+        Schedule::from_str(&report.frequency.cron)?;
+    } else if report.frequency.interval == 0 {
+        report.frequency.interval = 1;
     }
 
     match db::dashboards::reports::get(org_id, &report.name).await {
