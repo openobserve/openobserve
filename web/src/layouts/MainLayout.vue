@@ -495,7 +495,7 @@ export default defineComponent({
       {
         title: t("menu.slack"),
         iconComponent: markRaw(SlackIcon),
-        link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
+        link: "https://short.openobserve.ai/community",
         target: "_blank",
         external: true,
       },

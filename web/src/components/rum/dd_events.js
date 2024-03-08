@@ -4024,7 +4024,7 @@ export const dd_events = [
                                   role: "listitem",
                                   tabindex: "0",
                                   "data-test":
-                                    "menu-link-https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg-item",
+                                    "menu-link-https://short.openobserve.ai/community-item",
                                   "data-v-88dacebc": "",
                                 },
                                 childNodes: [
