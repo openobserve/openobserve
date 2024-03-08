@@ -55,11 +55,12 @@ pub async fn get(
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
         Err(err) => {
+            log::warn!("Schema doesn't exist: {} {}", key, err);
             let r = STREAM_SCHEMAS_LATEST.read().await;
             if let Some(schema) = r.get(map_key) {
                 return Ok(schema.clone());
             }
-            log::warn!("Schema doesn't exist: {} {}", key, err);
+
             Schema::empty()
         }
         Ok(v) => {
