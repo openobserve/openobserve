@@ -593,7 +593,7 @@ async fn _prepare_index_record_batches(
         }
 
         let split_arr = array_distinct(string_to_array(
-            lower(concat(&[col(column.name()), lit("")])),
+            lower(concat(&[col(column), lit("")])),
             lit(" "),
             lit(ScalarValue::Null),
         ));
