@@ -74,8 +74,9 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
 ];
 
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
-static RE_COUNT_DISTINCT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap());
+static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"count\*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
+});
 static RE_FIELD_FN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
@@ -609,10 +610,10 @@ pub async fn merge(
 
     if !is_final_phase
         && RE_COUNT_DISTINCT
-            .captures(query_sql.to_lowercase().as_str())
+            .captures(sql.to_lowercase().as_str())
             .is_some()
     {
-        query_sql = rewrite::rewrite_count_distinct_sql(&query_sql, false);
+        query_sql = rewrite::rewrite_count_distinct_sql(&sql, false);
     }
 
     // query data

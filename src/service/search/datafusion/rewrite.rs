@@ -162,7 +162,7 @@ impl VisitorMut for Rewrite {
                                 }
                                 field_names.insert(field_name.clone());
                                 *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                    Expr::Identifier(Ident::new(format!("{}", args[0]))),
+                                    Expr::Identifier(Ident::new(field_name)),
                                 )
                             }
                         }
@@ -268,6 +268,7 @@ mod tests {
     fn test_count_distinct_rewrite_phase1() {
         let sql = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -276,6 +277,7 @@ mod tests {
         ];
 
         let excepts = vec![
+            "SELECT DISTINCT a FROM tbl WHERE a > 3",
             "SELECT DISTINCT a FROM tbl WHERE a > 3",
             "SELECT DISTINCT a, b FROM tbl WHERE a > 3",
             "SELECT DISTINCT a, b, c FROM tbl WHERE a > 3",
@@ -296,6 +298,7 @@ mod tests {
     fn test_count_distinct_rewrite_phase2() {
         let sql = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -304,6 +307,7 @@ mod tests {
         ];
 
         let excepts = vec![
+            "SELECT DISTINCT a FROM tbl",
             "SELECT DISTINCT a FROM tbl",
             "SELECT DISTINCT a, b FROM tbl",
             "SELECT DISTINCT a, b, c FROM tbl",
@@ -324,6 +328,7 @@ mod tests {
     fn test_count_distinct_rewrite_phase3() {
         let sql = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -333,6 +338,7 @@ mod tests {
 
         let excepts = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl LIMIT 10",
+            "SELECT COUNT(DISTINCT (a)) FROM tbl LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(DISTINCT c) FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt, COUNT(b) FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
