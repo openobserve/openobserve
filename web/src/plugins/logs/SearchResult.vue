@@ -455,6 +455,7 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "expandlog",
+    "update:recordsPerPage",
   ],
   props: {
     expandedLogs: {
@@ -490,7 +491,7 @@ export default defineComponent({
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
         this.refreshPartitionPagination(true);
-        this.$emit("update:scroll");
+        this.$emit("update:recordsPerPage");
         this.searchTableRef.scrollTo(0);
       } else if (actionType == "pageChange") {
         if (
