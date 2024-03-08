@@ -16,6 +16,7 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
+    sync::Arc,
 };
 
 use chrono::Duration;
@@ -398,23 +399,21 @@ impl Sql {
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let mut fields = vec![];
-            if CONFIG.limit.fast_mode_strategy.to_lowercase() == "file_list" {
-                fields = generate_fast_mode_fields_from_file_list(
+            let file_schema = if CONFIG.limit.fast_mode_file_list_enabled {
+                generate_fast_mode_fields_from_file_list(
                     &session_id,
                     &org_id,
                     stream_type,
                     &stream_name,
                     partition_time_level,
                     meta.time_range.unwrap_or_default(),
-                    &schema,
-                    &match_all_fields,
                 )
-                .await;
-            }
-            if fields.is_empty() {
-                fields = generate_fast_mode_fields_from_schema(&schema, &match_all_fields);
-            }
+                .await
+            } else {
+                None
+            };
+            let fields =
+                generate_fast_mode_fields_from_schema(&file_schema, &schema, &match_all_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -790,9 +789,16 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
-fn generate_fast_mode_fields_from_schema(schema: &Schema, fts_fields: &[String]) -> Vec<String> {
+fn generate_fast_mode_fields_from_schema(
+    file_schema: &Option<Arc<Schema>>,
+    schema: &Schema,
+    fts_fields: &[String],
+) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = schema.fields();
+    let schema_fields = match file_schema {
+        Some(v) => v.fields(),
+        None => schema.fields(),
+    };
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
@@ -973,7 +979,6 @@ fn split_sql_token(text: &str) -> Vec<String> {
     tokens
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn generate_fast_mode_fields_from_file_list(
     session_id: &str,
     org_id: &str,
@@ -981,9 +986,7 @@ async fn generate_fast_mode_fields_from_file_list(
     stream_name: &str,
     time_level: PartitionTimeLevel,
     time_range: (i64, i64),
-    schema: &Schema,
-    fts_fields: &[String],
-) -> Vec<String> {
+) -> Option<Arc<Schema>> {
     let (time_min, time_max) = time_range;
     let file = match crate::service::file_list::query(
         org_id,
@@ -999,9 +1002,7 @@ async fn generate_fast_mode_fields_from_file_list(
         Ok(file_list) => file_list.last().cloned(),
         Err(_) => None,
     };
-    let Some(file) = file else {
-        return Vec::new();
-    };
+    let file = file?;
     let file_name = file.key;
     // read parquet file
     let mut parquet_buf = None;
@@ -1012,7 +1013,7 @@ async fn generate_fast_mode_fields_from_file_list(
     }
     if parquet_buf.is_none() {
         let Ok(data) = storage::get(&file_name).await else {
-            return Vec::new();
+            return None;
         };
         if let Err(e) = file_data::memory::set(session_id, &file_name, data.clone()).await {
             log::error!("set file data to memory error: {}", e);
@@ -1020,31 +1021,10 @@ async fn generate_fast_mode_fields_from_file_list(
         parquet_buf = Some(data);
     };
     // read schema from parquet file
-    let file_schema =
-        match config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap()).await {
-            Ok(schema) => schema,
-            Err(_) => return Vec::new(),
-        };
-    // read fields from schema
-    let mut fields = file_schema
-        .fields()
-        .iter()
-        .map(|f| f.name().to_string())
-        .collect::<Vec<String>>();
-    if fields.is_empty() {
-        return Vec::new();
+    match config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap()).await {
+        Ok(schema) => Some(schema),
+        Err(_) => None,
     }
-    // check _timestamp
-    if !fields.contains(&CONFIG.common.column_timestamp) {
-        fields.push(CONFIG.common.column_timestamp.to_string());
-    }
-    // check fts fields
-    for field in fts_fields {
-        if !fields.contains(field) && schema.field_with_name(field).is_ok() {
-            fields.push(field.to_string());
-        }
-    }
-    fields
 }
 
 #[cfg(test)]
