@@ -150,9 +150,9 @@ OpenObserve is licensed under the AGPL-3.0 license. For more details, see the [L
 
 ### 🔗 Join our Slack Channel
 
-[![Slack](./screenshots/slack.png)](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg)
+[![Slack](./screenshots/slack.png)](https://short.openobserve.ai/community)
 
-Easiest way to get support is to join the [Slack channel](https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg).
+Easiest way to get support is to join the [Slack channel](https://short.openobserve.ai/community).
 
 ### 📱 Join our WeChat Group
 
