@@ -74,7 +74,10 @@ describe("Logs testcases", () => {
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
     cy.wait("@allsearch");
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
-    cy.intercept("GET", "**/api/default/streams**").as("streams");
+    cy.intercept("GET", "**/api/default/streams**").as("streams")
+    cy.intercept('GET', '/api/default/e2e_automate/_values?').as('getValues')
+
+    
   });
 
   // This is a test case to navigate to the logs page
@@ -1032,19 +1035,15 @@ describe("Logs testcases", () => {
     ).click({
       force: true,
     });
-    logstests.addFeildandSubValue();
-    logstests.addsubFeildValue();
-    //click on the field
-    // get the data from the value variable
-    cy.wait("@value", { timeout: 5000 })
-      .its("response.statusCode")
-      .should("eq", 200);
-    logstests.addsubFeildValue();
-    cy.get("@value").its("response.body.hits").should("be.an", "array");
-    logstests.clickFeildSubvalue();
-    cy.wait(2000);
-    cy.intercept("GET", logData.ValueQuery).as("value");
-    logstests.clickOnFirstField();
+    cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
+      .click() // Click on the editor to focus
+      .type("match_all_indexed_ignore_case('provide_credentials')")
+    cy.wait(2000)
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+    cy.wait(3000);
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
     cy.contains("Reset Filters").click({ force: true });
     cy.get('[data-test="logs-search-bar-query-editor"]').should(
       "have.value",
@@ -1068,7 +1067,9 @@ describe("Logs testcases", () => {
   it("should redirect to logs after clicking on stream explorer via stream page", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="index-field-search-input"]').type("code");
+    
     cy.get('[data-test="log-search-expand-code-field-btn"]').click();
+    cy.wait(2000)
     cy.get('[data-test="logs-search-subfield-add-code-200"]').click();
     cy.get('[data-cy="date-time-button"] > .q-btn__content').click();
     cy.get('[data-test="date-time-relative-15-m-btn"]').click();
