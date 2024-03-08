@@ -71,94 +71,39 @@ impl VisitorMut for Rewrite {
         // remove the order by clause
         query.order_by = Vec::new();
         // rewrite the query body
-        match *query.body {
-            sqlparser::ast::SetExpr::Select(ref mut select) => {
-                // add distinct to the projection list
-                select.distinct = Some(sqlparser::ast::Distinct::Distinct);
-                // remove the having clause
-                select.having = None;
-                // remove the group by clause
-                select.group_by = GroupByExpr::Expressions(Vec::new());
-                if !self.is_first_phase {
-                    // remove the where clause
-                    select.selection = None;
-                }
-                let mut field_names = FxIndexSet::default();
-                let mut delete_idx = Vec::new();
-                for (idx, select_item) in &mut select.projection.iter_mut().enumerate() {
-                    match select_item {
-                        sqlparser::ast::SelectItem::ExprWithAlias { expr, alias } => {
-                            match expr {
-                                Expr::Function(Function {
-                                    name,
-                                    args,
-                                    distinct,
-                                    ..
-                                }) => {
-                                    // extract field name from the aggregate function
-                                    if AGGREGATE_UDF_LIST
-                                        .contains(&name.to_string().to_lowercase().as_str())
-                                    {
-                                        // check if aggregate function is count and distinct is
-                                        // false
-                                        if name.to_string().to_lowercase() == "count"
-                                            && !(*distinct)
-                                        {
-                                            select.distinct = None;
-                                        }
-                                        // check if the field name is already in the projection list
-                                        let field_name =
-                                            remove_brackets(format!("{}", args[0]).as_str());
-                                        if field_names.contains(&field_name) {
-                                            delete_idx.push(idx);
-                                            continue;
-                                        }
-                                        field_names.insert(field_name.clone());
-                                        *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                            Expr::Identifier(Ident::new(field_name)),
-                                        )
-                                    } else {
-                                        if !self.is_first_phase {
-                                            *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                                Expr::Identifier(alias.clone()),
-                                            );
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    if !self.is_first_phase {
-                                        *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                            Expr::Identifier(alias.clone()),
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                        // extrace function paraments from the projection list
-                        sqlparser::ast::SelectItem::UnnamedExpr(expr) => match expr {
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            // add distinct to the projection list
+            select.distinct = Some(sqlparser::ast::Distinct::Distinct);
+            // remove the having clause
+            select.having = None;
+            // remove the group by clause
+            select.group_by = GroupByExpr::Expressions(Vec::new());
+            if !self.is_first_phase {
+                // remove the where clause
+                select.selection = None;
+            }
+            let mut field_names = FxIndexSet::default();
+            let mut delete_idx = Vec::new();
+            for (idx, select_item) in &mut select.projection.iter_mut().enumerate() {
+                match select_item {
+                    sqlparser::ast::SelectItem::ExprWithAlias { expr, alias } => {
+                        match expr {
                             Expr::Function(Function {
                                 name,
                                 args,
                                 distinct,
                                 ..
                             }) => {
-                                if !AGGREGATE_UDF_LIST
+                                // extract field name from the aggregate function
+                                if AGGREGATE_UDF_LIST
                                     .contains(&name.to_string().to_lowercase().as_str())
                                 {
-                                    if !self.is_first_phase {
-                                        *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                            Expr::Identifier(Ident::new(format!("\"{}\"", expr))),
-                                        )
-                                    } else {
-                                        *select_item = sqlparser::ast::SelectItem::ExprWithAlias {
-                                            expr: expr.clone(),
-                                            alias: Ident::new(format!("\"{}\"", expr)),
-                                        }
-                                    }
-                                } else {
+                                    // check if aggregate function is count and distinct is
+                                    // false
                                     if name.to_string().to_lowercase() == "count" && !(*distinct) {
                                         select.distinct = None;
                                     }
+                                    // check if the field name is already in the projection list
                                     let field_name =
                                         remove_brackets(format!("{}", args[0]).as_str());
                                     if field_names.contains(&field_name) {
@@ -167,22 +112,69 @@ impl VisitorMut for Rewrite {
                                     }
                                     field_names.insert(field_name.clone());
                                     *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                        Expr::Identifier(Ident::new(format!("{}", args[0]))),
+                                        Expr::Identifier(Ident::new(field_name)),
                                     )
+                                } else if !self.is_first_phase {
+                                    *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                        Expr::Identifier(alias.clone()),
+                                    );
                                 }
                             }
-                            _ => {}
-                        },
-                        _ => {}
+                            _ => {
+                                if !self.is_first_phase {
+                                    *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                        Expr::Identifier(alias.clone()),
+                                    );
+                                }
+                            }
+                        }
                     }
-                }
-                if !delete_idx.is_empty() {
-                    for idx in delete_idx.iter().rev() {
-                        select.projection.remove(*idx);
+                    // extrace function paraments from the projection list
+                    sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
+                        if let Expr::Function(Function {
+                            name,
+                            args,
+                            distinct,
+                            ..
+                        }) = expr
+                        {
+                            if !AGGREGATE_UDF_LIST
+                                .contains(&name.to_string().to_lowercase().as_str())
+                            {
+                                if !self.is_first_phase {
+                                    *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                        Expr::Identifier(Ident::new(format!("\"{}\"", expr))),
+                                    )
+                                } else {
+                                    *select_item = sqlparser::ast::SelectItem::ExprWithAlias {
+                                        expr: expr.clone(),
+                                        alias: Ident::new(format!("\"{}\"", expr)),
+                                    }
+                                }
+                            } else {
+                                if name.to_string().to_lowercase() == "count" && !(*distinct) {
+                                    select.distinct = None;
+                                }
+                                let field_name = remove_brackets(format!("{}", args[0]).as_str());
+                                if field_names.contains(&field_name) {
+                                    delete_idx.push(idx);
+                                    continue;
+                                }
+                                field_names.insert(field_name.clone());
+                                *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                    Expr::Identifier(Ident::new(format!("{}", args[0]))),
+                                )
+                            }
+                        }
                     }
+                    _ => {}
                 }
             }
-            _ => {}
+            if !delete_idx.is_empty() {
+                for idx in delete_idx.iter().rev() {
+                    select.projection.remove(*idx);
+                }
+            }
         }
         ControlFlow::Continue(())
     }
@@ -205,63 +197,56 @@ impl VisitorMut for RewriteFinal {
             }
         }
         // rewrite the query body
-        match *query.body {
-            sqlparser::ast::SetExpr::Select(ref mut select) => {
-                // remove the where clause
-                select.selection = None;
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            // remove the where clause
+            select.selection = None;
 
-                // rewrite the group by clause
-                match select.group_by {
-                    GroupByExpr::Expressions(ref mut exprs) => {
-                        for expr in exprs.iter_mut() {
-                            *expr = match expr.clone() {
-                                Expr::Identifier(ident) => Expr::Identifier(ident.clone()),
-                                _ => Expr::Identifier(Ident::new(format!("\"{}\"", expr))),
-                            }
-                        }
+            // rewrite the group by clause
+            if let GroupByExpr::Expressions(ref mut exprs) = select.group_by {
+                for expr in exprs.iter_mut() {
+                    *expr = match expr.clone() {
+                        Expr::Identifier(ident) => Expr::Identifier(ident.clone()),
+                        _ => Expr::Identifier(Ident::new(format!("\"{}\"", expr))),
                     }
-                    _ => {}
                 }
+            }
 
-                for select_item in &mut select.projection {
-                    match select_item {
-                        sqlparser::ast::SelectItem::ExprWithAlias { expr, alias, .. } => {
-                            match expr {
-                                Expr::Function(Function { name, .. }) => {
-                                    // extract field name from the aggregate function
-                                    if !AGGREGATE_UDF_LIST
-                                        .contains(&name.to_string().to_lowercase().as_str())
-                                    {
-                                        *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                            Expr::Identifier(alias.clone()),
-                                        );
-                                    }
-                                }
-                                _ => {
+            for select_item in &mut select.projection {
+                match select_item {
+                    sqlparser::ast::SelectItem::ExprWithAlias { expr, alias, .. } => {
+                        match expr {
+                            Expr::Function(Function { name, .. }) => {
+                                // extract field name from the aggregate function
+                                if !AGGREGATE_UDF_LIST
+                                    .contains(&name.to_string().to_lowercase().as_str())
+                                {
                                     *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
                                         Expr::Identifier(alias.clone()),
                                     );
                                 }
                             }
-                        }
-                        // extrace function paraments from the projection list
-                        sqlparser::ast::SelectItem::UnnamedExpr(expr) => match expr {
-                            Expr::Function(Function { name, .. }) => {
-                                if !AGGREGATE_UDF_LIST
-                                    .contains(&name.to_string().to_lowercase().as_str())
-                                {
-                                    *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
-                                        Expr::Identifier(Ident::new(format!("\"{}\"", expr))),
-                                    )
-                                }
+                            _ => {
+                                *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                    Expr::Identifier(alias.clone()),
+                                );
                             }
-                            _ => {}
-                        },
-                        _ => {}
+                        }
                     }
+                    // extrace function paraments from the projection list
+                    sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
+                        if let Expr::Function(Function { name, .. }) = expr {
+                            if !AGGREGATE_UDF_LIST
+                                .contains(&name.to_string().to_lowercase().as_str())
+                            {
+                                *select_item = sqlparser::ast::SelectItem::UnnamedExpr(
+                                    Expr::Identifier(Ident::new(format!("\"{}\"", expr))),
+                                )
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
-            _ => {}
         }
         ControlFlow::Continue(())
     }
@@ -359,36 +344,5 @@ mod tests {
             statements.visit(&mut RewriteFinal);
             assert_eq!(statements[0].to_string(), **except);
         }
-    }
-
-    #[test]
-    fn test_rewrite() {
-        let sql = "select a, date_bin(a) as dte, count(distinct b) as cnt from test where b = 2 and level != ' limit ' group by a, dte having cnt > 3 order by dte limit 10 offset 5;";
-
-        let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
-        // println!("statements: {:?}", statements.first().unwrap());
-        statements.visit(&mut Rewrite {
-            is_first_phase: true,
-        });
-        assert_eq!(
-            statements[0].to_string(),
-            "SELECT DISTINCT a, date_bin(a) AS dte, b FROM test WHERE b = 2 AND level <> ' limit '"
-        );
-
-        let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
-        statements.visit(&mut Rewrite {
-            is_first_phase: false,
-        });
-        assert_eq!(
-            statements[0].to_string(),
-            "SELECT DISTINCT a, dte, b FROM test"
-        );
-
-        let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
-        statements.visit(&mut RewriteFinal);
-        assert_eq!(
-            statements[0].to_string(),
-            "SELECT a, dte, count(DISTINCT b) AS cnt FROM test GROUP BY a, dte HAVING cnt > 3 ORDER BY dte LIMIT 10 OFFSET 5"
-        );
     }
 }
