@@ -88,6 +88,12 @@ pub enum Error {
     ArrowJsonEncodeError {
         source: arrow::error::ArrowError,
     },
+    ArrowSchemaError {
+        source: arrow_schema::ArrowError,
+    },
+    ConcatBatchesError{
+        source: arrow_schema::ArrowError,
+    },
     ReadParquetFileError {
         source: parquet::errors::ParquetError,
     },

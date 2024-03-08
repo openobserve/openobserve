@@ -15,6 +15,7 @@
 
 use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 
+use arrow::compute::concat_batches;
 use arrow_schema::Schema;
 use config::{
     meta::stream::FileMeta,
@@ -103,17 +104,36 @@ impl Partition {
                 file_num: 1,
                 batch_num: data.data.len(),
             };
-            // write into parquet buf
-            let mut buf_parquet = Vec::new();
-            let mut writer =
-                new_parquet_writer(&mut buf_parquet, &self.schema, &[], &[], &file_meta);
+            // merge RecordBatch
+            let mut batches = Vec::with_capacity(data.data.len());
             for batch in data.data.iter() {
                 persist_stat.arrow_size += batch.data_arrow_size;
-                writer
-                    .write(&batch.data)
-                    .await
-                    .context(WriteParquetRecordBatchSnafu)?;
+                batches.push(&batch.data);
             }
+            let mut new_batch =
+                concat_batches(&self.schema, batches).context(ConcatBatchesSnafu)?;
+            // delete all null values column
+            let mut null_columns = Vec::new();
+            for i in 0..new_batch.num_columns() {
+                let fi = i - null_columns.len();
+                if new_batch.column(fi).null_count() == new_batch.num_rows() {
+                    null_columns.push(i);
+                    new_batch.remove_column(fi);
+                }
+            }
+            let new_chema = if null_columns.is_empty() {
+                self.schema.clone()
+            } else {
+                new_batch.schema()
+            };
+            // write into parquet buf
+            let mut buf_parquet = Vec::new();
+            let mut writer = new_parquet_writer(&mut buf_parquet, &new_chema, &[], &[], &file_meta);
+            writer
+                .write(&new_batch)
+                .await
+                .context(WriteParquetRecordBatchSnafu)?;
+
             writer.close().await.context(WriteParquetRecordBatchSnafu)?;
 
             // write into local file
