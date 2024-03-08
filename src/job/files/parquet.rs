@@ -592,7 +592,11 @@ async fn _prepare_index_record_batches(
             continue;
         }
 
-        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
+        let split_arr = array_distinct(string_to_array(
+            lower(concat(&[col(column.name()), lit("")])),
+            lit(" "),
+            lit(ScalarValue::Null),
+        ));
         let record_batch = index_df
             .with_column("terms", split_arr)?
             .unnest_column("terms")?
@@ -643,8 +647,11 @@ async fn prepare_index_record_batches_v1(
             continue;
         }
 
-        let split_arr =
-            string_to_array(lower(col(column.name())), lit(" "), lit(ScalarValue::Null));
+        let split_arr = array_distinct(string_to_array(
+            lower(concat(&[col(column.name()), lit("")])),
+            lit(" "),
+            lit(ScalarValue::Null),
+        ));
         let record_batch = index_df
             .with_column("terms", split_arr)?
             .unnest_column("terms")?
