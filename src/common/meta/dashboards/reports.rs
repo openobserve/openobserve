@@ -90,12 +90,18 @@ pub enum ReportFrequencyType {
     Weeks,
     #[serde(rename = "months")]
     Months,
+    #[serde(rename = "cron")]
+    Cron,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct ReportFrequency {
     /// Frequency interval in the `frequency_type` unit
+    #[serde(default)]
     pub interval: i64,
+    /// Cron expression
+    #[serde(default)]
+    pub cron: String,
     #[serde(rename = "type")]
     #[serde(default)]
     pub frequency_type: ReportFrequencyType,
@@ -105,7 +111,8 @@ impl Default for ReportFrequency {
     fn default() -> Self {
         Self {
             interval: 1,
-            frequency_type: ReportFrequencyType::default(),
+            cron: "".to_string(),
+            frequency_type: Default::default(),
         }
     }
 }
@@ -143,6 +150,10 @@ pub struct Report {
     pub password: String,
     #[serde(default)]
     pub timezone: String,
+    /// Fixed timezone offset in minutes
+    #[serde(default)]
+    #[serde(rename = "timezoneOffset")]
+    pub tz_offset: i32,
 }
 
 impl Default for Report {
@@ -162,6 +173,7 @@ impl Default for Report {
             user: "".to_string(),
             password: "".to_string(),
             timezone: "".to_string(),
+            tz_offset: 0, // UTC
         }
     }
 }

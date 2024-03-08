@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{Duration, Utc};
+use std::str::FromStr;
+
+use chrono::{Duration, FixedOffset, Utc};
 use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType};
+use cron::Schedule;
 use infra::dist_lock;
 
 use crate::{
@@ -218,6 +221,16 @@ async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
             // Disable the report
             report.enabled = false;
             db::dashboards::reports::set(org_id, &report).await?;
+        }
+        ReportFrequencyType::Cron => {
+            let schedule = Schedule::from_str(&report.frequency.cron)?;
+            // tz_offset is in minutes
+            let tz_offset = FixedOffset::east_opt(report.tz_offset * 60).unwrap();
+            new_trigger.next_run_at = schedule
+                .upcoming(tz_offset)
+                .next()
+                .unwrap()
+                .timestamp_micros();
         }
     }
 

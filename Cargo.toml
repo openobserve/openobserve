@@ -70,6 +70,7 @@ clap = { version = "4.1", default-features = false, features = [
   "cargo",
 ] }
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
+cron = "0.12.1"
 csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
