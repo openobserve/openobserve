@@ -613,7 +613,7 @@ pub async fn merge(
             .captures(sql.to_lowercase().as_str())
             .is_some()
     {
-        query_sql = rewrite::rewrite_count_distinct_sql(&sql, false);
+        query_sql = rewrite::rewrite_count_distinct_sql(sql, false);
     }
 
     // query data
