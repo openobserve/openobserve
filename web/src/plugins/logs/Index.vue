@@ -168,6 +168,7 @@ size="md" /> Select a
                     :expandedLogs="expandedLogs"
                     @update:datetime="setHistogramDate"
                     @update:scroll="getMoreData"
+                    @update:recordsPerPage="getMoreDataRecordsPerPage"
                     @expandlog="toggleExpandLog"
                   />
                 </div>
@@ -243,6 +244,30 @@ export default defineComponent({
           showFields: this.searchObj.meta.showFields,
           page: "Search Logs",
         });
+      }
+    },
+    async getMoreDataRecordsPerPage() {
+      if (this.searchObj.meta.refreshInterval == 0) {
+        // this.searchObj.data.resultGrid.currentPage =
+        //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
+        //     ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
+        //     150 -
+        //   1;
+        // this.searchObj.data.resultGrid.currentPage =
+        //   this.searchObj.data.resultGrid.currentPage + 1;
+        this.searchObj.loading = true;
+        await this.getQueryData(false);
+        this.refreshHistogramChart();
+
+        if (config.isCloud == "true") {
+          segment.track("Button Click", {
+            button: "Get More Data",
+            user_org: this.store.state.selectedOrganization.identifier,
+            user_id: this.store.state.userInfo.email,
+            stream_name: this.searchObj.data.stream.selectedStream.value,
+            page: "Search Logs",
+          });
+        }
       }
     },
     async getMoreData() {
