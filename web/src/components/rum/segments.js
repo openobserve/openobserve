@@ -4693,7 +4693,7 @@ export const segments = [
                                                   "class": "q-item q-item-type row no-wrap q-item--clickable q-link cursor-pointer q-focusable q-hoverable ql-item-mini",
                                                   "role": "listitem",
                                                   "tabindex": "0",
-                                                  "data-test": "menu-link-https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg-item",
+                                                  "data-test": "menu-link-https://short.openobserve.ai/community-item",
                                                   "data-v-88dacebc": ""
                                                 },
                                                 "childNodes": [
