@@ -160,7 +160,7 @@ impl Sql {
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
-        let track_total_hits = req_query.track_total_hits;
+        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
 
         // check SQL limitation
         // in context mode, disallow, [limit|offset|group by|having|join|union]
