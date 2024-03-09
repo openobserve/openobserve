@@ -1076,8 +1076,8 @@ const useLogs = () => {
           if (parsedSQL.limit.seperator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
+          delete queryReq.query.track_total_hits;
         }
-        delete queryReq.query.track_total_hits;
       }
 
       searchService
