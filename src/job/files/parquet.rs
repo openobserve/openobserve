@@ -487,11 +487,23 @@ pub(crate) async fn generate_index_on_compactor(
     org_id: &str,
     stream_name: &str,
 ) -> Result<(String, FileMeta), anyhow::Error> {
+    if buf.is_empty() {
+        log::warn!(
+            "[generate_index_on_compactor] Incoming fts_buf was found empty for stream {}. Skipping index creation.",
+            stream_name
+        );
+        return Ok((String::new(), FileMeta::default()));
+    }
+
     let mut index_record_batches =
         prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
+        log::warn!(
+            "[generate_index_on_compactor] failed to generate index_record_batches for stream {}. Skipping index creation.",
+            stream_name
+        );
         return Ok((String::new(), FileMeta::default()));
     };
 
@@ -630,6 +642,10 @@ async fn prepare_index_record_batches_v1(
     new_file_key: &str,
 ) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
     if batches.is_empty() {
+        log::warn!(
+            "[prepare_index_record_batches_v1] No batches found for stream {}. Skipping index creation.",
+            stream_name
+        );
         return Ok(vec![]);
     }
     let local = batches.first().unwrap().schema();
