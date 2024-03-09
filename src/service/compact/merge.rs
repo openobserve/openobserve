@@ -544,7 +544,13 @@ async fn merge_files(
                     stream_name,
                 )
                 .await
-                .map_err(|e| anyhow::anyhow!("generate_index_on_compactor error: {}", e))?;
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "generate_index_on_compactor error: {}, need delete files: {:?}",
+                        e,
+                        retain_file_list
+                    )
+                })?;
                 if !index_file_name.is_empty() {
                     log::info!("Created index file during compaction {}", index_file_name);
                     // Notify that we wrote the index file to the db.
@@ -559,11 +565,17 @@ async fn merge_files(
                     .await
                     {
                         log::error!(
-                            "generate_index_on_compactor write to file list: {}, error: {}",
+                            "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
                             index_file_name,
-                            e.to_string()
+                            e.to_string(),
+                            retain_file_list
                         );
                     }
+                } else {
+                    log::error!(
+                        "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
+                        retain_file_list
+                    );
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
