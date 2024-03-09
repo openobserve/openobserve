@@ -1206,9 +1206,9 @@ const useLogs = () => {
               if (totalNumber > 0) {
                 searchObj.data.queryResults.total += totalNumber;
               }
-            }
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            } 
           }
+          searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
           searchObj.data.functionError = "";
           if (
