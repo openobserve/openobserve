@@ -107,6 +107,7 @@ const defaultObject = {
       navigation: {
         currentRowIndex: 0,
       },
+      showPagination: true,
     },
     scrollInfo: {},
     flagWrapContent: false,
@@ -445,7 +446,7 @@ const useLogs = () => {
           end_time: new Date().getTime() * 1000,
           from:
             searchObj.meta.resultGrid.rowsPerPage *
-              (searchObj.data.resultGrid.currentPage - 1) || 0,
+            (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
           fast_mode: searchObj.meta.fastMode,
         },
@@ -460,8 +461,8 @@ const useLogs = () => {
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod
-            )
+            searchObj.data.datetime.relativeTimePeriod
+          )
           : cloneDeep(searchObj.data.datetime);
 
       if (
@@ -1056,13 +1057,13 @@ const useLogs = () => {
         queryReq.query.track_total_hits = true;
       } else if (
         searchObj.data.queryResults.partitionDetail.partitionTotal[
-          searchObj.data.resultGrid.currentPage - 1
+        searchObj.data.resultGrid.currentPage - 1
         ] > -1 &&
         queryReq.query.hasOwnProperty("track_total_hits")
       ) {
         delete queryReq.query.track_total_hits;
       }
-
+      searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
         const tempquery = searchObj.data.query
           .split("\n")
@@ -1071,13 +1072,14 @@ const useLogs = () => {
         const parsedSQL: any = parser.astify(tempquery);
         if (parsedSQL.limit != null) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
-          searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+          searchObj.meta.resultGrid.showPagination = false;
+          //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
 
           if (parsedSQL.limit.seperator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
+          delete queryReq.query.track_total_hits;
         }
-        delete queryReq.query.track_total_hits;
       }
 
       searchService
@@ -1096,7 +1098,7 @@ const useLogs = () => {
           ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
             if (
               searchObj.data.queryResults.partitionDetail.partitionTotal[
-                index
+              index
               ] == -1 &&
               queryReq.query.start_time == item[0]
             ) {
@@ -1204,9 +1206,9 @@ const useLogs = () => {
               if (totalNumber > 0) {
                 searchObj.data.queryResults.total += totalNumber;
               }
-            }
-            searchObj.data.histogram.chartParams.title = getHistogramTitle();
+            } 
           }
+          searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
           searchObj.data.functionError = "";
           if (
@@ -1261,7 +1263,7 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
-      const dismiss = () => {};
+      const dismiss = () => { };
       try {
         searchObj.data.histogram.errorMsg = "";
         searchObj.data.histogram.errorCode = 0;
@@ -1447,7 +1449,7 @@ const useLogs = () => {
           : {};
       const logFieldSelectedValue =
         logFilterField[
-          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+        `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
         ];
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (
@@ -1518,10 +1520,15 @@ const useLogs = () => {
   function getHistogramTitle() {
     const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
-    const endCount = Math.min(
+    let endCount;
+    if (searchObj.meta.resultGrid.showPagination == false) {
+      endCount  = searchObj.data.queryResults.hits.length;
+    }else{
+    endCount = Math.min(
       startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
       searchObj.data.queryResults.total
     );
+    };
     const title =
       "Showing " +
       startCount +
