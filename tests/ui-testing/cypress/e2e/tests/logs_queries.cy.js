@@ -80,36 +80,41 @@ describe("Logs testcases", () => {
   it("should display results for limit query", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type("match_all_indexed_ignore_case('provide_credentials') limit 5")
-    cy.wait(2000)
-    cy.get('[aria-label="SQL Mode"]').click({force:true})
-    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .type("match_all_indexed_ignore_case('provide_credentials') limit 5");
+    cy.wait(2000);
+    cy.get('[aria-label="SQL Mode"]').click({ force: true });
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content');
     cy.wait(3000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
     }).click({ force: true });
-    cy.wait(2000)
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 5 out of 5')
-    cy.get('.float-right.col > .q-btn--no-uppercase').click()
+    cy.wait(2000);
+    cy.get(".search-list > :nth-child(1) > .text-left").contains(
+      "Showing 1 to 5 out of 5"
+    );
+    cy.get(".float-right.col > .q-btn--no-uppercase").click();
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type(" WHERE match_all_indexed_ignore_case('provide_credentials')")
-    cy.get('[data-test="logs-search-result-records-per-page"]').click()
-    cy.get('.q-virtual-scroll__content:last').click();
+      .type(" WHERE match_all_indexed_ignore_case('provide_credentials')");
+    cy.get('[data-test="logs-search-result-records-per-page"]').click();
+    cy.get(".q-virtual-scroll__content:last").click();
 
     // Select "25" from the dropdown using contains
-    cy.contains('.q-item__label', '25').should('be.visible').click();
-    cy.get('.search-list > :nth-child(1) > .text-left').contains('Showing 1 to 5 out of 5').should('not.exist')
-
-  })
+    cy.contains(".q-item__label", "25").should("be.visible").click();
+    cy.get(".search-list > :nth-child(1) > .text-left")
+      .contains("Showing 1 to 5 out of 5")
+      .should("not.exist");
+  });
 
   it("should redirect to logs after clicking on stream explorer via stream page", () => {
     // cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-cy="index-field-search-input"]').type("code");
-    
+
     cy.get('[data-test="log-search-expand-code-field-btn"]').click();
-    cy.wait(2000)
-    cy.get('[data-test="logs-search-subfield-add-code-200"]').click({force:true});
+    cy.wait(2000);
+    cy.get('[data-test="logs-search-subfield-add-code-200"]').click({
+      force: true,
+    });
     cy.get('[data-cy="date-time-button"] > .q-btn__content').click();
     cy.get('[data-test="date-time-relative-15-m-btn"]').click();
     cy.get('[data-cy="search-bar-refresh-button"]').click();
@@ -156,9 +161,9 @@ describe("Logs testcases", () => {
     });
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type("match_all_indexed_ignore_case('provide_credentials')")
-    cy.wait(2000)
-    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .type("match_all_indexed_ignore_case('provide_credentials')");
+    cy.wait(2000);
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content');
     cy.wait(3000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
@@ -182,8 +187,6 @@ describe("Logs testcases", () => {
     ).click({ force: true });
     cy.get(".q-notification__message").should("not.exist");
   });
-
- 
 
   it("should add invalid query and display error", () => {
     // Type the value of a variable into an input field
@@ -266,6 +269,251 @@ describe("Logs testcases", () => {
     cy.contains("Field is required").should("exist");
   });
 
+  it.skip("should match total - SQL mode ignore case for normal and index search", () => {
+    const orgId = Cypress.env("ORGNAME");
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = btoa(
+      `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
+    );
+    // First query
+    cy.request({
+      method: "POST",
+      url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+      headers: {
+        Authorization: `Basic ${basicAuthCredentials}`,
+        "Content-Type": "application/json",
+      },
+      body: {
+        query: {
+          sql: "SELECT * FROM \"e2e_automate\" where match_all_indexed_ignore_case('logger')",
+          start_time: 1709726643160000,
+          end_time: 1710072243160000,
+          from: 0,
+          size: 250,
+          fast_mode: true,
+          sql_mode: "full",
+          track_total_hits: true,
+        },
+      },
+    }).then((response1) => {
+      const totalLogs1 = response1.body.total;
 
+      // Second query
+      cy.request({
+        method: "POST",
+        url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+        headers: {
+          Authorization: `Basic ${basicAuthCredentials}`,
+          "Content-Type": "application/json",
+        },
 
-})
+        body: {
+          query: {
+            sql: "SELECT * FROM \"e2e_automate\" where match_all_ignore_case('logger')",
+            start_time: 1709726508369000,
+            end_time: 1710072108369000,
+            from: 0,
+            size: 250,
+            fast_mode: true,
+            sql_mode: "full",
+            track_total_hits: true,
+          },
+        },
+      }).then((response2) => {
+        const totalLogs2 = response2.body.total;
+
+        // Assertion
+        expect(totalLogs1).to.equal(totalLogs2);
+      });
+    });
+  });
+
+  it.skip("should match total - SQL mode match_all for normal and index search", () => {
+    const orgId = Cypress.env("ORGNAME");
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = btoa(
+      `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
+    );
+    // First query
+    cy.request({
+      method: "POST",
+      url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+      headers: {
+        Authorization: `Basic ${basicAuthCredentials}`,
+        "Content-Type": "application/json",
+      },
+      body: {
+        query: {
+          sql: "SELECT * FROM \"e2e_automate\" where match_all('logger')",
+          start_time: 1709705928581000,
+          end_time: 1710051528581000,
+          from: 0,
+          size: 250,
+          fast_mode: true,
+          sql_mode: "full",
+          track_total_hits: true,
+        },
+      },
+    }).then((response1) => {
+      const totalLogs1 = response1.body.total;
+
+      // Second query
+      cy.request({
+        method: "POST",
+        url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+        headers: {
+          Authorization: `Basic ${basicAuthCredentials}`,
+          "Content-Type": "application/json",
+        },
+
+        body: {
+          query: {
+            sql: "SELECT * FROM \"e2e_automate\" where match_all_indexed('logger')",
+            start_time: 1709706092870000,
+            end_time: 1710051692870000,
+            from: 0,
+            size: 250,
+            fast_mode: true,
+            sql_mode: "full",
+            track_total_hits: true,
+          },
+        },
+      }).then((response2) => {
+        const totalLogs2 = response2.body.total;
+
+        // Assertion
+        expect(totalLogs1).to.equal(totalLogs2);
+      });
+    });
+  });
+
+  it.only("should match total - histogram mode match all for normal and index search", () => {
+    const orgId = Cypress.env("ORGNAME");
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = btoa(
+      `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
+    );
+    // First query
+    cy.request({
+      method: "POST",
+      url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+      headers: {
+        Authorization: `Basic ${basicAuthCredentials}`,
+        "Content-Type": "application/json",
+      },
+      body: {
+        query: {
+          sql: "select * from \"e2e_automate\"  WHERE match_all('logger')",
+          start_time: 1709725454701000,
+          end_time: 1710071054701000,
+          from: 0,
+          size: 0,
+          fast_mode: true,
+          track_total_hits: true,
+        },
+        aggs: {
+          histogram:
+            "select histogram(_timestamp, '30 minute') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+        },
+      },
+    }).then((response1) => {
+      const totalLogs1 = response1.body.total;
+
+      // Second query
+      cy.request({
+        method: "POST",
+        url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+        headers: {
+          Authorization: `Basic ${basicAuthCredentials}`,
+          "Content-Type": "application/json",
+        },
+
+        body: {
+          query: {
+            sql: "select * from \"e2e_automate\"  WHERE match_all_indexed('logger')",
+            start_time: 1709725511382000,
+            end_time: 1710071111382000,
+            from: 0,
+            size: 0,
+            fast_mode: true,
+            track_total_hits: true,
+          },
+          aggs: {
+            histogram:
+              "select histogram(_timestamp, '30 minute') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+          },
+        },
+      }).then((response2) => {
+        const totalLogs2 = response2.body.total;
+
+        // Assertion
+        expect(totalLogs1).to.equal(totalLogs2);
+      });
+    });
+  });
+
+  it.only("should match total - histogram mode ignore case for normal and index search", () => {
+    const orgId = Cypress.env("ORGNAME");
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = btoa(
+      `${Cypress.env("EMAIL")}:${Cypress.env("PASSWORD")}`
+    );
+    // First query
+    cy.request({
+      method: "POST",
+      url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+      headers: {
+        Authorization: `Basic ${basicAuthCredentials}`,
+        "Content-Type": "application/json",
+      },
+      body: {
+        query: {
+          sql: "select * from \"e2e_automate\"  WHERE match_all_ignore_case('logger')",
+          start_time: 1709725454701000,
+          end_time: 1710071054701000,
+          from: 0,
+          size: 0,
+          fast_mode: true,
+          track_total_hits: true,
+        },
+        aggs: {
+          histogram:
+            "select histogram(_timestamp, '30 minute') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+        },
+      },
+    }).then((response1) => {
+      const totalLogs1 = response1.body.total;
+
+      // Second query
+      cy.request({
+        method: "POST",
+        url: `${Cypress.config().ingestionUrl}/api/${orgId}/_search?type=logs`,
+        headers: {
+          Authorization: `Basic ${basicAuthCredentials}`,
+          "Content-Type": "application/json",
+        },
+
+        body: {
+          query: {
+            sql: "select * from \"e2e_automate\"  WHERE match_all_indexed_ignore_case('logger')",
+            start_time: 1709725511382000,
+            end_time: 1710071111382000,
+            from: 0,
+            size: 0,
+            fast_mode: true,
+            track_total_hits: true,
+          },
+          aggs: {
+            histogram:
+              "select histogram(_timestamp, '30 minute') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
+          },
+        },
+      }).then((response2) => {
+        const totalLogs2 = response2.body.total;
+
+        // Assertion
+        expect(totalLogs1).to.equal(totalLogs2);
+      });
+    });
+  });
+});
