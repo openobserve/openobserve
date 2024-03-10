@@ -387,7 +387,7 @@ describe("Logs testcases", () => {
     });
   });
 
-  it.only("should match total - histogram mode match all for normal and index search", () => {
+  it("should match total - histogram mode match all for normal and index search", () => {
     const orgId = Cypress.env("ORGNAME");
     const streamName = "e2e_automate";
     const basicAuthCredentials = btoa(
@@ -452,7 +452,7 @@ describe("Logs testcases", () => {
     });
   });
 
-  it.only("should match total - histogram mode ignore case for normal and index search test", () => {
+  it("should match total - histogram mode ignore case for normal and index search test", () => {
     const orgId = Cypress.env("ORGNAME");
     const streamName = "e2e_automate";
     const basicAuthCredentials = btoa(
