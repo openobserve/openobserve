@@ -314,6 +314,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
+            println!("index got file_list: {:?}", sorted_data.len());
+
             for (term, filename, count, _timestamp) in sorted_data {
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
                 if *current_count < limit_count {
@@ -321,6 +323,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     term_map.entry(term).or_insert_with(Vec::new).push(filename);
                 }
             }
+            println!("term_map: {:?}", term_map);
             (
                 term_map
                     .into_iter()
@@ -342,8 +345,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let mut idx_file_list: Vec<FileKey> = vec![];
         for filename in unique_files {
             let prefixed_filename = format!(
-                "files/{}/logs/{}/{}",
-                meta.org_id, meta.stream_name, filename
+                "files/{}/{}/{}/{}",
+                meta.org_id, stream_type, meta.stream_name, filename
             );
             if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
                 idx_file_list.push(FileKey {
@@ -369,6 +372,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             None,
         )
     };
+
+    println!("final file_list: {:?}", file_list.len());
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
