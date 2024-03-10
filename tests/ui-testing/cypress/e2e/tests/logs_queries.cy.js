@@ -452,7 +452,7 @@ describe("Logs testcases", () => {
     });
   });
 
-  it.only("should match total - histogram mode ignore case for normal and index search", () => {
+  it.only("should match total - histogram mode ignore case for normal and index search test", () => {
     const orgId = Cypress.env("ORGNAME");
     const streamName = "e2e_automate";
     const basicAuthCredentials = btoa(
