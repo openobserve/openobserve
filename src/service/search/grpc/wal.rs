@@ -223,7 +223,7 @@ pub async fn search_parquet(
         let schema = Arc::new(inferred_schema);
         let sql = sql.clone();
         let session = if is_single_group {
-            let id = format!("{}-0", work_dir);
+            let id = work_dir.to_string();
             meta::search::Session {
                 // here must be session_id, because the files set within this prefix
                 id,
