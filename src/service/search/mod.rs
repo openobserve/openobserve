@@ -572,7 +572,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     response.scan_stats.as_ref().unwrap().files,
                     response.scan_stats.as_ref().unwrap().original_size,
                 );
-                Ok(response)
+                Ok((node.clone(),response))
             }
             .instrument(grpc_span),
         );
@@ -620,7 +620,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let mut scan_stats = ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let sql = Arc::new(meta);
-    for resp in results {
+    for (node, resp) in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
         // handle hits
         let value = batches.entry("query".to_string()).or_default();
@@ -632,6 +632,18 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
         // handle aggs
         for agg in resp.aggs {
+            // insert count
+            if agg.name == "_count" && is_ingester(&node.role) {
+                let value = batches
+                    .entry(format!("agg_ingester_{}", agg.name))
+                    .or_default();
+                if !agg.hits.is_empty() {
+                    let buf = Cursor::new(agg.hits.clone());
+                    let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+                    let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+                    value.extend(batch);
+                }
+            }
             let value = batches.entry(format!("agg_{}", agg.name)).or_default();
             if !agg.hits.is_empty() {
                 let buf = Cursor::new(agg.hits);
@@ -648,11 +660,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
-            sql.aggs
-                .get(name.strip_prefix("agg_").unwrap())
-                .unwrap()
-                .0
-                .clone()
+            let mut agg_name = name.strip_prefix("agg_").unwrap();
+            if agg_name == "ingester__count" {
+                agg_name = "_count";
+            }
+            sql.aggs.get(agg_name).unwrap().0.clone()
         };
         let batch = match datafusion::exec::merge(
             &sql.org_id,
@@ -811,11 +823,17 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         None => result.hits.len(),
     };
     result.aggs.remove("_count");
+    // ingester total
+    let ingester_total = match result.aggs.get("ingester__count") {
+        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
+        None => result.hits.len(),
+    };
+    result.aggs.remove("ingester__count");
 
     let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
     // Maybe inverted index count is wrong, we use the max value
     if inverted_index_count > total {
-        result.set_total(inverted_index_count);
+        result.set_total(inverted_index_count + ingester_total);
     } else {
         result.set_total(total);
     }
