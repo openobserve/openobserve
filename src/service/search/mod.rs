@@ -634,9 +634,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         for agg in resp.aggs {
             // insert count
             if agg.name == "_count" && is_ingester(&node.role) {
-                let value = batches
-                    .entry(format!("agg_ingester_{}", agg.name))
-                    .or_default();
+                let value = batches.entry("agg_ingester_count".to_string()).or_default();
                 if !agg.hits.is_empty() {
                     let buf = Cursor::new(agg.hits.clone());
                     let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
@@ -661,7 +659,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             sql.origin_sql.clone()
         } else {
             let mut agg_name = name.strip_prefix("agg_").unwrap();
-            if agg_name == "ingester__count" {
+            if agg_name == "ingester_count" {
                 agg_name = "_count";
             }
             sql.aggs.get(agg_name).unwrap().0.clone()
@@ -824,22 +822,22 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     };
     result.aggs.remove("_count");
     // ingester total
-    let ingester_total = match result.aggs.get("ingester__count") {
+    let ingester_total = match result.aggs.get("ingester_count") {
         Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
         None => result.hits.len(),
     };
-    result.aggs.remove("ingester__count");
+    result.aggs.remove("ingester_count");
 
     let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
     // TODO: ingester mixed with querier will has problem.
-    // let inverted_index_total = inverted_index_count + ingester_total;
+    let inverted_index_total = inverted_index_count + ingester_total;
     log::info!("response_total: {}", total);
     log::info!("ingester_total: {}", ingester_total);
     log::info!("inverted_index_count: {}", inverted_index_count);
 
     // Maybe inverted index count is wrong, we use the max value
-    if inverted_index_count > total {
-        result.set_total(inverted_index_count + ingester_total);
+    if inverted_index_total > total {
+        result.set_total(inverted_index_total);
     } else {
         result.set_total(total);
     }
