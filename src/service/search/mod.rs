@@ -273,7 +273,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         let search_condition = terms
             .iter()
-            .map(|x| format!("term ilike '%{x}%'"))
+            .map(|x| format!("term LIKE '%{x}%'"))
             .collect::<Vec<String>>()
             .join(" or ");
 
@@ -307,7 +307,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    total_count += count;
+                    if terms.iter().all(|f| term.as_str().contains(f)) {
+                        total_count += count;
+                    }
                     (term, file_name, count, timestamp)
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
@@ -317,10 +319,18 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             println!("index got file_list: {:?}", sorted_data.len());
 
             for (term, filename, count, _timestamp) in sorted_data {
-                let current_count = term_counts.entry(term.clone()).or_insert(0);
-                if *current_count < limit_count {
-                    *current_count += count;
-                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                let term = term.as_str();
+                for search_term in terms.iter() {
+                    if term.contains(search_term) {
+                        let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
+                        if *current_count < limit_count {
+                            *current_count += count;
+                            term_map
+                                .entry(search_term.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(filename.to_string());
+                        }
+                    }
                 }
             }
             println!("term_map: {:?}", term_map);
