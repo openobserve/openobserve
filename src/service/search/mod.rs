@@ -278,7 +278,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .join(" or ");
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp FROM \"{}\" WHERE deleted IS FALSE AND ({})",
+            "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
             meta.stream_name, search_condition
         );
 
@@ -299,18 +299,32 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             // should be query size * 2
             let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
             let mut total_count = 0;
+            // get deleted file
+            let deleted_files = idx_resp
+                .hits
+                .iter()
+                .filter_map(|hit| {
+                    if hit.get("deleted").unwrap().as_bool().unwrap() {
+                        Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashSet<_>>();
             let sorted_data = idx_resp
                 .hits
                 .iter()
-                .map(|hit| {
+                .filter_map(|hit| {
                     let term = hit.get("term").unwrap().as_str().unwrap().to_string();
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    if terms.iter().all(|f| term.as_str().contains(f)) {
+                    if deleted_files.contains(&file_name) {
+                        None
+                    } else {
                         total_count += count;
+                        Some((term, file_name, count, timestamp))
                     }
-                    (term, file_name, count, timestamp)
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
