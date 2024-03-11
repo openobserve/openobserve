@@ -368,14 +368,6 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
-          streamResponse.stats.doc_time_max = date.formatDate(
-            parseInt(streamResponse.stats.doc_time_max) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
-          streamResponse.stats.doc_time_min = date.formatDate(
-            parseInt(streamResponse.stats.doc_time_min) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
           if (
             streamResponse.settings.full_text_search_keys.length == 0 &&
             (showFullTextSearchColumn.value || showPartitionColumn.value)
@@ -386,7 +378,18 @@ export default defineComponent({
           }
 
           indexData.value.schema = streamResponse.schema || [];
-          indexData.value.stats = streamResponse.stats;
+          indexData.value.stats = JSON.parse(
+            JSON.stringify(streamResponse.stats)
+          );
+
+          indexData.value.stats.doc_time_max = date.formatDate(
+            parseInt(streamResponse.stats.doc_time_max) / 1000,
+            "YYYY-MM-DDTHH:mm:ss:SSZ"
+          );
+          indexData.value.stats.doc_time_min = date.formatDate(
+            parseInt(streamResponse.stats.doc_time_min) / 1000,
+            "YYYY-MM-DDTHH:mm:ss:SSZ"
+          );
 
           if (showDataRetention.value)
             dataRetentionDays.value =
