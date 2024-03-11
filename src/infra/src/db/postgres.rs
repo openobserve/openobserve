@@ -37,7 +37,7 @@ fn connect() -> Pool<Postgres> {
 
     PgPoolOptions::new()
         .min_connections(CONFIG.limit.cpu_num as u32)
-        .max_connections(CONFIG.limit.cpu_num as u32 * 4)
+        .max_connections(CONFIG.limit.cpu_num as u32 * 2)
         .connect_lazy_with(db_opts)
 }
 
