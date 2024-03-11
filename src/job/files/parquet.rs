@@ -353,7 +353,8 @@ async fn merge_files(
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
-    let (mut new_file_meta, new_file_schema) = merge_parquet_files(
+    let mut fts_buf = Vec::new();
+    let (mut new_file_meta, _) = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
@@ -361,6 +362,7 @@ async fn merge_files(
         &full_text_search_fields,
         new_file_size,
         stream_type,
+        &mut fts_buf,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -384,18 +386,14 @@ async fn merge_files(
     );
 
     let buf = Bytes::from(buf);
+
     // upload file
-    match storage::put(&new_file_key, buf.clone()).await {
+    match storage::put(&new_file_key, buf).await {
         Ok(_) => {
             if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
-                generate_index_on_ingester(
-                    buf,
-                    new_file_key.clone(),
-                    &org_id,
-                    &stream_name,
-                    new_file_schema,
-                )
-                .await?;
+                generate_index_on_ingester(fts_buf, new_file_key.clone(), &org_id, &stream_name)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -405,17 +403,15 @@ async fn merge_files(
 
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_ingester(
-    buf: Bytes,
+    buf: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
-    schema: SchemaRef,
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let index_record_batches =
-        prepare_index_record_batches(buf, schema.clone(), org_id, stream_name, &new_file_key)
-            .await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
     if record_batches.is_empty() {
         return Ok(());
@@ -486,14 +482,13 @@ pub(crate) async fn generate_index_on_ingester(
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    buf: Bytes,
+    buf: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
-    schema: SchemaRef,
 ) -> Result<(String, FileMeta), anyhow::Error> {
     let mut index_record_batches =
-        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
@@ -557,7 +552,7 @@ pub(crate) async fn generate_index_on_compactor(
 /// * `org_id` - The organization ID.
 /// * `stream_name` - The stream name.
 /// * `new_file_key` - The new file key which is used to generate the index file.
-async fn prepare_index_record_batches(
+async fn _prepare_index_record_batches(
     buf: Bytes,
     schema: Arc<Schema>,
     org_id: &str,
@@ -598,7 +593,62 @@ async fn prepare_index_record_batches(
         }
 
         let split_arr = array_distinct(string_to_array(
-            lower(col(column)),
+            lower(concat(&[col(column), lit("")])),
+            lit(" "),
+            lit(ScalarValue::Null),
+        ));
+        let record_batch = index_df
+            .with_column("terms", split_arr)?
+            .unnest_column("terms")?
+            .with_column_renamed("terms", "term")?
+            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
+            .with_column("file_name", lit(file_name_without_prefix))?
+            .aggregate(
+                vec![col("term"), col("file_name")],
+                vec![
+                    min(col("_timestamp")).alias("_timestamp"),
+                    count(col("term")).alias("_count"),
+                ],
+            )?
+            .with_column("character_len", character_length(col("term")))?
+            .with_column("deleted", lit(false))?
+            .filter(col("character_len").gt_eq(lit(3)))?
+            .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
+            .collect()
+            .await?;
+
+        indexed_record_batches_to_merge.push(record_batch);
+    }
+    ctx.deregister_table("_tbl_raw_data")?;
+    Ok(indexed_record_batches_to_merge)
+}
+
+async fn prepare_index_record_batches_v1(
+    batches: Vec<RecordBatch>, // 10 fields index
+    org_id: &str,
+    stream_name: &str,
+    new_file_key: &str,
+) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
+    if batches.is_empty() {
+        return Ok(vec![]);
+    }
+    let local = batches.first().unwrap().schema();
+    let ctx = SessionContext::new();
+    let provider = MemTable::try_new(local.clone(), vec![batches])?;
+    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
+    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
+    let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
+    let mut indexed_record_batches_to_merge = Vec::new();
+    for column in local.fields().iter() {
+        // 1500 columns --> 100 columns of inverted index
+        let index_df = ctx.table("_tbl_raw_data").await?;
+
+        if column.data_type() != &DataType::Utf8 {
+            continue;
+        }
+
+        let split_arr = array_distinct(string_to_array(
+            lower(concat(&[col(column.name()), lit("")])),
             lit(" "),
             lit(ScalarValue::Null),
         ));

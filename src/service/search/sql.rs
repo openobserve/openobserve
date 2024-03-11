@@ -16,17 +16,22 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
+    sync::Arc,
 };
 
 use chrono::Duration;
 use config::{
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    cache::file_data,
+    errors::{Error, ErrorCodes},
+    storage,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -37,7 +42,11 @@ use crate::{
         stream::{StreamParams, StreamPartition},
     },
     handler::grpc::cluster_rpc,
-    service::{db, search::match_source, stream::get_stream_setting_fts_fields},
+    service::{
+        db,
+        search::match_source,
+        stream::{get_stream_setting_fts_fields, stream_settings, unwrap_partition_time_level},
+    },
 };
 
 const SQL_DELIMITERS: [u8; 12] = [
@@ -112,6 +121,11 @@ impl Display for SqlMode {
 
 impl Sql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
+        let session_id = if req.job.as_ref().is_some() {
+            req.job.as_ref().unwrap().session_id.clone()
+        } else {
+            String::new()
+        };
         let req_query = req.query.as_ref().unwrap();
         let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
@@ -147,7 +161,7 @@ impl Sql {
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
-        let track_total_hits = req_query.track_total_hits;
+        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
 
         // check SQL limitation
         // in context mode, disallow, [limit|offset|group by|having|join|union]
@@ -363,6 +377,9 @@ impl Sql {
             Err(_) => Schema::empty(),
         };
         let schema_fields = schema.fields().to_vec();
+        let stream_settings = stream_settings(&schema).unwrap_or_default();
+        let partition_time_level =
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
         // fetch fts fields
         let mut fts_terms = HashSet::new();
@@ -382,7 +399,21 @@ impl Sql {
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let fields = generate_fast_mode_fields(&schema, &match_all_fields);
+            let file_schema = if CONFIG.limit.fast_mode_file_list_enabled {
+                generate_fast_mode_fields_from_file_list(
+                    &session_id,
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    partition_time_level,
+                    meta.time_range.unwrap_or_default(),
+                )
+                .await
+            } else {
+                None
+            };
+            let fields =
+                generate_fast_mode_fields_from_schema(&file_schema, &schema, &match_all_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -758,9 +789,16 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
-fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> Vec<String> {
+fn generate_fast_mode_fields_from_schema(
+    file_schema: &Option<Arc<Schema>>,
+    schema: &Schema,
+    fts_fields: &[String],
+) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = schema.fields();
+    let schema_fields = match file_schema {
+        Some(v) => v.fields(),
+        None => schema.fields(),
+    };
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
@@ -939,6 +977,54 @@ fn split_sql_token(text: &str) -> Vec<String> {
         }
     }
     tokens
+}
+
+async fn generate_fast_mode_fields_from_file_list(
+    session_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_range: (i64, i64),
+) -> Option<Arc<Schema>> {
+    let (time_min, time_max) = time_range;
+    let file = match crate::service::file_list::query(
+        org_id,
+        stream_name,
+        stream_type,
+        time_level,
+        time_min,
+        time_max,
+        true,
+    )
+    .await
+    {
+        Ok(file_list) => file_list.last().cloned(),
+        Err(_) => None,
+    };
+    let file = file?;
+    let file_name = file.key;
+    // read parquet file
+    let mut parquet_buf = None;
+    if file_data::memory::exist(&file_name).await {
+        if let Some(data) = file_data::memory::get(&file_name, None).await {
+            parquet_buf = Some(data);
+        }
+    }
+    if parquet_buf.is_none() {
+        let Ok(data) = storage::get(&file_name).await else {
+            return None;
+        };
+        if let Err(e) = file_data::memory::set(session_id, &file_name, data.clone()).await {
+            log::error!("set file data to memory error: {}", e);
+        }
+        parquet_buf = Some(data);
+    };
+    // read schema from parquet file
+    match config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap()).await {
+        Ok(schema) => Some(schema),
+        Err(_) => None,
+    }
 }
 
 #[cfg(test)]

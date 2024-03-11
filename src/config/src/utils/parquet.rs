@@ -148,6 +148,12 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
+pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {
+    let schema_reader = Cursor::new(data.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    Ok(arrow_reader.schema().clone())
+}
+
 pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, anyhow::Error> {
     let mut meta = FileMeta::default();
     let schema_reader = Cursor::new(data.clone());

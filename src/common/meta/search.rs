@@ -195,6 +195,15 @@ pub struct ResponseTook {
     pub wait_queue: usize,
     pub cluster_total: usize,
     pub cluster_wait_queue: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<ResponseNodeTook>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+pub struct ResponseNodeTook {
+    pub node: String,
+    pub is_ingester: bool,
+    pub took: usize,
 }
 
 impl Response {
@@ -234,6 +243,7 @@ impl Response {
             wait_queue: 0,
             cluster_total: val,
             cluster_wait_queue: wait,
+            nodes: Vec::new(),
         });
     }
 
@@ -276,6 +286,7 @@ pub struct SearchPartitionRequest {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionResponse {
+    pub session_id: String,
     pub file_num: usize,
     pub records: usize,
     pub original_size: usize,
