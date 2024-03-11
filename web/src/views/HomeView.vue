@@ -157,38 +157,26 @@ export default defineComponent({
           let streamsCount = 0;
           let sum = 0;
           if (res.data.streams.length > 0) {
+            const streamTypes = [
+              "logs",
+              "metrics",
+              "traces",
+              "enrichment_tables",
+            ];
+
+            if (store.state.zoConfig.show_stream_stats_doc_num) {
+              streamTypes.push("index");
+              streamTypes.push("metadata");
+            }
+
+            const streamsSet = new Set(streamTypes);
+
             for (let i = 0; i < res.data.streams.length; i++) {
-              const streamTypes = [
-                "logs",
-                "metrics",
-                "traces",
-                "enrichment_tables",
-              ];
-
-              if (store.state.zoConfig.show_stream_stats_doc_num) {
-                streamTypes.push("index");
-                streamTypes.push("metadata");
-              }
-
-              const streamsSet = new Set(streamTypes);
-
               if (streamsSet.has(res.data.streams[i].stream_type)) {
                 streamsCount += 1;
                 sum += res.data.streams[i].stats.storage_size;
               }
             }
-            // sum = res.data.streams.reduce(
-            //   (
-            //     acc: number,
-            //     val: {
-            //       [x: string]: any;
-            //       storage_size: any;
-            //     }
-            //   ) => {
-            //     return acc + val.stats.storage_size;
-            //   },
-            //   0
-            // );
           }
 
           let ingest_fns = 0;
