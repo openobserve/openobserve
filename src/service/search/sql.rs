@@ -412,8 +412,13 @@ impl Sql {
             } else {
                 None
             };
-            let fields =
-                generate_fast_mode_fields_from_schema(&file_schema, &schema, &match_all_fields);
+            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
+            let fields = generate_fast_mode_fields_from_schema(
+                &stream_key,
+                &file_schema,
+                &schema,
+                &match_all_fields,
+            );
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -790,6 +795,7 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
 }
 
 fn generate_fast_mode_fields_from_schema(
+    stream_key: &str,
     file_schema: &Option<Arc<Schema>>,
     schema: &Schema,
     fts_fields: &[String],
@@ -799,6 +805,10 @@ fn generate_fast_mode_fields_from_schema(
         Some(v) => v.fields(),
         None => schema.fields(),
     };
+    log::warn!(
+        "schema fields is empty when generating fast mode fields from schema: {}",
+        stream_key
+    );
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
@@ -1021,10 +1031,9 @@ async fn generate_fast_mode_fields_from_file_list(
         parquet_buf = Some(data);
     };
     // read schema from parquet file
-    match config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap()).await {
-        Ok(schema) => Some(schema),
-        Err(_) => None,
-    }
+    config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap())
+        .await
+        .ok()
 }
 
 #[cfg(test)]
