@@ -17,7 +17,7 @@ use config::CONFIG;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{alerts::Alert, functions::Transform, stream::Stream};
+use super::{alerts::Alert, functions::Transform};
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";
@@ -57,9 +57,16 @@ pub struct OrganizationResponse {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgSummary {
-    pub streams: Vec<Stream>,
+    pub streams: StreamSummary,
     pub functions: Vec<Transform>,
     pub alerts: Vec<Alert>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct StreamSummary {
+    pub num_streams: i64,
+    pub total_storage_size: f64,
+    pub total_compressed_size: f64,
 }
 
 /// A container for passcodes and rumtokens
