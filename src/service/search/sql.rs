@@ -805,10 +805,12 @@ fn generate_fast_mode_fields_from_schema(
         Some(v) => v.fields(),
         None => schema.fields(),
     };
-    log::warn!(
-        "schema fields is empty when generating fast mode fields from schema: {}",
-        stream_key
-    );
+    if schema_fields.is_empty() {
+        log::warn!(
+            "schema fields is empty when generating fast mode fields from schema: {}",
+            stream_key
+        );
+    }
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
