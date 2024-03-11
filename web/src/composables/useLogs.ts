@@ -1300,10 +1300,13 @@ const useLogs = () => {
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
           })
-          .then((res) => {
+          .then(async (res) => {
             searchObj.loading = false;
+            alert(res.data.aggs)
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
+            await nextTick();
+            alert(searchObj.data.queryResults.aggs)
             generateHistogramData();
             // searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
@@ -1573,6 +1576,7 @@ const useLogs = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
+      alert(searchObj.data.queryResults.aggs)
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
@@ -1606,6 +1610,7 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
+      alert(searchObj.data.histogram.xData.length)
     } catch (e: any) {
       console.log("Error while generating histogram data");
     }
