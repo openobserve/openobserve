@@ -320,7 +320,7 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
         .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX meta_module_key3_idx on meta ((key3,key2, key1, module);",
+        "CREATE UNIQUE INDEX meta_module_key3_idx on meta (key3,key2, key1, module);",
     )
     .await?;
 
