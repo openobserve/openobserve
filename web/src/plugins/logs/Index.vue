@@ -733,6 +733,8 @@ export default defineComponent({
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
         this.searchObj.data.editorValue = "";
+        this.searchObj.loading = true;
+        this.getQueryData();
       }
       if (this.searchObj.loading == false) {
         this.searchObj.loading = true;
