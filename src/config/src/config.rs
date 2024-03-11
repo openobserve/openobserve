@@ -444,8 +444,8 @@ pub struct Common {
     pub query_on_stream_selection: bool,
     #[env_config(
         name = "ZO_SHOW_STREAM_DATES_DOCS_NUM",
-        default = false,
-        help = "Toggle search to be trigger based on button click event."
+        default = true,
+        help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
 }
