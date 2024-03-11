@@ -578,6 +578,8 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
+    #[env_config(name = "ZO_ENTRY_PER_SCHEMA_VERSION_ENABLED", default = false)]
+    pub row_per_schema_version_enabled: bool,
 }
 
 #[derive(EnvConfig)]
