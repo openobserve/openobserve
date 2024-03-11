@@ -41,7 +41,9 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let mut total_storage_size = 0.00;
     let mut total_compressed_size = 0.00;
     for stream in streams.iter() {
-        if stream.stream_type != StreamType::Index || stream.stream_type != StreamType::Metadata {
+        if !stream.stream_type.eq(&StreamType::Index)
+            && !stream.stream_type.eq(&StreamType::Metadata)
+        {
             num_streams += 1;
             total_storage_size += stream.stats.storage_size;
             total_compressed_size += stream.stats.compressed_size;
