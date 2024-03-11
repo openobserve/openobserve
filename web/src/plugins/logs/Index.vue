@@ -733,9 +733,10 @@ export default defineComponent({
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
         this.searchObj.data.editorValue = "";
+        this.searchObj.loading = true;
+        this.getQueryData();
       }
-      this.searchObj.loading = true;
-      this.getQueryData();
+      
       // this.searchResultRef.reDrawChart();
     },
     refreshHistogram() {

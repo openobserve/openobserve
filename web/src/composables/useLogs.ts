@@ -978,7 +978,6 @@ const useLogs = () => {
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
-        console.log(searchObj.data.histogramQuery)
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1281,13 +1280,10 @@ const useLogs = () => {
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
           })
-          .then(async (res) => {
+          .then((res) => {
             searchObj.loading = false;
-            alert(res.data.aggs)
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
-            await nextTick();
-            alert(searchObj.data.queryResults.aggs)
             generateHistogramData();
             // searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
@@ -1557,7 +1553,6 @@ const useLogs = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      alert(searchObj.data.queryResults.aggs)
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
@@ -1591,7 +1586,6 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
-      alert(searchObj.data.histogram.xData.length)
     } catch (e: any) {
       console.log("Error while generating histogram data");
     }
