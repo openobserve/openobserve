@@ -34,7 +34,10 @@ use config::{
         parquet::read_metadata_from_file,
         schema_ext::SchemaExt,
     },
-    FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
+    FxIndexMap, CONFIG,
+};
+use datafusion::{
+    arrow::json as arrow_json, datasource::MemTable, execution::context::SessionContext, prelude::*,
 };
 use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use infra::{cache, storage};
@@ -46,7 +49,6 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
-        schema::SchemaCache,
         search::datafusion::{
             exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
         },
@@ -580,9 +582,8 @@ async fn prepare_index_record_batches_v1(
         }
 
         let column_name = column.name();
-        let split_chars = &CONFIG.common.inverted_index_split_chars;
-
-        let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
+        let split_chars = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+        let remove_chars_btrim = split_chars;
         let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
         let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
         let distinct_terms = array_distinct(split_arr);
