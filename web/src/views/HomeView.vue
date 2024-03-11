@@ -116,10 +116,10 @@ export default defineComponent({
       orgService
         .get_organization_summary(org_id)
         .then((res) => {
-          setStreams("all", res.data.streams);
+          //setStreams("all", res.data.streams);
 
           if (
-            res.data.streams.length == 0 &&
+            res.data.streams.num_streams == 0 &&
             res.data.functions.length == 0 &&
             res.data.alerts.length == 0
           ) {
@@ -129,25 +129,9 @@ export default defineComponent({
             return;
           }
 
-          let streamsCount = 0;
-          let sum = 0;
-          if (res.data.streams.length > 0) {
-            const streamTypes = [
-              "logs",
-              "metrics",
-              "traces",
-              "enrichment_tables",
-            ];
+          let streamsCount = res.data.streams.num_streams;
+          let sum = res.data.streams.total_storage_size;
 
-            const streamsSet = new Set(streamTypes);
-
-            for (let i = 0; i < res.data.streams.length; i++) {
-              if (streamsSet.has(res.data.streams[i].stream_type)) {
-                streamsCount += 1;
-                sum += res.data.streams[i].stats.storage_size;
-              }
-            }
-          }
 
           let ingest_fns = 0;
           let query_fns = 0;

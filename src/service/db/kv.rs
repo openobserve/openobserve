@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use config::CONFIG;
 use infra::db as infra_db;
 
 use crate::common::infra::config::KVS;
@@ -84,7 +85,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value = ev.value.unwrap();
+                let item_value = if CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = match db.get(&ev.key).await {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!("[Schema:watch]: Error getting schema: {}", e);
+                            continue;
+                        }
+                    };
+                    ret
+                } else {
+                    ev.value.unwrap()
+                };
                 KVS.insert(item_key.to_string(), item_value);
             }
             infra_db::Event::Delete(ev) => {

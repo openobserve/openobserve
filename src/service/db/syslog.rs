@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{utils::json, CONFIG};
 use infra::db as infra_db;
 
 use crate::common::{
@@ -89,7 +89,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
-                let item_value: SyslogRoute = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: SyslogRoute = if CONFIG.common.meta_store_external {
+                    let db = infra_db::get_db().await;
+                    let ret = match db.get(&ev.key).await {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!("[Schema:watch]: Error getting schema: {}", e);
+                            continue;
+                        }
+                    };
+                    json::from_slice(&ret).unwrap()
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
+
                 SYSLOG_ROUTES.insert(item_value.id.to_owned(), item_value);
             }
             infra_db::Event::Delete(ev) => {

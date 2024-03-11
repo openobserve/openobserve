@@ -15,7 +15,7 @@
 
 use std::io::{Error, ErrorKind};
 
-use config::utils::rand::generate_random_string;
+use config::{meta::stream::StreamType, utils::rand::generate_random_string};
 
 use crate::{
     common::{
@@ -37,8 +37,23 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
     let functions = db::functions::list(org_id).await.unwrap();
     let alerts = db::alerts::list(org_id, None, None).await.unwrap();
+    let mut num_streams = 0;
+    let mut total_storage_size = 0.00;
+    let mut total_compressed_size = 0.00;
+    for stream in streams.iter() {
+        if stream.stream_type != StreamType::Index || stream.stream_type != StreamType::Metadata {
+            num_streams += 1;
+            total_storage_size += stream.stats.storage_size;
+            total_compressed_size += stream.stats.compressed_size;
+        }
+    }
+
     OrgSummary {
-        streams,
+        streams: crate::common::meta::organization::StreamSummary {
+            num_streams,
+            total_storage_size,
+            total_compressed_size,
+        },
         functions,
         alerts,
     }
