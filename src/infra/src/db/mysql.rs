@@ -78,7 +78,7 @@ impl super::Db for MysqlDb {
         let (module, key1, key2, key3) = super::parse_key(key);
         let pool = CLIENT.clone();
         let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;;"#,
+            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;"#,
         )
         .bind(module)
         .bind(key1)
@@ -100,7 +100,7 @@ impl super::Db for MysqlDb {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT IGNORE INTO meta (module, key1, key2,key3, value) VALUES (?, ?, ?,?, '');"#,
+            r#"INSERT IGNORE INTO meta (module, key1, key2,key3, value) VALUES (?, ?, ?, ?, '');"#,
         )
         .bind(&module)
         .bind(&key1)
@@ -114,14 +114,16 @@ impl super::Db for MysqlDb {
             }
             return Err(e.into());
         }
-        if let Err(e) =
-            sqlx::query(r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ?;"#)
-                .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-                .bind(&module)
-                .bind(&key1)
-                .bind(&key2)
-                .execute(&mut *tx)
-                .await
+        if let Err(e) = sqlx::query(
+            r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;"#,
+        )
+        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .bind(&key3)
+        .execute(&mut *tx)
+        .await
         {
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback put meta error: {}", e);
@@ -161,7 +163,7 @@ impl super::Db for MysqlDb {
             });
         }
 
-        let (module, key1, key2,key3) = super::parse_key(key);
+        let (module, key1, key2, key3) = super::parse_key(key);
         let sql = if with_prefix {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
@@ -195,7 +197,7 @@ impl super::Db for MysqlDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2, key3) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, key3, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -206,7 +208,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         if !key3.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key3);
+            sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -317,8 +319,10 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
     create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
         .await?;
-    create_index_item("CREATE UNIQUE INDEX meta_module_key3_idx on meta ((key3,key2, key1, module);")
-        .await?;
+    create_index_item(
+        "CREATE UNIQUE INDEX meta_module_key3_idx on meta ((key3,key2, key1, module);",
+    )
+    .await?;
 
     Ok(())
 }
