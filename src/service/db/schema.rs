@@ -51,6 +51,7 @@ pub async fn get(
     if let Some(schema) = r.get(map_key) {
         return Ok(schema.clone());
     }
+    drop(r);
 
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
@@ -60,7 +61,7 @@ pub async fn get(
             if let Some(schema) = r.get(map_key) {
                 return Ok(schema.clone());
             }
-
+            drop(r);
             Schema::empty()
         }
         Ok(v) => {
