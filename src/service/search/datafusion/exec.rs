@@ -248,6 +248,19 @@ pub async fn sql(
     // drop table
     ctx.deregister_table("tbl")?;
     ctx_aggs.deregister_table("tbl")?;
+
+    // unnest nested array columns
+    result = match unnest_array_record_batch(&result, sql.stream_type) {
+        Ok(parsed) => parsed,
+        Err(e) => {
+            log::info!(
+                "Failed to parse array record batch for: {}. Returning original",
+                e
+            );
+            result
+        }
+    };
+
     log::info!(
         "[session_id {session_id}] Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
@@ -1620,6 +1633,139 @@ fn filter_schema_null_fields(schema: &mut Schema) {
     }
 }
 
+fn pretty_print_record_batch(result: &Vec<RecordBatch>) {
+    let formatted = arrow::util::pretty::pretty_format_batches_with_options(
+        &result,
+        &datafusion::common::format::DEFAULT_FORMAT_OPTIONS,
+    )
+    .unwrap()
+    .to_string();
+
+    formatted
+        .trim()
+        .lines()
+        .for_each(|line| println!("{}", line));
+}
+
+fn unnest_array_record_batch(
+    original: &HashMap<String, Vec<RecordBatch>>,
+    stream_type: StreamType,
+) -> Result<HashMap<String, Vec<RecordBatch>>> {
+    let mut parsed_record_batch = HashMap::new();
+    for (key, original_record_batch) in original {
+        let schema = original_record_batch[0].schema();
+        if schema.fields().iter().any(|field| match field.data_type() {
+            DataType::List(_) => true,
+            _ => false,
+        }) {
+            let batch_record_ref: Vec<&RecordBatch> = original_record_batch.iter().collect();
+            match datafusion::arrow::json::writer::record_batches_to_json_rows(&batch_record_ref) {
+                Err(err) => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Error converting record batches to json rows: {}",
+                        err
+                    )));
+                }
+                Ok(json_rows) => {
+                    let before_len = json_rows.len();
+                    let parsed_json_rows: Vec<json::Value> = json_rows
+                        .into_iter()
+                        .filter_map(|hit| {
+                            if hit.values().any(|val| val.is_array()) {
+                                unnest_array_json_rows(hit)
+                                    .map(|ret| json::Value::Object(ret))
+                                    .ok()
+                            } else {
+                                Some(json::Value::Object(hit))
+                            }
+                        })
+                        .collect();
+
+                    if parsed_json_rows.len() != before_len {
+                        return Err(DataFusionError::Execution(format!(
+                            "Error parsing array json rows",
+                        )));
+                    }
+
+                    let parsed_json_iter = parsed_json_rows.iter();
+                    let inferred_schema =
+                        infer_json_schema_from_values(parsed_json_iter, stream_type)?;
+                    let mut decoder = arrow::json::ReaderBuilder::new(Arc::new(inferred_schema))
+                        .build_decoder()?;
+
+                    let mut record_batch = vec![];
+                    for row in parsed_json_rows {
+                        decoder.decode(json::to_string(&row).unwrap().as_bytes())?;
+                        record_batch.push(decoder.flush()?.unwrap());
+                    }
+                    parsed_record_batch.insert(key.to_owned(), record_batch);
+                }
+            }
+        } else {
+            parsed_record_batch.insert(key.to_owned(), original_record_batch.to_owned());
+        }
+    }
+    Ok(parsed_record_batch)
+}
+
+fn unnest_array_json_rows(
+    original: json::Map<String, json::Value>,
+) -> Result<json::Map<String, json::Value>> {
+    let mut parsed_map = json::Map::new();
+    for (key, val) in original {
+        // need to consider two special cases:
+        // 1. when value is of an array
+        // 2. when value is of an object
+        match val {
+            json::Value::Array(arr) => {
+                let mut parsed_row_names = vec![];
+
+                // two special regex pattern for key format returned by DataFusion
+                // check: number of parsed column names == number of Value in arr
+                let col_names = key.split(",").skip(1).collect::<Vec<&str>>().join("");
+                let unescaped_col_names = col_names.replace("\"", "");
+
+                // Two cases to consider for regex pattern in REGEXP_MATCH() from query rest
+                // 1. Patten contains Named capturing groups
+                // ?P<xxx> or ?<xxx> -> extract field names xxx
+                let re = Regex::new(r"\?<([^>']+)>|\?P<([^>']+)>").unwrap();
+                for (_, [col_name]) in re.captures_iter(&col_names).map(|cap| cap.extract()) {
+                    parsed_row_names.push(col_name);
+                }
+                if parsed_row_names.len() != arr.len() {
+                    // 2. Patten does not use Named Capturing groups. Only raw regex used.
+                    parsed_row_names.clear();
+                    let re = Regex::new(r#"\(([^()]+)\)"#).unwrap();
+                    for (_, [col_name]) in re
+                        .captures_iter(&unescaped_col_names)
+                        .map(|cap| cap.extract())
+                    {
+                        parsed_row_names.push(col_name);
+                    }
+                }
+                if parsed_row_names.len() != arr.len() {
+                    return Err(DataFusionError::Execution(format!(
+                        "Failed to parse json array to columns. Returning original"
+                    )));
+                }
+                parsed_row_names.into_iter().zip(arr.into_iter()).for_each(
+                    |(col_name, col_val)| {
+                        parsed_map.insert(col_name.to_string(), col_val);
+                    },
+                );
+            }
+            json::Value::Object(obj) => {
+                // recursively parse nested json rows in case any is array
+                parsed_map.insert(key, json::Value::Object(unnest_array_json_rows(obj)?));
+            }
+            _ => {
+                parsed_map.insert(key, val);
+            }
+        }
+    }
+    Ok(parsed_map)
+}
+
 #[cfg(test)]
 mod tests {
     use arrow::array::{Int32Array, NullArray, StringArray};
@@ -1774,5 +1920,26 @@ mod tests {
             let res = merge_rewrite_sql(sql, schema.clone()).unwrap();
             assert_eq!(res, **except);
         }
+    }
+
+    #[tokio::test]
+    async fn test_query_with_regexp_match() {
+        let sql = r#"SELECT REGEXP_MATCH('2024-02-29 00:15:30 15.128.22.213 GET /Administradores_Elina/service-worker.js - 443 - 15.128.69.103 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/122.0.0.0+Safari/537.36 https://ccwsqa/Administradores_Elina 200 0 0 6 15.159.53.87,+15.128.69.103:54910', '(?P<timestamp>[^\s]+ [^\s]+) (?P<client_ip>[^\s]+) (?P<http_method>[^\s]+) (?P<requested_path>[^\s]+) (?P<placeholder1>[^\s]+) (?P<server_port>[^\s]+) (?P<placeholder2>[^\s]+) (?P<referrer_ip>[^\s]+) (?P<user_agent>[^\s]+) (?P<referrer_url>[^\s]+) (?P<http_status>[^\s]+) (?P<other_codes>[^\s]+ [^\s]+) (?P<response_time>[^\s]+) (?P<forwarded_ips>.+)$')"#;
+        let ctx = SessionContext::new();
+
+        let batches = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        println!("before");
+        pretty_print_record_batch(&batches);
+
+        let mut result = HashMap::new();
+        result.insert("query".to_string(), batches);
+
+        let parsed = match unnest_array_record_batch(&result, StreamType::Logs) {
+            Ok(ret) => ret,
+            Err(_) => result,
+        };
+
+        let parsed_rb = parsed.get("query").unwrap();
+        pretty_print_record_batch(&parsed_rb);
     }
 }
