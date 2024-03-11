@@ -368,6 +368,7 @@ export default defineComponent({
       generateHistogramData,
       resetSearchObj,
       resetStreamData,
+      getHistogramQueryData,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -603,6 +604,7 @@ export default defineComponent({
       refreshTimezone,
       resetSearchObj,
       resetStreamData,
+      getHistogramQueryData,
     };
   },
   computed: {
@@ -678,7 +680,12 @@ export default defineComponent({
 
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
-          this.handleRunQuery();
+          // this.handleRunQuery();
+          this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
+            (res: any) => {
+              this.searchResultRef.reDrawChart();
+            }
+          );
         }
       }
     },
