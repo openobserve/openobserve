@@ -87,14 +87,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value = if CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;
-                    let ret = match db.get(&ev.key).await {
-                        Ok(v) => v,
+                    match db.get(&ev.key).await {
+                        Ok(val) => val,
                         Err(e) => {
-                            log::error!("[Schema:watch]: Error getting schema: {}", e);
+                            log::error!("Error getting value: {}", e);
                             continue;
                         }
-                    };
-                    ret
+                    }
                 } else {
                     ev.value.unwrap()
                 };

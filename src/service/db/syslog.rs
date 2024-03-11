@@ -91,14 +91,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_value: SyslogRoute = if CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;
-                    let ret = match db.get(&ev.key).await {
-                        Ok(v) => v,
+                    match db.get(&ev.key).await {
+                        Ok(val) => match json::from_slice(&val) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
+                        },
                         Err(e) => {
-                            log::error!("[Schema:watch]: Error getting schema: {}", e);
+                            log::error!("Error getting value: {}", e);
                             continue;
                         }
-                    };
-                    json::from_slice(&ret).unwrap()
+                    }
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
