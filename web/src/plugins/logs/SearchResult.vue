@@ -581,7 +581,6 @@ export default defineComponent({
     });
 
     const reDrawChart = () => {
-      alert(searchObj.data.histogram.xData.length)
       if (
         // eslint-disable-next-line no-prototype-builtins
         searchObj.data.histogram.hasOwnProperty("xData") &&
