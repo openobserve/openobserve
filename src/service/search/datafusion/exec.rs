@@ -249,7 +249,7 @@ pub async fn sql(
     ctx.deregister_table("tbl")?;
     ctx_aggs.deregister_table("tbl")?;
 
-    // unnest nested array columns
+    // unnest nested array columns, returning original if failed
     result = match unnest_array_record_batch(&result, sql.stream_type) {
         Ok(parsed) => parsed,
         Err(e) => {
@@ -1640,6 +1640,7 @@ fn unnest_array_record_batch(
     let mut parsed_record_batch = HashMap::new();
     for (key, original_record_batch) in original {
         let schema = original_record_batch[0].schema();
+        // only unnest RecordBatch that contains fields with array datatype
         if schema.fields().iter().any(|field| match field.data_type() {
             DataType::List(_) => true,
             _ => false,
@@ -1667,6 +1668,7 @@ fn unnest_array_record_batch(
                         })
                         .collect();
 
+                    // check # of rows before and after stays the same
                     if parsed_json_rows.len() != before_len {
                         return Err(DataFusionError::Execution(format!(
                             "Error parsing array json rows",
@@ -1731,7 +1733,7 @@ fn unnest_array_json_rows(
                 }
                 if parsed_row_names.len() != arr.len() {
                     return Err(DataFusionError::Execution(format!(
-                        "Failed to parse json array to columns. Returning original"
+                        "Failed to parse json array to columns due to inconsistent column count. Returning original"
                     )));
                 }
                 parsed_row_names.into_iter().zip(arr.into_iter()).for_each(
@@ -1909,7 +1911,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_query_with_regexp_match() {
+    async fn test_query_with_regexp_match_success() {
         let sql = r#"SELECT REGEXP_MATCH('2024-02-29 00:15:30 15.128.22.213 GET', '(?P<timestamp>[^\s]+ [^\s]+) (?<client_ip>[^\s]+) (?<http_method>[^\s]+)')"#;
         let ctx = SessionContext::new();
 
@@ -1934,8 +1936,35 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn test_query_with_regexp_match_fail() {
+        let sql = r#"SELECT REGEXP_MATCH('2024-02-29 00:15:30 15.128.22.213 GET', '')"#;
+        let ctx = SessionContext::new();
+
+        let batches = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        let mut result = HashMap::new();
+        result.insert("query".to_string(), batches);
+
+        let parsed = unnest_array_record_batch(&result, StreamType::Logs);
+        println!("{:?}", parsed.unwrap());
+        assert!(parsed.is_ok());
+
+        // let parsed = parsed.unwrap();
+        // assert_eq!(parsed.len(), result.get("query").unwrap().len());
+        // let parsed_rb = parsed.get("query").unwrap();
+        // let parsed_ref: Vec<&RecordBatch> = parsed_rb.iter().collect();
+        // let json_rows =
+        //     datafusion::arrow::json::writer::record_batches_to_json_rows(&parsed_ref).unwrap();
+
+        // for row in json_rows {
+        //     assert_eq!(row.get("client_ip").unwrap(), "15.128.22.213");
+        //     assert_eq!(row.get("http_method").unwrap(), "GET");
+        //     assert_eq!(row.get("timestamp").unwrap(), "2024-02-29 00:15:30");
+        // }
+    }
+
     #[test]
-    fn test_unnest_array_json_rwos() {
+    fn test_unnest_array_json_rows_success() {
         let value = json::json!({
             "code": 200,
             "success": true,
@@ -1955,8 +1984,33 @@ mod tests {
         assert!(parsed.is_ok());
         let parsed = parsed.unwrap();
         let parsed_val = parsed.get("query").unwrap();
-        let inner = parsed_val.get("payload").unwrap();
-        assert_eq!("2022/12/27 14:09:59", inner.get("[^\\s]+ [^\\s]+").unwrap());
-        assert_eq!("warn", inner.get("[^\\s]+").unwrap());
+        let payload = parsed_val.get("payload").unwrap();
+        assert_eq!(
+            "2022/12/27 14:09:59",
+            payload.get(r"[^\s]+ [^\s]+").unwrap()
+        );
+        assert_eq!("warn", payload.get(r"[^\s]+").unwrap());
+    }
+
+    #[test]
+    fn test_unnest_array_json_fail() {
+        let value = json::json!({
+            "code": 200,
+            "success": true,
+            "payload": {
+                "info": [
+                    "2022/12/27 14:09:59",
+                    "warn"
+                ],
+                "homepage": null
+            }
+        });
+
+        let mut original = json::Map::new();
+        original.insert("query".to_string(), value);
+
+        let parsed = unnest_array_json_rows(original);
+        // should fail because array doesn't have names
+        assert!(parsed.is_err());
     }
 }
