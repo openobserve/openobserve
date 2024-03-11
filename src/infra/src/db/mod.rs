@@ -154,8 +154,8 @@ pub fn parse_key(mut key: &str) -> (String, String, String, String) {
         _ => {
             module = columns[0].to_string();
             key1 = columns[1].to_string();
-            key2 = columns[2].join("/");
-            key3 = columns[3..].to_string();
+            key2 = columns[2].to_string();
+            key3 = columns[3..].join("/");
         }
     }
     (module, key1, key2, key3)
