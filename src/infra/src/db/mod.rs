@@ -119,15 +119,16 @@ pub trait Db: Sync + Send + 'static {
     async fn close(&self) -> Result<()>;
 }
 
-pub fn parse_key(mut key: &str) -> (String, String, String) {
+pub fn parse_key(mut key: &str) -> (String, String, String, String) {
     let mut module = "".to_string();
     let mut key1 = "".to_string();
     let mut key2 = "".to_string();
+    let mut key3 = "".to_string();
     if key.starts_with('/') {
         key = &key[1..];
     }
     if key.is_empty() {
-        return (module, key1, key2);
+        return (module, key1, key2, key3);
     }
     let columns = key.split('/').collect::<Vec<&str>>();
     match columns.len() {
@@ -144,22 +145,30 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
             key1 = columns[1].to_string();
             key2 = columns[2].to_string();
         }
-        _ => {
+        4 => {
             module = columns[0].to_string();
             key1 = columns[1].to_string();
             key2 = columns[2..].join("/");
         }
+        _ => {
+            module = columns[0].to_string();
+            key1 = columns[1].to_string();
+            key2 = columns[2].to_string();
+            key3 = columns[4].to_string();
+        }
     }
-    (module, key1, key2)
+    (module, key1, key2, key3)
 }
 
-pub fn build_key(module: &str, key1: &str, key2: &str) -> String {
+pub fn build_key(module: &str, key1: &str, key2: &str, key3: &str) -> String {
     if key1.is_empty() {
         format!("/{module}/")
     } else if key2.is_empty() {
         format!("/{module}/{key1}")
-    } else {
+    } else if key3.is_empty() {
         format!("/{module}/{key1}/{key2}")
+    } else {
+        format!("/{module}/{key1}/{key2}/{key3}")
     }
 }
 
@@ -187,6 +196,7 @@ pub struct MetaRecord {
     pub module: String,
     pub key1: String,
     pub key2: String,
+    pub key3: String,
     pub value: String,
 }
 
