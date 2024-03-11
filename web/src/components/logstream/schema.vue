@@ -46,17 +46,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <table class="q-table" data-test="schema-stream-meta-data-table">
               <thead>
                 <tr>
-                  <th>{{ t("logStream.docsCount") }}</th>
+                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
+                    {{ t("logStream.docsCount") }}
+                  </th>
                   <th>{{ t("logStream.storageSize") }}</th>
                   <th v-if="isCloud !== 'true'">
                     {{ t("logStream.compressedSize") }}
                   </th>
-                  <th>{{ t("logStream.time") }}</th>
+                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
+                    {{ t("logStream.time") }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>
+                  <td v-if="store.state.zoConfig.show_stream_stats_doc_num">
                     {{
                       parseInt(indexData.stats.doc_num).toLocaleString("en-US")
                     }}
@@ -67,7 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <td v-if="isCloud !== 'true'">
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </td>
-                  <td class="text-center">
+                  <td
+                    v-if="store.state.zoConfig.show_stream_stats_doc_num"
+                    class="text-center"
+                  >
                     {{ indexData.stats.doc_time_min }}
                     <br />
                     to
