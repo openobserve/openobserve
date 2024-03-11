@@ -26,7 +26,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-const MAX_LIMIT: usize = 10000;
+const MAX_LIMIT: usize = 100000;
 const MAX_OFFSET: usize = 100000;
 
 /// parsed sql

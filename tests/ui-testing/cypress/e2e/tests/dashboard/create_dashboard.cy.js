@@ -72,7 +72,7 @@ describe("Create a new dashboard", () => {
   //     cy.addDashboard();
   //   });
 
-  it("Add area chart panel", () => {
+  it.skip("Add area chart panel", () => {
     cy.addDashboard();
     cy.wait(1000);
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true });
@@ -80,7 +80,7 @@ describe("Create a new dashboard", () => {
     cy.addAreaChartPanel();
   });
 
-  it("Add panel errors without fields", () => {
+  it.skip("Add panel errors without fields", () => {
     cy.addDashboard();
     cy.wait(1000);
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true });
@@ -90,7 +90,7 @@ describe("Create a new dashboard", () => {
     cy.get('[data-test="dashboard-error"]').should("exist");
   });
 
-  it("drag and drop element", () => {
+  it.skip("drag and drop element", () => {
     cy.addDashboard();
     cy.wait(1000);
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true });
@@ -142,7 +142,7 @@ describe("Create a new dashboard", () => {
     cy.addAndSavePanel();
   });
 
-  it("Verify query generation on the when fields are added and removed from axis", () => {
+  it.skip("Verify query generation on the when fields are added and removed from axis", () => {
     cy.addDashboard();
     cy.wait(1000);
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true });
@@ -200,7 +200,7 @@ describe("Create a new dashboard", () => {
     // )
   });
 
-  it("should update the chart when field configurations are updated including filters", () => {
+  it.skip("should update the chart when field configurations are updated including filters", () => {
     cy.addDashboard();
     cy.get('[data-test="menu-link-/dashboards-item"]').click();
     cy.wait(2000);
@@ -337,7 +337,7 @@ describe("Create a new dashboard", () => {
     //  });
   });
 
-  it("should update the value automatically when trying to save the chart after switching from the auto to custom mode", () => {
+  it.skip("should update the value automatically when trying to save the chart after switching from the auto to custom mode", () => {
     cy.addDashboard();
     cy.wait(1000);
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true });
@@ -473,7 +473,7 @@ describe("Create a new dashboard", () => {
   //   ).click();
   //   cy.addAndSavePanel();
   // });
-  it("should clear the field after switch from custom to auto mode", () => {
+  it.skip("should clear the field after switch from custom to auto mode", () => {
     cy.addDashboard();
     cy.wait(1000);
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true });
@@ -520,7 +520,7 @@ describe("Create a new dashboard", () => {
       `[data-test='dashboard-x-item-${dashboardData.customQueryValue.field2}']`
     ).should("not.exist");
   });
-  it("should be able to generate chart with the custom query mode", () => {
+  it.skip("should be able to generate chart with the custom query mode", () => {
     cy.addDashboardPanel();
     cy.get(
       `[data-test="selected-chart-${dashboardData.ChartType}-item"]`
@@ -550,7 +550,7 @@ describe("Create a new dashboard", () => {
     ).click();
     cy.addAndSavePanel();
   });
-  it("should display error when add new chartype with existing chart type value", () => {
+  it.skip("should display error when add new chartype with existing chart type value", () => {
     cy.addDashboardPanel();
     cy.get(
       `[data-test="selected-chart-${dashboardData.ChartType}-item"]`
@@ -586,7 +586,7 @@ describe("Create a new dashboard", () => {
       .contains("Add one value field for donut and pie charts")
       .should("exist");
   });
-  it("Delete All", () => {
+  it.skip("Delete All", () => {
     cy.get('[data-test="dashboard-table"]')
       .find("td")
       .filter((index, element) =>

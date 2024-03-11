@@ -28,7 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ noOfRecordsTitle }}
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
+          
           <q-pagination
+            :disable="searchObj.loading == true"
+            v-if="
+              searchObj.meta.resultGrid.showPagination== true"        
             v-model="pageNumberInput"
             :key="
               searchObj.data.queryResults.total +
@@ -38,10 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                Math.ceil(
-                  searchObj.data.queryResults.total /
-                    searchObj.meta.resultGrid.rowsPerPage
-                )
+                searchObj.data.queryResults?.partitionDetail?.paginations
+                  ?.length || 0
               )
             "
             :input="false"
@@ -63,6 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-select
             data-test="logs-search-result-records-per-page"
+             v-if="
+              searchObj.meta.resultGrid.showPagination== true"   
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
             class="float-right select-pagination"
@@ -456,6 +460,7 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "expandlog",
+    "update:recordsPerPage",
   ],
   props: {
     expandedLogs: {
@@ -491,14 +496,13 @@ export default defineComponent({
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
         this.refreshPartitionPagination(true);
-        this.$emit("update:scroll");
+        this.$emit("update:recordsPerPage");
         this.searchTableRef.scrollTo(0);
       } else if (actionType == "pageChange") {
         if (
           this.pageNumberInput >
           Math.ceil(
-            this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage
+            this.searchObj.data.queryResults.partitionDetail.paginations.length
           )
         ) {
           this.$q.notify({

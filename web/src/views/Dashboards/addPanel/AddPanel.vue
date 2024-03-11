@@ -35,6 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex q-gutter-sm">
         <q-btn
+          outline
+          padding="sm"
+          class="q-mr-sm"
+          no-caps
+          label="Dashboard Tutorial"
+          @click="showTutorial"
+          data-test="dashboard-panel-tutorial-btn"
+        ></q-btn>
+        <q-btn
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           outline
           padding="sm"
@@ -369,6 +378,11 @@ export default defineComponent({
       metaData.value = metadata;
     };
 
+    //dashboard tutorial link on click
+    const showTutorial = () => {
+      window.open("https://short.openobserve.ai/dashboard-tutorial");
+    };
+    
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -1258,6 +1272,7 @@ export default defineComponent({
       metaData,
       panelTitle,
       onDataZoom,
+      showTutorial,
     };
   },
   methods: {

@@ -134,6 +134,7 @@ pub async fn search_partition(
                 )
             });
     let mut resp = search::SearchPartitionResponse {
+        session_id: session_id.to_string(),
         file_num: files.len(),
         records: records as usize,
         original_size: original_size as usize,
@@ -253,7 +254,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let partition_time_level =
         stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    let mut idx_file_list = vec![];
     let is_inverted_index = !meta.fts_terms.is_empty();
 
     log::warn!(
@@ -263,7 +263,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     );
 
     // If the query is of type inverted index and this is not an aggregations request
-    let file_list = if is_inverted_index && req.aggs.is_empty() {
+    let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {
         let mut idx_req = req.clone();
 
         // Get all the unique terms which the user has searched.
@@ -281,7 +281,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             .join(" or ");
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp FROM \"{}\" WHERE deleted IS False AND {}",
+            "SELECT file_name, term, _count, _timestamp FROM \"{}\" WHERE deleted IS FALSE AND ({})",
             meta.stream_name, search_condition
         );
 
@@ -289,8 +289,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.stream_type = StreamType::Index.to_string();
         idx_req.query.as_mut().unwrap().sql = query;
         idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
-        idx_req.query.as_mut().unwrap().size = 10000;
         idx_req.query.as_mut().unwrap().from = 0; // from 0 to get all the results from index anyway.
+        idx_req.query.as_mut().unwrap().size = 99999;
         idx_req.query.as_mut().unwrap().uses_zo_fn = false;
         idx_req.query.as_mut().unwrap().track_total_hits = false;
         idx_req.query.as_mut().unwrap().query_context = "".to_string();
@@ -298,8 +298,10 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         idx_req.aggs.clear();
 
         let idx_resp: search::Response = search_in_cluster(idx_req).await?;
-        let unique_files = if is_first_page {
-            let limit_count = 500;
+        let (unique_files, inverted_index_count) = if is_first_page {
+            // should be query size * 2
+            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
+            let mut total_count = 0;
             let sorted_data = idx_resp
                 .hits
                 .iter()
@@ -308,32 +310,39 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
+                    total_count += count;
                     (term, file_name, count, timestamp)
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
-
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
             for (term, filename, count, _timestamp) in sorted_data {
                 let current_count = term_counts.entry(term.clone()).or_insert(0);
-                if *current_count < limit_count || *current_count == 0 {
-                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                if *current_count < limit_count {
                     *current_count += count;
+                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
                 }
             }
-            term_map
-                .into_iter()
-                .flat_map(|(_, filenames)| filenames)
-                .collect::<HashSet<_>>()
+            (
+                term_map
+                    .into_iter()
+                    .flat_map(|(_, filenames)| filenames)
+                    .collect::<HashSet<_>>(),
+                Some(total_count),
+            )
         } else {
-            idx_resp
-                .hits
-                .iter()
-                .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
-                .collect::<HashSet<_>>()
+            (
+                idx_resp
+                    .hits
+                    .iter()
+                    .map(|hit| hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                    .collect::<HashSet<_>>(),
+                None,
+            )
         };
 
+        let mut idx_file_list: Vec<FileKey> = vec![];
         for filename in unique_files {
             let prefixed_filename = format!(
                 "files/{}/logs/{}/{}",
@@ -347,16 +356,21 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 });
             }
         }
-        idx_file_list
+        // sorted by _timestamp
+        idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+        (idx_file_list, inverted_index_count)
     } else {
-        get_file_list(
-            &session_id,
-            &meta,
-            stream_type,
-            partition_time_level,
-            &stream_settings.partition_keys,
+        (
+            get_file_list(
+                &session_id,
+                &meta,
+                stream_type,
+                partition_time_level,
+                &stream_settings.partition_keys,
+            )
+            .await,
+            None,
         )
-        .await
     };
 
     #[cfg(not(feature = "enterprise"))]
@@ -561,7 +575,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     response.scan_stats.as_ref().unwrap().files,
                     response.scan_stats.as_ref().unwrap().original_size,
                 );
-                Ok(response)
+                Ok((node.clone(),response))
             }
             .instrument(grpc_span),
         );
@@ -609,7 +623,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let mut scan_stats = ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let sql = Arc::new(meta);
-    for resp in results {
+    for (node, resp) in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
         // handle hits
         let value = batches.entry("query".to_string()).or_default();
@@ -621,6 +635,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
         // handle aggs
         for agg in resp.aggs {
+            // insert count
+            if agg.name == "_count" && is_ingester(&node.role) {
+                let value = batches.entry("agg_ingester_count".to_string()).or_default();
+                if !agg.hits.is_empty() {
+                    let buf = Cursor::new(agg.hits.clone());
+                    let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
+                    let batch = reader.into_iter().map(Result::unwrap).collect::<Vec<_>>();
+                    value.extend(batch);
+                }
+            }
             let value = batches.entry(format!("agg_{}", agg.name)).or_default();
             if !agg.hits.is_empty() {
                 let buf = Cursor::new(agg.hits);
@@ -637,11 +661,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let merge_sql = if name == "query" {
             sql.origin_sql.clone()
         } else {
-            sql.aggs
-                .get(name.strip_prefix("agg_").unwrap())
-                .unwrap()
-                .0
-                .clone()
+            let mut agg_name = name.strip_prefix("agg_").unwrap();
+            if agg_name == "ingester_count" {
+                agg_name = "_count";
+            }
+            sql.aggs.get(agg_name).unwrap().0.clone()
         };
         let batch = match datafusion::exec::merge(
             &sql.org_id,
@@ -800,8 +824,26 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         None => result.hits.len(),
     };
     result.aggs.remove("_count");
+    // ingester total
+    let ingester_total = match result.aggs.get("ingester_count") {
+        Some(v) => v.first().unwrap().get("num").unwrap().as_u64().unwrap() as usize,
+        None => result.hits.len(),
+    };
+    result.aggs.remove("ingester_count");
 
+    let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
+    // TODO: ingester mixed with querier will has problem.
+    // let inverted_index_total = inverted_index_count + ingester_total;
+    log::info!("response_total: {}", total);
+    log::info!("ingester_total: {}", ingester_total);
+    log::info!("inverted_index_count: {}", inverted_index_count);
+
+    // Maybe inverted index count is wrong, we use the max value
+    //  if inverted_index_total > total {
+    // result.set_total(inverted_index_total);
+    // } else {
     result.set_total(total);
+    //}
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);

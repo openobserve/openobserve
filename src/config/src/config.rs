@@ -349,8 +349,6 @@ pub struct Common {
     pub feature_query_partition_strategy: String,
     #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
     pub feature_query_infer_schema: bool,
-    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
-    pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -443,6 +441,12 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
+    #[env_config(
+        name = "ZO_QUERY_ON_STREAM_SELECTION",
+        default = true,
+        help = "Toggle search to be trigger based on button click event."
+    )]
+    pub query_on_stream_selection: bool,
 }
 
 #[derive(EnvConfig)]
@@ -519,6 +523,14 @@ pub struct Limit {
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
+    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
+    pub query_optimization_num_fields: usize,
+    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
+    pub fast_mode_num_fields: usize,
+    #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
+    pub fast_mode_strategy: String, // first, last, both
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
+    pub fast_mode_file_list_enabled: bool,
 }
 
 #[derive(EnvConfig)]

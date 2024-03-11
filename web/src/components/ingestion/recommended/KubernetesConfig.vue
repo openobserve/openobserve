@@ -20,6 +20,18 @@
     <ContentCopy class="q-mt-sm" content="helm repo update" />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
+      Install Prometheus operator CRDs(Required by Opentelemetry operator)
+    </div>
+    <ContentCopy
+      class="q-mt-sm"
+      content="kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml"
+    />
+    <ContentCopy
+      class="q-mt-sm"
+      content="kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml"
+    />
+
+    <div class="text-subtitle1 q-pl-xs q-mt-md">
       Install OpenTelemetry operator
     </div>
     <ContentCopy
@@ -40,15 +52,21 @@
       <ContentCopy class="q-mt-sm" :content="collectorCmd" />
     </div>
     <div v-else>
-      <q-tabs v-model="tab" horizontal
-align="left" no-caps>
-        <q-tab data-test="kubernetes-default-tab" name="external" :label="t('ingestion.external')" />
-        <q-tab data-test="kubernetes-this-tab" name="internal"
-:label="t('ingestion.internal')"
-          ><q-tooltip>
-            {{ t("ingestion.internalLabel") }}
-          </q-tooltip></q-tab
+      <q-tabs v-model="tab" horizontalalign="left" no-caps>
+        <q-tab
+          data-test="kubernetes-default-tab"
+          name="external"
+          :label="t('ingestion.external')"
+        />
+        <q-tab
+          data-test="kubernetes-this-tab"
+          name="internal"
+          :label="t('ingestion.internal')"
         >
+          <q-tooltip>
+            {{ t("ingestion.internalLabel") }}
+          </q-tooltip>
+        </q-tab>
       </q-tabs>
       <q-separator />
       <q-tab-panels
@@ -62,7 +80,8 @@ align="left" no-caps>
         <q-tab-panel name="internal" data-test="kubernetes-tab-panels-this">
           <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
           <pre>Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local 
-Make changes accordingly to the above URL.</pre>
+Make changes accordingly to the above URL.
+          </pre>
         </q-tab-panel>
 
         <q-tab-panel name="external" data-test="kubernetes-tab-panels-default">

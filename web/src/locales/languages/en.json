@@ -75,6 +75,7 @@
     "showFieldLabel": "Fields",
     "showHistogramLabel": "Histogram",
     "sqlModeLabel": "SQL Mode",
+    "fastModeLabel": "Quick Mode",
     "toggleFunctionLabel": "Function",
     "labelWrap": "Wrap Content",
     "messageWrapContent": "Wrap Table Content",
@@ -400,7 +401,8 @@
     "searchEnrichmentTable": "Search Enrichment Table",
     "uploadCSVFile": "Upload CSV File",
     "selectFunction": "Select Function",
-    "appendData": "Append data to existing Enrichment Table"
+    "appendData": "Append data to existing Enrichment Table",
+    "deleteAssociatedFunction": "Delete Associated Function"
   },
   "confirmDialog": {
     "cancel": "Cancel",

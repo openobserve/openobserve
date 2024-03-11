@@ -99,8 +99,8 @@ pub async fn sql(
     let session_id = session.id.clone();
     let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+        && CONFIG.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
     let (mut ctx, mut ctx_aggs) = if !file_type.eq(&FileType::ARROW) {
         let ctx = register_table(
             session,
@@ -270,8 +270,8 @@ async fn exec_query(
 
     let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+        && CONFIG.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
 
     let mut fast_mode = false;
     let (q_ctx, schema) = if sql.fast_mode && session.storage_type != StorageType::Tmpfs {
@@ -767,8 +767,8 @@ pub async fn merge(
 
     let select_wildcard = sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+        && CONFIG.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
 
     // rewrite sql
     let mut query_sql = match merge_rewrite_sql(sql, schema) {
@@ -1022,7 +1022,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         }
         fields = new_fields;
     }
-    if fields.len() != schema.fields().len() {
+    if fields.len() > schema.fields().len() {
         log::error!(
             "in sql fields: {:?}",
             fields
@@ -1137,8 +1137,8 @@ pub async fn convert_parquet_file(
 
     let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
-        && CONFIG.common.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.common.query_optimization_num_fields;
+        && CONFIG.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
 
     // query data
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
@@ -1239,6 +1239,7 @@ pub async fn convert_parquet_file(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn merge_parquet_files(
     session_id: &str,
     buf: &mut Vec<u8>,
@@ -1247,6 +1248,7 @@ pub async fn merge_parquet_files(
     full_text_search_fields: &[String],
     original_size: i64,
     stream_type: StreamType,
+    fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     // query data
     let runtime_env = create_runtime_env(None)?;
@@ -1314,6 +1316,42 @@ pub async fn merge_parquet_files(
         &file_meta,
     );
     for batch in batches {
+        if stream_type == StreamType::Logs {
+            // for FTS
+            let mut columns_to_index = if !full_text_search_fields.is_empty() {
+                full_text_search_fields.to_vec()
+            } else {
+                config::SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
+            };
+
+            // add _timestamp column to columns_to_index
+            if !columns_to_index.contains(&CONFIG.common.column_timestamp.to_string()) {
+                columns_to_index.push(CONFIG.common.column_timestamp.to_string());
+            }
+
+            if !columns_to_index.is_empty() {
+                let selected_column_indices: Vec<usize> = columns_to_index
+                    .iter()
+                    .filter_map(|name| batch.schema().index_of(name).ok())
+                    .collect();
+
+                // Use the found indices to select the columns
+                let selected_columns = selected_column_indices
+                    .iter()
+                    .map(|&i| batch.column(i).clone())
+                    .collect();
+
+                // Create a new schema for the new RecordBatch based on the selected columns
+                let selected_fields: Vec<arrow_schema::Field> = selected_column_indices
+                    .iter()
+                    .map(|&i| batch.schema().field(i).clone())
+                    .collect();
+                let new_schema = Arc::new(Schema::new(selected_fields));
+
+                // Create a new RecordBatch with the selected columns
+                fts_buf.push(RecordBatch::try_new(new_schema, selected_columns).unwrap());
+            }
+        }
         writer.write(&batch).await?;
     }
     writer.close().await?;
@@ -1481,8 +1519,8 @@ pub async fn register_table(
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
     if CONFIG.common.feature_query_infer_schema
-        || (CONFIG.common.query_optimization_num_fields > 0
-            && schema.fields().len() > CONFIG.common.query_optimization_num_fields)
+        && (CONFIG.limit.query_optimization_num_fields > 0
+            && schema.fields().len() > CONFIG.limit.query_optimization_num_fields)
     {
         config = config.infer_schema(&ctx.state()).await?;
     } else {

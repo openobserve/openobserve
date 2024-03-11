@@ -209,9 +209,11 @@ pub async fn search_parquet(
         }
         // add not exists field for wal infered schema
         let mut new_fields = Vec::new();
-        for field in schema_latest.fields() {
-            if inferred_schema.field_with_name(field.name()).is_err() {
-                new_fields.push(field.clone());
+        for field in sql.meta.fields.iter() {
+            if inferred_schema.field_with_name(field).is_err() {
+                if let Ok(field) = schema_latest.field_with_name(field) {
+                    new_fields.push(Arc::new(field.clone()));
+                }
             }
         }
         if !new_fields.is_empty() {
@@ -221,7 +223,7 @@ pub async fn search_parquet(
         let schema = Arc::new(inferred_schema);
         let sql = sql.clone();
         let session = if is_single_group {
-            let id = format!("{}-0", work_dir);
+            let id = work_dir.to_string();
             meta::search::Session {
                 // here must be session_id, because the files set within this prefix
                 id,
@@ -400,6 +402,13 @@ pub async fn search_memtable(
         }
         // add not exists field for wal infered schema
         let mut new_fields = Vec::new();
+        for field in sql.meta.fields.iter() {
+            if schema.field_with_name(field).is_err() {
+                if let Ok(field) = schema_latest.field_with_name(field) {
+                    new_fields.push(Arc::new(field.clone()));
+                }
+            }
+        }
         for field in schema_latest.fields() {
             if schema.field_with_name(field.name()).is_err() {
                 new_fields.push(field.clone());

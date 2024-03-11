@@ -499,7 +499,8 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let (mut new_file_meta, new_file_schema) = datafusion::exec::merge_parquet_files(
+    let mut fts_buf = Vec::new();
+    let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         schema,
@@ -507,6 +508,7 @@ async fn merge_files(
         &full_text_search_fields,
         new_file_size,
         stream_type,
+        &mut fts_buf,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -537,29 +539,43 @@ async fn merge_files(
             if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
-                    buf,
+                    fts_buf,
                     new_file_key.clone(),
                     org_id,
                     stream_name,
-                    new_file_schema.clone(),
                 )
-                .await?;
-                log::info!("Created index file during compaction {}", index_file_name);
-                // Notify that we wrote the index file to the db.
-                let ret = write_file_list(
-                    org_id,
-                    &[FileKey {
-                        key: index_file_name.clone(),
-                        meta: filemeta,
-                        deleted: false,
-                    }],
-                )
-                .await;
-                if let Err(e) = ret {
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "generate_index_on_compactor error: {}, need delete files: {:?}",
+                        e,
+                        retain_file_list
+                    )
+                })?;
+                if !index_file_name.is_empty() {
+                    log::info!("Created index file during compaction {}", index_file_name);
+                    // Notify that we wrote the index file to the db.
+                    if let Err(e) = write_file_list(
+                        org_id,
+                        &[FileKey {
+                            key: index_file_name.clone(),
+                            meta: filemeta,
+                            deleted: false,
+                        }],
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                            index_file_name,
+                            e.to_string(),
+                            retain_file_list
+                        );
+                    }
+                } else {
                     log::error!(
-                        "[merge_files] failed to write to file list on compactor: {}, error: {}",
-                        index_file_name,
-                        e.to_string()
+                        "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
+                        retain_file_list
                     );
                 }
             }

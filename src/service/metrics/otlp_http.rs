@@ -290,6 +290,24 @@ pub async fn metrics_json_handler(
                         continue;
                     };
 
+                    // udpate schema metadata
+                    if !schema_exists.has_metadata {
+                        if let Err(e) = set_schema_metadata(
+                            org_id,
+                            metric_name,
+                            StreamType::Metrics,
+                            &prom_meta,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "Failed to set metadata for metric: {} with error: {}",
+                                metric_name,
+                                e
+                            );
+                        }
+                    }
+
                     for mut rec in records {
                         // flattening
                         rec = flatten::flatten(rec).expect("failed to flatten");
@@ -297,17 +315,6 @@ pub async fn metrics_json_handler(
 
                         let local_metric_name =
                             &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
-
-                        if !schema_exists.has_metadata {
-                            set_schema_metadata(
-                                org_id,
-                                local_metric_name,
-                                StreamType::Metrics,
-                                &prom_meta,
-                            )
-                            .await
-                            .unwrap();
-                        }
 
                         if local_metric_name != metric_name {
                             // check for schema
@@ -785,6 +792,7 @@ fn process_hist_data_point(
         .into();
     }
     process_exemplars(rec, data_point);
+
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = get_float_value(data_point.get("count").unwrap()).into();
@@ -798,7 +806,6 @@ fn process_hist_data_point(
     bucket_recs.push(sum_rec);
 
     // add bucket records
-
     let buckets = data_point.get("bucketCounts").unwrap().as_array().unwrap();
     let explicit_bounds = data_point
         .get("explicitBounds")

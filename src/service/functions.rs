@@ -43,7 +43,7 @@ const FN_REMOVED: &str = "Function removed from stream";
 const FN_DELETED: &str = "Function deleted";
 const FN_ALREADY_EXIST: &str = "Function already exist";
 const FN_IN_USE: &str =
-    "Function is used in streams , please remove it from the streams before deleting:";
+    "Function is associated with streams, please remove association from streams before deleting:";
 
 #[tracing::instrument(skip(func))]
 pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
@@ -186,7 +186,7 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
             if !names.is_empty() {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     StatusCode::BAD_REQUEST.into(),
-                    format!("{} {}", FN_IN_USE, fn_name),
+                    format!("{} {}", FN_IN_USE, names),
                 )));
             }
         }
@@ -243,6 +243,7 @@ pub async fn delete_stream_function(
         for stream in val.iter_mut() {
             if stream.stream == stream_name {
                 stream.is_removed = true;
+                stream.order = 0;
                 break;
             }
         }
@@ -256,8 +257,8 @@ pub async fn delete_stream_function(
         } else {
             // cant be removed from watcher of function as stream name & type wont be
             // available , hence being removed here
-            let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-            remove_stream_fn_from_cache(&key, fn_name);
+            // let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+            // remove_stream_fn_from_cache(&key, fn_name);
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 FN_REMOVED.to_string(),
@@ -293,7 +294,12 @@ pub async fn add_function_to_stream(
     stream_order.stream_type = stream_type;
 
     if let Some(mut val) = existing_fn.streams {
-        val.push(stream_order);
+        if let Some(existing) = val.iter_mut().find(|x| x.stream == stream_order.stream) {
+            existing.is_removed = false;
+            existing.order = stream_order.order;
+        } else {
+            val.push(stream_order);
+        }
         existing_fn.streams = Some(val);
     } else {
         existing_fn.streams = Some(vec![stream_order]);
@@ -338,7 +344,7 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
     }
 }
 
-fn remove_stream_fn_from_cache(key: &str, fn_name: &str) {
+fn _remove_stream_fn_from_cache(key: &str, fn_name: &str) {
     if let Some(val) = STREAM_FUNCTIONS.clone().get(key) {
         if val.list.len() > 1 {
             let final_list = val

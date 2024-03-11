@@ -70,6 +70,8 @@ struct ConfigResponse<'a> {
     sso_enabled: bool,
     native_login_enabled: bool,
     rbac_enabled: bool,
+    query_on_stream_selection: bool,
+    custom_logo_text: String,
 }
 
 /// Healthz
@@ -101,6 +103,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let rbac_enabled = O2_CONFIG.openfga.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
+    #[cfg(feature = "enterprise")]
+    let custom_logo_text = &O2_CONFIG.common.custom_logo_text;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_logo_text = "";
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -123,6 +129,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
+        query_on_stream_selection: CONFIG.common.query_on_stream_selection,
+        custom_logo_text: custom_logo_text.to_string(),
     }))
 }
 
