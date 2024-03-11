@@ -805,10 +805,28 @@ fn generate_fast_mode_fields_from_schema(
         Some(v) => v.fields(),
         None => schema.fields(),
     };
-    if schema_fields.is_empty() {
+    // TODO: debug for schema fields
+    if schema_fields.len() < 3 {
         log::warn!(
-            "schema fields is empty when generating fast mode fields from schema: {}",
+            "[QUICK_MODE] schema fields is empty when generating fast mode fields from schema: {}",
             stream_key
+        );
+        match file_schema {
+            Some(v) => {
+                log::debug!(
+                    "[QUICK_MODE] stream {}, file_list schema fields: {:?}",
+                    stream_key,
+                    v.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+                );
+            }
+            None => {
+                log::debug!("[QUICK_MODE] stream {}, file_list schema fields: NONE", stream_key);
+            }
+        }
+        log::debug!(
+            "[QUICK_MODE] stream {}, stream latest schema fields: {:?}",
+            stream_key,
+            schema.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
         );
     }
     let mut fields = match strategy.as_str() {
