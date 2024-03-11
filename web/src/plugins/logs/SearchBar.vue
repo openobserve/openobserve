@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="12px"
             icon="save"
             :icon-right="'img:' + getImageURL('images/common/function.svg')"
-            :title="t('search.savedViewsLabel')"
+            :title="t('search.functionPlaceholder')"
             split
             class="no-outline saved-views-dropdown no-border btn-function"
             @click="fnSavedFunctionDialog"
