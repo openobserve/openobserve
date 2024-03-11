@@ -160,9 +160,14 @@ export const convertPromQLData = (
           hoveredSeriesState?.value &&
           panelSchema.id &&
           hoveredSeriesState?.value?.panelId != panelSchema.id
-        )
+        ) {
+          console.timeEnd("convertPromQLData: Tooltip:formatter");
           return "";
-        if (name.length == 0) return "";
+        }
+        if (name.length == 0) {
+          console.timeEnd("convertPromQLData: Tooltip:formatter");
+          return "";
+        }
 
         const date = new Date(name[0].data[0]);
 
