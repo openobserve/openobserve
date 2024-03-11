@@ -562,7 +562,7 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
 
 pub async fn list_organizations_from_cache() -> Vec<String> {
     let mut names = HashSet::new();
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     for schema_key in r.keys() {
         if !schema_key.contains('/') {
             continue;
@@ -577,7 +577,7 @@ pub async fn list_organizations_from_cache() -> Vec<String> {
 
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     for schema_key in r.keys() {
         if !schema_key.contains('/') {
             continue;
