@@ -77,7 +77,7 @@ impl super::Db for PostgresDb {
         let (module, key1, key2, key3) = super::parse_key(key);
         let pool = CLIENT.clone();
         let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key2 = $4;"#,
+            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
         )
         .bind(module)
         .bind(key1)
