@@ -116,6 +116,7 @@ const defaultObject = {
   },
   data: {
     query: <any>"",
+    histogramQuery: <any>"",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
@@ -544,7 +545,7 @@ const useLogs = () => {
 
         req.query.sql = query;
         req.query["sql_mode"] = "full";
-        delete req.aggs;
+        // delete req.aggs;
       } else {
         const parseQuery = query.split("|");
         let queryFunctions = "";
@@ -630,7 +631,7 @@ const useLogs = () => {
         searchObj.data.resultGrid.currentPage > 1 ||
         searchObj.meta.showHistogram === false
       ) {
-        delete req.aggs;
+        // delete req.aggs;
 
         if (searchObj.meta.showHistogram === false) {
           // delete searchObj.data.histogram;
@@ -974,10 +975,10 @@ const useLogs = () => {
         searchObj.data.errorCode = 0;
 
         // copy query request for histogram query and same for customDownload
-        const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
+        searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
-
+        console.log(searchObj.data.histogramQuery)
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1026,7 +1027,7 @@ const useLogs = () => {
         searchObj.data.queryResults.subpage = 1;
 
         // based on pagination request, get the data
-        await getPaginatedData(queryReq, histogramQueryReq);
+        await getPaginatedData(queryReq);
         if (
           (searchObj.data.queryResults.aggs == undefined &&
             searchObj.data.resultGrid.currentPage == 1 &&
@@ -1038,7 +1039,7 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          getHistogramQueryData(histogramQueryReq);
+          getHistogramQueryData(searchObj.data.histogramQuery);
         }
       } else {
         searchObj.loading = false;
@@ -1051,7 +1052,6 @@ const useLogs = () => {
 
   const getPaginatedData = async (
     queryReq: any,
-    histogramQueryReq: any,
     appendResult: boolean = false
   ) => {
     return new Promise((resolve, reject) => {
@@ -1185,7 +1185,7 @@ const useLogs = () => {
 
             searchObj.data.queryResults.subpage++;
 
-            await getPaginatedData(queryReq, histogramQueryReq, true);
+            await getPaginatedData(queryReq, true);
           }
 
           updateFieldValues();
@@ -1281,10 +1281,13 @@ const useLogs = () => {
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
           })
-          .then((res) => {
+          .then(async (res) => {
             searchObj.loading = false;
+            alert(res.data.aggs)
             searchObj.data.queryResults.aggs = res.data.aggs;
             searchObj.data.queryResults.total = res.data.total;
+            await nextTick();
+            alert(searchObj.data.queryResults.aggs)
             generateHistogramData();
             // searchObj.data.histogram.chartParams.title = getHistogramTitle();
             searchObj.loadingHistogram = false;
@@ -1554,6 +1557,7 @@ const useLogs = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
+      alert(searchObj.data.queryResults.aggs)
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
         searchObj.data.queryResults.aggs
@@ -1587,6 +1591,7 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
+      alert(searchObj.data.histogram.xData.length)
     } catch (e: any) {
       console.log("Error while generating histogram data");
     }
@@ -1969,6 +1974,7 @@ const useLogs = () => {
     loadStreamLists,
     refreshPartitionPagination,
     filterHitsColumns,
+    getHistogramQueryData,
   };
 };
 
