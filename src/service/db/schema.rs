@@ -357,8 +357,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;
-                    let ret = db.get(&ev.key).await?;
-                    json::from_slice(&ret).unwrap()
+                    match db.get(&ev.key).await {
+                        Ok(val) => match json::from_slice(&val) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    }
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
@@ -556,7 +567,7 @@ pub fn filter_schema_version_id(schemas: &[Schema], _start_dt: i64, end_dt: i64)
 
 pub async fn list_organizations_from_cache() -> Vec<String> {
     let mut names = HashSet::new();
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     for schema_key in r.keys() {
         if !schema_key.contains('/') {
             continue;
@@ -571,7 +582,7 @@ pub async fn list_organizations_from_cache() -> Vec<String> {
 
 pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
     let mut names = HashSet::new();
-    let r = STREAM_SCHEMAS.read().await;
+    let r = STREAM_SCHEMAS_LATEST.read().await;
     for schema_key in r.keys() {
         if !schema_key.contains('/') {
             continue;

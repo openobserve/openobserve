@@ -72,6 +72,7 @@ struct ConfigResponse<'a> {
     rbac_enabled: bool,
     query_on_stream_selection: bool,
     custom_logo_text: String,
+    show_stream_stats_doc_num: bool,
 }
 
 /// Healthz
@@ -131,6 +132,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         rbac_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
         custom_logo_text: custom_logo_text.to_string(),
+        show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
     }))
 }
 

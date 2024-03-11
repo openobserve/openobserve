@@ -568,7 +568,7 @@ async fn handle_diff_schema_cluster_mode(
     .await
     {
         log::error!(
-            "Failed to update schema for stream {} err: {:?}",
+            "[Schema:Evolution]:Failed to update schema for stream {} err: {:?}",
             stream_name,
             err
         );
@@ -602,7 +602,10 @@ async fn handle_diff_schema_cluster_mode(
         "Released lock for cluster stream {} after setting schema",
         stream_name
     );
-
+    log::info!(
+        "[Schema:Evolution] the delta for schema is  {:?} ",
+        field_datatype_delta
+    );
     Some(SchemaEvolution {
         schema_compatible: true,
         is_schema_changed: true,
