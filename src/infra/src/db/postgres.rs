@@ -237,7 +237,7 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         if !key3.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key3);
+            sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
