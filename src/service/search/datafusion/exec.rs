@@ -1633,20 +1633,6 @@ fn filter_schema_null_fields(schema: &mut Schema) {
     }
 }
 
-fn pretty_print_record_batch(result: &Vec<RecordBatch>) {
-    let formatted = arrow::util::pretty::pretty_format_batches_with_options(
-        &result,
-        &datafusion::common::format::DEFAULT_FORMAT_OPTIONS,
-    )
-    .unwrap()
-    .to_string();
-
-    formatted
-        .trim()
-        .lines()
-        .for_each(|line| println!("{}", line));
-}
-
 fn unnest_array_record_batch(
     original: &HashMap<String, Vec<RecordBatch>>,
     stream_type: StreamType,
@@ -1728,7 +1714,7 @@ fn unnest_array_json_rows(
                 // Two cases to consider for regex pattern in REGEXP_MATCH() from query rest
                 // 1. Patten contains Named capturing groups
                 // ?P<xxx> or ?<xxx> -> extract field names xxx
-                let re = Regex::new(r"\?<([^>']+)>|\?P<([^>']+)>").unwrap();
+                let re = Regex::new(r"\?<([^>']+)>|\?P<([^>']+)").unwrap();
                 for (_, [col_name]) in re.captures_iter(&col_names).map(|cap| cap.extract()) {
                     parsed_row_names.push(col_name);
                 }
@@ -1924,22 +1910,53 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_with_regexp_match() {
-        let sql = r#"SELECT REGEXP_MATCH('2024-02-29 00:15:30 15.128.22.213 GET /Administradores_Elina/service-worker.js - 443 - 15.128.69.103 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/122.0.0.0+Safari/537.36 https://ccwsqa/Administradores_Elina 200 0 0 6 15.159.53.87,+15.128.69.103:54910', '(?P<timestamp>[^\s]+ [^\s]+) (?P<client_ip>[^\s]+) (?P<http_method>[^\s]+) (?P<requested_path>[^\s]+) (?P<placeholder1>[^\s]+) (?P<server_port>[^\s]+) (?P<placeholder2>[^\s]+) (?P<referrer_ip>[^\s]+) (?P<user_agent>[^\s]+) (?P<referrer_url>[^\s]+) (?P<http_status>[^\s]+) (?P<other_codes>[^\s]+ [^\s]+) (?P<response_time>[^\s]+) (?P<forwarded_ips>.+)$')"#;
+        let sql = r#"SELECT REGEXP_MATCH('2024-02-29 00:15:30 15.128.22.213 GET', '(?P<timestamp>[^\s]+ [^\s]+) (?<client_ip>[^\s]+) (?<http_method>[^\s]+)')"#;
         let ctx = SessionContext::new();
 
         let batches = ctx.sql(sql).await.unwrap().collect().await.unwrap();
-        println!("before");
-        pretty_print_record_batch(&batches);
-
         let mut result = HashMap::new();
         result.insert("query".to_string(), batches);
 
-        let parsed = match unnest_array_record_batch(&result, StreamType::Logs) {
-            Ok(ret) => ret,
-            Err(_) => result,
-        };
+        let parsed = unnest_array_record_batch(&result, StreamType::Logs);
+        assert!(parsed.is_ok());
 
+        let parsed = parsed.unwrap();
+        assert_eq!(parsed.len(), result.get("query").unwrap().len());
         let parsed_rb = parsed.get("query").unwrap();
-        pretty_print_record_batch(&parsed_rb);
+        let parsed_ref: Vec<&RecordBatch> = parsed_rb.iter().collect();
+        let json_rows =
+            datafusion::arrow::json::writer::record_batches_to_json_rows(&parsed_ref).unwrap();
+
+        for row in json_rows {
+            assert_eq!(row.get("client_ip").unwrap(), "15.128.22.213");
+            assert_eq!(row.get("http_method").unwrap(), "GET");
+            assert_eq!(row.get("timestamp").unwrap(), "2024-02-29 00:15:30");
+        }
+    }
+
+    #[test]
+    fn test_unnest_array_json_rwos() {
+        let value = json::json!({
+            "code": 200,
+            "success": true,
+            "payload": {
+                r#"select regexp_match('2022/12/27 14:09:59 [warn] 37#37: *58234852', '([^\s]+ [^\s]+) ([^\s]+)')"#: [
+                    "2022/12/27 14:09:59",
+                    "warn"
+                ],
+                "homepage": null
+            }
+        });
+
+        let mut original = json::Map::new();
+        original.insert("query".to_string(), value);
+
+        let parsed = unnest_array_json_rows(original);
+        assert!(parsed.is_ok());
+        let parsed = parsed.unwrap();
+        let parsed_val = parsed.get("query").unwrap();
+        let inner = parsed_val.get("payload").unwrap();
+        assert_eq!("2022/12/27 14:09:59", inner.get("[^\\s]+ [^\\s]+").unwrap());
+        assert_eq!("warn", inner.get("[^\\s]+").unwrap());
     }
 }
