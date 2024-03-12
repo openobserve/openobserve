@@ -250,7 +250,7 @@ pub async fn sql(
     ctx_aggs.deregister_table("tbl")?;
 
     // unnest nested array columns, returning original if failed
-    result = match unnest_array_record_batch(&result, sql.stream_type) {
+    result = match try_unnest_array_record_batch(&result, sql.stream_type) {
         Ok(parsed) => parsed,
         Err(e) => {
             log::info!(
@@ -1633,7 +1633,7 @@ fn filter_schema_null_fields(schema: &mut Schema) {
     }
 }
 
-fn unnest_array_record_batch(
+fn try_unnest_array_record_batch(
     original: &HashMap<String, Vec<RecordBatch>>,
     stream_type: StreamType,
 ) -> Result<HashMap<String, Vec<RecordBatch>>> {
@@ -1659,7 +1659,7 @@ fn unnest_array_record_batch(
                         .into_iter()
                         .filter_map(|hit| {
                             if hit.values().any(|val| val.is_array()) {
-                                unnest_array_json_rows(hit)
+                                try_unnest_array_json_rows(hit)
                                     .map(|ret| json::Value::Object(ret))
                                     .ok()
                             } else {
@@ -1696,7 +1696,7 @@ fn unnest_array_record_batch(
     Ok(parsed_record_batch)
 }
 
-fn unnest_array_json_rows(
+fn try_unnest_array_json_rows(
     original: json::Map<String, json::Value>,
 ) -> Result<json::Map<String, json::Value>> {
     let mut parsed_map = json::Map::new();
@@ -1733,7 +1733,7 @@ fn unnest_array_json_rows(
                 }
                 if parsed_row_names.len() != arr.len() {
                     return Err(DataFusionError::Execution(format!(
-                        "Failed to parse json array to columns due to inconsistent column count. Returning original"
+                        "Failed to extract column names from nested column."
                     )));
                 }
                 parsed_row_names.into_iter().zip(arr.into_iter()).for_each(
@@ -1744,7 +1744,7 @@ fn unnest_array_json_rows(
             }
             json::Value::Object(obj) => {
                 // recursively parse nested json rows in case any is array
-                parsed_map.insert(key, json::Value::Object(unnest_array_json_rows(obj)?));
+                parsed_map.insert(key, json::Value::Object(try_unnest_array_json_rows(obj)?));
             }
             _ => {
                 parsed_map.insert(key, val);
@@ -1919,7 +1919,7 @@ mod tests {
         let mut result = HashMap::new();
         result.insert("query".to_string(), batches);
 
-        let parsed = unnest_array_record_batch(&result, StreamType::Logs);
+        let parsed = try_unnest_array_record_batch(&result, StreamType::Logs);
         assert!(parsed.is_ok());
 
         let parsed = parsed.unwrap();
@@ -1940,31 +1940,20 @@ mod tests {
     async fn test_query_with_regexp_match_fail() {
         let sql = r#"SELECT REGEXP_MATCH('2024-02-29 00:15:30 15.128.22.213 GET', '')"#;
         let ctx = SessionContext::new();
-
         let batches = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+
         let mut result = HashMap::new();
-        result.insert("query".to_string(), batches);
+        result.insert("query".to_string(), batches.clone());
 
-        let parsed = unnest_array_record_batch(&result, StreamType::Logs);
-        println!("{:?}", parsed.unwrap());
-        assert!(parsed.is_ok());
-
-        // let parsed = parsed.unwrap();
-        // assert_eq!(parsed.len(), result.get("query").unwrap().len());
-        // let parsed_rb = parsed.get("query").unwrap();
-        // let parsed_ref: Vec<&RecordBatch> = parsed_rb.iter().collect();
-        // let json_rows =
-        //     datafusion::arrow::json::writer::record_batches_to_json_rows(&parsed_ref).unwrap();
-
-        // for row in json_rows {
-        //     assert_eq!(row.get("client_ip").unwrap(), "15.128.22.213");
-        //     assert_eq!(row.get("http_method").unwrap(), "GET");
-        //     assert_eq!(row.get("timestamp").unwrap(), "2024-02-29 00:15:30");
-        // }
+        let parsed = match try_unnest_array_record_batch(&result, StreamType::Logs) {
+            Ok(parsed) => parsed,
+            Err(_) => result,
+        };
+        assert_eq!(batches, *parsed.get("query").unwrap());
     }
 
     #[test]
-    fn test_unnest_array_json_rows_success() {
+    fn test_try_unnest_array_json_rows_success() {
         let value = json::json!({
             "code": 200,
             "success": true,
@@ -1980,7 +1969,7 @@ mod tests {
         let mut original = json::Map::new();
         original.insert("query".to_string(), value);
 
-        let parsed = unnest_array_json_rows(original);
+        let parsed = try_unnest_array_json_rows(original);
         assert!(parsed.is_ok());
         let parsed = parsed.unwrap();
         let parsed_val = parsed.get("query").unwrap();
@@ -2009,7 +1998,7 @@ mod tests {
         let mut original = json::Map::new();
         original.insert("query".to_string(), value);
 
-        let parsed = unnest_array_json_rows(original);
+        let parsed = try_unnest_array_json_rows(original);
         // should fail because array doesn't have names
         assert!(parsed.is_err());
     }
