@@ -115,9 +115,12 @@ mod tests {
     async fn test_string_to_array_v2_format() {
         // let log_line = r#"2024-02-29T14:25:27.964079614+00:00 INFO actix_web::middleware::logger:
         // 10.1.59.229 "GET /healthz HTTP/1.1" 200 15 "-" "-" "kube-probe/1.28" 0.000049"#;
-        let log_line = r#"var-log0::log"#;
+        let log_line = r#"2024-03-12T15:05:20.366673042+00:00 INFO ingester::writer: [INGESTER:WAL] dones add to IMMUTABLES, file: ./data/wal/logs/0/sunny_organization_11122_zugLe5petywQwty/metrics/1709633785173906.wal,"#;
+
+        // let log_line = r#"var-log0::log"#;
         let sqls = [(
-            "select string_to_array_v2(log, '-:,::') as ret from t",
+            // "select string_to_array_v2(log, '-:,::') as ret from t",
+            "select string_to_array_v2(log, ' /') as ret from t",
             vec![
                 "+------------------+",
                 "| ret              |",

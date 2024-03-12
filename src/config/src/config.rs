@@ -60,6 +60,9 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
+pub const DEFAULT_INDEX_TRIM_CHARS: &str = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+pub const INDEX_MIN_CHAR_LEN: usize = 3;
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -440,6 +443,14 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
+
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
+        default = " ;,",
+        help = "Characters which should be used as a delimiter to split the string."
+    )]
+    pub inverted_index_split_chars: String,
+
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,

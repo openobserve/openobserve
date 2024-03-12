@@ -30,7 +30,7 @@ use config::{
         stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
     },
     utils::{flatten, json, str::find},
-    CONFIG,
+    CONFIG, INDEX_MIN_CHAR_LEN,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -270,8 +270,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let terms = meta
             .fts_terms
             .iter()
-            .flat_map(|t| t.split_whitespace().collect::<Vec<_>>())
-            .map(|t| t.to_lowercase())
+            .flat_map(|t| {
+                let mut tokenized_search_terms = vec![];
+                t.split(|c| CONFIG.common.inverted_index_split_chars.contains(c))
+                    .for_each(|s| {
+                        if !s.is_empty() && s.len() >= INDEX_MIN_CHAR_LEN {
+                            tokenized_search_terms.push(s.to_lowercase())
+                        }
+                    });
+                tokenized_search_terms
+            })
             .collect::<HashSet<String>>();
 
         let search_condition = terms

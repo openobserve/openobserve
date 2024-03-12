@@ -33,7 +33,7 @@ use config::{
         parquet::read_metadata_from_file,
         schema_ext::SchemaExt,
     },
-    FxIndexMap, CONFIG,
+    FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
 use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use infra::{cache, storage};
@@ -563,8 +563,9 @@ async fn prepare_index_record_batches_v1(
         }
 
         let column_name = column.name();
-        let split_chars = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
-        let remove_chars_btrim = split_chars;
+        let split_chars = &CONFIG.common.inverted_index_split_chars;
+
+        let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
         let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
         let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
         let distinct_terms = array_distinct(split_arr);
@@ -584,7 +585,7 @@ async fn prepare_index_record_batches_v1(
             )?
             .with_column("character_len", character_length(col("term")))?
             .with_column("deleted", lit(false))?
-            .filter(col("character_len").gt_eq(lit(3)))?
+            .filter(col("character_len").gt_eq(lit(INDEX_MIN_CHAR_LEN as i32)))?
             .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
             .collect()
             .await?;
