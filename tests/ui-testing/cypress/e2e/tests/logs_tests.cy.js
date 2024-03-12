@@ -140,7 +140,6 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-subfield-add-code-200"]').should(
       "be.visible"
     );
-    applyQueryButton();
   });
 
   it("should add the field to the editor when + is clicked", () => {
