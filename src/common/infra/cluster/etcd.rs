@@ -241,6 +241,10 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
 
 /// Leave cluster
 pub(crate) async fn leave() -> Result<()> {
+    unsafe {
+        super::LOCAL_NODE_STATUS = NodeStatus::Offline;
+    }
+
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.delete(key, None).await {
