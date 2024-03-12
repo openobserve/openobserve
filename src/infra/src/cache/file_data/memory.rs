@@ -79,9 +79,7 @@ impl FileData {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[session_id {session_id}] File memory cache is full {}/{}, can't cache extra {} bytes",
-                self.cur_size,
-                self.max_size,
+                "[session_id {session_id}] File memory cache is full, can't cache extra {} bytes",
                 data_size
             );
             // cache is full, need release some space
@@ -89,37 +87,7 @@ impl FileData {
                 CONFIG.memory_cache.max_size,
                 max(CONFIG.memory_cache.release_size, data_size * 100),
             );
-            let mut release_size = 0;
-            loop {
-                let item = self.data.remove();
-                if item.is_none() {
-                    log::error!(
-                        "[session_id {session_id}] File memory cache is corrupt, it shouldn't be none"
-                    );
-                    break;
-                }
-                let (key, data_size) = item.unwrap();
-                // move the file from memory to disk cache
-                if let Some((key, data)) = DATA.remove(&key) {
-                    _ = super::disk::set(session_id, &key, data).await;
-                }
-                // metrics
-                let columns = key.split('/').collect::<Vec<&str>>();
-                if columns[0] == "files" {
-                    metrics::QUERY_MEMORY_CACHE_FILES
-                        .with_label_values(&[columns[1], columns[2]])
-                        .dec();
-                    metrics::QUERY_MEMORY_CACHE_USED_BYTES
-                        .with_label_values(&[columns[1], columns[2]])
-                        .sub(data_size as i64);
-                }
-                release_size += data_size;
-                if release_size >= need_release_size {
-                    break;
-                }
-            }
-            self.cur_size -= release_size;
-            DATA.shrink_to_fit();
+            self.gc(session_id, need_release_size).await?;
         }
 
         self.cur_size += data_size;
@@ -139,6 +107,51 @@ impl FileData {
         Ok(())
     }
 
+    async fn gc(
+        &mut self,
+        session_id: &str,
+        need_release_size: usize,
+    ) -> Result<(), anyhow::Error> {
+        log::info!(
+            "[session_id {session_id}] File memory cache start gc {}/{}, need release {} bytes",
+            self.cur_size,
+            self.max_size,
+            need_release_size
+        );
+        let mut release_size = 0;
+        loop {
+            let item = self.data.remove();
+            if item.is_none() {
+                log::error!(
+                    "[session_id {session_id}] File memory cache is corrupt, it shouldn't be none"
+                );
+                break;
+            }
+            let (key, data_size) = item.unwrap();
+            // move the file from memory to disk cache
+            if let Some((key, data)) = DATA.remove(&key) {
+                _ = super::disk::set(session_id, &key, data).await;
+            }
+            // metrics
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] == "files" {
+                metrics::QUERY_MEMORY_CACHE_FILES
+                    .with_label_values(&[columns[1], columns[2]])
+                    .dec();
+                metrics::QUERY_MEMORY_CACHE_USED_BYTES
+                    .with_label_values(&[columns[1], columns[2]])
+                    .sub(data_size as i64);
+            }
+            release_size += data_size;
+            if release_size >= need_release_size {
+                break;
+            }
+        }
+        self.cur_size -= release_size;
+        DATA.shrink_to_fit();
+        Ok(())
+    }
+
     fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
@@ -155,6 +168,19 @@ impl FileData {
 pub async fn init() -> Result<(), anyhow::Error> {
     let files = FILES.read().await;
     _ = files.get("", None).await;
+
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            config::CONFIG.memory_cache.gc_interval,
+        ));
+        interval.tick().await; // the first tick is immediate
+        loop {
+            if let Err(e) = gc().await {
+                log::error!("memory cache gc error: {}", e);
+            }
+            interval.tick().await;
+        }
+    });
     Ok(())
 }
 
@@ -186,6 +212,21 @@ pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow
         return Ok(());
     }
     files.set(session_id, file, data).await
+}
+
+async fn gc() -> Result<(), anyhow::Error> {
+    if !CONFIG.memory_cache.enabled {
+        return Ok(());
+    }
+    let files = FILES.read().await;
+    if files.cur_size + CONFIG.memory_cache.release_size < files.max_size {
+        drop(files);
+        return Ok(());
+    }
+    let mut files = FILES.write().await;
+    files.gc("global", CONFIG.memory_cache.gc_size).await?;
+    drop(files);
+    Ok(())
 }
 
 #[inline]

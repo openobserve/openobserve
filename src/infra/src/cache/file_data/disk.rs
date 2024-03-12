@@ -106,9 +106,7 @@ impl FileData {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[session_id {session_id}] File disk cache is full {}/{}, can't cache extra {} bytes",
-                self.cur_size,
-                self.max_size,
+                "[session_id {session_id}] File disk cache is full, can't cache extra {} bytes",
                 data_size
             );
             // cache is full, need release some space
@@ -116,35 +114,7 @@ impl FileData {
                 CONFIG.disk_cache.max_size,
                 max(CONFIG.disk_cache.release_size, data_size * 100),
             );
-            let mut release_size = 0;
-            loop {
-                let item = self.data.remove();
-                if item.is_none() {
-                    log::error!(
-                        "[session_id {session_id}] File disk cache is corrupt, it shouldn't be none"
-                    );
-                    break;
-                }
-                let (key, data_size) = item.unwrap();
-                // delete file from local disk
-                let file_path = format!("{}{}", self.root_dir, key);
-                fs::remove_file(&file_path).await?;
-                // metrics
-                let columns = key.split('/').collect::<Vec<&str>>();
-                if columns[0] == "files" {
-                    metrics::QUERY_DISK_CACHE_FILES
-                        .with_label_values(&[columns[1], columns[2]])
-                        .dec();
-                    metrics::QUERY_DISK_CACHE_USED_BYTES
-                        .with_label_values(&[columns[1], columns[2]])
-                        .sub(data_size as i64);
-                }
-                release_size += data_size;
-                if release_size >= need_release_size {
-                    break;
-                }
-            }
-            self.cur_size -= release_size;
+            self.gc(session_id, need_release_size).await?;
         }
 
         self.cur_size += data_size;
@@ -166,6 +136,49 @@ impl FileData {
         Ok(())
     }
 
+    async fn gc(
+        &mut self,
+        session_id: &str,
+        need_release_size: usize,
+    ) -> Result<(), anyhow::Error> {
+        log::info!(
+            "[session_id {session_id}] File disk cache start gc {}/{}, need release {} bytes",
+            self.cur_size,
+            self.max_size,
+            need_release_size
+        );
+        let mut release_size = 0;
+        loop {
+            let item = self.data.remove();
+            if item.is_none() {
+                log::error!(
+                    "[session_id {session_id}] File disk cache is corrupt, it shouldn't be none"
+                );
+                break;
+            }
+            let (key, data_size) = item.unwrap();
+            // delete file from local disk
+            let file_path = format!("{}{}", self.root_dir, key);
+            fs::remove_file(&file_path).await?;
+            // metrics
+            let columns = key.split('/').collect::<Vec<&str>>();
+            if columns[0] == "files" {
+                metrics::QUERY_DISK_CACHE_FILES
+                    .with_label_values(&[columns[1], columns[2]])
+                    .dec();
+                metrics::QUERY_DISK_CACHE_USED_BYTES
+                    .with_label_values(&[columns[1], columns[2]])
+                    .sub(data_size as i64);
+            }
+            release_size += data_size;
+            if release_size >= need_release_size {
+                break;
+            }
+        }
+        self.cur_size -= release_size;
+        Ok(())
+    }
+
     fn size(&self) -> (usize, usize) {
         (self.max_size, self.cur_size)
     }
@@ -183,6 +196,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&CONFIG.common.data_cache_dir).expect("create cache dir success");
     let mut files = FILES.write().await;
     files.load().await?;
+
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            config::CONFIG.disk_cache.gc_interval,
+        ));
+        interval.tick().await; // the first tick is immediate
+        loop {
+            if let Err(e) = gc().await {
+                log::error!("disk cache gc error: {}", e);
+            }
+            interval.tick().await;
+        }
+    });
     Ok(())
 }
 
@@ -205,6 +231,21 @@ pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow
         return Ok(());
     }
     files.set(session_id, file, data).await
+}
+
+async fn gc() -> Result<(), anyhow::Error> {
+    if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
+        return Ok(());
+    }
+    let files = FILES.read().await;
+    if files.cur_size + CONFIG.disk_cache.release_size < files.max_size {
+        drop(files);
+        return Ok(());
+    }
+    let mut files = FILES.write().await;
+    files.gc("global", CONFIG.disk_cache.gc_size).await?;
+    drop(files);
+    Ok(())
 }
 
 #[inline]
