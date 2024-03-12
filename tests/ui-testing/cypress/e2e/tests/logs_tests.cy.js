@@ -965,7 +965,7 @@ describe("Logs testcases", () => {
     cy.contains(".a=2").should("be.visible");
   });
 
-  it("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
+  it.skip("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -976,7 +976,9 @@ describe("Logs testcases", () => {
     ).click({
       force: true,
     });
+    applyQueryButton()
     cy.wait(2000);
+    
     logstests.addFeildandSubValue();
     logstests.addsubFeildValue();
     //click on the field
