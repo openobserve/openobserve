@@ -77,15 +77,19 @@ impl super::Db for MysqlDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2, key3) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;"#,
-        )
-        .bind(module)
-        .bind(key1)
-        .bind(key2)
-        .bind(key3)
-        .fetch_one(&pool)
-        .await
+        let query = if module.eq("schema") {
+            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ? ORDER BY key3 DESC;"#
+        } else {
+            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;"#
+        };
+
+        let value: String = match sqlx::query_scalar(query)
+            .bind(module)
+            .bind(key1)
+            .bind(key2)
+            .bind(key3)
+            .fetch_one(&pool)
+            .await
         {
             Ok(v) => v,
             Err(_) => {
@@ -210,6 +214,7 @@ impl super::Db for MysqlDb {
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
+        sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -240,6 +245,7 @@ impl super::Db for MysqlDb {
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
+        sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
