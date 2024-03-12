@@ -76,15 +76,20 @@ impl super::Db for PostgresDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2, key3) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
-        )
-        .bind(module)
-        .bind(key1)
-        .bind(key2)
-        .bind(key3)
-        .fetch_one(&pool)
-        .await
+
+        let query = if module.eq("schema") {
+            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY key3 DESC;"#
+        } else {
+            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#
+        };
+
+        let value: String = match sqlx::query_scalar(query)
+            .bind(module)
+            .bind(key1)
+            .bind(key2)
+            .bind(key3)
+            .fetch_one(&pool)
+            .await
         {
             Ok(v) => v,
             Err(_) => {
@@ -99,7 +104,7 @@ impl super::Db for PostgresDb {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT INTO meta (module, key1, key2, key3,value) VALUES ($1, $2, $3,$4, '') ON CONFLICT DO NOTHING;"#,
+            r#"INSERT INTO meta (module, key1, key2, key3, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,
         )
         .bind(&module)
         .bind(&key1)
@@ -114,12 +119,12 @@ impl super::Db for PostgresDb {
             return Err(e.into());
         }
         if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
+            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
         )
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-         .bind(&key3)
+        .bind(&key3)
         .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .execute(&mut *tx)
         .await
@@ -136,8 +141,13 @@ impl super::Db for PostgresDb {
 
         // event watch
         if need_watch {
+            let key = if module.eq("schema") {
+                format!("/{module}/{key1}/{key2}")
+            } else {
+                key.to_string()
+            };
             let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator.put(key, Bytes::from(""), true).await?;
+            cluster_coordinator.put(&key, Bytes::from(""), true).await?;
         }
 
         Ok(())
@@ -207,8 +217,10 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         if !key3.is_empty() {
-            sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
+            sql = format!("{} AND key3 LIKE '{}%' ", sql, key3);
         }
+        sql = format!("{} ORDER BY key3 DESC ", sql);
+
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -226,7 +238,7 @@ impl super::Db for PostgresDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2, key3) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2,  key3, '' AS value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2,  key3, '' AS value FROM meta ".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -239,6 +251,7 @@ impl super::Db for PostgresDb {
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
+        sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -317,10 +330,10 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
         .await?;
-    create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module);",
-    )
-    .await?;
+    // create_index_item(
+    //     "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module);",
+    // )
+    // .await?;
     create_index_item(
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3,key2, key1, module);",
     )
