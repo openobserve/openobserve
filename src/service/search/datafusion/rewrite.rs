@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_count_distinct_rewrite_phase1() {
-        let sql = vec![
+        let sql = [
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -276,7 +276,7 @@ mod tests {
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
-        let excepts = vec![
+        let excepts = [
             "SELECT DISTINCT a FROM tbl WHERE a > 3",
             "SELECT DISTINCT a FROM tbl WHERE a > 3",
             "SELECT DISTINCT a, b FROM tbl WHERE a > 3",
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn test_count_distinct_rewrite_phase2() {
-        let sql = vec![
+        let sql = [
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -306,7 +306,7 @@ mod tests {
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
-        let excepts = vec![
+        let excepts = [
             "SELECT DISTINCT a FROM tbl",
             "SELECT DISTINCT a FROM tbl",
             "SELECT DISTINCT a, b FROM tbl",
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_count_distinct_rewrite_phase3() {
-        let sql = vec![
+        let sql = [
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -336,7 +336,7 @@ mod tests {
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
-        let excepts = vec![
+        let excepts = [
             "SELECT COUNT(DISTINCT a) FROM tbl LIMIT 10",
             "SELECT COUNT(DISTINCT (a)) FROM tbl LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",

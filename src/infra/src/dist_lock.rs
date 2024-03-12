@@ -30,7 +30,7 @@ enum LockerStore {
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
 pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
-    if CONFIG.common.local_mode {
+    if CONFIG.common.local_mode || !CONFIG.common.feature_query_queue_enabled {
         return Ok(None);
     }
     match CONFIG.common.cluster_coordinator.as_str() {

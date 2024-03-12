@@ -74,6 +74,7 @@ async fn init_cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         match CONFIG.common.meta_store.as_str().into() {
             MetaStore::Sled => Box::<sled::SledDb>::default(),
+            MetaStore::Nats => Box::<nats::NatsDb>::default(),
             _ => Box::<sqlite::SqliteDb>::default(),
         }
     } else {

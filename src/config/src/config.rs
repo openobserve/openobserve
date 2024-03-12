@@ -60,9 +60,6 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
-pub const DEFAULT_INDEX_TRIM_CHARS: &str = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
-pub const INDEX_MIN_CHAR_LEN: usize = 3;
-
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -198,7 +195,6 @@ pub struct Config {
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
-    pub rum: RUM,
 }
 
 #[derive(EnvConfig)]
@@ -264,8 +260,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 16,
-        help = "Max grpc message size in MB, default is 16 MB"
+        default = 4,
+        help = "Max grpc message size in MB, default is 4 MB"
     )]
     pub max_message_size: usize,
 }
@@ -341,6 +337,8 @@ pub struct Common {
     pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
+    #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
+    pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
@@ -445,14 +443,6 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
-
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = " ;,",
-        help = "Characters which should be used as a delimiter to split the string."
-    )]
-    pub inverted_index_split_chars: String,
-
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -535,28 +525,20 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
-    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 100)]
+    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
     pub fast_mode_num_fields: usize,
     #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
     pub fast_mode_strategy: String, // first, last, both
     #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
     pub fast_mode_file_list_enabled: bool,
-    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
-    pub fast_mode_file_list_interval: i64,
-    #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
-    pub sql_min_db_connections: u32,
-    #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
-    pub sql_max_db_connections: u32,
 }
 
 #[derive(EnvConfig)]
@@ -767,30 +749,6 @@ pub struct Prometheus {
     pub ha_replica_label: String,
 }
 
-#[derive(Debug, EnvConfig)]
-pub struct RUM {
-    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
-    pub enabled: bool,
-    #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
-    pub client_token: String,
-    #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
-    pub application_id: String,
-    #[env_config(name = "ZO_RUM_SITE", default = "")]
-    pub site: String,
-    #[env_config(name = "ZO_RUM_SERVICE", default = "")]
-    pub service: String,
-    #[env_config(name = "ZO_RUM_ENV", default = "")]
-    pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
-    #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
-    pub organization_identifier: String,
-    #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
-    pub api_version: String,
-    #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
-    pub insecure_http: bool,
-}
-
 pub fn init() -> Config {
     dotenv().ok();
     let mut cfg = Config::init().unwrap();
@@ -810,14 +768,6 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core * 2
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
-    }
-
-    if cfg.limit.sql_min_db_connections == 0 {
-        cfg.limit.sql_min_db_connections = cpu_num as u32
-    }
-
-    if cfg.limit.sql_max_db_connections == 0 {
-        cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
     }
 
     // check common config
