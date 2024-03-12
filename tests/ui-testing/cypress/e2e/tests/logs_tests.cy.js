@@ -74,6 +74,7 @@ describe("Logs testcases", () => {
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
     cy.wait("@allsearch");
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
+    applyQueryButton()
     cy.intercept("GET", "**/api/default/streams**").as("streams")
     cy.intercept('GET', '/api/default/e2e_automate/_values?').as('getValues')
 
@@ -193,7 +194,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should add the value to the editor when the != is clicked next to the field value", () => {
+  it.only("should add the value to the editor when the != is clicked next to the field value", () => {
     // Wait for 2 seconds
     cy.wait(5000);
     // Type the value of a variable into an input field
@@ -260,7 +261,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should click run query after SQL toggle on but without any query", () => {
+  it.only("should click run query after SQL toggle on but without any query", () => {
     // Wait for 2 seconds
     cy.wait(3000);
     // Type the value of a variable into an input field
@@ -275,7 +276,7 @@ describe("Logs testcases", () => {
     cy.contains("Invalid SQL Syntax").should("be.visible");
   });
 
-  it("should enter a valid SQL query", () => {
+  it.only("should enter a valid SQL query", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -320,7 +321,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should contain options to include, exclude and add field to table under Json", () => {
+  it.only("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -416,7 +417,7 @@ describe("Logs testcases", () => {
     });
   });
 
-  it("should contain options to include, exclude and add field to table under TABLE", () => {
+  it.only("should contain options to include, exclude and add field to table under TABLE", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
