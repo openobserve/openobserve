@@ -771,6 +771,30 @@ pub(crate) fn generate_quick_mode_fields(
             .map(|f| f.name().to_string())
             .collect(),
     };
+    // TODO: debug for schema fields
+    if schema_fields.len() < 3 {
+        log::warn!(
+            "[QUICK_MODE] schema fields is empty when generating fast mode fields from schema: {}",
+            stream_key
+        );
+        match file_schema {
+            Some(v) => {
+                log::debug!(
+                    "[QUICK_MODE] stream {}, file_list schema fields: {:?}",
+                    stream_key,
+                    v.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+                );
+            }
+            None => {
+                log::debug!("[QUICK_MODE] stream {}, file_list schema fields: NONE", stream_key);
+            }
+        }
+        log::debug!(
+            "[QUICK_MODE] stream {}, stream latest schema fields: {:?}",
+            stream_key,
+            schema.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+        );
+    }
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.quick_mode_num_fields);
