@@ -104,7 +104,7 @@ impl super::Db for MysqlDb {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT IGNORE INTO meta (module, key1, key2,key3, value) VALUES (?, ?, ?, ?, '');"#,
+            r#"INSERT IGNORE INTO meta (module, key1, key2, key3, value) VALUES (?, ?, ?, ?, '');"#,
         )
         .bind(&module)
         .bind(&key1)
@@ -178,12 +178,12 @@ impl super::Db for MysqlDb {
                 )
             } else if key3.is_empty() {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
                     module, key1, key2
                 )
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%' AND key3 LIKE '{}%';"#,
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' AND key3 LIKE '{}%';"#,
                     module, key1, key2, key3
                 )
             }
@@ -209,7 +209,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND key2 = '{}'", sql, key2);
         }
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
@@ -232,7 +232,7 @@ impl super::Db for MysqlDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2, key3) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2,  key3,'' AS value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, key3, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -240,7 +240,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND key2 = '{}'", sql, key2);
         }
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
@@ -271,7 +271,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
+            sql = format!("{} AND key2 = '{}'", sql, key2);
         }
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
@@ -326,7 +326,7 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
         .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX meta_module_key3_idx on meta (key3,key2, key1, module);",
+        "CREATE UNIQUE INDEX meta_module_key3_idx on meta (key3, key2, key1, module);",
     )
     .await?;
 
