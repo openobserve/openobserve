@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 
 use arrow_schema::Schema;
+use config::utils::schema_ext::SchemaExt;
 use once_cell::sync::Lazy;
 use regex::{self, Regex};
 
@@ -48,6 +49,35 @@ const MAX_KEY_LENGTH: usize = 100;
 
 static RE_CORRECT_STREAM_NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"[^a-zA-Z0-9_:]+").unwrap());
 
+pub struct SchemaCache {
+    schema: Schema,
+    fields_map: HashMap<String, usize>,
+    hash_key: String,
+}
+
+impl SchemaCache {
+    pub fn new(schema: Schema, fields_map: HashMap<String, usize>) -> Self {
+        let hash_key = schema.hash_key();
+        Self {
+            schema,
+            fields_map,
+            hash_key,
+        }
+    }
+
+    pub fn hash_key(&self) -> &str {
+        &self.hash_key
+    }
+
+    pub fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    pub fn fields_map(&self) -> &HashMap<String, usize> {
+        &self.fields_map
+    }
+}
+
 // format partition key
 pub fn format_partition_key(input: &str) -> String {
     let mut output = String::with_capacity(std::cmp::min(input.len(), MAX_KEY_LENGTH));
@@ -65,7 +95,7 @@ pub fn format_partition_key(input: &str) -> String {
 // format stream name
 pub async fn get_formatted_stream_name(
     params: &mut StreamParams,
-    schema_map: &mut HashMap<String, Schema>,
+    schema_map: &mut HashMap<String, SchemaCache>,
 ) -> String {
     let mut stream_name = params.stream_name.to_string();
 
@@ -73,17 +103,25 @@ pub async fn get_formatted_stream_name(
         .await
         .unwrap();
 
-    if schema.fields().is_empty() {
+    let schema = if schema.fields().is_empty() {
         stream_name = RE_CORRECT_STREAM_NAME
             .replace_all(&stream_name, "_")
             .to_string();
-        let corrected_schema = db::schema::get(&params.org_id, &stream_name, params.stream_type)
+        db::schema::get(&params.org_id, &stream_name, params.stream_type)
             .await
-            .unwrap();
-        schema_map.insert(stream_name.to_owned(), corrected_schema);
+            .unwrap()
     } else {
-        schema_map.insert(stream_name.to_owned(), schema);
-    }
+        schema
+    };
+
+    let fields_map = schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(i, f)| (f.name().to_owned(), i))
+        .collect();
+    schema_map.insert(stream_name.to_owned(), SchemaCache::new(schema, fields_map));
+
     params.stream_name = stream_name.to_owned().into();
 
     stream_name

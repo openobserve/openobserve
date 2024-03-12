@@ -27,7 +27,6 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 
 use crate::{
     common::meta::{
@@ -41,6 +40,7 @@ use crate::{
         logs::StreamMeta,
         schema::get_upto_discard_error,
         usage::report_request_usage_stats,
+        SchemaCache,
     },
 };
 
@@ -71,7 +71,7 @@ async fn ingest_inner(
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
 
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;

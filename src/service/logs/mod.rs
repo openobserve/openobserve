@@ -25,9 +25,11 @@ use config::{
     },
     CONFIG,
 };
-use datafusion::arrow::datatypes::Schema;
 
-use super::ingestion::{get_string_value, TriggerAlertData};
+use super::{
+    ingestion::{get_string_value, TriggerAlertData},
+    SchemaCache,
+};
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -151,7 +153,7 @@ pub fn cast_to_type(
 
 async fn add_valid_record(
     stream_meta: &StreamMeta<'_>,
-    stream_schema_map: &mut HashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
     status: &mut RecordStatus,
     write_buf: &mut HashMap<String, SchemaRecords>,
     mut record_val: Map<String, Value>,
@@ -185,7 +187,7 @@ async fn add_valid_record(
         stream_meta.partition_keys,
         unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
         &record_val,
-        Some(&schema_key),
+        Some(schema_key),
     );
 
     if !schema_evolution.schema_compatible {
@@ -244,7 +246,7 @@ async fn add_valid_record(
     }
 
     let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
-        let schema = Arc::new(rec_schema.clone().with_metadata(HashMap::new()));
+        let schema = Arc::new(rec_schema.schema().clone().with_metadata(HashMap::new()));
         let schema_key = schema.hash_key();
         SchemaRecords {
             schema_key,

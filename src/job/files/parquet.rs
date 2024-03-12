@@ -52,6 +52,7 @@ use crate::{
         db,
         search::datafusion::exec::merge_parquet_files,
         stream::{self, get_stream_setting_fts_fields},
+        SchemaCache,
     },
 };
 
@@ -418,7 +419,7 @@ pub(crate) async fn generate_index_on_ingester(
     }
     let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
 
-    let mut schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let schema_chk = crate::service::schema::stream_schema_exists(
         org_id,
         stream_name,

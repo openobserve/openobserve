@@ -41,6 +41,7 @@ use crate::{
         schema::check_for_schema,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
+        SchemaCache,
     },
 };
 
@@ -218,12 +219,18 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             stream_schema_map.insert(stream_name.clone(), schema);
         }
 
+        let mut new_map: HashMap<String, SchemaCache> = HashMap::new();
+        for (key, schema) in stream_schema_map.drain() {
+            let inner_map: HashMap<String, usize> = HashMap::new();
+            new_map.insert(key, SchemaCache::new(schema, inner_map));
+        }
+
         // check for schema evolution
         let _ = check_for_schema(
             org_id,
             &stream_name,
             StreamType::Metrics,
-            &mut stream_schema_map,
+            &mut new_map,
             record,
             timestamp,
         )

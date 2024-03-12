@@ -25,7 +25,6 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG,
 };
-use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
@@ -51,6 +50,7 @@ use crate::{
         schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
+        SchemaCache,
     },
 };
 
@@ -89,7 +89,7 @@ pub async fn handle_grpc_request(
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
@@ -311,6 +311,7 @@ pub async fn handle_grpc_request(
                     let schema = metric_schema_map
                         .get(local_metric_name)
                         .unwrap()
+                        .schema()
                         .clone()
                         .with_metadata(HashMap::new());
                     let schema_key = schema.hash_key();

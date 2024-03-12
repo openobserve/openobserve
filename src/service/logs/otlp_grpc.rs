@@ -26,7 +26,6 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -48,8 +47,9 @@ use crate::{
             grpc::{get_val, get_val_with_type_retained},
             write_file, TriggerAlertData,
         },
-        schema::{get_upto_discard_error, stream_schema_exists},
+        schema::get_upto_discard_error,
         usage::report_request_usage_stats,
+        SchemaCache,
     },
 };
 
@@ -60,7 +60,7 @@ pub async fn usage_ingest(
     thread_id: usize,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
     let stream_name = &get_formatted_stream_name(
         &mut StreamParams::new(org_id, in_stream_name, StreamType::Logs),
@@ -274,7 +274,7 @@ pub async fn handle_grpc_request(
     }
 
     let start = std::time::Instant::now();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
@@ -284,9 +284,9 @@ pub async fn handle_grpc_request(
             .await
         }
         None => {
-            let _schema_exists =
-                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
-                    .await;
+            // let _schema_exists =
+            //     stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
+            //         .await;
             "default".to_owned()
         }
     };
