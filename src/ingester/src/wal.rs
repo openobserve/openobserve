@@ -185,7 +185,7 @@ pub(crate) async fn replay_wal_files(latest_schemas: HashMap<String, Schema>) ->
             // check schema
             let schema_key = format!("{}/{}/{}", org_id, stream_type, entry.stream);
             let cache_key = format!("{}/{}", schema_key, entry.schema_key);
-            if !schema_key.contains(&cache_key) {
+            if !schema_map.contains_key(&cache_key) {
                 let latest_schema = match latest_schemas.get(&schema_key) {
                     Some(v) => v.clone(),
                     None => Schema::empty(),
