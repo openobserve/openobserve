@@ -15,12 +15,6 @@
 
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
-use chromiumoxide::{
-    browser::BrowserConfig,
-    detection::{default_executable, DetectionOptions},
-    fetcher::{BrowserFetcher, BrowserFetcherOptions},
-    handler::viewport::Viewport,
-};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
@@ -66,9 +60,6 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
-pub const DEFAULT_INDEX_TRIM_CHARS: &str = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
-pub const INDEX_MIN_CHAR_LEN: usize = 3;
-
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -91,25 +82,6 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
             }),
     )
     .collect::<Vec<_>>();
-    fields.sort();
-    fields.dedup();
-    fields
-});
-
-pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = CONFIG
-        .common
-        .feature_quick_mode_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -174,87 +146,6 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     )
 });
 
-static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
-    tokio::sync::OnceCell::const_new();
-
-pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
-    CHROME_LAUNCHER_OPTIONS
-        .get_or_init(init_chrome_launch_options)
-        .await
-}
-
-async fn init_chrome_launch_options() -> Option<BrowserConfig> {
-    if !CONFIG.chrome.chrome_enabled {
-        None
-    } else {
-        let mut browser_config = BrowserConfig::builder()
-            .window_size(
-                CONFIG.chrome.chrome_window_width,
-                CONFIG.chrome.chrome_window_height,
-            )
-            .viewport(Viewport {
-                width: CONFIG.chrome.chrome_window_width,
-                height: CONFIG.chrome.chrome_window_height,
-                device_scale_factor: Some(1.0),
-                ..Viewport::default()
-            });
-
-        if CONFIG.chrome.chrome_no_sandbox {
-            browser_config = browser_config.no_sandbox();
-        }
-
-        if !CONFIG.chrome.chrome_path.is_empty() {
-            browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
-        } else {
-            let mut should_download = false;
-
-            if !CONFIG.chrome.chrome_check_default {
-                should_download = true;
-            } else {
-                // Check if chrome is available on default paths
-                // 1. Check the CHROME env
-                // 2. Check usual chrome file names in user path
-                // 3. (Windows) Registry
-                // 4. (Windows & MacOS) Usual installations paths
-                if let Ok(exec_path) = default_executable(DetectionOptions::default()) {
-                    browser_config = browser_config.chrome_executable(exec_path);
-                } else {
-                    should_download = true;
-                }
-            }
-            if should_download {
-                // Download known good chrome version
-                let download_path = &CONFIG.chrome.chrome_download_path;
-                log::info!("fetching chrome at: {download_path}");
-                tokio::fs::create_dir_all(download_path).await.unwrap();
-                let fetcher = BrowserFetcher::new(
-                    BrowserFetcherOptions::builder()
-                        .with_path(download_path)
-                        .build()
-                        .unwrap(),
-                );
-
-                // Fetches the browser revision, either locally if it was previously
-                // installed or remotely. Returns error when the download/installation
-                // fails. Since it doesn't retry on network errors during download,
-                // if the installation fails, it might leave the cache in a bad state
-                // and it is advised to wipe it.
-                // Note: Does not work on LinuxArm platforms.
-                let info = fetcher
-                    .fetch()
-                    .await
-                    .expect("chrome could not be downloaded");
-                log::info!(
-                    "chrome fetched at path {:#?}",
-                    info.executable_path.as_path()
-                );
-                browser_config = browser_config.chrome_executable(info.executable_path);
-            }
-        }
-        Some(browser_config.build().unwrap())
-    }
-}
-
 pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy::new(|| {
     if !CONFIG.smtp.smtp_enabled {
         None
@@ -304,28 +195,6 @@ pub struct Config {
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
-    pub rum: RUM,
-    pub chrome: Chrome,
-}
-
-#[derive(EnvConfig)]
-pub struct Chrome {
-    #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
-    pub chrome_enabled: bool,
-    #[env_config(name = "ZO_CHROME_PATH", default = "")]
-    pub chrome_path: String,
-    #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
-    pub chrome_check_default: bool,
-    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
-    pub chrome_download_path: String,
-    #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
-    pub chrome_no_sandbox: bool,
-    #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
-    pub chrome_sleep_secs: u16,
-    #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
-    pub chrome_window_width: u32,
-    #[env_config(name = "ZO_CHROME_WINDOW_HEIGHT", default = 730)]
-    pub chrome_window_height: u32,
 }
 
 #[derive(EnvConfig)]
@@ -391,8 +260,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 16,
-        help = "Max grpc message size in MB, default is 16 MB"
+        default = 4,
+        help = "Max grpc message size in MB, default is 4 MB"
     )]
     pub max_message_size: usize,
 }
@@ -425,8 +294,6 @@ pub struct Common {
     pub local_mode_storage: String,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
     pub cluster_coordinator: String,
-    #[env_config(name = "ZO_QUEUE_STORE", default = "")]
-    pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
@@ -468,12 +335,12 @@ pub struct Common {
     pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
+    #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
+    pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
-    pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
@@ -574,14 +441,6 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
-
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = " ;,",
-        help = "Characters which should be used as a delimiter to split the string."
-    )]
-    pub inverted_index_split_chars: String,
-
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -594,13 +453,6 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
-
-    #[env_config(
-        name = "ZO_RUN_SCHEMA_MIGRATION_ON_START_UP",
-        default = false,
-        help = "Run autimatic schema migration on start up"
-    )]
-    pub run_schema_migration_on_start_up: bool,
 }
 
 #[derive(EnvConfig)]
@@ -671,42 +523,20 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
-    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
-    pub alert_schedule_concurrency: i64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
-    pub alert_schedule_timeout: i64,
-    #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
-    pub report_schedule_timeout: i64,
-    #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
-    pub scheduler_max_retries: i32,
-    #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
-    pub scheduler_clean_interval: u64,
-    #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
-    pub scheduler_watch_interval: u64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 100)]
-    pub quick_mode_num_fields: usize,
-    #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
-    pub quick_mode_strategy: String, // first, last, both
-    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_ENABLED", default = false)]
-    pub quick_mode_file_list_enabled: bool,
-    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
-    pub quick_mode_file_list_interval: i64,
-    #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
-    pub sql_min_db_connections: u32,
-    #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
-    pub sql_max_db_connections: u32,
-    #[env_config(name = "ZO_ENTRY_PER_SCHEMA_VERSION_ENABLED", default = true)]
-    pub row_per_schema_version_enabled: bool,
+    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
+    pub fast_mode_num_fields: usize,
+    #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
+    pub fast_mode_strategy: String, // first, last, both
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
+    pub fast_mode_file_list_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -848,16 +678,14 @@ pub struct Nats {
     pub addr: String,
     #[env_config(name = "ZO_NATS_PREFIX", default = "o2_")]
     pub prefix: String,
-    #[env_config(name = "ZO_NATS_USER", default = "")]
-    pub user: String,
-    #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
-    pub password: String,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
+    #[env_config(name = "ZO_NATS_LOAD_PAGE_SIZE", default = 1000)]
+    pub load_page_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -917,30 +745,6 @@ pub struct Prometheus {
     pub ha_replica_label: String,
 }
 
-#[derive(Debug, EnvConfig)]
-pub struct RUM {
-    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
-    pub enabled: bool,
-    #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
-    pub client_token: String,
-    #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
-    pub application_id: String,
-    #[env_config(name = "ZO_RUM_SITE", default = "")]
-    pub site: String,
-    #[env_config(name = "ZO_RUM_SERVICE", default = "")]
-    pub service: String,
-    #[env_config(name = "ZO_RUM_ENV", default = "")]
-    pub env: String,
-    #[env_config(name = "ZO_RUM_VERSION", default = "")]
-    pub version: String,
-    #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
-    pub organization_identifier: String,
-    #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
-    pub api_version: String,
-    #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
-    pub insecure_http: bool,
-}
-
 pub fn init() -> Config {
     dotenv().ok();
     let mut cfg = Config::init().unwrap();
@@ -960,14 +764,6 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core * 2
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
-    }
-
-    if cfg.limit.sql_min_db_connections == 0 {
-        cfg.limit.sql_min_db_connections = cpu_num as u32
-    }
-
-    if cfg.limit.sql_max_db_connections == 0 {
-        cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
     }
 
     // check common config
