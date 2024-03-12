@@ -132,6 +132,7 @@ describe("Logs testcases", () => {
       force: true,
     });
     applyQueryButton();
+    cy.wait(2000);
     logstests.expandLogsSearch();
     logstests.verifyLogsStatusCode();
     cy.intercept("GET", logData.ValueQuery).as("value");
