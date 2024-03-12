@@ -443,7 +443,7 @@ pub struct Common {
     pub inverted_index_enabled: bool,
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
-        default = false,
+        default = true,
         help = "Toggle search to be trigger based on button click event."
     )]
     pub query_on_stream_selection: bool,
