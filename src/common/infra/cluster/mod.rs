@@ -93,6 +93,15 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     None
 }
 
+#[inline]
+pub fn get_internal_grpc_token() -> String {
+    if CONFIG.grpc.internal_grpc_token.is_empty() {
+        INSTANCE_ID.get("instance_id").unwrap().to_string()
+    } else {
+        CONFIG.grpc.internal_grpc_token.clone()
+    }
+}
+
 /// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
     if CONFIG.common.local_mode {
@@ -161,10 +170,6 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
 }
 
 pub async fn leave() -> Result<()> {
-    unsafe {
-        LOCAL_NODE_STATUS = NodeStatus::Offline;
-    }
-
     if CONFIG.common.local_mode {
         return Ok(());
     }
