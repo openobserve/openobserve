@@ -337,7 +337,10 @@ const useLogs = () => {
             selectedStream = itemObj;
           }
         }
-        if (store.state.zoConfig.query_on_stream_selection == false) {
+        if (
+          store.state.zoConfig.query_on_stream_selection == false ||
+          router.currentRoute.value.query?.type == "stream_explorer"
+        ) {
           searchObj.data.stream.selectedStream = selectedStream;
         }
       } else {
@@ -1948,6 +1951,24 @@ const useLogs = () => {
 
     if (store.state.zoConfig.query_on_stream_selection == false) {
       handleQueryData();
+    } else {
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.queryResults = {
+        hits: []
+      };
+      searchObj.data.sortedQueryResults = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
+      };
     }
   };
 
