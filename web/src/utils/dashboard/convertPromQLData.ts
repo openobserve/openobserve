@@ -172,36 +172,36 @@ export const convertPromQLData = (
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        let hoverText = name.map((it: any) => {
-          // check if the series is the current series being hovered
-          // if have than bold it
-          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-            return `<strong>${it.marker} ${it.seriesName} : ${
-              it.data[1] == null
-                ? "-"
-                : formatUnitValue(
-                    getUnitValue(
-                      it.data[1],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals
-                    )
+        let hoverText: string[] = [];
+        name.forEach((it: any) => {
+          // if data is not null than show in tooltip
+          if (it.data[1] != null) {
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
+              hoverText.push(
+                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
                   )
-            } </strong>`;
-          // else normal text
-          else
-            return `${it.marker} ${it.seriesName} : ${
-              it.data[1] == null
-                ? "-"
-                : formatUnitValue(
-                    getUnitValue(
-                      it.data[1],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals
-                    ) ?? ""
-                  )
-            }`;
+                )} </strong>`
+              );
+            // else normal text
+            else
+              hoverText.push(
+                `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  ) ?? ""
+                )}`
+              );
+          }
         });
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
@@ -346,9 +346,10 @@ export const convertPromQLData = (
                 // used slice to remove Z from isostring to pass as a utc
                 data: xAxisData.map((value: any) => [
                   value,
-                  seriesDataObj[value.getTime() / 1000] || null,
+                  seriesDataObj[value.getTime() / 1000] ?? null,
                 ]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
 
@@ -717,7 +718,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "line":
       return {
         type: "line",
-        connectNulls: true,
         emphasis: { focus: "series" },
         smooth: true,
         showSymbol: false,
@@ -751,7 +751,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "area":
       return {
         type: "line",
-        connectNulls: true,
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {},
@@ -768,7 +767,6 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         smooth: true,
-        connectNulls: true,
         stack: "Total",
         areaStyle: {},
         showSymbol: false,
