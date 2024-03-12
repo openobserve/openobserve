@@ -500,7 +500,7 @@ fn parse_expr_for_field(
                     fields.push((
                         ident.value.to_string(),
                         SqlValue::String("".to_string()),
-                        SqlOperator::Eq.into(),
+                        SqlOperator::Eq,
                         *expr_op,
                     ));
                 }

@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::{Duration, Utc};
 use config::{
     cluster::{is_compactor, is_querier, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::{cluster::Role, stream::FileKey},
-    metrics, CONFIG,
+    metrics,
+    utils::parquet::read_recordbatch_from_bytes,
+    CONFIG,
 };
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
@@ -24,7 +27,7 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::infra::cluster::get_node_from_consistent_hash,
+    common::infra::{cluster::get_node_from_consistent_hash, config::STREAM_SCHEMAS_FIELDS},
     handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList},
 };
 
@@ -84,7 +87,7 @@ impl Event for Eventer {
 
         // cache latest files for querier
         if CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
-            for item in put_items {
+            for item in put_items.iter() {
                 let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
                 else {
                     continue; // no querier node
@@ -93,6 +96,10 @@ impl Event for Eventer {
                     continue; // not this node
                 }
                 _ = infra::cache::file_data::download("download", &item.key).await;
+            }
+            // cache latest schema fields
+            if let Some(item) = put_items.first() {
+                _ = cache_latest_fields(&item.key).await;
             }
         }
 
@@ -107,4 +114,73 @@ impl Event for Eventer {
 
         Ok(Response::new(EmptyResponse {}))
     }
+}
+
+async fn cache_latest_fields(file: &str) -> Result<(), anyhow::Error> {
+    if CONFIG.limit.fast_mode_file_list_enabled {
+        return Ok(());
+    }
+    let columns = file.split('/').collect::<Vec<&str>>();
+    let stream_key = columns[1..4].join("/");
+    let fr: tokio::sync::RwLockReadGuard<'_, hashbrown::HashMap<String, (i64, Vec<String>)>> =
+        STREAM_SCHEMAS_FIELDS.read().await;
+    let field_cache_time = fr.get(&stream_key).map(|v| v.0).unwrap_or(0);
+    drop(fr);
+
+    if field_cache_time
+        + Duration::seconds(CONFIG.limit.fast_mode_file_list_interval)
+            .num_microseconds()
+            .unwrap()
+        >= Utc::now().timestamp_micros()
+    {
+        return Ok(());
+    }
+
+    let buf = match infra::cache::file_data::memory::get(file, None).await {
+        Some(buf) => Some(buf),
+        _ => infra::cache::file_data::disk::get(file, None).await,
+    };
+    let Some(buf) = buf else {
+        return Ok(());
+    };
+
+    let (schema, batches) = read_recordbatch_from_bytes(&buf).await?;
+    let mut new_batch = arrow::compute::concat_batches(&schema, &batches)?;
+    // delete all null values column
+    let mut null_columns = Vec::new();
+    for i in 0..new_batch.num_columns() {
+        let fi = i - null_columns.len();
+        if new_batch.column(fi).null_count() == new_batch.num_rows() {
+            null_columns.push(i);
+            new_batch.remove_column(fi);
+        }
+    }
+    let new_chema = if null_columns.is_empty() {
+        schema
+    } else {
+        new_batch.schema()
+    };
+    let mut fields = new_chema
+        .fields()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect::<Vec<_>>();
+    fields.sort();
+    if fields.is_empty() {
+        return Ok(());
+    }
+
+    log::debug!(
+        "cached latest stream: {}, fields: {}",
+        stream_key,
+        fields.len()
+    );
+
+    let mut fw = STREAM_SCHEMAS_FIELDS.write().await;
+    let entry = fw.entry(stream_key).or_insert((0, Vec::new()));
+    entry.0 = Utc::now().timestamp_micros();
+    entry.1 = fields;
+    drop(fw);
+
+    Ok(())
 }
