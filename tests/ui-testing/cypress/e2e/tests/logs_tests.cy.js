@@ -194,7 +194,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.only("should add the value to the editor when the != is clicked next to the field value", () => {
+  it("should add the value to the editor when the != is clicked next to the field value", () => {
     // Wait for 2 seconds
     cy.wait(5000);
     // Type the value of a variable into an input field
@@ -261,7 +261,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.only("should click run query after SQL toggle on but without any query", () => {
+  it("should click run query after SQL toggle on but without any query", () => {
     // Wait for 2 seconds
     cy.wait(3000);
     // Type the value of a variable into an input field
@@ -276,7 +276,7 @@ describe("Logs testcases", () => {
     cy.contains("Invalid SQL Syntax").should("be.visible");
   });
 
-  it.only("should enter a valid SQL query", () => {
+  it("should enter a valid SQL query", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -321,7 +321,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it.only("should contain options to include, exclude and add field to table under Json", () => {
+  it("should contain options to include, exclude and add field to table under Json", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -417,7 +417,7 @@ describe("Logs testcases", () => {
     });
   });
 
-  it.only("should contain options to include, exclude and add field to table under TABLE", () => {
+  it("should contain options to include, exclude and add field to table under TABLE", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
