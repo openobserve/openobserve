@@ -156,7 +156,6 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
-    println!("set schema: {:?}", schema);
     if CONFIG.limit.row_per_schema_version_enabled {
         if min_ts.is_some() {
             let last_schema = get(org_id, stream_name, stream_type).await?;
@@ -168,7 +167,6 @@ pub async fn set(
                 let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
                 last_meta.insert("end_dt".to_string(), min_ts.to_string());
                 let prev_schema = vec![last_schema.clone().with_metadata(last_meta)];
-                println!("prev_schema: {:?}", prev_schema);
                 let _ = db
                     .put(
                         &key,
@@ -194,7 +192,6 @@ pub async fn set(
             let new_schema = vec![schema.to_owned().with_metadata(metadata)];
 
             let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
-            println!("new schema: {:?}", new_schema);
             let _ = db
                 .put(
                     &key,
@@ -437,7 +434,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if let Some(last) = item_value.last() {
                     let mut sl = STREAM_SCHEMAS_LATEST.write().await;
                     sl.insert(item_key.to_string(), last.clone());
-                    println!("sl: {:?}", sl);
                     drop(sl);
                 }
                 let mut sa = STREAM_SCHEMAS.write().await;
