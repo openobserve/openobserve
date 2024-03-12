@@ -120,7 +120,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     for (item_key, item_value) in db.list(key).await? {
         let new_key = item_key.strip_prefix(key).unwrap();
-        let key_count = new_key.to_string().split('/').count();
+        let key_count = new_key.split('/').count();
         // Hack for Report triggers
         if (key_count == 3 && !new_key.starts_with("report")) || key_count < 3 {
             _ = db.delete(&item_key, false, infra_db::NO_NEED_WATCH).await;
