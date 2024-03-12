@@ -168,18 +168,17 @@ impl RumExtraData {
 
 #[cfg(test)]
 mod tests {
-    use actix_web::test;
-
     use super::*;
 
-    #[test]
+    #[tokio::test]
     async fn test_data_filtering() {
         // Create a mock query string
         let query_string =
             "oo-api-key=123&o2-api-key=456&oo-param1=value1&o2-param2=value2&batch_time=123456";
 
         // Create a mock ServiceRequest with the query string
-        let req = test::TestRequest::with_uri(&format!("/path?{}", query_string)).to_srv_request();
+        let req = actix_web::test::TestRequest::with_uri(&format!("/path?{}", query_string))
+            .to_srv_request();
 
         // Call the from_query function
         let mut data =
@@ -195,7 +194,7 @@ mod tests {
         assert!(!data.contains_key("o2-api-key"));
     }
 
-    #[test]
+    #[tokio::test]
     async fn test_filter_tags() {
         // Create a mock query string
         let query_string_oo_tags = "ootags=sdk_version:0.2.9,api:fetch,env:production,service:web-application,version:1.0.1";
@@ -203,7 +202,8 @@ mod tests {
 
         for query in &[query_string_oo_tags, query_string_o2_tags] {
             // Create a mock ServiceRequest with the query string
-            let req = test::TestRequest::with_uri(&format!("/path?{}", query)).to_srv_request();
+            let req = actix_web::test::TestRequest::with_uri(&format!("/path?{}", query))
+                .to_srv_request();
 
             // Call the from_query function
             let query_data =

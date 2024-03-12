@@ -114,12 +114,9 @@ pub fn time_range_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use datafusion::{
         arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
+            datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         datasource::MemTable,
