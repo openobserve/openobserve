@@ -18,7 +18,6 @@
 use core::ops::ControlFlow;
 
 use config::FxIndexSet;
-use datafusion::error::Result;
 use sqlparser::{
     ast::{Expr, Function, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
     dialect::GenericDialect,
@@ -35,8 +34,8 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
     "approx_percentile_cont",
 ];
 
-pub fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String> {
-    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
+pub fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> String {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
     if is_first_phase {
         statements.visit(&mut Rewrite {
             is_first_phase: true,
@@ -46,13 +45,13 @@ pub fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<Str
             is_first_phase: false,
         });
     }
-    Ok(statements[0].to_string())
+    statements[0].to_string()
 }
 
-pub fn rewrite_count_distinct_merge_sql(sql: &str) -> Result<String> {
-    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
+pub fn rewrite_count_distinct_merge_sql(sql: &str) -> String {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
     statements.visit(&mut RewriteFinal);
-    Ok(statements[0].to_string())
+    statements[0].to_string()
 }
 
 // A visitor that count(distinct(field)) query
@@ -261,93 +260,13 @@ fn remove_brackets(input: &str) -> String {
     }
 }
 
-pub fn remove_where_clause(sql: &str) -> Result<String> {
-    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
-    statements.visit(&mut RemoveWhere);
-    Ok(statements[0].to_string())
-}
-
-// A visitor that remove where clause
-struct RemoveWhere;
-
-// Visit each expression after its children have been visited
-impl VisitorMut for RemoveWhere {
-    type Break = ();
-
-    /// Invoked for any queries that appear in the AST before visiting children
-    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
-            // remove the where clause
-            select.selection = None;
-        }
-        ControlFlow::Continue(())
-    }
-}
-
-pub fn add_group_by_field_to_select(sql: &str) -> Result<String> {
-    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
-    statements.visit(&mut AddGroupBy);
-    Ok(statements[0].to_string())
-}
-
-// A visitor that add group by field to select
-struct AddGroupBy;
-
-// Visit each expression after its children have been visited
-impl VisitorMut for AddGroupBy {
-    type Break = ();
-
-    /// Invoked for any queries that appear in the AST before visiting children
-    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        // collect select field in query
-        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
-            // early return if group by clause is empty
-            if let GroupByExpr::Expressions(ref exprs) = select.group_by {
-                if exprs.is_empty() {
-                    return ControlFlow::Break(());
-                }
-            }
-            // Warning: collect field name use String
-            // here no log use expr because of the table identifier
-            // it is maybe Some("tbl") or Some("") or NULL, it is not always equal
-            let mut select_exprs = Vec::new();
-            for select_item in &select.projection {
-                match select_item {
-                    sqlparser::ast::SelectItem::ExprWithAlias { alias, .. } => {
-                        select_exprs.push(trim_quotes(alias.to_string()));
-                    }
-                    sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
-                        select_exprs.push(trim_quotes(expr.to_string()));
-                    }
-                    _ => {}
-                }
-            }
-            if let GroupByExpr::Expressions(ref exprs) = select.group_by {
-                for expr in exprs.iter() {
-                    let expr_name = trim_quotes(expr.to_string());
-                    if !select_exprs.contains(&expr_name) {
-                        select
-                            .projection
-                            .push(sqlparser::ast::SelectItem::UnnamedExpr(expr.clone()));
-                    }
-                }
-            }
-        }
-        ControlFlow::Continue(())
-    }
-}
-
-fn trim_quotes(input: String) -> String {
-    input.trim_matches(|v| v == '\'' || v == '"').to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_count_distinct_rewrite_phase1() {
-        let sql = [
+        let sql = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -357,7 +276,7 @@ mod tests {
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
-        let excepts = [
+        let excepts = vec![
             "SELECT DISTINCT a FROM tbl WHERE a > 3",
             "SELECT DISTINCT a FROM tbl WHERE a > 3",
             "SELECT DISTINCT a, b FROM tbl WHERE a > 3",
@@ -367,14 +286,17 @@ mod tests {
             "SELECT DISTINCT date_bin(INTERVAL '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) AS x_axis_1, userid FROM segment WHERE event IN ('OpenObserve - heartbeat')",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
-            let new_sql = rewrite_count_distinct_sql(sql, true).unwrap();
-            assert_eq!(new_sql, **except);
+            let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+            statements.visit(&mut Rewrite {
+                is_first_phase: true,
+            });
+            assert_eq!(statements[0].to_string(), **except);
         }
     }
 
     #[test]
     fn test_count_distinct_rewrite_phase2() {
-        let sql = [
+        let sql = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -384,7 +306,7 @@ mod tests {
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
-        let excepts = [
+        let excepts = vec![
             "SELECT DISTINCT a FROM tbl",
             "SELECT DISTINCT a FROM tbl",
             "SELECT DISTINCT a, b FROM tbl",
@@ -394,14 +316,17 @@ mod tests {
             "SELECT DISTINCT x_axis_1, userid FROM segment",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
-            let new_sql = rewrite_count_distinct_sql(sql, false).unwrap();
-            assert_eq!(new_sql, **except);
+            let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+            statements.visit(&mut Rewrite {
+                is_first_phase: false,
+            });
+            assert_eq!(statements[0].to_string(), **except);
         }
     }
 
     #[test]
     fn test_count_distinct_rewrite_phase3() {
-        let sql = [
+        let sql = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
             "SELECT COUNT(DISTINCT(a)) FROM tbl where a > 3 limit 10",
             "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 order by cnt limit 10",
@@ -411,7 +336,7 @@ mod tests {
             "SELECT date_bin(interval '1 day', to_timestamp_micros('2001-01-01T00:00:00'), to_timestamp('2001-01-01T00:00:00')) as x_axis_1, count(distinct(userid)) as y_axis_1  FROM segment WHERE event IN ('OpenObserve - heartbeat') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
 
-        let excepts = [
+        let excepts = vec![
             "SELECT COUNT(DISTINCT a) FROM tbl LIMIT 10",
             "SELECT COUNT(DISTINCT (a)) FROM tbl LIMIT 10",
             "SELECT a, COUNT(DISTINCT b) AS cnt FROM tbl GROUP BY a HAVING cnt > 1 ORDER BY cnt LIMIT 10",
@@ -421,35 +346,9 @@ mod tests {
             "SELECT x_axis_1, count(DISTINCT (userid)) AS y_axis_1 FROM segment GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 15",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
-            let new_sql = rewrite_count_distinct_merge_sql(sql).unwrap();
-            assert_eq!(new_sql, **except);
-        }
-    }
-
-    #[test]
-    fn test_add_group_by() {
-        let sql = [
-            "SELECT count(*) as cnt FROM default group by k8s_namespace_name",
-            "SELECT count(*) FROM default group by k8s_namespace_name",
-            "SELECT k8s_namespace_name as k8s, count(*) FROM default group by k8s",
-            "SELECT k8s_namespace_name, count(*) FROM default group by k8s_namespace_name",
-            "SELECT * FROM default where a = b",
-            "SELECT a, b, c FROM default",
-            "SELECT avg(resource_duration / 1000000) AS y_axis_1, SPLIT_PART(resource_url, '?', 1) AS x_axis_1 FROM tbl WHERE (_timestamp >= 1710404419324000 AND _timestamp < 1710490819324000) AND (resource_duration >= 0) GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
-        ];
-
-        let excepts = [
-            "SELECT count(*) AS cnt, k8s_namespace_name FROM default GROUP BY k8s_namespace_name",
-            "SELECT count(*), k8s_namespace_name FROM default GROUP BY k8s_namespace_name",
-            "SELECT k8s_namespace_name AS k8s, count(*) FROM default GROUP BY k8s",
-            "SELECT k8s_namespace_name, count(*) FROM default GROUP BY k8s_namespace_name",
-            "SELECT * FROM default WHERE a = b",
-            "SELECT a, b, c FROM default",
-            "SELECT avg(resource_duration / 1000000) AS y_axis_1, SPLIT_PART(resource_url, '?', 1) AS x_axis_1 FROM tbl WHERE (_timestamp >= 1710404419324000 AND _timestamp < 1710490819324000) AND (resource_duration >= 0) GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 10",
-        ];
-        for (sql, except) in sql.iter().zip(excepts.iter()) {
-            let new_sql = add_group_by_field_to_select(sql).unwrap();
-            assert_eq!(new_sql, except.to_string());
+            let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+            statements.visit(&mut RewriteFinal);
+            assert_eq!(statements[0].to_string(), **except);
         }
     }
 }
