@@ -107,8 +107,8 @@ describe("Logs testcases", () => {
       .should("not.exist");
   });
 
-  it.skip("should redirect to logs after clicking on stream explorer via stream page", () => {
-    // cy.intercept("GET", logData.ValueQuery).as("value");
+  it.only("should redirect to logs after clicking on stream explorer via stream page", () => {
+    cy.wait(2000);
     cy.get('[data-cy="index-field-search-input"]').type("code");
 
     cy.get('[data-test="log-search-expand-code-field-btn"]').click();
