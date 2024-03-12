@@ -278,7 +278,7 @@ import {
   convertToUtcTimestamp,
   timestampToTimezoneDate,
 } from "../utils/zincutils";
-import { date } from "quasar";
+import { date, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { utcToZonedTime } from "date-fns-tz";
@@ -308,6 +308,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
+    const $q = useQuasar();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00",
@@ -513,6 +514,14 @@ export default defineComponent({
     const saveDate = (dateType) => {
       displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
+      if (isNaN(date.endTime) || isNaN(date.startTime)) {
+        $q.notify({
+          message: `Invalid date. Please select a valid date.`,
+          color: "negative",
+          timeout: 2000,
+        });
+        return false;
+      }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";

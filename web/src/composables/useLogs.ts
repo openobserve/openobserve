@@ -450,7 +450,7 @@ const useLogs = () => {
           end_time: new Date().getTime() * 1000,
           from:
             searchObj.meta.resultGrid.rowsPerPage *
-            (searchObj.data.resultGrid.currentPage - 1) || 0,
+              (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
           fast_mode: searchObj.meta.fastMode,
         },
@@ -465,8 +465,8 @@ const useLogs = () => {
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-            searchObj.data.datetime.relativeTimePeriod
-          )
+              searchObj.data.datetime.relativeTimePeriod
+            )
           : cloneDeep(searchObj.data.datetime);
 
       if (
@@ -926,6 +926,18 @@ const useLogs = () => {
         return;
       }
 
+      if (
+        isNaN(searchObj.data.datetime.endTime) ||
+        isNaN(searchObj.data.datetime.startTime)
+      ) {
+        $q.notify({
+          message: `Invalid date. Please select a valid date.`,
+          color: "negative",
+          timeout: 2000,
+        });
+        return;
+      }
+
       const queryReq = buildSearch();
 
       // reset query data and get partition detail for given query.
@@ -1060,7 +1072,7 @@ const useLogs = () => {
         queryReq.query.track_total_hits = true;
       } else if (
         searchObj.data.queryResults.partitionDetail.partitionTotal[
-        searchObj.data.resultGrid.currentPage - 1
+          searchObj.data.resultGrid.currentPage - 1
         ] > -1 &&
         queryReq.query.hasOwnProperty("track_total_hits")
       ) {
@@ -1101,7 +1113,7 @@ const useLogs = () => {
           ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
             if (
               searchObj.data.queryResults.partitionDetail.partitionTotal[
-              index
+                index
               ] == -1 &&
               queryReq.query.start_time == item[0]
             ) {
@@ -1209,7 +1221,7 @@ const useLogs = () => {
               if (totalNumber > 0) {
                 searchObj.data.queryResults.total += totalNumber;
               }
-            } 
+            }
           }
           searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
@@ -1266,7 +1278,7 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
-      const dismiss = () => { };
+      const dismiss = () => {};
       try {
         searchObj.data.histogram.errorMsg = "";
         searchObj.data.histogram.errorCode = 0;
@@ -1452,7 +1464,7 @@ const useLogs = () => {
           : {};
       const logFieldSelectedValue =
         logFilterField[
-        `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
         ];
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (
@@ -1525,13 +1537,13 @@ const useLogs = () => {
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
     if (searchObj.meta.resultGrid.showPagination == false) {
-      endCount  = searchObj.data.queryResults.hits.length;
-    }else{
-    endCount = Math.min(
-      startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-      searchObj.data.queryResults.total
-    );
-    };
+      endCount = searchObj.data.queryResults.hits.length;
+    } else {
+      endCount = Math.min(
+        startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+        searchObj.data.queryResults.total
+      );
+    }
     const title =
       "Showing " +
       startCount +
