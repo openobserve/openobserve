@@ -524,7 +524,7 @@ async fn merge_files(
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
     log::info!(
-        "[COMPACT] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        "[COMPACT] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,

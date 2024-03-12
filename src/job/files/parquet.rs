@@ -377,7 +377,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,

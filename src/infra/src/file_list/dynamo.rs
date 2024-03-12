@@ -401,7 +401,7 @@ impl super::FileList for DynamoFileList {
                     .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
                     .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             } else {
-                let time_start = time_start + 1; // because the beween is [start, end], we don't want to include the start
+                let time_start = time_start + 1; // because the between is [start, end], we don't want to include the start
                 client
                     .query()
                     .table_name(&self.file_list_table)
@@ -425,7 +425,7 @@ impl super::FileList for DynamoFileList {
                 .key_condition_expression("org = :org")
                 .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
         } else {
-            let time_start = time_start + 1; // because the beween is [start, end], we don't want to include the start
+            let time_start = time_start + 1; // because the between is [start, end], we don't want to include the start
             client
                 .query()
                 .table_name(&self.file_list_table)
