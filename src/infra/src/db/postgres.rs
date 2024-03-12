@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::CONFIG;
+use config::{utils::json, CONFIG};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -233,17 +233,34 @@ impl super::Db for PostgresDb {
             .fetch_all(&pool)
             .await?;
         if module == "schema" {
-            println!("{:?}", ret);
+            let mut grouped_values: HashMap<String, Vec<datafusion::arrow::datatypes::Schema>> =
+                HashMap::new();
+            for record in ret {
+                let key = format!("/{}/{}/{}", record.module, record.key1, record.key2);
+                let mut parsed: Vec<datafusion::arrow::datatypes::Schema> =
+                    json::from_str(&record.value).unwrap();
+
+                grouped_values
+                    .entry(key.to_owned())
+                    .or_insert_with(Vec::new)
+                    .append(&mut parsed);
+            }
+
+            Ok(grouped_values
+                .into_iter()
+                .map(|(key, vec)| (key, json::to_vec(&vec).unwrap().into()))
+                .collect())
+        } else {
+            Ok(ret
+                .into_iter()
+                .map(|r| {
+                    (
+                        super::build_key(&r.module, &r.key1, &r.key2),
+                        Bytes::from(r.value),
+                    )
+                })
+                .collect())
         }
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    super::build_key(&r.module, &r.key1, &r.key2),
-                    Bytes::from(r.value),
-                )
-            })
-            .collect())
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
