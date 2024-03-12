@@ -15,7 +15,6 @@
 
 use std::collections::HashMap;
 
-use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -65,7 +64,7 @@ pub fn format_partition_key(input: &str) -> String {
 // format stream name
 pub async fn get_formatted_stream_name(
     params: &mut StreamParams,
-    schema_map: &mut HashMap<String, Schema>,
+    schema_map: &mut HashMap<String, schema::SchemaCache>,
 ) -> String {
     let mut stream_name = params.stream_name.to_string();
 
@@ -73,17 +72,28 @@ pub async fn get_formatted_stream_name(
         .await
         .unwrap();
 
-    if schema.fields().is_empty() {
+    let schema = if schema.fields().is_empty() {
         stream_name = RE_CORRECT_STREAM_NAME
             .replace_all(&stream_name, "_")
             .to_string();
-        let corrected_schema = db::schema::get(&params.org_id, &stream_name, params.stream_type)
+        db::schema::get(&params.org_id, &stream_name, params.stream_type)
             .await
-            .unwrap();
-        schema_map.insert(stream_name.to_owned(), corrected_schema);
+            .unwrap()
     } else {
-        schema_map.insert(stream_name.to_owned(), schema);
-    }
+        schema
+    };
+
+    let fields_map = schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(i, f)| (f.name().to_owned(), i))
+        .collect();
+    schema_map.insert(
+        stream_name.to_owned(),
+        schema::SchemaCache::new(schema, fields_map),
+    );
+
     params.stream_name = stream_name.to_owned().into();
 
     stream_name
