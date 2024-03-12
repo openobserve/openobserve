@@ -968,7 +968,7 @@ describe("Logs testcases", () => {
     cy.contains(".a=2").should("be.visible");
   });
 
-  it.only("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
+  it("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
