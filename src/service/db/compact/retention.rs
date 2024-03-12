@@ -54,7 +54,14 @@ pub async fn delete_stream(
     let db_key = format!("/compact/delete/{key}");
     CACHE.insert(key);
 
-    Ok(db.put(&db_key, "OK".into(), infra_db::NEED_WATCH).await?)
+    Ok(db
+        .put(
+            &db_key,
+            "OK".into(),
+            infra_db::NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await?)
 }
 
 // set the stream is processing by the node
@@ -69,7 +76,12 @@ pub async fn process_stream(
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
     Ok(db
-        .put(&db_key, node.to_string().into(), infra_db::NEED_WATCH)
+        .put(
+            &db_key,
+            node.to_string().into(),
+            infra_db::NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
         .await?)
 }
 

@@ -39,6 +39,7 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
         &key,
         json::to_vec(&setting).unwrap().into(),
         infra_db::NEED_WATCH,
+        chrono::Utc::now().timestamp_micros(),
     )
     .await?;
 
@@ -130,6 +131,7 @@ pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
             &key,
             json::to_vec(org).unwrap().into(),
             infra_db::NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
         )
         .await
     {

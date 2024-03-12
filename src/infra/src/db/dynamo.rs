@@ -130,7 +130,13 @@ impl super::Db for DynamoDb {
         }
     }
 
-    async fn put(&self, in_key: &str, value: Bytes, need_watch: bool) -> Result<()> {
+    async fn put(
+        &self,
+        in_key: &str,
+        value: Bytes,
+        need_watch: bool,
+        created_at: i64,
+    ) -> Result<()> {
         let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
         let client = get_db_client().await.clone();
         match client
@@ -159,7 +165,7 @@ impl super::Db for DynamoDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(in_key, Bytes::from(""), true)
+                .put(in_key, Bytes::from(""), true, created_at)
                 .await?;
         }
 
