@@ -461,13 +461,8 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
-    use crate::{
-        common::{infra::config::STREAM_SETTINGS, meta::stream::StreamPartition},
-        service::stream::stream_settings,
-    };
+    use crate::{common::infra::config::STREAM_SETTINGS, service::stream::stream_settings};
 
     #[test]
     fn test_format_partition_key() {

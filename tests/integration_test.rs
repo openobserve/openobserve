@@ -69,18 +69,18 @@ mod tests {
         setup();
 
         // register node
-        _ = openobserve::common::infra::cluster::register_and_keepalive()
+        openobserve::common::infra::cluster::register_and_keepalive()
             .await
             .unwrap();
         // init config
-        _ = config::init().await.unwrap();
+        config::init().await.unwrap();
         // init infra
-        _ = infra::init().await.unwrap();
-        _ = openobserve::common::infra::init().await.unwrap();
+        infra::init().await.unwrap();
+        openobserve::common::infra::init().await.unwrap();
         // ingester init
-        _ = ingester::init().await.unwrap();
+        ingester::init().await.unwrap();
         // init job
-        _ = openobserve::job::init().await.unwrap();
+        openobserve::job::init().await.unwrap();
 
         for _i in 0..3 {
             e2e_1_post_bulk().await;

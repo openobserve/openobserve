@@ -290,7 +290,7 @@ pub async fn handle_grpc_request(
                     let value_str = json::to_string(&val_map).unwrap();
 
                     // check for schema evolution
-                    if schema_evolved.get(local_metric_name).is_none()
+                    if !schema_evolved.contains_key(local_metric_name)
                         && check_for_schema(
                             org_id,
                             local_metric_name,

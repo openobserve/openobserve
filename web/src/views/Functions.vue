@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -98,12 +98,21 @@ export default defineComponent({
     const functionAssociatedStreams = ref([]);
     const splitterModel = ref(220);
 
+    watch(
+      () => router.currentRoute.value.name,
+      (routeName) => {
+        // This is added to redirect to functionList if the user is on functions route
+        // This case happens when user clicks on functions from menu when he is already on functions page
+        if (routeName === "functions") redirectRoute();
+      }
+    );
+
     onBeforeMount(() => {
       redirectRoute();
     });
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "functions") {
-        router.push({
+        router.replace({
           name: "functionList",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,

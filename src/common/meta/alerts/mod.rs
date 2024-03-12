@@ -132,19 +132,19 @@ pub enum AggFunction {
     P99,
 }
 
-impl ToString for AggFunction {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for AggFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AggFunction::Avg => "avg".to_string(),
-            AggFunction::Min => "min".to_string(),
-            AggFunction::Max => "max".to_string(),
-            AggFunction::Sum => "sum".to_string(),
-            AggFunction::Count => "count".to_string(),
-            AggFunction::P50 => "p50".to_string(),
-            AggFunction::P75 => "p75".to_string(),
-            AggFunction::P90 => "p90".to_string(),
-            AggFunction::P95 => "p95".to_string(),
-            AggFunction::P99 => "p99".to_string(),
+            AggFunction::Avg => write!(f, "avg"),
+            AggFunction::Min => write!(f, "min"),
+            AggFunction::Max => write!(f, "max"),
+            AggFunction::Sum => write!(f, "sum"),
+            AggFunction::Count => write!(f, "count"),
+            AggFunction::P50 => write!(f, "p50"),
+            AggFunction::P75 => write!(f, "p75"),
+            AggFunction::P90 => write!(f, "p90"),
+            AggFunction::P95 => write!(f, "p95"),
+            AggFunction::P99 => write!(f, "p99"),
         }
     }
 }
@@ -179,12 +179,12 @@ pub enum QueryType {
     PromQL,
 }
 
-impl ToString for QueryType {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for QueryType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            QueryType::Custom => "custom".to_string(),
-            QueryType::SQL => "sql".to_string(),
-            QueryType::PromQL => "promql".to_string(),
+            QueryType::Custom => write!(f, "custom"),
+            QueryType::SQL => write!(f, "sql"),
+            QueryType::PromQL => write!(f, "promql"),
         }
     }
 }
@@ -234,17 +234,17 @@ impl Default for Operator {
     }
 }
 
-impl ToString for Operator {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Operator::EqualTo => "=".to_string(),
-            Operator::NotEqualTo => "!=".to_string(),
-            Operator::GreaterThan => ">".to_string(),
-            Operator::GreaterThanEquals => ">=".to_string(),
-            Operator::LessThan => "<".to_string(),
-            Operator::LessThanEquals => "<=".to_string(),
-            Operator::Contains => "contains".to_string(),
-            Operator::NotContains => "not contains".to_string(),
+            Operator::EqualTo => write!(f, "="),
+            Operator::NotEqualTo => write!(f, "!="),
+            Operator::GreaterThan => write!(f, ">"),
+            Operator::GreaterThanEquals => write!(f, ">="),
+            Operator::LessThan => write!(f, "<"),
+            Operator::LessThanEquals => write!(f, "<="),
+            Operator::Contains => write!(f, "contains"),
+            Operator::NotContains => write!(f, "not contains"),
         }
     }
 }

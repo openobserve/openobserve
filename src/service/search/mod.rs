@@ -1280,139 +1280,140 @@ mod tests {
     fn test_partition_file_by_bytes() {
         use config::meta::stream::FileMeta;
 
-        let mut vec = Vec::new();
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 100,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 1,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 200,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 30,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 90,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 5,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 150,
-                compressed_size: -1,
-            },
-            false,
-        ));
+        let vec = vec![
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 100,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 1,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 200,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 30,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 90,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 5,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 150,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+        ];
         let expected: Vec<Vec<i64>> = vec![
             vec![256, 256, 100],
             vec![256, 1, 256],

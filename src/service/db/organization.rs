@@ -97,8 +97,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             let item_value = ev.value.unwrap();
             let json_val: OrganizationSetting = if config::CONFIG.common.meta_store_external {
                 let db = infra_db::get_db().await;
-                let ret = db.get(&item_key).await?;
-                json::from_slice(&ret).unwrap()
+                match db.get(&item_key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("Error getting value: {}", e);
+                        continue;
+                    }
+                }
             } else {
                 json::from_slice(&item_value).unwrap()
             };
