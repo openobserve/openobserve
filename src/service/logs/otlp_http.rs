@@ -45,7 +45,7 @@ use crate::{
         ingestion::{
             evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
         },
-        schema::get_upto_discard_error,
+        schema::{get_upto_discard_error, stream_schema_exists},
         usage::report_request_usage_stats,
         SchemaCache,
     },
@@ -131,9 +131,9 @@ pub async fn logs_json_handler(
             .await
         }
         None => {
-            // let _schema_exists =
-            //     stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
-            //         .await;
+            let _schema_exists =
+                stream_schema_exists(org_id, "default", StreamType::Logs, &mut stream_schema_map)
+                    .await;
             "default".to_owned()
         }
     };
