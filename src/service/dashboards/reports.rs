@@ -321,18 +321,61 @@ async fn generate_report(
 
     let timerange = &dashboard.timerange;
 
-    let dashb_url = match timerange.range_type {
+    // dashboard link in the email should contain data of the same period as the report
+    let (dashb_url, email_dashb_url) = match timerange.range_type {
         ReportTimerangeType::Relative => {
-            format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={}&var-__dynamic_filters=%255B%255D&print=true",
-                &timerange.period
-            )
+            let period = &timerange.period;
+            let (time_duration, time_unit) = period.split_at(period.len() - 1);
+            let dashb_url = format!(
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&var-__dynamic_filters=%255B%255D&print=true",
+            );
+
+            let time_duration: i64 = time_duration.parse()?;
+            let end_time = chrono::Utc::now().timestamp_micros();
+            let start_time = match time_unit {
+                "m" => {
+                    end_time
+                        - chrono::Duration::minutes(time_duration)
+                            .num_microseconds()
+                            .unwrap()
+                }
+                "h" => {
+                    end_time
+                        - chrono::Duration::hours(time_duration)
+                            .num_microseconds()
+                            .unwrap()
+                }
+                "d" => {
+                    end_time
+                        - chrono::Duration::days(time_duration)
+                            .num_microseconds()
+                            .unwrap()
+                }
+                "w" => {
+                    end_time
+                        - chrono::Duration::weeks(time_duration)
+                            .num_microseconds()
+                            .unwrap()
+                }
+                _ => {
+                    end_time
+                        - chrono::Duration::days(30 * time_duration)
+                            .num_microseconds()
+                            .unwrap()
+                }
+            };
+
+            let email_dashb_url = format!(
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&var-__dynamic_filters=%255B%255D&print=true",
+            );
+            (dashb_url, email_dashb_url)
         }
         ReportTimerangeType::Absolute => {
-            format!(
+            let url = format!(
                 "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&var-__dynamic_filters=%255B%255D&print=true",
                 &timerange.from, &timerange.to
-            )
+            );
+            (url.clone(), url)
         }
     };
 
@@ -381,5 +424,5 @@ async fn generate_report(
 
     browser.close().await?;
     handle.await?;
-    Ok((pdf_data, dashb_url))
+    Ok((pdf_data, email_dashb_url))
 }

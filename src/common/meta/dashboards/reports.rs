@@ -13,9 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::Utc;
+use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::datetime_now;
 
 #[derive(Serialize, Debug, Deserialize, Clone, ToSchema)]
 pub enum ReportDestination {
@@ -154,6 +156,16 @@ pub struct Report {
     #[serde(default)]
     #[serde(rename = "timezoneOffset")]
     pub tz_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_triggered_at: Option<i64>,
+    #[serde(default = "datetime_now")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: DateTime<FixedOffset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String, format = DateTime)]
+    pub updated_at: Option<DateTime<FixedOffset>>,
+    pub owner: String,
+    pub last_edited_by: String,
 }
 
 impl Default for Report {
@@ -174,6 +186,11 @@ impl Default for Report {
             password: "".to_string(),
             timezone: "".to_string(),
             tz_offset: 0, // UTC
+            last_triggered_at: None,
+            created_at: datetime_now(),
+            updated_at: None,
+            owner: "".to_string(),
+            last_edited_by: "".to_string(),
         }
     }
 }

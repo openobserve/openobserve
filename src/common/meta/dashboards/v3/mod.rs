@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset};
 use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::datetime_now;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -37,12 +39,6 @@ pub struct Dashboard {
     pub tabs: Vec<Tab>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Variables>,
-}
-
-fn datetime_now() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
-        "BUG", // This can't possibly fail. Can it?
-    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
