@@ -821,10 +821,7 @@ fn generate_fast_mode_fields_from_schema(
                 );
             }
             None => {
-                log::debug!(
-                    "[QUICK_MODE] stream {}, file_list schema fields: NONE",
-                    stream_key
-                );
+                log::debug!("[QUICK_MODE] stream {}, file_list schema fields: NONE", stream_key);
             }
         }
         log::debug!(
