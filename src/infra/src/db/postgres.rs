@@ -113,34 +113,51 @@ impl super::Db for PostgresDb {
             }
             return Err(e.into());
         }
-        if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(&created_at)
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-        .execute(&mut *tx)
-        .await
-        {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback put meta error: {}", e);
+        if module == "schema" {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(&created_at)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback put meta error: {}", e);
+                }
+                return Err(e.into());
             }
-            return Err(e.into());
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit put meta error: {}", e);
-            return Err(e.into());
+            if let Err(e) = tx.commit().await {
+                log::error!("[POSTGRES] commit put meta error: {}", e);
+                return Err(e.into());
+            }
+        } else {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback put meta error: {}", e);
+                }
+                return Err(e.into());
+            }
+            if let Err(e) = tx.commit().await {
+                log::error!("[POSTGRES] commit put meta error: {}", e);
+                return Err(e.into());
+            }
         }
 
         // event watch
         if need_watch {
-            let key = if module.eq("schema") {
-                format!("/{module}/{key1}/{key2}")
-            } else {
-                key.to_string()
-            };
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
                 .put(&key, Bytes::from(""), true, created_at)
@@ -215,6 +232,9 @@ impl super::Db for PostgresDb {
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
+        if module == "schema" {
+            println!("{:?}", ret);
+        }
         Ok(ret
             .into_iter()
             .map(|r| {
@@ -314,12 +334,12 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
         .await?;
-    // create_index_item(
-    //     "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module);",
-    // )
-    // .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3,key2, key1, module);",
+         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';",
+     )
+     .await?;
+    create_index_item(
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3,key2, key1, module) where module ='schema';",
     )
     .await?;
 
