@@ -24,7 +24,7 @@ use std::{
     time::Duration,
 };
 
-use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use config::{
     cluster::{is_router, LOCAL_NODE_ROLE},
@@ -184,12 +184,14 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // init http server
-    init_http_server().await?;
+    if let Err(e) = init_http_server().await {
+        log::error!("HTTP server runs failed: {}", e);
+    }
     log::info!("HTTP server stopped");
 
     // leave the cluster
     _ = cluster::leave().await;
-    log::info!("left cluster");
+    log::info!("Node left cluster");
 
     // stop gRPC server
     grpc_shutudown_tx.send(()).ok();
@@ -380,14 +382,63 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
     .bind(haddr)?;
 
-    server
+    let server = server
         .workers(CONFIG.limit.http_worker_num)
         .worker_max_blocking_threads(
             CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
         )
-        .run()
-        .await?;
+        .disable_signals()
+        .run();
+    let handle = server.handle();
+    tokio::task::spawn(async move {
+        graceful_shutdown(handle).await;
+    });
+    server.await?;
     Ok(())
+}
+
+async fn graceful_shutdown(handle: ServerHandle) {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let mut sigquit = signal(SignalKind::quit()).unwrap();
+        let mut sigterm = signal(SignalKind::terminate()).unwrap();
+        let mut sigint = signal(SignalKind::interrupt()).unwrap();
+
+        tokio::select! {
+            _ = sigquit.recv() =>  log::info!("SIGQUIT received"),
+            _ = sigterm.recv() =>  log::info!("SIGTERM received"),
+            _ = sigint.recv() =>   log::info!("SIGINT received"),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        use tokio::signal::windows::*;
+
+        let mut sigbreak = ctrl_break().unwrap();
+        let mut sigint = ctrl_c().unwrap();
+        let mut sigquit = ctrl_close().unwrap();
+        let mut sigterm = ctrl_shutdown().unwrap();
+
+        tokio::select! {
+            _ = sigbreak.recv() =>  log::info!("ctrl-break received"),
+            _ = sigquit.recv() =>  log::info!("ctrl-c received"),
+            _ = sigterm.recv() =>  log::info!("ctrl-close received"),
+            _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
+        }
+    }
+    // tokio::signal::ctrl_c().await.unwrap();
+    // println!("ctrl-c received!");
+
+    // offline the node
+    if let Err(e) = cluster::set_offline(true).await {
+        log::error!("set offline failed: {}", e);
+    }
+    log::info!("Node is offline");
+
+    handle.stop(true).await;
 }
 
 /// Setup the tracing related components

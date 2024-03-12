@@ -43,9 +43,12 @@ jobs:
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
       
+      - name: Print rustc cfg
+        run: rustc --print cfg
+
       - name: Setup cargo config
         run: cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
 
       - name: Run unit tests
         run: ./coverage.sh
-       
+      

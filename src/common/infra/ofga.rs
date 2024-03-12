@@ -34,6 +34,8 @@ use crate::service::db;
 
 #[cfg(feature = "enterprise")]
 pub async fn init() {
+    use infra::dist_lock;
+
     let mut migrate_native_objects = false;
     let existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
@@ -45,8 +47,7 @@ pub async fn init() {
     // 1. create a cluster lock
     let mut dist_locker = None;
     if !config::CONFIG.common.local_mode {
-        let mut locker = etcd::Locker::new("/lock/ofga/model/");
-        locker.lock(0).await.expect("Failed to acquire lock");
+        let locker = dist_lock::lock("/ofga/model/", 0).await;
         dist_locker = Some(locker);
     }
     match db::ofga::set_ofga_model(existing_meta).await {
@@ -135,6 +136,8 @@ pub async fn init() {
     }
     // release lock
     if let Some(locker) = dist_locker {
-        locker.unlock().await.expect("Failed to release lock");
+        dist_lock::unlock(&locker)
+            .await
+            .expect("Failed to release lock");
     }
 }

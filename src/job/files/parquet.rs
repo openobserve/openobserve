@@ -35,9 +35,7 @@ use config::{
     },
     FxIndexMap, CONFIG,
 };
-use datafusion::{
-    arrow::json as arrow_json, datasource::MemTable, execution::context::SessionContext, prelude::*,
-};
+use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use infra::{cache, storage};
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task::JoinHandle, time};

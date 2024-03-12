@@ -102,14 +102,8 @@ pub fn string_to_array_v2_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use datafusion::{
-        arrow::{
-            array::StringArray,
-            datatypes::{DataType, Field, Schema},
-            record_batch::RecordBatch,
-        },
+        arrow::{array::StringArray, datatypes::Schema, record_batch::RecordBatch},
         assert_batches_eq,
         datasource::MemTable,
         prelude::SessionContext,
@@ -154,7 +148,7 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         for item in sqls {
-            let df = ctx.sql(&item.0).await.unwrap();
+            let df = ctx.sql(item.0).await.unwrap();
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }

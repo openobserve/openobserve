@@ -20,7 +20,7 @@ use crate::common::meta::telemetry::Telemetry;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let mut interval = time::interval(time::Duration::from_secs(
-        (CONFIG.limit.hb_interval * 60).try_into().unwrap(),
+        (CONFIG.common.telemetry_heartbeat).try_into().unwrap(),
     ));
     interval.tick().await;
     loop {
