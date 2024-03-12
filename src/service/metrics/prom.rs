@@ -47,7 +47,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
         search as search_service,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -89,7 +89,7 @@ pub async fn remote_write(
     let mut accept_record: bool;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
@@ -344,6 +344,7 @@ pub async fn remote_write(
             let schema = metric_schema_map
                 .get(&metric_name)
                 .unwrap()
+                .schema()
                 .clone()
                 .with_metadata(HashMap::new());
             let schema_key = schema.hash_key();
