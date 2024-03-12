@@ -57,7 +57,7 @@ pub async fn get(
     Ok(match db.get(&key).await {
         Err(err) => {
             if !err.to_string().ends_with("does not exist") {
-                log::warn!("get schema from db error: {}, {}", key, err);
+                log::error!("get schema from db error: {}, {}", key, err);
             }
             let r = STREAM_SCHEMAS_LATEST.read().await;
             if let Some(schema) = r.get(map_key) {
