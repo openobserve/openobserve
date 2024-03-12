@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    cmp::max,
     collections::HashMap,
     net::SocketAddr,
     str::FromStr,
@@ -376,10 +377,12 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
+        5,
         CONFIG.limit.keep_alive,
-    )))
-    .client_request_timeout(Duration::from_secs(CONFIG.limit.request_timeout))
+    ))))
+    .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
+    .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
     .bind(haddr)?;
 
     let server = server

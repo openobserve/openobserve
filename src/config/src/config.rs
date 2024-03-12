@@ -523,8 +523,10 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 10)] // seconds
     pub keep_alive: u64,
+    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
