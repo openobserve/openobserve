@@ -187,10 +187,10 @@ impl super::Db for SqliteDb {
     }
 
     async fn get(&self, key: &str) -> Result<Bytes> {
-        let (module, key1, key2 ,key3) = super::parse_key(key);
+        let (module, key1, key2, key3) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3  AND key3 = $4;"#,
+            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3  AND key3 = $4 ORDER BY key3 DESC;"#,
         )
         .bind(module)
         .bind(key1)
@@ -228,7 +228,7 @@ impl super::Db for SqliteDb {
             return Err(e.into());
         }
         if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
+            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
         )
         .bind(&module)
         .bind(&key1)
@@ -295,7 +295,7 @@ impl super::Db for SqliteDb {
             });
         }
 
-        let (module, key1, key2 , key3) = super::parse_key(key);
+        let (module, key1, key2, key3) = super::parse_key(key);
         let sql = if with_prefix {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
@@ -309,11 +309,10 @@ impl super::Db for SqliteDb {
                     r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
                     module, key1, key2
                 )
-            }
-            else {
+            } else {
                 format!(
                     r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%' AND key3 LIKE '{}%';"#,
-                    module, key1, key2 , key3
+                    module, key1, key2, key3
                 )
             }
         } else {
@@ -341,9 +340,10 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-         if !key3.is_empty() {
+        if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
+        sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -352,7 +352,7 @@ impl super::Db for SqliteDb {
             .into_iter()
             .map(|r| {
                 (
-                    super::build_key(&r.module, &r.key1, &r.key2 ,&r.key3),
+                    super::build_key(&r.module, &r.key1, &r.key2, &r.key3),
                     Bytes::from(r.value),
                 )
             })
@@ -374,6 +374,7 @@ impl super::Db for SqliteDb {
         if !key3.is_empty() {
             sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
+        sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -390,7 +391,7 @@ impl super::Db for SqliteDb {
     }
 
     async fn count(&self, prefix: &str) -> Result<i64> {
-        let (module, key1, key2 , key3) = super::parse_key(prefix);
+        let (module, key1, key2, key3) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);

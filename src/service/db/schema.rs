@@ -156,6 +156,60 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
+    println!("set schema: {:?}", schema);
+    if CONFIG.limit.row_per_schema_version_enabled {
+        if min_ts.is_some() {
+            let last_schema = get(org_id, stream_name, stream_type).await?;
+            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+            let db = infra_db::get_db().await;
+            if !last_schema.fields().is_empty() {
+                let mut last_meta = last_schema.metadata().clone();
+                let key = format!(
+                    "/schema/{org_id}/{stream_type}/{stream_name}/{}",
+                    last_meta.get("start_dt").unwrap().clone()
+                );
+                last_meta.insert("end_dt".to_string(), min_ts.to_string());
+                let prev_schema = vec![last_schema.clone().with_metadata(last_meta)];
+                println!("prev_schema: {:?}", prev_schema);
+                let _ = db
+                    .put(
+                        &key,
+                        json::to_vec(&prev_schema).unwrap().into(),
+                        infra_db::NO_NEED_WATCH,
+                    )
+                    .await;
+            }
+
+            let mut metadata = last_schema.metadata().clone();
+            if metadata.contains_key("created_at") {
+                metadata.insert(
+                    "created_at".to_string(),
+                    metadata.get("created_at").unwrap().clone(),
+                );
+            } else {
+                metadata.insert("created_at".to_string(), min_ts.to_string());
+            }
+
+            metadata.insert("start_dt".to_string(), min_ts.to_string());
+
+            let new_schema = vec![schema.to_owned().with_metadata(metadata)];
+
+            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}/{min_ts}");
+            println!("new schema: {:?}", new_schema);
+            let _ = db
+                .put(
+                    &key,
+                    json::to_vec(&new_schema).unwrap().into(),
+                    infra_db::NEED_WATCH,
+                )
+                .await;
+
+            return Ok(());
+        }
+        return Err(anyhow::anyhow!(
+            "Error putting schema: row_per_schema_version_enabled is enabled"
+        ));
+    }
     let db = infra_db::get_db().await;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
@@ -380,6 +434,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if let Some(last) = item_value.last() {
                     let mut sl = STREAM_SCHEMAS_LATEST.write().await;
                     sl.insert(item_key.to_string(), last.clone());
+                    println!("sl: {:?}", sl);
                     drop(sl);
                 }
                 let mut sa = STREAM_SCHEMAS.write().await;

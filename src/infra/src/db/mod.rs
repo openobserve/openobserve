@@ -154,8 +154,14 @@ pub fn parse_key(mut key: &str) -> (String, String, String, String) {
         _ => {
             module = columns[0].to_string();
             key1 = columns[1].to_string();
-            key2 = columns[2].to_string();
-            key3 = columns[3..].join("/");
+            if module.eq("schema") {
+                key2 = format!("{}/{}", columns[2].to_string(), columns[3]);
+                if columns.len() > 4 {
+                    key3 = columns[4].to_string();
+                }
+            } else {
+                key2 = columns[2..].join("/");
+            }
         }
     }
     (module, key1, key2, key3)
@@ -169,7 +175,11 @@ pub fn build_key(module: &str, key1: &str, key2: &str, key3: &str) -> String {
     } else if key3.is_empty() {
         format!("/{module}/{key1}/{key2}")
     } else {
-        format!("/{module}/{key1}/{key2}/{key3}")
+        if module.eq("schema") {
+            format!("/{module}/{key1}/{key2}")
+        } else {
+            format!("/{module}/{key1}/{key2}/{key3}")
+        }
     }
 }
 
