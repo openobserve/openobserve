@@ -80,7 +80,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     for (item_key, item_value) in db.list(key).await? {
         let new_key = item_key.strip_prefix(key).unwrap();
-        if new_key.to_string().split('/').count() < 4 {
+        if new_key.split('/').count() < 4 {
             _ = db.delete(&item_key, false, infra_db::NO_NEED_WATCH).await;
             continue;
         }
@@ -110,8 +110,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Trigger = if config::CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;
-                    let ret = db.get(&ev.key).await?;
-                    json::from_slice(&ret).unwrap()
+                    match db.get(&ev.key).await {
+                        Ok(val) => match json::from_slice(&val) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    }
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };

@@ -16,10 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
-    <div class="flex justify-center" style="height: 150px">
+    <div
+      class="flex justify-center text-center"
+      v-if="config.isEnterprise == 'true' && store.state.zoConfig.custom_logo_text != ''"
+    >
+      <div class="text-h5 text-bold q-pa-none text-centered full-width">
+        {{ store.state.zoConfig.custom_logo_text }}
+      </div>
+
+      <div class="text-caption full-width text-centered"><img :src="getImageURL('images/common/spark-logo-connector.png')" class="q-mt-sm" style="width: 30px" /></div>
+    </div>
+    <div class="flex justify-center q-mb-lg">
       <img
         class="appLogo"
-        style="width: 250px; height: auto"
+        style="height: auto"
+        :style="
+          store.state.zoConfig.custom_logo_text != ''
+            ? 'width: 150px;'
+            : 'width: 250px;'
+        "
         :src="
           store?.state?.theme == 'dark'
             ? getImageURL('images/common/open_observe_logo_2.svg')
@@ -68,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform"
+class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -328,6 +344,7 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      config,
     };
   },
   methods: {

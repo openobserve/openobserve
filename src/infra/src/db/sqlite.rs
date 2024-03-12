@@ -79,7 +79,7 @@ fn connect_ro() -> Pool<Sqlite> {
         .read_only(true);
     SqlitePoolOptions::new()
         .min_connections(CONFIG.limit.cpu_num as u32)
-        .max_connections(CONFIG.limit.cpu_num as u32 * 4)
+        .max_connections(CONFIG.limit.cpu_num as u32 * 2)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
 }

@@ -26,7 +26,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-const MAX_LIMIT: usize = 10000;
+const MAX_LIMIT: usize = 100000;
 const MAX_OFFSET: usize = 100000;
 
 /// parsed sql
@@ -750,10 +750,7 @@ impl TryFrom<&BinaryOperator> for SqlOperator {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::parser::Parser;
-
     use super::*;
-    use crate::common::meta::sql::SqlValue;
 
     #[test]
     fn parse_sql_works() {

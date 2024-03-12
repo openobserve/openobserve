@@ -21,7 +21,9 @@ mod date_format_udf;
 pub mod exec;
 pub mod match_udf;
 pub mod regexp_udf;
+mod rewrite;
 pub mod storage;
+pub mod string_to_array_v2_udf;
 mod time_range_udf;
 mod transform_udf;
 

@@ -48,9 +48,6 @@ pub async fn add_node_to_consistent_hash(node: &Node, role: &Role) {
         let hash = h.sum64(&key);
         nodes.insert(hash, node.uuid.clone());
     }
-    for (k, v) in nodes.iter() {
-        log::debug!("consistent hash[{}] {} {}", role, k, v);
-    }
 }
 
 pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
@@ -65,9 +62,6 @@ pub async fn remove_node_from_consistent_hash(node: &Node, role: &Role) {
         let hash = h.sum64(&key);
         nodes.remove(&hash);
     }
-    for (k, v) in nodes.iter() {
-        log::debug!("consistent hash[{}] {} {}", role, k, v);
-    }
 }
 
 pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<String> {
@@ -81,12 +75,13 @@ pub async fn get_node_from_consistent_hash(key: &str, role: &Role) -> Option<Str
     }
     let hash = config::utils::hash::gxhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
-    loop {
-        if let Some(uuid) = iter.value() {
-            return Some(uuid.clone());
-        };
-        iter.move_next();
+    if let Some((_, uuid)) = iter.next() {
+        return Some(uuid.clone());
     }
+    if let Some((_, uuid)) = nodes.first_key_value() {
+        return Some(uuid.clone());
+    }
+    None
 }
 
 /// Register and keepalive the node to cluster
@@ -157,7 +152,13 @@ pub async fn register() -> Result<()> {
     locker.lock(0).await?;
 
     // 2. get node list
-    let node_list = list_nodes().await?;
+    let node_list = match list_nodes().await {
+        Ok(v) => v,
+        Err(e) => {
+            locker.unlock().await?;
+            return Err(e);
+        }
+    };
 
     // 3. calculate node_id
     let mut node_id = 1;
@@ -219,7 +220,10 @@ pub async fn register() -> Result<()> {
         LOCAL_NODE_KEY_LEASE_ID = id;
     }
     let opt = PutOptions::new().with_lease(id);
-    let _resp = client.put(key, val, Some(opt)).await?;
+    if let Err(e) = client.put(key, val, Some(opt)).await {
+        locker.unlock().await?;
+        return Err(e.into());
+    }
 
     // 5. watch node list
     tokio::task::spawn(async move { watch_node_list().await });
@@ -505,7 +509,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_consistent_hashing() {
         let node = load_local_mode_node();
         for i in 0..10 {
@@ -523,7 +526,7 @@ mod tests {
             add_node_to_consistent_hash(&node_c, &Role::Compactor).await;
         }
 
-        for key in vec!["test", "test1", "test2", "test3"] {
+        for key in ["test", "test1", "test2", "test3"] {
             println!(
                 "{key}-q: {}",
                 get_node_from_consistent_hash(key, &Role::Querier)
@@ -539,28 +542,28 @@ mod tests {
         }
 
         // fnv hash
-        let _data = vec![
+        let _data = [
             ["test", "node-q-8", "node-c-8"],
             ["test1", "node-q-8", "node-c-8"],
             ["test2", "node-q-8", "node-c-8"],
             ["test3", "node-q-8", "node-c-8"],
         ];
         // murmur3 hash
-        let _data = vec![
+        let _data = [
             ["test", "node-q-2", "node-c-3"],
             ["test1", "node-q-5", "node-c-6"],
             ["test2", "node-q-4", "node-c-2"],
             ["test3", "node-q-0", "node-c-3"],
         ];
         // cityhash hash
-        let _data = vec![
+        let _data = [
             ["test", "node-q-6", "node-c-7"],
             ["test1", "node-q-5", "node-c-2"],
             ["test2", "node-q-2", "node-c-4"],
             ["test3", "node-q-2", "node-c-1"],
         ];
         // gxhash hash
-        let data = vec![
+        let data = [
             ["test", "node-q-8", "node-c-0"],
             ["test1", "node-q-9", "node-c-1"],
             ["test2", "node-q-9", "node-c-8"],
@@ -568,11 +571,11 @@ mod tests {
         ];
         for key in data {
             assert_eq!(
-                get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Querier).await,
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Querier).await,
                 Some(key.get(1).unwrap().to_string())
             );
             assert_eq!(
-                get_node_from_consistent_hash(key.get(0).unwrap(), &Role::Compactor).await,
+                get_node_from_consistent_hash(key.first().unwrap(), &Role::Compactor).await,
                 Some(key.get(2).unwrap().to_string())
             );
         }

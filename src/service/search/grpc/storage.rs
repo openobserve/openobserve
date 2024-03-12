@@ -204,33 +204,31 @@ pub async fn search(
         };
         // cacluate the diff between latest schema and group schema
         let mut diff_fields = HashMap::new();
-        if CONFIG.common.widening_schema_evolution && ver != schema_latest_id {
-            let group_fields = schema.fields();
-            for field in group_fields {
-                if let Ok(v) = schema_latest.field_with_name(field.name()) {
-                    if v.data_type() != field.data_type() {
-                        diff_fields.insert(v.name().clone(), v.data_type().clone());
-                    }
+        let group_fields = schema.fields();
+        for field in group_fields {
+            if let Ok(v) = schema_latest.field_with_name(field.name()) {
+                if v.data_type() != field.data_type() {
+                    diff_fields.insert(v.name().clone(), v.data_type().clone());
                 }
             }
-            for (field, alias) in sql.meta.field_alias.iter() {
-                if let Some(v) = diff_fields.get(field) {
-                    diff_fields.insert(alias.to_string(), v.clone());
+        }
+        for (field, alias) in sql.meta.field_alias.iter() {
+            if let Some(v) = diff_fields.get(field) {
+                diff_fields.insert(alias.to_string(), v.clone());
+            }
+        }
+        // add not exists field for wal infered schema
+        let mut new_fields = Vec::new();
+        for field in sql.meta.fields.iter() {
+            if schema.field_with_name(field).is_err() {
+                if let Ok(field) = schema_latest.field_with_name(field) {
+                    new_fields.push(Arc::new(field.clone()));
                 }
             }
-            // add not exists field for wal infered schema
-            let mut new_fields = Vec::new();
-            for field in sql.meta.fields.iter() {
-                if schema.field_with_name(field).is_err() {
-                    if let Ok(field) = schema_latest.field_with_name(field) {
-                        new_fields.push(field.clone());
-                    }
-                }
-            }
-            if !new_fields.is_empty() {
-                let new_schema = Schema::new(new_fields);
-                schema = Schema::try_merge(vec![schema, new_schema])?;
-            }
+        }
+        if !new_fields.is_empty() {
+            let new_schema = Schema::new(new_fields);
+            schema = Schema::try_merge(vec![schema, new_schema])?;
         }
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",

@@ -326,7 +326,7 @@ pub async fn remote_write(
             let value_str = config::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
-            if schema_evolved.get(&metric_name).is_none()
+            if !schema_evolved.contains_key(&metric_name)
                 && check_for_schema(
                     org_id,
                     &metric_name,
