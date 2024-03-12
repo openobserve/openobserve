@@ -21,7 +21,7 @@ use regex::Regex;
 
 use crate::{
     common::{
-        infra::config::SYSLOG_ENABLED,
+        infra::config::{STREAM_SCHEMAS_LATEST, SYSLOG_ENABLED},
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
     service::{compact::stats::update_stats_from_file_list, db, users},
@@ -130,6 +130,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::metrics::cache_prom_cluster_leader()
         .await
         .expect("prom cluster leader cache failed");
+
+    // check ingester wal
+    // Why here, because we need to cache the schema first
+    let latest_schema = STREAM_SCHEMAS_LATEST.read().await.clone();
+    ingester::init(latest_schema)
+        .await
+        .expect("ingester init failed");
 
     // cache alerts
     db::alerts::templates::cache()

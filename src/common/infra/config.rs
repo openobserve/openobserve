@@ -15,9 +15,9 @@
 
 use std::sync::Arc;
 
+use arrow_schema::Schema;
 use config::{RwAHashMap, RwAHashSet, RwHashMap};
 use dashmap::DashMap;
-use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;

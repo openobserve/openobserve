@@ -56,7 +56,9 @@ pub async fn get(
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
         Err(err) => {
-            log::warn!("Schema doesn't exist: {} {}", key, err);
+            if !err.to_string().ends_with("does not exist") {
+                log::warn!("get schema {}, db error: {}", key, err);
+            }
             let r = STREAM_SCHEMAS_LATEST.read().await;
             if let Some(schema) = r.get(map_key) {
                 return Ok(schema.clone());
