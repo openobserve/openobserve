@@ -77,8 +77,6 @@ mod tests {
         // init infra
         infra::init().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
-        // ingester init
-        ingester::init().await.unwrap();
         // init job
         openobserve::job::init().await.unwrap();
 
