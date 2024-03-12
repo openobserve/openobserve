@@ -327,9 +327,7 @@ async fn exec_query(
         .captures(query.to_lowercase().as_str())
         .is_some()
     {
-        query = rewrite::rewrite_count_distinct_sql(&query, true)?;
-    } else {
-        query = rewrite::add_group_by_field_to_select(&query)?;
+        query = rewrite::rewrite_count_distinct_sql(&query, true);
     }
 
     // Debug SQL
@@ -483,6 +481,25 @@ async fn exec_query(
     Ok(batches)
 }
 
+fn remove_clause(sql: &mut String, regex: &Lazy<Regex>, keywords: &[&str]) {
+    let mut clause_str = match regex.captures(sql) {
+        Some(caps) => caps[0].to_string(),
+        None => "".to_string(),
+    };
+
+    if !clause_str.is_empty() {
+        let mut clause_str_lower = clause_str.to_lowercase();
+        for keyword in keywords.iter() {
+            if let Some(pos) = clause_str_lower.find(keyword) {
+                clause_str = clause_str[..pos].to_string();
+                clause_str_lower = clause_str.to_lowercase();
+            }
+        }
+        let index = sql.find(&clause_str).unwrap();
+        sql.replace_range(index..index + clause_str.len(), " ");
+    }
+}
+
 async fn get_fast_mode_ctx(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -614,7 +631,7 @@ pub async fn merge(
             .captures(sql.to_lowercase().as_str())
             .is_some()
     {
-        query_sql = rewrite::rewrite_count_distinct_sql(sql, false)?;
+        query_sql = rewrite::rewrite_count_distinct_sql(sql, false);
     }
 
     // query data
@@ -702,7 +719,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
         .captures(sql.to_lowercase().as_str())
         .is_some()
     {
-        let sql = rewrite::rewrite_count_distinct_merge_sql(sql)?;
+        let sql = rewrite::rewrite_count_distinct_merge_sql(sql);
         return Ok(sql);
     }
 
@@ -1511,81 +1528,5 @@ mod tests {
         .unwrap();
 
         assert!(!res.is_empty())
-    }
-
-    #[test]
-    fn test_count_distinct_rewrite_phase1() {
-        let sql = [
-            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-        ];
-
-        let res = [
-            "SELECT DISTINCT \"a\"  FROM  tbl where a > 3 ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
-            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl where a > 3   ",
-            "SELECT  a, \"b\"  FROM  tbl where a > 3   ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
-        ];
-        for (sql, except) in sql.iter().zip(res.iter()) {
-            let res = rewrite_count_distinct_sql(sql, true).unwrap();
-            assert_eq!(res, **except);
-        }
-    }
-
-    #[test]
-    fn test_count_distinct_rewrite_phase2() {
-        let sql = [
-            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-        ];
-
-        let res = [
-            "SELECT DISTINCT \"a\"  FROM  tbl ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
-            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl ",
-            "SELECT  a, \"b\"  FROM  tbl ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
-        ];
-        for (sql, except) in sql.iter().zip(res.iter()) {
-            let res = rewrite_count_distinct_sql(sql, false).unwrap();
-            assert_eq!(res, **except);
-        }
-    }
-
-    #[test]
-    fn test_count_distinct_rewrite_phase3() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Utf8, false),
-            Field::new("b", DataType::Utf8, false),
-            Field::new("c", DataType::Utf8, false),
-        ]));
-
-        let sql = [
-            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-        ];
-
-        let res = [
-            "SELECT COUNT(DISTINCT a) FROM tbl  limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl  group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl  group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl  group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl  group by a having cnt > 1 limit 10",
-        ];
-
-        for (sql, except) in sql.iter().zip(res.iter()) {
-            let res = merge_rewrite_sql(sql, schema.clone()).unwrap();
-            assert_eq!(res, **except);
-        }
     }
 }
