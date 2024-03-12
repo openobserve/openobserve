@@ -2,14 +2,14 @@ const units: any = {
   bytes: [
     { unit: "B", divisor: 1 },
     { unit: "KB", divisor: 1024 },
-    { unit: "MB", divisor: 1024 * 1024 },
-    { unit: "GB", divisor: 1024 * 1024 * 1024 },
-    { unit: "TB", divisor: 1024 * 1024 * 1024 * 1024 },
-    { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
+    { unit: "MB", divisor: 1024 ** 2 },
+    { unit: "GB", divisor: 1024 ** 3 },
+    { unit: "TB", divisor: 1024 ** 4 },
+    { unit: "PB", divisor: 1024 ** 5 },
   ],
   seconds: [
-    { unit: "μs", divisor: 0.000001 },
-    { unit: "ms", divisor: 0.001 },
+    { unit: "μs", divisor: 1e-6 },
+    { unit: "ms", divisor: 1e-3 },
     { unit: "s", divisor: 1 },
     { unit: "m", divisor: 60 },
     { unit: "h", divisor: 3600 },
@@ -19,40 +19,47 @@ const units: any = {
   ],
   microseconds: [
     { unit: "μs", divisor: 1 },
-    { unit: "ms", divisor: 1000 },
-    { unit: "s", divisor: 1000000 },
-    { unit: "m", divisor: 60000000 },
-    { unit: "h", divisor: 3600000000 },
-    { unit: "D", divisor: 86400000000 },
-    { unit: "M", divisor: 2592000000000 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536000000000 }, // Assuming 365 days in a year
+    { unit: "ms", divisor: 1e3 },
+    { unit: "s", divisor: 1e6 },
+    { unit: "m", divisor: 6e7 },
+    { unit: "h", divisor: 36e8 },
+    { unit: "D", divisor: 864e8 },
+    { unit: "M", divisor: 2592e9 }, // Assuming 30 days in a month
+    { unit: "Y", divisor: 31536e9 }, // Assuming 365 days in a year
   ],
   milliseconds: [
-    { unit: "μs", divisor: 0.001 },
+    { unit: "μs", divisor: 1e-3 },
     { unit: "ms", divisor: 1 },
-    { unit: "s", divisor: 1000 },
-    { unit: "m", divisor: 60000 },
-    { unit: "h", divisor: 3600000 },
-    { unit: "D", divisor: 86400000 },
-    { unit: "M", divisor: 2592000000 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536000000 }, // Assuming 365 days in a year
+    { unit: "s", divisor: 1e3 },
+    { unit: "m", divisor: 6e4 },
+    { unit: "h", divisor: 36e5 },
+    { unit: "D", divisor: 864e5 },
+    { unit: "M", divisor: 2592e6 }, // Assuming 30 days in a month
+    { unit: "Y", divisor: 31536e6 }, // Assuming 365 days in a year
   ],
-  bps: ["B", "KB", "MB", "GB", "TB"],
+  bps: [
+    { unit: "B/s", divisor: 1 },
+    { unit: "KB/s", divisor: 1024 },
+    { unit: "MB/s", divisor: 1024 ** 2 },
+    { unit: "GB/s", divisor: 1024 ** 3 },
+    { unit: "TB/s", divisor: 1024 ** 4 },
+    { unit: "PB/s", divisor: 1024 ** 5 },
+  ],
   kilobytes: [
     { unit: "B", divisor: 1 / 1024 },
     { unit: "KB", divisor: 1 },
     { unit: "MB", divisor: 1024 },
-    { unit: "GB", divisor: 1024 * 1024 },
-    { unit: "TB", divisor: 1024 * 1024 * 1024 },
-    { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 },
+    { unit: "GB", divisor: 1024 ** 2 },
+    { unit: "TB", divisor: 1024 ** 3 },
+    { unit: "PB", divisor: 1024 ** 4 },
   ],
   megabytes: [
-    { unit: "B", divisor: 1 / (1024 * 1024) },
+    { unit: "B", divisor: 1 / 1024 ** 2 },
     { unit: "KB", divisor: 1 / 1024 },
     { unit: "MB", divisor: 1 },
     { unit: "GB", divisor: 1024 },
-    { unit: "TB", divisor: 1024 * 1024 },
-    { unit: "PB", divisor: 1024 * 1024 * 1024 },
+    { unit: "TB", divisor: 1024 ** 2 },
+    { unit: "PB", divisor: 1024 ** 3 },
   ],
 };
 
@@ -70,223 +77,61 @@ export const getUnitValue = (
   customUnit: string,
   decimals: number = 2
 ) => {
-  // console.time("convertDataIntoUnitValue:getUnitValue");
-  switch (unit) {
-    case "bytes": {
-      for (let unitInfo of units[unit]) {
-        const unitValue: any = value ? value / unitInfo.divisor : 0;
+  console.time("convertPromQLData");
+  // value sign: positive = 1, negative = -1
+  const sign = Math.sign(value);
+  // abs value
+  const absValue = Math.abs(value);
 
-        if (Math.abs(unitValue) < 1024) {
-          return {
-            value: `${value < 0 ? "-" : ""}${
-              parseFloat(Math.abs(unitValue)?.toString()).toFixed(decimals) ?? 0
-            }`,
-            unit: unitInfo.unit,
-          };
-        }
+  switch (unit) {
+    case "bytes":
+    case "seconds":
+    case "microseconds":
+    case "milliseconds":
+    case "kilobytes":
+    case "bps":
+    case "megabytes": {
+      // start with last index
+      let unitIndex = units[unit].length - 1;
+      // while the value is smaller than the divisor
+      while (unitIndex > 0 && absValue < units[unit][unitIndex].divisor) {
+        unitIndex--;
       }
 
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+      // calculate the final value: sign * absValue / divisor
+      const finalValue = (
+        (sign * absValue) /
+        units[unit][unitIndex].divisor
+      ).toFixed(decimals);
+      const finalUnit = units[unit][unitIndex].unit;
 
-      // Handle both positive and negative values for PB
-      const absValue: any = Math.abs(value)
-        ? Math.abs(value / units[unit][units[unit].length - 1].divisor)
-        : 0;
-      return {
-        value: `${value < 0 ? "-" : ""}${
-          parseFloat(absValue).toFixed(decimals) ?? 0
-        }`,
-        unit: "PB",
-      };
+      console.timeEnd("convertPromQLData");
+      return { value: finalValue, unit: finalUnit };
     }
     case "custom": {
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
+      console.timeEnd("convertPromQLData");
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: `${customUnit ?? ""}`,
       };
     }
-    case "seconds": {
-      for (let i = units[unit].length - 1; i >= 0; i--) {
-        const unitInfo = units[unit][i];
-        const unitValue = value / unitInfo.divisor;
-        if (Math.abs(unitValue) >= 1) {
-          return {
-            value: `${value < 0 ? "-" : ""}${parseFloat(
-              Math.abs(unitValue)?.toFixed(decimals) ?? 0
-            )}`,
-            unit: unitInfo.unit,
-          };
-        }
-      }
-
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      // If the value is too small to fit in any unit, return in microseconds
-      return {
-        value: `${value < 0 ? "-" : ""}${parseFloat(
-          Math.abs(value / units[unit][0].divisor)?.toFixed(decimals) ?? 0
-        )}`,
-        unit: units[unit][0].unit,
-      };
-    }
-
-    case "microseconds": {
-      for (let i = units[unit].length - 1; i >= 0; i--) {
-        const unitInfo = units[unit][i];
-        const unitValue = value / unitInfo.divisor;
-        if (Math.abs(unitValue) >= 1) {
-          return {
-            value: `${value < 0 ? "-" : ""}${parseFloat(
-              Math.abs(unitValue)?.toFixed(decimals) ?? 0
-            )}`,
-            unit: unitInfo.unit,
-          };
-        }
-      }
-
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      // If the value is too small to fit in any unit, return in microseconds
-      return {
-        value: `${value < 0 ? "-" : ""}${parseFloat(
-          Math.abs(value / units[unit][0].divisor)?.toFixed(decimals) ?? 0
-        )}`,
-        unit: units[unit][0].unit,
-      };
-    }
-
-    case "milliseconds": {
-      for (let i = units[unit].length - 1; i >= 0; i--) {
-        const unitInfo = units[unit][i];
-        const unitValue = value / unitInfo.divisor;
-        if (Math.abs(unitValue) >= 1) {
-          return {
-            value: `${value < 0 ? "-" : ""}${parseFloat(
-              Math.abs(unitValue)?.toFixed(decimals) ?? 0
-            )}`,
-            unit: unitInfo.unit,
-          };
-        }
-      }
-
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      // If the value is too small to fit in any unit, return in microseconds
-      return {
-        value: `${value < 0 ? "-" : ""}${parseFloat(
-          Math.abs(value / units[unit][0].divisor)?.toFixed(decimals) ?? 0
-        )}`,
-        unit: units[unit][0].unit,
-      };
-    }
-    case "bps": {
-      for (let unitInfo of units[unit]) {
-        const absValue: any = Math.abs(value);
-
-        if (absValue < 1024) {
-          return {
-            value: `${value < 0 ? "-" : ""}${
-              parseFloat(absValue)?.toFixed(decimals) ?? 0
-            }`,
-            unit: `${unitInfo}/s`,
-          };
-        }
-        value /= 1024;
-      }
-
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      // Handle both positive and negative values for PB/s
-      return {
-        value: `${value < 0 ? "-" : ""}${
-          parseFloat(Math.abs(value)?.toString())?.toFixed(decimals) ?? 0
-        }`,
-        unit: "PB/s",
-      };
-    }
     case "percent-1": {
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
+      console.timeEnd("convertPromQLData");
       return {
         value: `${(parseFloat(value) * 100)?.toFixed(decimals) ?? 0}`,
         unit: "%",
       };
-      // `${parseFloat(value) * 100}`;
     }
     case "percent": {
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
+      console.timeEnd("convertPromQLData");
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: "%",
       };
-      // ${parseFloat(value)}`;
     }
-    case "kilobytes": {
-      for (let unitInfo of units[unit]) {
-        const unitValue: any = value ? value / unitInfo.divisor : 0;
-
-        if (Math.abs(unitValue) < 1024) {
-          return {
-            value: `${value < 0 ? "-" : ""}${
-              parseFloat(Math.abs(unitValue)?.toString())?.toFixed(decimals) ??
-              0
-            }`,
-            unit: unitInfo.unit,
-          };
-        }
-      }
-      const val: any = Math.abs(value)
-        ? Math.abs(value / units[unit][units[unit].length - 1].divisor)
-        : 0;
-
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      return {
-        value: `${value < 0 ? "-" : ""}${
-          parseFloat(val)?.toFixed(decimals) ?? 0
-        }`,
-        unit: "PB",
-      };
-    }
-    case "megabytes": {
-      for (let unitInfo of units[unit]) {
-        const unitValue: any = value ? value / unitInfo.divisor : 0;
-        if (Math.abs(unitValue) < 1024) {
-          return {
-            value: `${value < 0 ? "-" : ""}${
-              parseFloat(Math.abs(unitValue)?.toString())?.toFixed(decimals) ??
-              0
-            }`,
-            unit: unitInfo.unit,
-          };
-        }
-      }
-      const val: any = Math.abs(value)
-        ? Math.abs(value / units[unit][units[unit].length - 1].divisor)
-        : 0;
-
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      return {
-        value: `${value < 0 ? "-" : ""}${
-          parseFloat(val)?.toFixed(decimals) ?? 0
-        }`,
-        unit: "PB",
-      };
-    }
-    case "default": {
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
-      return {
-        value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
-        unit: "",
-      };
-    }
+    case "default":
     default: {
-      // console.timeEnd("convertDataIntoUnitValue:getUnitValue");
-
+      console.timeEnd("convertPromQLData");
       return {
         value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",
