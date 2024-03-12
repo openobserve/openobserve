@@ -99,8 +99,9 @@ impl super::Db for PostgresDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, created_at: i64) -> Result<()> {
         let (module, key1, key2, key3) = super::parse_key(key);
+        key3 = UTC.now().timestamp().to_string();
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
@@ -147,7 +148,9 @@ impl super::Db for PostgresDb {
                 key.to_string()
             };
             let cluster_coordinator = super::get_coordinator().await;
-            cluster_coordinator.put(&key, Bytes::from(""), true).await?;
+            cluster_coordinator
+                .put(&key, Bytes::from(""), true, created_at)
+                .await?;
         }
 
         Ok(())
