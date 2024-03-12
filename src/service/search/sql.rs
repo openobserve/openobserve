@@ -786,7 +786,10 @@ pub(crate) fn generate_quick_mode_fields(
                 );
             }
             None => {
-                log::debug!("[QUICK_MODE] stream {}, file_list schema fields: NONE", stream_key);
+                log::debug!(
+                    "[QUICK_MODE] stream {}, file_list schema fields: NONE",
+                    stream_key
+                );
             }
         }
         log::debug!(
