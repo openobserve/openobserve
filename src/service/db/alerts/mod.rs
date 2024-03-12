@@ -68,6 +68,7 @@ pub async fn set(
             &key,
             json::to_vec(alert).unwrap().into(),
             infra_db::NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
         )
         .await
     {
@@ -252,6 +253,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         &item_key,
                         json::to_vec(&alert).unwrap().into(),
                         infra_db::NO_NEED_WATCH,
+                        chrono::Utc::now().timestamp_micros(),
                     )
                     .await;
                 alert

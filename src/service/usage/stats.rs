@@ -280,15 +280,26 @@ pub async fn set_last_stats_offset(
         offset.to_string()
     };
     let key = format!("/stats/last_updated/org/{org_id}");
-    db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?;
+    db.put(
+        &key,
+        val.into(),
+        infra_db::NO_NEED_WATCH,
+        chrono::Utc::now().timestamp_micros(),
+    )
+    .await?;
     Ok(())
 }
 
 pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = "/stats/cache_expiry".to_string();
-    db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
-        .await?;
+    db.put(
+        &key,
+        offset.to_string().into(),
+        infra_db::NO_NEED_WATCH,
+        chrono::Utc::now().timestamp_micros(),
+    )
+    .await?;
     Ok(())
 }
 

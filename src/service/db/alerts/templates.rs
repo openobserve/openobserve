@@ -53,6 +53,7 @@ pub async fn set(org_id: &str, template: &mut Template) -> Result<(), anyhow::Er
             &key,
             json::to_vec(template).unwrap().into(),
             infra_db::NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
         )
         .await?)
 }

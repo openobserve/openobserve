@@ -75,19 +75,14 @@ impl super::Db for MysqlDb {
     }
 
     async fn get(&self, key: &str) -> Result<Bytes> {
-        let (module, key1, key2, key3) = super::parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let query = if module.eq("schema") {
-            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ? ORDER BY key3 DESC;"#
-        } else {
-            r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;"#
-        };
+        let query = r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY key3 DESC;"#;
 
         let value: String = match sqlx::query_scalar(query)
             .bind(module)
             .bind(key1)
             .bind(key2)
-            .bind(key3)
             .fetch_one(&pool)
             .await
         {
@@ -100,7 +95,7 @@ impl super::Db for MysqlDb {
     }
 
     async fn put(&self, key: &str, value: Bytes, need_watch: bool, created_at: i64) -> Result<()> {
-        let (module, key1, key2, key3) = super::parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
@@ -109,7 +104,7 @@ impl super::Db for MysqlDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&key3)
+        .bind(&created_at)
         .execute(&mut *tx)
         .await
         {
@@ -125,7 +120,7 @@ impl super::Db for MysqlDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&key3)
+        .bind(&created_at)
         .execute(&mut *tx)
         .await
         {
@@ -169,7 +164,7 @@ impl super::Db for MysqlDb {
             });
         }
 
-        let (module, key1, key2, key3) = super::parse_key(key);
+        let (module, key1, key2) = super::parse_key(key);
         let sql = if with_prefix {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
@@ -178,21 +173,16 @@ impl super::Db for MysqlDb {
                     r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
                     module, key1
                 )
-            } else if key3.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
-                    module, key1, key2
-                )
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' AND key3 = '{}';"#,
-                    module, key1, key2, key3
+                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 LIKE '{}%';"#,
+                    module, key1, key2
                 )
             }
         } else {
             format!(
-                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' AND key3 = '{}';"#,
-                module, key1, key2, key3
+                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
+                module, key1, key2
             )
         };
         let pool = CLIENT.clone();
@@ -202,7 +192,7 @@ impl super::Db for MysqlDb {
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
-        let (module, key1, key2, key3) = super::parse_key(prefix);
+        let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT module, key1, key2, key3, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
@@ -213,9 +203,6 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 = '{}'", sql, key2);
         }
-        if !key3.is_empty() {
-            sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
-        }
         sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -225,7 +212,7 @@ impl super::Db for MysqlDb {
             .into_iter()
             .map(|r| {
                 (
-                    super::build_key(&r.module, &r.key1, &r.key2, &r.key3),
+                    super::build_key(&r.module, &r.key1, &r.key2),
                     Bytes::from(r.value),
                 )
             })
@@ -233,7 +220,7 @@ impl super::Db for MysqlDb {
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
-        let (module, key1, key2, key3) = super::parse_key(prefix);
+        let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT module, key1, key2, key3, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
@@ -244,9 +231,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 = '{}'", sql, key2);
         }
-        if !key3.is_empty() {
-            sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
-        }
+
         sql = format!("{} ORDER BY key3 DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -254,7 +239,7 @@ impl super::Db for MysqlDb {
             .await?;
         Ok(ret
             .into_iter()
-            .map(|r| format!("/{}/{}/{}/{}", r.module, r.key1, r.key2, r.key3))
+            .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
             .collect())
     }
 
@@ -264,7 +249,7 @@ impl super::Db for MysqlDb {
     }
 
     async fn count(&self, prefix: &str) -> Result<i64> {
-        let (module, key1, key2, key3) = super::parse_key(prefix);
+        let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
@@ -274,9 +259,6 @@ impl super::Db for MysqlDb {
         }
         if !key2.is_empty() {
             sql = format!("{} AND key2 = '{}'", sql, key2);
-        }
-        if !key3.is_empty() {
-            sql = format!("{} AND key3 LIKE '{}%'", sql, key3);
         }
         let pool = CLIENT.clone();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
@@ -304,7 +286,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
-    key3    VARCHAR(256) not null,
+    key3    BIGINT not null,
     value   LONGTEXT not null
 );
         "#,
@@ -325,8 +307,8 @@ CREATE TABLE IF NOT EXISTS meta
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
-    create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
-        .await?;
+    // create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
+    //     .await?;
     create_index_item(
         "CREATE UNIQUE INDEX meta_module_key3_idx on meta (key3, key2, key1, module);",
     )

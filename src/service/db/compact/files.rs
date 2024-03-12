@@ -74,8 +74,13 @@ pub async fn set_offset(
     let Some(node) = node else {
         // release this key from this node
         let db = infra_db::get_db().await;
-        db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
-            .await?;
+        db.put(
+            &key,
+            offset.to_string().into(),
+            infra_db::NO_NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await?;
         let mut w = CACHES.write().await;
         w.remove(&key);
         drop(w);
@@ -133,7 +138,13 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
             } else {
                 offset.to_string()
             };
-            db.put(key, val.into(), infra_db::NO_NEED_WATCH).await?;
+            db.put(
+                key,
+                val.into(),
+                infra_db::NO_NEED_WATCH,
+                chrono::Utc::now().timestamp_micros(),
+            )
+            .await?;
         }
     }
     Ok(())

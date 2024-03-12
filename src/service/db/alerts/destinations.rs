@@ -42,6 +42,7 @@ pub async fn set(org_id: &str, destination: &Destination) -> Result<(), anyhow::
             &key,
             json::to_vec(destination).unwrap().into(),
             infra_db::NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
         )
         .await?)
 }

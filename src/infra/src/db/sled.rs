@@ -75,7 +75,13 @@ impl super::Db for SledDb {
         }
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        _created_at: i64,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         client.insert(key.as_str(), value.to_vec())?;

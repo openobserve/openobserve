@@ -119,16 +119,15 @@ pub trait Db: Sync + Send + 'static {
     async fn close(&self) -> Result<()>;
 }
 
-pub fn parse_key(mut key: &str) -> (String, String, String, String) {
+pub fn parse_key(mut key: &str) -> (String, String, String) {
     let mut module = "".to_string();
     let mut key1 = "".to_string();
     let mut key2 = "".to_string();
-    let mut key3 = "".to_string();
     if key.starts_with('/') {
         key = &key[1..];
     }
     if key.is_empty() {
-        return (module, key1, key2, key3);
+        return (module, key1, key2);
     }
     let columns = key.split('/').collect::<Vec<&str>>();
     match columns.len() {
@@ -145,41 +144,22 @@ pub fn parse_key(mut key: &str) -> (String, String, String, String) {
             key1 = columns[1].to_string();
             key2 = columns[2].to_string();
         }
-        4 => {
-            module = columns[0].to_string();
-            key1 = columns[1].to_string();
-            key2 = columns[2].to_string();
-            key3 = columns[3..].join("/");
-        }
         _ => {
             module = columns[0].to_string();
             key1 = columns[1].to_string();
-            if module.eq("schema") {
-                key2 = format!("{}/{}", columns[2].to_string(), columns[3]);
-                if columns.len() > 4 {
-                    key3 = columns[4].to_string();
-                }
-            } else {
-                key2 = columns[2..].join("/");
-            }
+            key2 = columns[2..].join("/");
         }
     }
-    (module, key1, key2, key3)
+    (module, key1, key2)
 }
 
-pub fn build_key(module: &str, key1: &str, key2: &str, key3: &str) -> String {
+pub fn build_key(module: &str, key1: &str, key2: &str) -> String {
     if key1.is_empty() {
         format!("/{module}/")
     } else if key2.is_empty() {
         format!("/{module}/{key1}")
-    } else if key3.is_empty() {
-        format!("/{module}/{key1}/{key2}")
     } else {
-        if module.eq("schema") {
-            format!("/{module}/{key1}/{key2}")
-        } else {
-            format!("/{module}/{key1}/{key2}/{key3}")
-        }
+        format!("/{module}/{key1}/{key2}")
     }
 }
 
@@ -207,7 +187,6 @@ pub struct MetaRecord {
     pub module: String,
     pub key1: String,
     pub key2: String,
-    pub key3: String,
     pub value: String,
 }
 

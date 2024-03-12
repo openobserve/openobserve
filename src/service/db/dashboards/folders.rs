@@ -30,7 +30,12 @@ pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::
     let key = format!("/folders/{org_id}/{}", folder.folder_id);
     let db = infra_db::get_db().await;
     match db
-        .put(&key, json::to_vec(&folder)?.into(), infra_db::NO_NEED_WATCH)
+        .put(
+            &key,
+            json::to_vec(&folder)?.into(),
+            infra_db::NO_NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
         .await
     {
         Ok(_) => Ok(folder),

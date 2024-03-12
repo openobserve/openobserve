@@ -147,7 +147,15 @@ async fn register() -> Result<()> {
 
     // 6. register node to cluster
     let client = get_coordinator().await;
-    if let Err(e) = client.put(&key, val.into(), NEED_WATCH).await {
+    if let Err(e) = client
+        .put(
+            &key,
+            val.into(),
+            NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await
+    {
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(format!("register node error: {}", e)));
     }
@@ -197,7 +205,15 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
 
     let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
     let client = get_coordinator().await;
-    if let Err(e) = client.put(&key, val.into(), NEED_WATCH).await {
+    if let Err(e) = client
+        .put(
+            &key,
+            val.into(),
+            NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await
+    {
         return Err(Error::Message(format!("online node error: {}", e)));
     }
 
@@ -219,7 +235,15 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
     let val = json::to_vec(&node).unwrap();
     let client = get_coordinator().await;
-    if let Err(e) = client.put(&key, val.into(), NEED_WATCH).await {
+    if let Err(e) = client
+        .put(
+            &key,
+            val.into(),
+            NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
+        )
+        .await
+    {
         return Err(Error::Message(format!("update node error: {}", e)));
     }
     Ok(())

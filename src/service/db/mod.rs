@@ -49,6 +49,7 @@ pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
             key,
             json::to_vec(&id).unwrap().into(),
             infra_db::NO_NEED_WATCH,
+            chrono::Utc::now().timestamp_micros(),
         )
         .await
     {

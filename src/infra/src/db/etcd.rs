@@ -105,7 +105,13 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool, created_at: i64) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        _created_at: i64,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
@@ -518,15 +524,15 @@ mod tests {
         }
         let client = Etcd::default();
         client
-            .put("/test/count/1", bytes::Bytes::from("1"), false,0)
+            .put("/test/count/1", bytes::Bytes::from("1"), false, 0)
             .await
             .unwrap();
         client
-            .put("/test/count/2", bytes::Bytes::from("2"), false,0)
+            .put("/test/count/2", bytes::Bytes::from("2"), false, 0)
             .await
             .unwrap();
         client
-            .put("/test/count/3", bytes::Bytes::from("3"), false,0)
+            .put("/test/count/3", bytes::Bytes::from("3"), false, 0)
             .await
             .unwrap();
         let count = client.count("/test/count").await.unwrap();
