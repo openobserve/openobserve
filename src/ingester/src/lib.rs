@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use arrow_schema::Schema;
-use hashbrown::HashMap;
-
 mod entry;
 pub mod errors;
 mod immutable;
@@ -30,12 +27,12 @@ pub use entry::Entry;
 pub use immutable::read_from_immutable;
 pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
 
-pub async fn init(latest_schemas: HashMap<String, Schema>) -> errors::Result<()> {
+pub async fn init() -> errors::Result<()> {
     // check uncompleted parquet files, need delete those files
     wal::check_uncompleted_parquet_files().await?;
 
     // replay wal files to create immutable
-    wal::replay_wal_files(latest_schemas).await?;
+    wal::replay_wal_files().await?;
 
     // start a job to dump immutable data to disk
     tokio::task::spawn(async move {

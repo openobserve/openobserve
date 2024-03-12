@@ -20,9 +20,7 @@ use std::{
     sync::Arc,
 };
 
-use arrow_schema::Schema;
 use config::{utils::schema::infer_json_schema_from_values, CONFIG};
-use hashbrown::HashMap;
 use snafu::ResultExt;
 
 use crate::{errors::*, immutable, memtable, writer::WriterKey};
@@ -101,7 +99,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 }
 
 // replay wal files to create immutable
-pub(crate) async fn replay_wal_files(latest_schemas: HashMap<String, Schema>) -> Result<()> {
+pub(crate) async fn replay_wal_files() -> Result<()> {
     let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
@@ -110,8 +108,6 @@ pub(crate) async fn replay_wal_files(latest_schemas: HashMap<String, Schema>) ->
     if wal_files.is_empty() {
         return Ok(());
     }
-
-    let mut schema_map: HashMap<String, Arc<Schema>> = HashMap::new();
     for wal_file in wal_files.iter() {
         log::warn!("starting replay wal file: {:?}", wal_file);
         let file_str = wal_file.to_string_lossy().to_string();
@@ -182,32 +178,10 @@ pub(crate) async fn replay_wal_files(latest_schemas: HashMap<String, Schema>) ->
             };
             i += 1;
             total += entry.data.len();
-            // check schema
-            let schema_key = format!("{}/{}/{}", org_id, stream_type, entry.stream);
-            let cache_key = format!("{}/{}", schema_key, entry.schema_key);
-            if !schema_map.contains_key(&cache_key) {
-                let latest_schema = match latest_schemas.get(&schema_key) {
-                    Some(v) => v.clone(),
-                    None => Schema::empty(),
-                };
-                let infer_schema =
-                    infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
-                        .context(InferJsonSchemaSnafu)?;
-                let schema = match Schema::try_merge([latest_schema, infer_schema.clone()]) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "Unable to merge schema for {}, use the infer schema, error: {}",
-                            schema_key,
-                            e
-                        );
-                        infer_schema
-                    }
-                };
-                schema_map.insert(cache_key.clone(), Arc::new(schema));
-            };
-            let schema = schema_map.get(&cache_key).unwrap().clone();
-            memtable.write(schema, entry).await?;
+            let infer_schema =
+                infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
+                    .context(InferJsonSchemaSnafu)?;
+            memtable.write(Arc::new(infer_schema), entry).await?;
         }
         log::warn!(
             "replay wal file: {:?}, entries: {}, records: {}",
