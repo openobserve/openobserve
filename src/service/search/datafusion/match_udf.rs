@@ -18,16 +18,15 @@ use std::sync::Arc;
 use config::utils::str;
 use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanArray},
+        array::{ArrayRef, BooleanArray, StringArray},
         datatypes::DataType,
     },
-    common::cast::as_string_array,
     error::DataFusionError,
     logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
+    physical_plan::functions::make_scalar_function,
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
-use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// Implementation of match_range
@@ -58,19 +57,24 @@ pub(crate) static MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 
 /// match function for datafusion
 pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
-    Arc::new(move |args: &[ColumnarValue]| {
+    let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
         if args.len() != 2 {
             return Err(DataFusionError::SQL(
                 ParserError::ParserError("match UDF expects two string".to_string()),
                 None,
             ));
         }
-        let args = ColumnarValue::values_to_arrays(args)?;
 
         // 1. cast both arguments to string. These casts MUST be aligned with the signature or this
         //    function panics!
-        let haystack = as_string_array(&args[0]).expect("cast failed");
-        let needle = as_string_array(&args[1]).expect("cast failed");
+        let haystack = &args[0]
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast failed");
+        let needle = &args[1]
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .expect("cast failed");
 
         // 2. perform the computation
         let array = haystack
@@ -95,13 +99,14 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
 
         // `Ok` because no error occurred during the calculation
         // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
-    })
+        Ok(Arc::new(array) as ArrayRef)
+    };
+
+    make_scalar_function(func)
 }
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::StringArray;
     use datafusion::{
         arrow::{
             array::Int64Array,
