@@ -45,11 +45,11 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
+        schema::SchemaCache,
         search::datafusion::{
             exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
         },
         stream::{self},
-        SchemaCache,
     },
 };
 

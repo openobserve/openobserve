@@ -47,9 +47,8 @@ use crate::{
             grpc::{get_val, get_val_with_type_retained},
             write_file, TriggerAlertData,
         },
-        schema::{get_upto_discard_error, stream_schema_exists},
+        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
-        SchemaCache,
     },
 };
 

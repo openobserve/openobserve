@@ -38,10 +38,9 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
-        schema::check_for_schema,
+        schema::{check_for_schema, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
-        SchemaCache,
     },
 };
 

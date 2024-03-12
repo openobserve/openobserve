@@ -45,9 +45,8 @@ use crate::{
         ingestion::{
             evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
         },
-        schema::{get_upto_discard_error, stream_schema_exists},
+        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
-        SchemaCache,
     },
 };
 

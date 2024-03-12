@@ -42,8 +42,7 @@ use crate::{
     service::{
         db, distinct_values, get_formatted_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        schema::get_upto_discard_error,
-        SchemaCache,
+        schema::{get_upto_discard_error, SchemaCache},
     },
 };
 

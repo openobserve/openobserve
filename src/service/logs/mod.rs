@@ -26,10 +26,7 @@ use config::{
     CONFIG,
 };
 
-use super::{
-    ingestion::{get_string_value, TriggerAlertData},
-    SchemaCache,
-};
+use super::ingestion::{get_string_value, TriggerAlertData};
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -37,7 +34,9 @@ use crate::{
         stream::{SchemaRecords, StreamPartition},
     },
     service::{
-        ingestion::get_wal_time_key, schema::check_for_schema, stream::unwrap_partition_time_level,
+        ingestion::get_wal_time_key,
+        schema::{check_for_schema, SchemaCache},
+        stream::unwrap_partition_time_level,
     },
 };
 

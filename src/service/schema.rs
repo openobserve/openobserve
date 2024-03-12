@@ -38,7 +38,6 @@ use infra::dist_lock;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 
-use super::SchemaCache;
 use crate::{
     common::{
         infra::config::LOCAL_SCHEMA_LOCKER,
@@ -281,6 +280,35 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)
+}
+
+pub struct SchemaCache {
+    schema: Schema,
+    fields_map: HashMap<String, usize>,
+    hash_key: String,
+}
+
+impl SchemaCache {
+    pub fn new(schema: Schema, fields_map: HashMap<String, usize>) -> Self {
+        let hash_key = schema.hash_key();
+        Self {
+            schema,
+            fields_map,
+            hash_key,
+        }
+    }
+
+    pub fn hash_key(&self) -> &str {
+        &self.hash_key
+    }
+
+    pub fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    pub fn fields_map(&self) -> &HashMap<String, usize> {
+        &self.fields_map
+    }
 }
 
 pub async fn check_for_schema(

@@ -47,11 +47,10 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
         search as search_service,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
-        SchemaCache,
     },
 };
 

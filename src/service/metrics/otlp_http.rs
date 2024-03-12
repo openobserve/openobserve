@@ -48,10 +48,9 @@ use crate::{
             write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
-        SchemaCache,
     },
 };
 

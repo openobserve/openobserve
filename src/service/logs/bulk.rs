@@ -29,7 +29,7 @@ use config::{
     CONFIG, DISTINCT_FIELDS,
 };
 
-use super::{SchemaCache, StreamMeta};
+use super::StreamMeta;
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -43,7 +43,7 @@ use crate::{
     service::{
         db, distinct_values,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        schema::{get_upto_discard_error, stream_schema_exists},
+        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
 };

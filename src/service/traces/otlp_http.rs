@@ -43,10 +43,9 @@ use crate::{
             evaluate_trigger, get_string_value, get_uint_value, grpc::get_val_for_attr, write_file,
             TriggerAlertData,
         },
-        schema::{check_for_schema, stream_schema_exists},
+        schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
-        SchemaCache,
     },
 };
 

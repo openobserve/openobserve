@@ -37,7 +37,6 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
-use super::SchemaCache;
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -48,7 +47,7 @@ use crate::{
     service::{
         db, distinct_values, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
-        schema::{check_for_schema, stream_schema_exists},
+        schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
