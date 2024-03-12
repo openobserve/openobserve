@@ -174,8 +174,6 @@ pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
 
 #[cfg(test)]
 mod tests {
-    // use float_cmp::approx_eq;
-
     use super::*;
 
     #[test]

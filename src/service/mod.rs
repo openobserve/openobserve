@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
-use regex::{self, Regex};
+use regex::Regex;
 
 use crate::common::meta::stream::StreamParams;
 
