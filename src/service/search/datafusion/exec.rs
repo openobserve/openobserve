@@ -1512,4 +1512,80 @@ mod tests {
 
         assert!(!res.is_empty())
     }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase1() {
+        let sql = [
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = [
+            "SELECT DISTINCT \"a\"  FROM  tbl where a > 3 ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
+            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl where a > 3   ",
+            "SELECT  a, \"b\"  FROM  tbl where a > 3   ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
+        ];
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = rewrite_count_distinct_sql(sql, true).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase2() {
+        let sql = [
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = [
+            "SELECT DISTINCT \"a\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl ",
+            "SELECT  a, \"b\"  FROM  tbl ",
+            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
+        ];
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = rewrite_count_distinct_sql(sql, false).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
+
+    #[test]
+    fn test_count_distinct_rewrite_phase3() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Utf8, false),
+            Field::new("c", DataType::Utf8, false),
+        ]));
+
+        let sql = [
+            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
+        ];
+
+        let res = [
+            "SELECT COUNT(DISTINCT a) FROM tbl  limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl  group by a having cnt > 1 limit 10",
+            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl  group by a having cnt > 1 limit 10",
+        ];
+
+        for (sql, except) in sql.iter().zip(res.iter()) {
+            let res = merge_rewrite_sql(sql, schema.clone()).unwrap();
+            assert_eq!(res, **except);
+        }
+    }
 }
