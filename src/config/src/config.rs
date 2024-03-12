@@ -187,6 +187,7 @@ pub struct Config {
     pub disk_cache: DiskCache,
     pub log: Log,
     pub etcd: Etcd,
+    pub nats: Nats,
     pub sled: Sled,
     pub dynamo: Dynamo,
     pub s3: S3,
@@ -291,6 +292,8 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
+    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
+    pub cluster_coordinator: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
@@ -375,6 +378,8 @@ pub struct Common {
     pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
     pub telemetry_url: String,
+    #[env_config(name = "ZO_TELEMETRY_HEARTBEAT", default = 1800)] // seconds
+    pub telemetry_heartbeat: i64,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
@@ -442,6 +447,12 @@ pub struct Common {
         help = "Toggle search to be trigger based on button click event."
     )]
     pub query_on_stream_selection: bool,
+    #[env_config(
+        name = "ZO_SHOW_STREAM_DATES_DOCS_NUM",
+        default = true,
+        help = "Show docs count and stream dates"
+    )]
+    pub show_stream_dates_doc_num: bool,
 }
 
 #[derive(EnvConfig)]
@@ -498,23 +509,23 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
-    pub hb_interval: i64,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
+    #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
+    pub node_heartbeat_ttl: i64,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)] // equals to 1024 if 0
     pub http_worker_max_blocking: usize,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
-    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
+    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
@@ -623,6 +634,14 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct Sled {
+    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
+    pub data_dir: String,
+    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
+    pub prefix: String,
+}
+
 #[derive(Debug, EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
@@ -651,16 +670,22 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
-    pub node_heartbeat_ttl: i64,
 }
 
-#[derive(EnvConfig)]
-pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
-    pub data_dir: String,
-    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
+#[derive(Debug, EnvConfig)]
+pub struct Nats {
+    #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
+    pub addr: String,
+    #[env_config(name = "ZO_NATS_PREFIX", default = "o2_")]
     pub prefix: String,
+    #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
+    pub connect_timeout: u64,
+    #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
+    pub command_timeout: u64,
+    #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
+    pub lock_wait_timeout: u64,
+    #[env_config(name = "ZO_NATS_LOAD_PAGE_SIZE", default = 1000)]
+    pub load_page_size: i64,
 }
 
 #[derive(EnvConfig)]

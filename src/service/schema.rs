@@ -34,7 +34,7 @@ use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
 };
-use infra::db::etcd;
+use infra::dist_lock;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 
@@ -49,7 +49,7 @@ use crate::{
             stream::{SchemaEvolution, StreamPartition},
         },
     },
-    service::{db, search::server_internal_error},
+    service::db,
 };
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
@@ -564,14 +564,21 @@ async fn handle_diff_schema_cluster_mode(
     }
 
     // acquire lock and update schema to meta store
-    let lock_key = format!("schema/{org_id}/{stream_type}/{stream_name}");
-    let mut lock = etcd::Locker::new(&lock_key);
-    lock.lock(0).await.map_err(server_internal_error).unwrap();
+    let lock_key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
+    let locker = match dist_lock::lock(&lock_key, 0).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("dist_lock for handle diff schema error: {}", e);
+            return None;
+        }
+    };
 
     let Some((field_datatype_delta, final_schema)) =
         get_merged_schema(org_id, stream_name, stream_type, inferred_schema).await
     else {
-        lock.unlock().await.map_err(server_internal_error).unwrap();
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            log::error!("dist_lock unlock err: {}", e);
+        }
         return None;
     };
 
@@ -592,11 +599,13 @@ async fn handle_diff_schema_cluster_mode(
     .await
     {
         log::error!(
-            "Failed to update schema for stream {} err: {:?}",
+            "[Schema:Evolution]:Failed to update schema for stream {} err: {:?}",
             stream_name,
             err
         );
-        lock.unlock().await.map_err(server_internal_error).unwrap();
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            log::error!("dist_lock unlock err: {}", e);
+        }
         log::info!(
             "Released lock for cluster stream {} after setting schema",
             stream_name
@@ -626,12 +635,17 @@ async fn handle_diff_schema_cluster_mode(
     );
 
     // release lock
-    lock.unlock().await.map_err(server_internal_error).unwrap();
+    if let Err(e) = dist_lock::unlock(&locker).await {
+        log::error!("dist_lock unlock err: {}", e);
+    }
     log::info!(
         "Released lock for cluster stream {} after setting schema",
         stream_name
     );
-
+    log::info!(
+        "[Schema:Evolution] the delta for schema is  {:?} ",
+        field_datatype_delta
+    );
     Some(SchemaEvolution {
         schema_compatible: true,
         is_schema_changed: true,
@@ -857,8 +871,6 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::datatypes::{DataType, Field, Schema};
-
     use super::*;
 
     #[test]

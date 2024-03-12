@@ -67,7 +67,7 @@ async fn search_in_cluster(
     let op_start = std::time::Instant::now();
 
     // get querier nodes from cluster
-    let mut nodes = cluster::get_cached_online_querier_nodes().unwrap();
+    let mut nodes = cluster::get_cached_online_querier_nodes().await.unwrap();
     // sort nodes by node_id this will improve hit cache ratio
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);

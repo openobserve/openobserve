@@ -273,6 +273,7 @@ export default defineComponent({
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
+      { label: t("logStream.labelIndex"), value: "index" },
     ];
     const { getStreams, resetStreams, removeStream } = useStreams();
     const columns = ref<QTableProps["columns"]>([
@@ -348,6 +349,12 @@ export default defineComponent({
     let deleteStreamType = "";
 
     onBeforeMount(() => {
+      if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
+        columns.value = columns.value.filter(
+          (column) => column.name !== "doc_num"
+        );
+      }
+
       if (router.currentRoute.value.name === "streamExplorer") {
         router.push({
           name: "streamExplorer",

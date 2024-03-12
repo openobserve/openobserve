@@ -113,7 +113,7 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
         metrics::META_NUM_NODES.with_label_values(&["all"]).set(1);
     } else {
         metrics::META_NUM_NODES.reset();
-        let nodes = get_cached_online_nodes();
+        let nodes = get_cached_online_nodes().await;
         if nodes.is_some() {
             for node in nodes.unwrap() {
                 if cluster::is_ingester(&node.role) {

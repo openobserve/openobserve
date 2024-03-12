@@ -26,6 +26,7 @@ use crate::errors::{DbError, Error, Result};
 pub mod dynamo;
 pub mod etcd;
 pub mod mysql;
+pub mod nats;
 pub mod postgres;
 pub mod sled;
 pub mod sqlite;
@@ -41,7 +42,9 @@ pub async fn get_db() -> &'static Box<dyn Db> {
 }
 
 pub async fn get_coordinator() -> &'static Box<dyn Db> {
-    CLUSTER_COORDINATOR.get_or_init(cluster_coordinator).await
+    CLUSTER_COORDINATOR
+        .get_or_init(init_cluster_coordinator)
+        .await
 }
 
 pub async fn init() -> Result<()> {
@@ -60,20 +63,25 @@ async fn default() -> Box<dyn Db> {
         MetaStore::Sled => Box::<sled::SledDb>::default(),
         MetaStore::Sqlite => Box::<sqlite::SqliteDb>::default(),
         MetaStore::Etcd => Box::<etcd::Etcd>::default(),
+        MetaStore::Nats => Box::<nats::NatsDb>::default(),
         MetaStore::DynamoDB => Box::<dynamo::DynamoDb>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlDb>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresDb>::default(),
     }
 }
 
-async fn cluster_coordinator() -> Box<dyn Db> {
+async fn init_cluster_coordinator() -> Box<dyn Db> {
     if CONFIG.common.local_mode {
         match CONFIG.common.meta_store.as_str().into() {
             MetaStore::Sled => Box::<sled::SledDb>::default(),
+            MetaStore::Nats => Box::<nats::NatsDb>::default(),
             _ => Box::<sqlite::SqliteDb>::default(),
         }
     } else {
-        Box::<etcd::Etcd>::default()
+        match CONFIG.common.cluster_coordinator.as_str().into() {
+            MetaStore::Nats => Box::<nats::NatsDb>::default(),
+            _ => Box::<etcd::Etcd>::default(),
+        }
     }
 }
 
@@ -185,8 +193,6 @@ pub struct MetaRecord {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
-
     use super::*;
 
     #[tokio::test]

@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-lg">
-    <div
-      v-if="!no_data_ingest"
-      class="q-pa-md row items-start q-gutter-md"
-      style="margin: 0 auto; justify-content: center"
-    >
+    <div v-if="!no_data_ingest" class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center">
       <q-card class="my-card">
         <q-card-section align="center" flat bordered class="my-card">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
@@ -32,13 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'logstreams' }"
-              class="absolute full-width full-height"
-            ></router-link>
+          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
+            <router-link exact :to="{ name: 'logstreams' }" class="absolute full-width full-height"></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -52,13 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
         <q-separator />
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'functions' }"
-              class="absolute full-width full-height"
-            ></router-link>
+          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
+            <router-link exact :to="{ name: 'functions' }" class="absolute full-width full-height"></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -72,23 +59,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
         <q-separator />
         <q-card-actions align="center">
-          <q-btn no-caps color="primary" flat
-            >{{ t("home.view") }}
-            <router-link
-              exact
-              :to="{ name: 'alerts' }"
-              class="absolute full-width full-height"
-            ></router-link>
+          <q-btn no-caps color="primary" flat>{{ t("home.view") }}
+            <router-link exact :to="{ name: 'alerts' }" class="absolute full-width full-height"></router-link>
           </q-btn>
         </q-card-actions>
       </q-card>
     </div>
 
-    <div
-      v-if="no_data_ingest"
-      class="q-pa-md row items-start q-gutter-md"
-      style="margin: 0 auto; justify-content: center"
-    >
+    <div v-if="no_data_ingest" class="q-pa-md row items-start q-gutter-md"
+      style="margin: 0 auto; justify-content: center">
       <q-card class="my-card">
         <q-card-section align="center" flat bordered class="my-card">
           <div class="text-h6">{{ t("home.noData") }}</div>
@@ -98,12 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-separator />
 
         <q-card-actions align="center">
-          <q-btn
-            no-caps
-            color="primary"
-            @click="() => $router.push({ name: 'ingestion' })"
-            flat
-            >{{ t("home.findIngestion") }}
+          <q-btn no-caps color="primary" @click="() => $router.push({ name: 'ingestion' })" flat>{{
+      t("home.findIngestion") }}
           </q-btn>
         </q-card-actions>
       </q-card>
@@ -141,10 +116,10 @@ export default defineComponent({
       orgService
         .get_organization_summary(org_id)
         .then((res) => {
-          setStreams("all", res.data.streams);
+          //setStreams("all", res.data.streams);
 
           if (
-            res.data.streams.length == 0 &&
+            res.data.streams.num_streams == 0 &&
             res.data.functions.length == 0 &&
             res.data.alerts.length == 0
           ) {
@@ -153,21 +128,10 @@ export default defineComponent({
             dismiss();
             return;
           }
-          let sum = 0;
-          if (res.data.streams.length > 0) {
-            sum = res.data.streams.reduce(
-              (
-                acc: number,
-                val: {
-                  [x: string]: any;
-                  storage_size: any;
-                }
-              ) => {
-                return acc + val.stats.storage_size;
-              },
-              0
-            );
-          }
+
+          let streamsCount = res.data.streams.num_streams;
+          let sum = res.data.streams.total_storage_size;
+
 
           let ingest_fns = 0;
           let query_fns = 0;
@@ -193,7 +157,7 @@ export default defineComponent({
             });
           }
           summary.value = {
-            streams_count: res.data.streams.length,
+            streams_count: streamsCount,
             ingested_data: formatSizeFromMB(sum.toFixed(2)),
             ingest_fns: ingest_fns,
             query_fns: query_fns,

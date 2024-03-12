@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{Duration, Utc};
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType};
 use infra::dist_lock;
 
 use crate::{
@@ -30,18 +30,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let org_id = "default";
     // get the working node for the organization
     let node = db::alerts::alert_manager::get_mark(org_id).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[ALERT_MANAGER] is processing by {node}");
         return Ok(());
     }
 
     // before start merging, set current node to lock the organization
-    let lock_key = format!("alert_manager/organization/{org_id}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let lock_key = format!("/alert_manager/organization/{org_id}");
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     // check the working node for the organization again, maybe other node locked it
     // first
     let node = db::alerts::alert_manager::get_mark(org_id).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[ALERT_MANAGER] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(());
