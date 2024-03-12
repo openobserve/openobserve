@@ -69,10 +69,13 @@ export const convertPromQLData = (
 
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
-    xAxisData[index] =
+    // we need both milliseconds and date (object or string)
+    xAxisData[index] = [
+      value,
       store.state.timezone != "UTC"
         ? utcToZonedTime(value * 1000, store.state.timezone)
-        : new Date(value * 1000).toISOString().slice(0, -1);
+        : new Date(value * 1000).toISOString().slice(0, -1),
+    ];
   });
 
   const legendConfig: any = {
@@ -345,8 +348,9 @@ export const convertPromQLData = (
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
                 data: xAxisData.map((value: any) => [
-                  value,
-                  seriesDataObj[value.getTime() / 1000] ?? null,
+                  // value will be an array [milliseconds, date object or date string]
+                  value[1],
+                  seriesDataObj[value[0]] ?? null,
                 ]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
