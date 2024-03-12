@@ -26,7 +26,6 @@ EOF
 
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
-
     cargo llvm-cov test \
         --verbose \
         --ignore-filename-regex job \

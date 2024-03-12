@@ -33,16 +33,11 @@ use config::{
         parquet::read_metadata_from_file,
         schema_ext::SchemaExt,
     },
-    FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
+    FxIndexMap, CONFIG,
 };
-use datafusion::{
-    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable, prelude::*,
-    scalar::ScalarValue,
-};
+use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use infra::{cache, storage};
-use parquet::arrow::{
-    arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
-};
+use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
@@ -50,8 +45,10 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
-        search::datafusion::exec::merge_parquet_files,
-        stream::{self, get_stream_setting_fts_fields},
+        search::datafusion::{
+            exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
+        },
+        stream::{self},
     },
 };
 
@@ -378,7 +375,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -540,89 +537,6 @@ pub(crate) async fn generate_index_on_compactor(
     Ok((filename, filemeta))
 }
 
-/// Prepares index record batches from the provided Parquet file buffer.
-///
-/// Reads the Parquet data into record batches. Registers the batches as a table.
-/// Generates an index record batch for each text column, by splitting into terms,
-/// filtering, aggregating, etc. Returns the generated index record batches.
-///
-/// # Arguments
-/// * `buf` - The Parquet file buffer with actual data.
-/// * `schema` - The schema of the Parquet file.
-/// * `org_id` - The organization ID.
-/// * `stream_name` - The stream name.
-/// * `new_file_key` - The new file key which is used to generate the index file.
-async fn _prepare_index_record_batches(
-    buf: Bytes,
-    schema: Arc<Schema>,
-    org_id: &str,
-    stream_name: &str,
-    new_file_key: &str,
-) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
-    let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
-        .unwrap()
-        .build()
-        .unwrap();
-    let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
-    let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema.clone(), vec![batches])?;
-    ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
-    let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
-    let columns_to_index = if !fts_fields.is_empty() {
-        fts_fields
-    } else {
-        SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-    };
-    let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
-    let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
-    let mut indexed_record_batches_to_merge = Vec::new();
-    for column in columns_to_index.iter() {
-        let index_df = ctx.table("_tbl_raw_data").await?;
-        let schema = index_df.schema();
-
-        if !schema.has_column_with_unqualified_name(column) {
-            continue;
-        }
-
-        if schema.data_type(&Column::from_name(column)).unwrap() != &DataType::Utf8 {
-            log::warn!(
-                "[JOB]: Index column {} is not of type Utf8. Skipping indexing for this column.",
-                column
-            );
-            continue;
-        }
-
-        let split_arr = array_distinct(string_to_array(
-            lower(concat(&[col(column), lit("")])),
-            lit(" "),
-            lit(ScalarValue::Null),
-        ));
-        let record_batch = index_df
-            .with_column("terms", split_arr)?
-            .unnest_column("terms")?
-            .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
-            .with_column("file_name", lit(file_name_without_prefix))?
-            .aggregate(
-                vec![col("term"), col("file_name")],
-                vec![
-                    min(col("_timestamp")).alias("_timestamp"),
-                    count(col("term")).alias("_count"),
-                ],
-            )?
-            .with_column("character_len", character_length(col("term")))?
-            .with_column("deleted", lit(false))?
-            .filter(col("character_len").gt_eq(lit(3)))?
-            .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
-            .collect()
-            .await?;
-
-        indexed_record_batches_to_merge.push(record_batch);
-    }
-    ctx.deregister_table("_tbl_raw_data")?;
-    Ok(indexed_record_batches_to_merge)
-}
-
 async fn prepare_index_record_batches_v1(
     batches: Vec<RecordBatch>, // 10 fields index
     org_id: &str,
@@ -647,16 +561,18 @@ async fn prepare_index_record_batches_v1(
             continue;
         }
 
-        let split_arr = array_distinct(string_to_array(
-            lower(concat(&[col(column.name()), lit("")])),
-            lit(" "),
-            lit(ScalarValue::Null),
-        ));
+        let column_name = column.name();
+        let split_chars = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+        let remove_chars_btrim = split_chars;
+        let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
+        let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
+        let distinct_terms = array_distinct(split_arr);
+
         let record_batch = index_df
-            .with_column("terms", split_arr)?
+            .with_column("terms", distinct_terms)?
             .unnest_column("terms")?
             .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
+            .with_column("term", btrim(vec![col("term"), lit(remove_chars_btrim)]))?
             .with_column("file_name", lit(file_name_without_prefix))?
             .aggregate(
                 vec![col("term"), col("file_name")],

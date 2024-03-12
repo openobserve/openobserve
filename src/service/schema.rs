@@ -820,7 +820,6 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

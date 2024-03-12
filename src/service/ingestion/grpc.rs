@@ -154,7 +154,6 @@ pub fn get_val_with_type_retained(attr_val: &Option<&AnyValue>) -> json::Value {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

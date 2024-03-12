@@ -107,7 +107,6 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-
     use datafusion::{
         arrow::{
             array::Int64Array,

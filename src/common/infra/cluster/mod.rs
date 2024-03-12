@@ -102,6 +102,7 @@ pub fn get_internal_grpc_token() -> String {
     }
 }
 
+/// Register and keepalive the node to cluster
 pub async fn register_and_keepalive() -> Result<()> {
     if CONFIG.common.local_mode {
         let roles = load_local_node_role();

@@ -750,7 +750,6 @@ impl TryFrom<&BinaryOperator> for SqlOperator {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

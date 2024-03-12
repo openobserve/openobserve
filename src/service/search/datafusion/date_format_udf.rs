@@ -106,7 +106,6 @@ pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},

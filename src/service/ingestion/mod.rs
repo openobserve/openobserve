@@ -461,7 +461,6 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{common::infra::config::STREAM_SETTINGS, service::stream::stream_settings};
 

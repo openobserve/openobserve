@@ -56,7 +56,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
 
     let mut offset = offset;
     if offset == 0 {
-        // get earilest date from schema
+        // get earliest date from schema
         offset = time_now.timestamp_micros();
         let r = STREAM_SCHEMAS.read().await;
         for (key, val) in r.iter() {

@@ -19,7 +19,7 @@ use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
     utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
-    FxIndexSet, CONFIG, PARQUET_BATCH_SIZE,
+    CONFIG, PARQUET_BATCH_SIZE,
 };
 use datafusion::{
     arrow::{
@@ -60,7 +60,7 @@ use crate::{
         search::{SearchType, Session as SearchSession},
         sql,
     },
-    service::search::sql::Sql,
+    service::search::{datafusion::rewrite, sql::Sql},
 };
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
@@ -74,11 +74,9 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
 ];
 
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
-static RE_GROUP_BY: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) group by (.*)").unwrap());
-static RE_LIMIT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) limit (.*)").unwrap());
-static RE_HAVING: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) having (.*)").unwrap());
-static RE_COUNT_DISTINCT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap());
+static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
+});
 static RE_FIELD_FN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
@@ -323,7 +321,13 @@ async fn exec_query(
         sql.origin_sql.clone()
     };
 
-    let query = rewrite_count_distinct_sql(&query, true)?;
+    let mut query = query;
+    if RE_COUNT_DISTINCT
+        .captures(query.to_lowercase().as_str())
+        .is_some()
+    {
+        query = rewrite::rewrite_count_distinct_sql(&query, true);
+    }
 
     // Debug SQL
     if CONFIG.common.print_key_sql {
@@ -476,192 +480,6 @@ async fn exec_query(
     Ok(batches)
 }
 
-// rewrite count(distinct) sql
-fn rewrite_count_distinct_sql(sql: &str, is_first_phase: bool) -> Result<String> {
-    if RE_COUNT_DISTINCT
-        .captures(sql.to_lowercase().as_str())
-        .is_none()
-    {
-        return Ok(sql.to_string());
-    }
-
-    let mut sql = sql.to_string();
-    let mut fields = Vec::new();
-    let mut from_pos = 0;
-    let sql_chars = sql.chars().collect::<Vec<char>>();
-    let sql_chars_len = sql_chars.len();
-    let mut start_pos = 0;
-    let mut in_word = false;
-    let mut brackets = 0;
-    let mut quotes = 0;
-    let mut quote_now = '\"';
-    for i in 0..sql_chars_len {
-        let c = sql_chars.get(i).unwrap();
-        if *c == '(' {
-            brackets += 1;
-            continue;
-        }
-        if *c == ')' {
-            brackets -= 1;
-            continue;
-        }
-        if *c == '"' || *c == '\'' {
-            if quotes == 0 {
-                quotes += 1;
-                quote_now = *c;
-                if !in_word {
-                    start_pos = i;
-                    in_word = true;
-                }
-                continue;
-            }
-            if quotes == 1 && quote_now == *c {
-                quotes = 0;
-                continue;
-            }
-        }
-        if *c == ',' || *c == ' ' {
-            if brackets > 0 || quotes > 0 {
-                continue;
-            }
-            if in_word {
-                let field = sql_chars[start_pos..i].iter().collect::<String>();
-                if field.to_lowercase().eq("from") {
-                    from_pos = i;
-                    break;
-                } else if field.to_lowercase().eq("over") {
-                    continue;
-                }
-                fields.push(field);
-            }
-            in_word = false;
-            continue;
-        }
-        if in_word {
-            continue;
-        }
-        start_pos = i;
-        in_word = true;
-    }
-
-    let mut new_fields = Vec::new();
-    let mut sel_fields_name = Vec::new();
-    let mut sel_fields_has_star = false;
-    let mut last_is_as = false;
-    let mut last_is_distinct = false;
-    for field in fields.iter() {
-        let field = if last_is_distinct {
-            last_is_distinct = false;
-            format!("DISTINCT {}", field.trim())
-        } else {
-            field.trim().to_string()
-        };
-        if field.to_lowercase().eq("select") {
-            continue;
-        }
-        if field.to_lowercase().eq("distinct") {
-            last_is_distinct = true;
-            continue;
-        }
-        if field.to_lowercase().eq("as") {
-            last_is_as = true;
-            continue;
-        }
-        if field.to_lowercase().starts_with("over") && field.contains('(') {
-            // replace previouse field with over
-            let prev_field = new_fields.pop().unwrap();
-            new_fields.push(format!("{} {}", prev_field, field));
-            continue;
-        }
-        if last_is_as {
-            let prev_field = new_fields.pop().unwrap();
-            new_fields.push(format!("{prev_field} AS {field}"));
-            sel_fields_name.remove(sel_fields_name.len() - 1);
-            sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
-            last_is_as = false;
-            continue;
-        }
-        if field.eq("*") {
-            sel_fields_has_star = true;
-        }
-        new_fields.push(field.to_string());
-        sel_fields_name.push(field.to_string().replace('"', "").replace(", ", ","));
-    }
-
-    let fields = new_fields;
-    // handle select *
-    if sel_fields_has_star {
-        return Ok(sql);
-    }
-
-    let mut need_distinct = true;
-    let mut field_names = FxIndexSet::<String>::default();
-    for i in 0..fields.len() {
-        let field = fields.get(i).unwrap();
-
-        let cap = match RE_FIELD_FN.captures(field) {
-            Some(caps) => caps,
-            None => {
-                field_names.insert(field.to_string());
-                continue;
-            }
-        };
-        let fn_name = cap.get(1).unwrap().as_str().to_lowercase();
-        let field_name = cap.get(2).unwrap().as_str().split(' ').last().unwrap();
-
-        let over_as = if field.to_lowercase().contains("over") && field.contains('(') {
-            field[field.to_lowercase().find("over").unwrap()..].to_string()
-        } else {
-            "".to_string()
-        };
-
-        if fn_name == "count"
-            && !cap
-                .get(2)
-                .unwrap()
-                .as_str()
-                .to_lowercase()
-                .contains("distinct")
-        {
-            need_distinct = false;
-        }
-        field_names.insert(format!("\"{}\" {}", field_name, over_as));
-    }
-
-    let field_names = field_names.into_iter().collect::<Vec<String>>();
-    let distinct_clause = if need_distinct { "DISTINCT" } else { "" };
-    sql = format!(
-        "SELECT {} {} FROM {}",
-        distinct_clause,
-        &field_names.join(", "),
-        &sql[from_pos..]
-    );
-
-    // delete group_by from sql
-    remove_clause(
-        &mut sql,
-        &RE_GROUP_BY,
-        &[" order by", " having", " limit", " offset"],
-    );
-
-    // delete having from sql
-    remove_clause(&mut sql, &RE_HAVING, &[" order by", " limit", " offset"]);
-
-    // delete limit from sql
-    remove_clause(&mut sql, &RE_LIMIT, &[]);
-
-    if !is_first_phase {
-        // delete where from sql
-        remove_clause(
-            &mut sql,
-            &RE_WHERE,
-            &[" order by", " group by", " offset", " limit"],
-        );
-    }
-
-    Ok(sql)
-}
-
 fn remove_clause(sql: &mut String, regex: &Lazy<Regex>, keywords: &[&str]) {
     let mut clause_str = match regex.captures(sql) {
         Some(caps) => caps[0].to_string(),
@@ -790,11 +608,12 @@ pub async fn merge(
         }
     };
 
-    if !is_final_phase {
-        let rewrite_sql = rewrite_count_distinct_sql(sql, false)?;
-        if rewrite_sql != sql {
-            query_sql = rewrite_sql;
-        }
+    if !is_final_phase
+        && RE_COUNT_DISTINCT
+            .captures(sql.to_lowercase().as_str())
+            .is_some()
+    {
+        query_sql = rewrite::rewrite_count_distinct_sql(sql, false);
     }
 
     // query data
@@ -882,13 +701,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         .captures(sql.to_lowercase().as_str())
         .is_some()
     {
-        let mut sql = sql.to_string();
-        // delete where from sql
-        remove_clause(
-            &mut sql,
-            &RE_WHERE,
-            &[" order by", " group by", " offset", " limit"],
-        );
+        let sql = rewrite::rewrite_count_distinct_merge_sql(sql);
         return Ok(sql);
     }
 
@@ -1455,6 +1268,7 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
     ctx.register_udf(super::date_format_udf::DATE_FORMAT_UDF.clone());
+    ctx.register_udf(super::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
 
     {
         let udf_list = get_all_transform(_org_id).await;
@@ -1697,81 +1511,5 @@ mod tests {
         .unwrap();
 
         assert!(!res.is_empty())
-    }
-
-    #[test]
-    fn test_count_distinct_rewrite_phase1() {
-        let sql = [
-            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-        ];
-
-        let res = [
-            "SELECT DISTINCT \"a\"  FROM  tbl where a > 3 ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
-            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl where a > 3   ",
-            "SELECT  a, \"b\"  FROM  tbl where a > 3   ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl where a > 3   ",
-        ];
-        for (sql, except) in sql.iter().zip(res.iter()) {
-            let res = rewrite_count_distinct_sql(sql, true).unwrap();
-            assert_eq!(res, **except);
-        }
-    }
-
-    #[test]
-    fn test_count_distinct_rewrite_phase2() {
-        let sql = [
-            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-        ];
-
-        let res = [
-            "SELECT DISTINCT \"a\"  FROM  tbl ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
-            "SELECT DISTINCT a, \"b\" , \"c\"  FROM  tbl ",
-            "SELECT  a, \"b\"  FROM  tbl ",
-            "SELECT DISTINCT a, \"b\"  FROM  tbl ",
-        ];
-        for (sql, except) in sql.iter().zip(res.iter()) {
-            let res = rewrite_count_distinct_sql(sql, false).unwrap();
-            assert_eq!(res, **except);
-        }
-    }
-
-    #[test]
-    fn test_count_distinct_rewrite_phase3() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Utf8, false),
-            Field::new("b", DataType::Utf8, false),
-            Field::new("c", DataType::Utf8, false),
-        ]));
-
-        let sql = [
-            "SELECT COUNT(DISTINCT a) FROM tbl where a > 3 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl where a > 3 group by a having cnt > 1 limit 10",
-        ];
-
-        let res = [
-            "SELECT COUNT(DISTINCT a) FROM tbl  limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt FROM tbl  group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(DISTINCT c) FROM tbl  group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, COUNT(b) FROM tbl  group by a having cnt > 1 limit 10",
-            "SELECT a, COUNT(DISTINCT b) as cnt, MAX(b) FROM tbl  group by a having cnt > 1 limit 10",
-        ];
-
-        for (sql, except) in sql.iter().zip(res.iter()) {
-            let res = merge_rewrite_sql(sql, schema.clone()).unwrap();
-            assert_eq!(res, **except);
-        }
     }
 }

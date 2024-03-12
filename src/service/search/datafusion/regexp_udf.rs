@@ -203,7 +203,6 @@ fn clean_non_meta_escapes(pattern: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-
     use datafusion::{
         arrow::{
             array::{Int64Array, StringArray},
