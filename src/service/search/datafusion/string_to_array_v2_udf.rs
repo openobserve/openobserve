@@ -148,7 +148,7 @@ mod tests {
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
         for item in sqls {
-            let df = ctx.sql(&item.0).await.unwrap();
+            let df = ctx.sql(item.0).await.unwrap();
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
