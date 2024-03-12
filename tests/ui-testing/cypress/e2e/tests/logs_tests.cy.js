@@ -131,13 +131,13 @@ describe("Logs testcases", () => {
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
     });
+    applyQueryButton();
     logstests.expandLogsSearch();
     logstests.verifyLogsStatusCode();
     cy.intercept("GET", logData.ValueQuery).as("value");
     cy.get('[data-test="logs-search-subfield-add-code-200"]').should(
       "be.visible"
     );
-    applyQueryButton();
   });
 
   it("should add the field to the editor when + is clicked", () => {
