@@ -16,30 +16,37 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
+    sync::Arc,
 };
 
 use chrono::Duration;
 use config::{
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    cache::file_data,
+    errors::{Error, ErrorCodes},
+    storage,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        infra::config::STREAM_SCHEMAS_FIELDS,
-        meta::{
-            sql::{Sql as MetaSql, SqlOperator},
-            stream::{StreamParams, StreamPartition},
-        },
+    common::meta::{
+        sql::{Sql as MetaSql, SqlOperator},
+        stream::{StreamParams, StreamPartition},
     },
     handler::grpc::cluster_rpc,
-    service::{db, search::match_source, stream::get_stream_setting_fts_fields},
+    service::{
+        db,
+        search::match_source,
+        stream::{get_stream_setting_fts_fields, stream_settings, unwrap_partition_time_level},
+    },
 };
 
 const SQL_DELIMITERS: [u8; 12] = [
@@ -70,13 +77,13 @@ static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
     pub origin_sql: String,
-    pub rewrite_sql: String,
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
     pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
+    pub fields: Vec<String>,
     pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
                           * data from the latest file */
@@ -114,6 +121,11 @@ impl Display for SqlMode {
 
 impl Sql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
+        let session_id = if req.job.as_ref().is_some() {
+            req.job.as_ref().unwrap().session_id.clone()
+        } else {
+            String::new()
+        };
         let req_query = req.query.as_ref().unwrap();
         let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
@@ -121,7 +133,6 @@ impl Sql {
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
-        let mut rewrite_sql = req_query.sql.clone();
         // log::info!("origin_sql: {:?}", origin_sql);
         origin_sql = origin_sql.replace('\n', " ");
         origin_sql = origin_sql.trim().to_string();
@@ -239,22 +250,14 @@ impl Sql {
 
         // check time_range values
         if req_time_range.0 > 0
-            && req_time_range.0
-                < Duration::try_seconds(1)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
+            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query SQL time_range start_time should be microseconds".to_string(),
             )));
         }
         if req_time_range.1 > 0
-            && req_time_range.1
-                < Duration::try_seconds(1)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
+            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query SQL time_range start_time should be microseconds".to_string(),
@@ -374,6 +377,9 @@ impl Sql {
             Err(_) => Schema::empty(),
         };
         let schema_fields = schema.fields().to_vec();
+        let stream_settings = stream_settings(&schema).unwrap_or_default();
+        let partition_time_level =
+            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
         // fetch fts fields
         let mut fts_terms = HashSet::new();
@@ -393,24 +399,29 @@ impl Sql {
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
-            let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
-                STREAM_SCHEMAS_FIELDS
-                    .read()
-                    .await
-                    .get(&stream_key)
-                    .map(|v| v.1.clone())
+            let file_schema = if CONFIG.limit.fast_mode_file_list_enabled {
+                generate_fast_mode_fields_from_file_list(
+                    &session_id,
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    partition_time_level,
+                    meta.time_range.unwrap_or_default(),
+                )
+                .await
             } else {
                 None
             };
-            let fields = generate_fast_mode_fields(&schema, cached_fields, &match_all_fields);
+            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
+            let fields = generate_fast_mode_fields_from_schema(
+                &stream_key,
+                &file_schema,
+                &schema,
+                &match_all_fields,
+            );
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
-                .to_string();
-            // rewrite distribution sql
-            rewrite_sql = RE_ONLY_SELECT
-                .replace(rewrite_sql.as_str(), &select_fields)
                 .to_string();
             // reset meta fields
             meta.fields.extend(fields);
@@ -455,7 +466,10 @@ impl Sql {
         for item in indexed_text.iter() {
             let mut indexed_search = Vec::new();
             for field in &schema_fields {
-                if !match_all_fields.contains(&field.name().to_lowercase()) {
+                // TODO(ansrivas): Review this again
+                if !CONFIG.common.feature_fulltext_on_all_fields
+                    && !match_all_fields.contains(&field.name().to_lowercase())
+                {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
@@ -479,7 +493,9 @@ impl Sql {
         for item in fulltext.iter() {
             let mut fulltext_search = Vec::new();
             for field in &schema_fields {
-                if !match_all_fields.contains(&field.name().to_lowercase()) {
+                if !CONFIG.common.feature_fulltext_on_all_fields
+                    && !match_all_fields.contains(&field.name().to_lowercase())
+                {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
@@ -684,15 +700,15 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
-        Ok(Sql {
+        let mut sql = Sql {
             origin_sql,
-            rewrite_sql,
             org_id,
             stream_type,
             stream_name,
             meta,
             fulltext,
             aggs,
+            fields: vec![],
             sql_mode,
             fast_mode,
             schema,
@@ -700,7 +716,16 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
-        })
+        };
+
+        // calculate all needs fields
+        for field in schema_fields {
+            if check_field_in_use(&sql, field.name()) {
+                sql.fields.push(field.name().to_string());
+            }
+        }
+
+        Ok(sql)
     }
 
     /// match a source is a valid file or not
@@ -757,45 +782,89 @@ pub fn generate_filter_from_quick_text(
     filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
-pub(crate) fn generate_fast_mode_fields(
+fn check_field_in_use(sql: &Sql, field: &str) -> bool {
+    let re = Regex::new(&format!(r"\b{field}\b")).unwrap();
+    if find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
+        return true;
+    }
+    for (_, sql) in sql.aggs.iter() {
+        if find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
+            return true;
+        }
+    }
+    false
+}
+
+fn generate_fast_mode_fields_from_schema(
+    stream_key: &str,
+    file_schema: &Option<Arc<Schema>>,
     schema: &Schema,
-    cached_fields: Option<Vec<String>>,
     fts_fields: &[String],
 ) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = match cached_fields {
-        Some(v) => v,
-        None => schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_string())
-            .collect(),
+    let schema_fields = match file_schema {
+        Some(v) => v.fields(),
+        None => schema.fields(),
     };
+    // TODO: debug for schema fields
+    if schema_fields.len() < 3 {
+        log::warn!(
+            "[QUICK_MODE] schema fields is empty when generating fast mode fields from schema: {}",
+            stream_key
+        );
+        match file_schema {
+            Some(v) => {
+                log::debug!(
+                    "[QUICK_MODE] stream {}, file_list schema fields: {:?}",
+                    stream_key,
+                    v.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+                );
+            }
+            None => {
+                log::debug!("[QUICK_MODE] stream {}, file_list schema fields: NONE", stream_key);
+            }
+        }
+        log::debug!(
+            "[QUICK_MODE] stream {}, stream latest schema fields: {:?}",
+            stream_key,
+            schema.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+        );
+    }
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
-            schema_fields.into_iter().skip(skip).collect()
+            schema_fields
+                .iter()
+                .skip(skip)
+                .map(|f| f.name().to_string())
+                .collect()
         }
         "both" => {
             let mut inner_fields = schema_fields
                 .iter()
                 .take(CONFIG.limit.fast_mode_num_fields / 2)
-                .map(|f| f.to_string())
+                .map(|f| f.name().to_string())
                 .collect::<Vec<_>>();
             if schema_fields.len() > inner_fields.len() {
                 let skip = std::cmp::max(
                     0,
                     schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
                 );
-                inner_fields.extend(schema_fields.iter().skip(skip).map(|f| f.to_string()));
+                inner_fields.extend(
+                    schema_fields
+                        .iter()
+                        .skip(skip)
+                        .map(|f| f.name().to_string()),
+                );
             }
             inner_fields
         }
         _ => {
             // default is first mode
             schema_fields
-                .into_iter()
+                .iter()
                 .take(CONFIG.limit.fast_mode_num_fields)
+                .map(|f| f.name().to_string())
                 .collect()
         }
     };
@@ -822,10 +891,7 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
             "{} second",
             std::cmp::max(
                 (time_range.1 - time_range.0)
-                    / Duration::try_seconds(1)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
+                    / Duration::seconds(1).num_microseconds().unwrap()
                     / num as i64,
                 1
             )
@@ -834,47 +900,23 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
 
     let intervals = [
         (
-            Duration::try_hours(24 * 30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
+            Duration::hours(24 * 30).num_microseconds().unwrap(),
             "1 day",
         ),
         (
-            Duration::try_hours(24 * 7)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
+            Duration::hours(24 * 7).num_microseconds().unwrap(),
             "1 hour",
         ),
+        (Duration::hours(24).num_microseconds().unwrap(), "30 minute"),
+        (Duration::hours(6).num_microseconds().unwrap(), "5 minute"),
+        (Duration::hours(2).num_microseconds().unwrap(), "1 minute"),
+        (Duration::hours(1).num_microseconds().unwrap(), "30 second"),
         (
-            Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
-            "30 minute",
-        ),
-        (
-            Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
-            "5 minute",
-        ),
-        (
-            Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
-            "1 minute",
-        ),
-        (
-            Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
-            "30 second",
-        ),
-        (
-            Duration::try_minutes(30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
+            Duration::minutes(30).num_microseconds().unwrap(),
             "15 second",
         ),
         (
-            Duration::try_minutes(15)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
+            Duration::minutes(15).num_microseconds().unwrap(),
             "10 second",
         ),
     ];
@@ -968,6 +1010,53 @@ fn split_sql_token(text: &str) -> Vec<String> {
     tokens
 }
 
+async fn generate_fast_mode_fields_from_file_list(
+    session_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_range: (i64, i64),
+) -> Option<Arc<Schema>> {
+    let (time_min, time_max) = time_range;
+    let file = match crate::service::file_list::query(
+        org_id,
+        stream_name,
+        stream_type,
+        time_level,
+        time_min,
+        time_max,
+        true,
+    )
+    .await
+    {
+        Ok(file_list) => file_list.last().cloned(),
+        Err(_) => None,
+    };
+    let file = file?;
+    let file_name = file.key;
+    // read parquet file
+    let mut parquet_buf = None;
+    if file_data::memory::exist(&file_name).await {
+        if let Some(data) = file_data::memory::get(&file_name, None).await {
+            parquet_buf = Some(data);
+        }
+    }
+    if parquet_buf.is_none() {
+        let Ok(data) = storage::get(&file_name).await else {
+            return None;
+        };
+        if let Err(e) = file_data::memory::set(session_id, &file_name, data.clone()).await {
+            log::error!("set file data to memory error: {}", e);
+        }
+        parquet_buf = Some(data);
+    };
+    // read schema from parquet file
+    config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap())
+        .await
+        .ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1006,7 +1095,7 @@ mod tests {
         let resp = Sql::new(&rpc_req).await.unwrap();
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
-        assert!(resp.meta.fields.contains(&col.to_string()));
+        assert!(check_field_in_use(&resp, col));
     }
 
     #[tokio::test]
