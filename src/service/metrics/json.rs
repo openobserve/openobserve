@@ -69,7 +69,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
@@ -121,7 +121,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     )
                     .await?;
                 }
-                stream_schema_map.insert(stream_name.clone(), schema);
+                let fields_map = schema
+                    .fields()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| (f.name().to_owned(), i))
+                    .collect();
+                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema, fields_map));
             }
             continue;
         }
@@ -216,13 +222,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 )
                 .await;
             }
-            stream_schema_map.insert(stream_name.clone(), schema);
-        }
-
-        let mut new_map: HashMap<String, SchemaCache> = HashMap::new();
-        for (key, schema) in stream_schema_map.drain() {
-            let inner_map: HashMap<String, usize> = HashMap::new();
-            new_map.insert(key, SchemaCache::new(schema, inner_map));
+            let fields_map = schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect();
+            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema, fields_map));
         }
 
         // check for schema evolution
@@ -230,7 +236,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             org_id,
             &stream_name,
             StreamType::Metrics,
-            &mut new_map,
+            &mut stream_schema_map,
             record,
             timestamp,
         )
@@ -255,6 +261,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let schema = stream_schema_map
             .get(&stream_name)
             .unwrap()
+            .schema()
             .clone()
             .with_metadata(HashMap::new());
         let schema_key = schema.hash_key();
