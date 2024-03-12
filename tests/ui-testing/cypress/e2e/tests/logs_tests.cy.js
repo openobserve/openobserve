@@ -126,7 +126,7 @@ describe("Logs testcases", () => {
     logstests.attributeToNotHaveVrlFunctionvalue();
   });
 
-  it.only("should load the values of a field when the field is expanded", () => {
+  it("should load the values of a field when the field is expanded", () => {
     cy.get('[data-cy="date-time-button"]').click({ force: true });
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
