@@ -106,12 +106,9 @@ pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use datafusion::{
         arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
+            datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         assert_batches_eq,

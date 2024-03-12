@@ -273,12 +273,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         let search_condition = terms
             .iter()
-            .map(|x| format!("term ilike '%{x}%'"))
+            .map(|x| format!("term LIKE '%{x}%'"))
             .collect::<Vec<String>>()
             .join(" or ");
 
         let query = format!(
-            "SELECT file_name, term, _count, _timestamp FROM \"{}\" WHERE deleted IS FALSE AND ({})",
+            "SELECT file_name, term, _count, _timestamp, deleted FROM \"{}\" WHERE {}",
             meta.stream_name, search_condition
         );
 
@@ -299,28 +299,55 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             // should be query size * 2
             let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
             let mut total_count = 0;
+            // get deleted file
+            let deleted_files = idx_resp
+                .hits
+                .iter()
+                .filter_map(|hit| {
+                    if hit.get("deleted").unwrap().as_bool().unwrap() {
+                        Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashSet<_>>();
             let sorted_data = idx_resp
                 .hits
                 .iter()
-                .map(|hit| {
+                .filter_map(|hit| {
                     let term = hit.get("term").unwrap().as_str().unwrap().to_string();
                     let file_name = hit.get("file_name").unwrap().as_str().unwrap().to_string();
                     let timestamp = hit.get("_timestamp").unwrap().as_i64().unwrap();
                     let count = hit.get("_count").unwrap().as_u64().unwrap();
-                    total_count += count;
-                    (term, file_name, count, timestamp)
+                    if deleted_files.contains(&file_name) {
+                        None
+                    } else {
+                        total_count += count;
+                        Some((term, file_name, count, timestamp))
+                    }
                 })
                 .sorted_by(|a, b| Ord::cmp(&b.3, &a.3)); // Descending order of timestamp
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
+            println!("index got file_list: {:?}", sorted_data.len());
+
             for (term, filename, count, _timestamp) in sorted_data {
-                let current_count = term_counts.entry(term.clone()).or_insert(0);
-                if *current_count < limit_count {
-                    *current_count += count;
-                    term_map.entry(term).or_insert_with(Vec::new).push(filename);
+                let term = term.as_str();
+                for search_term in terms.iter() {
+                    if term.contains(search_term) {
+                        let current_count = term_counts.entry(search_term.to_string()).or_insert(0);
+                        if *current_count < limit_count {
+                            *current_count += count;
+                            term_map
+                                .entry(search_term.to_string())
+                                .or_insert_with(Vec::new)
+                                .push(filename.to_string());
+                        }
+                    }
                 }
             }
+            println!("term_map: {:?}", term_map);
             (
                 term_map
                     .into_iter()
@@ -342,8 +369,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         let mut idx_file_list: Vec<FileKey> = vec![];
         for filename in unique_files {
             let prefixed_filename = format!(
-                "files/{}/logs/{}/{}",
-                meta.org_id, meta.stream_name, filename
+                "files/{}/{}/{}/{}",
+                meta.org_id, stream_type, meta.stream_name, filename
             );
             if let Ok(file_meta) = file_list::get_file_meta(&prefixed_filename).await {
                 idx_file_list.push(FileKey {
@@ -369,6 +396,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             None,
         )
     };
+
+    println!("final file_list: {:?}", file_list.len());
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
@@ -830,17 +859,17 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let inverted_index_count = inverted_index_count.unwrap_or_default() as usize;
     // TODO: ingester mixed with querier will has problem.
-    // let inverted_index_total = inverted_index_count + ingester_total;
+    let inverted_index_total = inverted_index_count + ingester_total;
     log::info!("response_total: {}", total);
     log::info!("ingester_total: {}", ingester_total);
     log::info!("inverted_index_count: {}", inverted_index_count);
 
     // Maybe inverted index count is wrong, we use the max value
-    //  if inverted_index_total > total {
-    // result.set_total(inverted_index_total);
-    // } else {
-    result.set_total(total);
-    //}
+    if inverted_index_total > total {
+        result.set_total(inverted_index_total);
+    } else {
+        result.set_total(total);
+    }
     result.set_cluster_took(start.elapsed().as_millis() as usize, took_wait);
     result.set_file_count(scan_stats.files as usize);
     result.set_scan_size(scan_stats.original_size as usize);
@@ -1251,139 +1280,140 @@ mod tests {
     fn test_partition_file_by_bytes() {
         use config::meta::stream::FileMeta;
 
-        let mut vec = Vec::new();
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 100,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 1,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 200,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 30,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 90,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 256,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 5,
-                compressed_size: -1,
-            },
-            false,
-        ));
-        vec.push(FileKey::new(
-            "",
-            FileMeta {
-                min_ts: -1,
-                max_ts: -1,
-                records: -1,
-                original_size: 150,
-                compressed_size: -1,
-            },
-            false,
-        ));
+        let vec = vec![
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 100,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 1,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 200,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 30,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 90,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 256,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 5,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+            FileKey::new(
+                "",
+                FileMeta {
+                    min_ts: -1,
+                    max_ts: -1,
+                    records: -1,
+                    original_size: 150,
+                    compressed_size: -1,
+                },
+                false,
+            ),
+        ];
         let expected: Vec<Vec<i64>> = vec![
             vec![256, 256, 100],
             vec![256, 1, 256],
