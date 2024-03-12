@@ -434,7 +434,8 @@ CREATE TABLE IF NOT EXISTS meta
         r#"
 CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
 CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3, key2, key1, module);
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3, key2, key1, module) where module ='schema';
         "#,
     )
     .execute(&*client)
