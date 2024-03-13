@@ -319,3 +319,14 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
 }
+
+#[get("/stream_fields/{org_id}/{stream_type}/{stream_name}")]
+async fn stream_fields(path: web::Path<(String, String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, stream_type, stream_name) = path.into_inner();
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let r = STREAM_SCHEMAS_FIELDS.read().await;
+    Ok(MetaHttpResponse::json(match r.get(&key) {
+        Some((updated, fields)) => json::json!({"updated_at": *updated, "fields": fields}),
+        None => json::json!({"updated_at": 0, "fields": []}),
+    }))
+}

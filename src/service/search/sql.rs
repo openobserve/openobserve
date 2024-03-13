@@ -16,37 +16,31 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
-    sync::Arc,
 };
 
 use chrono::Duration;
 use config::{
-    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    meta::stream::{FileKey, StreamType},
     utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
-use infra::{
-    cache::file_data,
-    errors::{Error, ErrorCodes},
-    storage,
-};
+use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::meta::{
-        sql::{Sql as MetaSql, SqlOperator},
-        stream::{StreamParams, StreamPartition},
+    common::{
+        infra::config::STREAM_SCHEMAS_FIELDS,
+        meta::{
+            sql::{Sql as MetaSql, SqlOperator},
+            stream::{StreamParams, StreamPartition},
+        },
     },
     handler::grpc::cluster_rpc,
-    service::{
-        db,
-        search::match_source,
-        stream::{get_stream_setting_fts_fields, stream_settings, unwrap_partition_time_level},
-    },
+    service::{db, search::match_source, stream::get_stream_setting_fts_fields},
 };
 
 const SQL_DELIMITERS: [u8; 12] = [
@@ -121,11 +115,6 @@ impl Display for SqlMode {
 
 impl Sql {
     pub async fn new(req: &cluster_rpc::SearchRequest) -> Result<Sql, Error> {
-        let session_id = if req.job.as_ref().is_some() {
-            req.job.as_ref().unwrap().session_id.clone()
-        } else {
-            String::new()
-        };
         let req_query = req.query.as_ref().unwrap();
         let req_time_range = (req_query.start_time, req_query.end_time);
         let org_id = req.org_id.clone();
@@ -377,9 +366,6 @@ impl Sql {
             Err(_) => Schema::empty(),
         };
         let schema_fields = schema.fields().to_vec();
-        let stream_settings = stream_settings(&schema).unwrap_or_default();
-        let partition_time_level =
-            unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
         // fetch fts fields
         let mut fts_terms = HashSet::new();
@@ -399,26 +385,18 @@ impl Sql {
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let file_schema = if CONFIG.limit.fast_mode_file_list_enabled {
-                generate_fast_mode_fields_from_file_list(
-                    &session_id,
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    partition_time_level,
-                    meta.time_range.unwrap_or_default(),
-                )
-                .await
+            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
+            let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
+                STREAM_SCHEMAS_FIELDS
+                    .read()
+                    .await
+                    .get(&stream_key)
+                    .map(|v| v.1.clone())
             } else {
                 None
             };
-            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
-            let fields = generate_fast_mode_fields_from_schema(
-                &stream_key,
-                &file_schema,
-                &schema,
-                &match_all_fields,
-            );
+            let fields =
+                generate_fast_mode_fields(&stream_key, &schema, cached_fields, &match_all_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -794,16 +772,20 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
     false
 }
 
-fn generate_fast_mode_fields_from_schema(
+fn generate_fast_mode_fields(
     stream_key: &str,
-    file_schema: &Option<Arc<Schema>>,
     schema: &Schema,
+    cached_fields: Option<Vec<String>>,
     fts_fields: &[String],
 ) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = match file_schema {
-        Some(v) => v.fields(),
-        None => schema.fields(),
+    let schema_fields = match cached_fields.clone() {
+        Some(v) => v,
+        None => schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect(),
     };
     // TODO: debug for schema fields
     if schema_fields.len() < 3 {
@@ -811,12 +793,12 @@ fn generate_fast_mode_fields_from_schema(
             "[QUICK_MODE] schema fields is empty when generating fast mode fields from schema: {}",
             stream_key
         );
-        match file_schema {
+        match cached_fields {
             Some(v) => {
                 log::debug!(
                     "[QUICK_MODE] stream {}, file_list schema fields: {:?}",
                     stream_key,
-                    v.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+                    v
                 );
             }
             None => {
@@ -835,38 +817,28 @@ fn generate_fast_mode_fields_from_schema(
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
-            schema_fields
-                .iter()
-                .skip(skip)
-                .map(|f| f.name().to_string())
-                .collect()
+            schema_fields.into_iter().skip(skip).collect()
         }
         "both" => {
             let mut inner_fields = schema_fields
                 .iter()
                 .take(CONFIG.limit.fast_mode_num_fields / 2)
-                .map(|f| f.name().to_string())
+                .map(|f| f.to_string())
                 .collect::<Vec<_>>();
             if schema_fields.len() > inner_fields.len() {
                 let skip = std::cmp::max(
                     0,
                     schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
                 );
-                inner_fields.extend(
-                    schema_fields
-                        .iter()
-                        .skip(skip)
-                        .map(|f| f.name().to_string()),
-                );
+                inner_fields.extend(schema_fields.iter().skip(skip).map(|f| f.to_string()));
             }
             inner_fields
         }
         _ => {
             // default is first mode
             schema_fields
-                .iter()
+                .into_iter()
                 .take(CONFIG.limit.fast_mode_num_fields)
-                .map(|f| f.name().to_string())
                 .collect()
         }
     };
@@ -1010,53 +982,6 @@ fn split_sql_token(text: &str) -> Vec<String> {
         }
     }
     tokens
-}
-
-async fn generate_fast_mode_fields_from_file_list(
-    session_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_level: PartitionTimeLevel,
-    time_range: (i64, i64),
-) -> Option<Arc<Schema>> {
-    let (time_min, time_max) = time_range;
-    let file = match crate::service::file_list::query(
-        org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-        true,
-    )
-    .await
-    {
-        Ok(file_list) => file_list.last().cloned(),
-        Err(_) => None,
-    };
-    let file = file?;
-    let file_name = file.key;
-    // read parquet file
-    let mut parquet_buf = None;
-    if file_data::memory::exist(&file_name).await {
-        if let Some(data) = file_data::memory::get(&file_name, None).await {
-            parquet_buf = Some(data);
-        }
-    }
-    if parquet_buf.is_none() {
-        let Ok(data) = storage::get(&file_name).await else {
-            return None;
-        };
-        if let Err(e) = file_data::memory::set(session_id, &file_name, data.clone()).await {
-            log::error!("set file data to memory error: {}", e);
-        }
-        parquet_buf = Some(data);
-    };
-    // read schema from parquet file
-    config::utils::parquet::read_schema_from_bytes(parquet_buf.as_ref().unwrap())
-        .await
-        .ok()
 }
 
 #[cfg(test)]

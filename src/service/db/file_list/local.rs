@@ -47,25 +47,25 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
             break;
         }
     }
-    if CONFIG.common.meta_store_external {
-        return Ok(());
+    if !CONFIG.common.meta_store_external {
+        // write into local cache for s3
+        let mut write_buf = json::to_vec(&file_data)?;
+        write_buf.push(b'\n');
+        let file = wal::get_or_create(
+            0,
+            StreamParams::new("", "", StreamType::Filelist),
+            None,
+            &date_key,
+        )
+        .await;
+        file.write(write_buf.as_ref()).await;
     }
 
-    // write into local cache for s3
-    let mut write_buf = json::to_vec(&file_data)?;
-    write_buf.push(b'\n');
-    let file = wal::get_or_create(
-        0,
-        StreamParams::new("", "", StreamType::Filelist),
-        None,
-        &date_key,
-    )
-    .await;
-    file.write(write_buf.as_ref()).await;
-
     // notifiy other nodes
-    let mut q = BROADCAST_QUEUE.write().await;
-    q.push(file_data);
+    if !CONFIG.common.meta_store_external || CONFIG.memory_cache.cache_latest_files {
+        let mut q = BROADCAST_QUEUE.write().await;
+        q.push(file_data);
+    }
 
     Ok(())
 }
