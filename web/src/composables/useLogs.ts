@@ -924,7 +924,10 @@ const useLogs = () => {
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
 
-      if (!searchObj.data.stream.streamLists?.length) {
+      if (
+        !searchObj.data.stream.streamLists?.length ||
+        searchObj.data.stream.selectedStream.value == ""
+      ) {
         searchObj.loading = false;
         return;
       }
@@ -1954,7 +1957,7 @@ const useLogs = () => {
     } else {
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.queryResults = {
-        hits: []
+        hits: [],
       };
       searchObj.data.sortedQueryResults = [];
       searchObj.data.histogram = {
@@ -1969,6 +1972,7 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
+      extractFields();
     }
   };
 
