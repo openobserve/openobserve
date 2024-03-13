@@ -35,7 +35,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             let start_dt: i64 = meta.get("start_dt").unwrap().clone().parse().unwrap();
             db.put(
                 &key,
-                json::to_vec(&schema).unwrap().into(),
+                json::to_vec(&vec![schema]).unwrap().into(),
                 NO_NEED_WATCH,
                 start_dt,
             )
