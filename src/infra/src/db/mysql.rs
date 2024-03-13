@@ -145,7 +145,13 @@ impl super::Db for MysqlDb {
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        need_watch: bool,
+        updated_at: Option<i64>,
+    ) -> Result<()> {
         // event watch
         if need_watch {
             // find all keys then send event
@@ -157,7 +163,10 @@ impl super::Db for MysqlDb {
             let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if let Err(e) = cluster_coordinator.delete(&key, false, true).await {
+                    if let Err(e) = cluster_coordinator
+                        .delete(&key, false, true, updated_at)
+                        .await
+                    {
                         log::error!("[MYSQL] send event error: {}", e);
                     }
                 }
@@ -185,6 +194,13 @@ impl super::Db for MysqlDb {
                 module, key1, key2
             )
         };
+
+        let sql = if let Some(updated_at) = updated_at {
+            sql.replace(';', &format!(" AND updated_at = {};", updated_at))
+        } else {
+            sql
+        };
+
         let pool = CLIENT.clone();
         sqlx::query(&sql).execute(&pool).await?;
 
@@ -272,6 +288,9 @@ impl super::Db for MysqlDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+    async fn add_updated_at_column(&self) -> Result<()> {
+        add_updated_at_column().await
+    }
 }
 
 pub async fn create_table() -> Result<()> {
@@ -327,5 +346,40 @@ async fn create_index_item(sql: &str) -> Result<()> {
         log::error!("[MYSQL] create table meta index error: {}", e);
         return Err(e.into());
     }
+    Ok(())
+}
+
+async fn add_updated_at_column() -> Result<()> {
+    let pool = CLIENT.clone();
+    // create table
+    if let Err(e) = sqlx::query(
+        r#"
+    ALTER TABLE meta
+    ADD COLUMN updated_at BIGINT not null DEFAULT 0;
+
+    DROP INDEX IF EXISTS meta_module_key2_idx;
+        "#,
+    )
+    .execute(&pool)
+    .await
+    {
+        if e.to_string().contains("Duplicate key") {
+            // index already exists
+            return Ok(());
+        }
+        log::error!("[MYSQL] create table meta index error: {}", e);
+        return Err(e.into());
+    }
+
+    create_index_item(
+         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';",
+     )
+     .await?;
+
+    create_index_item(
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2, key1, module) where module ='schema';",
+    )
+    .await?;
+
     Ok(())
 }
