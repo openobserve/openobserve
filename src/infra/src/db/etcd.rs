@@ -110,7 +110,7 @@ impl super::Db for Etcd {
         key: &str,
         value: Bytes,
         _need_watch: bool,
-        _created_at: i64,
+        _updated_at: i64,
     ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
