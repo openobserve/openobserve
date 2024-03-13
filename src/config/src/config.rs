@@ -194,6 +194,7 @@ pub struct Config {
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
+    pub rum: RUM,
 }
 
 #[derive(EnvConfig)]
@@ -518,8 +519,10 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // in second
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 10)] // in second
     pub keep_alive: u64,
+    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
@@ -532,6 +535,8 @@ pub struct Limit {
     pub fast_mode_strategy: String, // first, last, both
     #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
     pub fast_mode_file_list_enabled: bool,
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
+    pub fast_mode_file_list_interval: i64,
 }
 
 #[derive(EnvConfig)]
@@ -724,6 +729,30 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+}
+
+#[derive(Debug, EnvConfig)]
+pub struct RUM {
+    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
+    pub enabled: bool,
+    #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
+    pub client_token: String,
+    #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
+    pub application_id: String,
+    #[env_config(name = "ZO_RUM_SITE", default = "")]
+    pub site: String,
+    #[env_config(name = "ZO_RUM_SERVICE", default = "")]
+    pub service: String,
+    #[env_config(name = "ZO_RUM_ENV", default = "")]
+    pub env: String,
+    #[env_config(name = "ZO_RUM_VERSION", default = "")]
+    pub version: String,
+    #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
+    pub organization_identifier: String,
+    #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
+    pub api_version: String,
+    #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
+    pub insecure_http: bool,
 }
 
 pub fn init() -> Config {
