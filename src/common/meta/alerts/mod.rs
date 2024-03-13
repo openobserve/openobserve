@@ -47,6 +47,10 @@ pub struct Alert {
     pub description: String,
     #[serde(default)]
     pub enabled: bool,
+    #[serde(default)]
+    /// Timezone offset in minutes.
+    /// The negative secs means the Western Hemisphere
+    pub tz_offset: i32,
 }
 
 impl PartialEq for Alert {
@@ -72,6 +76,7 @@ impl Default for Alert {
             row_template: "".to_string(),
             description: "".to_string(),
             enabled: false,
+            tz_offset: 0, // UTC
         }
     }
 }
@@ -86,7 +91,20 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub frequency: i64, // 1 minute
     #[serde(default)]
+    pub cron: String, // Cron Expression
+    #[serde(default)]
+    pub frequency_type: AlertFrequencyType,
+    #[serde(default)]
     pub silence: i64, // silence for 10 minutes after fire an alert
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub enum AlertFrequencyType {
+    #[serde(rename = "cron")]
+    Cron,
+    #[serde(rename = "minutes")]
+    #[default]
+    Minutes,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
