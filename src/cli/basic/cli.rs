@@ -108,7 +108,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .value_name("file")
                         .help("the parquet file name"),
                 ),
+            clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
         ])
+        
         .get_matches();
 
     if app.subcommand().is_none() {
@@ -251,6 +253,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "export" => {
             return export::Export::operator(dataCli::arg_matches(command.clone()));
+        }
+         "migrate-schemas" => {
+            println!("Running schema migration to row per schema version");
+            migration::schema::run().await?
         }
         _ => {
             return Err(anyhow::anyhow!("unsupport sub command: {name}"));

@@ -173,11 +173,20 @@ impl super::Db for DynamoDb {
     }
 
     // TODO: support prefix mode
-    async fn delete(&self, in_key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        in_key: &str,
+        _with_prefix: bool,
+        need_watch: bool,
+        updated_at: Option<i64>,
+    ) -> Result<()> {
         // event watch
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
-            if let Err(e) = cluster_coordinator.delete(in_key, false, true).await {
+            if let Err(e) = cluster_coordinator
+                .delete(in_key, false, true, updated_at)
+                .await
+            {
                 log::error!("[DYNAMODB] send event error: {}", e);
             }
         }
@@ -448,6 +457,9 @@ impl super::Db for DynamoDb {
     }
 
     async fn close(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn add_updated_at_column(&self) -> Result<()> {
         Ok(())
     }
 }

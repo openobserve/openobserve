@@ -300,7 +300,7 @@ pub async fn delete(
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let db = infra_db::get_db().await;
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting schema: {}", e);

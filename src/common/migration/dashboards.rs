@@ -41,7 +41,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             .await
         {
             Ok(_) => {
-                let _ = db.delete(&key, false, infra_db::NO_NEED_WATCH).await;
+                let _ = db.delete(&key, false, infra_db::NO_NEED_WATCH, None).await;
                 println!("Migrated dashboard: {} successfully", key);
             }
             Err(_) => {

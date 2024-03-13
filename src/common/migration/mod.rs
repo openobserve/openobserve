@@ -18,6 +18,7 @@ use config::CONFIG;
 pub mod dashboards;
 pub mod file_list;
 pub mod meta;
+pub mod schema;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
     if !CONFIG.common.local_mode || old_ver >= new_ver {

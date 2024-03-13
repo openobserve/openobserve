@@ -154,7 +154,7 @@ pub async fn get(org_id: &str) -> Result<Organization, anyhow::Error> {
 pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("{ORG_KEY_PREFIX}/{}", org_id);
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting function: {}", e);

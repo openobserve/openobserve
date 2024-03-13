@@ -132,7 +132,7 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting user: {}", e);
@@ -279,7 +279,7 @@ pub async fn root_user_exists() -> bool {
 pub async fn reset() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = "/user/";
-    db.delete(key, true, infra_db::NO_NEED_WATCH).await?;
+    db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 

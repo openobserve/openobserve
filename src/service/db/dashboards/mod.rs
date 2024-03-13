@@ -181,12 +181,14 @@ pub(crate) async fn delete(
 ) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let db = infra_db::get_db().await;
-    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
+    Ok(db
+        .delete(&key, false, infra_db::NO_NEED_WATCH, None)
+        .await?)
 }
 
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
     let db = infra_db::get_db().await;
-    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
+    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?)
 }

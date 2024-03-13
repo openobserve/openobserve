@@ -88,7 +88,13 @@ impl super::Db for SledDb {
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        _need_watch: bool,
+        _updated_at: Option<i64>,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         if !with_prefix {
@@ -215,6 +221,9 @@ impl super::Db for SledDb {
     }
 
     async fn close(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn add_updated_at_column(&self) -> Result<()> {
         Ok(())
     }
 }

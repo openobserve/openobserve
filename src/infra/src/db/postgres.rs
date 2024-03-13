@@ -167,7 +167,13 @@ impl super::Db for PostgresDb {
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        need_watch: bool,
+        updated_at: Option<i64>,
+    ) -> Result<()> {
         // event watch
         if need_watch {
             // find all keys then send event
@@ -179,7 +185,10 @@ impl super::Db for PostgresDb {
             let cluster_coordinator = super::get_coordinator().await;
             tokio::task::spawn(async move {
                 for key in items {
-                    if let Err(e) = cluster_coordinator.delete(&key, false, true).await {
+                    if let Err(e) = cluster_coordinator
+                        .delete(&key, false, true, updated_at)
+                        .await
+                    {
                         log::error!("[POSTGRES] send event error: {}", e);
                     }
                 }
@@ -207,6 +216,13 @@ impl super::Db for PostgresDb {
                 module, key1, key2
             )
         };
+
+        let sql = if let Some(updated_at) = updated_at {
+            sql.replace(';', &format!(" AND updated_at = {};", updated_at))
+        } else {
+            sql
+        };
+
         let pool = CLIENT.clone();
         sqlx::query(&sql).execute(&pool).await?;
 
@@ -315,6 +331,11 @@ impl super::Db for PostgresDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+
+    async fn add_updated_at_column(&self) -> Result<()> {
+        Ok(())
+        // add_updated_at_column().await
+    }
 }
 
 pub async fn create_table() -> Result<()> {
@@ -355,10 +376,15 @@ CREATE TABLE IF NOT EXISTS meta
          "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';",
      )
      .await?;
-    create_index_item(
+    match create_index_item(
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2, key1, module) where module ='schema';",
     )
-    .await?;
+    .await{
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("[POSTGRES] create table meta meta_module_updated_at_idx error: {}", e);
+        }
+    }
 
     Ok(())
 }
@@ -371,3 +397,45 @@ async fn create_index_item(sql: &str) -> Result<()> {
     }
     Ok(())
 }
+
+// async fn add_updated_at_column() -> Result<()> {
+//     log::info!("[POSTGRES] ENTER: add_updated_at_column");
+//     let pool = CLIENT.clone();
+//     let mut tx = pool.begin().await?;
+//     // create table
+//     if let Err(_) = sqlx::query(
+//         r#"
+//     ALTER TABLE meta
+//     ADD COLUMN updated_at BIGINT not null DEFAULT 0;
+
+//     DROP INDEX IF EXISTS meta_module_key2_idx;
+//         "#,
+//     )
+//     .execute(&mut *tx)
+//     .await
+//     {
+//         if let Err(e) = tx.rollback().await {
+//             log::info!(
+//                 "[POSTGRES] rollback add column updated_at meta error: {}",
+//                 e
+//             );
+//         }
+//         // return Err(e.into());
+//     }
+//     if let Err(e) = tx.commit().await {
+//         log::info!("[POSTGRES] commit add column updated_at meta error: {}", e);
+//         // return Err(e.into());
+//     }
+
+//     create_index_item(
+//          "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module)
+// where module !='schema';",      )
+//      .await?;
+
+//     create_index_item(
+//         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2,
+// key1, module) where module ='schema';",     )
+//     .await?;
+//     log::info!("[POSTGRES] EXIT: add_updated_at_column");
+//     Ok(())
+// }

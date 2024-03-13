@@ -268,7 +268,13 @@ impl super::Db for SqliteDb {
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        need_watch: bool,
+        updated_at: Option<i64>,
+    ) -> Result<()> {
         // event watch
         if need_watch {
             // find all keys then send event
@@ -314,6 +320,12 @@ impl super::Db for SqliteDb {
                 r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
                 module, key1, key2
             )
+        };
+
+        let sql = if let Some(updated_at) = updated_at {
+            sql.replace(';', &format!(" AND updated_at = {};", updated_at))
+        } else {
+            sql
         };
 
         let client = CLIENT_RW.clone();
@@ -409,6 +421,24 @@ impl super::Db for SqliteDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+    async fn add_updated_at_column(&self) -> Result<()> {
+        println!("[SQLITE] ENTER: add_updated_at_column");
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        sqlx::query(
+            r#"
+    ALTER TABLE meta
+    ADD COLUMN updated_at INTEGER not null DEFAULT 0;
+    DROP INDEX IF EXISTS meta_module_key2_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
+    CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at, key2, key1, module) where module ='schema';
+        "#,
+        )
+        .execute(&*client)
+        .await?;
+        println!("[SQLITE] EXIT: add_updated_at_column");
+        Ok(())
+    }
 }
 
 async fn create_table() -> Result<()> {
@@ -436,10 +466,23 @@ CREATE TABLE IF NOT EXISTS meta
 CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
 CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
 CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at, key2, key1, module) where module ='schema';
+
         "#,
     )
     .execute(&*client)
     .await?;
+
+    match sqlx::query(
+        r#"
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at, key2, key1, module) where module ='schema';
+        "#,
+    )
+    .execute(&*client)
+    .await{
+        Ok(_) => {},
+        Err(e) => {
+            log::error!("[SQLITE] create meta_module_updated_at_idx index error: {}", e);
+        }
+    }
     Ok(())
 }

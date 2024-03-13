@@ -72,7 +72,9 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
-    Ok(db.delete(&key.clone(), false, infra_db::NEED_WATCH).await?)
+    Ok(db
+        .delete(&key.clone(), false, infra_db::NEED_WATCH, None)
+        .await?)
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
@@ -82,7 +84,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (item_key, item_value) in db.list(key).await? {
         let new_key = item_key.strip_prefix(key).unwrap();
         if new_key.split('/').count() < 4 {
-            _ = db.delete(&item_key, false, infra_db::NO_NEED_WATCH).await;
+            _ = db
+                .delete(&item_key, false, infra_db::NO_NEED_WATCH, None)
+                .await;
             continue;
         }
         let json_val: Trigger = json::from_slice(&item_value).unwrap();
