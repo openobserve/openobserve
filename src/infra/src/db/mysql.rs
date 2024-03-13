@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::CONFIG;
+use config::{utils::json, CONFIG};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
