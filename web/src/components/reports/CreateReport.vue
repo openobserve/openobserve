@@ -357,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         stack-label
                         type="text"
                         outlined
+                        :rules="[() => (cronError.length ? cronError : true)]"
                         dense
                         style="width: 100%"
                       />
@@ -766,6 +767,7 @@ import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import cronParser from "cron-parser";
 
 const props = defineProps({
   report: {
@@ -895,6 +897,8 @@ const emails = ref("");
 const isEditingReport = ref(false);
 
 const isFetchingReport = ref(false);
+
+const cronError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -1286,6 +1290,17 @@ const validateReportData = async () => {
       )
     ) {
       step.value = 1;
+      return;
+    }
+  }
+
+  if (formData.value.frequency.type === "cron") {
+    try {
+      cronParser.parseExpression(frequency.value.cron);
+      cronError.value = "";
+    } catch (err) {
+      cronError.value = "Invalid cron expression!";
+      step.value = 2;
       return;
     }
   }
