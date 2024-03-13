@@ -77,7 +77,7 @@ export const getUnitValue = (
   customUnit: string,
   decimals: number = 2
 ) => {
-  console.time("convertPromQLData");
+  // console.time("getUnitValue:");
   // value sign: positive = 1, negative = -1
   const sign = Math.sign(value);
   // abs value
@@ -105,25 +105,25 @@ export const getUnitValue = (
       ).toFixed(decimals);
       const finalUnit = units[unit][unitIndex].unit;
 
-      console.timeEnd("convertPromQLData");
+      // console.timeEnd("getUnitValue:");
       return { value: finalValue, unit: finalUnit };
     }
     case "custom": {
-      console.timeEnd("convertPromQLData");
+      // console.timeEnd("getUnitValue:");
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: `${customUnit ?? ""}`,
       };
     }
     case "percent-1": {
-      console.timeEnd("convertPromQLData");
+      // console.timeEnd("getUnitValue:");
       return {
         value: `${(parseFloat(value) * 100)?.toFixed(decimals) ?? 0}`,
         unit: "%",
       };
     }
     case "percent": {
-      console.timeEnd("convertPromQLData");
+      // console.timeEnd("getUnitValue:");
       return {
         value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
         unit: "%",
@@ -131,7 +131,7 @@ export const getUnitValue = (
     }
     case "default":
     default: {
-      console.timeEnd("convertPromQLData");
+      // console.timeEnd("getUnitValue:");
       return {
         value: isNaN(value) ? value : (+value)?.toFixed(decimals) ?? 0,
         unit: "",

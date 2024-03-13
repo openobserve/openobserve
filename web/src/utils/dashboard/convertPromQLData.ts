@@ -37,7 +37,7 @@ export const convertPromQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
-  console.time("convertPromQLData");
+  // console.time("convertPromQLData");
 
   // if no data than return it
   if (
@@ -46,7 +46,7 @@ export const convertPromQLData = (
     !searchQueryData[0] ||
     !panelSchema
   ) {
-    console.timeEnd("convertPromQLData");
+    // console.timeEnd("convertPromQLData");
     return { options: null };
   }
 
@@ -652,7 +652,7 @@ export const convertPromQLData = (
 
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {
-    console.timeEnd("convertPromQLData");
+    // console.timeEnd("convertPromQLData");
     return {
       options: {
         series: [],
@@ -664,7 +664,7 @@ export const convertPromQLData = (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
   // promql query will be always timeseries except gauge and metric text chart.
-  console.timeEnd("convertPromQLData");
+  // console.timeEnd("convertPromQLData");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
