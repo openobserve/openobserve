@@ -7,7 +7,7 @@ import logsdata from "../../data/logs_data.json";
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
 });
-describe("Logs testcases", () => {
+describe("Menu testcases", () => {
   let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");

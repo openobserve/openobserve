@@ -523,7 +523,7 @@ describe("Logs testcases", () => {
   });
 
 
-  it.only("should add timestamp to editor save this view and switch", () => {
+  it("should add timestamp to editor save this view and switch", () => {
     cy.wait(1000)
     cy.get('[data-test="log-table-column-1-@timestamp"] > .flex > .ellipsis').click();
     cy.get(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click();
@@ -554,10 +554,5 @@ describe("Logs testcases", () => {
     cy.get('[data-test="confirm-button"] > .q-btn__content').click({
       force: true,
     });
-
-
-
-    
-    
   });
 });
