@@ -115,13 +115,13 @@ impl super::Db for MysqlDb {
         }
         if module == "schema" {
             if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND updated_at = $4;"#,
+                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ? AND updated_at = ?;"#,
             )
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(&updated_at)
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .bind(&updated_at)            
             .execute(&mut *tx)
             .await
             {
@@ -136,12 +136,12 @@ impl super::Db for MysqlDb {
             }
         } else {
             if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ?;"#,
             )
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .execute(&mut *tx)
             .await
             {
@@ -368,19 +368,19 @@ CREATE TABLE IF NOT EXISTS meta
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
-    create_index_item(
-         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';",
-     )
-     .await?;
-    match create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2, key1, module) where module ='schema';",
-    )
-    .await{
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("[MYSQL] create table meta meta_module_updated_at_idx error: {}", e);
-        }
-    }
+    // create_index_item(
+    //      "CREATE UNIQUE INDEX  meta_module_key2_idx on meta (key2, key1, module) where module
+    // !='schema';",  )
+    //  .await?;
+    // match create_index_item(
+    //     "CREATE UNIQUE INDEX  meta_module_updated_at_idx on meta (updated_at,key2, key1, module)
+    // where module ='schema';", )
+    // .await{
+    //     Ok(_) => {}
+    //     Err(e) => {
+    //         log::error!("[MYSQL] create table meta meta_module_updated_at_idx error: {}", e);
+    //     }
+    // }
 
     Ok(())
 }
@@ -406,7 +406,7 @@ async fn add_updated_at_column() -> Result<()> {
     // Drop index if exists
     if let Err(e) = sqlx::query(
         r#"
-        DROP INDEX IF EXISTS meta_module_key2_idx;
+        DROP INDEX meta_module_key2_idx ON meta;
         "#,
     )
     .execute(&mut *tx)
@@ -449,13 +449,13 @@ async fn add_updated_at_column() -> Result<()> {
     }
 
     // Create indexes outside of the transaction
-    create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx ON meta (key2, key1, module) WHERE module != 'schema';",
-    ).await?;
+    // create_index_item(
+    //     "CREATE UNIQUE INDEX meta_module_key2_idx ON meta (key2, key1, module) WHERE module !=
+    // 'schema';", ).await?;
 
-    create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx ON meta (updated_at, key2, key1, module) WHERE module = 'schema';",
-    ).await?;
+    // create_index_item(
+    //     "CREATE UNIQUE INDEX meta_module_updated_at_idx ON meta (updated_at, key2, key1, module)
+    // WHERE module = 'schema';", ).await?;
 
     log::info!("[MYSQL] EXIT: add_updated_at_column");
     Ok(())
