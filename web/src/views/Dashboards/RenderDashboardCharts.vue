@@ -325,7 +325,6 @@ export default defineComponent({
 
     // save the dashboard value
     const saveDashboard = async () => {
-      console.time("RenderDashboardCharts:saveDashboard");
       try {
         await updateDashboard(
           store,
@@ -350,7 +349,6 @@ export default defineComponent({
         // refresh dashboard
         refreshDashboard();
       }
-      console.timeEnd("RenderDashboardCharts:saveDashboard");
     };
 
     //add panel

@@ -308,7 +308,6 @@ export default defineComponent({
     });
 
     const loadDashboard = async () => {
-      console.time("viewDashboard:loadDashboard");
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
@@ -334,7 +333,6 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
-      console.timeEnd("viewDashboard:loadDashboard");
     };
 
     const openSettingsDialog = () => {

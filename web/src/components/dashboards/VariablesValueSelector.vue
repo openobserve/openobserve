@@ -164,31 +164,20 @@ export default defineComponent({
     };
 
     const getVariablesData = async () => {
-      console.time("getVariablesData");
       if (
         isInvalidDate(props.selectedTimeDate?.start_time) ||
         isInvalidDate(props.selectedTimeDate?.end_time)
       ) {
-        console.timeEnd("getVariablesData");
         return;
       }
-      console.time("getVariablesData:clone-variablesConfigList");
-      console.log(
-        "getVariablesData",
-        props.variablesConfig,
-        props.selectedTimeDate
-      );
 
       // do we have variables & date?
       if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
         variablesData.values = [];
         variablesData.isVariablesLoading = false;
         emitVariablesData();
-        console.timeEnd("getVariablesData:clone-variablesConfigList");
-        console.timeEnd("getVariablesData");
         return;
       }
-      console.timeEnd("getVariablesData:clone-variablesConfigList");
 
       const variablesConfigList =
         JSON.parse(JSON.stringify(props.variablesConfig?.list)) || [];
@@ -260,7 +249,6 @@ export default defineComponent({
                 type: it.query_data.stream_type,
               })
               .then((res: any) => {
-                console.time("getVariablesData:query_values then");
                 obj.isLoading = false;
                 if (res.data.hits.length) {
                   //set options value from the api response
@@ -294,7 +282,6 @@ export default defineComponent({
                   variablesData.values[index] = obj;
 
                   emitVariablesData();
-                  console.timeEnd("getVariablesData:query_values then");
                   return obj;
                 } else {
                   variablesData.isVariablesLoading = variablesData.values.some(
@@ -305,12 +292,10 @@ export default defineComponent({
                   variablesData.values[index] = obj;
 
                   emitVariablesData();
-                  console.timeEnd("getVariablesData:query_values then");
                   return obj;
                 }
               })
               .catch((err: any) => {
-                console.time("getVariablesData:query_values catch");
                 obj.isLoading = false;
 
                 variablesData.isVariablesLoading = variablesData.values.some(
@@ -319,19 +304,15 @@ export default defineComponent({
 
                 // triggers rerendering in the current component
                 variablesData.values[index] = obj;
-                console.timeEnd("getVariablesData:query_values catch");
                 emitVariablesData();
                 return obj;
               });
           }
           case "constant": {
-            console.time("Variables:constant");
             obj.value = it.value;
-            console.timeEnd("Variables:constant");
             return obj;
           }
           case "textbox": {
-            console.time("Variables:textbox");
             let oldVariableObjectSelectedValue = oldVariableValue.find(
               (it2: any) => it2.name === it.name
             );
@@ -340,11 +321,9 @@ export default defineComponent({
             } else {
               obj.value = it.value;
             }
-            console.timeEnd("Variables:textbox");
             return obj;
           }
           case "custom": {
-            console.time("Variables:custom");
             obj["options"] = it?.options;
             let oldVariableObjectSelectedValue = oldVariableValue.find(
               (it2: any) => it2.name === it.name
@@ -355,7 +334,6 @@ export default defineComponent({
             } else {
               obj.value = obj.options[0]?.value || "";
             }
-            console.timeEnd("Variables:custom");
             return obj;
             // break;
           }
@@ -438,7 +416,6 @@ export default defineComponent({
             //     emitVariablesData();
             //     return obj;
             //   });
-            console.time("Variables:dynamic_filters");
             obj.isLoading = false; // Set loading state
             let oldVariableObjectSelectedValue = oldVariableValue.find(
               (it2: any) => it2.name === it.name
@@ -449,7 +426,6 @@ export default defineComponent({
               obj.value = it.value;
             }
             emitVariablesData();
-            console.timeEnd("Variables:dynamic_filters");
             return obj;
           }
           default:
@@ -471,7 +447,6 @@ export default defineComponent({
           variablesData.isVariablesLoading = false;
           emitVariablesData();
         });
-      console.timeEnd("getVariablesData");
     };
     return {
       props,

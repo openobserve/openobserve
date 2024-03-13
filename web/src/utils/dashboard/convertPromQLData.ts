@@ -37,7 +37,6 @@ export const convertPromQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
-  console.time("convertPromQLData");
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -154,20 +153,15 @@ export const convertPromQLData = (
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
       extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
       formatter: function (name: any) {
-        console.time("convertPromQLData: Tooltip:formatter");
         // show tooltip for hovered panel only for other we only need axis so just return empty string
         if (
           hoveredSeriesState?.value &&
           panelSchema.id &&
           hoveredSeriesState?.value?.panelId != panelSchema.id
-        ) {
-          console.timeEnd("convertPromQLData: Tooltip:formatter");
+        )
           return "";
-        }
-        if (name.length == 0) {
-          console.timeEnd("convertPromQLData: Tooltip:formatter");
-          return "";
-        }
+
+        if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
 
@@ -220,7 +214,6 @@ export const convertPromQLData = (
           }
         });
 
-        console.timeEnd("convertPromQLData: Tooltip:formatter");
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       },
       axisPointer: {
@@ -333,27 +326,26 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
-  console.time("convertPromQLData-map-1: searchQueryData");
   const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
     panelSchema.type
   );
 
-  // date cache for converting milli seconds to date(local time)
-  const dateCache: any = {};
-  const convertMilliSecondsToDate = (milliseconds: number) => {
-    if (!dateCache[milliseconds]) {
-      const dateObj = new Date(milliseconds);
+  // // date cache for converting milli seconds to date(local time)
+  // const dateCache: any = {};
+  // const convertMilliSecondsToDate = (milliseconds: number) => {
+  //   if (!dateCache[milliseconds]) {
+  //     const dateObj = new Date(milliseconds);
 
-      // if utc then simply return the values by removing z from string
-      // else convert time from utc to zoned
-      // used slice to remove Z from isostring to pass as a utc
-      dateCache[milliseconds] =
-        store.state.timezone === "UTC"
-          ? dateObj.toISOString().slice(0, -1)
-          : utcToZonedTime(dateObj, store.state.timezone);
-    }
-    return dateCache[milliseconds];
-  };
+  //     // if utc then simply return the values by removing z from string
+  //     // else convert time from utc to zoned
+  //     // used slice to remove Z from isostring to pass as a utc
+  //     dateCache[milliseconds] =
+  //       store.state.timezone === "UTC"
+  //         ? dateObj.toISOString().slice(0, -1)
+  //         : utcToZonedTime(dateObj, store.state.timezone);
+  //   }
+  //   return dateCache[milliseconds];
+  // };
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -364,8 +356,6 @@ export const convertPromQLData = (
         switch (it?.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
-              // console.time("convertPromQLData-map-2: result");
-
               // Now, we are using xaxisData which will be sorted by the timestamp
               // const values = metric.values.sort(
               //   (a: any, b: any) => a[0] - b[0]
@@ -612,11 +602,8 @@ export const convertPromQLData = (
       }
     }
   });
-  console.timeEnd("convertPromQLData-map-1: searchQueryData");
 
-  // console.time("convertPromQLData: options: flat options");
   options.series = options.series.flat();
-  // console.timeEnd("convertPromQLData: options: flat options");
 
   const calculateWidthText = (text: string): number => {
     if (!text) return 0;
@@ -690,7 +677,6 @@ export const convertPromQLData = (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
-  console.timeEnd("convertPromQLData");
   // promql query will be always timeseries except gauge and metric text chart.
   return {
     options,
@@ -705,7 +691,6 @@ export const convertPromQLData = (
  * @param {string} label - The label template for the legend name. If null or empty, the metric object will be converted to a JSON string and returned.
  * @return {string} The legend name with the placeholders replaced by the corresponding values from the metric object.
  */
-console.time("convertPromQLData:Part2");
 const getPromqlLegendName = (metric: any, label: string) => {
   if (label) {
     let template = label || "";
@@ -857,4 +842,3 @@ const getPropsByChartTypeForSeries = (type: string) => {
       };
   }
 };
-console.timeEnd("convertPromQLData:Part2");
