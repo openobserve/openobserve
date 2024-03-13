@@ -256,7 +256,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let is_inverted_index = !meta.fts_terms.is_empty();
 
-    log::warn!(
+    log::info!(
         "searching in is_agg_query {:?} is_inverted_index {:?}",
         !req.aggs.is_empty(),
         is_inverted_index
@@ -409,6 +409,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     };
 
     println!("final file_list: {:?}", file_list.len());
+    for file in &file_list {
+        println!("file: {:?}", file.key);
+    }
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
