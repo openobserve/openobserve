@@ -77,7 +77,7 @@ impl super::Db for MysqlDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let query = r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY key3 DESC;"#;
+        let query = r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY updated_at DESC;"#;
 
         let value: String = match sqlx::query_scalar(query)
             .bind(module)
@@ -99,7 +99,7 @@ impl super::Db for MysqlDb {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT IGNORE INTO meta (module, key1, key2, key3, value) VALUES (?, ?, ?, ?, '');"#,
+            r#"INSERT IGNORE INTO meta (module, key1, key2, updated_at, value) VALUES (?, ?, ?, ?, '');"#,
         )
         .bind(&module)
         .bind(&key1)
@@ -114,7 +114,7 @@ impl super::Db for MysqlDb {
             return Err(e.into());
         }
         if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND key3 = ?;"#,
+            r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND updated_at = ?;"#,
         )
         .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .bind(&module)
@@ -193,7 +193,7 @@ impl super::Db for MysqlDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, key3, value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, updated_at, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -203,7 +203,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 = '{}'", sql, key2);
         }
-        sql = format!("{} ORDER BY key3 DESC ", sql);
+        sql = format!("{} ORDER BY updated_at DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -221,7 +221,7 @@ impl super::Db for MysqlDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, key3, '' AS value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, updated_at, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -232,7 +232,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key2 = '{}'", sql, key2);
         }
 
-        sql = format!("{} ORDER BY key3 DESC ", sql);
+        sql = format!("{} ORDER BY updated_at DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -286,7 +286,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
-    key3    BIGINT not null,
+    updated_at    BIGINT not null,
     value   LONGTEXT not null
 );
         "#,
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS meta
     // create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
     //     .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX meta_module_key3_idx on meta (key3, key2, key1, module);",
+        "CREATE UNIQUE INDEX meta_module_updated_at_idx on meta (updated_at, key2, key1, module);",
     )
     .await?;
 
