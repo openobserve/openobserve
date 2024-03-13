@@ -131,7 +131,13 @@ impl super::Db for NatsDb {
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        _need_watch: bool,
+        _updated_at: Option<i64>,
+    ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         if !with_prefix {
             let key = base64::encode_url(new_key);
@@ -310,6 +316,9 @@ impl super::Db for NatsDb {
     }
 
     async fn close(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn add_updated_at_column(&self) -> Result<()> {
         Ok(())
     }
 }

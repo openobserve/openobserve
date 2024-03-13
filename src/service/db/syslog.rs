@@ -71,7 +71,12 @@ pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
 pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     Ok(db
-        .delete(&format!("/syslog/route/{id}"), false, infra_db::NEED_WATCH)
+        .delete(
+            &format!("/syslog/route/{id}"),
+            false,
+            infra_db::NEED_WATCH,
+            None,
+        )
         .await?)
 }
 

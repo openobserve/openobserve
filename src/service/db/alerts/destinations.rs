@@ -50,7 +50,7 @@ pub async fn set(org_id: &str, destination: &Destination) -> Result<(), anyhow::
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
-    Ok(db.delete(&key, false, infra_db::NEED_WATCH).await?)
+    Ok(db.delete(&key, false, infra_db::NEED_WATCH, None).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {

@@ -118,7 +118,13 @@ impl super::Db for Etcd {
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        _need_watch: bool,
+        _updated_at: Option<i64>,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
         let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
@@ -324,6 +330,9 @@ impl super::Db for Etcd {
     }
 
     async fn close(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn add_updated_at_column(&self) -> Result<()> {
         Ok(())
     }
 }

@@ -58,5 +58,7 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
 pub(crate) async fn delete(org_id: &str, folder_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("/folders/{org_id}/{folder_id}");
     let db = infra_db::get_db().await;
-    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
+    Ok(db
+        .delete(&key, false, infra_db::NO_NEED_WATCH, None)
+        .await?)
 }
