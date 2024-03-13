@@ -91,8 +91,8 @@ impl Event for Eventer {
         }
 
         // cache latest files for querier
-        let mut cached_field_stream = HashSet::new();
         if CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
+            let mut cached_field_stream = HashSet::new();
             for item in put_items.iter() {
                 let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
                 else {
