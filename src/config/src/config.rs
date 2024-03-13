@@ -19,6 +19,7 @@ use chromiumoxide::{
     browser::BrowserConfig,
     detection::{default_executable, DetectionOptions},
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
+    handler::viewport::Viewport,
 };
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
@@ -169,7 +170,12 @@ async fn init_chrome_launch_options() -> Option<BrowserConfig> {
                 CONFIG.chrome.chrome_window_width,
                 CONFIG.chrome.chrome_window_height,
             )
-            .incognito();
+            .viewport(Viewport {
+                width: CONFIG.chrome.chrome_window_width,
+                height: CONFIG.chrome.chrome_window_height,
+                device_scale_factor: Some(1.0),
+                ..Viewport::default()
+            });
 
         if CONFIG.chrome.chrome_no_sandbox {
             browser_config = browser_config.no_sandbox();
