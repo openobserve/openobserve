@@ -195,6 +195,7 @@ pub struct Config {
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
+    pub rum: RUM,
 }
 
 #[derive(EnvConfig)]
@@ -745,6 +746,30 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+}
+
+#[derive(Debug, EnvConfig)]
+pub struct RUM {
+    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
+    pub enabled: bool,
+    #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
+    pub client_token: String,
+    #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
+    pub application_id: String,
+    #[env_config(name = "ZO_RUM_SITE", default = "")]
+    pub site: String,
+    #[env_config(name = "ZO_RUM_SERVICE", default = "")]
+    pub service: String,
+    #[env_config(name = "ZO_RUM_ENV", default = "")]
+    pub env: String,
+    #[env_config(name = "ZO_RUM_VERSION", default = "")]
+    pub version: String,
+    #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
+    pub organization_identifier: String,
+    #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
+    pub api_version: String,
+    #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
+    pub insecure_http: bool,
 }
 
 pub fn init() -> Config {
