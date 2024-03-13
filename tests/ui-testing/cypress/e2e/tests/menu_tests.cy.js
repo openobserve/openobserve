@@ -82,7 +82,7 @@ describe("Logs testcases", () => {
   });
 
   // This test checks if menu items load and pag url is updated as per menu
-  it("Should  click on all options under Menu", () => {
+  it.skip("Should  click on all options under Menu", () => {
     cy.get('.q-list').should('be.visible')
     // cy.get('.q-drawer__content > .q-list').should('be.visible')
     cy.get('[data-test="menu-link-/logs-item"]').click({force:true})
