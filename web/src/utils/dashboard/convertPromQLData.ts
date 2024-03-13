@@ -54,6 +54,30 @@ export const convertPromQLData = (
     panelSchema?.config?.legends_position
   );
 
+  // get the x axis key which will be timestamp
+  let xAxisData: any = new Set();
+
+  // add all series timestamp
+  searchQueryData.forEach((queryData: any) =>
+    queryData.result.forEach((result: any) =>
+      result.values.forEach((value: any) => xAxisData.add(value[0]))
+    )
+  );
+
+  // sort the timestamp and make an array
+  xAxisData = Array.from(xAxisData).sort();
+
+  // convert timestamp to specified timezone time
+  xAxisData.forEach((value: number, index: number) => {
+    // we need both milliseconds and date (object or string)
+    xAxisData[index] = [
+      value,
+      store.state.timezone != "UTC"
+        ? utcToZonedTime(value * 1000, store.state.timezone)
+        : new Date(value * 1000).toISOString().slice(0, -1),
+    ];
+  });
+
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
     type: "scroll",
@@ -151,28 +175,36 @@ export const convertPromQLData = (
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        let hoverText = name.map((it: any) => {
-          // check if the series is the current series being hovered
-          // if have than bold it
-          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )} </strong>`;
-          // else normal text
-          else
-            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )}`;
+        let hoverText: string[] = [];
+        name.forEach((it: any) => {
+          // if data is not null than show in tooltip
+          if (it.data[1] != null) {
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
+              hoverText.push(
+                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )} </strong>`
+              );
+            // else normal text
+            else
+              hoverText.push(
+                `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  ) ?? ""
+                )}`
+              );
+          }
         });
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
@@ -297,9 +329,18 @@ export const convertPromQLData = (
         switch (it?.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
-              const values = metric.values.sort(
-                (a: any, b: any) => a[0] - b[0]
-              );
+
+              // Now, we are using xaxisData which will be sorted by the timestamp
+              // const values = metric.values.sort(
+              //   (a: any, b: any) => a[0] - b[0]
+              // );
+
+              // object, which will have timestamp as key and value as value
+              const seriesDataObj: any = {};
+              metric.values.forEach((value: any) => {
+                seriesDataObj[value[0]] = value[1];
+              });
+
               return {
                 name: getPromqlLegendName(
                   metric.metric,
@@ -308,13 +349,13 @@ export const convertPromQLData = (
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
-                data: values.map((value: any) => [
-                  store.state.timezone != "UTC"
-                    ? utcToZonedTime(value[0] * 1000, store.state.timezone)
-                    : new Date(value[0] * 1000).toISOString().slice(0, -1),
+                data: xAxisData.map((value: any) => [
+                  // value will be an array [milliseconds, date object or date string]
                   value[1],
+                  seriesDataObj[value[0]] ?? null,
                 ]),
                 ...getPropsByChartTypeForSeries(panelSchema.type),
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
 

@@ -260,6 +260,29 @@ fn remove_brackets(input: &str) -> String {
     }
 }
 
+pub fn remove_where_clause(sql: &str) -> String {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+    statements.visit(&mut RemoveWhere);
+    statements[0].to_string()
+}
+
+// A visitor that remove where clause
+struct RemoveWhere;
+
+// Visit each expression after its children have been visited
+impl VisitorMut for RemoveWhere {
+    type Break = ();
+
+    /// Invoked for any queries that appear in the AST before visiting children
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            // remove the where clause
+            select.selection = None;
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

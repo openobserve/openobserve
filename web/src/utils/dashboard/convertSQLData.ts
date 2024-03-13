@@ -266,28 +266,36 @@ export const convertSQLData = (
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        const hoverText = name.map((it: any) => {
-          // check if the series is the current series being hovered
-          // if have than bold it
-          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )} </strong>`;
-          // else normal text
-          else
-            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )}`;
+        const hoverText: string[] = [];
+        name.forEach((it: any) => {
+          // if value is not null, show in tooltip
+          if (it.value != null) {
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
+              hoverText.push(
+                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )} </strong>`
+              );
+            // else normal text
+            else
+              hoverText.push(
+                `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )}`
+              );
+          }
         });
 
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
@@ -482,13 +490,15 @@ export const convertSQLData = (
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
                 ...getPropsByChartTypeForSeries(panelSchema.type),
+                // config to connect null values
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
                 data: Array.from(
                   new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
                 ).map(
                   (it: any) =>
                     searchQueryData[0].find(
                       (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
-                    )?.[yAxis] || 0
+                    )?.[yAxis] ?? null
                 ),
               };
               return seriesObj;
@@ -508,6 +518,8 @@ export const convertSQLData = (
               )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
+            // config to connect null values
+            connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
           };
           return seriesObj;
@@ -535,28 +547,37 @@ export const convertSQLData = (
           name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
           name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-          const hoverText = name.map((it: any) => {
-            // check if the series is the current series being hovered
-            // if have than bold it
-            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-              return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                getUnitValue(
-                  it.data,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
-              )} </strong>`;
-            // else normal text
-            else
-              return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                getUnitValue(
-                  it.data,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals
-                )
-              )}`;
+          const hoverText: string[] = [];
+          name.forEach((it: any) => {
+            if (it.data != null) {
+              // check if the series is the current series being hovered
+              // if have than bold it
+              if (
+                it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              )
+                hoverText.push(
+                  `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                    getUnitValue(
+                      it.data,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals
+                    )
+                  )} </strong>`
+                );
+              // else normal text
+              else
+                hoverText.push(
+                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                    getUnitValue(
+                      it.data,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals
+                    )
+                  )}`
+                );
+            }
           });
 
           return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
@@ -572,6 +593,8 @@ export const convertSQLData = (
               )?.color || "#5960b2",
             opacity: 0.8,
             ...getPropsByChartTypeForSeries(panelSchema.type),
+            // config to connect null values
+            connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
           };
           return seriesObj;
@@ -1218,6 +1241,7 @@ export const convertSQLData = (
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
       options?.series?.map((seriesObj: any) => {
+        // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             store.state.timezone != "UTC"
@@ -1230,7 +1254,7 @@ export const convertSQLData = (
               : new Date(options?.xAxis[0]?.data[index])
                   .toISOString()
                   .slice(0, -1),
-            it,
+            it ?? null,
           ]);
         } else if (timestampField) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1238,7 +1262,7 @@ export const convertSQLData = (
               new Date(options.xAxis[0].data[index]).getTime() / 1000,
               store.state.timezone
             ),
-            it,
+            it ?? null,
           ]);
         }
       });
@@ -1267,28 +1291,35 @@ export const convertSQLData = (
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        const hoverText = name.map((it: any) => {
-          // check if the series is the current series being hovered
-          // if have than bold it
-          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )} </strong>`;
-          // else normal text
-          else
-            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )}`;
+        const hoverText: string[] = [];
+        name.forEach((it: any) => {
+          if (it.data[1] != null) {
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
+              hoverText.push(
+                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )} </strong>`
+              );
+            // else normal text
+            else
+              hoverText.push(
+                `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )}`
+              );
+          }
         });
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
@@ -1347,6 +1378,7 @@ export const convertSQLData = (
       isTimeSeriesFlag = true;
 
       options?.series?.map((seriesObj: any) => {
+        // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
             store.state.timezone != "UTC"
@@ -1355,7 +1387,7 @@ export const convertSQLData = (
                   store.state.timezone
                 )
               : new Date(options.xAxis[0].data[index]).getTime(),
-            it,
+            it ?? null,
           ]);
         } else if (isTimeStampData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1363,7 +1395,7 @@ export const convertSQLData = (
               new Date(options.xAxis[0].data[index]).getTime() / 1000,
               store.state.timezone
             ),
-            it,
+            it ?? null,
           ]);
         }
       });
@@ -1392,28 +1424,35 @@ export const convertSQLData = (
         name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
         name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
-        const hoverText = name.map((it: any) => {
-          // check if the series is the current series being hovered
-          // if have than bold it
-          if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-            return `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )} </strong>`;
-          // else normal text
-          else
-            return `${it.marker} ${it.seriesName} : ${formatUnitValue(
-              getUnitValue(
-                it.data[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals
-              )
-            )}`;
+        const hoverText: string[] = [];
+        name.forEach((it: any) => {
+          if (it.data[1] != null) {
+            // check if the series is the current series being hovered
+            // if have than bold it
+            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
+              hoverText.push(
+                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )} </strong>`
+              );
+            // else normal text
+            else
+              hoverText.push(
+                `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                  getUnitValue(
+                    it.data[1],
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals
+                  )
+                )}`
+              );
+          }
         });
 
         return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
