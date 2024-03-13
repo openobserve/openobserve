@@ -427,8 +427,7 @@ impl super::Db for SqliteDb {
         let client = client.lock().await;
         sqlx::query(
             r#"
-    ALTER TABLE meta
-    ADD COLUMN updated_at INTEGER not null DEFAULT 0;
+    ALTER TABLE meta ADD COLUMN updated_at INTEGER not null DEFAULT 0;
     DROP INDEX IF EXISTS meta_module_key2_idx;
     CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
     CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at, key2, key1, module) where module ='schema';
