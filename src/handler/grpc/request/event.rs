@@ -21,6 +21,7 @@ use config::{
     utils::parquet::read_recordbatch_from_bytes,
     CONFIG,
 };
+use hashbrown::HashSet;
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
 use tonic::{Request, Response, Status};
@@ -58,10 +59,25 @@ impl Event for Eventer {
             .filter(|v| v.deleted)
             .map(|v| v.key.clone())
             .collect::<Vec<_>>();
+
+        // Warning: external meta store should not accept any file list
         // querier and compactor can accept add new files
         // ingester only accept remove old files
-        if is_querier(&LOCAL_NODE_ROLE) || is_compactor(&LOCAL_NODE_ROLE) {
-            if let Err(e) = infra_file_list::batch_add(&put_items).await {
+        if !CONFIG.common.meta_store_external {
+            if is_querier(&LOCAL_NODE_ROLE) || is_compactor(&LOCAL_NODE_ROLE) {
+                if let Err(e) = infra_file_list::batch_add(&put_items).await {
+                    // metrics
+                    let time = start.elapsed().as_secs_f64();
+                    metrics::GRPC_RESPONSE_TIME
+                        .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                        .observe(time);
+                    metrics::GRPC_INCOMING_REQUESTS
+                        .with_label_values(&["/event/send_file_list", "500", "", "", ""])
+                        .inc();
+                    return Err(Status::internal(e.to_string()));
+                }
+            }
+            if let Err(e) = infra_file_list::batch_remove(&del_items).await {
                 // metrics
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
@@ -73,19 +89,9 @@ impl Event for Eventer {
                 return Err(Status::internal(e.to_string()));
             }
         }
-        if let Err(e) = infra_file_list::batch_remove(&del_items).await {
-            // metrics
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/event/send_file_list", "500", "", "", ""])
-                .inc();
-            return Err(Status::internal(e.to_string()));
-        }
 
         // cache latest files for querier
+        let mut cached_field_stream = HashSet::new();
         if CONFIG.memory_cache.cache_latest_files && is_querier(&LOCAL_NODE_ROLE) {
             for item in put_items.iter() {
                 let Some(node) = get_node_from_consistent_hash(&item.key, &Role::Querier).await
@@ -95,11 +101,23 @@ impl Event for Eventer {
                 if LOCAL_NODE_UUID.ne(&node) {
                     continue; // not this node
                 }
-                _ = infra::cache::file_data::download("download", &item.key).await;
-            }
-            // cache latest schema fields
-            if let Some(item) = put_items.first() {
-                _ = cache_latest_fields(&item.key).await;
+                if infra::cache::file_data::download("download", &item.key)
+                    .await
+                    .is_ok()
+                    && CONFIG.limit.fast_mode_file_list_enabled
+                {
+                    let columns = item.key.split('/').collect::<Vec<&str>>();
+                    if columns[2] == "index" || columns[2] == "metadata" {
+                        continue;
+                    }
+                    let stream_key = columns[1..4].join("/");
+                    if cached_field_stream.contains(&stream_key) {
+                        continue;
+                    }
+                    if cache_latest_fields(&stream_key, &item.key).await.is_ok() {
+                        cached_field_stream.insert(stream_key);
+                    }
+                }
             }
         }
 
@@ -116,15 +134,9 @@ impl Event for Eventer {
     }
 }
 
-async fn cache_latest_fields(file: &str) -> Result<(), anyhow::Error> {
-    if CONFIG.limit.fast_mode_file_list_enabled {
-        return Ok(());
-    }
-    let columns = file.split('/').collect::<Vec<&str>>();
-    let stream_key = columns[1..4].join("/");
-    let fr: tokio::sync::RwLockReadGuard<'_, hashbrown::HashMap<String, (i64, Vec<String>)>> =
-        STREAM_SCHEMAS_FIELDS.read().await;
-    let field_cache_time = fr.get(&stream_key).map(|v| v.0).unwrap_or(0);
+async fn cache_latest_fields(stream: &str, file: &str) -> Result<(), anyhow::Error> {
+    let fr = STREAM_SCHEMAS_FIELDS.read().await;
+    let field_cache_time = fr.get(stream).map(|v| v.0).unwrap_or(0);
     drop(fr);
 
     if field_cache_time
@@ -170,14 +182,10 @@ async fn cache_latest_fields(file: &str) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    log::debug!(
-        "cached latest stream: {}, fields: {}",
-        stream_key,
-        fields.len()
-    );
+    log::debug!("cached latest stream: {}, fields: {}", stream, fields.len());
 
     let mut fw = STREAM_SCHEMAS_FIELDS.write().await;
-    let entry = fw.entry(stream_key).or_insert((0, Vec::new()));
+    let entry = fw.entry(stream.to_string()).or_insert((0, Vec::new()));
     entry.0 = Utc::now().timestamp_micros();
     entry.1 = fields;
     drop(fw);
