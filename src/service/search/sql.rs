@@ -777,12 +777,12 @@ pub(crate) fn generate_quick_mode_fields(
             "[QUICK_MODE] schema fields is empty when generating fast mode fields from schema: {}",
             stream_key
         );
-        match file_schema {
+        match cached_fields {
             Some(v) => {
                 log::debug!(
                     "[QUICK_MODE] stream {}, file_list schema fields: {:?}",
                     stream_key,
-                    v.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+                    v,
                 );
             }
             None => {

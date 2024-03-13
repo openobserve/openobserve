@@ -511,18 +511,6 @@ fn parse_expr_for_field(
                 }
             }
         }
-        SqlExpr::IsNotNull(expr) => {
-            if let SqlExpr::Identifier(ident) = expr.as_ref() {
-                if parse_expr_check_field_name(&ident.value, field) {
-                    fields.push((
-                        ident.value.to_string(),
-                        SqlValue::String("".to_string()),
-                        SqlOperator::Eq,
-                        *expr_op,
-                    ));
-                }
-            }
-        }
         _ => {}
     }
 
