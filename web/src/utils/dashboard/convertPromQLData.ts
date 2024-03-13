@@ -37,6 +37,8 @@ export const convertPromQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
+  console.time("convertPromQLData");
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -44,6 +46,7 @@ export const convertPromQLData = (
     !searchQueryData[0] ||
     !panelSchema
   ) {
+    console.timeEnd("convertPromQLData");
     return { options: null };
   }
 
@@ -382,6 +385,8 @@ export const convertPromQLData = (
                 ]),
                 ...seriesPropsBasedOnChartType,
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
+                large:true,
+                // largeThreshold: 1
               };
             });
 
@@ -605,26 +610,6 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  const calculateWidthText = (text: string): number => {
-    if (!text) return 0;
-
-    const span = document.createElement("span");
-    document.body.appendChild(span);
-
-    span.style.font = "sans-serif";
-    span.style.fontSize = "12px";
-    span.style.height = "auto";
-    span.style.width = "auto";
-    span.style.top = "0px";
-    span.style.position = "absolute";
-    span.style.whiteSpace = "no-wrap";
-    span.innerHTML = text;
-
-    const width = Math.ceil(span.clientWidth);
-    span.remove();
-    return width;
-  };
-
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
   if (
@@ -667,6 +652,7 @@ export const convertPromQLData = (
 
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {
+    console.timeEnd("convertPromQLData");
     return {
       options: {
         series: [],
@@ -678,10 +664,31 @@ export const convertPromQLData = (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
   // promql query will be always timeseries except gauge and metric text chart.
+  console.timeEnd("convertPromQLData");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
   };
+};
+
+const calculateWidthText = (text: string): number => {
+  if (!text) return 0;
+
+  const span = document.createElement("span");
+  document.body.appendChild(span);
+
+  span.style.font = "sans-serif";
+  span.style.fontSize = "12px";
+  span.style.height = "auto";
+  span.style.width = "auto";
+  span.style.top = "0px";
+  span.style.position = "absolute";
+  span.style.whiteSpace = "no-wrap";
+  span.innerHTML = text;
+
+  const width = Math.ceil(span.clientWidth);
+  span.remove();
+  return width;
 };
 
 /**

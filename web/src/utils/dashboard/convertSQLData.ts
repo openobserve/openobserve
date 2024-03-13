@@ -35,6 +35,8 @@ export const convertSQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
+  console.time("convertSQLData");
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -43,6 +45,7 @@ export const convertSQLData = (
     !panelSchema.queries[0].fields.x ||
     !panelSchema.queries[0].fields.y
   ) {
+    console.timeEnd("convertSQLData");
     return { options: null };
   }
 
@@ -1589,6 +1592,7 @@ export const convertSQLData = (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
+  console.timeEnd("convertSQLData");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
