@@ -401,52 +401,52 @@ async fn create_index_item(sql: &str) -> Result<()> {
 async fn add_updated_at_column() -> Result<()> {
     log::info!("[MYSQL] ENTER: add_updated_at_column");
     let pool = CLIENT.clone();
-    let mut tx = pool.begin().await?;
+    //let mut tx = pool.begin().await?;
 
     // Drop index if exists
-    if let Err(e) = sqlx::query(
-        r#"
-        DROP INDEX meta_module_key2_idx ON meta;
-        "#,
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        log::error!("[MYSQL] Error in dropping index : {}", e);
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-        }
-        return Err(e.into());
-    }
+    // if let Err(e) = sqlx::query(
+    //     r#"
+    //     DROP INDEX meta_module_key2_idx ON meta;
+    //     "#,
+    // )
+    // .execute(&mut *tx)
+    // .await
+    // {
+    //     log::error!("[MYSQL] Error in dropping index : {}", e);
+    //     if let Err(e) = tx.rollback().await {
+    //         log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+    //     }
+    //     return Err(e.into());
+    // }
 
     // Commit transaction
-    if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {}", e);
-        return Err(e.into());
-    }
+    // if let Err(e) = tx.commit().await {
+    //     log::info!("[MYSQL] Error in committing transaction: {}", e);
+    //     return Err(e.into());
+    // }
 
-    let mut tx1 = pool.begin().await?;
-    // add column
-    if let Err(e) = sqlx::query(
-        r#"
-        ALTER TABLE meta ADD COLUMN updated_at BIGINT NOT NULL DEFAULT 0;
-        "#,
-    )
-    .execute(&mut *tx1)
-    .await
-    {
-        log::error!("[MYSQL] Error in  adding column: {}", e);
-        if let Err(e) = tx1.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-        }
-        return Err(e.into());
-    }
+    // let mut tx1 = pool.begin().await?;
+    // // add column
+    // if let Err(e) = sqlx::query(
+    //     r#"
+    //     ALTER TABLE meta ADD COLUMN updated_at BIGINT NOT NULL DEFAULT 0;
+    //     "#,
+    // )
+    // .execute(&mut *tx1)
+    // .await
+    // {
+    //     log::error!("[MYSQL] Error in  adding column: {}", e);
+    //     if let Err(e) = tx1.rollback().await {
+    //         log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+    //     }
+    //     return Err(e.into());
+    // }
 
-    // Commit transaction
-    if let Err(e) = tx1.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {}", e);
-        return Err(e.into());
-    }
+    // // Commit transaction
+    // if let Err(e) = tx1.commit().await {
+    //     log::info!("[MYSQL] Error in committing transaction: {}", e);
+    //     return Err(e.into());
+    // }
 
     // Create indexes outside of the transaction
     // create_index_item(
