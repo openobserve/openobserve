@@ -838,7 +838,11 @@ pub async fn send_http_notification(
     let resp = req.body(msg.clone()).send().await?;
     if !resp.status().is_success() {
         log::error!("Alert body: {}", msg);
-        return Err(anyhow::anyhow!("sent error: {:?}", resp.bytes().await));
+        return Err(anyhow::anyhow!(
+            "sent error status: {}, err: {:?}",
+            resp.status(),
+            resp.bytes().await
+        ));
     }
 
     Ok(())
