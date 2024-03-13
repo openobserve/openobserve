@@ -104,7 +104,7 @@ impl super::Db for PostgresDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&created_at)
+        .bind(&updated_at)
         .execute(&mut *tx)
         .await
         {
@@ -120,7 +120,7 @@ impl super::Db for PostgresDb {
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(&created_at)
+            .bind(&updated_at)
             .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .execute(&mut *tx)
             .await
@@ -160,7 +160,7 @@ impl super::Db for PostgresDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(&key, Bytes::from(""), true, created_at)
+                .put(&key, Bytes::from(""), true, updated_at)
                 .await?;
         }
 
