@@ -496,6 +496,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-toggle
+        v-if="
+          ['area', 'line', 'area-stacked'].includes(
+            dashboardPanelData.data.type
+          )
+        "
+        v-model="dashboardPanelData.data.config.connect_nulls"
+        label="Connect null values"
+        data-test="dashboard-config-connect-null-values"
+      />
+
+      <div class="space"></div>
+
       <q-select
         v-if="dashboardPanelData.data.type == 'geomap'"
         outlined
@@ -666,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, watch, onBeforeMount } from "vue";
+import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 
@@ -706,6 +719,11 @@ export default defineComponent({
           },
           size_fixed: 2,
         };
+      }
+
+      // by default, use connect_nulls as false
+      if (!dashboardPanelData.data.config.connect_nulls) {
+        dashboardPanelData.data.config.connect_nulls = false;
       }
     });
 
