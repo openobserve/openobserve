@@ -329,6 +329,8 @@ export const convertPromQLData = (
         switch (it?.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
+
+              // Now, we are using xaxisData which will be sorted by the timestamp
               // const values = metric.values.sort(
               //   (a: any, b: any) => a[0] - b[0]
               // );
