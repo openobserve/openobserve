@@ -559,15 +559,18 @@ export default defineComponent({
           })
           .then((res: any) => {
             if (res.data.hits.length) {
-              fieldValues.value[name]["values"] = res.data.hits
+              fieldValues.value[name]["values"] = [];
+              res.data.hits
                 .find((field: any) => field.field === name)
-                .values.map((value: any) => {
-                  return {
+                .values.forEach((value: any) => {
+                  if (!value.zo_sql_key?.toString().length) return;
+
+                  fieldValues.value[name]["values"].push({
                     key: value.zo_sql_key?.toString()
                       ? value.zo_sql_key
                       : "null",
                     count: formatLargeNumber(value.zo_sql_num),
-                  };
+                  });
                 });
             }
           })
