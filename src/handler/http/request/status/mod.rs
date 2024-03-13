@@ -80,6 +80,7 @@ struct ConfigResponse<'a> {
 
 #[derive(Serialize)]
 struct Rum {
+    pub enabled: bool,
     pub client_token: String,
     pub application_id: String,
     pub site: String,
@@ -160,6 +161,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         rum: Rum {
+            enabled: CONFIG.rum.enabled,
             client_token: CONFIG.rum.client_token.to_string(),
             application_id: CONFIG.rum.application_id.to_string(),
             site: CONFIG.rum.site.to_string(),

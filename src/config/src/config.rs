@@ -733,6 +733,8 @@ pub struct Prometheus {
 
 #[derive(Debug, EnvConfig)]
 pub struct RUM {
+    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
+    pub enabled: bool,
     #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
     pub client_token: String,
     #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
