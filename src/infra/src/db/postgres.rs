@@ -77,7 +77,7 @@ impl super::Db for PostgresDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
 
-        let query = r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY key3 DESC;"#;
+        let query = r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY updated_at DESC;"#;
 
         let value: String = match sqlx::query_scalar(query)
             .bind(module)
@@ -94,12 +94,12 @@ impl super::Db for PostgresDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, created_at: i64) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, updated_at: i64) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT INTO meta (module, key1, key2, key3, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,
+            r#"INSERT INTO meta (module, key1, key2, updated_at, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,
         )
         .bind(&module)
         .bind(&key1)
@@ -115,7 +115,7 @@ impl super::Db for PostgresDb {
         }
         if module == "schema" {
             if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
+                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND updated_at = $4;"#,
             )
             .bind(&module)
             .bind(&key1)
@@ -215,7 +215,7 @@ impl super::Db for PostgresDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2,  key3, value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2,  updated_at, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -226,7 +226,7 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
 
-        sql = format!("{} ORDER BY key3 DESC ", sql);
+        sql = format!("{} ORDER BY updated_at DESC ", sql);
 
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -265,7 +265,7 @@ impl super::Db for PostgresDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2,  key3, '' AS value FROM meta ".to_string();
+        let mut sql = "SELECT module, key1, key2,  updated_at, '' AS value FROM meta ".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -275,7 +275,7 @@ impl super::Db for PostgresDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        sql = format!("{} ORDER BY key3 DESC ", sql);
+        sql = format!("{} ORDER BY updated_at DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -329,7 +329,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
-    key3    BIGINT not null,
+    updated_at    BIGINT not null,
     value   TEXT not null
 );
         "#,
@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS meta
      )
      .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3,key2, key1, module) where module ='schema';",
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2, key1, module) where module ='schema';",
     )
     .await?;
 
