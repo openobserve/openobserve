@@ -1525,7 +1525,7 @@ export default defineComponent({
       if (isSavedViewAction.value == "create") {
         if (
           savedViewName.value == "" ||
-          /^[A-Za-z0-9 -_]+$/.test(savedViewName.value) == false
+          /^[A-Za-z0-9 \-\_]+$/.test(savedViewName.value) == false
         ) {
           $q.notify({
             message: `Please provide valid view name.`,
