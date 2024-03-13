@@ -15,7 +15,9 @@
 
 use std::{io::Cursor, path::PathBuf, sync::Arc};
 
+use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
+use futures::TryStreamExt;
 use parquet::{
     arrow::{arrow_reader::ArrowReaderMetadata, AsyncArrowWriter, ParquetRecordBatchStreamBuilder},
     basic::{Compression, Encoding},
@@ -146,6 +148,17 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     );
     let file_name = columns[8].to_string();
     Ok((stream_key, date_key, file_name))
+}
+
+pub async fn read_recordbatch_from_bytes(
+    data: &bytes::Bytes,
+) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
+    let schema_reader = Cursor::new(data.clone());
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+    let schema = arrow_reader.schema().clone();
+    let record_reader = arrow_reader.build()?;
+    let batches = record_reader.try_collect().await?;
+    Ok((schema, batches))
 }
 
 pub async fn read_schema_from_bytes(data: &bytes::Bytes) -> Result<Arc<Schema>, anyhow::Error> {

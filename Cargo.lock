@@ -2075,6 +2075,7 @@ dependencies = [
  "dashmap",
  "dotenv_config",
  "dotenvy",
+ "futures",
  "get_if_addrs",
  "getrandom",
  "gxhash",
