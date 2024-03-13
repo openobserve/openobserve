@@ -633,6 +633,13 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        // send broadcast to other nodes
+        if CONFIG.memory_cache.cache_latest_files {
+            if let Err(e) = db::file_list::broadcast::send(events, None).await {
+                log::error!("[COMPACT] send broadcast for file_list failed: {}", e);
+            }
+        }
+        // broadcast success
         success = true;
         break;
     }
