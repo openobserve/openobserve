@@ -21,7 +21,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load dashboards list
     let db = infra_db::get_db().await;
 
-    // db.add_updated_at_column().await?;
+    db.add_updated_at_column().await?;
     log::info!("[Schema:Migration]: Inside migrating schemas");
     let db_key = "/schema/".to_string();
     log::info!("[Schema:Migration]: Listing all schemas");
