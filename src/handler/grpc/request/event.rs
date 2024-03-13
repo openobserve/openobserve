@@ -107,8 +107,8 @@ impl Event for Eventer {
                     && CONFIG.limit.fast_mode_file_list_enabled
                 {
                     let columns = item.key.split('/').collect::<Vec<&str>>();
-                    if columns[2] == "index" || columns[2] == "metadata" {
-                        continue;
+                    if columns[2] != "logs" {
+                        continue; // only cache fields for logs
                     }
                     let stream_key = columns[1..4].join("/");
                     if cached_field_stream.contains(&stream_key) {
