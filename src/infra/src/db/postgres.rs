@@ -333,8 +333,7 @@ impl super::Db for PostgresDb {
     }
 
     async fn add_updated_at_column(&self) -> Result<()> {
-        Ok(())
-        // add_updated_at_column().await
+        add_updated_at_column().await
     }
 }
 
@@ -398,44 +397,43 @@ async fn create_index_item(sql: &str) -> Result<()> {
     Ok(())
 }
 
-// async fn add_updated_at_column() -> Result<()> {
-//     log::info!("[POSTGRES] ENTER: add_updated_at_column");
-//     let pool = CLIENT.clone();
-//     let mut tx = pool.begin().await?;
-//     // create table
-//     if let Err(_) = sqlx::query(
-//         r#"
-//     ALTER TABLE meta
-//     ADD COLUMN updated_at BIGINT not null DEFAULT 0;
+async fn add_updated_at_column() -> Result<()> {
+    log::info!("[POSTGRES] ENTER: add_updated_at_column");
+    let pool = CLIENT.clone();
+    let mut tx = pool.begin().await?;
 
-//     DROP INDEX IF EXISTS meta_module_key2_idx;
-//         "#,
-//     )
-//     .execute(&mut *tx)
-//     .await
-//     {
-//         if let Err(e) = tx.rollback().await {
-//             log::info!(
-//                 "[POSTGRES] rollback add column updated_at meta error: {}",
-//                 e
-//             );
-//         }
-//         // return Err(e.into());
-//     }
-//     if let Err(e) = tx.commit().await {
-//         log::info!("[POSTGRES] commit add column updated_at meta error: {}", e);
-//         // return Err(e.into());
-//     }
+    // Drop index if exists and add column
+    if let Err(e) = sqlx::query(
+        r#"
+        DROP INDEX IF EXISTS meta_module_key2_idx;
+        ALTER TABLE meta ADD COLUMN updated_at BIGINT NOT NULL DEFAULT 0;
+        "#,
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        log::error!("[POSTGRES] Error in dropping index or adding column: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+        }
+        return Err(e.into());
+    }
 
-//     create_index_item(
-//          "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module)
-// where module !='schema';",      )
-//      .await?;
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        log::info!("[POSTGRES] Error in committing transaction: {}", e);
+        return Err(e.into());
+    }
 
-//     create_index_item(
-//         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2,
-// key1, module) where module ='schema';",     )
-//     .await?;
-//     log::info!("[POSTGRES] EXIT: add_updated_at_column");
-//     Ok(())
-// }
+    // Create indexes outside of the transaction
+    create_index_item(
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx ON meta (key2, key1, module) WHERE module != 'schema';",
+    ).await?;
+
+    create_index_item(
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx ON meta (updated_at, key2, key1, module) WHERE module = 'schema';",
+    ).await?;
+
+    log::info!("[POSTGRES] EXIT: add_updated_at_column");
+    Ok(())
+}
