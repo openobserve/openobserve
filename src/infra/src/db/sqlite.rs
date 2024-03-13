@@ -190,7 +190,7 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         let value: String = match sqlx::query_scalar(
-            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY key3 DESC;"#,
+            r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY updated_at DESC;"#,
         )
         .bind(module)
         .bind(key1)
@@ -206,18 +206,18 @@ impl super::Db for SqliteDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, created_at: i64) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, updated_at: i64) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT OR IGNORE INTO meta (module, key1, key2,  key3, value) VALUES ($1, $2, $3,  $4, '');"#,
+            r#"INSERT OR IGNORE INTO meta (module, key1, key2,  updated_at, value) VALUES ($1, $2, $3,  $4, '');"#,
         )
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&created_at)
+        .bind(&updated_at)
         .execute(&mut *tx)
         .await
         {
@@ -227,12 +227,12 @@ impl super::Db for SqliteDb {
             return Err(e.into());
         }
         if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND key3 = $4;"#,
+            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND updated_at = $4;"#,
         )
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&created_at)
+        .bind(&updated_at)
         .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .execute(&mut *tx)
         .await
@@ -321,9 +321,10 @@ impl super::Db for SqliteDb {
         sqlx::query(&sql).execute(&*client).await?;
         Ok(())
     }
+
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, key3, value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, updated_at, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -333,7 +334,7 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        sql = format!("{} ORDER BY key3 DESC ", sql);
+        sql = format!("{} ORDER BY updated_at DESC ", sql);
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -351,7 +352,7 @@ impl super::Db for SqliteDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, key3, '' AS value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, updated_at, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -362,7 +363,7 @@ impl super::Db for SqliteDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
 
-        sql = format!("{} ORDER BY key3 DESC ", sql);
+        sql = format!("{} ORDER BY updated_at DESC ", sql);
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -422,7 +423,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR  not null,
     key1    VARCHAR not null,
     key2    VARCHAR not null,
-    key3    INTEGER not null,
+    updated_at    INTEGER not null,
     value   TEXT not null
 );
         "#,
@@ -435,7 +436,7 @@ CREATE TABLE IF NOT EXISTS meta
 CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
 CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
 CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key3_idx on meta (key3, key2, key1, module) where module ='schema';
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at, key2, key1, module) where module ='schema';
         "#,
     )
     .execute(&*client)

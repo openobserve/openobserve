@@ -123,7 +123,7 @@ impl super::Db for NatsDb {
         key: &str,
         value: Bytes,
         _need_watch: bool,
-        _created_at: i64,
+        _updated_at: i64,
     ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = base64::encode_url(new_key);

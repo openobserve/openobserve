@@ -94,7 +94,7 @@ impl super::Db for MysqlDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, created_at: i64) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, updated_at: i64) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
@@ -104,7 +104,7 @@ impl super::Db for MysqlDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&created_at)
+        .bind(&updated_at)
         .execute(&mut *tx)
         .await
         {
@@ -120,7 +120,7 @@ impl super::Db for MysqlDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&created_at)
+        .bind(&updated_at)
         .execute(&mut *tx)
         .await
         {
@@ -138,7 +138,7 @@ impl super::Db for MysqlDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(key, Bytes::from(""), true, created_at)
+                .put(key, Bytes::from(""), true, updated_at)
                 .await?;
         }
 

@@ -80,7 +80,7 @@ impl super::Db for SledDb {
         key: &str,
         value: Bytes,
         _need_watch: bool,
-        _created_at: i64,
+        _updated_at: i64,
     ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();

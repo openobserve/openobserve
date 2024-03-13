@@ -100,7 +100,7 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, created_at: i64) -> Result<()>;
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, updated_at: i64) -> Result<()>;
     async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()>;
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.
