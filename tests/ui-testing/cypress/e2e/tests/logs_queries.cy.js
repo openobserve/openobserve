@@ -72,9 +72,9 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/functions**").as("functions");
     cy.visit(`${logData.logsUrl}?org_identifier=${Cypress.env("ORGNAME")}`);
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
-    cy.wait("@allsearch");
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
-    applyQueryButton
+    applyQueryButton()
+    cy.wait("@allsearch");
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });
 
