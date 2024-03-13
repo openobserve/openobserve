@@ -35,8 +35,6 @@ export const convertSQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
-  // console.time("convertSQLData");
-
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -45,7 +43,6 @@ export const convertSQLData = (
     !panelSchema.queries[0].fields.x ||
     !panelSchema.queries[0].fields.y
   ) {
-    // console.timeEnd("convertSQLData");
     return { options: null };
   }
 
@@ -258,20 +255,16 @@ export const convertSQLData = (
           return "";
         if (name.length == 0) return "";
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
-        if (hoveredSeriesState?.value?.hoveredSeriesName) {
-          // get the current series index from name
-          const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-          );
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) =>
+            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+        );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
-        }
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
@@ -308,61 +301,64 @@ export const convertSQLData = (
         return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
-    xAxis: xAxisKeys?.map((key: any, index: number) => {
-      const data = getAxisDataFromKey(key);
+    xAxis: xAxisKeys
+      ?.map((key: any, index: number) => {
+        const data = getAxisDataFromKey(key);
 
-      //unique value index array
-      const arr: any = [];
-      for (let i = 0; i < data.length; i++) {
-        if (i == 0 || data[i] != data[i - 1]) arr.push(i);
-      }
+        //unique value index array
+        const arr: any = [];
+        for (let i = 0; i < data.length; i++) {
+          if (i == 0 || data[i] != data[i - 1]) arr.push(i);
+        }
 
-      return {
-        type: "category",
-        position: panelSchema.type == "h-bar" ? "left" : "bottom",
-        name: index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
-        nameLocation: "middle",
-        nameGap: 9 * (xAxisKeys.length - index + 1),
-        nameTextStyle: {
-          fontWeight: "bold",
-          fontSize: 14,
-        },
-        axisLabel: {
-          interval:
-            panelSchema.type == "h-stacked"
-              ? "auto"
-              : index == xAxisKeys.length - 1
-              ? "auto"
-              : function (i: any) {
-                  return arr.includes(i);
-                },
-          overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
-          // hide axis label if overlaps
-          hideOverlap: true,
-          width: 100,
-          margin: 18 * (xAxisKeys.length - index - 1) + 5,
-        },
-        splitLine: {
-          show: true,
-        },
-        axisLine: {
-          show: panelSchema.config?.axis_border_show || false,
-        },
-        axisTick: {
-          show: xAxisKeys.length == 1 ? false : true,
-          align: "left",
-          alignWithLabel: false,
-          length: 20 * (xAxisKeys.length - index),
-          interval:
-            panelSchema.type == "h-stacked"
-              ? "auto"
-              : function (i: any) {
-                  return arr.includes(i);
-                },
-        },
-        data: data,
-      };
-    }),
+        return {
+          type: "category",
+          position: panelSchema.type == "h-bar" ? "left" : "bottom",
+          name:
+            index == 0 ? panelSchema.queries[0]?.fields?.x[index]?.label : "",
+          nameLocation: "middle",
+          nameGap: 9 * (xAxisKeys.length - index + 1),
+          nameTextStyle: {
+            fontWeight: "bold",
+            fontSize: 14,
+          },
+          axisLabel: {
+            interval:
+              panelSchema.type == "h-stacked"
+                ? "auto"
+                : index == xAxisKeys.length - 1
+                ? "auto"
+                : function (i: any) {
+                    return arr.includes(i);
+                  },
+            overflow: index == xAxisKeys.length - 1 ? "none" : "truncate",
+            // hide axis label if overlaps
+            hideOverlap: true,
+            width: 100,
+            margin: 18 * (xAxisKeys.length - index - 1) + 5,
+          },
+          splitLine: {
+            show: true,
+          },
+          axisLine: {
+            show: panelSchema.config?.axis_border_show || false,
+          },
+          axisTick: {
+            show: xAxisKeys.length == 1 ? false : true,
+            align: "left",
+            alignWithLabel: false,
+            length: 20 * (xAxisKeys.length - index),
+            interval:
+              panelSchema.type == "h-stacked"
+                ? "auto"
+                : function (i: any) {
+                    return arr.includes(i);
+                  },
+          },
+          data: data,
+        };
+      })
+      .flat(),
     yAxis: {
       type: "value",
       name:
@@ -425,7 +421,6 @@ export const convertSQLData = (
     },
     series: [],
   };
-  const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type
@@ -483,31 +478,27 @@ export const convertSQLData = (
         ].filter((it) => it);
 
         // create a trace based on second xAxis's unique values
-        // queryData who has the xaxis[0] key.
-        const xAxisUniqueValue = Array.from(
-          new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-        );
         options.series = yAxisKeys
           .map((yAxis: any) => {
             const yAxisName = panelSchema?.queries[0]?.fields?.y.find(
               (it: any) => it.alias == yAxis
             ).label;
+
             return stackedXAxisUniqueValue?.map((key: any) => {
-              // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-              const data = searchQueryData[0].filter(
-                (it: any) => it[key1] == key
-              );
               const seriesObj = {
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
-                ...defaultSeriesProps,
+                ...getPropsByChartTypeForSeries(panelSchema.type),
                 // config to connect null values
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
-                data: xAxisUniqueValue.map(
+                data: Array.from(
+                  new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+                ).map(
                   (it: any) =>
-                    data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
-                    null
+                    searchQueryData[0].find(
+                      (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+                    )?.[yAxis] ?? null
                 ),
               };
               return seriesObj;
@@ -526,7 +517,7 @@ export const convertSQLData = (
                 (it: any) => it.alias == key
               )?.color || "#5960b2",
             opacity: 0.8,
-            ...defaultSeriesProps,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -545,19 +536,17 @@ export const convertSQLData = (
             return "";
           if (name.length == 0) return "";
 
-          // if hovered series is not null
-          // then swap the hovered series to top in tooltip
-          if (hoveredSeriesState?.value?.hoveredSeriesName) {
-            // get the current series index from name
-            const currentSeriesIndex = name.findIndex(
-              (it: any) =>
-                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-            );
-            // swap current hovered series index to top in tooltip
-            const temp = name[0];
-            name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-            name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
-          }
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) =>
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+          );
+
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
           const hoverText: string[] = [];
           name.forEach((it: any) => {
             if (it.data != null) {
@@ -590,6 +579,7 @@ export const convertSQLData = (
                 );
             }
           });
+
           return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
         };
         options.series = yAxisKeys?.map((key: any) => {
@@ -602,7 +592,7 @@ export const convertSQLData = (
                 (it: any) => it.alias == key
               )?.color || "#5960b2",
             opacity: 0.8,
-            ...defaultSeriesProps,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -622,7 +612,7 @@ export const convertSQLData = (
             panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
               ?.color || "#5960b2",
           opacity: 0.8,
-          ...defaultSeriesProps,
+          ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -640,7 +630,7 @@ export const convertSQLData = (
             panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
               ?.color || "#5960b2",
           opacity: 0.8,
-          ...defaultSeriesProps,
+          ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key),
         };
         return seriesObj;
@@ -650,7 +640,7 @@ export const convertSQLData = (
       options.xAxis = options.yAxis;
       options.yAxis = temp;
 
-      options.yAxis.forEach((it: any) => {
+      options.yAxis.map((it: any) => {
         it.nameGap = calculateWidthText(
           xAxisKeys.reduce(
             (str: any, it: any) => str + largestLabel(getAxisDataFromKey(it)),
@@ -697,7 +687,7 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
-          ...defaultSeriesProps,
+          ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
@@ -748,7 +738,7 @@ export const convertSQLData = (
       //generate trace based on the y axis keys
       options.series = yAxisKeys?.map((key: any) => {
         const seriesObj = {
-          ...defaultSeriesProps,
+          ...getPropsByChartTypeForSeries(panelSchema.type),
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
@@ -805,22 +795,17 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
-      // queryData who has the xaxis[0] key.
-      const xAxisUniqueValue = Array.from(
-        new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-      );
-
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
-        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
-          ...defaultSeriesProps,
-          data: xAxisUniqueValue.map(
+          ...getPropsByChartTypeForSeries(panelSchema.type),
+          data: Array.from(
+            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+          ).map(
             (it: any) =>
-              data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
-                yAxisKeys[0]
-              ] ?? null
+              searchQueryData[0].find(
+                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+              )?.[yAxisKeys[0]] || 0
           ),
         };
         return seriesObj;
@@ -843,18 +828,19 @@ export const convertSQLData = (
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
-      const zValues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
-        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter((it: any) => it[key1] == first);
-
+      const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         return xAxisZerothPositionUniqueValue.map((zero: any) => {
-          return data.find((it: any) => it[key0] == zero)?.[yAxisKey0] || "-";
+          return (
+            searchQueryData[0].find(
+              (it: any) => it[key0] == zero && it[key1] == first
+            )?.[yAxisKey0] || "-"
+          );
         });
       });
 
       (options.visualMap = {
         min: 0,
-        max: zValues.reduce(
+        max: Zvalues.reduce(
           (a: any, b: any) =>
             Math.max(
               a,
@@ -868,17 +854,13 @@ export const convertSQLData = (
       }),
         (options.series = [
           {
-            ...defaultSeriesProps,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
             name: panelSchema?.queries[0]?.fields?.y[0].label,
-            data: zValues
-              .map((it: any, index: any) => {
-                return xAxisZerothPositionUniqueValue.map(
-                  (i: any, j: number) => {
-                    return [j, index, it[j]];
-                  }
-                );
-              })
-              .flat(),
+            data: Zvalues.map((it: any, index: any) => {
+              return xAxisZerothPositionUniqueValue.map((i: any, j: number) => {
+                return [j, index, it[j]];
+              });
+            }).flat(),
             label: {
               show: true,
               fontSize: 12,
@@ -1013,21 +995,17 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
-      // get the unique value of the first xAxis's key
-      const xAxisUniqueValue = Array.from(
-        new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
-      );
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
-        // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
-          ...defaultSeriesProps,
-          data: xAxisUniqueValue.map(
+          ...getPropsByChartTypeForSeries(panelSchema.type),
+          data: Array.from(
+            new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+          ).map(
             (it: any) =>
-              data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
-                yAxisKeys[0]
-              ] ?? null
+              searchQueryData[0].find(
+                (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+              )?.[yAxisKeys[0]] || 0
           ),
         };
         return seriesObj;
@@ -1066,7 +1044,7 @@ export const convertSQLData = (
       options.yAxis = [];
       options.series = [
         {
-          ...defaultSeriesProps,
+          ...getPropsByChartTypeForSeries(panelSchema.type),
           renderItem: function (params: any) {
             return {
               type: "text",
@@ -1142,7 +1120,7 @@ export const convertSQLData = (
 
       options.series = yAxisValue.map((it: any, index: any) => {
         return {
-          ...defaultSeriesProps,
+          ...getPropsByChartTypeForSeries(panelSchema.type),
           min: panelSchema?.queries[0]?.config?.min || 0,
           max: panelSchema?.queries[0]?.config?.max || 100,
 
@@ -1262,7 +1240,7 @@ export const convertSQLData = (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      options?.series?.forEach((seriesObj: any) => {
+      options?.series?.map((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1302,20 +1280,16 @@ export const convertSQLData = (
 
         const date = new Date(name[0].data[0]);
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
-        if (hoveredSeriesState?.value?.hoveredSeriesName) {
-          // get the current series index from name
-          const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-          );
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) =>
+            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+        );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
-        }
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
@@ -1403,7 +1377,7 @@ export const convertSQLData = (
       // set timeseries flag as a true
       isTimeSeriesFlag = true;
 
-      options?.series?.forEach((seriesObj: any) => {
+      options?.series?.map((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1439,20 +1413,16 @@ export const convertSQLData = (
 
         const date = new Date(name[0].data[0]);
 
-        // if hovered series is not null
-        // then swap the hovered series to top in tooltip
-        if (hoveredSeriesState?.value?.hoveredSeriesName) {
-          // get the current series index from name
-          const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-          );
+        // get the current series index from name
+        const currentSeriesIndex = name.findIndex(
+          (it: any) =>
+            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+        );
 
-          // swap current hovered series index to top in tooltip
-          const temp = name[0];
-          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
-        }
+        // swap current hovered series index to top in tooltip
+        const temp = name[0];
+        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
@@ -1574,7 +1544,6 @@ export const convertSQLData = (
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
-  // console.timeEnd("convertSQLData");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
