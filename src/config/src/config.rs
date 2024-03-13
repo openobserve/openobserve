@@ -549,6 +549,8 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_LOOKBACK_HOURS", default = 0)] // hours
+    pub lookback_hours: i64,
     #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
