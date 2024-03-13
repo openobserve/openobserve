@@ -665,6 +665,7 @@ describe("Logs testcases", () => {
       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)'
     ).click({ force: true });
     cy.get('[data-test="add-alert-name-input"]').type("e2e@@@@@");
+    cy.wait(2000);
     cy.get(".q-card__actions > .bg-primary > .q-btn__content").click({
       force: true,
     });
@@ -688,6 +689,7 @@ describe("Logs testcases", () => {
       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)'
     ).click({ force: true });
     cy.get('[data-test="add-alert-name-input"]').type("e2etest2");
+    cy.wait(2000);
     cy.get('[data-test="saved-view-dialog-save-btn"]').click({
       force: true,
     });
@@ -699,6 +701,7 @@ describe("Logs testcases", () => {
     cy.get(
       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon'
     ).click({ force: true });
+    cy.wait(2000);
     cy.get(":nth-child(1) > .q-item__section--main > .q-item__label").click({
       force: true,
     });
