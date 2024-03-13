@@ -15,6 +15,7 @@
 
 use std::{
     cmp::{max, min},
+    ops::Range,
     path::Path,
 };
 
@@ -95,6 +96,21 @@ impl FileData {
 
     async fn exist(&mut self, file: &str) -> bool {
         self.data.contains_key(file)
+    }
+
+    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+        let file_path = format!("{}{}", self.root_dir, file);
+        let data = match get_file_contents(&file_path).await {
+            Ok(data) => Bytes::from(data),
+            Err(_) => {
+                return None;
+            }
+        };
+        Some(if let Some(range) = range {
+            data.slice(range)
+        } else {
+            data
+        })
     }
 
     async fn set(
@@ -210,6 +226,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     });
     Ok(())
+}
+
+#[inline]
+pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    if !CONFIG.disk_cache.enabled {
+        return None;
+    }
+    let files = FILES.read().await;
+    files.get(file, range).await
 }
 
 #[inline]

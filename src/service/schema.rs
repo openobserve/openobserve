@@ -282,11 +282,40 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     allowed_type.contains(to)
 }
 
+pub struct SchemaCache {
+    schema: Schema,
+    fields_map: HashMap<String, usize>,
+    hash_key: String,
+}
+
+impl SchemaCache {
+    pub fn new(schema: Schema, fields_map: HashMap<String, usize>) -> Self {
+        let hash_key = schema.hash_key();
+        Self {
+            schema,
+            fields_map,
+            hash_key,
+        }
+    }
+
+    pub fn hash_key(&self) -> &str {
+        &self.hash_key
+    }
+
+    pub fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    pub fn fields_map(&self) -> &HashMap<String, usize> {
+        &self.fields_map
+    }
+}
+
 pub async fn check_for_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    stream_schema_map: &mut HashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
     record_val: &Map<String, Value>,
     record_ts: i64,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
@@ -294,10 +323,19 @@ pub async fn check_for_schema(
         let schema = db::schema::get(org_id, stream_name, stream_type)
             .await
             .unwrap();
-        stream_schema_map.insert(stream_name.to_string(), schema);
+        let fields_map = schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name().to_owned(), i))
+            .collect();
+        stream_schema_map.insert(
+            stream_name.to_string(),
+            SchemaCache::new(schema, fields_map),
+        );
     }
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.fields().is_empty() && CONFIG.common.skip_schema_validation {
+    if !schema.schema().fields().is_empty() && CONFIG.common.skip_schema_validation {
         return Ok((
             SchemaEvolution {
                 schema_compatible: true,
@@ -313,7 +351,7 @@ pub async fn check_for_schema(
     let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     // fast path
-    if schema.fields.eq(&inferred_schema.fields) {
+    if schema.schema().fields.eq(&inferred_schema.fields) {
         return Ok((
             SchemaEvolution {
                 schema_compatible: true,
@@ -328,7 +366,7 @@ pub async fn check_for_schema(
         return Err(get_request_columns_limit_error());
     }
 
-    let is_new = schema.fields().is_empty();
+    let is_new = schema.schema().fields().is_empty();
     if !is_new {
         let (is_schema_changed, field_datatype_delta) =
             get_schema_changes(schema, &inferred_schema);
@@ -338,7 +376,7 @@ pub async fn check_for_schema(
                 inferred_schema
             } else {
                 let schema_latest = stream_schema_map.get(stream_name).unwrap();
-                inferred_schema.cloned_from(schema_latest)
+                inferred_schema.cloned_from(schema_latest.schema())
             };
             return Ok((
                 SchemaEvolution {
@@ -370,7 +408,7 @@ pub async fn check_for_schema(
 
     // generate new schema
     let schema_latest = stream_schema_map.get(stream_name).unwrap();
-    let inferred_schema = inferred_schema.cloned_from(schema_latest);
+    let inferred_schema = inferred_schema.cloned_from(schema_latest.schema());
 
     Ok((ret, Some(inferred_schema)))
 }
@@ -414,7 +452,7 @@ async fn handle_diff_schema(
     is_new: bool,
     inferred_schema: &Schema,
     record_ts: i64,
-    stream_schema_map: &mut HashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Option<SchemaEvolution> {
     if CONFIG.common.local_mode {
         handle_diff_schema_local_mode(
@@ -448,15 +486,21 @@ async fn handle_diff_schema_local_mode(
     is_new: bool,
     inferred_schema: &Schema,
     record_ts: i64,
-    stream_schema_map: &mut HashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Option<SchemaEvolution> {
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
         metadata.insert("created_at".to_string(), record_ts.to_string());
+        let fields_map = inferred_schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name().to_owned(), i))
+            .collect();
         stream_schema_map.insert(
             stream_name.to_string(),
-            inferred_schema.clone().with_metadata(metadata),
+            SchemaCache::new(inferred_schema.clone().with_metadata(metadata), fields_map),
         );
     }
 
@@ -499,9 +543,18 @@ async fn handle_diff_schema_local_mode(
         )
         .await;
     }
+    let fields_map = final_schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(i, f)| (f.name().to_owned(), i))
+        .collect();
 
     // update thread cache
-    stream_schema_map.insert(stream_name.to_string(), final_schema);
+    stream_schema_map.insert(
+        stream_name.to_string(),
+        SchemaCache::new(final_schema, fields_map),
+    );
 
     // release lock
     drop(lock_acquired);
@@ -520,15 +573,21 @@ async fn handle_diff_schema_cluster_mode(
     is_new: bool,
     inferred_schema: &Schema,
     record_ts: i64,
-    stream_schema_map: &mut HashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> Option<SchemaEvolution> {
     // first update thread cache
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
         metadata.insert("created_at".to_string(), record_ts.to_string());
+        let fields_map = inferred_schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name().to_owned(), i))
+            .collect();
         stream_schema_map.insert(
             stream_name.to_string(),
-            inferred_schema.clone().with_metadata(metadata),
+            SchemaCache::new(inferred_schema.clone().with_metadata(metadata), fields_map),
         );
     }
 
@@ -591,8 +650,17 @@ async fn handle_diff_schema_cluster_mode(
         .await;
     }
 
+    let fields_map = final_schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(i, f)| (f.name().to_owned(), i))
+        .collect();
     // update thread cache
-    stream_schema_map.insert(stream_name.to_string(), final_schema);
+    stream_schema_map.insert(
+        stream_name.to_string(),
+        SchemaCache::new(final_schema, fields_map),
+    );
 
     // release lock
     if let Err(e) = dist_lock::unlock(&locker).await {
@@ -662,29 +730,31 @@ fn get_merge_schema_changes(
     (is_schema_changed, field_datatype_delta, merged_fields)
 }
 
-fn get_schema_changes(schema: &Schema, inferred_schema: &Schema) -> (bool, Vec<Field>) {
+fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
-    let mut field_datatype_delta: Vec<_> = vec![];
+    let mut field_datatype_delta: Vec<Field> = vec![];
 
     for item in inferred_schema.fields.iter() {
         let item_name = item.name();
         let item_data_type = item.data_type();
 
-        match schema.field_with_name(item_name) {
-            Err(_) => {
+        match schema.fields_map().get(item_name) {
+            None => {
                 is_schema_changed = true;
             }
-            Ok(f) => {
-                if f.data_type() != item_data_type {
+            Some(idx) => {
+                let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
+                if existing_field.data_type() != item_data_type {
                     if !CONFIG.common.widening_schema_evolution {
-                        field_datatype_delta.push(f.clone());
-                    } else if is_widening_conversion(f.data_type(), item_data_type) {
+                        field_datatype_delta.push(existing_field.as_ref().to_owned());
+                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
                         is_schema_changed = true;
                         field_datatype_delta.push((**item).clone());
                     } else {
-                        let mut meta = f.metadata().clone();
+                        let mut meta = existing_field.metadata().clone();
                         meta.insert("zo_cast".to_owned(), true.to_string());
-                        field_datatype_delta.push(f.clone().with_metadata(meta));
+                        field_datatype_delta
+                            .push(existing_field.as_ref().clone().with_metadata(meta));
                     }
                 }
             }
@@ -698,7 +768,7 @@ pub async fn stream_schema_exists(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    stream_schema_map: &mut HashMap<String, Schema>,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
 ) -> StreamSchemaChk {
     let mut schema_chk = StreamSchemaChk {
         conforms: true,
@@ -707,12 +777,21 @@ pub async fn stream_schema_exists(
         has_metadata: false,
     };
     let schema = match stream_schema_map.get(stream_name) {
-        Some(schema) => schema.clone(),
+        Some(schema) => schema.schema().clone(),
         None => {
             let schema = db::schema::get(org_id, stream_name, stream_type)
                 .await
                 .unwrap();
-            stream_schema_map.insert(stream_name.to_string(), schema.clone());
+            let fields_map = schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect();
+            stream_schema_map.insert(
+                stream_name.to_string(),
+                SchemaCache::new(schema.clone(), fields_map),
+            );
             schema
         }
     };
@@ -865,8 +944,17 @@ mod tests {
             Field::new("City", DataType::Utf8, false),
             Field::new("_timestamp", DataType::Int64, false),
         ]);
-        let mut map: HashMap<String, Schema> = HashMap::new();
-        map.insert(stream_name.to_string(), schema);
+        let mut map: HashMap<String, SchemaCache> = HashMap::new();
+        let fields_map = schema
+            .fields()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.name().to_owned(), i))
+            .collect();
+        map.insert(
+            stream_name.to_string(),
+            SchemaCache::new(schema, fields_map),
+        );
         let result = check_for_schema(
             org_name,
             stream_name,

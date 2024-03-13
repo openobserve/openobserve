@@ -480,25 +480,6 @@ async fn exec_query(
     Ok(batches)
 }
 
-fn remove_clause(sql: &mut String, regex: &Lazy<Regex>, keywords: &[&str]) {
-    let mut clause_str = match regex.captures(sql) {
-        Some(caps) => caps[0].to_string(),
-        None => "".to_string(),
-    };
-
-    if !clause_str.is_empty() {
-        let mut clause_str_lower = clause_str.to_lowercase();
-        for keyword in keywords.iter() {
-            if let Some(pos) = clause_str_lower.find(keyword) {
-                clause_str = clause_str[..pos].to_string();
-                clause_str_lower = clause_str.to_lowercase();
-            }
-        }
-        let index = sql.find(&clause_str).unwrap();
-        sql.replace_range(index..index + clause_str.len(), " ");
-    }
-}
-
 async fn get_fast_mode_ctx(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -922,13 +903,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         }
     }
 
-    // delete where from sql
-    remove_clause(
-        &mut sql,
-        &RE_WHERE,
-        &[" order by", " group by", " offset", " limit"],
-    );
-
+    sql = rewrite::remove_where_clause(&sql);
     Ok(sql)
 }
 

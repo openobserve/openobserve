@@ -125,7 +125,8 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .wrap(cors)
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node),
+            .service(status::flush_node)
+            .service(status::stream_fields),
     );
 
     cfg.service(

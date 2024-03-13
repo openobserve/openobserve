@@ -25,7 +25,6 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 use syslog_loose::{Message, ProcId, Protocol};
 
 use super::StreamMeta;
@@ -43,7 +42,7 @@ use crate::{
     service::{
         db, distinct_values, get_formatted_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        schema::get_upto_discard_error,
+        schema::{get_upto_discard_error, SchemaCache},
     },
 };
 
@@ -69,7 +68,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let org_id = &route.org_id;
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
     if !cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {

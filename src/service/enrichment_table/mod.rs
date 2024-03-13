@@ -31,7 +31,6 @@ use config::{
     utils::{json, schema_ext::SchemaExt},
     CONFIG,
 };
-use datafusion::arrow::datatypes::Schema;
 use futures::{StreamExt, TryStreamExt};
 use infra::cache::stats;
 
@@ -44,7 +43,7 @@ use crate::{
         compact::retention,
         db, format_stream_name,
         ingestion::write_file,
-        schema::{check_for_schema, stream_schema_exists},
+        schema::{check_for_schema, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
 };
@@ -88,7 +87,7 @@ pub async fn save_enrichment_data(
     }
 
     let mut schema_evolved = false;
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
         stream_name,
@@ -108,6 +107,7 @@ pub async fn save_enrichment_data(
     } else {
         let schema = stream_schema_map.get(stream_name).unwrap();
         schema
+            .schema()
             .metadata()
             .get("created_at")
             .unwrap()
@@ -167,7 +167,7 @@ pub async fn save_enrichment_data(
                         &vec![],
                         PartitionTimeLevel::Unset,
                         &json_record,
-                        Some(&schema_key),
+                        Some(schema_key),
                     );
                 }
                 let record = json::Value::Object(json_record);
@@ -190,6 +190,7 @@ pub async fn save_enrichment_data(
     let schema = stream_schema_map
         .get(stream_name)
         .unwrap()
+        .schema()
         .clone()
         .with_metadata(HashMap::new());
     let schema_key = schema.hash_key();

@@ -143,13 +143,21 @@ impl TryFrom<&Statement> for Sql {
                 let offset = offset.map_or(0, |v| Offset(v).into());
                 let limit = limit.map_or(0, |v| Limit(v).into());
 
-                let fields = Projection(projection).try_into()?;
+                let mut fields: Vec<String> = Projection(projection).try_into()?;
                 let selection = selection.as_ref().cloned();
                 let field_alias: Vec<(String, String)> = Projection(projection).try_into()?;
                 let time_range: Option<(i64, i64)> = Timerange(&selection).try_into()?;
-
                 let quick_text: Vec<(String, String, SqlOperator)> =
                     Quicktext(&selection).try_into()?;
+
+                fields.extend(
+                    quick_text
+                        .iter()
+                        .map(|(field, _value, _op)| field.to_string())
+                        .collect::<Vec<String>>(),
+                );
+                fields.sort();
+                fields.dedup();
 
                 Ok(Sql {
                     fields,
@@ -484,6 +492,18 @@ fn parse_expr_for_field(
             let ret = parse_expr_function(f, field, fields);
             if ret.is_err() {
                 return Err(anyhow::anyhow!("{:?}", ret.err()));
+            }
+        }
+        SqlExpr::IsNull(expr) => {
+            if let SqlExpr::Identifier(ident) = expr.as_ref() {
+                if parse_expr_check_field_name(&ident.value, field) {
+                    fields.push((
+                        ident.value.to_string(),
+                        SqlValue::String("".to_string()),
+                        SqlOperator::Eq,
+                        *expr_op,
+                    ));
+                }
             }
         }
         _ => {}
