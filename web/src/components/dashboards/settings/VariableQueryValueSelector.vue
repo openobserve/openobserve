@@ -82,7 +82,9 @@ export default defineComponent({
 
     // update selected value
     watch(selectedValue, () => {
-      emit("update:modelValue", selectedValue.value);
+      // If selected value is '<blank>', emit empty string ''
+      const valueToEmit = selectedValue.value === '<blank>' ? '' : selectedValue.value;
+      emit("update:modelValue", valueToEmit);
     });
 
     return {
