@@ -367,7 +367,7 @@ export const convertPromQLData = (
                   value[1],
                   seriesDataObj[value[0]] ?? null,
                 ]),
-                ...seriesPropsBasedOnChartType,
+                ...getPropsByChartTypeForSeries(panelSchema.type),
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
