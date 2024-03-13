@@ -1816,7 +1816,9 @@ export default defineComponent({
       }
       searchObj.data.editorValue = "";
       queryEditorRef.value.setValue(searchObj.data.query);
-      handleRunQuery();
+      if (store.state.zoConfig.query_on_stream_selection == false) {
+        handleRunQuery();
+      }
     };
 
     const customDownloadDialog = ref(false);
