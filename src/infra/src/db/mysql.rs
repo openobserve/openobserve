@@ -350,36 +350,42 @@ async fn create_index_item(sql: &str) -> Result<()> {
 }
 
 async fn add_updated_at_column() -> Result<()> {
+    log::info!("[POSTGRES] ENTER: add_updated_at_column");
     let pool = CLIENT.clone();
-    // create table
+    let mut tx = pool.begin().await?;
+
+    // Drop index if exists and add column
     if let Err(e) = sqlx::query(
         r#"
-    ALTER TABLE meta
-    ADD COLUMN updated_at BIGINT not null DEFAULT 0;
-
-    DROP INDEX IF EXISTS meta_module_key2_idx;
+        DROP INDEX IF EXISTS meta_module_key2_idx;
+        ALTER TABLE meta ADD COLUMN updated_at BIGINT NOT NULL DEFAULT 0;
         "#,
     )
-    .execute(&pool)
+    .execute(&mut *tx)
     .await
     {
-        if e.to_string().contains("Duplicate key") {
-            // index already exists
-            return Ok(());
+        log::error!("[POSTGRES] Error in dropping index or adding column: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
         }
-        log::error!("[MYSQL] create table meta index error: {}", e);
         return Err(e.into());
     }
 
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        log::info!("[POSTGRES] Error in committing transaction: {}", e);
+        return Err(e.into());
+    }
+
+    // Create indexes outside of the transaction
     create_index_item(
-         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';",
-     )
-     .await?;
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx ON meta (key2, key1, module) WHERE module != 'schema';",
+    ).await?;
 
     create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2, key1, module) where module ='schema';",
-    )
-    .await?;
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx ON meta (updated_at, key2, key1, module) WHERE module = 'schema';",
+    ).await?;
 
+    log::info!("[POSTGRES] EXIT: add_updated_at_column");
     Ok(())
 }
