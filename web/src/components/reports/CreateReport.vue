@@ -807,6 +807,7 @@ const defaultReport = {
   frequency: {
     interval: 1,
     type: "once",
+    cron: "",
   },
   user: "",
   password: "",
@@ -1160,7 +1161,8 @@ const convertDateToTimestamp = (
 };
 
 const saveReport = async () => {
-  if (selectedTimeTab.value === "sendNow") {
+  // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
+  if (selectedTimeTab.value === "sendNow" || frequency.value.type === "cron") {
     const now = new Date();
 
     // Get the day, month, and year from the date object
@@ -1203,8 +1205,7 @@ const saveReport = async () => {
     formData.value.frequency.interval = Number(frequency.value.custom.interval);
   } else if (frequency.value.type === "cron") {
     formData.value.frequency.type = frequency.value.type;
-    formData.value.frequency.cron = frequency.value.cron;
-    delete formData.value.frequency.interval;
+    formData.value.frequency.cron = frequency.value.cron + " *";
   } else {
     formData.value.frequency.type = frequency.value.type;
     formData.value.frequency.interval = 1;
