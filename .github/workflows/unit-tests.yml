@@ -19,7 +19,7 @@ jobs:
   build:
 
     runs-on: 
-      labels: ubuntu-latest
+      labels: ubicloud-standard-8
 
     steps:
 
