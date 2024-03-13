@@ -503,8 +503,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           )
         "
         v-model="dashboardPanelData.data.config.connect_nulls"
-        label="Connect null points"
-        data-test="dashboard-config-connect-null"
+        label="Connect null values"
+        data-test="dashboard-config-connect-null-values"
       />
 
       <div class="space"></div>
