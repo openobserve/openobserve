@@ -113,25 +113,47 @@ impl super::Db for MysqlDb {
             }
             return Err(e.into());
         }
-        if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND updated_at = ?;"#,
-        )
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(&updated_at)
-        .execute(&mut *tx)
-        .await
-        {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback put meta error: {}", e);
+        if module == "schema" {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND updated_at = $4;"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(&updated_at)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback put meta error: {}", e);
+                }
+                return Err(e.into());
             }
-            return Err(e.into());
-        }
-        if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit put meta error: {}", e);
-            return Err(e.into());
+            if let Err(e) = tx.commit().await {
+                log::error!("[MYSQL] commit put meta error: {}", e);
+                return Err(e.into());
+            }
+        } else {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback put meta error: {}", e);
+                }
+                return Err(e.into());
+            }
+            if let Err(e) = tx.commit().await {
+                log::error!("[MYSQL] commit put meta error: {}", e);
+                return Err(e.into());
+            }
         }
 
         // event watch
@@ -224,15 +246,35 @@ impl super::Db for MysqlDb {
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    super::build_key(&r.module, &r.key1, &r.key2),
-                    Bytes::from(r.value),
-                )
-            })
-            .collect())
+        if module == "schema" {
+            let mut grouped_values: HashMap<String, Vec<datafusion::arrow::datatypes::Schema>> =
+                HashMap::new();
+            for record in ret {
+                let key = format!("/{}/{}/{}", record.module, record.key1, record.key2);
+                let mut parsed: Vec<datafusion::arrow::datatypes::Schema> =
+                    json::from_str(&record.value).unwrap();
+
+                grouped_values
+                    .entry(key.to_owned())
+                    .or_insert_with(Vec::new)
+                    .append(&mut parsed);
+            }
+
+            Ok(grouped_values
+                .into_iter()
+                .map(|(key, vec)| (key, json::to_vec(&vec).unwrap().into()))
+                .collect())
+        } else {
+            Ok(ret
+                .into_iter()
+                .map(|r| {
+                    (
+                        super::build_key(&r.module, &r.key1, &r.key2),
+                        Bytes::from(r.value),
+                    )
+                })
+                .collect())
+        }
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
@@ -326,12 +368,19 @@ CREATE TABLE IF NOT EXISTS meta
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
-    // create_index_item("CREATE UNIQUE INDEX meta_module_key2_idx on meta (key2, key1, module);")
-    //     .await?;
     create_index_item(
-        "CREATE UNIQUE INDEX meta_module_updated_at_idx on meta (updated_at, key2, key1, module);",
+         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';",
+     )
+     .await?;
+    match create_index_item(
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx on meta (updated_at,key2, key1, module) where module ='schema';",
     )
-    .await?;
+    .await{
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("[POSTGRES] create table meta meta_module_updated_at_idx error: {}", e);
+        }
+    }
 
     Ok(())
 }
@@ -350,7 +399,7 @@ async fn create_index_item(sql: &str) -> Result<()> {
 }
 
 async fn add_updated_at_column() -> Result<()> {
-    log::info!("[POSTGRES] ENTER: add_updated_at_column");
+    log::info!("[MYSQL] ENTER: add_updated_at_column");
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
 
@@ -364,16 +413,16 @@ async fn add_updated_at_column() -> Result<()> {
     .execute(&mut *tx)
     .await
     {
-        log::error!("[POSTGRES] Error in dropping index or adding column: {}", e);
+        log::error!("[MYSQL] Error in dropping index or adding column: {}", e);
         if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
         }
         return Err(e.into());
     }
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        log::info!("[POSTGRES] Error in committing transaction: {}", e);
+        log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());
     }
 
@@ -386,6 +435,6 @@ async fn add_updated_at_column() -> Result<()> {
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_updated_at_idx ON meta (updated_at, key2, key1, module) WHERE module = 'schema';",
     ).await?;
 
-    log::info!("[POSTGRES] EXIT: add_updated_at_column");
+    log::info!("[MYSQL] EXIT: add_updated_at_column");
     Ok(())
 }
