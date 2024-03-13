@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="ellipsis q-pr-xs"
                                 style="width: calc(100% - 50px)"
                               >
-                                {{ value.key }}
+                                {{ value.label || value.key }}
                               </div>
                               <div
                                 :title="value.count"
@@ -369,7 +369,7 @@ export default defineComponent({
     const fieldValues: Ref<{
       [key: string | number]: {
         isLoading: boolean;
-        values: { key: string; count: string }[];
+        values: { key: string; count: string; label?: string }[];
       };
     }> = ref({});
     const parser = new Parser();
@@ -563,14 +563,30 @@ export default defineComponent({
               res.data.hits
                 .find((field: any) => field.field === name)
                 .values.forEach((value: any) => {
-                  if (!value.zo_sql_key?.toString().length) return;
-
-                  fieldValues.value[name]["values"].push({
-                    key: value.zo_sql_key?.toString()
-                      ? value.zo_sql_key
-                      : "null",
-                    count: formatLargeNumber(value.zo_sql_num),
-                  });
+                  if (
+                    value.zo_sql_key === null ||
+                    value.zo_sql_key === undefined
+                  ) {
+                    // If values is null or undefined
+                    fieldValues.value[name]["values"].push({
+                      key: "null",
+                      count: formatLargeNumber(value.zo_sql_num),
+                    });
+                  } else if (!value.zo_sql_key?.toString().length) {
+                    // If key is empty string
+                    fieldValues.value[name]["values"].push({
+                      label: "<blank>",
+                      key: "",
+                      count: formatLargeNumber(value.zo_sql_num),
+                    });
+                  } else {
+                    fieldValues.value[name]["values"].push({
+                      key: value.zo_sql_key?.toString()
+                        ? value.zo_sql_key
+                        : "null",
+                      count: formatLargeNumber(value.zo_sql_num),
+                    });
+                  }
                 });
             }
           })
