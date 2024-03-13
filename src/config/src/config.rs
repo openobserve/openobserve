@@ -539,7 +539,7 @@ pub struct Limit {
     pub fast_mode_strategy: String, // first, last, both
     #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
     pub fast_mode_file_list_enabled: bool,
-    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 60)] // seconds
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
     pub fast_mode_file_list_interval: i64,
 }
 
