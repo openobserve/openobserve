@@ -6,7 +6,7 @@ import * as menutests from "../allfunctions/menufunctions";
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
 });
-describe("Sanity testcases", () => {
+describe("Menu testcases", () => {
   let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
