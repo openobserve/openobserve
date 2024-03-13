@@ -501,13 +501,16 @@ export const convertSQLData = (
                 //only append if yaxiskeys length is more than 1
                 name:
                   yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
-                ...defaultSeriesProps,
+                ...getPropsByChartTypeForSeries(panelSchema.type),
                 // config to connect null values
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
-                data: xAxisUniqueValue.map(
+                data: Array.from(
+                  new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
+                ).map(
                   (it: any) =>
-                    data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
-                    null
+                    searchQueryData[0].find(
+                      (it2: any) => it2[xAxisKeys[0]] == it && it2[key1] == key
+                    )?.[yAxis] ?? null
                 ),
               };
               return seriesObj;
@@ -526,7 +529,7 @@ export const convertSQLData = (
                 (it: any) => it.alias == key
               )?.color || "#5960b2",
             opacity: 0.8,
-            ...defaultSeriesProps,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -545,19 +548,17 @@ export const convertSQLData = (
             return "";
           if (name.length == 0) return "";
 
-          // if hovered series is not null
-          // then swap the hovered series to top in tooltip
-          if (hoveredSeriesState?.value?.hoveredSeriesName) {
-            // get the current series index from name
-            const currentSeriesIndex = name.findIndex(
-              (it: any) =>
-                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-            );
-            // swap current hovered series index to top in tooltip
-            const temp = name[0];
-            name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-            name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
-          }
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) =>
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+          );
+
+          // swap current hovered series index to top in tooltip
+          const temp = name[0];
+          name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
+          name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+
           const hoverText: string[] = [];
           name.forEach((it: any) => {
             if (it.data != null) {
@@ -602,7 +603,7 @@ export const convertSQLData = (
                 (it: any) => it.alias == key
               )?.color || "#5960b2",
             opacity: 0.8,
-            ...defaultSeriesProps,
+            ...getPropsByChartTypeForSeries(panelSchema.type),
             // config to connect null values
             connectNulls: panelSchema.config?.connect_nulls ?? false,
             data: getAxisDataFromKey(key),
@@ -1262,7 +1263,7 @@ export const convertSQLData = (
       // else check if xaxis value is interger(ie time will be in milliseconds)
       // if yes then return to convert into other timezone
       // if no then create new datetime object and get in milliseconds using getTime method
-      options?.series?.forEach((seriesObj: any) => {
+      options?.series?.map((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (field) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
@@ -1403,7 +1404,7 @@ export const convertSQLData = (
       // set timeseries flag as a true
       isTimeSeriesFlag = true;
 
-      options?.series?.forEach((seriesObj: any) => {
+      options?.series?.map((seriesObj: any) => {
         // if value field is not present in the data than use null
         if (isTimeSeriesData) {
           seriesObj.data = seriesObj?.data?.map((it: any, index: any) => [
