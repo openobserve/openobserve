@@ -158,7 +158,7 @@ impl FileData {
         need_release_size: usize,
     ) -> Result<(), anyhow::Error> {
         log::info!(
-            "[session_id {session_id}] File disk cache start gc {}/{}, need release {} bytes",
+            "[session_id {session_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
             self.max_size,
             need_release_size
@@ -192,6 +192,10 @@ impl FileData {
             }
         }
         self.cur_size -= release_size;
+        log::info!(
+            "[session_id {session_id}] File disk cache gc done, released {} bytes",
+            release_size
+        );
         Ok(())
     }
 
