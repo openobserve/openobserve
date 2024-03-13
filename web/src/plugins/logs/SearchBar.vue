@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="12px"
             icon="save"
             :icon-right="'img:' + getImageURL('images/common/function.svg')"
-            :title="t('search.savedViewsLabel')"
+            :title="t('search.functionPlaceholder')"
             split
             class="no-outline saved-views-dropdown no-border btn-function"
             @click="fnSavedFunctionDialog"
@@ -1525,7 +1525,7 @@ export default defineComponent({
       if (isSavedViewAction.value == "create") {
         if (
           savedViewName.value == "" ||
-          !/^[A-Za-z0-9 ]+$/.test(savedViewName.value)
+          /^[A-Za-z0-9 \-\_]+$/.test(savedViewName.value) == false
         ) {
           $q.notify({
             message: `Please provide valid view name.`,
