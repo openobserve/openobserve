@@ -368,19 +368,15 @@ CREATE TABLE IF NOT EXISTS meta
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
-    // create_index_item(
-    //      "CREATE UNIQUE INDEX  meta_module_key2_idx on meta (key2, key1, module) where module
-    // !='schema';",  )
-    //  .await?;
-    // match create_index_item(
-    //     "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (start_dt,key2, key1, module)
-    // where module ='schema';", )
-    // .await{
-    //     Ok(_) => {}
-    //     Err(e) => {
-    //         log::error!("[MYSQL] create table meta meta_module_start_dt_idx error: {}", e);
-    //     }
-    // }
+
+    match create_index_item(
+        "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (start_dt,key2, key1, module);")
+    .await{
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("[MYSQL] create table meta meta_module_start_dt_idx error: {}", e);
+        }
+    }
 
     Ok(())
 }
@@ -401,61 +397,56 @@ async fn create_index_item(sql: &str) -> Result<()> {
 async fn add_start_dt_column() -> Result<()> {
     log::info!("[MYSQL] ENTER: add_start_dt_column");
     let pool = CLIENT.clone();
-    //let mut tx = pool.begin().await?;
+    let mut tx = pool.begin().await?;
 
-    // Drop index if exists
-    // if let Err(e) = sqlx::query(
-    //     r#"
-    //     DROP INDEX meta_module_key2_idx ON meta;
-    //     "#,
-    // )
-    // .execute(&mut *tx)
-    // .await
-    // {
-    //     log::error!("[MYSQL] Error in dropping index : {}", e);
-    //     if let Err(e) = tx.rollback().await {
-    //         log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-    //     }
-    //     return Err(e.into());
-    // }
+     //Drop index if exists
+     if let Err(e) = sqlx::query(
+         r#"
+         DROP INDEX meta_module_key2_idx ON meta;
+         "#,
+     )
+     .execute(&mut *tx)
+     .await
+     {
+         log::error!("[MYSQL] Error in dropping index : {}", e);
+         if let Err(e) = tx.rollback().await {
+             log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+         }
+         return Err(e.into());
+     }
+
+    //Commit transaction
+    if let Err(e) = tx.commit().await {
+        log::info!("[MYSQL] Error in committing transaction: {}", e);
+        return Err(e.into());
+    }
+
+    let mut tx1 = pool.begin().await?;
+    // add column
+    if let Err(e) = sqlx::query(
+        r#"
+        ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;
+        "#,
+    )
+    .execute(&mut *tx1)
+    .await
+    {
+        log::error!("[MYSQL] Error in  adding column: {}", e);
+        if let Err(e) = tx1.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+        }
+        return Err(e.into());
+    }
 
     // Commit transaction
-    // if let Err(e) = tx.commit().await {
-    //     log::info!("[MYSQL] Error in committing transaction: {}", e);
-    //     return Err(e.into());
-    // }
+    if let Err(e) = tx1.commit().await {
+        log::info!("[MYSQL] Error in committing transaction: {}", e);
+        return Err(e.into());
+    }
 
-    // let mut tx1 = pool.begin().await?;
-    // // add column
-    // if let Err(e) = sqlx::query(
-    //     r#"
-    //     ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;
-    //     "#,
-    // )
-    // .execute(&mut *tx1)
-    // .await
-    // {
-    //     log::error!("[MYSQL] Error in  adding column: {}", e);
-    //     if let Err(e) = tx1.rollback().await {
-    //         log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-    //     }
-    //     return Err(e.into());
-    // }
 
-    // // Commit transaction
-    // if let Err(e) = tx1.commit().await {
-    //     log::info!("[MYSQL] Error in committing transaction: {}", e);
-    //     return Err(e.into());
-    // }
-
-    // Create indexes outside of the transaction
-    // create_index_item(
-    //     "CREATE UNIQUE INDEX meta_module_key2_idx ON meta (key2, key1, module) WHERE module !=
-    // 'schema';", ).await?;
-
-    // create_index_item(
-    //     "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module)
-    // WHERE module = 'schema';", ).await?;
+    create_index_item(
+        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);").await?;
 
     log::info!("[MYSQL] EXIT: add_start_dt_column");
     Ok(())
