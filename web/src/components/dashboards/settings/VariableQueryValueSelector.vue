@@ -23,8 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       v-model="selectedValue"
       :display-value="
-        selectedValue
-          ? selectedValue
+        selectedValue || selectedValue == ''
+          ? selectedValue == ''
+            ? '<blank>'
+            : selectedValue
           : !variableItem.isLoading
           ? '(No Data Found)'
           : ''
@@ -32,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
       input-debounce="0"
-      map-options
       option-value="value"
       option-label="label"
       behavior="menu"

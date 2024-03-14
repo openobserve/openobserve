@@ -221,7 +221,7 @@ export default defineComponent({
           name: it.name,
           label: it.label,
           type: it.type,
-          value: it.type == "dynamic_filters" ? [] : "",
+          value: it.type == "dynamic_filters" ? [] : null,
           isLoading: ["query_values", "dynamic_filters"].includes(it.type)
             ? true
             : false,
