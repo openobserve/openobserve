@@ -258,12 +258,17 @@ export default defineComponent({
                       (value: any) =>
                         value.zo_sql_key || value.zo_sql_key === ""
                     )
-                    .map((value: any) => {
-                      return value.zo_sql_key !== ""
-                        ? value.zo_sql_key.toString()
-                        : "<blank>";
-                    });
-                    
+                    .map((value: any) => ({
+                      label:
+                        value.zo_sql_key !== ""
+                          ? value.zo_sql_key.toString()
+                          : "<blank>",
+                      value:
+                        value.zo_sql_key !== ""
+                          ? value.zo_sql_key.toString()
+                          : "<blank>",
+                    }));
+
                   // find old value is exists in the dropdown
                   let oldVariableObjectSelectedValue = oldVariableValue.find(
                     (it2: any) => it2.name === it.name
@@ -271,15 +276,16 @@ export default defineComponent({
 
                   // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                   if (oldVariableObjectSelectedValue) {
-                    obj.value = obj.options.includes(
-                      oldVariableObjectSelectedValue.value
+                    obj.value = obj.options.some(
+                      (option: any) =>
+                        option.value === oldVariableObjectSelectedValue.value
                     )
                       ? oldVariableObjectSelectedValue.value
                       : obj.options.length
-                      ? obj.options[0]
+                      ? obj.options[0].value
                       : "";
                   } else {
-                    obj.value = obj.options[0] || "";
+                    obj.value = obj.options.length ? obj.options[0].value : "";
                   }
                   variablesData.isVariablesLoading = variablesData.values.some(
                     (val: { isLoading: any }) => val.isLoading

@@ -32,12 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
       input-debounce="0"
+      map-options
+      option-value="value"
+      option-label="label"
       behavior="menu"
       use-input
       stack-label
       @filter="fieldsFilterFn"
-      option-value="name"
-      option-label="name"
       emit-value
       class="textbox col no-case"
       :loading="variableItem.isLoading"
@@ -63,6 +64,7 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    console.log("props", props);
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -82,6 +84,7 @@ export default defineComponent({
 
     // update selected value
     watch(selectedValue, () => {
+      console.log("selectedValue", selectedValue.value);
       // If selected value is '<blank>', emit empty string ''
       const valueToEmit = selectedValue.value === '<blank>' ? '' : selectedValue.value;
       emit("update:modelValue", valueToEmit);
