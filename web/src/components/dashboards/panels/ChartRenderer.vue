@@ -79,8 +79,100 @@ import {
   onActivated,
   inject,
 } from "vue";
-import * as echarts from "echarts";
 import { useStore } from "vuex";
+import * as echarts from "echarts/core";
+import {
+  BarChart,
+  LineChart,
+  CustomChart,
+  GaugeChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  SankeyChart,
+  TreeChart
+} from "echarts/charts";
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  ToolboxComponent,
+  DatasetComponent,
+  LegendComponent,
+  PolarComponent,
+  VisualMapComponent,
+  DataZoomComponent
+} from "echarts/components";
+import { LabelLayout, UniversalTransition } from "echarts/features";
+import { CanvasRenderer } from "echarts/renderers";
+import type {
+  BarSeriesOption,
+  LineSeriesOption,
+  CustomSeriesOption,
+  GaugeSeriesOption,
+  PieSeriesOption,
+  ScatterSeriesOption,
+  HeatmapSeriesOption,
+  SankeySeriesOption,
+  TreeSeriesOption,
+} from "echarts/charts";
+import type { ComposeOption } from "echarts/core";
+import type {
+  TitleComponentOption,
+  TooltipComponentOption,
+  GridComponentOption,
+  ToolboxComponentOption,
+  DatasetComponentOption,
+  LegendComponentOption,
+  PolarComponentOption,
+  VisualMapComponentOption,
+  DataZoomComponentOption
+} from "echarts/components";
+
+type ECOption = ComposeOption<
+  | BarSeriesOption
+  | LineSeriesOption
+  | CustomSeriesOption
+  | GaugeSeriesOption
+  | PieSeriesOption
+  | ScatterSeriesOption
+  | HeatmapSeriesOption
+  | SankeySeriesOption
+  | TreeSeriesOption
+  | TitleComponentOption
+  | TooltipComponentOption
+  | GridComponentOption
+  | ToolboxComponentOption
+  | DatasetComponentOption
+  | LegendComponentOption
+  | PolarComponentOption
+  | VisualMapComponentOption
+  | DataZoomComponentOption
+>;
+
+echarts.use([
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  ToolboxComponent,
+  DatasetComponent,
+  LegendComponent,
+  PolarComponent,
+  VisualMapComponent,
+  DataZoomComponent,
+  BarChart,
+  LineChart,
+  CustomChart,
+  GaugeChart,
+  PieChart,
+  ScatterChart,
+  HeatmapChart,
+  SankeyChart,
+  TreeChart,
+  LabelLayout,
+  UniversalTransition,
+  CanvasRenderer,
+]);
 
 export default defineComponent({
   name: "ChartRenderer",
@@ -271,6 +363,7 @@ export default defineComponent({
         // and hovered series is not -1
         // and chart is time series
         if (
+          isChartVisible &&
           props?.data?.extras?.panelId &&
           props?.data?.extras?.panelId != hoveredSeriesState?.value?.panelId &&
           hoveredSeriesState?.value?.panelId != -1 &&
@@ -378,6 +471,39 @@ export default defineComponent({
     });
     onUnmounted(() => {
       window.removeEventListener("resize", windowResizeEventCallback);
+    });
+
+    // observer for chart visibility
+    let isChartVisibleObserver: any;
+
+    // flag for chart visibility
+    let isChartVisible: any = false;
+
+    onMounted(() => {
+      // chart visibility observer
+      isChartVisibleObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // chart is visible
+            isChartVisible = true;
+          } else {
+            // chart is not visible
+            isChartVisible = false;
+          }
+        });
+      });
+
+      if (chartRef.value) {
+        // observe chart
+        isChartVisibleObserver.observe(chartRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      if (chartRef.value) {
+        // unobserve chart
+        isChartVisibleObserver.unobserve(chartRef.value);
+      }
     });
 
     //need to resize chart on activated

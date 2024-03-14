@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   onActivated,
   provide,
@@ -137,9 +138,12 @@ import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
-import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
+
+const ViewPanel = defineAsyncComponent(() => {
+  return import("@/components/dashboards/viewPanel/ViewPanel.vue");
+});
 
 export default defineComponent({
   name: "RenderDashboardCharts",

@@ -305,8 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
-  onActivated,
   onMounted,
   ref,
   watch,
@@ -316,7 +316,6 @@ import { useQuasar, date } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
-import AddDashboard from "../../components/dashboards/AddDashboard.vue";
 import QTablePagination from "../../components/shared/grid/Pagination.vue";
 import NoData from "../../components/shared/grid/NoData.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -337,7 +336,14 @@ import {
   outlinedEdit,
 } from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
-import MoveDashboardToAnotherFolder from "@/components/dashboards/MoveDashboardToAnotherFolder.vue";
+
+const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
+  return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
+});
+
+const AddDashboard = defineAsyncComponent(() => {
+  return import("@/components/dashboards/AddDashboard.vue");
+});
 
 export default defineComponent({
   name: "Dashboards",
