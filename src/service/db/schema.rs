@@ -206,12 +206,13 @@ pub async fn set(
             let current_schema = get(org_id, stream_name, stream_type).await?;
             let mut current_meta = current_schema.metadata().clone();
             let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-
-            let created_at: i64 = if current_meta.contains_key("created_at") {
-                current_meta.insert(
-                    "start_dt".to_string(),
-                    current_meta.get("created_at").unwrap().clone(),
-                );
+            let start_dt = if current_meta.contains_key("created_at") {
+                if !current_meta.contains_key("start_dt") {
+                    current_meta.insert(
+                        "start_dt".to_string(),
+                        current_meta.get("created_at").unwrap().clone(),
+                    );
+                }
                 current_meta
                     .get("start_dt")
                     .unwrap()
@@ -231,7 +232,7 @@ pub async fn set(
                     &key,
                     json::to_vec(&new_schema).unwrap().into(),
                     infra_db::NEED_WATCH,
-                    created_at,
+                    start_dt,
                 )
                 .await;
             return Ok(());
