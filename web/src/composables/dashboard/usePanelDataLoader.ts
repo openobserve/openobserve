@@ -438,7 +438,11 @@ export const usePanelDataLoader = (
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
-        const variableValue = variable.value;
+        let variableValue = variable.value;
+        //if variableValue is null set as '' 
+        if (variableValue === null) {
+          variableValue = "";
+        }
         if (query.includes(variableName)) {
           metadata.push({
             type: "variable",
