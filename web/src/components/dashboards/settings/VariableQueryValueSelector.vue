@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
-    selectedValue: {{ selectedValue }}
   </div>
 </template>
 
@@ -65,12 +64,10 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    console.log("props", props);
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
     const options = toRef(props.variableItem, "options");
-    // console.log("options", options.value);
 
     // get filtered options
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
@@ -87,10 +84,6 @@ export default defineComponent({
 
     // update selected value
     watch(selectedValue, () => {
-      console.log("selectedValue", selectedValue.value);
-      // If selected value is '<blank>', emit empty string ''
-      // const valueToEmit =
-      // selectedValue.value === "<blank>" ? "" : selectedValue.value;
       emit("update:modelValue", selectedValue.value.value);
     });
 
@@ -103,5 +96,4 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
