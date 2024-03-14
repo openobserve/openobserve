@@ -37,6 +37,8 @@ export const convertPromQLData = (
   chartPanelRef: any,
   hoveredSeriesState: any
 ) => {
+  // console.time("convertPromQLData");
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -44,6 +46,7 @@ export const convertPromQLData = (
     !searchQueryData[0] ||
     !panelSchema
   ) {
+    // console.timeEnd("convertPromQLData");
     return { options: null };
   }
 
@@ -160,20 +163,27 @@ export const convertPromQLData = (
           hoveredSeriesState?.value?.panelId != panelSchema.id
         )
           return "";
+
         if (name.length == 0) return "";
 
         const date = new Date(name[0].data[0]);
 
-        // get the current series index from name
-        const currentSeriesIndex = name.findIndex(
-          (it: any) =>
-            it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-        );
+        // if hovered series is not null
+        // then swap the hovered series to top in tooltip
+        if (hoveredSeriesState?.value?.hoveredSeriesName) {
+          // get the current series index from name
+          const currentSeriesIndex = name.findIndex(
+            (it: any) =>
+              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+          );
 
-        // swap current hovered series index to top in tooltip
-        const temp = name[0];
-        name[0] = name[currentSeriesIndex != -1 ? currentSeriesIndex : 0];
-        name[currentSeriesIndex != -1 ? currentSeriesIndex : 0] = temp;
+          // swap current hovered series index to top in tooltip
+          if (currentSeriesIndex != -1) {
+            const temp = name[0];
+            name[0] = name[currentSeriesIndex];
+            name[currentSeriesIndex] = temp;
+          }
+        }
 
         let hoverText: string[] = [];
         name.forEach((it: any) => {
@@ -319,6 +329,10 @@ export const convertPromQLData = (
     options.grid = gridDataForGauge.gridArray;
   }
 
+  const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
+    panelSchema.type
+  );
+
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -329,7 +343,6 @@ export const convertPromQLData = (
         switch (it?.resultType) {
           case "matrix": {
             const seriesObj = it?.result?.map((metric: any) => {
-
               // Now, we are using xaxisData which will be sorted by the timestamp
               // const values = metric.values.sort(
               //   (a: any, b: any) => a[0] - b[0]
@@ -354,7 +367,7 @@ export const convertPromQLData = (
                   value[1],
                   seriesDataObj[value[0]] ?? null,
                 ]),
-                ...getPropsByChartTypeForSeries(panelSchema.type),
+                ...seriesPropsBasedOnChartType,
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
               };
             });
@@ -579,26 +592,6 @@ export const convertPromQLData = (
 
   options.series = options.series.flat();
 
-  const calculateWidthText = (text: string): number => {
-    if (!text) return 0;
-
-    const span = document.createElement("span");
-    document.body.appendChild(span);
-
-    span.style.font = "sans-serif";
-    span.style.fontSize = "12px";
-    span.style.height = "auto";
-    span.style.width = "auto";
-    span.style.top = "0px";
-    span.style.position = "absolute";
-    span.style.whiteSpace = "no-wrap";
-    span.innerHTML = text;
-
-    const width = Math.ceil(span.clientWidth);
-    span.remove();
-    return width;
-  };
-
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
   if (
@@ -641,6 +634,7 @@ export const convertPromQLData = (
 
   //check if is there any data else filter out axis or series data
   if (!options?.series?.length && !options?.xAxis?.length) {
+    // console.timeEnd("convertPromQLData");
     return {
       options: {
         series: [],
@@ -651,12 +645,32 @@ export const convertPromQLData = (
 
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
-
   // promql query will be always timeseries except gauge and metric text chart.
+  // console.timeEnd("convertPromQLData");
   return {
     options,
     extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
   };
+};
+
+const calculateWidthText = (text: string): number => {
+  if (!text) return 0;
+
+  const span = document.createElement("span");
+  document.body.appendChild(span);
+
+  span.style.font = "sans-serif";
+  span.style.fontSize = "12px";
+  span.style.height = "auto";
+  span.style.width = "auto";
+  span.style.top = "0px";
+  span.style.position = "absolute";
+  span.style.whiteSpace = "no-wrap";
+  span.innerHTML = text;
+
+  const width = Math.ceil(span.clientWidth);
+  span.remove();
+  return width;
 };
 
 /**
