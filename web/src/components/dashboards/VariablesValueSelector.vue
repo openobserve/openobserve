@@ -284,6 +284,7 @@ export default defineComponent({
                   } else {
                     obj.value = obj.options.length ? obj.options[0].value : "";
                   }
+                  
                   variablesData.isVariablesLoading = variablesData.values.some(
                     (val: { isLoading: any }) => val.isLoading
                   );
