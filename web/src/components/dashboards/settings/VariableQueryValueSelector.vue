@@ -23,8 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       v-model="selectedValue"
       :display-value="
-        selectedValue
-          ? selectedValue
+        selectedValue || selectedValue == ''
+          ? selectedValue == ''
+            ? '<blank>'
+            : selectedValue
           : !variableItem.isLoading
           ? '(No Data Found)'
           : ''
@@ -32,13 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
       input-debounce="0"
+      emit-value
+      option-value="value"
+      option-label="label"
       behavior="menu"
       use-input
       stack-label
       @filter="fieldsFilterFn"
-      option-value="name"
-      option-label="name"
-      emit-value
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
@@ -94,5 +96,4 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
