@@ -263,10 +263,7 @@ export default defineComponent({
                         value.zo_sql_key !== ""
                           ? value.zo_sql_key.toString()
                           : "<blank>",
-                      value:
-                        value.zo_sql_key !== ""
-                          ? value.zo_sql_key.toString()
-                          : "<blank>",
+                      value: value.zo_sql_key.toString(),
                     }));
 
                   // find old value is exists in the dropdown

@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       use-input
       stack-label
       @filter="fieldsFilterFn"
-      emit-value
       class="textbox col no-case"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-query-value-selector"
@@ -52,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
     </q-select>
+    selectedValue: {{ selectedValue }}
   </div>
 </template>
 
@@ -69,6 +69,7 @@ export default defineComponent({
     const selectedValue = ref(props.variableItem?.value);
 
     const options = toRef(props.variableItem, "options");
+    // console.log("options", options.value);
 
     // get filtered options
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
@@ -78,6 +79,7 @@ export default defineComponent({
     watch(
       () => props.variableItem,
       () => {
+        console.log("options", options.value, props.variableItem);
         options.value = props.variableItem?.options;
       }
     );
@@ -86,8 +88,9 @@ export default defineComponent({
     watch(selectedValue, () => {
       console.log("selectedValue", selectedValue.value);
       // If selected value is '<blank>', emit empty string ''
-      const valueToEmit = selectedValue.value === '<blank>' ? '' : selectedValue.value;
-      emit("update:modelValue", valueToEmit);
+      // const valueToEmit =
+      // selectedValue.value === "<blank>" ? "" : selectedValue.value;
+      emit("update:modelValue", selectedValue.value.value);
     });
 
     return {
