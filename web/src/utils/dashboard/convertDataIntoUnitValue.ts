@@ -2,14 +2,14 @@ const units: any = {
   bytes: [
     { unit: "B", divisor: 1 },
     { unit: "KB", divisor: 1024 },
-    { unit: "MB", divisor: 1024 ** 2 },
-    { unit: "GB", divisor: 1024 ** 3 },
-    { unit: "TB", divisor: 1024 ** 4 },
-    { unit: "PB", divisor: 1024 ** 5 },
+    { unit: "MB", divisor: 1024 * 1024 },
+    { unit: "GB", divisor: 1024 * 1024 * 1024 },
+    { unit: "TB", divisor: 1024 * 1024 * 1024 * 1024 },
+    { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
   ],
   seconds: [
-    { unit: "μs", divisor: 1e-6 },
-    { unit: "ms", divisor: 1e-3 },
+    { unit: "μs", divisor: 0.000001 },
+    { unit: "ms", divisor: 0.001 },
     { unit: "s", divisor: 1 },
     { unit: "m", divisor: 60 },
     { unit: "h", divisor: 3600 },
@@ -19,47 +19,47 @@ const units: any = {
   ],
   microseconds: [
     { unit: "μs", divisor: 1 },
-    { unit: "ms", divisor: 1e3 },
-    { unit: "s", divisor: 1e6 },
-    { unit: "m", divisor: 6e7 },
-    { unit: "h", divisor: 36e8 },
-    { unit: "D", divisor: 864e8 },
-    { unit: "M", divisor: 2592e9 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536e9 }, // Assuming 365 days in a year
+    { unit: "ms", divisor: 1000 },
+    { unit: "s", divisor: 1000000 },
+    { unit: "m", divisor: 60 * 1000000 },
+    { unit: "h", divisor: 3600 * 1000000 },
+    { unit: "D", divisor: 86400 * 1000000 },
+    { unit: "M", divisor: 2592000 * 1000000 }, // Assuming 30 days in a month
+    { unit: "Y", divisor: 31536000 * 1000000 }, // Assuming 365 days in a year
   ],
   milliseconds: [
-    { unit: "μs", divisor: 1e-3 },
+    { unit: "μs", divisor: 0.001 },
     { unit: "ms", divisor: 1 },
-    { unit: "s", divisor: 1e3 },
-    { unit: "m", divisor: 6e4 },
-    { unit: "h", divisor: 36e5 },
-    { unit: "D", divisor: 864e5 },
-    { unit: "M", divisor: 2592e6 }, // Assuming 30 days in a month
-    { unit: "Y", divisor: 31536e6 }, // Assuming 365 days in a year
+    { unit: "s", divisor: 1000 },
+    { unit: "m", divisor: 60 * 1000 },
+    { unit: "h", divisor: 3600 * 1000 },
+    { unit: "D", divisor: 86400 * 1000 },
+    { unit: "M", divisor: 2592000 * 1000 }, // Assuming 30 days in a month
+    { unit: "Y", divisor: 31536000 * 1000 }, // Assuming 365 days in a year
   ],
   bps: [
     { unit: "B/s", divisor: 1 },
     { unit: "KB/s", divisor: 1024 },
-    { unit: "MB/s", divisor: 1024 ** 2 },
-    { unit: "GB/s", divisor: 1024 ** 3 },
-    { unit: "TB/s", divisor: 1024 ** 4 },
-    { unit: "PB/s", divisor: 1024 ** 5 },
+    { unit: "MB/s", divisor: 1024 * 1024 },
+    { unit: "GB/s", divisor: 1024 * 1024 * 1024 },
+    { unit: "TB/s", divisor: 1024 * 1024 * 1024 * 1024 },
+    { unit: "PB/s", divisor: 1024 * 1024 * 1024 * 1024 * 1024 },
   ],
   kilobytes: [
     { unit: "B", divisor: 1 / 1024 },
     { unit: "KB", divisor: 1 },
     { unit: "MB", divisor: 1024 },
-    { unit: "GB", divisor: 1024 ** 2 },
-    { unit: "TB", divisor: 1024 ** 3 },
-    { unit: "PB", divisor: 1024 ** 4 },
+    { unit: "GB", divisor: 1024 * 1024 },
+    { unit: "TB", divisor: 1024 * 1024 * 1024 },
+    { unit: "PB", divisor: 1024 * 1024 * 1024 * 1024 },
   ],
   megabytes: [
-    { unit: "B", divisor: 1 / 1024 ** 2 },
+    { unit: "B", divisor: 1 / (1024 * 1024) },
     { unit: "KB", divisor: 1 / 1024 },
     { unit: "MB", divisor: 1 },
     { unit: "GB", divisor: 1024 },
-    { unit: "TB", divisor: 1024 ** 2 },
-    { unit: "PB", divisor: 1024 ** 3 },
+    { unit: "TB", divisor: 1024 * 1024 },
+    { unit: "PB", divisor: 1024 * 1024 * 1024 },
   ],
 };
 

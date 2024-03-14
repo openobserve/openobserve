@@ -482,17 +482,6 @@ export const convertSQLData = (
           ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
 
-        // let uniqueValues: any = {};
-        // let stackedXAxisUniqueValue: any = [];
-
-        // for (let obj of searchQueryData[0]) {
-        //   let value = obj[key1];
-        //   if (value && !uniqueValues[value]) {
-        //     stackedXAxisUniqueValue.push(value);
-        //     uniqueValues[value] = true; // mark as seen
-        //   }
-        // }
-
         // create a trace based on second xAxis's unique values
         // queryData who has the xaxis[0] key.
         const xAxisUniqueValue = Array.from(
@@ -816,17 +805,6 @@ export const convertSQLData = (
         ...new Set(searchQueryData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
-      // let uniqueValues: any = {};
-      // let stackedXAxisUniqueValue: any = [];
-
-      // for (let obj of searchQueryData[0]) {
-      //   let value = obj[key1];
-      //   if (value && !uniqueValues[value]) {
-      //     stackedXAxisUniqueValue.push(value);
-      //     uniqueValues[value] = true; // mark as seen
-      //   }
-      // }
-
       // queryData who has the xaxis[0] key.
       const xAxisUniqueValue = Array.from(
         new Set(searchQueryData[0].map((it: any) => it[xAxisKeys[0]]))
@@ -865,7 +843,7 @@ export const convertSQLData = (
       ].filter((it) => it);
 
       const yAxisKey0 = zAxisKeys[0];
-      const Zvalues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
+      const zValues: any = xAxisFirstPositionUniqueValue.map((first: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
         const data = searchQueryData[0].filter((it: any) => it[key1] == first);
 
@@ -876,7 +854,7 @@ export const convertSQLData = (
 
       (options.visualMap = {
         min: 0,
-        max: Zvalues.reduce(
+        max: zValues.reduce(
           (a: any, b: any) =>
             Math.max(
               a,
@@ -892,11 +870,15 @@ export const convertSQLData = (
           {
             ...defaultSeriesProps,
             name: panelSchema?.queries[0]?.fields?.y[0].label,
-            data: Zvalues.map((it: any, index: any) => {
-              return xAxisZerothPositionUniqueValue.map((i: any, j: number) => {
-                return [j, index, it[j]];
-              });
-            }).flat(),
+            data: zValues
+              .map((it: any, index: any) => {
+                return xAxisZerothPositionUniqueValue.map(
+                  (i: any, j: number) => {
+                    return [j, index, it[j]];
+                  }
+                );
+              })
+              .flat(),
             label: {
               show: true,
               fontSize: 12,

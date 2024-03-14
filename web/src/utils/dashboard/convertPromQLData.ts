@@ -333,22 +333,6 @@ export const convertPromQLData = (
     panelSchema.type
   );
 
-  // // date cache for converting milli seconds to date(local time)
-  // const dateCache: any = {};
-  // const convertMilliSecondsToDate = (milliseconds: number) => {
-  //   if (!dateCache[milliseconds]) {
-  //     const dateObj = new Date(milliseconds);
-
-  //     // if utc then simply return the values by removing z from string
-  //     // else convert time from utc to zoned
-  //     // used slice to remove Z from isostring to pass as a utc
-  //     dateCache[milliseconds] =
-  //       store.state.timezone === "UTC"
-  //         ? dateObj.toISOString().slice(0, -1)
-  //         : utcToZonedTime(dateObj, store.state.timezone);
-  //   }
-  //   return dateCache[milliseconds];
-  // };
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
