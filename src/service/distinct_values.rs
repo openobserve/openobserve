@@ -201,18 +201,17 @@ impl DistinctValues {
     }
 
     async fn stop(&self) -> Result<()> {
+        log::info!("[DISTINCT_VALUES] shutting down");
         let tx = self.channel.clone();
         tx.send(DvEvent::shutdown())
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
-        let mut i = 0;
-        while i < 10 {
+        loop {
             if self.shutdown.load(Ordering::Relaxed) {
                 break;
             }
             time::sleep(time::Duration::from_secs(1)).await;
             log::info!("[DISTINCT_VALUES] shutting down");
-            i += 1;
         }
         Ok(())
     }
