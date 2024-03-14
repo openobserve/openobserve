@@ -490,6 +490,11 @@ const defaultValue: any = () => {
     context_attributes: {},
     enabled: true,
     description: "",
+    lastTriggeredAt: 0,
+    createdAt: "",
+    updatedAt: "",
+    owner: "",
+    lastEditedBy: "",
   };
 };
 let callAlert: Promise<{ data: any }>;
@@ -948,6 +953,17 @@ export default defineComponent({
 
       if (getSelectedTab.value === "promql") {
         payload.query_condition.sql = "";
+      }
+
+      if (beingUpdated) {
+        payload.updatedAt = new Date().toISOString();
+        payload.lastEditedBy = store.state.userInfo.email;
+      } else {
+        payload.createdAt = new Date().toISOString();
+        payload.owner = store.state.userInfo.email;
+        payload.lastTriggeredAt = new Date().getTime();
+        payload.lastEditedBy = store.state.userInfo.email;
+        formData.value.updatedAt = new Date().toISOString();
       }
 
       return payload;
