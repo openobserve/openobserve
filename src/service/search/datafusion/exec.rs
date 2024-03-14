@@ -706,7 +706,8 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
         return Ok(sql);
     }
 
-    let mut sql = sql.to_string();
+    let mut sql = rewrite::add_group_by_field_to_select(sql);
+
     let mut fields = Vec::new();
     let mut from_pos = 0;
     let sql_chars = sql.chars().collect::<Vec<char>>();
