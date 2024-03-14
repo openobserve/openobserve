@@ -306,7 +306,6 @@ impl VisitorMut for AddGroupBy {
                     sqlparser::ast::SelectItem::ExprWithAlias { alias, .. } => {
                         select_exprs.push(Expr::Identifier(alias.clone()));
                     }
-                    // extrace function paraments from the projection list
                     sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
                         select_exprs.push(expr.clone());
                     }
