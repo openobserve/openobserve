@@ -1215,6 +1215,7 @@ const saveReport = async () => {
     formData.value.owner = store.state.userInfo.email;
     formData.value.lastTriggeredAt = new Date().getTime();
     formData.value.lastEditedBy = store.state.userInfo.email;
+    formData.value.updatedAt = new Date().toISOString();
   }
 
   // Check if all report input fields are valid
