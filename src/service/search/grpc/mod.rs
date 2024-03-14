@@ -161,18 +161,34 @@ pub async fn search(
         }
     }
 
+    // convert select field to schema::Field
+    let select_fields = sql
+        .meta
+        .fields
+        .iter()
+        .filter_map(|f| {
+            sql.schema
+                .field_with_name(f)
+                .ok()
+                .map(|f| Arc::new(f.clone()))
+        })
+        .collect::<Vec<_>>();
+
     // merge all batches
     let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
     let mut merge_results = HashMap::new();
     for (name, batches) in results {
-        let merge_sql = if name == "query" {
-            sql.origin_sql.clone()
+        let (merge_sql, select_fields) = if name == "query" {
+            (sql.origin_sql.clone(), select_fields.clone())
         } else {
-            sql.aggs
-                .get(name.strip_prefix("agg_").unwrap())
-                .unwrap()
-                .0
-                .clone()
+            (
+                sql.aggs
+                    .get(name.strip_prefix("agg_").unwrap())
+                    .unwrap()
+                    .0
+                    .clone(),
+                vec![],
+            )
         };
         let batches = match super::datafusion::exec::merge(
             &sql.org_id,
@@ -180,6 +196,7 @@ pub async fn search(
             limit,
             &merge_sql,
             &batches,
+            &select_fields,
             false,
         )
         .await

@@ -15,6 +15,7 @@
 
 use std::{str::FromStr, sync::Arc};
 
+use arrow_schema::Field;
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
@@ -552,6 +553,7 @@ pub async fn merge(
     limit: usize,
     sql: &str,
     batches: &[RecordBatch],
+    select_fields: &[Arc<Field>],
     is_final_phase: bool, // use to indicate if this is the final phase of merge
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
@@ -559,9 +561,25 @@ pub async fn merge(
     }
 
     // write temp file
-    let (schema, work_dir) = merge_write_recordbatch(batches)?;
+    let (mut schema, work_dir) = merge_write_recordbatch(batches)?;
     if schema.fields().is_empty() {
         return Ok(vec![]);
+    }
+
+    // add not exists field for wal infered schema
+    let mut new_fields = Vec::new();
+    for field in select_fields.iter() {
+        if schema.field_with_name(field.name()).is_err() {
+            new_fields.push(field.clone());
+        }
+    }
+    if !new_fields.is_empty() {
+        let new_schema = Schema::new(new_fields);
+        schema = Arc::new(
+            Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).map_err(|e| {
+                datafusion::error::DataFusionError::Execution(format!("merge schema error: {e}",))
+            })?,
+        );
     }
 
     let select_wildcard = sql.to_lowercase().starts_with("select * ");
@@ -1480,6 +1498,7 @@ mod tests {
             100,
             "select * from tbl limit 10",
             &[batch, batch2],
+            &[],
             true,
         )
         .await
