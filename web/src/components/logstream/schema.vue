@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
         <div
-          v-if="indexData.schema.length == 0"
+          v-else-if="indexData.schema.length == 0"
           class="q-pt-md text-center q-w-md q-mx-lg"
           style="max-width: 450px"
         >
