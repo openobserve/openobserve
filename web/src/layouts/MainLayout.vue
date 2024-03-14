@@ -379,7 +379,14 @@ export default defineComponent({
   },
   methods: {
     navigateToDocs() {
-      window.open("https://openobserve.ai/docs", "_blank");
+      let docURL = "https://openobserve.ai/docs";
+      if (
+        this.config.isEnterprise == "true" &&
+        this.store.state.zoConfig.custom_docs_url != ""
+      ) {
+        docURL = this.store.state.zoConfig.custom_docs_url;
+      }
+      window.open(docURL, "_blank");
     },
     navigateToOpenAPI(zoBackendUrl: string) {
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
@@ -431,6 +438,13 @@ export default defineComponent({
     ];
 
     const orgOptions = ref([{ label: Number, value: String }]);
+    let slackURL = "https://short.openobserve.ai/community";
+    if (
+      config.isEnterprise == "true" &&
+      store.state.zoConfig.custom_slack_url != ""
+    ) {
+      slackURL = store.state.zoConfig.custom_slack_url;
+    }
 
     let user = store.state.userInfo;
 
@@ -495,7 +509,7 @@ export default defineComponent({
       {
         title: t("menu.slack"),
         iconComponent: markRaw(SlackIcon),
-        link: "https://short.openobserve.ai/community",
+        link: slackURL,
         target: "_blank",
         external: true,
       },

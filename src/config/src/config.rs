@@ -60,6 +60,9 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
+pub const DEFAULT_INDEX_TRIM_CHARS: &str = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+pub const INDEX_MIN_CHAR_LEN: usize = 3;
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -195,6 +198,7 @@ pub struct Config {
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
+    pub rum: RUM,
 }
 
 #[derive(EnvConfig)]
@@ -335,8 +339,6 @@ pub struct Common {
     pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
-    #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
-    pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
@@ -441,6 +443,14 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
+
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
+        default = " ;,",
+        help = "Characters which should be used as a delimiter to split the string."
+    )]
+    pub inverted_index_split_chars: String,
+
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -757,6 +767,30 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+}
+
+#[derive(Debug, EnvConfig)]
+pub struct RUM {
+    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
+    pub enabled: bool,
+    #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
+    pub client_token: String,
+    #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
+    pub application_id: String,
+    #[env_config(name = "ZO_RUM_SITE", default = "")]
+    pub site: String,
+    #[env_config(name = "ZO_RUM_SERVICE", default = "")]
+    pub service: String,
+    #[env_config(name = "ZO_RUM_ENV", default = "")]
+    pub env: String,
+    #[env_config(name = "ZO_RUM_VERSION", default = "")]
+    pub version: String,
+    #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
+    pub organization_identifier: String,
+    #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
+    pub api_version: String,
+    #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
+    pub insecure_http: bool,
 }
 
 pub fn init() -> Config {

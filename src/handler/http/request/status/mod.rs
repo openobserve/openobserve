@@ -71,8 +71,25 @@ struct ConfigResponse<'a> {
     native_login_enabled: bool,
     rbac_enabled: bool,
     query_on_stream_selection: bool,
-    custom_logo_text: String,
     show_stream_stats_doc_num: bool,
+    custom_logo_text: String,
+    custom_slack_url: String,
+    custom_docs_url: String,
+    rum: Rum,
+}
+
+#[derive(Serialize)]
+struct Rum {
+    pub enabled: bool,
+    pub client_token: String,
+    pub application_id: String,
+    pub site: String,
+    pub service: String,
+    pub env: String,
+    pub version: String,
+    pub organization_identifier: String,
+    pub api_version: String,
+    pub insecure_http: bool,
 }
 
 /// Healthz
@@ -108,6 +125,14 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_logo_text = &O2_CONFIG.common.custom_logo_text;
     #[cfg(not(feature = "enterprise"))]
     let custom_logo_text = "";
+    #[cfg(feature = "enterprise")]
+    let custom_slack_url = &O2_CONFIG.common.custom_slack_url;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_slack_url = "";
+    #[cfg(feature = "enterprise")]
+    let custom_docs_url = &O2_CONFIG.common.custom_docs_url;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_docs_url = "";
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -131,8 +156,22 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         native_login_enabled,
         rbac_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
-        custom_logo_text: custom_logo_text.to_string(),
         show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
+        custom_logo_text: custom_logo_text.to_string(),
+        custom_slack_url: custom_slack_url.to_string(),
+        custom_docs_url: custom_docs_url.to_string(),
+        rum: Rum {
+            enabled: CONFIG.rum.enabled,
+            client_token: CONFIG.rum.client_token.to_string(),
+            application_id: CONFIG.rum.application_id.to_string(),
+            site: CONFIG.rum.site.to_string(),
+            service: CONFIG.rum.service.to_string(),
+            env: CONFIG.rum.env.to_string(),
+            version: CONFIG.rum.version.to_string(),
+            organization_identifier: CONFIG.rum.organization_identifier.to_string(),
+            api_version: CONFIG.rum.api_version.to_string(),
+            insecure_http: CONFIG.rum.insecure_http,
+        },
     }))
 }
 

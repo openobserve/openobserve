@@ -33,9 +33,6 @@ import configService from "./services/config";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 
-import { datadogRum } from "@datadog/browser-rum";
-import { datadogLogs } from "@datadog/browser-logs";
-
 const app = createApp(App);
 const router = createRouter(store);
 
@@ -76,17 +73,19 @@ const getConfig = async () => {
         // We recommend adjusting this value in production
         tracesSampleRate: 1.0,
       });
+    }
 
+    if (res.data.rum.enabled) {
       const options = {
-        clientToken: config.ooClientToken,
-        applicationId: config.ooApplicationID,
-        site: config.ooSite,
-        service: config.ooService,
-        env: config.environment,
-        version: "0.0.1",
-        organizationIdentifier: config.ooOrgIdentifier,
-        insecureHTTP: false,
-        apiVersion: "v1",
+        clientToken: res.data.rum.client_token,
+        applicationId: res.data.rum.application_id,
+        site: res.data.rum.site,
+        service: res.data.rum.service,
+        env: res.data.rum.env,
+        version: res.data.rum.version || "0.0.1",
+        organizationIdentifier: res.data.rum.organization_identifier,
+        insecureHTTP: res.data.rum.insecure_http || false,
+        apiVersion: res.data.rum.api_version || "v1",
       };
 
       openobserveRum.init({
@@ -117,33 +116,6 @@ const getConfig = async () => {
       });
 
       openobserveRum.startSessionReplayRecording();
-
-      datadogRum.init({
-        applicationId: config.ddAPPID, // required, any string identifying your application
-        clientToken: config.ddClientToken,
-        site: config.ddSite,
-        service: "openobserve",
-        // service: "my-web-application",
-        // env: "production",
-        // version: "1.0.0",
-        sessionSampleRate: 100,
-        sessionReplaySampleRate: 100, // if not included, the default is 100
-        trackResources: true,
-        trackLongTasks: true,
-        trackUserInteractions: true,
-        version: "v1",
-        defaultPrivacyLevel: "allow",
-      });
-
-      datadogLogs.init({
-        clientToken: config.ddClientToken,
-        site: config.ddSite,
-        forwardErrorsToLogs: true,
-        sessionSampleRate: 100,
-        version: "v1",
-      });
-
-      datadogRum.startSessionReplayRecording();
     }
   });
 };

@@ -516,4 +516,38 @@ describe("Logs testcases", () => {
       });
     });
   });
+
+
+  it("should add timestamp to editor save this view and switch", () => {
+    cy.wait(1000)
+    cy.get('[data-test="log-table-column-1-@timestamp"] > .flex > .ellipsis').click();
+    cy.get(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click();
+    cy.get('[data-test="log-details-include-field-btn"]').click();
+    cy.get('[data-test="close-dialog"] > .q-btn__content').click();
+    cy.get('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown--current > .q-btn__content > :nth-child(1)').click();
+    cy.get('[data-test="add-alert-name-input"]').type("e2etimestamp");
+    cy.get('[data-test="saved-view-dialog-save-btn"] > .q-btn__content').click()
+    
+    cy.get('[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon').click()
+    cy.get('.q-item__label').contains('timestamp').click();
+    cy.get(".q-notification__message").should(
+      "contain",
+      "e2etimestamp view applied successfully"
+    );
+    cy.wait(3000)
+    cy.get(
+      '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon'
+    ).click({force:true});
+    cy.get(".saved-view-item")
+      .first()
+      .within(() => {
+        cy.get(
+          '[data-test="logs-search-bar-delete-e2etimestamp-saved-view-btn"]'
+        ).click({ force: true });
+      });
+
+    cy.get('[data-test="confirm-button"] > .q-btn__content').click({
+      force: true,
+    });
+  });
 });
