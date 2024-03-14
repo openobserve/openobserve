@@ -170,6 +170,10 @@ pub async fn update_local_node(node: &Node) -> Result<()> {
 }
 
 pub async fn leave() -> Result<()> {
+    unsafe {
+        LOCAL_NODE_STATUS = NodeStatus::Offline;
+    }
+
     if CONFIG.common.local_mode {
         return Ok(());
     }
