@@ -219,7 +219,6 @@ pub async fn set(
                     .parse()
                     .unwrap()
             } else {
-                let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
                 current_meta.insert("start_dt".to_string(), min_ts.to_string());
                 current_meta.insert("created_at".to_string(), min_ts.to_string());
                 min_ts
