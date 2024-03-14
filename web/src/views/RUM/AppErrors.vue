@@ -106,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <AppTable
-            v-else
             :columns="columns"
             :rows="errorTrackingState.data.errors"
             class="app-table-container"
@@ -124,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { nextTick, onBeforeMount, onMounted, ref, type Ref } from "vue";
-import AppTable from "@/components/AppTable.vue";
+import AppTable from "@/components/rum/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
@@ -139,6 +138,7 @@ import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
 const dateTime = ref({
@@ -235,6 +235,8 @@ const userDataSet = new Set([
 ]);
 
 const router = useRouter();
+
+const q = useQuasar();
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -363,6 +365,21 @@ const getErrorLogs = () => {
     })
     .then((res) => {
       errorTrackingState.data.errors = res.data.hits;
+      totalErrorsCount.value = res.data.hits.reduce(
+        (acc: number, curr: any) => {
+          return acc + curr.events;
+        },
+        0
+      );
+    })
+    .catch((err) => {
+      q.notify({
+        message:
+          err.response?.data?.message || "Error while fetching error events",
+        position: "bottom",
+        color: "negative",
+        timeout: 4000,
+      });
     })
     .finally(() => isLoading.value.pop());
 };
