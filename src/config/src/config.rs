@@ -264,8 +264,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 4,
-        help = "Max grpc message size in MB, default is 4 MB"
+        default = 16,
+        help = "Max grpc message size in MB, default is 16 MB"
     )]
     pub max_message_size: usize,
 }
@@ -533,7 +533,7 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 10)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,

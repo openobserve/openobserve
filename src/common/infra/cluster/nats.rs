@@ -205,10 +205,6 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
 
 /// Leave cluster
 pub(crate) async fn leave() -> Result<()> {
-    unsafe {
-        super::LOCAL_NODE_STATUS = NodeStatus::Offline;
-    }
-
     let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
     let client = get_coordinator().await;
     if let Err(e) = client.delete(&key, false, NEED_WATCH).await {

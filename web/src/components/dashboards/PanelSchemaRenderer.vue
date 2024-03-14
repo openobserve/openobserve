@@ -155,17 +155,34 @@ import {
   computed,
   inject,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
-import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
-import HTMLRenderer from "./panels/HTMLRenderer.vue";
-import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
+
+const ChartRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/ChartRenderer.vue");
+});
+
+const TableRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/TableRenderer.vue");
+});
+
+const GeoMapRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/GeoMapRenderer.vue");
+});
+
+const HTMLRenderer = defineAsyncComponent(() => {
+  return import("./panels/HTMLRenderer.vue");
+});
+
+const MarkdownRenderer = defineAsyncComponent(() => {
+  return import("./panels/MarkdownRenderer.vue");
+});
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {

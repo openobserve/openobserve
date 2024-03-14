@@ -15,6 +15,7 @@
 
 use std::{str::FromStr, sync::Arc};
 
+use arrow_schema::Field;
 use config::{
     ider,
     meta::stream::{FileKey, FileMeta, StreamType},
@@ -327,6 +328,8 @@ async fn exec_query(
         .is_some()
     {
         query = rewrite::rewrite_count_distinct_sql(&query, true);
+    } else {
+        query = rewrite::add_group_by_field_to_select(&query);
     }
 
     // Debug SQL
@@ -552,6 +555,7 @@ pub async fn merge(
     limit: usize,
     sql: &str,
     batches: &[RecordBatch],
+    select_fields: &[Arc<Field>],
     is_final_phase: bool, // use to indicate if this is the final phase of merge
 ) -> Result<Vec<RecordBatch>> {
     if batches.is_empty() {
@@ -559,9 +563,25 @@ pub async fn merge(
     }
 
     // write temp file
-    let (schema, work_dir) = merge_write_recordbatch(batches)?;
+    let (mut schema, work_dir) = merge_write_recordbatch(batches)?;
     if schema.fields().is_empty() {
         return Ok(vec![]);
+    }
+
+    // add not exists field for wal infered schema
+    let mut new_fields = Vec::new();
+    for field in select_fields.iter() {
+        if schema.field_with_name(field.name()).is_err() {
+            new_fields.push(field.clone());
+        }
+    }
+    if !new_fields.is_empty() {
+        let new_schema = Schema::new(new_fields);
+        schema = Arc::new(
+            Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).map_err(|e| {
+                datafusion::error::DataFusionError::Execution(format!("merge schema error: {e}",))
+            })?,
+        );
     }
 
     let select_wildcard = sql.to_lowercase().starts_with("select * ");
@@ -570,7 +590,7 @@ pub async fn merge(
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
 
     // rewrite sql
-    let mut query_sql = match merge_rewrite_sql(sql, schema) {
+    let mut query_sql = match merge_rewrite_sql(sql, schema, is_final_phase) {
         Ok(sql) => {
             if offset > 0
                 && sql.to_uppercase().contains(" LIMIT ")
@@ -676,7 +696,7 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Stri
     Ok((Arc::new(schema), work_dir))
 }
 
-fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
+fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Result<String> {
     // special case for count distinct
     if RE_COUNT_DISTINCT
         .captures(sql.to_lowercase().as_str())
@@ -687,6 +707,10 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     let mut sql = sql.to_string();
+    if !is_final_phase {
+        sql = rewrite::add_group_by_field_to_select(&sql);
+    }
+
     let mut fields = Vec::new();
     let mut from_pos = 0;
     let sql_chars = sql.chars().collect::<Vec<char>>();
@@ -1411,7 +1435,6 @@ fn filter_schema_null_fields(schema: &mut Schema) {
 #[cfg(test)]
 mod tests {
     use arrow::array::{Int32Array, NullArray, StringArray};
-    use arrow_schema::Field;
 
     use super::*;
 
@@ -1480,6 +1503,7 @@ mod tests {
             100,
             "select * from tbl limit 10",
             &[batch, batch2],
+            &[],
             true,
         )
         .await
