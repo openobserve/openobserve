@@ -842,7 +842,7 @@ export const convertSQLData = (
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
                 yAxisKeys[0]
-              ] || 0
+              ] ?? null
           ),
         };
         return seriesObj;
@@ -1045,7 +1045,7 @@ export const convertSQLData = (
             (it: any) =>
               data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
                 yAxisKeys[0]
-              ] || 0
+              ] ?? null
           ),
         };
         return seriesObj;
