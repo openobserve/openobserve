@@ -61,15 +61,7 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
         );
         let mut count = 0;
         for (key, value) in res.iter() {
-            match dest
-                .put(
-                    key,
-                    value.clone(),
-                    false,
-                    chrono::Utc::now().timestamp_micros(),
-                )
-                .await
-            {
+            match dest.put(key, value.clone(), false, 0).await {
                 Ok(_) => {
                     count += 1;
                 }
