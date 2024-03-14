@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
       input-debounce="0"
+      emit-value
       option-value="value"
       option-label="label"
       behavior="menu"
@@ -83,7 +84,7 @@ export default defineComponent({
 
     // update selected value
     watch(selectedValue, () => {
-      emit("update:modelValue", selectedValue.value.value);
+      emit("update:modelValue", selectedValue.value);
     });
 
     return {
@@ -95,5 +96,4 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>
