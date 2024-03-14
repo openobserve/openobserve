@@ -652,17 +652,30 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         }
     }
 
+    // convert select field to schema::Field
+    let select_fields = sql
+        .meta
+        .fields
+        .iter()
+        .filter_map(|f| {
+            sql.schema
+                .field_with_name(f)
+                .ok()
+                .map(|f| Arc::new(f.clone()))
+        })
+        .collect::<Vec<_>>();
+
     // merge all batches
     let mut merge_batches = HashMap::new();
     for (name, batch) in batches {
-        let merge_sql = if name == "query" {
-            sql.origin_sql.clone()
+        let (merge_sql, select_fields) = if name == "query" {
+            (sql.origin_sql.clone(), select_fields.clone())
         } else {
             let mut agg_name = name.strip_prefix("agg_").unwrap();
             if agg_name == "ingester_count" {
                 agg_name = "_count";
             }
-            sql.aggs.get(agg_name).unwrap().0.clone()
+            (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
         };
         let batch = match datafusion::exec::merge(
             &sql.org_id,
@@ -670,6 +683,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             sql.meta.limit,
             &merge_sql,
             &batch,
+            &select_fields,
             true,
         )
         .await
