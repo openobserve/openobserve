@@ -68,7 +68,7 @@ pub async fn set(
             &key,
             json::to_vec(alert).unwrap().into(),
             infra_db::NEED_WATCH,
-            chrono::Utc::now().timestamp_micros(),
+            0,
         )
         .await
     {

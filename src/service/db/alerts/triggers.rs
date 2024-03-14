@@ -51,7 +51,7 @@ pub async fn set(
             &db_key,
             json::to_vec(trigger).unwrap().into(),
             infra_db::NEED_WATCH,
-            chrono::Utc::now().timestamp_micros(),
+            0,
         )
         .await
     {

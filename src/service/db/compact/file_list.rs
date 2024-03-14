@@ -29,26 +29,16 @@ pub async fn get_offset() -> Result<i64, anyhow::Error> {
 pub async fn set_offset(offset: i64) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = "/compact/file_list/offset";
-    db.put(
-        key,
-        offset.to_string().into(),
-        infra_db::NO_NEED_WATCH,
-        chrono::Utc::now().timestamp_micros(),
-    )
-    .await?;
+    db.put(key, offset.to_string().into(), infra_db::NO_NEED_WATCH, 0)
+        .await?;
     Ok(())
 }
 
 pub async fn set_delete(key: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/delete/{key}");
-    db.put(
-        &key,
-        "OK".into(),
-        infra_db::NO_NEED_WATCH,
-        chrono::Utc::now().timestamp_micros(),
-    )
-    .await?;
+    db.put(&key, "OK".into(), infra_db::NO_NEED_WATCH, 0)
+        .await?;
     Ok(())
 }
 
@@ -83,13 +73,8 @@ pub async fn get_process(offset: i64) -> String {
 pub async fn set_process(offset: i64, node: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/process/{offset}");
-    db.put(
-        &key,
-        node.to_string().into(),
-        infra_db::NO_NEED_WATCH,
-        chrono::Utc::now().timestamp_micros(),
-    )
-    .await?;
+    db.put(&key, node.to_string().into(), infra_db::NO_NEED_WATCH, 0)
+        .await?;
     Ok(())
 }
 
