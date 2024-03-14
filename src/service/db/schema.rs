@@ -157,10 +157,10 @@ pub async fn set(
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
     if CONFIG.limit.row_per_schema_version_enabled {
-        if min_ts.is_some() {
+        let db = infra_db::get_db().await;
+        if min_ts.is_some() && new_version {
             let last_schema = get(org_id, stream_name, stream_type).await?;
             let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-            let db = infra_db::get_db().await;
             if !last_schema.fields().is_empty() {
                 let mut last_meta = last_schema.metadata().clone();
                 let created_at: i64 = last_meta.get("start_dt").unwrap().clone().parse().unwrap();
@@ -202,10 +202,34 @@ pub async fn set(
                 .await;
 
             return Ok(());
+        } else {
+            let current_schema = get(org_id, stream_name, stream_type).await?;
+            let mut current_meta = current_schema.metadata().clone();
+            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+            let created_at: i64 = if current_meta.is_empty() {
+                current_meta.insert("created_at".to_string(), min_ts.to_string());
+                current_meta.insert("start_dt".to_string(), min_ts.to_string());
+                min_ts
+            } else {
+                current_meta
+                    .get("start_dt")
+                    .unwrap()
+                    .clone()
+                    .parse()
+                    .unwrap()
+            };
+            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
+            let new_schema = vec![schema.to_owned().with_metadata(current_meta)];
+            let _ = db
+                .put(
+                    &key,
+                    json::to_vec(&new_schema).unwrap().into(),
+                    infra_db::NEED_WATCH,
+                    created_at,
+                )
+                .await;
+            return Ok(());
         }
-        return Err(anyhow::anyhow!(
-            "Error putting schema: row_per_schema_version_enabled is enabled"
-        ));
     }
     let db = infra_db::get_db().await;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
