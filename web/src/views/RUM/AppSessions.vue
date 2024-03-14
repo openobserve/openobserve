@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="columns"
                 :rows="rows"
                 class="app-table-container"
+                :bordered="false"
                 @event-emitted="handleTableEvents"
               >
                 <template v-slot:session_location_column="slotProps">
@@ -155,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, defineProps, onMounted, type Ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
-import AppTable from "@/components/AppTable.vue";
+import AppTable from "@/components/rum/AppTable.vue";
 import {
   formatDuration,
   b64DecodeUnicode,
@@ -446,7 +447,7 @@ const getSessions = () => {
 const getSessionLogs = (req: any) => {
   let geoFields = "";
   let userFields = "";
-  if (schemaMapping.value["geo_info_country"]) {
+  if (schemaMapping.value["geo_info_city"]) {
     geoFields += "min(geo_info_city) as city,";
   }
   if (schemaMapping.value["geo_info_city"]) {
@@ -484,7 +485,7 @@ const getSessionLogs = (req: any) => {
           sessionState.data.sessions[hit.session_id].country = hit.country;
           sessionState.data.sessions[hit.session_id].city = hit.city;
           sessionState.data.sessions[hit.session_id].country_iso_code =
-            hit.country_iso_code.toLowerCase();
+            hit.country_iso_code?.toLowerCase();
         }
       });
       rows.value = Object.values(sessionState.data.sessions);
