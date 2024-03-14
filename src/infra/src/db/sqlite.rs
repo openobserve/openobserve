@@ -429,8 +429,7 @@ impl super::Db for SqliteDb {
             r#"
     ALTER TABLE meta ADD COLUMN start_dt INTEGER not null DEFAULT 0;
     DROP INDEX IF EXISTS meta_module_key2_idx;
-    CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
-    CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module) where module ='schema';
+    CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module);
         "#,
         )
         .execute(&*client)
@@ -464,7 +463,6 @@ CREATE TABLE IF NOT EXISTS meta
         r#"
 CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
 CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, module) where module !='schema';
         "#,
     )
     .execute(&*client)
@@ -472,14 +470,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS meta_module_key2_idx on meta (key2, key1, modu
 
     match sqlx::query(
         r#"
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module) where module ='schema';
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module);
         "#,
     )
     .execute(&*client)
-    .await{
-        Ok(_) => {},
+    .await
+    {
+        Ok(_) => {}
         Err(e) => {
-            log::error!("[SQLITE] create meta_module_start_dt_idx index error: {}", e);
+            log::error!(
+                "[SQLITE] create meta_module_start_dt_idx index error: {}",
+                e
+            );
         }
     }
     Ok(())
