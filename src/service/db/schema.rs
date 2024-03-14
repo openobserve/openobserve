@@ -206,18 +206,25 @@ pub async fn set(
             let current_schema = get(org_id, stream_name, stream_type).await?;
             let mut current_meta = current_schema.metadata().clone();
             let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-            let created_at: i64 = if current_meta.is_empty() {
-                current_meta.insert("created_at".to_string(), min_ts.to_string());
-                current_meta.insert("start_dt".to_string(), min_ts.to_string());
-                min_ts
-            } else {
+
+            let created_at: i64 = if current_meta.contains_key("created_at") {
+                current_meta.insert(
+                    "start_dt".to_string(),
+                    current_meta.get("created_at").unwrap().clone(),
+                );
                 current_meta
                     .get("start_dt")
                     .unwrap()
                     .clone()
                     .parse()
                     .unwrap()
+            } else {
+                let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+                current_meta.insert("start_dt".to_string(), min_ts.to_string());
+                current_meta.insert("created_at".to_string(), min_ts.to_string());
+                min_ts
             };
+
             let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
             let new_schema = vec![schema.to_owned().with_metadata(current_meta)];
             let _ = db
@@ -256,7 +263,7 @@ pub async fn set(
                         &key,
                         json::to_vec(&versions).unwrap().into(),
                         infra_db::NEED_WATCH,
-                        min_ts.unwrap(),
+                        0,
                     )
                     .await;
             }
@@ -268,7 +275,7 @@ pub async fn set(
                     &key,
                     json::to_vec(&versions).unwrap().into(),
                     infra_db::NEED_WATCH,
-                    min_ts.unwrap(),
+                    0,
                 )
                 .await;
         }
@@ -294,7 +301,7 @@ pub async fn set(
             &key,
             json::to_vec(&values).unwrap().into(),
             infra_db::NEED_WATCH,
-            min_ts.unwrap(),
+            0,
         )
         .await
     {
