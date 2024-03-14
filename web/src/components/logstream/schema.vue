@@ -32,6 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
+          v-if="loadingState"
+          class="q-pt-md text-center q-w-md q-mx-lg"
+          style="max-width: 450px"
+        >
+          <q-spinner-hourglass color="primary" size="lg" />
+        </div>
+        <div
           v-if="indexData.schema.length == 0"
           class="q-pt-md text-center q-w-md q-mx-lg"
           style="max-width: 450px"
@@ -288,6 +295,7 @@ export default defineComponent({
     const deleteFieldList = ref([]);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
+    const loadingState = ref(true);
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
@@ -397,6 +405,7 @@ export default defineComponent({
               store.state.zoConfig.data_retention_days;
 
           if (!streamResponse.schema) {
+            loadingState.value = false;
             dismiss();
             return;
           }
@@ -449,9 +458,13 @@ export default defineComponent({
             fieldIndices.length = 0;
           }
 
+          loadingState.value = false;
           dismiss();
         })
-        .catch((err) => console.log(err));
+        .catch((err) => {
+          loadingState.value = false;
+          console.log(err);
+        });
     };
 
     const onSubmit = async () => {
@@ -635,6 +648,7 @@ export default defineComponent({
       formDirtyFlag,
       streamIndexType,
       disableOptions,
+      loadingState,
     };
   },
   created() {
@@ -644,6 +658,8 @@ export default defineComponent({
       this.indexData.stream_type = this.modelValue.stream_type;
 
       this.getSchema();
+    } else {
+      this.loadingState.value = false;
     }
   },
 });

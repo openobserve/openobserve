@@ -31,7 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <template #no-data>
-        <NoData />
+        <div v-if="!loadingState" class="text-center full-width full-height">
+          <NoData />
+        </div>
+        <div v-else class="text-center full-width full-height q-mt-lg">
+          <q-spinner-hourglass color="primary" size="lg" />
+        </div>
       </template>
       <template #header-selection="scope">
         <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
@@ -268,6 +273,7 @@ export default defineComponent({
     const filterQuery = ref("");
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("all");
+    const loadingState = ref(true);
     const streamFilterValues = [
       { label: t("logStream.labelAll"), value: "all" },
       { label: t("logStream.labelLogs"), value: "logs" },
@@ -428,10 +434,11 @@ export default defineComponent({
             });
 
             onChangeStreamFilter(selectedStreamType.value);
-
+            loadingState.value = false;
             dismiss();
           })
           .catch((err) => {
+            loadingState.value = false;
             dismiss();
             $q.notify({
               type: "negative",
@@ -623,6 +630,7 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
+      loadingState,
     };
   },
 });
