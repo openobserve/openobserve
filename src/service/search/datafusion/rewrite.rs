@@ -283,6 +283,50 @@ impl VisitorMut for RemoveWhere {
     }
 }
 
+pub fn add_group_by_field_to_select(sql: &str) -> String {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+    statements.visit(&mut RemoveWhere);
+    statements[0].to_string()
+}
+
+// A visitor that add group by field to select
+struct AddGroupBy;
+
+// Visit each expression after its children have been visited
+impl VisitorMut for AddGroupBy {
+    type Break = ();
+
+    /// Invoked for any queries that appear in the AST before visiting children
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        // collect select field in query
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            let mut select_exprs = Vec::new();
+            for select_item in &select.projection {
+                match select_item {
+                    sqlparser::ast::SelectItem::ExprWithAlias { alias, .. } => {
+                        select_exprs.push(Expr::Identifier(alias.clone()));
+                    }
+                    // extrace function paraments from the projection list
+                    sqlparser::ast::SelectItem::UnnamedExpr(expr) => {
+                        select_exprs.push(expr.clone());
+                    }
+                    _ => {}
+                }
+            }
+            if let GroupByExpr::Expressions(ref exprs) = select.group_by {
+                for expr in exprs.iter() {
+                    if !select_exprs.contains(expr) {
+                        select
+                            .projection
+                            .push(sqlparser::ast::SelectItem::UnnamedExpr(expr.clone()));
+                    }
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,6 +415,28 @@ mod tests {
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
             statements.visit(&mut RewriteFinal);
+            assert_eq!(statements[0].to_string(), **except);
+        }
+    }
+
+    #[test]
+    fn test_add_group_by() {
+        let sql = [
+            "SELECT count(*) as cnt FROM default group by k8s_namespace_name",
+            "SELECT count(*) FROM default group by k8s_namespace_name",
+            "SELECT k8s_namespace_name as k8s, count(*) FROM default group by k8s",
+            "SELECT k8s_namespace_name, count(*) FROM default group by k8s_namespace_name",
+        ];
+
+        let excepts = [
+            "SELECT count(*) AS cnt, k8s_namespace_name FROM default GROUP BY k8s_namespace_name",
+            "SELECT count(*), k8s_namespace_name FROM default GROUP BY k8s_namespace_name",
+            "SELECT k8s_namespace_name AS k8s, count(*) FROM default GROUP BY k8s",
+            "SELECT k8s_namespace_name, count(*) FROM default GROUP BY k8s_namespace_name",
+        ];
+        for (sql, except) in sql.iter().zip(excepts.iter()) {
+            let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+            statements.visit(&mut AddGroupBy);
             assert_eq!(statements[0].to_string(), **except);
         }
     }

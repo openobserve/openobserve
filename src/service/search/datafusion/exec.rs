@@ -328,6 +328,8 @@ async fn exec_query(
         .is_some()
     {
         query = rewrite::rewrite_count_distinct_sql(&query, true);
+    } else {
+        query = rewrite::add_group_by_field_to_select(&query);
     }
 
     // Debug SQL
@@ -1429,7 +1431,6 @@ fn filter_schema_null_fields(schema: &mut Schema) {
 #[cfg(test)]
 mod tests {
     use arrow::array::{Int32Array, NullArray, StringArray};
-    use arrow_schema::Field;
 
     use super::*;
 
