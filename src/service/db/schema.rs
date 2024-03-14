@@ -534,9 +534,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             }
         };
         let settings = stream_settings(json_val.last().unwrap()).unwrap_or_default();
-        if let Some(last) = json_val.last() {
+        if let Some(first) = json_val.first() {
             let mut sl = STREAM_SCHEMAS_LATEST.write().await;
-            sl.insert(item_key_str.to_string(), last.clone());
+            sl.insert(item_key_str.to_string(), first.clone());
             drop(sl);
         }
         let mut sa = STREAM_SCHEMAS.write().await;
