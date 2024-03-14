@@ -300,6 +300,12 @@ impl VisitorMut for AddGroupBy {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         // collect select field in query
         if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            // early return if group by clause is empty
+            if let GroupByExpr::Expressions(ref exprs) = select.group_by {
+                if exprs.is_empty() {
+                    return ControlFlow::Break(());
+                }
+            }
             let mut select_exprs = Vec::new();
             for select_item in &select.projection {
                 match select_item {
