@@ -285,7 +285,7 @@ impl VisitorMut for RemoveWhere {
 
 pub fn add_group_by_field_to_select(sql: &str) -> String {
     let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
-    statements.visit(&mut RemoveWhere);
+    statements.visit(&mut AddGroupBy);
     statements[0].to_string()
 }
 
