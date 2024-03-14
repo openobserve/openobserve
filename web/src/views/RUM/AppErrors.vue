@@ -138,6 +138,7 @@ import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
 const dateTime = ref({
@@ -234,6 +235,8 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
+const q = useQuasar();
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
 });
@@ -329,7 +332,15 @@ const getErrorLogs = () => {
         0
       );
     })
-    .catch(() => {})
+    .catch((err) => {
+      q.notify({
+        message:
+          err.response?.data?.message || "Error while fetching error events",
+        position: "bottom",
+        color: "negative",
+        timeout: 4000,
+      });
+    })
     .finally(() => isLoading.value.pop());
 };
 

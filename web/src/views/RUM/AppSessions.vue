@@ -167,7 +167,7 @@ import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { date } from "quasar";
+import { date, useQuasar } from "quasar";
 import useSession from "@/composables/useSessionReplay";
 import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -194,6 +194,8 @@ const props = defineProps({
 
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
+
+const q = useQuasar();
 
 const { sessionState } = useSession();
 const store = useStore();
@@ -441,6 +443,14 @@ const getSessions = () => {
 
       getSessionLogs(req);
     })
+    .catch((err) => {
+      rows.value = [];
+      q.notify({
+        message: err.response?.data?.message || "Error while fetching sessions",
+        color: "negative",
+        position: "bottom",
+      });
+    })
     .finally(() => isLoading.value.pop());
 };
 
@@ -489,6 +499,14 @@ const getSessionLogs = (req: any) => {
         }
       });
       rows.value = Object.values(sessionState.data.sessions);
+    })
+    .catch((err) => {
+      q.notify({
+        message: err.response?.data?.message || "Error while fetching sessions",
+        position: "bottom",
+        color: "negative",
+        timeout: 4000,
+      });
     })
     .finally(() => isLoading.value.pop());
 };
