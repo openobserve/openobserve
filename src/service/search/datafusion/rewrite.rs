@@ -431,6 +431,8 @@ mod tests {
             "SELECT count(*) FROM default group by k8s_namespace_name",
             "SELECT k8s_namespace_name as k8s, count(*) FROM default group by k8s",
             "SELECT k8s_namespace_name, count(*) FROM default group by k8s_namespace_name",
+            "SELECT * FROM default where a = b",
+            "SELECT a, b, c FROM default",
         ];
 
         let excepts = [
@@ -438,6 +440,8 @@ mod tests {
             "SELECT count(*), k8s_namespace_name FROM default GROUP BY k8s_namespace_name",
             "SELECT k8s_namespace_name AS k8s, count(*) FROM default GROUP BY k8s",
             "SELECT k8s_namespace_name, count(*) FROM default GROUP BY k8s_namespace_name",
+            "SELECT * FROM default WHERE a = b",
+            "SELECT a, b, c FROM default",
         ];
         for (sql, except) in sql.iter().zip(excepts.iter()) {
             let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
