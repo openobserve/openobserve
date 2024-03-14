@@ -79,21 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="padding-top: 5px"
             >
               {{
-                new Date(currentTimeObj?.start_time?.getTime() / 1000)
-                  .toISOString()
-                  .replace(/T/, " ")
-                  .replace(/\..+/, "")
-                  .replace(/-/g, "/")
-                  .slice(0, 16)
+                formatDate(
+                  new Date(currentTimeObj?.start_time?.getTime() / 1000)
+                )
               }}
               -
               {{
-                new Date(currentTimeObj?.end_time?.getTime() / 1000)
-                  .toISOString()
-                  .replace(/T/, " ")
-                  .replace(/\..+/, "")
-                  .replace(/-/g, "/")
-                  .slice(0, 16)
+                formatDate(new Date(currentTimeObj?.end_time?.getTime() / 1000))
               }}
             </div>
             <DateTimePickerDashboard
@@ -631,6 +623,16 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
+    const formatDate = (d: Date) => {
+      var year = d.getFullYear();
+      var month = ("0" + (d.getMonth() + 1)).slice(-2); // Months are zero-based
+      var day = ("0" + d.getDate()).slice(-2);
+      var hours = ("0" + d.getHours()).slice(-2);
+      var minutes = ("0" + d.getMinutes()).slice(-2);
+
+      return `${year}/${month}/${day} ${hours}:${minutes}`;
+    };
+
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -661,6 +663,7 @@ export default defineComponent({
       selectedTabId,
       onMovePanel,
       printDashboard,
+      formatDate,
     };
   },
 });
