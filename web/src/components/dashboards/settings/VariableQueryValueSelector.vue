@@ -77,7 +77,6 @@ export default defineComponent({
     watch(
       () => props.variableItem,
       () => {
-        console.log("options", options.value, props.variableItem);
         options.value = props.variableItem?.options;
       }
     );
@@ -96,4 +95,5 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+</style>
