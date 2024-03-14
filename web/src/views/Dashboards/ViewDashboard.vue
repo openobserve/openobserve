@@ -624,11 +624,11 @@ export default defineComponent({
     });
 
     const formatDate = (d: Date) => {
-      var year = d.getFullYear();
-      var month = ("0" + (d.getMonth() + 1)).slice(-2); // Months are zero-based
-      var day = ("0" + d.getDate()).slice(-2);
-      var hours = ("0" + d.getHours()).slice(-2);
-      var minutes = ("0" + d.getMinutes()).slice(-2);
+      var year = d.getUTCFullYear();
+      var month = ("0" + (d.getUTCMonth() + 1)).slice(-2); // Months are zero-based
+      var day = ("0" + d.getUTCDate()).slice(-2);
+      var hours = ("0" + d.getUTCHours()).slice(-2);
+      var minutes = ("0" + d.getUTCMinutes()).slice(-2);
 
       return `${year}/${month}/${day} ${hours}:${minutes}`;
     };
