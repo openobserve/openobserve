@@ -67,6 +67,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="refDateTime"
             v-model="selectedDate"
           /> -->
+            <!-- for Print Mode -->
+            <!-- if time is relative, show start and end time -->
+            <div
+              v-if="
+                store.state.printMode === true &&
+                selectedDate.valueType == 'relative' &&
+                currentTimeObj.start_time &&
+                currentTimeObj.end_time
+              "
+              style="padding-top: 5px"
+            >
+              {{
+                new Date(currentTimeObj?.start_time?.getTime() / 1000)
+                  .toISOString()
+                  .replace(/T/, " ")
+                  .replace(/\..+/, "")
+                  .replace(/-/g, "/")
+                  .slice(0, 16)
+              }}
+              -
+              {{
+                new Date(currentTimeObj?.end_time?.getTime() / 1000)
+                  .toISOString()
+                  .replace(/T/, " ")
+                  .replace(/\..+/, "")
+                  .replace(/-/g, "/")
+                  .slice(0, 16)
+              }}
+            </div>
             <DateTimePickerDashboard
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
