@@ -55,12 +55,5 @@ pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::E
     } else {
         offset.to_string()
     };
-    Ok(db
-        .put(
-            key,
-            val.into(),
-            infra_db::NO_NEED_WATCH,
-            chrono::Utc::now().timestamp_micros(),
-        )
-        .await?)
+    Ok(db.put(key, val.into(), infra_db::NO_NEED_WATCH, 0).await?)
 }

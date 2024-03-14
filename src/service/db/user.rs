@@ -97,7 +97,7 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
         &key,
         json::to_vec(&user).unwrap().into(),
         infra_db::NEED_WATCH,
-        chrono::Utc::now().timestamp_micros(),
+        0,
     )
     .await?;
 

@@ -34,7 +34,7 @@ pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::
             &key,
             json::to_vec(&folder)?.into(),
             infra_db::NO_NEED_WATCH,
-            chrono::Utc::now().timestamp_micros(),
+            0,
         )
         .await
     {
