@@ -813,6 +813,11 @@ const defaultReport = {
   password: "",
   timezone: "UTC",
   timezoneOffset: 0,
+  lastTriggeredAt: 0,
+  createdAt: "",
+  updatedAt: "",
+  owner: "",
+  lastEditedBy: "",
 };
 
 const { t } = useI18n();
@@ -1016,13 +1021,14 @@ const onDashboardSelection = (dashboardId: any) => {
 };
 
 const updateDateTime = (datetime: any) => {
-  formData.value.dashboards[0].timerange.type = datetime.valueType;
-  formData.value.dashboards[0].timerange.period = datetime.relativeTimePeriod;
+  formData.value.dashboards[0].timerange.type =
+    datetime.valueType === "relative-custom" ? "relative" : datetime.valueType;
 
-  if (datetime.relativeTimePeriod === "absolute") {
-    formData.value.dashboards[0].timerange.from = datetime.startTime;
-    formData.value.dashboards[0].timerange.to = datetime.endTime;
-  }
+  formData.value.dashboards[0].timerange.from = datetime.startTime;
+  formData.value.dashboards[0].timerange.to = datetime.endTime;
+
+  formData.value.dashboards[0].timerange.period =
+    datetime.relativeTimePeriod || "30m";
 };
 
 const customFrequencyOptions = [
@@ -1200,6 +1206,16 @@ const saveReport = async () => {
   }
 
   formData.value.timezone = scheduling.value.timezone;
+
+  if (isEditingReport.value) {
+    formData.value.updatedAt = new Date().toISOString();
+    formData.value.lastEditedBy = store.state.userInfo.email;
+  } else {
+    formData.value.createdAt = new Date().toISOString();
+    formData.value.owner = store.state.userInfo.email;
+    formData.value.lastTriggeredAt = new Date().getTime();
+    formData.value.lastEditedBy = store.state.userInfo.email;
+  }
 
   // Check if all report input fields are valid
   try {
