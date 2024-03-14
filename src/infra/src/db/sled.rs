@@ -75,13 +75,7 @@ impl super::Db for SledDb {
         }
     }
 
-    async fn put(
-        &self,
-        key: &str,
-        value: Bytes,
-        _need_watch: bool,
-        _updated_at: i64,
-    ) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, _need_watch: bool, _start_dt: i64) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
         client.insert(key.as_str(), value.to_vec())?;
@@ -93,7 +87,7 @@ impl super::Db for SledDb {
         key: &str,
         with_prefix: bool,
         _need_watch: bool,
-        _updated_at: Option<i64>,
+        _start_dt: Option<i64>,
     ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let client = SLED_CLIENT.clone().unwrap();
@@ -223,7 +217,7 @@ impl super::Db for SledDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
-    async fn add_updated_at_column(&self) -> Result<()> {
+    async fn add_start_dt_column(&self) -> Result<()> {
         Ok(())
     }
 }

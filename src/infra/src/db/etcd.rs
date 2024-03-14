@@ -105,13 +105,7 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-    async fn put(
-        &self,
-        key: &str,
-        value: Bytes,
-        _need_watch: bool,
-        _updated_at: i64,
-    ) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, _need_watch: bool, _start_dt: i64) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
@@ -123,7 +117,7 @@ impl super::Db for Etcd {
         key: &str,
         with_prefix: bool,
         _need_watch: bool,
-        _updated_at: Option<i64>,
+        _start_dt: Option<i64>,
     ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
@@ -332,7 +326,7 @@ impl super::Db for Etcd {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
-    async fn add_updated_at_column(&self) -> Result<()> {
+    async fn add_start_dt_column(&self) -> Result<()> {
         Ok(())
     }
 }
