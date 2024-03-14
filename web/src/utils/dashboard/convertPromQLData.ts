@@ -369,8 +369,6 @@ export const convertPromQLData = (
                 ]),
                 ...seriesPropsBasedOnChartType,
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
-                // large:true,
-                // largeThreshold: 1
               };
             });
 

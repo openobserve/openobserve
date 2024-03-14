@@ -304,6 +304,7 @@ export default defineComponent({
 
                 // triggers rerendering in the current component
                 variablesData.values[index] = obj;
+
                 emitVariablesData();
                 return obj;
               });
@@ -416,6 +417,7 @@ export default defineComponent({
             //     emitVariablesData();
             //     return obj;
             //   });
+
             obj.isLoading = false; // Set loading state
             let oldVariableObjectSelectedValue = oldVariableValue.find(
               (it2: any) => it2.name === it.name
