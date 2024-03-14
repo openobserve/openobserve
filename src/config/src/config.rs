@@ -264,8 +264,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 4,
-        help = "Max grpc message size in MB, default is 4 MB"
+        default = 16,
+        help = "Max grpc message size in MB, default is 16 MB"
     )]
     pub max_message_size: usize,
 }

@@ -328,6 +328,8 @@ async fn exec_query(
         .is_some()
     {
         query = rewrite::rewrite_count_distinct_sql(&query, true);
+    } else {
+        query = rewrite::add_group_by_field_to_select(&query);
     }
 
     // Debug SQL
@@ -588,7 +590,7 @@ pub async fn merge(
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
 
     // rewrite sql
-    let mut query_sql = match merge_rewrite_sql(sql, schema) {
+    let mut query_sql = match merge_rewrite_sql(sql, schema, is_final_phase) {
         Ok(sql) => {
             if offset > 0
                 && sql.to_uppercase().contains(" LIMIT ")
@@ -694,7 +696,7 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Stri
     Ok((Arc::new(schema), work_dir))
 }
 
-fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
+fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Result<String> {
     // special case for count distinct
     if RE_COUNT_DISTINCT
         .captures(sql.to_lowercase().as_str())
@@ -705,6 +707,10 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>) -> Result<String> {
     }
 
     let mut sql = sql.to_string();
+    if !is_final_phase {
+        sql = rewrite::add_group_by_field_to_select(&sql);
+    }
+
     let mut fields = Vec::new();
     let mut from_pos = 0;
     let sql_chars = sql.chars().collect::<Vec<char>>();
@@ -1429,7 +1435,6 @@ fn filter_schema_null_fields(schema: &mut Schema) {
 #[cfg(test)]
 mod tests {
     use arrow::array::{Int32Array, NullArray, StringArray};
-    use arrow_schema::Field;
 
     use super::*;
 
