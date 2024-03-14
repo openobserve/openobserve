@@ -196,8 +196,8 @@ byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "35"
-datafusion-expr = "35"
+datafusion = "36"
+datafusion-expr = "36"
 arrow = { version = "50.0.0", features = ["ipc_compression"] }
 arrow-json = "50.0.0"
 arrow-schema = { version = "50.0.0", features = ["serde"] }

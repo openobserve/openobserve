@@ -1265,6 +1265,7 @@ async fn register_udf(ctx: &mut SessionContext, _org_id: &str) {
     ctx.register_udf(super::match_udf::MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
+    ctx.register_udf(super::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
     ctx.register_udf(super::time_range_udf::TIME_RANGE_UDF.clone());
     ctx.register_udf(super::date_format_udf::DATE_FORMAT_UDF.clone());
     ctx.register_udf(super::string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF.clone());
