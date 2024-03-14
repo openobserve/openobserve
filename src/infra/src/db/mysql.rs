@@ -77,7 +77,7 @@ impl super::Db for MysqlDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let query = r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY updated_at DESC;"#;
+        let query = r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC;"#;
 
         let value: String = match sqlx::query_scalar(query)
             .bind(module)
@@ -94,17 +94,17 @@ impl super::Db for MysqlDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, updated_at: i64) -> Result<()> {
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT IGNORE INTO meta (module, key1, key2, updated_at, value) VALUES (?, ?, ?, ?, '');"#,
+            r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#,
         )
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&updated_at)
+        .bind(&start_dt)
         .execute(&mut *tx)
         .await
         {
@@ -115,13 +115,13 @@ impl super::Db for MysqlDb {
         }
         if module == "schema" {
             if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ? AND updated_at = ?;"#,
+                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#,
             )
             .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(&updated_at)            
+            .bind(&start_dt)            
             .execute(&mut *tx)
             .await
             {
@@ -160,7 +160,7 @@ impl super::Db for MysqlDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(key, Bytes::from(""), true, updated_at)
+                .put(key, Bytes::from(""), true, start_dt)
                 .await?;
         }
 
@@ -172,7 +172,7 @@ impl super::Db for MysqlDb {
         key: &str,
         with_prefix: bool,
         need_watch: bool,
-        updated_at: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()> {
         // event watch
         if need_watch {
@@ -186,7 +186,7 @@ impl super::Db for MysqlDb {
             tokio::task::spawn(async move {
                 for key in items {
                     if let Err(e) = cluster_coordinator
-                        .delete(&key, false, true, updated_at)
+                        .delete(&key, false, true, start_dt)
                         .await
                     {
                         log::error!("[MYSQL] send event error: {}", e);
@@ -217,8 +217,8 @@ impl super::Db for MysqlDb {
             )
         };
 
-        let sql = if let Some(updated_at) = updated_at {
-            sql.replace(';', &format!(" AND updated_at = {};", updated_at))
+        let sql = if let Some(start_dt) = start_dt {
+            sql.replace(';', &format!(" AND start_dt = {};", start_dt))
         } else {
             sql
         };
@@ -231,7 +231,7 @@ impl super::Db for MysqlDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, updated_at, value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -241,7 +241,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 = '{}'", sql, key2);
         }
-        sql = format!("{} ORDER BY updated_at DESC ", sql);
+        sql = format!("{} ORDER BY start_dt DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -279,7 +279,7 @@ impl super::Db for MysqlDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, updated_at, '' AS value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, start_dt, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -290,7 +290,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key2 = '{}'", sql, key2);
         }
 
-        sql = format!("{} ORDER BY updated_at DESC ", sql);
+        sql = format!("{} ORDER BY start_dt DESC ", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -330,8 +330,8 @@ impl super::Db for MysqlDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
-    async fn add_updated_at_column(&self) -> Result<()> {
-        add_updated_at_column().await
+    async fn add_start_dt_column(&self) -> Result<()> {
+        add_start_dt_column().await
     }
 }
 
@@ -347,7 +347,7 @@ CREATE TABLE IF NOT EXISTS meta
     module  VARCHAR(100) not null,
     key1    VARCHAR(256) not null,
     key2    VARCHAR(256) not null,
-    updated_at    BIGINT not null,
+    start_dt    BIGINT not null,
     value   LONGTEXT not null
 );
         "#,
@@ -373,12 +373,12 @@ CREATE TABLE IF NOT EXISTS meta
     // !='schema';",  )
     //  .await?;
     // match create_index_item(
-    //     "CREATE UNIQUE INDEX  meta_module_updated_at_idx on meta (updated_at,key2, key1, module)
+    //     "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (start_dt,key2, key1, module)
     // where module ='schema';", )
     // .await{
     //     Ok(_) => {}
     //     Err(e) => {
-    //         log::error!("[MYSQL] create table meta meta_module_updated_at_idx error: {}", e);
+    //         log::error!("[MYSQL] create table meta meta_module_start_dt_idx error: {}", e);
     //     }
     // }
 
@@ -398,8 +398,8 @@ async fn create_index_item(sql: &str) -> Result<()> {
     Ok(())
 }
 
-async fn add_updated_at_column() -> Result<()> {
-    log::info!("[MYSQL] ENTER: add_updated_at_column");
+async fn add_start_dt_column() -> Result<()> {
+    log::info!("[MYSQL] ENTER: add_start_dt_column");
     let pool = CLIENT.clone();
     //let mut tx = pool.begin().await?;
 
@@ -429,7 +429,7 @@ async fn add_updated_at_column() -> Result<()> {
     // // add column
     // if let Err(e) = sqlx::query(
     //     r#"
-    //     ALTER TABLE meta ADD COLUMN updated_at BIGINT NOT NULL DEFAULT 0;
+    //     ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;
     //     "#,
     // )
     // .execute(&mut *tx1)
@@ -454,9 +454,9 @@ async fn add_updated_at_column() -> Result<()> {
     // 'schema';", ).await?;
 
     // create_index_item(
-    //     "CREATE UNIQUE INDEX meta_module_updated_at_idx ON meta (updated_at, key2, key1, module)
+    //     "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module)
     // WHERE module = 'schema';", ).await?;
 
-    log::info!("[MYSQL] EXIT: add_updated_at_column");
+    log::info!("[MYSQL] EXIT: add_start_dt_column");
     Ok(())
 }

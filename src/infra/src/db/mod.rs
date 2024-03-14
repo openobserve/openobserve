@@ -100,7 +100,7 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, updated_at: i64) -> Result<()>;
+    async fn put(&self, key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()>;
     async fn delete(
         &self,
         key: &str,
@@ -123,7 +123,7 @@ pub trait Db: Sync + Send + 'static {
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
     async fn close(&self) -> Result<()>;
-    async fn add_updated_at_column(&self) -> Result<()>;
+    async fn add_start_dt_column(&self) -> Result<()>;
 }
 
 pub fn parse_key(mut key: &str) -> (String, String, String) {
