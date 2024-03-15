@@ -61,6 +61,7 @@ async-recursion.workspace = true
 awc = "3.2"
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
+base64.workspace = true
 chrono.workspace = true
 clap = { version = "4.1", default-features = false, features = [
   "std",

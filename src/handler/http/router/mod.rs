@@ -216,6 +216,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::org::organizations)
             .service(organization::settings::get)
             .service(organization::settings::create)
+            .service(organization::settings::upload_logo)
             .service(organization::org::org_summary)
             .service(organization::org::get_user_passcode)
             .service(organization::org::update_user_passcode)
