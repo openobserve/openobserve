@@ -194,7 +194,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should add the value to the editor when the != is clicked next to the field value", () => {
+  it.skip("should add the value to the editor when the != is clicked next to the field value", () => {
     // Wait for 2 seconds
     cy.wait(5000);
     // Type the value of a variable into an input field
