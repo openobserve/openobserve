@@ -104,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { cloneDeep } from "lodash-es";
 import { ref, watch } from "vue";
 import AppTabs from "../common/AppTabs.vue";
 
@@ -140,7 +139,7 @@ const filteredEvents = ref<any[]>([]);
 watch(
   () => props.events,
   () => {
-    filteredEvents.value = cloneDeep(props.events);
+    filteredEvents.value = [...props.events];
   },
   { immediate: true, deep: true }
 );
@@ -159,14 +158,12 @@ const searchEvents = (value: string | number | null) => {
     value = "";
   }
   const _value = value.toString();
-  filteredEvents.value = cloneDeep(
-    props.events.filter((event: any) => {
-      return (
-        selectedEventTypes.value.includes(event.type) &&
-        event?.name.toLowerCase().includes(_value.toString().toLowerCase())
-      );
-    })
-  );
+  filteredEvents.value = props.events.filter((event: any) => {
+    return (
+      selectedEventTypes.value.includes(event.type) &&
+      event?.name.toLowerCase().includes(_value.toString().toLowerCase())
+    );
+  });
 };
 
 const handleEventClick = (event: any) => {
