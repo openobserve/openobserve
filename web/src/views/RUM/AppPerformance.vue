@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <q-separator></q-separator>
     <router-view v-slot="{ Component }">
-      <component
-        :is="Component"
-        :date-time="currentTimeObj"
-        :selected-date="selectedDate"
-      />
+      <keep-alive>
+        <component
+          :is="Component"
+          :date-time="currentTimeObj"
+          :selected-date="selectedDate"
+        />
+      </keep-alive>
     </router-view>
   </q-page>
 </template>
