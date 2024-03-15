@@ -48,6 +48,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </li>
                 <li>
+                  For filter the keyword in the field use str_match
+                  <span class="bg-highlight">str_match(field, 'error')</span> in query
+                  editor.
+                </li>
+                <li>
+                  For filter the case-insensitive keyword in the field use str_match_ignore_case
+                  <span class="bg-highlight"
+                    >str_match_ignore_case(field, 'Error')</span
+                  >
+                </li>
+                <li>
                   For column search of value 'error' use
                   <span class="bg-highlight"
                     >str_match(<b>fieldname</b>, 'error')</span
