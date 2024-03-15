@@ -447,7 +447,7 @@ export default defineComponent({
 
               property.level = level;
 
-              if (partition.types === "values")
+              if (partition.types === "value")
                 fieldIndices.push("keyPartition");
 
               if (partition.types?.hash)
