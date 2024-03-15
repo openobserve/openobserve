@@ -347,14 +347,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="o2-input q-mr-sm"
                       style="padding-top: 0; width: 320px"
                     >
+                      <div class="q-mb-xs text-bold text-grey-8">
+                        {{ t("reports.cronExpression") }}
+                        <q-icon
+                          :name="outlinedInfo"
+                          size="17px"
+                          class="q-ml-xs cursor-pointer"
+                          :class="
+                            store.state.theme === 'dark'
+                              ? 'text-grey-5'
+                              : 'text-grey-7'
+                          "
+                        >
+                          <q-tooltip anchor="center right" self="center left">
+                            <span style="font-size: 14px">
+                              Pattern: * * * * * * means every second.
+                              <br />
+                              Format: [Second (optional) 0-59] [Minute 0-59]
+                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
+                              [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                              <br />
+                              Use '*' to represent any value, 'L' for the last
+                              day/weekday. <br />
+                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
+                              daily. It specifies second, minute, hour, day of
+                              month, month, and day of week, respectively.</span
+                            >
+                          </q-tooltip>
+                        </q-icon>
+                      </div>
                       <q-input
                         filled
                         v-model="frequency.cron"
-                        label="Cron expression"
                         color="input-border"
                         bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
                         type="text"
                         outlined
                         :rules="[() => (cronError.length ? cronError : true)]"
@@ -768,6 +794,7 @@ import reports from "@/services/reports";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import cronParser from "cron-parser";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
 const props = defineProps({
   report: {

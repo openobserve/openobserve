@@ -820,6 +820,8 @@
     "name": "Report name",
     "replyTo": "Reply-to email address",
     "title": "Title",
-    "description": "Description"
+    "description": "Description",
+    "cron": "Cron Job",
+    "cronExpression": "Cron expression"
   }
 }
