@@ -396,6 +396,7 @@ const useLogs = () => {
 
     if (searchObj.data.stream.selectedStream.label) {
       query["stream"] = searchObj.data.stream.selectedStream.label;
+      query["stream_value"] = searchObj.data.stream.selectedStream.value;
     }
 
     if (date.type == "relative") {
@@ -1841,6 +1842,13 @@ const useLogs = () => {
       searchObj.meta.pageType = queryParams.type;
     }
     searchObj.meta.fastMode = queryParams.fast_mode == "false" ? false : true;
+
+    if (queryParams.stream && queryParams.stream_value) {
+      searchObj.data.stream.selectedStream = {
+        value: queryParams.stream_value,
+        label: queryParams.stream,
+      };
+    }
 
     router.push({
       query: {
