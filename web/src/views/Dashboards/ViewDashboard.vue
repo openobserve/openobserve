@@ -232,6 +232,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
+import moment from "moment-timezone";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
