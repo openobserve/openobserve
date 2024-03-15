@@ -1,6 +1,5 @@
 def test_e2e_ingestlogs(create_session, base_url):
     """Running an E2E test logs ingestion."""
-
     session = create_session
     url = base_url
     org_id = "default"
