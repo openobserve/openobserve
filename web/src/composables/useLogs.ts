@@ -1836,7 +1836,7 @@ const useLogs = () => {
     }
 
     if (queryParams.stream_type) {
-      searchObj.data.stream.streamType = queryParams.streamType;
+      searchObj.data.stream.streamType = queryParams.stream_type;
     } else {
       searchObj.data.stream.streamType = "logs";
     }
