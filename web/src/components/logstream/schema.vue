@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round
-flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -447,7 +446,7 @@ export default defineComponent({
 
               property.level = level;
 
-              if (partition.types === "values")
+              if (partition.types === "value")
                 fieldIndices.push("keyPartition");
 
               if (partition.types?.hash)
