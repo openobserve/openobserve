@@ -53,6 +53,7 @@ const defaultObject = {
   runQuery: false,
   loading: false,
   loadingHistogram: false,
+  shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
@@ -373,7 +374,8 @@ const useLogs = () => {
 
   const getStreamList = async () => {
     try {
-      resetStreamData();
+      // commented below function as we are doing resetStreamData from all the places where getStreamList is called
+      // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData: any = await getStreams(streamType, false);
       searchObj.data.streamResults["list"] = streamData.list;
@@ -924,7 +926,6 @@ const useLogs = () => {
     try {
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
-
       if (
         !searchObj.data.stream.streamLists?.length ||
         searchObj.data.stream.selectedStream.value == ""
@@ -1802,8 +1803,10 @@ const useLogs = () => {
   };
 
   const restoreUrlQueryParams = async () => {
+    searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
+      searchObj.shouldIgnoreWatcher = false;
       return;
     }
     const date = {
@@ -1850,6 +1853,7 @@ const useLogs = () => {
       };
     }
 
+    searchObj.shouldIgnoreWatcher = false;
     router.push({
       query: {
         ...queryParams,

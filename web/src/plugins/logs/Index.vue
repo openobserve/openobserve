@@ -671,7 +671,10 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-      if (this.searchObj.meta.showHistogram == true) {
+      if (
+        this.searchObj.meta.showHistogram == true &&
+        this.searchObj.shouldIgnoreWatcher == false
+      ) {
         if (this.searchObj.meta.sqlMode == false) {
           setTimeout(() => {
             if (this.searchResultRef) this.searchResultRef.reDrawChart();
@@ -733,14 +736,13 @@ export default defineComponent({
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
         this.searchObj.data.editorValue = "";
-        if (this.searchObj.loading == false) {
+        if (
+          this.searchObj.loading == false &&
+          this.searchObj.shouldIgnoreWatcher == false
+        ) {
           this.searchObj.loading = true;
           this.getQueryData();
         }
-      }
-      if (this.searchObj.loading == false) {
-        this.searchObj.loading = true;
-        this.getQueryData();
       }
       // this.searchResultRef.reDrawChart();
     },
