@@ -553,6 +553,10 @@ pub struct Limit {
     pub fast_mode_file_list_enabled: bool,
     #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
     pub fast_mode_file_list_interval: i64,
+    #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
+    pub sql_min_db_connections: u32,
+    #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
+    pub sql_max_db_connections: u32,
 }
 
 #[derive(EnvConfig)]
@@ -806,6 +810,14 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core * 2
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
+    }
+
+    if cfg.limit.sql_min_db_connections == 0 {
+        cfg.limit.sql_min_db_connections = cpu_num as u32
+    }
+
+    if cfg.limit.sql_max_db_connections == 0 {
+        cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
     }
 
     // check common config
