@@ -395,8 +395,7 @@ impl Sql {
             } else {
                 None
             };
-            let fields =
-                generate_fast_mode_fields(&stream_key, &schema, cached_fields, &match_all_fields);
+            let fields = generate_fast_mode_fields(&schema, cached_fields, &match_all_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -769,7 +768,6 @@ fn check_field_in_use(sql: &Sql, field: &str) -> bool {
 }
 
 fn generate_fast_mode_fields(
-    stream_key: &str,
     schema: &Schema,
     cached_fields: Option<Vec<String>>,
     fts_fields: &[String],
@@ -783,33 +781,6 @@ fn generate_fast_mode_fields(
             .map(|f| f.name().to_string())
             .collect(),
     };
-    // TODO: debug for schema fields
-    if schema_fields.len() < 3 {
-        log::warn!(
-            "[QUICK_MODE] schema fields is empty when generating fast mode fields from schema: {}",
-            stream_key
-        );
-        match cached_fields {
-            Some(v) => {
-                log::debug!(
-                    "[QUICK_MODE] stream {}, file_list schema fields: {:?}",
-                    stream_key,
-                    v,
-                );
-            }
-            None => {
-                log::debug!(
-                    "[QUICK_MODE] stream {}, file_list schema fields: NONE",
-                    stream_key
-                );
-            }
-        }
-        log::debug!(
-            "[QUICK_MODE] stream {}, stream latest schema fields: {:?}",
-            stream_key,
-            schema.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
-        );
-    }
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
