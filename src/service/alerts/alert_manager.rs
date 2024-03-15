@@ -64,8 +64,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     let now = Utc::now().timestamp_micros();
     let cacher = TRIGGERS.read().await;
+    let triggers = infra::queue::scheduler::read(1).await?;
 
-    for (key, trigger) in cacher.iter() {
+    for trigger in triggers.iter() {
         if trigger.next_run_at > now {
             continue;
         }
