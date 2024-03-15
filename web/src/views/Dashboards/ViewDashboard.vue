@@ -79,20 +79,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="padding-top: 5px"
             >
               {{
-                formatDate(
-                  new Date(currentTimeObj?.start_time?.getTime() / 1000)
-                )
+                moment(currentTimeObj?.start_time?.getTime() / 1000)
+                  .tz(store.state.timezone)
+                  .format("YYYY/MM/DD HH:mm")
               }}
               -
               {{
-                formatDate(new Date(currentTimeObj?.end_time?.getTime() / 1000))
+                moment(currentTimeObj?.end_time?.getTime() / 1000)
+                  .tz(store.state.timezone)
+                  .format("YYYY/MM/DD HH:mm")
               }}
+              {{ store.state.timezone }}
             </div>
+            <!-- do not show date time picker for print mode and relative time is selected -->
             <DateTimePickerDashboard
+              v-if="
+                !(
+                  store.state.printMode === true &&
+                  selectedDate.valueType === 'relative'
+                )
+              "
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
               v-model="selectedDate"
+              :initialTimezone="initialTimezone"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -226,6 +237,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
+import moment from "moment-timezone";
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -387,6 +399,9 @@ export default defineComponent({
     // refresh interval v-model
     const refreshInterval = ref(0);
 
+    // intial timezone, which will come from the route query
+    const initialTimezone = ref(route.query.timezone ?? null);
+
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
       currentTimeObj.value = {
@@ -462,6 +477,23 @@ export default defineComponent({
 
       if (params.refresh) {
         refreshInterval.value = parseDuration(params.refresh);
+      }
+
+      // check if timezone query params exist
+      // will be used for intial time zone only, so remove it from query
+      if (params.timezone) {
+        // get the query params
+        const query = {
+          ...route.query,
+        };
+
+        // remove timezone from query
+        delete query.timezone;
+
+        // replace route with query params
+        router.replace({
+          query,
+        });
       }
 
       // check if print query params exist
@@ -664,6 +696,8 @@ export default defineComponent({
       onMovePanel,
       printDashboard,
       formatDate,
+      initialTimezone,
+      moment,
     };
   },
 });

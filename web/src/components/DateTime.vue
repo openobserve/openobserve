@@ -301,6 +301,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    initialTimezone: {
+      required: false,
+      default: null,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change"],
@@ -331,6 +335,31 @@ export default defineComponent({
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
+
+    const onTimezoneChange = async () => {
+      let selectedTimezone = timezone.value;
+      if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
+        selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+      //Intl.DateTimeFormat().resolvedOptions().timeZone
+      useLocalTimezone(selectedTimezone);
+      store.dispatch("setTimezone", selectedTimezone);
+      await nextTick();
+      if (selectedType.value == "absolute") saveDate("absolute");
+      else saveDate("relative");
+      emit("on:timezone-change");
+    };
+
+    // if initial timezone is provided
+    if (props.initialTimezone) {
+      // check if it is a valid timezone
+      timezone.value =
+        timezoneOptions.find(
+          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
+        ) || currentTimezone;
+
+      onTimezoneChange();
+    }
 
     const filteredTimezone: any = ref([]);
 
@@ -424,20 +453,6 @@ export default defineComponent({
 
     const onCustomPeriodSelect = () => {
       if (props.autoApply) saveDate("relative-custom");
-    };
-
-    const onTimezoneChange = async () => {
-      let selectedTimezone = timezone.value;
-      if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
-        selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      }
-      //Intl.DateTimeFormat().resolvedOptions().timeZone
-      useLocalTimezone(selectedTimezone);
-      store.dispatch("setTimezone", selectedTimezone);
-      await nextTick();
-      if (selectedType.value == "absolute") saveDate("absolute");
-      else saveDate("relative");
-      emit("on:timezone-change");
     };
 
     const setRelativeTime = (period) => {
