@@ -280,7 +280,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             }
         };
         let ret_type = &args[0].get_type(schema)?;
-        let fields = regex_pattern_to_fields(&regexp_pattern, ret_type);
+        let fields = regex_pattern_to_fields(&regexp_pattern, ret_type)?;
         Ok(DataType::Struct(Fields::from_iter(fields)))
     }
 
@@ -324,7 +324,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
         };
 
         // 2. Unpack result and argument to construct returning struct
-        let fields = regex_pattern_to_fields(&regexp_pattern, &ret_data_type);
+        let fields = regex_pattern_to_fields(&regexp_pattern, &ret_data_type)?;
 
         // 3. Build returning struct
         let mut struct_builder = ArrayData::builder(DataType::Struct(fields.into()));
@@ -355,7 +355,12 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             _ => unreachable!(), // since checked above
         }
 
-        let struct_array_data = struct_builder.build()?;
+        let Ok(struct_array_data) = struct_builder.build() else {
+            return Err(DataFusionError::Execution(format!(
+                r"regexp_match_to_fields failed to pack result to fields. Named Capturing groups are
+                required in regexp pattern"
+            )));
+        };
 
         let struct_array = StructArray::from(struct_array_data);
         Ok(ColumnarValue::Scalar(ScalarValue::Struct(Arc::new(
@@ -368,34 +373,25 @@ impl ScalarUDFImpl for RegxpMatchToFields {
     }
 }
 
-/// Parsing field names considering two scenarios
-/// 1. More general where Named Capturing Groups were not used -> get the raw regex
-/// 2. Special case where Named Capturing Groups were used in original regex -> found field names
-fn regex_pattern_to_fields(pattern: &str, ret_type: &DataType) -> Vec<Field> {
-    // case 1
-    let mut field_names_wo_grps = vec![];
-    let re = regex::Regex::new(r#"(\([^()]+)\)"#).unwrap();
-    for (_, [field_name]) in re.captures_iter(pattern).map(|cap| cap.extract()) {
-        field_names_wo_grps.push(field_name);
-    }
-
-    // case 2
-    let mut field_names_w_grps = vec![];
+/// Parsing field names from given regex pattern by using Named Capturing Groups
+/// Error if Named Capturing Groups not used in regex pattern.
+fn regex_pattern_to_fields(pattern: &str, ret_type: &DataType) -> Result<Vec<Field>> {
+    let mut field_names = vec![];
     let re = regex::Regex::new(r"\?<([^>']+)>|\?P<([^>']+)").unwrap();
     for (_, [field_name]) in re.captures_iter(pattern).map(|cap| cap.extract()) {
-        field_names_w_grps.push(field_name);
+        field_names.push(field_name);
     }
 
-    let field_names = if field_names_w_grps.len() == field_names_wo_grps.len() {
-        field_names_w_grps
+    if field_names.len() == 0 {
+        Err(DataFusionError::Execution(format!(
+            "Named Capturing Groups must be used to assign field names for regexp_match_to_fields function"
+        )))
     } else {
-        field_names_wo_grps
-    };
-
-    field_names
-        .into_iter()
-        .map(|field_name| Field::new(field_name, ret_type.to_owned(), false))
-        .collect()
+        Ok(field_names
+            .into_iter()
+            .map(|field_name| Field::new(field_name, ret_type.to_owned(), false))
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -494,36 +490,13 @@ mod tests {
             ),
             (
                 r#"select regexp_match_to_fields(log, '([^\s]+ [^\s]+) ([^\s]+) ([^\s]+)') as subquery from t"#,
-                vec![
-                    "+-----------------------------------------------------------------------------+",
-                    "| subquery                                                                    |",
-                    "+-----------------------------------------------------------------------------+",
-                    r#"| {([^\s]+ [^\s]+: 2024-02-29 00:15:30, ([^\s]+: 15.128.22.213, ([^\s]+: GET} |"#,
-                    "+-----------------------------------------------------------------------------+",
-                ],
+                vec![],
             ),
         ];
+        let test1 = ctx.sql(sqls[0].0).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(sqls[0].1, &test1);
 
-        for (sql, expected) in sqls {
-            let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
-            assert_batches_eq!(expected, &result);
-        }
-
-        // let sql = r#"select regexp_match_to_fields(log, '(?P<timestamp>[^\s]+ [^\s]+)
-        // (?P<client_ip>[^\s]+) (?P<http_method>[^\s]+) (?P<requested_path>[^\s]+)
-        // (?P<placeholder1>[^\s]+) (?P<server_port>[^\s]+)') as subquery from t"#;
-        // let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
-
-        // let expected = vec![
-        //     "+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+",
-        //     "| subquery
-        // |",
-        //     "+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+",
-        //     "| {timestamp: 2024-02-29 00:15:30, client_ip: 15.128.22.213, http_method: GET,
-        // requested_path: /Administradores_Elina/service-worker.js, placeholder1: -, server_port:
-        // 443} |",
-        //     "+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+",
-        // ];
-        // assert_batches_eq!(expected, &result);
+        let test2 = ctx.sql(sqls[1].0).await;
+        assert!(test2.is_err());
     }
 }
