@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
-              v-if="store.state.printMode === false"
+              v-show="store.state.printMode === false"
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
