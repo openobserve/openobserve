@@ -161,7 +161,9 @@ const searchEvents = (value: string | number | null) => {
   filteredEvents.value = props.events.filter((event: any) => {
     return (
       selectedEventTypes.value.includes(event.type) &&
-      event?.name.toLowerCase().includes(_value.toString().toLowerCase())
+      (event.type + " " + event?.name)
+        .toLowerCase()
+        .includes(_value.toString().toLowerCase())
     );
   });
 };
