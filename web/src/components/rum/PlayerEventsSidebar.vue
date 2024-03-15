@@ -69,27 +69,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             emit-value
             size="xs"
+            @update:model-value="searchEvents(searchEvent)"
           />
         </div>
       </div>
       <q-separator class="q-mt-sm" />
       <div class="events-list">
-        <template v-for="event in filteredEvents" :key="event.id">
+        <template
+          v-for="(filteredEvent, index) in filteredEvents"
+          :key="filteredEvent.id + '-' + index"
+        >
           <div
-            v-if="selectedEventTypes && selectedEventTypes.includes(event.type)"
             class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
-            @click="handleEventClick(event)"
+            @click="handleEventClick(filteredEvent)"
           >
             <div class="ellipsis">
-              <div class="q-mr-md inline">{{ event.displayTime }}</div>
+              <div class="q-mr-md inline">{{ filteredEvent.displayTime }}</div>
               <div
                 class="q-mr-md inline event-type q-px-xs"
                 style="border-radius: 4px"
-                :class="event.type === 'error' ? 'bg-red-3' : ''"
+                :class="filteredEvent.type === 'error' ? 'bg-red-3' : ''"
               >
-                {{ event.type }}
+                {{ filteredEvent.type }}
               </div>
-              <div class="inline" :title="event.name">{{ event.name }}</div>
+              <div class="inline" :title="filteredEvent.name">
+                {{ filteredEvent.name }}
+              </div>
             </div>
           </div>
         </template>
@@ -99,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { cloneDeep } from "lodash-es";
 import { ref, watch } from "vue";
 import AppTabs from "../common/AppTabs.vue";
 
@@ -135,12 +139,12 @@ const filteredEvents = ref<any[]>([]);
 watch(
   () => props.events,
   () => {
-    filteredEvents.value = cloneDeep(props.events);
+    filteredEvents.value = [...props.events];
   },
   { immediate: true, deep: true }
 );
 
-const selectedEventTypes = ref<string[] | null>(["error", "action", "view"]);
+const selectedEventTypes = ref<string[]>(["error", "action", "view"]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
@@ -150,18 +154,18 @@ const eventOptions = [
 ];
 
 const searchEvents = (value: string | number | null) => {
-  if (value) {
-    filteredEvents.value = cloneDeep(
-      props.events.filter((event: any) => {
-        return (
-          event?.name.toLowerCase().includes(value.toString().toLowerCase()) ||
-          event?.type.toLowerCase().includes(value.toString().toLowerCase())
-        );
-      })
-    );
-  } else {
-    filteredEvents.value = cloneDeep(props.events);
+  if (value === null) {
+    value = "";
   }
+  const _value = value.toString();
+  filteredEvents.value = props.events.filter((event: any) => {
+    return (
+      selectedEventTypes.value.includes(event.type) &&
+      (event.type + " " + event?.name)
+        .toLowerCase()
+        .includes(_value.toString().toLowerCase())
+    );
+  });
 };
 
 const handleEventClick = (event: any) => {

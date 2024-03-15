@@ -276,11 +276,16 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
     fn try_from(projection: Projection<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         for item in projection.0 {
-            // We only support UnnamedExpr at the moment
-            if let SelectItem::UnnamedExpr(expr) = item {
-                let field = expr.to_string();
-                let field = field.trim_matches(|v| v == '\'' || v == '"');
-                fields.push(field.to_owned());
+            let field = match item {
+                SelectItem::UnnamedExpr(expr) => get_field_name_from_expr(expr),
+                SelectItem::ExprWithAlias { expr, alias: _ } => get_field_name_from_expr(expr),
+                _ => None,
+            };
+            if let Some(field) = field {
+                let field = field
+                    .into_iter()
+                    .map(|v| v.trim_matches(|v| v == '\'' || v == '"').to_string());
+                fields.extend(field);
             }
         }
         Ok(fields)
@@ -495,6 +500,18 @@ fn parse_expr_for_field(
             }
         }
         SqlExpr::IsNull(expr) => {
+            if let SqlExpr::Identifier(ident) = expr.as_ref() {
+                if parse_expr_check_field_name(&ident.value, field) {
+                    fields.push((
+                        ident.value.to_string(),
+                        SqlValue::String("".to_string()),
+                        SqlOperator::Eq,
+                        *expr_op,
+                    ));
+                }
+            }
+        }
+        SqlExpr::IsNotNull(expr) => {
             if let SqlExpr::Identifier(ident) = expr.as_ref() {
                 if parse_expr_check_field_name(&ident.value, field) {
                     fields.push((
@@ -749,6 +766,42 @@ fn get_value_from_expr(expr: &SqlExpr) -> Option<SqlValue> {
     }
 }
 
+fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
+    match expr {
+        SqlExpr::Identifier(ident) => Some(vec![ident.value.to_string()]),
+        SqlExpr::BinaryOp { left, op: _, right } => {
+            let left = get_field_name_from_expr(left);
+            let right = get_field_name_from_expr(right);
+            let mut fields = Vec::new();
+            if let Some(v) = left {
+                fields.extend(v);
+            }
+            if let Some(v) = right {
+                fields.extend(v);
+            }
+            if fields.is_empty() {
+                None
+            } else {
+                Some(fields)
+            }
+        }
+        SqlExpr::Function(f) => {
+            return match f.args.first() {
+                Some(FunctionArg::Named {
+                    name: _name,
+                    arg: FunctionArgExpr::Expr(expr),
+                }) => get_field_name_from_expr(expr),
+                Some(FunctionArg::Unnamed(FunctionArgExpr::Expr(expr))) => {
+                    get_field_name_from_expr(expr)
+                }
+                _ => None,
+            };
+        }
+        SqlExpr::Nested(expr) => get_field_name_from_expr(expr),
+        _ => None,
+    }
+}
+
 impl TryFrom<&BinaryOperator> for SqlOperator {
     type Error = anyhow::Error;
     fn try_from(value: &BinaryOperator) -> Result<Self, Self::Error> {
@@ -845,7 +898,7 @@ mod tests {
 
     #[test]
     fn test_sql_parse_timerange() {
-        let samples = vec![
+        let samples = [
             ("select * from tbl where ts in (1, 2, 3)", (0,0)),
             ("select * from tbl where _timestamp >= 1666093521151350", (1666093521151350,0)),
             ("select * from tbl where _timestamp >= 1666093521151350 AND _timestamp < 1666093521151351", (1666093521151350,1666093521151351)),
@@ -868,6 +921,25 @@ mod tests {
             if expected_t2 != 0 {
                 assert_eq!(actual_t2, expected_t2);
             }
+        }
+    }
+
+    #[test]
+    fn test_sql_parse_fields() {
+        let samples = [
+            ("select * FROM tbl", vec![]),
+            ("select a, b, c FROM tbl", vec!["a", "b", "c"]),
+            ("select a, avg(b) FROM tbl where c=1", vec!["a", "b", "c"]),
+            ("select a, a + b FROM tbl where c=1", vec!["a", "b", "c"]),
+            ("select a, b + 1 FROM tbl where c=1", vec!["a", "b", "c"]),
+            (
+                "select a, (a + b) as d FROM tbl where c=1",
+                vec!["a", "b", "c"],
+            ),
+        ];
+        for (sql, fields) in samples {
+            let actual = Sql::new(sql).unwrap().fields;
+            assert_eq!(actual, fields);
         }
     }
 }
