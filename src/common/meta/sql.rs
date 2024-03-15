@@ -282,10 +282,10 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
                 _ => None,
             };
             if let Some(field) = field {
-                for v in field {
-                    let v = v.trim_matches(|v| v == '\'' || v == '"');
-                    fields.push(v.to_string());
-                }
+                let field = field
+                    .into_iter()
+                    .map(|v| v.trim_matches(|v| v == '\'' || v == '"').to_string());
+                fields.extend(field);
             }
         }
         Ok(fields)
