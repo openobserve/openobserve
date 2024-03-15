@@ -77,20 +77,10 @@ fn connect_ro() -> Pool<Sqlite> {
         .busy_timeout(Duration::from_secs(30))
         // .disable_statement_logging()
         .read_only(true);
-    let mut min_connections = CONFIG.limit.sql_min_db_connections;
-    let mut max_connections = CONFIG.limit.sql_max_db_connections;
-
-    if min_connections == 0 {
-        min_connections = CONFIG.limit.cpu_num as u32
-    }
-
-    if max_connections == 0 {
-        max_connections = min_connections * 2
-    }
 
     SqlitePoolOptions::new()
-        .min_connections(min_connections)
-        .max_connections(max_connections)
+        .min_connections(CONFIG.limit.sql_min_db_connections)
+        .max_connections(CONFIG.limit.sql_max_db_connections)
         .acquire_timeout(Duration::from_secs(30))
         .connect_lazy_with(db_opts)
 }
