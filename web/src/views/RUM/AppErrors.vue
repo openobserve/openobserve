@@ -323,7 +323,10 @@ const getErrorLogs = () => {
     errorWhereClause += "error_handling,";
   }
 
-  if (schemaMapping.value["error_handling"]) {
+  if (
+    schemaMapping.value["error_handling_stack"] ||
+    schemaMapping.value["error_stack"]
+  ) {
     errorWhereClause +=
       "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack,";
     errorFields += "error_stack,";

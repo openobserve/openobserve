@@ -130,7 +130,8 @@ export default defineComponent({
 
     const loadDashboard = async () => {
       // schema migration
-      currentDashboardData.value.data = convertDashboardSchemaVersion(overviewDashboard);
+      currentDashboardData.value.data =
+        convertDashboardSchemaVersion(overviewDashboard);
 
       // if variables data is null, set it to empty list
 
