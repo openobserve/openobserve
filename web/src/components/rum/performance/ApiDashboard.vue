@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="q-px-sm performance-dashboard">
         <RenderDashboardCharts
-          ref="errorRenderDashboardChartsRef"
+          ref="apiDashboardChartsRef"
           :viewOnly="true"
           :dashboardData="currentDashboardData.data"
           :currentTimeObj="dateTime"
@@ -54,7 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onActivated } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  onActivated,
+  nextTick,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -89,6 +97,7 @@ export default defineComponent({
       data: {},
     });
     const showDashboardSettingsDialog = ref(false);
+    const apiDashboardChartsRef: Ref<any> = ref(null);
     const viewOnly = ref(true);
     const eventLog = ref([]);
     const topSlowResources = ref([]);
@@ -118,13 +127,18 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
-      isLoading.value.push(true);
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      // emit window resize event to trigger the layout
+      apiDashboardChartsRef.value.layoutUpdate();
 
-      // Settimeout is used to make consitent loading experience across all tabs
-      // As due to vue-grid-layout issue in summary and webvitals
-      setTimeout(() => {
-        isLoading.value.pop();
-      }, 1000);
+      // Dashboards gets overlapped as we have used keep alive
+      // Its an internal bug of vue-grid-layout
+      // So adding settimeout of 1 sec to fix the issue
+      apiDashboardChartsRef.value.layoutUpdate();
+      window.dispatchEvent(new Event("resize"));
     };
 
     const getTopSlowResources = () => {
@@ -291,6 +305,7 @@ export default defineComponent({
       loadDashboard,
       apiDashboard,
       isLoading,
+      apiDashboardChartsRef,
     };
   },
 });
