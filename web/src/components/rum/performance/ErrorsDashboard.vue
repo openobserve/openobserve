@@ -107,7 +107,7 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
-      // isLoading.value.push(true);
+      isLoading.value.push(true);
       await nextTick();
       await nextTick();
       await nextTick();
@@ -127,7 +127,7 @@ export default defineComponent({
       // Its an internal bug of vue-grid-layout
       // So adding settimeout of 1 sec to fix the issue
       setTimeout(() => {
-        // isLoading.value.pop();
+        isLoading.value.pop();
         errorRenderDashboardChartsRef.value.layoutUpdate();
         window.dispatchEvent(new Event("resize"));
       }, 1000);
