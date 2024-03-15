@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="relative-position">
     <div
-      class="performance-error-dashboard"
+      class="q-mx-sm performance-error-dashboard"
       :style="{ visibility: isLoading.length ? 'hidden' : 'visible' }"
     >
       <div class="q-px-sm performance-dashboard">
@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :viewOnly="true"
           :dashboardData="currentDashboardData.data"
           :currentTimeObj="dateTime"
-          @variablesData="variablesDataUpdated"
         />
       </div>
     </div>
@@ -51,7 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onActivated, onMounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onActivated,
+  onMounted,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { reactive } from "vue";
@@ -101,21 +107,18 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
-      // await nextTick();
-      // await nextTick();
-      // await nextTick();
-      // await nextTick();
-      // // emit window resize event to trigger the layout
-      // errorRenderDashboardChartsRef.value.layoutUpdate();
-      isLoading.value.push(true);
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      // emit window resize event to trigger the layout
+      errorRenderDashboardChartsRef.value.layoutUpdate();
 
-      // Settimeout is used to make consitent loading experience across all tabs
-      // As due to vue-grid-layout issue in summary and webvitals
-
-      setTimeout(() => {
-        errorRenderDashboardChartsRef.value.layoutUpdate();
-        isLoading.value.pop();
-      }, 1000);
+      // Dashboards gets overlapped as we have used keep alive
+      // Its an internal bug of vue-grid-layout
+      // So adding settimeout of 1 sec to fix the issue
+      errorRenderDashboardChartsRef.value.layoutUpdate();
+      window.dispatchEvent(new Event("resize"));
     };
 
     // variables data
@@ -144,7 +147,6 @@ export default defineComponent({
     const loadDashboard = async () => {
       // schema migration
       currentDashboardData.data = convertDashboardSchemaVersion(errorDashboard);
-
 
       // if variables data is null, set it to empty list
       if (
