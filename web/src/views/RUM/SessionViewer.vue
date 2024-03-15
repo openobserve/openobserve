@@ -88,6 +88,7 @@ import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 
 import { date } from "quasar";
+import { getUUID } from "@/utils/zincutils";
 
 const defaultEvent = {
   id: "",
@@ -343,7 +344,7 @@ const getSessionErrorLogs = () => {
 
       events.forEach((hit: any, index: number) => {
         hit.type = "error";
-        hit.error_id = index;
+        hit.error_id = getUUID();
         hit.error_message = hit.message;
         segmentEvents.value.push(formatEvent(hit));
       });
