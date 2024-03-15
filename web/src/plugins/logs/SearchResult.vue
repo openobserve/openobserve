@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
+            v-if="searchObj.meta.resultGrid.showPagination"
             :disable="searchObj.loading == true"
             v-model="pageNumberInput"
             :key="
