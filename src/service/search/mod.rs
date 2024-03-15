@@ -227,6 +227,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     // reset query sql
     req.query.as_mut().unwrap().sql = meta.origin_sql.clone();
+    req.query.as_mut().unwrap().sql_mode = "full".to_string();
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
