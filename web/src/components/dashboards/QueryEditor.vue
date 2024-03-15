@@ -402,6 +402,18 @@ export default defineComponent({
               insertText: `match_all_indexed_ignore_case('${lastElement}')`,
               range: range,
             });
+            filteredSuggestions.push({
+              label: `str_match_ignore_case(fieldname, '${lastElement}')`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `str_match_ignore_case(fieldname, '${lastElement}')`,
+              range: range,
+            });
+            filteredSuggestions.push({
+              label: `str_match(fieldname, '${lastElement}')`,
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: `str_match(fieldname, '${lastElement}')`,
+              range: range,
+            });
 
           } else {
             props.suggestions.forEach((suggestion: any) => {
