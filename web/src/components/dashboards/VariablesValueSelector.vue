@@ -279,45 +279,45 @@ export default defineComponent({
       // reset the values
       variablesData.values = [];
       variablesData.isVariablesLoading = false;
-      // Create a graph to represent dependencies for query_values
-      const queryValuesDependencyGraph: any = {};
-      console.log("variablesConfigList", variablesConfigList);
-      // console.log("variablesConfigList it",it.query_data.filter);
+      // // Create a graph to represent dependencies for query_values
+      // const queryValuesDependencyGraph: any = {};
+      // console.log("variablesConfigList", variablesConfigList);
+      // // console.log("variablesConfigList it",it.query_data.filter);
 
-      // Add edges to the graph based on query_values dependencies
-      variablesConfigList
-        .filter((it: any) => it.type === "query_values" && it.query_data.filter)
-        .forEach((variable: any) => {
-          const dependencies = variable.query_data.filter.map(
-            (filter: any) => filter.value
-          );
-          queryValuesDependencyGraph[variable.name] = dependencies;
-        });
-      // console.log("name", name);
+      // // Add edges to the graph based on query_values dependencies
+      // variablesConfigList
+      //   .filter((it: any) => it.type === "query_values" && it.query_data.filter)
+      //   .forEach((variable: any) => {
+      //     const dependencies = variable.query_data.filter.map(
+      //       (filter: any) => filter.value
+      //     );
+      //     queryValuesDependencyGraph[variable.name] = dependencies;
+      //   });
+      // // console.log("name", name);
 
-      console.log("Query Values Dependency Graph:", queryValuesDependencyGraph);
+      // console.log("Query Values Dependency Graph:", queryValuesDependencyGraph);
 
-      // Perform topological sorting to find hierarchy for query_values
-      const sortedQueryValues = topologicalSort(queryValuesDependencyGraph);
+      // // Perform topological sorting to find hierarchy for query_values
+      // const sortedQueryValues = topologicalSort(queryValuesDependencyGraph);
 
-      console.log("Sorted Query Values:", sortedQueryValues);
+      // console.log("Sorted Query Values:", sortedQueryValues);
 
-      // Check for circular dependencies for query_values
-      const hasQueryValuesCycles = hasCyclesInGraph(queryValuesDependencyGraph);
+      // // Check for circular dependencies for query_values
+      // const hasQueryValuesCycles = hasCyclesInGraph(queryValuesDependencyGraph);
 
-      if (hasQueryValuesCycles) {
-        console.error("Circular dependencies detected in query_values!");
-        // Handle circular dependencies error
-        return;
-      }
+      // if (hasQueryValuesCycles) {
+      //   console.error("Circular dependencies detected in query_values!");
+      //   // Handle circular dependencies error
+      //   return;
+      // }
 
-      // Continue with the rest of the code using sortedQueryValues for query_values
-      const promise = sortedQueryValues?.map(
-        async (variableName: any, index: any) => {
-          const it = variablesConfigList.find(
-            (it: any) => it.name === variableName
-          );
-          // const promise = variablesConfigList?.map((it: any, index: any) => {
+      // // Continue with the rest of the code using sortedQueryValues for query_values
+      // const promise = sortedQueryValues?.map(
+      //   async (variableName: any, index: any) => {
+      //     const it = variablesConfigList.find(
+      //       (it: any) => it.name === variableName
+      //     );
+          const promise = variablesConfigList?.map((it: any, index: any) => {
           const obj: any = {
             name: it.name,
             label: it.label,
