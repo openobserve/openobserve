@@ -154,12 +154,16 @@ const eventOptions = [
   { label: "View", value: "view" },
 ];
 
-const searchEvents = (value: string) => {
+const searchEvents = (value: string | number | null) => {
+  if (value === null) {
+    value = "";
+  }
+  const _value = value.toString();
   filteredEvents.value = cloneDeep(
     props.events.filter((event: any) => {
       return (
         selectedEventTypes.value.includes(event.type) &&
-        event?.name.toLowerCase().includes(value.toString().toLowerCase())
+        event?.name.toLowerCase().includes(_value.toString().toLowerCase())
       );
     })
   );
