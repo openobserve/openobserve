@@ -436,6 +436,7 @@ const useLogs = () => {
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["fast_mode"] = searchObj.meta.fastMode;
+    query["show_histogram"] = searchObj.meta.showHistogram;
     // query["timezone"] = store.state.timezone;
     return query;
   };
@@ -1851,6 +1852,10 @@ const useLogs = () => {
         value: queryParams.stream_value,
         label: queryParams.stream,
       };
+    }
+
+    if (queryParams.show_histogram) {
+      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
     }
 
     searchObj.shouldIgnoreWatcher = false;

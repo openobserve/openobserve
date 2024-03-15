@@ -691,6 +691,7 @@ export default defineComponent({
           );
         }
       }
+      this.updateUrlQueryParams();
     },
     moveSplitter() {
       if (this.searchObj.meta.showFields == false) {
@@ -732,6 +733,7 @@ export default defineComponent({
       if (newVal) {
         await nextTick();
         this.setQuery(newVal);
+        this.updateUrlQueryParams();
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
