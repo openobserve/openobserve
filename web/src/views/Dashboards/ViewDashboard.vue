@@ -655,16 +655,6 @@ export default defineComponent({
       isFullscreen.value = false;
     });
 
-    const formatDate = (d: Date) => {
-      var year = d.getUTCFullYear();
-      var month = ("0" + (d.getUTCMonth() + 1)).slice(-2); // Months are zero-based
-      var day = ("0" + d.getUTCDate()).slice(-2);
-      var hours = ("0" + d.getUTCHours()).slice(-2);
-      var minutes = ("0" + d.getUTCMinutes()).slice(-2);
-
-      return `${year}/${month}/${day} ${hours}:${minutes}`;
-    };
-
     return {
       currentDashboardData,
       toggleFullscreen,
@@ -695,7 +685,6 @@ export default defineComponent({
       selectedTabId,
       onMovePanel,
       printDashboard,
-      formatDate,
       initialTimezone,
       moment,
     };
