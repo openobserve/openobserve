@@ -225,6 +225,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let stream_type = StreamType::from(req.stream_type.as_str());
     let meta = sql::Sql::new(&req).await?;
 
+    // reset query sql
+    req.query.as_mut().unwrap().sql = meta.origin_sql.clone();
+
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
     // sort nodes by node_id this will improve hit cache ratio
