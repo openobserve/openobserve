@@ -169,12 +169,6 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
-import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
-import GeoJSONMapRenderer from "@/components/dashboards/panels/GeoJSONMapRenderer.vue";
-import HTMLRenderer from "./panels/HTMLRenderer.vue";
-import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 
@@ -190,6 +184,10 @@ const GeoMapRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/GeoMapRenderer.vue");
 });
 
+const GeoJSONMapRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/GeoJSONMapRenderer.vue");
+});
+
 const HTMLRenderer = defineAsyncComponent(() => {
   return import("./panels/HTMLRenderer.vue");
 });
@@ -203,7 +201,8 @@ export default defineComponent({
   components: {
     ChartRenderer,
     TableRenderer,
-    GeoMapRenderer, GeoJSONMapRenderer,
+    GeoMapRenderer,
+    GeoJSONMapRenderer,
     HTMLRenderer,
     MarkdownRenderer,
   },
