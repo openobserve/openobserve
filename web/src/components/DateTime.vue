@@ -353,11 +353,13 @@ export default defineComponent({
     // if initial timezone is provided
     if (props.initialTimezone) {
       // check if it is a valid timezone
+      // ignore case
       timezone.value =
         timezoneOptions.find(
           (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
         ) || currentTimezone;
 
+      // call onTimezoneChange to set the timezone in the store
       onTimezoneChange();
     }
 
