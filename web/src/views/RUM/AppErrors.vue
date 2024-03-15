@@ -310,26 +310,36 @@ const getErrorLogs = () => {
   let errorWhereClause = "";
 
   if (schemaMapping.value["error_id"]) {
-    errorFields += "error_id,";
-    errorWhereClause += "error_id,";
+    errorFields += "error_id, ";
+    errorWhereClause += "error_id, ";
   }
 
   if (schemaMapping.value["error_message"]) {
-    errorFields += "error_message,";
-    errorWhereClause += "error_message,";
+    errorFields += "error_message, ";
+    errorWhereClause += "error_message, ";
   }
   if (schemaMapping.value["error_handling"]) {
-    errorFields += "error_handling,";
-    errorWhereClause += "error_handling,";
+    errorFields += "error_handling, ";
+    errorWhereClause += "error_handling, ";
   }
+  schemaMapping.value["error_stack"] = false;
+  schemaMapping.value["error_handling_stack"] = false;
 
   if (
-    schemaMapping.value["error_handling_stack"] ||
+    schemaMapping.value["error_handling_stack"] &&
     schemaMapping.value["error_stack"]
   ) {
     errorWhereClause +=
-      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack,";
-    errorFields += "error_stack,";
+      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
+    errorFields += "error_stack, ";
+  } else if (schemaMapping.value["error_handling_stack"]) {
+    errorWhereClause +=
+      "MIN(CASE WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
+    errorFields += "error_stack, ";
+  } else if (schemaMapping.value["error_stack"]) {
+    errorWhereClause +=
+      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE NULL END ) AS error_stack, ";
+    errorFields += "error_stack, ";
   }
 
   req.query.sql = `select max(${
