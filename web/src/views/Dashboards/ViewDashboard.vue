@@ -69,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /> -->
             <!-- for Print Mode -->
             <!-- if time is relative, show start and end time -->
+            <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
             <div
               v-if="
                 store.state.printMode === true &&
-                selectedDate.valueType == 'relative' &&
                 currentTimeObj.start_time &&
                 currentTimeObj.end_time
               "
@@ -89,16 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   .tz(store.state.timezone)
                   .format("YYYY/MM/DD HH:mm")
               }}
-              {{ store.state.timezone }}
+              ({{ store.state.timezone }})
             </div>
-            <!-- do not show date time picker for print mode and relative time is selected -->
+            <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
-              v-if="
-                !(
-                  store.state.printMode === true &&
-                  selectedDate.valueType === 'relative'
-                )
-              "
+              v-if="store.state.printMode === false"
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
