@@ -258,6 +258,7 @@ export default defineComponent({
       // set the initial value as false on component activated
       // also, this function will clear the settimeout if previously set
       setImmediateValue(false);
+      window.dispatchEvent(new Event("resize"));
     });
 
     // Watch for changes in the computed property and update the debouncer accordingly

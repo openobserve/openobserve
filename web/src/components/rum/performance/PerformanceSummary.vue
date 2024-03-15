@@ -111,7 +111,6 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
-      isLoading.value.push(true);
       await nextTick();
       await nextTick();
       await nextTick();
@@ -121,16 +120,14 @@ export default defineComponent({
       // Dashboards gets overlapped as we have used keep alive
       // Its an internal bug of vue-grid-layout
       // So adding settimeout of 1 sec to fix the issue
-      setTimeout(() => {
-        performanceChartsRef.value.layoutUpdate();
-        window.dispatchEvent(new Event("resize"));
-        isLoading.value.pop();
-      }, 1000);
+      performanceChartsRef.value.layoutUpdate();
+      window.dispatchEvent(new Event("resize"));
     };
 
     const loadDashboard = async () => {
       // schema migration
-      currentDashboardData.value.data = convertDashboardSchemaVersion(overviewDashboard);
+      currentDashboardData.value.data =
+        convertDashboardSchemaVersion(overviewDashboard);
 
       // if variables data is null, set it to empty list
 
