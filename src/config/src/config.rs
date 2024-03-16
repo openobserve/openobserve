@@ -543,7 +543,7 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 500)]
+    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 100)]
     pub fast_mode_num_fields: usize,
     #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
     pub fast_mode_strategy: String, // first, last, both
