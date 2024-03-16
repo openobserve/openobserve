@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span>&nbsp;</span>
 
-        <div class="flex justify-start q-mt-lg">
+        <div class="flex justify-start">
           <q-btn
             data-test="dashboard-add-submit"
             :loading="onSubmit.isLoading.value"
@@ -56,31 +56,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-    <div class="q-px-md q-py-md">
-      <div class="text-body1 text-bold">
-        {{ t("settings.enterpriseTitle") }}
+    <div id="enterpriseFeature" v-if="config.isEnterprise == 'true'">
+      <div class="q-px-md q-py-md">
+        <div class="text-body1 text-bold">
+          {{ t("settings.enterpriseTitle") }}
+        </div>
       </div>
-    </div>
-    <q-separator />
-    <div class="q-mx-lg">
-      <div class="q-gutter-sm row q-mt-xs">
-        <q-label class="q-pt-md">{{ t("settings.customLogoTitle") }}</q-label>
-        <q-file
-          v-model="files"
-          :label="t('settings.logoLabel')"
-          filled
-          counter
-          :counter-label="counterLabelFn"
-          style="width: 400px"
-          max-file-size="20480"
-          accept=".png, image/*"
-          @rejected="onRejected"
-          @update:model-value="uploadImage"
-        >
-          <template v-slot:prepend>
-            <q-icon name="attach_file" />
-          </template>
-        </q-file>
+      <q-separator />
+      <div class="q-mx-lg">
+        <div class="q-gutter-sm row q-mt-xs">
+          <q-label class="q-pt-md">{{ t("settings.customLogoTitle") }}</q-label>
+          <q-file
+            v-model="files"
+            :label="t('settings.logoLabel')"
+            filled
+            counter
+            :counter-label="counterLabelFn"
+            style="width: 400px"
+            max-file-size="20480"
+            accept=".png, image/*"
+            @rejected="onRejected"
+            @update:model-value="uploadImage"
+          >
+            <template v-slot:prepend>
+              <q-icon name="attach_file" />
+            </template>
+          </q-file>
+        </div>
       </div>
     </div>
   </div>
@@ -96,6 +98,7 @@ import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -144,31 +147,40 @@ export default defineComponent({
     });
 
     const uploadImage = (event: Event) => {
-      const formData = new FormData();
-      formData.append("image", event);
-      let orgIdentifier = "default";
-      for (let item of store.state.organizations) {
-        if (item.type == "default") {
-          orgIdentifier = item.identifier;
+      if (config.isEnterprise == "true") {
+        const formData = new FormData();
+        formData.append("image", event);
+        let orgIdentifier = "default";
+        for (let item of store.state.organizations) {
+          if (item.type == "default") {
+            orgIdentifier = item.identifier;
+          }
         }
-      }
-      settingsService
-        .createLogo(orgIdentifier, formData)
-        .then((res) => {
-          console.log(res);
-        })
-        .catch((e) => {
-          console.log(e);
-        })
-        .finally(() => {
-          console.log("finally");
+        settingsService
+          .createLogo(orgIdentifier, formData)
+          .then((res) => {
+            console.log(res);
+          })
+          .catch((e) => {
+            console.log(e);
+          })
+          .finally(() => {
+            console.log("finally");
+          });
+      } else {
+        q.notify({
+          type: "negative",
+          message: "You are not allowed to perform this action.",
+          timeout: 2000,
         });
+      }
     };
 
     return {
       t,
       q,
       store,
+      config,
       router,
       scrapeIntereval,
       onSubmit,
