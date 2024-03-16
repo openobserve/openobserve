@@ -134,19 +134,15 @@ pub async fn search(
     let mut rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
-    let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req).await
-    {
-        Ok(v) => v,
+    let stream_name = match crate::common::meta::sql::Sql::new(&req.query.sql) {
+        Ok(v) => v.source.to_string(),
         Err(e) => {
-            return Ok(match e {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            return Ok(
+                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     e.to_string(),
                 )),
-            });
+            );
         }
     };
 
@@ -170,7 +166,7 @@ pub async fn search(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("{}:{}", stream_type, resp.stream_name),
+                        o2_type: format!("{}:{}", stream_type, stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),
@@ -252,7 +248,7 @@ pub async fn search(
             report_request_usage_stats(
                 req_stats,
                 &org_id,
-                &resp.stream_name,
+                &stream_name,
                 StreamType::Logs,
                 UsageType::Search,
                 num_fn,
