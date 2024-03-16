@@ -31,9 +31,12 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::meta::{
-        sql::{Sql as MetaSql, SqlOperator},
-        stream::{StreamParams, StreamPartition},
+    common::{
+        infra::config::STREAM_SCHEMAS_FIELDS,
+        meta::{
+            sql::{Sql as MetaSql, SqlOperator},
+            stream::{StreamParams, StreamPartition},
+        },
     },
     handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
