@@ -937,7 +937,7 @@ mod tests {
         let resp = Sql::new(&rpc_req).await.unwrap();
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
-        assert!(check_field_in_use(&resp, col));
+        assert!(resp.meta.fields.contains(&col.to_string()));
     }
 
     #[tokio::test]
