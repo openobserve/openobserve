@@ -66,15 +66,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
           <q-label class="q-pt-md">{{ t("settings.customLogoTitle") }}</q-label>
+          <q-img
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig.custom_logo_img != ''
+            "
+            :src="store.state.custom_logo_img"
+            :alt="t('settings.logoLabel')"
+            style="width: 400px"
+            class="q-mx-md"
+          />
           <q-file
+            v-else
             v-model="files"
             :label="t('settings.logoLabel')"
             filled
             counter
             :counter-label="counterLabelFn"
             style="width: 400px"
-            max-file-size="20480"
-            accept=".png, image/*"
+            max-file-size="20481"
+            accept=".png, .jpg, .jpeg, .svg, .jpeg2, image/*"
             @rejected="onRejected"
             @update:model-value="uploadImage"
           >
@@ -162,7 +173,11 @@ export default defineComponent({
             console.log(res);
           })
           .catch((e) => {
-            console.log(e);
+            q.notify({
+              type: "negative",
+              message: e?.message || "Error while uploading image.",
+              timeout: 2000,
+            });
           })
           .finally(() => {
             console.log("finally");
@@ -186,7 +201,7 @@ export default defineComponent({
       onSubmit,
       files: ref(null),
       counterLabelFn({ totalSize, filesNumber }) {
-        return `(Only .png & size <20kb) ${filesNumber} file | ${totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb) ${filesNumber} file | ${totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),
