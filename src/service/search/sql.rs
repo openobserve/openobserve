@@ -47,8 +47,7 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
-pub(crate) static RE_ONLY_SELECT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
+static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
