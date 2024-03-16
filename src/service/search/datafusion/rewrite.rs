@@ -18,6 +18,7 @@
 use core::ops::ControlFlow;
 
 use config::FxIndexSet;
+use datafusion::error::Result;
 use sqlparser::{
     ast::{Expr, Function, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
     dialect::GenericDialect,
@@ -260,10 +261,10 @@ fn remove_brackets(input: &str) -> String {
     }
 }
 
-pub fn remove_where_clause(sql: &str) -> String {
-    let mut statements = Parser::parse_sql(&GenericDialect {}, sql).unwrap();
+pub fn remove_where_clause(sql: &str) -> Result<String> {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
     statements.visit(&mut RemoveWhere);
-    statements[0].to_string()
+    Ok(statements[0].to_string())
 }
 
 // A visitor that remove where clause

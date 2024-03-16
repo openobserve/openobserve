@@ -927,7 +927,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
         }
     }
 
-    sql = rewrite::remove_where_clause(&sql);
+    sql = rewrite::remove_where_clause(&sql)?;
     Ok(sql)
 }
 
