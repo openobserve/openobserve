@@ -53,6 +53,7 @@ const defaultObject = {
   runQuery: false,
   loading: false,
   loadingHistogram: false,
+  shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
@@ -90,6 +91,7 @@ const defaultObject = {
     showHistogram: true,
     showDetailTab: false,
     toggleFunction: true,
+    searchApplied: false,
     toggleSourceWrap: useLocalWrapContent()
       ? JSON.parse(useLocalWrapContent())
       : false,
@@ -115,6 +117,7 @@ const defaultObject = {
   },
   data: {
     query: <any>"",
+    histogramQuery: <any>"",
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
@@ -335,7 +338,12 @@ const useLogs = () => {
             selectedStream = itemObj;
           }
         }
-        searchObj.data.stream.selectedStream = selectedStream;
+        if (
+          store.state.zoConfig.query_on_stream_selection == false ||
+          router.currentRoute.value.query?.type == "stream_explorer"
+        ) {
+          searchObj.data.stream.selectedStream = selectedStream;
+        }
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
       }
@@ -366,7 +374,8 @@ const useLogs = () => {
 
   const getStreamList = async () => {
     try {
-      resetStreamData();
+      // commented below function as we are doing resetStreamData from all the places where getStreamList is called
+      // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData: any = await getStreams(streamType, false);
       searchObj.data.streamResults["list"] = streamData.list;
@@ -389,6 +398,7 @@ const useLogs = () => {
 
     if (searchObj.data.stream.selectedStream.label) {
       query["stream"] = searchObj.data.stream.selectedStream.label;
+      query["stream_value"] = searchObj.data.stream.selectedStream.value;
     }
 
     if (date.type == "relative") {
@@ -426,6 +436,7 @@ const useLogs = () => {
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["fast_mode"] = searchObj.meta.fastMode;
+    query["show_histogram"] = searchObj.meta.showHistogram;
     // query["timezone"] = store.state.timezone;
     return query;
   };
@@ -446,7 +457,7 @@ const useLogs = () => {
           end_time: new Date().getTime() * 1000,
           from:
             searchObj.meta.resultGrid.rowsPerPage *
-            (searchObj.data.resultGrid.currentPage - 1) || 0,
+              (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
           fast_mode: searchObj.meta.fastMode,
         },
@@ -461,8 +472,8 @@ const useLogs = () => {
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-            searchObj.data.datetime.relativeTimePeriod
-          )
+              searchObj.data.datetime.relativeTimePeriod
+            )
           : cloneDeep(searchObj.data.datetime);
 
       if (
@@ -541,7 +552,7 @@ const useLogs = () => {
 
         req.query.sql = query;
         req.query["sql_mode"] = "full";
-        delete req.aggs;
+        // delete req.aggs;
       } else {
         const parseQuery = query.split("|");
         let queryFunctions = "";
@@ -627,7 +638,7 @@ const useLogs = () => {
         searchObj.data.resultGrid.currentPage > 1 ||
         searchObj.meta.showHistogram === false
       ) {
-        delete req.aggs;
+        // delete req.aggs;
 
         if (searchObj.meta.showHistogram === false) {
           // delete searchObj.data.histogram;
@@ -915,9 +926,24 @@ const useLogs = () => {
   const getQueryData = async (isPagination = false) => {
     try {
       searchObj.meta.showDetailTab = false;
-
-      if (!searchObj.data.stream.streamLists?.length) {
+      searchObj.meta.searchApplied = true;
+      if (
+        !searchObj.data.stream.streamLists?.length ||
+        searchObj.data.stream.selectedStream.value == ""
+      ) {
         searchObj.loading = false;
+        return;
+      }
+
+      if (
+        isNaN(searchObj.data.datetime.endTime) ||
+        isNaN(searchObj.data.datetime.startTime)
+      ) {
+        $q.notify({
+          message: `Invalid date. Please select a valid date.`,
+          color: "negative",
+          timeout: 2000,
+        });
         return;
       }
 
@@ -970,10 +996,9 @@ const useLogs = () => {
         searchObj.data.errorCode = 0;
 
         // copy query request for histogram query and same for customDownload
-        const histogramQueryReq = JSON.parse(JSON.stringify(queryReq));
+        searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
-
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1022,7 +1047,7 @@ const useLogs = () => {
         searchObj.data.queryResults.subpage = 1;
 
         // based on pagination request, get the data
-        await getPaginatedData(queryReq, histogramQueryReq);
+        await getPaginatedData(queryReq);
         if (
           (searchObj.data.queryResults.aggs == undefined &&
             searchObj.data.resultGrid.currentPage == 1 &&
@@ -1034,7 +1059,7 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          getHistogramQueryData(histogramQueryReq);
+          getHistogramQueryData(searchObj.data.histogramQuery);
         }
       } else {
         searchObj.loading = false;
@@ -1047,7 +1072,6 @@ const useLogs = () => {
 
   const getPaginatedData = async (
     queryReq: any,
-    histogramQueryReq: any,
     appendResult: boolean = false
   ) => {
     return new Promise((resolve, reject) => {
@@ -1057,7 +1081,7 @@ const useLogs = () => {
         queryReq.query.track_total_hits = true;
       } else if (
         searchObj.data.queryResults.partitionDetail.partitionTotal[
-        searchObj.data.resultGrid.currentPage - 1
+          searchObj.data.resultGrid.currentPage - 1
         ] > -1 &&
         queryReq.query.hasOwnProperty("track_total_hits")
       ) {
@@ -1098,7 +1122,7 @@ const useLogs = () => {
           ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
             if (
               searchObj.data.queryResults.partitionDetail.partitionTotal[
-              index
+                index
               ] == -1 &&
               queryReq.query.start_time == item[0]
             ) {
@@ -1181,7 +1205,7 @@ const useLogs = () => {
 
             searchObj.data.queryResults.subpage++;
 
-            await getPaginatedData(queryReq, histogramQueryReq, true);
+            await getPaginatedData(queryReq, true);
           }
 
           updateFieldValues();
@@ -1206,7 +1230,7 @@ const useLogs = () => {
               if (totalNumber > 0) {
                 searchObj.data.queryResults.total += totalNumber;
               }
-            } 
+            }
           }
           searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
@@ -1263,7 +1287,7 @@ const useLogs = () => {
 
   const getHistogramQueryData = (queryReq: any) => {
     return new Promise((resolve, reject) => {
-      const dismiss = () => { };
+      const dismiss = () => {};
       try {
         searchObj.data.histogram.errorMsg = "";
         searchObj.data.histogram.errorCode = 0;
@@ -1449,7 +1473,7 @@ const useLogs = () => {
           : {};
       const logFieldSelectedValue =
         logFilterField[
-        `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
+          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
         ];
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (
@@ -1522,13 +1546,13 @@ const useLogs = () => {
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
     if (searchObj.meta.resultGrid.showPagination == false) {
-      endCount  = searchObj.data.queryResults.hits.length;
-    }else{
-    endCount = Math.min(
-      startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-      searchObj.data.queryResults.total
-    );
-    };
+      endCount = searchObj.data.queryResults.hits.length;
+    } else {
+      endCount = Math.min(
+        startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+        searchObj.data.queryResults.total
+      );
+    }
     const title =
       "Showing " +
       startCount +
@@ -1780,8 +1804,10 @@ const useLogs = () => {
   };
 
   const restoreUrlQueryParams = async () => {
+    searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
+      searchObj.shouldIgnoreWatcher = false;
       return;
     }
     const date = {
@@ -1811,7 +1837,7 @@ const useLogs = () => {
     }
 
     if (queryParams.stream_type) {
-      searchObj.data.stream.streamType = queryParams.streamType;
+      searchObj.data.stream.streamType = queryParams.stream_type;
     } else {
       searchObj.data.stream.streamType = "logs";
     }
@@ -1821,6 +1847,18 @@ const useLogs = () => {
     }
     searchObj.meta.fastMode = queryParams.fast_mode == "false" ? false : true;
 
+    if (queryParams.stream && queryParams.stream_value) {
+      searchObj.data.stream.selectedStream = {
+        value: queryParams.stream_value,
+        label: queryParams.stream,
+      };
+    }
+
+    if (queryParams.show_histogram) {
+      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
+    }
+
+    searchObj.shouldIgnoreWatcher = false;
     router.push({
       query: {
         ...queryParams,
@@ -1929,8 +1967,30 @@ const useLogs = () => {
     searchObj.data.editorValue = query;
     searchObj.data.query = query;
     searchObj.data.tempFunctionContent = "";
+    searchObj.meta.searchApplied = false;
 
-    handleQueryData();
+    if (store.state.zoConfig.query_on_stream_selection == false) {
+      handleQueryData();
+    } else {
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.queryResults = {
+        hits: [],
+      };
+      searchObj.data.sortedQueryResults = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
+      };
+      extractFields();
+    }
   };
 
   return {
@@ -1962,6 +2022,7 @@ const useLogs = () => {
     loadStreamLists,
     refreshPartitionPagination,
     filterHitsColumns,
+    getHistogramQueryData,
   };
 };
 

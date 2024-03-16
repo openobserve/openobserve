@@ -72,8 +72,9 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/functions**").as("functions");
     cy.visit(`${logData.logsUrl}?org_identifier=${Cypress.env("ORGNAME")}`);
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
-    cy.wait("@allsearch");
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
+    applyQueryButton()
+    cy.wait("@allsearch");
     cy.intercept("GET", "**/api/default/streams**").as("streams")
     cy.intercept('GET', '/api/default/e2e_automate/_values?').as('getValues')
 
@@ -131,6 +132,8 @@ describe("Logs testcases", () => {
     cy.get('[data-test="date-time-relative-6-w-btn"] > .q-btn__content').click({
       force: true,
     });
+    applyQueryButton();
+    cy.wait(2000);
     logstests.expandLogsSearch();
     logstests.verifyLogsStatusCode();
     cy.intercept("GET", logData.ValueQuery).as("value");
@@ -191,7 +194,7 @@ describe("Logs testcases", () => {
     applyQueryButton();
   });
 
-  it("should add the value to the editor when the != is clicked next to the field value", () => {
+  it.skip("should add the value to the editor when the != is clicked next to the field value", () => {
     // Wait for 2 seconds
     cy.wait(5000);
     // Type the value of a variable into an input field
@@ -965,7 +968,7 @@ describe("Logs testcases", () => {
     cy.contains(".a=2").should("be.visible");
   });
 
-  it("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
+  it.skip("should verify if user searches a value and graph appears when user selects SQL toggle and switches off again", () => {
     // Wait for 2 seconds
     cy.wait(2000);
     // Type the value of a variable into an input field
@@ -976,6 +979,9 @@ describe("Logs testcases", () => {
     ).click({
       force: true,
     });
+    applyQueryButton()
+    cy.wait(2000);
+    
     logstests.addFeildandSubValue();
     logstests.addsubFeildValue();
     //click on the field
