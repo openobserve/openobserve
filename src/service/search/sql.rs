@@ -44,8 +44,7 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
-pub(crate) static RE_ONLY_SELECT: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
+static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
@@ -68,6 +67,7 @@ static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
     pub origin_sql: String,
+    pub rewrite_sql: String,
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
@@ -118,6 +118,7 @@ impl Sql {
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
+        let mut rewrite_sql = req_query.sql.clone();
         // log::info!("origin_sql: {:?}", origin_sql);
         origin_sql = origin_sql.replace('\n', " ");
         origin_sql = origin_sql.trim().to_string();
@@ -374,6 +375,35 @@ impl Sql {
                 .map(|v| v.to_string())
                 .collect::<Vec<String>>()
         };
+
+        // Hack for fast_mode
+        // replace `select *` to `select f1,f2,f3`
+        if req_query.fast_mode
+            && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
+            && RE_ONLY_SELECT.is_match(&origin_sql)
+        {
+            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
+            let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
+                STREAM_SCHEMAS_FIELDS
+                    .read()
+                    .await
+                    .get(&stream_key)
+                    .map(|v| v.1.clone())
+            } else {
+                None
+            };
+            let fields = generate_fast_mode_fields(&schema, cached_fields, &match_all_fields);
+            let select_fields = "SELECT ".to_string() + &fields.join(",");
+            origin_sql = RE_ONLY_SELECT
+                .replace(origin_sql.as_str(), &select_fields)
+                .to_string();
+            // reset meta fields
+            meta.fields.extend(fields);
+            // rewrite distribution sql
+            rewrite_sql = RE_ONLY_SELECT
+                .replace(rewrite_sql.as_str(), &select_fields)
+                .to_string();
+        }
 
         // get sql where tokens
         let where_tokens = split_sql_token(&origin_sql);
@@ -649,6 +679,7 @@ impl Sql {
 
         Ok(Sql {
             origin_sql,
+            rewrite_sql,
             org_id,
             stream_type,
             stream_name,
