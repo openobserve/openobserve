@@ -223,7 +223,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
-    let req_query = req.query.as_ref().unwrap();
     let meta = sql::Sql::new(&req).await?;
     if meta.rewrite_sql != req.query.as_ref().unwrap().sql {
         req.query.as_mut().unwrap().sql = meta.rewrite_sql.clone();
