@@ -310,6 +310,7 @@ import {
   onMounted,
   watch,
   markRaw,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -343,6 +344,7 @@ import {
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -809,13 +811,18 @@ export default defineComponent({
     const getConfig = async () => {
       await configService
         .get_config()
-        .then((res: any) => {
+        .then(async (res: any) => {
           if (res.data.functions_enabled && config.isCloud == "false") {
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
           }
           store.dispatch("setConfig", res.data);
+          await nextTick();
+          // if rum enabled then setUser to capture session details.
+          if (res.data.rum.enabled) {
+            setRumUser();
+          }
         })
         .catch((error) => console.log(error));
     };
@@ -857,6 +864,16 @@ export default defineComponent({
       } else {
         router.push({
           query: { org_identifier: selectedOrg.value.identifier },
+        });
+      }
+    };
+
+    const setRumUser = () => {
+      if (store.state.zoConfig?.rum?.enabled == true) {
+        const userInfo = store.state.userInfo;
+        openobserveRum.setUser({
+          name: userInfo.given_name + " " + userInfo.family_name,
+          email: userInfo.email,
         });
       }
     };
