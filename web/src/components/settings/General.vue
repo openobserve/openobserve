@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val) => !!val || 'Scrape interval is required']"
+          :rules="[(val: any) => !!val || 'Scrape interval is required']"
           :lazy-rules="true"
         />
         <span>&nbsp;</span>
@@ -56,6 +56,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
+    <div class="q-px-md q-py-md">
+      <div class="text-body1 text-bold">
+        {{ t("settings.enterpriseTitle") }}
+      </div>
+    </div>
+    <q-separator />
+    <div class="q-mx-lg">
+      <div class="q-gutter-sm row q-mt-xs">
+        <q-label class="q-pt-md">{{ t("settings.customLogoTitle") }}</q-label>
+        <q-file
+          v-model="files"
+          :label="t('settings.logoLabel')"
+          filled
+          counter
+          :counter-label="counterLabelFn"
+          style="width: 400px"
+          max-file-size="20480"
+          accept=".png, image/*"
+          @rejected="onRejected"
+          @update:model-value="uploadImage"
+        >
+          <template v-slot:prepend>
+            <q-icon name="attach_file" />
+          </template>
+        </q-file>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -68,6 +95,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
+import settingsService from "@/services/settings";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -115,6 +143,28 @@ export default defineComponent({
       }
     });
 
+    const uploadImage = (event: Event) => {
+      const formData = new FormData();
+      formData.append("image", event);
+      let orgIdentifier = "default";
+      for (let item of store.state.organizations) {
+        if (item.type == "default") {
+          orgIdentifier = item.identifier;
+        }
+      }
+      settingsService
+        .createLogo(orgIdentifier, formData)
+        .then((res) => {
+          console.log(res);
+        })
+        .catch((e) => {
+          console.log(e);
+        })
+        .finally(() => {
+          console.log("finally");
+        });
+    };
+
     return {
       t,
       q,
@@ -122,6 +172,24 @@ export default defineComponent({
       router,
       scrapeIntereval,
       onSubmit,
+      files: ref(null),
+      counterLabelFn({ totalSize, filesNumber }) {
+        return `(Only .png & size <20kb) ${filesNumber} file | ${totalSize}`;
+      },
+      filesImages: ref(null),
+      filesMaxSize: ref(null),
+      filesMaxTotalSize: ref(null),
+      filesMaxNumber: ref(null),
+
+      onRejected(rejectedEntries: string | any[]) {
+        // Notify plugin needs to be installed
+        // https://quasar.dev/quasar-plugins/notify#Installation
+        q.notify({
+          type: "negative",
+          message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
+        });
+      },
+      uploadImage,
     };
   },
 });

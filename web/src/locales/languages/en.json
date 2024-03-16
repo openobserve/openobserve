@@ -795,6 +795,9 @@
     "generalLabel": "General",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
-    "scrapintervalLabel": "Scrape Interval (In Seconds) *"
+    "scrapintervalLabel": "Scrape Interval (In Seconds) *",
+    "enterpriseTitle": "Enterprise Settings",
+    "logoLabel": "Select Logo Image",
+    "customLogoTitle": "Custom Logo"
   }
 }
