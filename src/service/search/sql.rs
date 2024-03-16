@@ -21,7 +21,6 @@ use std::{
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
-    utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -32,12 +31,9 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        infra::config::STREAM_SCHEMAS_FIELDS,
-        meta::{
-            sql::{Sql as MetaSql, SqlOperator},
-            stream::{StreamParams, StreamPartition},
-        },
+    common::meta::{
+        sql::{Sql as MetaSql, SqlOperator},
+        stream::{StreamParams, StreamPartition},
     },
     handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
@@ -48,7 +44,8 @@ const SQL_DELIMITERS: [u8; 12] = [
 ];
 const SQL_DEFAULT_FULL_MODE_LIMIT: usize = 1000;
 
-static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
+pub(crate) static RE_ONLY_SELECT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
@@ -77,7 +74,6 @@ pub struct Sql {
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
     pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
-    pub fields: Vec<String>,
     pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
                           * data from the latest file */
@@ -379,31 +375,6 @@ impl Sql {
                 .collect::<Vec<String>>()
         };
 
-        // Hack for fast_mode
-        // replace `select *` to `select f1,f2,f3`
-        if req_query.fast_mode
-            && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
-            && RE_ONLY_SELECT.is_match(&origin_sql)
-        {
-            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
-            let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
-                STREAM_SCHEMAS_FIELDS
-                    .read()
-                    .await
-                    .get(&stream_key)
-                    .map(|v| v.1.clone())
-            } else {
-                None
-            };
-            let fields = generate_fast_mode_fields(&schema, cached_fields, &match_all_fields);
-            let select_fields = "SELECT ".to_string() + &fields.join(",");
-            origin_sql = RE_ONLY_SELECT
-                .replace(origin_sql.as_str(), &select_fields)
-                .to_string();
-            // reset meta fields
-            meta.fields.extend(fields);
-        }
-
         // get sql where tokens
         let where_tokens = split_sql_token(&origin_sql);
         let where_pos = where_tokens
@@ -676,7 +647,7 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
-        let mut sql = Sql {
+        Ok(Sql {
             origin_sql,
             org_id,
             stream_type,
@@ -684,7 +655,6 @@ impl Sql {
             meta,
             fulltext,
             aggs,
-            fields: vec![],
             sql_mode,
             fast_mode,
             schema,
@@ -692,16 +662,7 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
-        };
-
-        // calculate all needs fields
-        for field in schema_fields {
-            if check_field_in_use(&sql, field.name()) {
-                sql.fields.push(field.name().to_string());
-            }
-        }
-
-        Ok(sql)
+        })
     }
 
     /// match a source is a valid file or not
@@ -758,20 +719,7 @@ pub fn generate_filter_from_quick_text(
     filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
-fn check_field_in_use(sql: &Sql, field: &str) -> bool {
-    let re = Regex::new(&format!(r"\b{field}\b")).unwrap();
-    if find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
-        return true;
-    }
-    for (_, sql) in sql.aggs.iter() {
-        if find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
-            return true;
-        }
-    }
-    false
-}
-
-fn generate_fast_mode_fields(
+pub(crate) fn generate_fast_mode_fields(
     schema: &Schema,
     cached_fields: Option<Vec<String>>,
     fts_fields: &[String],
@@ -993,7 +941,7 @@ mod tests {
         let resp = Sql::new(&rpc_req).await.unwrap();
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
-        assert!(check_field_in_use(&resp, col));
+        assert!(resp.meta.fields.contains(&col.to_string()));
     }
 
     #[tokio::test]

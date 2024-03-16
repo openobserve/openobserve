@@ -30,7 +30,7 @@ use config::{
         stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
     },
     utils::{flatten, json, str::find},
-    CONFIG,
+    CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -47,7 +47,10 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::{
-        infra::cluster::{self, get_node_from_consistent_hash},
+        infra::{
+            cluster::{self, get_node_from_consistent_hash},
+            config::STREAM_SCHEMAS_FIELDS,
+        },
         meta::{
             functions::VRLResultResolver,
             search,
@@ -223,11 +226,48 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
+    let req_query = req.query.as_ref().unwrap();
     let meta = sql::Sql::new(&req).await?;
 
-    // reset query sql
-    req.query.as_mut().unwrap().sql = meta.origin_sql.clone();
-    req.query.as_mut().unwrap().sql_mode = "full".to_string();
+    // stream settings
+    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+
+    // Hack for fast_mode sql
+    // replace `select *` to `select f1,f2,f3`
+    if req_query.fast_mode
+        && meta.schema.fields().len() > CONFIG.limit.fast_mode_num_fields
+        && sql::RE_ONLY_SELECT.is_match(&meta.origin_sql)
+    {
+        let stream_key = format!("{}/{}/{}", &meta.org_id, stream_type, meta.stream_name);
+        let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
+            STREAM_SCHEMAS_FIELDS
+                .read()
+                .await
+                .get(&stream_key)
+                .map(|v| v.1.clone())
+        } else {
+            None
+        };
+        let match_all_fields = if !stream_settings.full_text_search_keys.is_empty() {
+            stream_settings
+                .full_text_search_keys
+                .iter()
+                .map(|v| v.to_lowercase())
+                .collect()
+        } else {
+            SQL_FULL_TEXT_SEARCH_FIELDS
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+        };
+        let fields = sql::generate_fast_mode_fields(&meta.schema, cached_fields, &match_all_fields);
+        let select_fields = "SELECT ".to_string() + &fields.join(",");
+        req.query.as_mut().unwrap().sql = sql::RE_ONLY_SELECT
+            .replace(req_query.sql.as_str(), &select_fields)
+            .to_string();
+    }
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().unwrap();
@@ -250,10 +290,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         stage: 0,
         partition: 0,
     };
-
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
-    let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     let is_inverted_index = !meta.fts_terms.is_empty();
 
