@@ -929,12 +929,6 @@ export default defineComponent({
       );
     };
 
-    const sortedStreamFields = () => {
-      return searchObj.data.stream.selectedStreamFields.sort(
-        (a: object, b: object) => (a as any).group - (b as any).group
-      );
-    };
-
     return {
       t,
       store,
