@@ -14,23 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-use hashbrown::HashSet;
-#[cfg(feature = "enterprise")]
-use infra::db::etcd;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::{
-    authorizer::authz::{get_org_creation_tuples, get_user_role_tuple, update_tuples},
-    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+use {
+    crate::common::{
+        infra::config::{STREAM_SCHEMAS, USERS},
+        meta::organization::DEFAULT_ORG,
+        meta::user::UserRole,
+    },
+    crate::service::db,
+    hashbrown::HashSet,
+    infra::dist_lock,
+    o2_enterprise::enterprise::openfga::{
+        authorizer::authz::{get_org_creation_tuples, get_user_role_tuple, update_tuples},
+        meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+    },
 };
-
-#[cfg(feature = "enterprise")]
-use crate::common::{
-    infra::config::{STREAM_SCHEMAS, USERS},
-    meta::organization::DEFAULT_ORG,
-    meta::user::UserRole,
-};
-#[cfg(feature = "enterprise")]
-use crate::service::db;
 
 #[cfg(feature = "enterprise")]
 pub async fn init() {
@@ -45,11 +42,9 @@ pub async fn init() {
         }
     };
     // 1. create a cluster lock
-    let mut dist_locker = None;
-    if !config::CONFIG.common.local_mode {
-        let locker = dist_lock::lock("/ofga/model/", 0).await;
-        dist_locker = Some(locker);
-    }
+    let locker = dist_lock::lock("/ofga/model/", 0)
+        .await
+        .expect("Failed to acquire lock for openFGA");
     match db::ofga::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
             if store_id.is_empty() {
@@ -135,9 +130,7 @@ pub async fn init() {
         }
     }
     // release lock
-    if let Some(locker) = dist_locker {
-        dist_lock::unlock(&locker)
-            .await
-            .expect("Failed to release lock");
-    }
+    dist_lock::unlock(&locker)
+        .await
+        .expect("Failed to release lock");
 }

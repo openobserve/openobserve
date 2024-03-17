@@ -78,17 +78,6 @@ const useEnvRoutes = () => {
 
   const homeChildRoutes = [
     {
-      path: "organizations",
-      name: "organizations",
-      component: Organizations,
-      meta: {
-        keepAlive: true,
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
       path: "billings",
       name: "billings",
       component: Billing,
