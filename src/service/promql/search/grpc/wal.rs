@@ -203,7 +203,7 @@ async fn get_file_list(
     time_range: (i64, i64),
     filters: &[(&str, Vec<String>)],
 ) -> Result<Vec<cluster_rpc::MetricsWalFile>> {
-    let nodes = get_cached_online_ingester_nodes();
+    let nodes = get_cached_online_ingester_nodes().await;
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
         return Ok(vec![]);
     }

@@ -16,7 +16,7 @@
 use config::CONFIG;
 use datafusion::arrow::datatypes::Schema;
 use once_cell::sync::Lazy;
-use regex::{self, Regex};
+use regex::Regex;
 
 use crate::common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL};
 

@@ -107,12 +107,10 @@ pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use datafusion::{
         arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
+            array::Int64Array,
+            datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         datasource::MemTable,

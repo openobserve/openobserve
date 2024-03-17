@@ -29,13 +29,13 @@ import {
   onUnmounted,
   nextTick,
 } from "vue";
-import * as echarts from "echarts";
 import { useStore } from "vuex";
 import L from "leaflet";
 import "@/utils/dashboard/leaflet-echarts/index";
 
 // import {tileLayer as LtileLayer } from 'leaflet';
 import "leaflet/dist/leaflet.css";
+import * as echarts from "echarts/core";
 
 export default defineComponent({
   name: "GeoMapRenderer",

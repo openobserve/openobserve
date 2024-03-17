@@ -76,6 +76,9 @@ pub enum Error {
     InferJsonSchemaError {
         source: arrow::error::ArrowError,
     },
+    MergeSchemaError {
+        source: arrow::error::ArrowError,
+    },
     CreateArrowWriterError {
         source: arrow::error::ArrowError,
     },

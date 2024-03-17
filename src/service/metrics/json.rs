@@ -38,7 +38,7 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{get_wal_time_key, write_file},
-        schema::check_for_schema,
+        schema::{check_for_schema, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -68,7 +68,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
     let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut stream_partitioning_map: HashMap<String, PartitioningDetails> = HashMap::new();
@@ -94,7 +94,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
 
         // check metrics type for Histogram & Summary
         if metrics_type.to_lowercase() == "histogram" || metrics_type.to_lowercase() == "summary" {
-            if stream_schema_map.get(&stream_name).is_none() {
+            if !stream_schema_map.contains_key(&stream_name) {
                 let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
                 if schema == Schema::empty() {
                     // create the metadata for the stream
@@ -120,7 +120,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                     )
                     .await?;
                 }
-                stream_schema_map.insert(stream_name.clone(), schema);
+                let fields_map = schema
+                    .fields()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| (f.name().to_owned(), i))
+                    .collect();
+                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema, fields_map));
             }
             continue;
         }
@@ -181,7 +187,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let record_str = json::to_string(&record).unwrap();
 
         // check schema
-        if stream_schema_map.get(&stream_name).is_none() {
+        if !stream_schema_map.contains_key(&stream_name) {
             let mut schema = db::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
             if schema.fields().is_empty() {
                 let mut schema_reader = BufReader::new(record_str.as_bytes());
@@ -215,7 +221,13 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
                 )
                 .await;
             }
-            stream_schema_map.insert(stream_name.clone(), schema);
+            let fields_map = schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect();
+            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema, fields_map));
         }
 
         // check for schema evolution
@@ -248,6 +260,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
         let schema = stream_schema_map
             .get(&stream_name)
             .unwrap()
+            .schema()
             .clone()
             .with_metadata(HashMap::new());
         let schema_key = schema.hash_key();

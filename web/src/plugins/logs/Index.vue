@@ -146,16 +146,36 @@ size="md" /> Select a
                   v-else-if="
                     searchObj.data.queryResults.hasOwnProperty('hits') &&
                     searchObj.data.queryResults.hits.length == 0 &&
-                    searchObj.loading == false
+                    searchObj.loading == false &&
+                    searchObj.meta.searchApplied == true
                   "
                   class="row"
                 >
-                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-10">
-                    <q-icon
-                      name="info"
-                      color="primary"
-                      size="md"
-                    /> {{ t("search.noRecordFound") }}
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-10"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.noRecordFound") }}
+                  </h6>
+                </div>
+                <div
+                  v-else-if="
+                    searchObj.data.queryResults.hasOwnProperty('hits') &&
+                    searchObj.data.queryResults.hits.length == 0 &&
+                    searchObj.loading == false &&
+                    searchObj.meta.searchApplied == false
+                  "
+                  class="row"
+                >
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-10"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.applySearch") }}
                   </h6>
                 </div>
                 <div
@@ -348,6 +368,7 @@ export default defineComponent({
       generateHistogramData,
       resetSearchObj,
       resetStreamData,
+      getHistogramQueryData,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -583,6 +604,7 @@ export default defineComponent({
       refreshTimezone,
       resetSearchObj,
       resetStreamData,
+      getHistogramQueryData,
     };
   },
   computed: {
@@ -649,7 +671,10 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-      if (this.searchObj.meta.showHistogram == true) {
+      if (
+        this.searchObj.meta.showHistogram == true &&
+        this.searchObj.shouldIgnoreWatcher == false
+      ) {
         if (this.searchObj.meta.sqlMode == false) {
           setTimeout(() => {
             if (this.searchResultRef) this.searchResultRef.reDrawChart();
@@ -658,9 +683,15 @@ export default defineComponent({
 
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
-          this.handleRunQuery();
+          // this.handleRunQuery();
+          this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
+            (res: any) => {
+              this.searchResultRef.reDrawChart();
+            }
+          );
         }
       }
+      this.updateUrlQueryParams();
     },
     moveSplitter() {
       if (this.searchObj.meta.showFields == false) {
@@ -702,14 +733,18 @@ export default defineComponent({
       if (newVal) {
         await nextTick();
         this.setQuery(newVal);
+        this.updateUrlQueryParams();
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
         this.searchObj.data.editorValue = "";
-      }
-      if (this.searchObj.loading == false) {
-        this.searchObj.loading = true;
-        this.getQueryData();
+        if (
+          this.searchObj.loading == false &&
+          this.searchObj.shouldIgnoreWatcher == false
+        ) {
+          this.searchObj.loading = true;
+          this.getQueryData();
+        }
       }
       // this.searchResultRef.reDrawChart();
     },

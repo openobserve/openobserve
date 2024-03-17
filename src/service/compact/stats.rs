@@ -22,7 +22,7 @@ use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[COMPACT] update stats from file_list is processing by {node}");
         return Ok(None);
     }
@@ -61,12 +61,12 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
 }
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
-    let lock_key = "compact/stream_stats/offset".to_string();
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let lock_key = "/compact/stream_stats/offset".to_string();
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     // check the working node for the organization again, maybe other node locked it
     // first
     let (offset, node) = db::compact::stats::get_offset().await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         dist_lock::unlock(&locker).await?;
         log::debug!("[COMPACT] update stats from file_list is processing by {node}");
         return Ok(None);

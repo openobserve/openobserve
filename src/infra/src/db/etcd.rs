@@ -42,10 +42,13 @@ use crate::{
 static ETCD_CLIENT: OnceCell<etcd_client::Client> = OnceCell::const_new();
 
 pub async fn get_etcd_client() -> &'static etcd_client::Client {
-    ETCD_CLIENT.get_or_init(connect_etcd).await
+    ETCD_CLIENT.get_or_init(connect).await
 }
 
 pub async fn init() {
+    if CONFIG.common.local_mode || CONFIG.common.cluster_coordinator.to_lowercase() == "nats" {
+        return;
+    }
     // enable keep alive for auth token
     tokio::task::spawn(async move { keepalive_connection().await });
 }
@@ -259,7 +262,7 @@ impl super::Db for Etcd {
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>> {
         let (tx, rx) = mpsc::channel(1024);
         let key = format!("{}{}", &self.prefix, prefix);
-        let prefix_key = self.prefix.to_string();
+        let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
             loop {
                 if cluster::is_offline() {
@@ -288,7 +291,7 @@ impl super::Db for Etcd {
                         for ev in ev.events() {
                             let kv = ev.kv().unwrap();
                             let item_key = kv.key_str().unwrap();
-                            let item_key = item_key.strip_prefix(&prefix_key).unwrap();
+                            let item_key = item_key.strip_prefix(&self_prefix).unwrap();
                             match ev.event_type() {
                                 EventType::Put => tx
                                     .send(Event::Put(EventData {
@@ -323,9 +326,9 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect_etcd() -> etcd_client::Client {
+pub async fn connect() -> etcd_client::Client {
     if CONFIG.common.print_key_config {
-        log::info!("etcd init config: {:?}", CONFIG.etcd);
+        log::info!("Etcd init config: {:?}", CONFIG.etcd);
     }
 
     let mut opts = etcd_client::ConnectOptions::new()
@@ -431,24 +434,23 @@ where
     Ok(())
 }
 
-pub struct Locker {
+pub(crate) struct Locker {
     key: String,
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
 }
 
 impl Locker {
-    pub fn new(key: &str) -> Self {
-        let key = format!("{}lock/{}", &CONFIG.etcd.prefix, key);
+    pub(crate) fn new(key: &str) -> Self {
         Self {
-            key,
+            key: format!("{}locker{}", &CONFIG.etcd.prefix, key),
             lock_id: "".to_string(),
             state: Arc::new(AtomicU8::new(0)),
         }
     }
 
     /// lock with timeout, 0 means use default timeout, unit: second
-    pub async fn lock(&mut self, timeout: u64) -> Result<()> {
+    pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
         let mut client = get_etcd_client().await.clone();
         let mut last_err = None;
         let timeout = if timeout == 0 {
@@ -477,22 +479,22 @@ impl Locker {
             };
         }
         if let Some(err) = last_err {
-            return Err(Error::Message(format!("etcd lock error: {err}")));
+            return Err(Error::Message(format!(
+                "etcd lock for key: {}, error: {}",
+                self.key, err
+            )));
         }
         Ok(())
     }
 
-    pub async fn unlock(&self) -> Result<()> {
+    pub(crate) async fn unlock(&self) -> Result<()> {
         if self.state.load(Ordering::SeqCst) != 1 {
             return Ok(());
         }
         let mut client = get_etcd_client().await.clone();
-        match client.unlock(self.lock_id.as_str()).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("etcd unlock error: {}, key: {}", err, self.key);
-                return Err(Error::Message("etcd unlock error".to_string()));
-            }
+        if let Err(err) = client.unlock(self.lock_id.as_str()).await {
+            log::error!("etcd unlock for key: {}, error: {}", self.key, err);
+            return Err(Error::Message("etcd unlock error".to_string()));
         };
         self.state.store(2, Ordering::SeqCst);
         Ok(())

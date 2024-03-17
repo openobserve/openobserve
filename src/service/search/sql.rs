@@ -447,10 +447,7 @@ impl Sql {
         for item in indexed_text.iter() {
             let mut indexed_search = Vec::new();
             for field in &schema_fields {
-                // TODO(ansrivas): Review this again
-                if !CONFIG.common.feature_fulltext_on_all_fields
-                    && !match_all_fields.contains(&field.name().to_lowercase())
-                {
+                if !match_all_fields.contains(&field.name().to_lowercase()) {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
@@ -461,6 +458,7 @@ impl Sql {
                     func = "ILIKE";
                 }
                 indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+
                 fts_terms.insert(item.1.clone());
             }
             if indexed_search.is_empty() {
@@ -473,9 +471,7 @@ impl Sql {
         for item in fulltext.iter() {
             let mut fulltext_search = Vec::new();
             for field in &schema_fields {
-                if !CONFIG.common.feature_fulltext_on_all_fields
-                    && !match_all_fields.contains(&field.name().to_lowercase())
-                {
+                if !match_all_fields.contains(&field.name().to_lowercase()) {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
