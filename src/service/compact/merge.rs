@@ -169,7 +169,7 @@ pub async fn merge_by_stream(
                 offset_time_hour + Duration::hours(1).num_microseconds().unwrap() - 1,
             )
         };
-    let files = file_list::query(
+    let mut files = file_list::query(
         org_id,
         stream_name,
         stream_type,
@@ -180,6 +180,31 @@ pub async fn merge_by_stream(
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+
+    // check lookback files
+    if CONFIG.compact.lookback_hours > 0 {
+        let lookback_offset = Duration::hours(CONFIG.compact.lookback_hours)
+            .num_microseconds()
+            .unwrap();
+        let lookback_offset_start = partition_offset_start - lookback_offset;
+        let mut lookback_offset_end = partition_offset_end - lookback_offset;
+        if lookback_offset_end > partition_offset_start {
+            // the lookback period is overlap with current period
+            lookback_offset_end = partition_offset_start;
+        }
+        let lookback_files = file_list::query(
+            org_id,
+            stream_name,
+            stream_type,
+            partition_time_level,
+            lookback_offset_start,
+            lookback_offset_end,
+            true,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("query lookback file list failed: {}", e))?;
+        files.extend(lookback_files);
+    }
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
