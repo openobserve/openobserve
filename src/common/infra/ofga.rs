@@ -31,8 +31,6 @@ use {
 
 #[cfg(feature = "enterprise")]
 pub async fn init() {
-    use infra::dist_lock;
-
     let mut migrate_native_objects = false;
     let existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
