@@ -39,10 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -203,7 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn

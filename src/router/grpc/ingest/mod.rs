@@ -21,8 +21,8 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
-pub(crate) fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
-    let nodes = cluster::get_cached_online_ingester_nodes();
+pub(crate) async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
+    let nodes = cluster::get_cached_online_ingester_nodes().await;
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
         if !CONFIG.route.ingester_srv_url.is_empty() {
             Ok(format!(

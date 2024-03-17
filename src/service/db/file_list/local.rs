@@ -47,8 +47,9 @@ pub async fn set(key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<(),
             break;
         }
     }
+
+    // write into local cache for s3
     if !CONFIG.common.meta_store_external {
-        // write into local cache for s3
         let mut write_buf = json::to_vec(&file_data)?;
         write_buf.push(b'\n');
         let file = wal::get_or_create(

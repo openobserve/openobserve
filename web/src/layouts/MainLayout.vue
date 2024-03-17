@@ -39,12 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ store.state.zoConfig.custom_logo_text }}</span
           >
           <br />
-          <img
-            :src="getImageURL('images/common/spark-logo-connector.png')"
-            size="sm"
-            class="q-pt-xs q-pl-xs"
-            style="width: 30px"
-          />
+          <img :src="getImageURL('images/common/spark-logo-connector.png')"
+size="sm" class="q-pt-xs q-pl-xs" style="width: 30px" />
           <img
             class="appLogo"
             :src="
@@ -169,7 +165,9 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"
@@ -1204,5 +1202,22 @@ export default defineComponent({
   .q-item {
     padding: 4px 8px;
   }
+}
+
+.text-powered-by {
+  float: left;
+  display: inline-block;
+  position: absolute;
+  margin-top: 16px;
+  margin-left: 0px;
+}
+
+.custom-text-logo {
+  display: inline-block;
+  float: left;
+  position: absolute;
+  margin-left: 72px !important;
+  margin-top: 16px !important;
+  width: 80px !important;
 }
 </style>

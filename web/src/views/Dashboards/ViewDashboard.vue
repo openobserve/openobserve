@@ -67,11 +67,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="refDateTime"
             v-model="selectedDate"
           /> -->
+            <!-- for Print Mode -->
+            <!-- if time is relative, show start and end time -->
+            <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
+            <div
+              v-if="
+                store.state.printMode === true &&
+                currentTimeObj.start_time &&
+                currentTimeObj.end_time
+              "
+              style="padding-top: 5px"
+            >
+              {{
+                moment(currentTimeObj?.start_time?.getTime() / 1000)
+                  .tz(store.state.timezone)
+                  .format("YYYY/MM/DD HH:mm")
+              }}
+              -
+              {{
+                moment(currentTimeObj?.end_time?.getTime() / 1000)
+                  .tz(store.state.timezone)
+                  .format("YYYY/MM/DD HH:mm")
+              }}
+              ({{ store.state.timezone }})
+            </div>
+            <!-- do not show date time picker for print mode -->
             <DateTimePickerDashboard
+              v-show="store.state.printMode === false"
               ref="dateTimePicker"
               class="dashboard-icons q-ml-sm"
               size="sm"
               v-model="selectedDate"
+              :initialTimezone="initialTimezone"
             />
             <AutoRefreshInterval
               v-model="refreshInterval"
@@ -188,6 +215,10 @@ import {
   onActivated,
   nextTick,
   provide,
+  defineAsyncComponent,
+  reactive,
+  onMounted,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -195,16 +226,17 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "../../utils/date";
-import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
-import AutoRefreshInterval from "../../components/AutoRefreshInterval.vue";
-import ExportDashboard from "../../components/dashboards/ExportDashboard.vue";
-import DashboardSettings from "./DashboardSettings.vue";
+import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import { copyToClipboard, useQuasar } from "quasar";
-import { onMounted } from "vue";
-import { onUnmounted } from "vue";
+import moment from "moment-timezone";
+
+const DashboardSettings = defineAsyncComponent(() => {
+  return import("./DashboardSettings.vue");
+});
 
 export default defineComponent({
   name: "ViewDashboard",
@@ -362,6 +394,9 @@ export default defineComponent({
     // refresh interval v-model
     const refreshInterval = ref(0);
 
+    // intial timezone, which will come from the route query
+    const initialTimezone = ref(route.query.timezone ?? null);
+
     // when the date changes from the picker, update the current time object for the dashboard
     watch(selectedDate, () => {
       currentTimeObj.value = {
@@ -437,6 +472,23 @@ export default defineComponent({
 
       if (params.refresh) {
         refreshInterval.value = parseDuration(params.refresh);
+      }
+
+      // check if timezone query params exist
+      // will be used for intial time zone only, so remove it from query
+      if (params.timezone) {
+        // get the query params
+        const query = {
+          ...route.query,
+        };
+
+        // remove timezone from query
+        delete query.timezone;
+
+        // replace route with query params
+        router.replace({
+          query,
+        });
       }
 
       // check if print query params exist
@@ -628,6 +680,8 @@ export default defineComponent({
       selectedTabId,
       onMovePanel,
       printDashboard,
+      initialTimezone,
+      moment,
     };
   },
 });

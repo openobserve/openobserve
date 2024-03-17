@@ -18,7 +18,7 @@ use std::{cmp::Ordering, sync::Arc, time::Duration};
 use config::FxIndexMap;
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
-use regex::{self, Regex};
+use regex::Regex;
 use serde::{
     ser::{SerializeSeq, SerializeStruct, Serializer},
     Serialize,

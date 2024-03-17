@@ -19,7 +19,7 @@ jobs:
   build:
 
     runs-on: 
-      labels: ubuntu-latest
+      labels: ubicloud-standard-8
 
     steps:
 
@@ -29,8 +29,8 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2023-12-24
-          targets: x86_64-unknown-linux-musl
+          toolchain: nightly-2024-03-02
+          targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -43,9 +43,12 @@ jobs:
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
       
+      - name: Print rustc cfg
+        run: rustc --print cfg
+
       - name: Setup cargo config
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
 
       - name: Run unit tests
         run: ./coverage.sh
-       
+      

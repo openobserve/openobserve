@@ -36,8 +36,8 @@ fn connect() -> Pool<MySql> {
         .disable_statement_logging();
 
     MySqlPoolOptions::new()
-        .min_connections(CONFIG.limit.cpu_num as u32)
-        .max_connections(CONFIG.limit.cpu_num as u32 * 2)
+        .min_connections(CONFIG.limit.sql_min_db_connections)
+        .max_connections(CONFIG.limit.sql_max_db_connections)
         .connect_lazy_with(db_opts)
 }
 

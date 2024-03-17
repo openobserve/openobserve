@@ -54,16 +54,17 @@ pub async fn merge_by_stream(
 
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
 
     if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-        let lock_key = format!("compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
-        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
         }
@@ -524,7 +525,7 @@ async fn merge_files(
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
     log::info!(
-        "[COMPACT] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        "[COMPACT] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,

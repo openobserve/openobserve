@@ -127,6 +127,7 @@ impl Partition {
             let mut f = OpenOptions::new()
                 .create(true)
                 .write(true)
+                .truncate(true)
                 .open(&path)
                 .await
                 .context(CreateFileSnafu { path: path.clone() })?;
@@ -136,10 +137,10 @@ impl Partition {
 
             // update metrics
             metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[&org_id, stream_type])
+                .with_label_values(&[org_id, stream_type])
                 .add(buf_parquet.len() as i64);
             metrics::INGEST_WAL_WRITE_BYTES
-                .with_label_values(&[&org_id, stream_type])
+                .with_label_values(&[org_id, stream_type])
                 .inc_by(buf_parquet.len() as u64);
 
             paths.push((path, persist_stat));

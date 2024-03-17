@@ -12,13 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-// #![deny(
-//     unused_import_braces,
-//     unused_imports,
-//     unused_variables,
-//     unused_allocation,
-//     unused_extern_crates
-// )]
 
 use std::{
     cmp::max,
@@ -32,7 +25,7 @@ use std::{
     time::Duration,
 };
 
-use actix_web::{http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use config::{
     cluster::{is_router, LOCAL_NODE_ROLE},
@@ -95,7 +88,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use tracing_subscriber::{
-    self, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
+    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
 
 #[tokio::main]
@@ -192,12 +185,14 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // init http server
-    init_http_server().await?;
+    if let Err(e) = init_http_server().await {
+        log::error!("HTTP server runs failed: {}", e);
+    }
     log::info!("HTTP server stopped");
 
     // leave the cluster
     _ = cluster::leave().await;
-    log::info!("left cluster");
+    log::info!("Node left cluster");
 
     // stop gRPC server
     grpc_shutudown_tx.send(()).ok();
@@ -206,13 +201,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
+    // flush distinct values
+    _ = distinct_values::close().await;
     // flush compact offset cache to disk disk
     _ = db::compact::files::sync_cache_to_db().await;
     // flush db
     let db = infra::db::get_db().await;
     _ = db.close().await;
-    // flush distinct values
-    _ = distinct_values::close().await;
 
     // stop telemetry
     meta::telemetry::Telemetry::new()
@@ -390,14 +385,63 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
     .bind(haddr)?;
 
-    server
+    let server = server
         .workers(CONFIG.limit.http_worker_num)
         .worker_max_blocking_threads(
             CONFIG.limit.http_worker_num * CONFIG.limit.http_worker_max_blocking,
         )
-        .run()
-        .await?;
+        .disable_signals()
+        .run();
+    let handle = server.handle();
+    tokio::task::spawn(async move {
+        graceful_shutdown(handle).await;
+    });
+    server.await?;
     Ok(())
+}
+
+async fn graceful_shutdown(handle: ServerHandle) {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let mut sigquit = signal(SignalKind::quit()).unwrap();
+        let mut sigterm = signal(SignalKind::terminate()).unwrap();
+        let mut sigint = signal(SignalKind::interrupt()).unwrap();
+
+        tokio::select! {
+            _ = sigquit.recv() =>  log::info!("SIGQUIT received"),
+            _ = sigterm.recv() =>  log::info!("SIGTERM received"),
+            _ = sigint.recv() =>   log::info!("SIGINT received"),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        use tokio::signal::windows::*;
+
+        let mut sigbreak = ctrl_break().unwrap();
+        let mut sigint = ctrl_c().unwrap();
+        let mut sigquit = ctrl_close().unwrap();
+        let mut sigterm = ctrl_shutdown().unwrap();
+
+        tokio::select! {
+            _ = sigbreak.recv() =>  log::info!("ctrl-break received"),
+            _ = sigquit.recv() =>  log::info!("ctrl-c received"),
+            _ = sigterm.recv() =>  log::info!("ctrl-close received"),
+            _ = sigint.recv() =>   log::info!("ctrl-shutdown received"),
+        }
+    }
+    // tokio::signal::ctrl_c().await.unwrap();
+    // println!("ctrl-c received!");
+
+    // offline the node
+    if let Err(e) = cluster::set_offline(true).await {
+        log::error!("set offline failed: {}", e);
+    }
+    log::info!("Node is offline");
+
+    handle.stop(true).await;
 }
 
 /// Setup the tracing related components

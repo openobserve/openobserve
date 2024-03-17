@@ -21,6 +21,8 @@ use std::collections::VecDeque;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
+const INITIAL_CACHE_SIZE: usize = 128;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CacheType {
     Disk,
@@ -37,7 +39,10 @@ impl CacheStrategy {
     fn new(name: &str) -> Self {
         match name.to_lowercase().as_str() {
             "lru" => CacheStrategy::Lru(LruCache::new_unbounded()),
-            "fifo" => CacheStrategy::Fifo((VecDeque::new(), HashSet::new())),
+            "fifo" => CacheStrategy::Fifo((
+                VecDeque::with_capacity(INITIAL_CACHE_SIZE),
+                HashSet::with_capacity(INITIAL_CACHE_SIZE),
+            )),
             _ => CacheStrategy::Lru(LruCache::new_unbounded()),
         }
     }

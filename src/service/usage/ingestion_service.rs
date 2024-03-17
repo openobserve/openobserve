@@ -27,7 +27,7 @@ pub async fn ingest(
     dest_org_id: &str,
     req: cluster_rpc::UsageRequest,
 ) -> Result<UsageResponse, Error> {
-    let mut nodes = cluster::get_cached_online_ingester_nodes().unwrap();
+    let mut nodes = cluster::get_cached_online_ingester_nodes().await.unwrap();
     nodes.sort_by_key(|x| x.id);
 
     if nodes.is_empty() {
