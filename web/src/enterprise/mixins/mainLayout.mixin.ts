@@ -28,11 +28,6 @@ const MainLayoutCloudMixin = {
         icon: "img:" + getImageURL("images/common/function.svg"),
         link: "/functions",
       });
-      linksList.value.splice(7, 0, {
-        title: t("menu.organizations"),
-        icon: "corporate_fare",
-        link: "/organizations",
-      });
       linksList.value.splice(10, 0, {
         title: t("menu.billings"),
         icon: "payments",
