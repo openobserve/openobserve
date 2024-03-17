@@ -174,6 +174,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     _ = files.get("", None).await;
 
     tokio::task::spawn(async move {
+        if CONFIG.memory_cache.gc_interval == 0 {
+            return;
+        }
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
             config::CONFIG.memory_cache.gc_interval,
         ));

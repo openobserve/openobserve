@@ -600,7 +600,7 @@ pub struct MemoryCache {
     pub release_size: usize,
     #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 10)] // MB
     pub gc_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
@@ -628,7 +628,7 @@ pub struct DiskCache {
     pub release_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 10)] // MB
     pub gc_size: usize,
-    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 10)] // seconds
+    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
     pub gc_interval: u64,
 }
 
