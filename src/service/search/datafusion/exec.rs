@@ -327,9 +327,9 @@ async fn exec_query(
         .captures(query.to_lowercase().as_str())
         .is_some()
     {
-        query = rewrite::rewrite_count_distinct_sql(&query, true);
+        query = rewrite::rewrite_count_distinct_sql(&query, true)?;
     } else {
-        query = rewrite::add_group_by_field_to_select(&query);
+        query = rewrite::add_group_by_field_to_select(&query)?;
     }
 
     // Debug SQL
@@ -614,7 +614,7 @@ pub async fn merge(
             .captures(sql.to_lowercase().as_str())
             .is_some()
     {
-        query_sql = rewrite::rewrite_count_distinct_sql(sql, false);
+        query_sql = rewrite::rewrite_count_distinct_sql(sql, false)?;
     }
 
     // query data
@@ -702,13 +702,13 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
         .captures(sql.to_lowercase().as_str())
         .is_some()
     {
-        let sql = rewrite::rewrite_count_distinct_merge_sql(sql);
+        let sql = rewrite::rewrite_count_distinct_merge_sql(sql)?;
         return Ok(sql);
     }
 
     let mut sql = sql.to_string();
     if !is_final_phase {
-        sql = rewrite::add_group_by_field_to_select(&sql);
+        sql = rewrite::add_group_by_field_to_select(&sql)?;
     }
 
     let mut fields = Vec::new();
@@ -927,7 +927,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
         }
     }
 
-    sql = rewrite::remove_where_clause(&sql);
+    sql = rewrite::remove_where_clause(&sql)?;
     Ok(sql)
 }
 

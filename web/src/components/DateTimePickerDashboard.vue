@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :default-relative-time="modelValue.relativeTimePeriod"
     @on:date-change="updateDateTime"
+    :initialTimezone="initialTimezone"
   >
   </date-time>
 </template>
@@ -46,6 +47,10 @@ export default defineComponent({
         relativeTimePeriod: "15m",
         valueType: "relative",
       }),
+    },
+    initialTimezone: {
+      required: false,
+      default: null,
     },
   },
   emits: ["update:modelValue"],

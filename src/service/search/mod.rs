@@ -227,6 +227,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
     let meta = sql::Sql::new(&req).await?;
+    if meta.rewrite_sql != req.query.as_ref().unwrap().sql {
+        req.query.as_mut().unwrap().sql = meta.rewrite_sql.clone();
+    }
 
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
@@ -250,10 +253,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         partition: 0,
     };
 
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
-    let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-
     let is_inverted_index = !meta.fts_terms.is_empty();
 
     log::warn!(
@@ -261,6 +260,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         !req.aggs.is_empty(),
         is_inverted_index
     );
+
+    // stream settings
+    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let partition_time_level =
+        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // If the query is of type inverted index and this is not an aggregations request
     let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {

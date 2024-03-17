@@ -278,7 +278,7 @@ import {
   convertToUtcTimestamp,
   timestampToTimezoneDate,
 } from "../utils/zincutils";
-import { date } from "quasar";
+import { date, useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { utcToZonedTime } from "date-fns-tz";
@@ -301,6 +301,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    initialTimezone: {
+      required: false,
+      default: null,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change"],
@@ -308,6 +312,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
+    const $q = useQuasar();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00",
@@ -331,6 +336,33 @@ export default defineComponent({
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
+
+    const onTimezoneChange = async () => {
+      let selectedTimezone = timezone.value;
+      if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
+        selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      }
+      //Intl.DateTimeFormat().resolvedOptions().timeZone
+      useLocalTimezone(selectedTimezone);
+      store.dispatch("setTimezone", selectedTimezone);
+      await nextTick();
+      if (selectedType.value == "absolute") saveDate("absolute");
+      else saveDate("relative");
+      emit("on:timezone-change");
+    };
+
+    // if initial timezone is provided
+    if (props.initialTimezone) {
+      // check if it is a valid timezone
+      // ignore case
+      timezone.value =
+        timezoneOptions.find(
+          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
+        ) || currentTimezone;
+
+      // call onTimezoneChange to set the timezone in the store
+      onTimezoneChange();
+    }
 
     const filteredTimezone: any = ref([]);
 
@@ -426,20 +458,6 @@ export default defineComponent({
       if (props.autoApply) saveDate("relative-custom");
     };
 
-    const onTimezoneChange = async () => {
-      let selectedTimezone = timezone.value;
-      if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
-        selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      }
-      //Intl.DateTimeFormat().resolvedOptions().timeZone
-      useLocalTimezone(selectedTimezone);
-      store.dispatch("setTimezone", selectedTimezone);
-      await nextTick();
-      if (selectedType.value == "absolute") saveDate("absolute");
-      else saveDate("relative");
-      emit("on:timezone-change");
-    };
-
     const setRelativeTime = (period) => {
       const periodString = period?.match(/(\d+)([mhdwM])/);
 
@@ -513,6 +531,14 @@ export default defineComponent({
     const saveDate = (dateType) => {
       displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
+      if (isNaN(date.endTime) || isNaN(date.startTime)) {
+        $q.notify({
+          message: `Invalid date. Please select a valid date.`,
+          color: "negative",
+          timeout: 2000,
+        });
+        return false;
+      }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       // date["relativeTimePeriod"] = "";

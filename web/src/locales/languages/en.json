@@ -103,7 +103,8 @@
     "customDownloadMessage": "Enter the initial number and select the range for downloading data.",
     "noRecordFound": "No records found. Please adjust filters and try again.",
     "functionErrorLabel": "Function not applied: (expand for more details)",
-    "histogramErrorBtnLabel": "Click for error details"
+    "histogramErrorBtnLabel": "Click for error details",
+    "applySearch": "Adjust filter parameters and click 'Run query'."
   },
   "menu": {
     "home": "Home",
