@@ -489,7 +489,6 @@ export default defineComponent({
           org_identifier: this.store.state.selectedOrganization.identifier,
         },
       });
-      console.log("updateOrganizationList");
       this.showAddOrganizationDialog = false;
       this.getOrganizations();
 
