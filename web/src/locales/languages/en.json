@@ -104,7 +104,8 @@
     "noRecordFound": "No records found. Please adjust filters and try again.",
     "functionErrorLabel": "Function not applied: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
-    "applySearch": "Adjust filter parameters and click 'Run query'."
+    "applySearch": "Adjust filter parameters and click 'Run query'.",
+    "quickModeFieldLabel": "Fields Per Event"
   },
   "menu": {
     "home": "Home",

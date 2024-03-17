@@ -99,8 +99,44 @@ color="grey" size="xs" />
         <q-toggle
           data-test="logs-search-bar-fast-mode-toggle-btn"
           v-model="searchObj.meta.fastMode"
-          :label="t('search.fastModeLabel')"
         />
+        <q-btn-group class="no-outline q-pa-none no-border quick-mode-select">
+          <q-btn-dropdown
+            v-if="searchObj.meta.fastMode"
+            data-test="logs-search-quick-mode-btn"
+            auto-close
+            size="12px"
+            :label="t('search.fastModeLabel')"
+            :title="t('search.fastModeLabel')"
+            split
+            class="no-outline saved-views-dropdown no-border"
+          >
+            <q-list data-test="logs-search-quick-mode-list">
+              <q-item-label header class="q-pa-sm">{{
+                t("search.quickModeFieldLabel")
+              }}</q-item-label>
+              <q-separator inset></q-separator>
+
+              <div>
+                <q-item
+                  class="q-pa-sm saved-view-item"
+                  clickable
+                  v-for="(item, i) in searchObj.config.fieldsPerRowOptions"
+                  :key="'quick-mode-' + i"
+                  v-close-popup
+                >
+                  <q-item-section
+                    @click.stop="applyQuickMode(item)"
+                    v-close-popup
+                  >
+                    <q-item-label>{{ item }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </div>
+            </q-list>
+          </q-btn-dropdown>
+          <q-label style="font-size: 13px" v-else>{{ t("search.fastModeLabel") }}</q-label>
+        </q-btn-group>
       </div>
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
@@ -674,6 +710,13 @@ export default defineComponent({
   },
   emits: ["searchdata", "onChangeInterval", "onChangeTimezone"],
   methods: {
+    toggleQuickMode(e) {
+      this.searchObj.meta.fastMode = !this.searchObj.meta.fastMode;
+      e.stopPropagation();
+    },
+    applyQuickMode() {
+      alert("applyquick mode");
+    },
     searchData() {
       if (this.searchObj.loading == false) {
         // this.searchObj.runQuery = true;
@@ -2222,5 +2265,10 @@ export default defineComponent({
 .q-pagination__middle > .q-btn {
   min-width: 30px !important;
   max-width: 30px !important;
+}
+
+.quick-mode-select .q-btn{
+  text-transform: capitalize;
+  font-size: 12px;
 }
 </style>

@@ -82,6 +82,7 @@ const defaultObject = {
         { label: "30 min", value: 1800 },
       ],
     ],
+    fieldsPerRowOptions: [50, 100, 200, 300, 400, 500],
   },
   meta: {
     refreshInterval: <number>0,
@@ -104,6 +105,7 @@ const defaultObject = {
       wrapCells: false,
       manualRemoveFields: false,
       rowsPerPage: 250,
+      fieldsPerRow: 50,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
