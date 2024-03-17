@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, onUpdated } from "vue";
+import { defineComponent, ref, onMounted, onUpdated, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard } from "quasar";
@@ -271,6 +271,15 @@ export default defineComponent({
       rowsPerPage: 20,
     });
 
+    watch(
+      () => router.currentRoute.value.query?.action,
+      (action) => {
+        if (action == "add") {
+          showAddOrganizationDialog.value = true;
+        }
+      }
+    );
+
     onMounted(() => {
       if (router.currentRoute.value.query.action == "add") {
         showAddOrganizationDialog.value = true;
@@ -309,7 +318,6 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      // showAddOrganizationDialog.value = true;
 
       if (evt) {
         let button_txt = evt.target.innerText;
@@ -378,7 +386,6 @@ export default defineComponent({
           };
         });
 
-        console.log("dismis");
         dismiss();
       });
     };
@@ -482,6 +489,7 @@ export default defineComponent({
           org_identifier: this.store.state.selectedOrganization.identifier,
         },
       });
+      console.log("updateOrganizationList");
       this.showAddOrganizationDialog = false;
       this.getOrganizations();
 
