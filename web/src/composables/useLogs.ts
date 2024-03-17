@@ -1866,30 +1866,30 @@ const useLogs = () => {
           }
         }
 
-        delete finalArray.common;
-        // Object.keys(finalArray).forEach((stream: any) => {
-        for (const stream of Object.keys(finalArray)) {
-          if (
-            searchObj.data.stream.selectedStreamFields.length > 1 &&
-            finalArray[stream].length > 0
-          ) {
-            searchObj.data.stream.selectedStreamFields.push({
-              name: convertToCamelCase(stream),
-              label: true,
-              ftsKey: false,
-              isSchemaField: false,
-              showValues: false,
-              group: stream,
-              isExpanded: false,
-              streams: fieldToStreamsMap.hasOwnProperty(stream)
-                ? fieldToStreamsMap[stream]
-                : [stream],
-            });
-          }
-          searchObj.data.stream.selectedStreamFields.push(
-            ...finalArray[stream]
-          );
-        }
+        // delete finalArray.common;
+        // // Object.keys(finalArray).forEach((stream: any) => {
+        // for (const stream of Object.keys(finalArray)) {
+        //   if (
+        //     searchObj.data.stream.selectedStreamFields.length > 1 &&
+        //     finalArray[stream].length > 0
+        //   ) {
+        //     searchObj.data.stream.selectedStreamFields.push({
+        //       name: convertToCamelCase(stream),
+        //       label: true,
+        //       ftsKey: false,
+        //       isSchemaField: false,
+        //       showValues: false,
+        //       group: stream,
+        //       isExpanded: false,
+        //       streams: fieldToStreamsMap.hasOwnProperty(stream)
+        //         ? fieldToStreamsMap[stream]
+        //         : [stream],
+        //     });
+        //   }
+        //   searchObj.data.stream.selectedStreamFields.push(
+        //     ...finalArray[stream]
+        //   );
+        // }
         // finalArray.forEach((group: any, group_index: any) => {
         //   // console.log(group, group_index);
         //   // Object.keys(finalArray[group]).forEach((row: any, row_index: any) => {
@@ -2328,7 +2328,8 @@ const useLogs = () => {
     }
 
     if (queryParams.show_histogram) {
-      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
+      searchObj.meta.showHistogram =
+        queryParams.show_histogram == "true" ? true : false;
     }
 
     searchObj.shouldIgnoreWatcher = false;
