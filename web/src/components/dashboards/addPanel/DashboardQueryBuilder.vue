@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       !promqlMode &&
       dashboardPanelData.data.type != 'geomap' &&
+      dashboardPanelData.data.type != 'maps' &&
       dashboardPanelData.data.type != 'sankey'
     "
   >
@@ -968,6 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ></DashboardFiltersOption>
   </div>
   <DashboardMapQueryBuilder :dashboardData="dashboardData" />
+  <DashboardGeoMapQueryBuilder />
   <DashboardSankeyChartBuilder :dashboardData="dashboardData" />
 </template>
 
@@ -977,6 +979,7 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import DashboardMapQueryBuilder from "./DashboardMapQueryBuilder.vue";
+import DashboardGeoMapQueryBuilder from "./DashboardGeoMapQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
@@ -991,7 +994,8 @@ export default defineComponent({
     DashboardMapQueryBuilder,
     SortByBtnGrp,
     HistogramIntervalDropDown,
-    DashboardSankeyChartBuilder,
+    DashboardGeoMapQueryBuilder,
+    DashboardSankeyChartBuilder,,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     DashboardFiltersOption,
@@ -1035,6 +1039,7 @@ export default defineComponent({
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
+
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
       { label: t("dashboard.countDistinct"), value: "count-distinct" },

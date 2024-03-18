@@ -494,6 +494,680 @@ export default defineComponent({
       }
     });
 
+    let query = "";
+    // Generate the query when the fields are updated
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
+      ],
+      () => {
+        // only continue if current mode is auto query generation
+        if (
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          if (dashboardPanelData.data.type == "geomap") {
+            query = geoMapChart();
+          } else if (dashboardPanelData.data.type == "maps") {
+            query = mapChart();
+          } else if (dashboardPanelData.data.type == "sankey") {
+            query = sankeyChartQuery();
+          } else {
+            query = sqlchart();
+          }
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query = query;
+        }
+      },
+      { deep: true }
+    );
+
+    const geoMapChart = () => {
+      let query = "";
+
+      const { latitude, longitude, weight } =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields;
+
+      if (latitude && longitude) {
+        query += `SELECT ${latitude.column} as ${latitude.alias}, ${longitude.column} as ${longitude.alias}`;
+      } else if (latitude) {
+        query += `SELECT ${latitude.column} as ${latitude.alias}`;
+      } else if (longitude) {
+        query += `SELECT ${longitude.column} as ${longitude.alias}`;
+      }
+
+      if (query) {
+        if (weight) {
+          switch (weight.aggregationFunction) {
+            case "p50":
+              query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
+              break;
+            case "p90":
+              query += `, approx_percentile_cont(${weight.column}, 0.9) as ${weight.alias}`;
+              break;
+            case "p95":
+              query += `, approx_percentile_cont(${weight.column}, 0.95) as ${weight.alias}`;
+              break;
+            case "p99":
+              query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
+              break;
+            case "count-distinct":
+              query += `, count(distinct(${weight.column})) as ${weight.alias}`;
+              break;
+            default:
+              query += `, ${weight.aggregationFunction}(${weight.column}) as ${weight.alias}`;
+              break;
+          }
+        }
+        query += ` FROM "${
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        }" `;
+      }
+
+      // Add WHERE clause based on applied filters
+      const filterData =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter;
+
+      const filterItems = filterData.map((field) => {
+        let selectFilter = "";
+        // Handle different filter types and operators
+        if (field.type == "list" && field.values?.length > 0) {
+          selectFilter += `${field.column} IN (${field.values
+            .map((it) => `'${it}'`)
+            .join(", ")})`;
+        } else if (field.type == "condition" && field.operator != null) {
+          selectFilter += `${field?.column} `;
+          if (["Is Null", "Is Not Null"].includes(field.operator)) {
+            switch (field?.operator) {
+              case "Is Null":
+                selectFilter += `IS NULL`;
+                break;
+              case "Is Not Null":
+                selectFilter += `IS NOT NULL`;
+                break;
+            }
+          } else if (field.value != null && field.value != "") {
+            switch (field.operator) {
+              case "=":
+              case "<>":
+              case "<":
+              case ">":
+              case "<=":
+              case ">=":
+                selectFilter += `${field?.operator} ${field?.value}`;
+                break;
+              case "Contains":
+                selectFilter += `LIKE '%${field.value}%'`;
+                break;
+              case "Not Contains":
+                selectFilter += `NOT LIKE '%${field.value}%'`;
+                break;
+              default:
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+            }
+          }
+        }
+        return selectFilter;
+      });
+
+      const whereClause = filterItems.filter((it) => it).join(" AND ");
+      if (whereClause) {
+        query += ` WHERE ${whereClause} `;
+      }
+
+      // Group By clause
+      if (latitude || longitude) {
+        const aliases = [latitude?.alias, longitude?.alias]
+          .filter(Boolean)
+          .join(", ");
+        query += `GROUP BY ${aliases}`;
+      }
+
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
+
+      [latitude, longitude, weight].forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it.alias} ${it.sortBy}`);
+        }
+      });
+
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    const mapChart = () => {
+      const { name, value } =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields;
+
+      let query = "";
+
+      if (name && value) {
+        query = `SELECT ${name.column} as "${name.alias}", `;
+
+        if (value?.aggregationFunction) {
+          switch (value.aggregationFunction) {
+            case "count-distinct":
+              query += `count(distinct(${value.column})) as "${value.alias}"`;
+              break;
+            default:
+              query += `${value.aggregationFunction}(${value.column}) as "${value.alias}"`;
+              break;
+          }
+        } else {
+          query += `${value.column} as "${value.alias}"`;
+        }
+
+        query += ` FROM "${
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        }"`;
+
+        // Add WHERE clause based on applied filters
+        const filterData =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter;
+
+        const filterItems = filterData.map((field) => {
+          let selectFilter = "";
+          // Handle different filter types and operators
+          if (field.type == "list" && field.values?.length > 0) {
+            selectFilter += `${field.column} IN (${field.values
+              .map((it) => `'${it}'`)
+              .join(", ")})`;
+          } else if (field.type == "condition" && field.operator != null) {
+            selectFilter += `${field?.column} `;
+            if (["Is Null", "Is Not Null"].includes(field.operator)) {
+              switch (field?.operator) {
+                case "Is Null":
+                  selectFilter += `IS NULL`;
+                  break;
+                case "Is Not Null":
+                  selectFilter += `IS NOT NULL`;
+                  break;
+              }
+            } else if (field.value != null && field.value != "") {
+              switch (field.operator) {
+                case "=":
+                case "<>":
+                case "<":
+                case ">":
+                case "<=":
+                case ">=":
+                  selectFilter += `${field?.operator} ${field?.value}`;
+                  break;
+                case "Contains":
+                  selectFilter += `LIKE '%${field.value}%'`;
+                  break;
+                case "Not Contains":
+                  selectFilter += `NOT LIKE '%${field.value}%'`;
+                  break;
+                default:
+                  selectFilter += `${field.operator} ${field.value}`;
+                  break;
+              }
+            }
+          }
+          return selectFilter;
+        });
+
+        const whereClause = filterItems.filter((it) => it).join(" AND ");
+        if (whereClause) {
+          query += ` WHERE ${whereClause} `;
+        }
+
+        // Group By clause
+        if (name) {
+          query += ` GROUP BY ${name.alias}`;
+        }
+      }
+
+      return query;
+    };
+
+    const sankeyChartQuery = () => {
+      const queryData =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      const { source, target, value } = queryData.fields;
+      const stream = queryData.fields.stream;
+
+      if (!source && !target && !value) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+        return;
+      }
+
+      let query = "SELECT ";
+      const selectFields = [];
+
+      if (source) {
+        selectFields.push(`${source.column} as ${source.alias}`);
+      }
+
+      if (target) {
+        selectFields.push(`${target.column} as ${target.alias}`);
+      }
+
+      if (value) {
+        switch (value?.aggregationFunction) {
+          case "p50":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`
+            );
+            break;
+          case "p90":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`
+            );
+            break;
+          case "p95":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`
+            );
+            break;
+          case "p99":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`
+            );
+            break;
+          default:
+            selectFields.push(
+              `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+            );
+            break;
+        }
+      }
+
+      // Adding the selected fields to the query
+      query += selectFields.join(", ");
+
+      query += ` FROM "${stream}"`;
+
+      // Adding filter conditions
+      const filterData = queryData.fields.filter || [];
+      const filterConditions = filterData.map((field: any) => {
+        let selectFilter = "";
+        if (field.type === "list" && field.values?.length > 0) {
+          selectFilter += `${field.column} IN (${field.values
+            .map((it: string) => `'${it}'`)
+            .join(", ")})`;
+        } else if (field.type === "condition" && field.operator != null) {
+          selectFilter += `${field.column} `;
+          if (["Is Null", "Is Not Null"].includes(field.operator)) {
+            selectFilter +=
+              field.operator === "Is Null" ? "IS NULL" : "IS NOT NULL";
+          } else if (field.value != null && field.value !== "") {
+            switch (field.operator) {
+              case "=":
+              case "<>":
+              case "<":
+              case ">":
+              case "<=":
+              case ">=":
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+              case "Contains":
+                selectFilter += `LIKE '%${field.value}%'`;
+                break;
+              case "Not Contains":
+                selectFilter += `NOT LIKE '%${field.value}%'`;
+                break;
+              default:
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+            }
+          }
+        }
+        return selectFilter;
+      });
+
+      // Adding filter conditions to the query
+      if (filterConditions.length > 0) {
+        query += " WHERE " + filterConditions.join(" AND ");
+      }
+
+      // Adding group by statement
+      if (source && target) {
+        query += ` GROUP BY ${source.alias}, ${target.alias}`;
+      }
+
+      // Adding sorting
+      const orderByArr: string[] = [];
+      [source, target, value].forEach((field) => {
+        if (field && field.sortBy) {
+          orderByArr.push(`${field.alias} ${field.sortBy}`);
+        }
+      });
+
+      if (orderByArr.length > 0) {
+        query += ` ORDER BY ${orderByArr.join(", ")}`;
+      }
+
+      // Adding limit
+      const queryLimit = queryData.config.limit ?? 0;
+      if (queryLimit > 0) {
+        query += ` LIMIT ${queryLimit}`;
+      }
+
+      return query;
+    };
+
+    const sqlchart = () => {
+      // STEP 1: first check if there is at least 1 field selected
+      if (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x.length == 0 &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.length == 0 &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z.length == 0 &&
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown?.length == 0
+      ) {
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = "";
+        return;
+      }
+
+      // STEP 2: Now, continue if we have at least 1 field selected
+      // merge the fields list
+      let query = "SELECT ";
+      const fields = [
+        ...dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        ...dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        ...(dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.breakdown
+          ? [
+              ...dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.breakdown,
+            ]
+          : []),
+        ...(dashboardPanelData.data?.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.z
+          ? [
+              ...dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.z,
+            ]
+          : []),
+      ].flat();
+      const filter = [
+        ...dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.filter,
+      ];
+      const array = fields.map((field, i) => {
+        let selector = "";
+
+        // TODO: add aggregator
+        if (field?.aggregationFunction) {
+          switch (field?.aggregationFunction) {
+            case "count-distinct":
+              selector += `count(distinct(${field?.column}))`;
+              break;
+            case "p50":
+              selector += `approx_percentile_cont(${field?.column}, 0.5)`;
+              break;
+            case "p90":
+              selector += `approx_percentile_cont(${field?.column}, 0.9)`;
+              break;
+            case "p95":
+              selector += `approx_percentile_cont(${field?.column}, 0.95)`;
+              break;
+            case "p99":
+              selector += `approx_percentile_cont(${field?.column}, 0.99)`;
+              break;
+            case "histogram": {
+              // if inteval is not null, then use it
+              if (field?.args && field?.args?.length && field?.args[0].value) {
+                selector += `${field?.aggregationFunction}(${field?.column}, '${field?.args[0]?.value}')`;
+              } else {
+                selector += `${field?.aggregationFunction}(${field?.column})`;
+              }
+              break;
+            }
+            default:
+              selector += `${field?.aggregationFunction}(${field?.column})`;
+              break;
+          }
+        } else {
+          selector += `${field?.column}`;
+        }
+        selector += ` as "${field?.alias}"${
+          i == fields.length - 1 ? " " : ", "
+        }`;
+        return selector;
+      });
+      query += array?.join("");
+
+      // now add from stream name
+      query += ` FROM "${
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields?.stream
+      }" `;
+
+      const filterData = filter?.map((field, i) => {
+        let selectFilter = "";
+        if (field.type == "list" && field.values?.length > 0) {
+          selectFilter += `${field.column} IN (${field.values
+            .map((it) => `'${it}'`)
+            .join(", ")})`;
+        } else if (field.type == "condition" && field.operator != null) {
+          selectFilter += `${field?.column} `;
+          if (["Is Null", "Is Not Null"].includes(field.operator)) {
+            switch (field?.operator) {
+              case "Is Null":
+                selectFilter += `IS NULL`;
+                break;
+              case "Is Not Null":
+                selectFilter += `IS NOT NULL`;
+                break;
+            }
+          } else if (field.value != null && field.value != "") {
+            switch (field.operator) {
+              case "=":
+              case "<>":
+              case "<":
+              case ">":
+              case "<=":
+              case ">=":
+                selectFilter += `${field?.operator} ${field?.value}`;
+                break;
+              case "Contains":
+                selectFilter += `LIKE '%${field.value}%'`;
+                break;
+              case "Not Contains":
+                selectFilter += `NOT LIKE '%${field.value}%'`;
+                break;
+              default:
+                selectFilter += `${field.operator} ${field.value}`;
+                break;
+            }
+          }
+        }
+        return selectFilter;
+      });
+      const filterItems = filterData.filter((it: any) => it);
+      if (filterItems.length > 0) {
+        query += "WHERE " + filterItems.join(" AND ");
+      }
+
+      // add group by statement
+      const xAxisAlias = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.x.map((it: any) => it?.alias);
+
+      const yAxisAlias = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.y.map((it: any) => it?.alias);
+
+      const bAxisAlias = dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields?.breakdown?.map((it: any) => it?.alias);
+
+      if (dashboardPanelData.data.type == "heatmap") {
+        query +=
+          xAxisAlias.length && yAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
+            : "";
+      } else if (bAxisAlias?.length) {
+        query +=
+          xAxisAlias.length && bAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              bAxisAlias.join(", ")
+            : "";
+      } else {
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+      }
+
+      // array of sorting fields with followed by asc or desc
+      const orderByArr = [];
+
+      fields.forEach((it: any) => {
+        // ignore if None is selected or sortBy is not there
+        if (it?.sortBy) {
+          orderByArr.push(`${it?.alias} ${it?.sortBy}`);
+        }
+      });
+
+      // append with query by joining array with comma
+      query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+      // append limit
+      // if limit is less than or equal to 0 then don't add
+      const queryLimit =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit ?? 0;
+      query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.meta.stream.selectedStreamFields,
+      ],
+      async () => {
+        // Only continue if the current mode is "show custom query"
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery &&
+          dashboardPanelData.data.queryType == "sql"
+        ) {
+          // Call the updateQueryValue function
+          if (parser) updateQueryValue();
+        } else {
+          // auto query mode selected
+          // remove the custom fields from the list
+          dashboardPanelData.meta.stream.customQueryFields = [];
+        }
+        // if (dashboardPanelData.data.queryType == "promql") {
+        //     updatePromQLQuery()
+        // }
+      },
+      { deep: true }
+    );
+
     // on queryerror change dispatch resize event to resize monaco editor
     watch(
       () => dashboardPanelData.meta.errors.queryErrors,
