@@ -222,7 +222,6 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
-    console.log("props", props);
 
     // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config

@@ -48,7 +48,7 @@ export default defineComponent({
     wrapCells: {
       required: false,
       type: Boolean,
-      default: false, // Default value can be set based on your application's requirement
+      default: false,
     },
   },
   emits: ["row-click"],
