@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(tab, index) in currentDashboardData.data.tabs"
           :key="index"
           class="draggable-row"
-          :class="tab.tabId === 'default' ? 'q-pb-sm' : ''"
         >
           <div class="draggable-handle">
             <q-icon
@@ -70,13 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <div v-else style="display: flex; flex-direction: row">
               <input
-                v-if="tab.tabId !== 'default'"
                 v-model="editTabObj.data.name"
                 class="edit-input"
                 data-test="dashboard-tab-settings-tab-name-edit"
               />
               <q-btn
-                v-if="tab.tabId !== 'default'"
                 icon="check"
                 class="q-ml-xs"
                 unelevated
@@ -89,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-settings-tab-name-edit-save"
               ></q-btn>
               <q-btn
-                v-if="tab.tabId !== 'default'"
                 icon="close"
                 class="q-ml-xs"
                 unelevated
@@ -103,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <span class="q-ml-lg">
               <q-btn
-                v-if="tab.tabId !== 'default'"
                 icon="edit"
                 class="q-ml-xs"
                 padding="sm"
@@ -117,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-settings-tab-edit-btn"
               ></q-btn>
               <q-btn
-                v-if="tab.tabId !== 'default'"
+                v-if="currentDashboardData.data.tabs.length !== 1"
                 :icon="outlinedDelete"
                 :title="t('dashboard.delete')"
                 class="q-ml-xs"
