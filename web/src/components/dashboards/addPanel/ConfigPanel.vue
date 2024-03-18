@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.wrap_text"
+      :label="t('dashboard.wraptext')"
+      data-test="dashboard-config-wrap-text"
+    />
+
+    <div class="space"></div>
+
     <div class="o2-input">
       <q-select
         v-if="
