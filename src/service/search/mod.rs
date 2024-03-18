@@ -905,7 +905,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     // Maybe inverted index count is wrong, we use the max value
     if inverted_index_total > total {
-        result.set_total(inverted_index_total);
+        result.set_total(inverted_index_count);
     } else {
         result.set_total(total);
     }
