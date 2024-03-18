@@ -6,21 +6,21 @@ import time
 
 
 def test_e2e_alerts(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
+    """Running an E2E test no payload."""
 
     session = create_session
     url = base_url
     org_id = "default"
 
-    resp_get_allalerts = session.post(f"{url}api/{org_id}/_search?type=logs")
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs")
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allalerts.status_code == 400
-    ), f"No payload added 400, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp_get_allsearch.status_code == 400
+    ), f"No payload added 400, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 def test_e2e_query(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
+    """Running an E2E test for valid sql query."""
 
 
 
@@ -41,17 +41,17 @@ def test_e2e_query(create_session, base_url):
                 },
             }
 
-    resp_get_allalerts = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
 
-    # print(resp_get_allalerts.content)
+  
     assert (
-        resp_get_allalerts.status_code == 200
-    ), f"Sql mode added 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp_get_allsearch.status_code == 200
+    ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 def test_e2e_invalidsqlquery(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
+    """Running an E2E test for invalid sql query."""
 
 
 
@@ -72,17 +72,17 @@ def test_e2e_invalidsqlquery(create_session, base_url):
                 },
             }
 
-    resp_get_allalerts = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allalerts.status_code == 500
-    ), f"Sql mode added 500, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp_get_allsearch.status_code == 500
+    ), f"Sql mode added 500, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 def test_e2e_limitadded(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
+    """Running an E2E test add limit to sql query."""
 
 
 
@@ -103,17 +103,17 @@ def test_e2e_limitadded(create_session, base_url):
                 },
             }
 
-    resp_get_allalerts = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allalerts.status_code == 200
-    ), f"Sql mode added  with limit 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp_get_allsearch.status_code == 200
+    ), f"Sql mode added  with limit 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 def test_e2e_validhistogram(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
+    """Running an E2E test for valid histogram."""
 
 
 
@@ -138,18 +138,18 @@ def test_e2e_validhistogram(create_session, base_url):
         }
     }
 
-    resp_get_allalerts = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allalerts.status_code == 200
-    ), f"histogram mode added 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
 
 def test_e2e_histogramwithlimit(create_session, base_url):
-    """Running an E2E test for get all the alerts list."""
+    """Running an E2E test for invalid query -history with limit  list."""
 
 
 
@@ -174,10 +174,10 @@ def test_e2e_histogramwithlimit(create_session, base_url):
         }
     }
 
-    resp_get_allalerts = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
 
     # print(resp_get_allalerts.content)
     assert (
-        resp_get_allalerts.status_code == 500
-    ), f"histogram mode added 200, but got {resp_get_allalerts.status_code} {resp_get_allalerts.content}"
+        resp_get_allsearch.status_code == 500
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
