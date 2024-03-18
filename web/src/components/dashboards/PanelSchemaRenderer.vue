@@ -18,8 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
     <div ref="chartPanelRef" style="height: 100%; position: relative">
       <div v-if="!errorDetail" style="height: 100%; width: 100%">
+      <GeoJSONMapRenderer
+        v-if="panelSchema.type == 'maps'"
+        :data="
+          panelData.chartType == 'maps'
+            ? panelData
+            : { options: {} }
+        "
+      ></GeoJSONMapRenderer>
         <GeoMapRenderer
-          v-if="panelSchema.type == 'geomap'"
+          v-else-if="panelSchema.type == 'geomap'"
           :data="
             panelData.chartType == 'geomap'
               ? panelData
@@ -31,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="
             panelData.chartType == 'table'
               ? panelData
-              : { options: { backgroundColor: 'transparent' } }
+              : { options: {  backgroundColor: 'transparent'  } }
           "
           @row-click="onChartClick"
           ref="tableRendererRef"
@@ -66,7 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (data.length &&
               data[0]?.length &&
               panelData.chartType != 'geomap' &&
-              panelData.chartType != 'table')
+              panelData.chartType != 'table' &&
+            panelData.chartType != 'maps')
               ? panelData
               : { options: { backgroundColor: 'transparent' } }
           "
@@ -75,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onChartClick"
         />
       </div>
-      <div v-if="!errorDetail" class="noData" data-test="no-data">
+      <div v-if="!errorDetail && panelSchema.type != 'geomap' && panelSchema.type != 'maps'" class="noData" data-test="no-data">
         {{ noData }}
       </div>
       <div
@@ -176,6 +185,10 @@ const GeoMapRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/GeoMapRenderer.vue");
 });
 
+const GeoJSONMapRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/GeoJSONMapRenderer.vue");
+});
+
 const HTMLRenderer = defineAsyncComponent(() => {
   return import("./panels/HTMLRenderer.vue");
 });
@@ -190,6 +203,7 @@ export default defineComponent({
     ChartRenderer,
     TableRenderer,
     GeoMapRenderer,
+    GeoJSONMapRenderer,
     HTMLRenderer,
     MarkdownRenderer,
   },
@@ -377,6 +391,17 @@ export default defineComponent({
               yAlias.every((y: any) => data.value[0][0][y] != null) &&
               zAlias.every((z: any) => data.value[0][0][z]) != null)
           );
+        }
+        case "pie":
+        case "donut": {
+          return (
+            data.value[0]?.length > 1 ||
+            yAlias.every((y: any) => data.value[0][0][y] != null)
+          );
+        }
+        case "maps":
+        case "geomap": {
+          return true;
         }
         case "sankey": {
           const source = panelSchema.value.queries[0].fields.source.alias;

@@ -541,6 +541,7 @@
     "stackedLabel": "Stacked",
     "heatmapLabel": "Heatmap",
     "geomapLabel": "GeoMap",
+    "worldmapLabel": "Maps",
     "hstackedLabel": "H-Stacked",
     "pieLabel": "Pie",
     "donutLabel": "Donut",
@@ -663,6 +664,8 @@
     "latitude": "Latitude",
     "longitude": "Longitude",
     "weight": "Weight",
+    "mapname": "Name",
+    "mapvalue": "Value",
     "source": "Source",
     "target": "Target",
     "value": "Value"
