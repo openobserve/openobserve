@@ -153,7 +153,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             token: None,
                         },
                     )
-                    .await?; 
+                    .await?;
                 }
                 "user" => {
                     db::user::reset().await?;

@@ -106,8 +106,8 @@ async fn register() -> Result<()> {
     drop(w);
 
     node_ids.sort();
-    for id in &node_ids {
-        if *id == node_id {
+    for id in node_ids {
+        if id == node_id {
             node_id += 1;
         } else {
             break;

@@ -397,7 +397,11 @@ pub async fn around(
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
-            start_time: around_key - Duration::seconds(900).num_microseconds().unwrap(),
+            start_time: around_key
+                - Duration::try_seconds(900)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap(),
             end_time: around_key,
             sort_by: Some(format!("{} DESC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
@@ -454,7 +458,11 @@ pub async fn around(
             from: 0,
             size: around_size / 2,
             start_time: around_key,
-            end_time: around_key + Duration::seconds(900).num_microseconds().unwrap(),
+            end_time: around_key
+                + Duration::try_seconds(900)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap(),
             sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
             fast_mode: false,

@@ -258,7 +258,8 @@ impl Writer {
         compressed_size > 0
             && (compressed_size + data_size > CONFIG.limit.max_file_size_on_disk
                 || self.created_at.load(Ordering::Relaxed)
-                    + Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                    + Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap()
                     <= Utc::now().timestamp_micros())
