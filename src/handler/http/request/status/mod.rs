@@ -32,7 +32,7 @@ use {
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
     actix_web::http::header,
     o2_enterprise::enterprise::{
-        common::infra::config::O2_CONFIG,
+        common::{infra::config::O2_CONFIG, settings::get_logo},
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
     },
     std::io::ErrorKind,
@@ -76,6 +76,7 @@ struct ConfigResponse<'a> {
     custom_slack_url: String,
     custom_docs_url: String,
     rum: Rum,
+    custom_logo_img: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -134,6 +135,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let custom_docs_url = "";
 
+    #[cfg(feature = "enterprise")]
+    let logo = get_logo().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo = None;
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
@@ -160,6 +167,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_logo_text: custom_logo_text.to_string(),
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
+        custom_logo_img: logo,
         rum: Rum {
             enabled: CONFIG.rum.enabled,
             client_token: CONFIG.rum.client_token.to_string(),

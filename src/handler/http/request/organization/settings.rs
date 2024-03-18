@@ -15,9 +15,15 @@
 
 use std::io::Error as StdErr;
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_multipart::Multipart;
+use actix_web::{delete, get, post, web, HttpResponse};
 use config::utils::json;
 use infra::errors::{DbError, Error};
+#[cfg(feature = "enterprise")]
+use {
+    o2_enterprise::enterprise::common::settings,
+    futures::{StreamExt, TryStreamExt}
+};
 
 use crate::{
     common::meta::{
@@ -98,4 +104,58 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
             Ok(MetaHttpResponse::bad_request(&err))
         }
     }
+}
+
+#[cfg(feature = "enterprise")]
+#[post("/{org_id}/settings/logo")]
+async fn upload_logo(
+    _path: web::Path<String>,
+    mut payload: Multipart,
+) -> Result<HttpResponse, StdErr> {
+    match payload.try_next().await {
+        Ok(field) => {
+            let mut data: Vec<u8> = Vec::<u8>::new();
+            if let Some(mut field) = field {
+                while let Some(chunk) = field.next().await {
+                    let chunk = chunk.unwrap();
+                    data.extend(chunk);
+                }
+                if data.is_empty() {
+                    return Ok(MetaHttpResponse::bad_request("Image data not present"));
+                }
+
+                match settings::upload_logo(data).await {
+                    Ok(_) => Ok(HttpResponse::Ok().json("Successful")),
+                    Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+                }
+            } else {
+                Ok(MetaHttpResponse::bad_request("Payload file not present"))
+            }
+        }
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/settings/logo")]
+async fn upload_logo(
+    _path: web::Path<String>,
+    _payload: Multipart,
+) -> Result<HttpResponse, StdErr> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[delete("/{org_id}/settings/logo")]
+async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
+    match settings::delete_logo().await {
+        Ok(_) => Ok(HttpResponse::Ok().json("Successful")),
+        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[delete("/{org_id}/settings/logo")]
+async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
