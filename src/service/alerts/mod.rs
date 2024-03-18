@@ -372,7 +372,8 @@ impl QueryCondition {
                     return Ok(None);
                 }
                 let start = now
-                    - Duration::minutes(alert.trigger_condition.period)
+                    - Duration::try_minutes(alert.trigger_condition.period)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap();
                 let end = now;
@@ -445,7 +446,8 @@ impl QueryCondition {
                 from: 0,
                 size: 100,
                 start_time: now
-                    - Duration::minutes(alert.trigger_condition.period)
+                    - Duration::try_minutes(alert.trigger_condition.period)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap(),
                 end_time: now,
@@ -1042,17 +1044,28 @@ async fn process_dest_template(
         Utc::now().timestamp_micros()
     } else {
         // the frontend will drop the second, so we add 1 minute to the end time
-        alert_end_time + Duration::minutes(1).num_microseconds().unwrap()
+        alert_end_time
+            + Duration::try_minutes(1)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
     };
     if alert_start_time == 0 {
         alert_start_time = alert_end_time
-            - Duration::minutes(alert.trigger_condition.period)
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
     }
-    if alert_end_time - alert_start_time < Duration::minutes(1).num_microseconds().unwrap() {
+    if alert_end_time - alert_start_time
+        < Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap()
+    {
         alert_start_time = alert_end_time
-            - Duration::minutes(alert.trigger_condition.period)
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
     }

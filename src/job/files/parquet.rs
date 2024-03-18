@@ -149,7 +149,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 let mut has_expired_files = false;
                 // not enough files to upload, check if some files are too old
                 let min_ts = Utc::now().timestamp_micros()
-                    - Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                    - Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap();
                 for file in files_with_size.iter() {
