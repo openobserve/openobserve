@@ -749,7 +749,7 @@ pub fn generate_filter_from_quick_text(
     filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
-pub(crate) fn generate_fast_mode_fields(
+fn generate_fast_mode_fields(
     schema: &Schema,
     cached_fields: Option<Vec<String>>,
     fts_fields: &[String],

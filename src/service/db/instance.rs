@@ -13,21 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cache;
-pub mod db;
-pub mod dist_lock;
-pub mod errors;
-pub mod file_list;
-pub mod queue;
-pub mod storage;
+use config::utils::json;
+use infra::errors::Result;
 
-pub async fn init() -> Result<(), anyhow::Error> {
-    db::init().await?;
-    db::create_table().await?;
-    cache::init().await?;
-    file_list::create_table().await?;
-    queue::init().await?;
-    // because of asynchronous, we need to wait for a while
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    Ok(())
+pub async fn get() -> Result<Option<String>> {
+    let ret = super::get("/instance/").await?;
+    let loc_value = json::from_slice(&ret).unwrap();
+    let value = Some(loc_value);
+    Ok(value)
+}
+
+pub async fn set(id: &str) -> Result<()> {
+    super::put(
+        "/instance/",
+        json::to_vec(&id).unwrap().into(),
+        super::NO_NEED_WATCH,
+    )
+    .await
 }

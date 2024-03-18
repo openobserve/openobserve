@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::RwHashMap;
-use infra::db as infra_db;
 use once_cell::sync::Lazy;
+
+use crate::service::db;
 
 pub static STREAMS: Lazy<RwHashMap<String, RwHashMap<String, i64>>> = Lazy::new(Default::default);
 
@@ -24,9 +25,8 @@ fn mk_key(org_id: &str, module: &str) -> String {
 }
 
 pub async fn get_offset(org_id: &str, module: &str) -> (i64, String) {
-    let db = infra_db::get_db().await;
     let key = mk_key(org_id, module);
-    let value = match db.get(&key).await {
+    let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
@@ -46,12 +46,11 @@ pub async fn set_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = mk_key(org_id, module);
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
         offset.to_string()
     };
-    Ok(db.put(&key, val.into(), infra_db::NO_NEED_WATCH).await?)
+    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH).await?)
 }

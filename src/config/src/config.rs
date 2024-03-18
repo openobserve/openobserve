@@ -298,6 +298,8 @@ pub struct Common {
     pub local_mode_storage: String,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
     pub cluster_coordinator: String,
+    #[env_config(name = "ZO_QUEUE_STORE", default = "")]
+    pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
@@ -443,14 +445,12 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
-
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = " ;,",
         help = "Characters which should be used as a delimiter to split the string."
     )]
     pub inverted_index_split_chars: String,
-
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -696,14 +696,16 @@ pub struct Nats {
     pub addr: String,
     #[env_config(name = "ZO_NATS_PREFIX", default = "o2_")]
     pub prefix: String,
+    #[env_config(name = "ZO_NATS_USER", default = "")]
+    pub user: String,
+    #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
+    pub password: String,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
     pub command_timeout: u64,
     #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
-    #[env_config(name = "ZO_NATS_LOAD_PAGE_SIZE", default = 1000)]
-    pub load_page_size: i64,
 }
 
 #[derive(EnvConfig)]
@@ -904,6 +906,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
     // format metadata storage
+    if cfg.common.cluster_coordinator.is_empty() {
+        cfg.common.cluster_coordinator = "etcd".to_string();
+    }
+    if cfg.common.queue_store.is_empty() {
+        cfg.common.queue_store = "nats".to_string();
+    }
     if cfg.common.meta_store.is_empty() {
         if cfg.common.local_mode {
             cfg.common.meta_store = "sqlite".to_string();

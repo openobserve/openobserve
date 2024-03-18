@@ -19,10 +19,7 @@ use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::{HashMap, HashSet};
-use infra::{
-    cache,
-    db::{self as infra_db},
-};
+use infra::cache;
 
 use crate::{
     common::{
@@ -32,7 +29,7 @@ use crate::{
         },
         meta::stream::{StreamSchema, StreamSettings},
     },
-    service::{enrichment::StreamTable, stream::stream_settings},
+    service::{db, enrichment::StreamTable, stream::stream_settings},
 };
 
 fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -53,8 +50,7 @@ pub async fn get(
     }
     drop(r);
 
-    let db = infra_db::get_db().await;
-    Ok(match db.get(&key).await {
+    Ok(match db::get(&key).await {
         Err(err) => {
             if !err.to_string().ends_with("does not exist") {
                 log::error!("get schema from db error: {}, {}", key, err);
@@ -96,8 +92,7 @@ pub async fn get_from_db(
     stream_type: StreamType,
 ) -> Result<Schema, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let db = infra_db::get_db().await;
-    Ok(match db.get(&key).await {
+    Ok(match db::get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
             Schema::empty()
@@ -129,8 +124,7 @@ pub async fn get_versions(
         return Ok(schema.clone());
     }
 
-    let db = infra_db::get_db().await;
-    Ok(match db.get(&key).await {
+    Ok(match db::get(&key).await {
         Err(_) => {
             // REVIEW: shouldn't we report the error?
             vec![]
@@ -156,7 +150,6 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
     let r = STREAM_SCHEMAS.read().await;
@@ -176,24 +169,22 @@ pub async fn set(
                 metadata.insert("start_dt".to_string(), min_ts.unwrap().to_string());
                 metadata.insert("created_at".to_string(), created_at);
                 versions.push(schema.clone().with_metadata(metadata));
-                let _ = db
-                    .put(
-                        &key,
-                        json::to_vec(&versions).unwrap().into(),
-                        infra_db::NEED_WATCH,
-                    )
-                    .await;
+                let _ = db::put(
+                    &key,
+                    json::to_vec(&versions).unwrap().into(),
+                    db::NEED_WATCH,
+                )
+                .await;
             }
         } else {
             versions.pop().unwrap();
             versions.push(schema.clone());
-            let _ = db
-                .put(
-                    &key,
-                    json::to_vec(&versions).unwrap().into(),
-                    infra_db::NEED_WATCH,
-                )
-                .await;
+            let _ = db::put(
+                &key,
+                json::to_vec(&versions).unwrap().into(),
+                db::NEED_WATCH,
+            )
+            .await;
         }
         return Ok(());
     }
@@ -212,14 +203,7 @@ pub async fn set(
         metadata.insert("created_at".to_string(), min_ts.to_string());
     }
     let values = vec![schema.to_owned().with_metadata(metadata)];
-    match db
-        .put(
-            &key,
-            json::to_vec(&values).unwrap().into(),
-            infra_db::NEED_WATCH,
-        )
-        .await
-    {
+    match db::put(&key, json::to_vec(&values).unwrap().into(), db::NEED_WATCH).await {
         Ok(_) => {
             let settings = stream_settings(values.last().unwrap()).unwrap_or_default();
             let mut w = STREAM_SCHEMAS.write().await;
@@ -245,8 +229,7 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
-    let db = infra_db::get_db().await;
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db::delete(&key, false, db::NEED_WATCH).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting schema: {}", e);
@@ -308,13 +291,11 @@ pub async fn list(
         return Ok(list_stream_schemas(org_id, stream_type, fetch_schema).await);
     }
 
-    let db = infra_db::get_db().await;
     let db_key = match stream_type {
         None => format!("/schema/{org_id}/"),
         Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
     };
-    Ok(db
-        .list(&db_key)
+    Ok(db::list(&db_key)
         .await?
         .into_iter()
         .map(|(key, val)| {
@@ -342,7 +323,7 @@ pub async fn list(
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/schema/";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream schema");
@@ -355,11 +336,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -406,7 +386,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     );
                 }
             }
-            infra_db::Event::Delete(ev) => {
+            db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let columns = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = columns[0];
@@ -441,16 +421,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 }
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/schema/";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key_str = item_key.strip_prefix(key).unwrap();
         // Hack: compatible for DataFusion 15
