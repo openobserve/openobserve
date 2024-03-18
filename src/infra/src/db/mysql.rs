@@ -104,7 +104,7 @@ impl super::Db for MysqlDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&start_dt)
+        .bind(start_dt)
         .execute(&mut *tx)
         .await
         {
@@ -121,7 +121,7 @@ impl super::Db for MysqlDb {
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(&start_dt)            
+            .bind(start_dt)
             .execute(&mut *tx)
             .await
             {
@@ -370,11 +370,16 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
 
     match create_index_item(
-        "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (start_dt,key2, key1, module);")
-    .await{
+        "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (start_dt,key2, key1, module);",
+    )
+    .await
+    {
         Ok(_) => {}
         Err(e) => {
-            log::error!("[MYSQL] create table meta meta_module_start_dt_idx error: {}", e);
+            log::error!(
+                "[MYSQL] create table meta meta_module_start_dt_idx error: {}",
+                e
+            );
         }
     }
 
@@ -399,23 +404,29 @@ async fn add_start_dt_column() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
 
-     //Drop index if exists
-     if let Err(e) = sqlx::query(
-         r#"
+    // Drop index if exists
+    if let Err(e) = sqlx::query(
+        r#"
          DROP INDEX meta_module_key2_idx ON meta;
          "#,
-     )
-     .execute(&mut *tx)
-     .await
-     {
-         log::error!("[MYSQL] Error in dropping index : {}", e);
-         if let Err(e) = tx.rollback().await {
-             log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-         }
-         return Err(e.into());
-     }
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        log::error!("[MYSQL] Error in dropping index : {}", e);
 
-    //Commit transaction
+        if e.to_string().contains("Can't DROP") || e.to_string().contains("doesn't exist") {
+            log::info!("[MYSQL] Index did not exist, continuing.");
+        } else {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+            }
+
+            return Err(e.into());
+        }
+    }
+
+    // Commit transaction
     if let Err(e) = tx.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());
@@ -432,10 +443,15 @@ async fn add_start_dt_column() -> Result<()> {
     .await
     {
         log::error!("[MYSQL] Error in  adding column: {}", e);
-        if let Err(e) = tx1.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+
+        if e.to_string().contains("Duplicate column name") {
+            log::info!("[MYSQL] Column already exists, continuing.");
+        } else {
+            // Check for the specific MySQL error code for duplicate column
+            log::error!("[MYSQL] Unexpected error in adding column: {}", e);
+            tx1.rollback().await?;
+            return Err(e.into());
         }
-        return Err(e.into());
     }
 
     // Commit transaction
@@ -444,9 +460,10 @@ async fn add_start_dt_column() -> Result<()> {
         return Err(e.into());
     }
 
-
     create_index_item(
-        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);").await?;
+        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
+    )
+    .await?;
 
     log::info!("[MYSQL] EXIT: add_start_dt_column");
     Ok(())

@@ -217,7 +217,7 @@ impl super::Db for SqliteDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&start_dt)
+        .bind(start_dt)
         .execute(&mut *tx)
         .await
         {
@@ -232,7 +232,7 @@ impl super::Db for SqliteDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(&start_dt)
+        .bind(start_dt)
         .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .execute(&mut *tx)
         .await
@@ -421,19 +421,45 @@ impl super::Db for SqliteDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+
     async fn add_start_dt_column(&self) -> Result<()> {
         println!("[SQLITE] ENTER: add_start_dt_column");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query(
+
+        // Attempt to add the column, ignoring the error if the column already exists
+        let add_column_result = sqlx::query(
             r#"
-    ALTER TABLE meta ADD COLUMN start_dt INTEGER not null DEFAULT 0;
-    DROP INDEX IF EXISTS meta_module_key2_idx;
-    CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module);
+        ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;
         "#,
         )
         .execute(&*client)
-        .await?;
+        .await;
+
+        match add_column_result {
+            Ok(_) => println!("[SQLITE] Column added or already exists."),
+            Err(e) => {
+                // Check if the error is about the duplicate column
+                if e.to_string().contains("duplicate column name") {
+                    // Ignore the duplicate column error and proceed
+                    println!("[SQLITE] Column already exists, proceeding.");
+                } else {
+                    // If the error is not about the duplicate column, return it
+                    return Err(e.into());
+                }
+            }
+        }
+
+        // Proceed to drop the index if it exists and create a new one if it does not exist
+        sqlx::query(
+        r#"
+        DROP INDEX IF EXISTS meta_module_key2_idx;
+        CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);
+        "#
+    )
+    .execute(&*client)
+    .await?;
+
         println!("[SQLITE] EXIT: add_start_dt_column");
         Ok(())
     }

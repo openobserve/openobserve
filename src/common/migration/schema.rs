@@ -21,7 +21,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let cc = infra_db::get_coordinator().await;
     cc.add_start_dt_column().await?;
 
-    // load dashboards list
     let db = infra_db::get_db().await;
     db.add_start_dt_column().await?;
 
