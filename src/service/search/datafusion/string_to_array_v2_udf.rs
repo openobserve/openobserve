@@ -21,10 +21,10 @@ use datafusion::{
     arrow::{array::ArrayRef, datatypes::DataType},
     common::cast::as_generic_string_array,
     error::DataFusionError,
-    logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
-    physical_plan::functions::make_scalar_function,
+    logical_expr::{ScalarUDF, Volatility},
     prelude::create_udf,
 };
+use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// The name of the string_to_array_v2 UDF given to DataFusion.
@@ -42,62 +42,60 @@ pub(crate) static STRING_TO_ARRAY_V2_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
             true,
         )))),
         Volatility::Immutable,
-        string_to_array_v2_impl(),
+        Arc::new(string_to_array_v2_impl),
     )
 });
 
 /// date_format function for datafusion
-pub fn string_to_array_v2_impl() -> ScalarFunctionImplementation {
-    let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
-        let string_array = as_generic_string_array::<i32>(&args[0])?;
-        let delimiter_array = as_generic_string_array::<i32>(&args[1])?;
+pub fn string_to_array_v2_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
+    let args = ColumnarValue::values_to_arrays(args)?;
 
-        let mut list_builder = ListBuilder::new(StringBuilder::with_capacity(
-            string_array.len(),
-            string_array.get_buffer_memory_size(),
-        ));
+    let string_array = as_generic_string_array::<i32>(&args[0])?;
+    let delimiter_array = as_generic_string_array::<i32>(&args[1])?;
 
-        match args.len() {
-            2 => {
-                string_array
-                    .iter()
-                    .zip(delimiter_array.iter())
-                    .for_each(|(string, delimiter)| {
-                        match (string, delimiter) {
-                            (Some(string), Some("")) => {
-                                list_builder.values().append_value(string);
-                                list_builder.append(true);
-                            }
-                            (Some(string), Some(delimiter)) => {
-                                string.split(|c| delimiter.contains(c)).for_each(|s| {
-                                    if !s.is_empty() {
-                                        list_builder.values().append_value(s);
-                                    }
-                                });
-                                list_builder.append(true);
-                            }
-                            (Some(string), None) => {
-                                string.chars().map(|c| c.to_string()).for_each(|c| {
-                                    list_builder.values().append_value(c);
-                                });
-                                list_builder.append(true);
-                            }
-                            _ => list_builder.append(false), // null value
+    let mut list_builder = ListBuilder::new(StringBuilder::with_capacity(
+        string_array.len(),
+        string_array.get_buffer_memory_size(),
+    ));
+
+    match args.len() {
+        2 => {
+            string_array
+                .iter()
+                .zip(delimiter_array.iter())
+                .for_each(|(string, delimiter)| {
+                    match (string, delimiter) {
+                        (Some(string), Some("")) => {
+                            list_builder.values().append_value(string);
+                            list_builder.append(true);
                         }
-                    });
-            }
-            _ => {
-                return Err(DataFusionError::NotImplemented(
-                    "Expect string_to_array_v2 function to take two or three parameters".into(),
-                ));
-            }
+                        (Some(string), Some(delimiter)) => {
+                            string.split(|c| delimiter.contains(c)).for_each(|s| {
+                                if !s.is_empty() {
+                                    list_builder.values().append_value(s);
+                                }
+                            });
+                            list_builder.append(true);
+                        }
+                        (Some(string), None) => {
+                            string.chars().map(|c| c.to_string()).for_each(|c| {
+                                list_builder.values().append_value(c);
+                            });
+                            list_builder.append(true);
+                        }
+                        _ => list_builder.append(false), // null value
+                    }
+                });
         }
+        _ => {
+            return Err(DataFusionError::NotImplemented(
+                "Expect string_to_array_v2 function to take two or three parameters".into(),
+            ));
+        }
+    }
 
-        let list_array = list_builder.finish();
-        Ok(Arc::new(list_array) as ArrayRef)
-    };
-
-    make_scalar_function(func)
+    let list_array = list_builder.finish();
+    Ok(ColumnarValue::from(Arc::new(list_array) as ArrayRef))
 }
 
 #[cfg(test)]

@@ -196,8 +196,8 @@ byteorder = "1.4.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
-datafusion = "35"
-datafusion-expr = "35"
+datafusion = "36"
+datafusion-expr = "36"
 arrow = { version = "50.0.0", features = ["ipc_compression"] }
 arrow-json = "50.0.0"
 arrow-schema = { version = "50.0.0", features = ["serde"] }
@@ -214,7 +214,7 @@ get_if_addrs = "0.5"
 getrandom = "0.2.11"
 gxhash = "~3.0.0"
 hashlink = "0.8.4"
-hashbrown = { version = "0.14.3", features = ["serde"] }
+hashbrown = { version = "0.14", features = ["serde"] }
 hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
@@ -254,7 +254,7 @@ sqlx = { version = "0.7", features = [
   "sqlite",
   "chrono",
 ] }
-sqlparser = { version = "0.41", features = ["serde", "visitor"] }
+sqlparser = { version = "0.43", features = ["serde", "visitor"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
 tempfile = "3"

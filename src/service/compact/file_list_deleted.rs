@@ -144,7 +144,7 @@ async fn query_deleted_from_s3(
             let entry = files.entry(file).or_insert_with(Vec::new);
             entry.extend(records);
         }
-        cur_time += Duration::hours(1).num_microseconds().unwrap();
+        cur_time += Duration::try_hours(1).unwrap().num_microseconds().unwrap();
     }
     Ok(files)
 }

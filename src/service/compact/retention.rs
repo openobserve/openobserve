@@ -54,7 +54,7 @@ pub async fn delete_by_stream(
 
     // Hack for 1970-01-01
     if lifecycle_start.le("1970-01-01") {
-        let lifecycle_end = created_at + Duration::days(1);
+        let lifecycle_end = created_at + Duration::try_days(1).unwrap();
         let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
         return db::compact::retention::delete_stream(
             org_id,
@@ -225,7 +225,7 @@ pub async fn delete_by_date(
             if path.exists() {
                 tokio::fs::remove_dir_all(path).await?;
             }
-            date_start += Duration::days(1);
+            date_start += Duration::try_days(1).unwrap();
         }
     } else {
         // delete files from s3
@@ -266,7 +266,7 @@ pub async fn delete_by_date(
                 }
                 tokio::task::yield_now().await; // yield to other tasks
             }
-            date_start += Duration::days(1);
+            date_start += Duration::try_days(1).unwrap();
         }
     }
 
