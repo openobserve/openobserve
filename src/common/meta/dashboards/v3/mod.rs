@@ -182,6 +182,8 @@ pub struct PanelConfig {
     drilldown: Option<Vec<DrillDown>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     connect_nulls: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    wrap_text: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
