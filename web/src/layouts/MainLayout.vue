@@ -39,8 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ store.state.zoConfig.custom_logo_text }}</span
           >
           <br />
-          <img :src="getImageURL('images/common/spark-logo-connector.png')"
+          <img v-if="store.state.zoConfig.custom_logo_img != ''" :src="store.state.zoConfig.custom_logo_img"
 size="sm" class="q-pt-xs q-pl-xs" style="width: 30px" />
+          <q-icon name="bolt" size="sm" class="q-pt-xs" />
           <img
             class="appLogo"
             :src="
