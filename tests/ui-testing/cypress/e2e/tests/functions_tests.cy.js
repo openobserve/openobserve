@@ -1,7 +1,7 @@
 ///<reference types="cypress" />
 import * as logstests from "../allfunctions/logs";
 import "cypress-file-upload";
-import logsdata from "../../../../../test-data/logs_data.json"
+import logsdata from "../../../../test-data/logs_data.json"
 // import logsdata from "../../data/logs_data.json";
 import { getRandomText } from "../utils";
 // import { login } from "../../support/commons"

@@ -1,6 +1,6 @@
 ///<reference types="cypress" />
 import * as menutests from "../allfunctions/menufunctions";
-import logsdata from "../../../../../test-data/logs_data.json"
+import logsdata from "../../../../test-data/logs_data.json"
 // import logsdata from "../../data/logs_data.json";
 // import { login } from "../../support/commons"
 // import { selectStreamAndStreamType } from "../../support/log-commons";
