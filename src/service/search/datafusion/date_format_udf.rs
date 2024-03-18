@@ -19,9 +19,10 @@ use chrono::{FixedOffset, TimeZone, Utc};
 use config::utils::time;
 use datafusion::{
     arrow::{
-        array::{ArrayRef, Int64Array, StringArray},
+        array::{ArrayRef, StringArray},
         datatypes::DataType,
     },
+    common::cast::{as_int64_array, as_string_array},
     error::DataFusionError,
     logical_expr::{ScalarUDF, Volatility},
     prelude::create_udf,
@@ -56,23 +57,13 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
             None,
         ));
     }
-
     let args = ColumnarValue::values_to_arrays(args)?;
 
     // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
     //    function panics!
-    let timestamp = &args[0]
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .expect("cast failed");
-    let format = &args[1]
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .expect("cast failed");
-    let timezone = &args[2]
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .expect("cast failed");
+    let timestamp = as_int64_array(&args[0]).expect("cast failed");
+    let format = as_string_array(&args[1]).expect("cast failed");
+    let timezone = as_string_array(&args[2]).expect("cast failed");
 
     // 2. perform the computation
     let array = zip(timestamp.iter(), zip(format.iter(), timezone.iter()))
@@ -104,6 +95,7 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::Int64Array;
     use datafusion::{
         arrow::{
             datatypes::{Field, Schema},
@@ -117,7 +109,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_date_format() {
+    async fn test_date_format_udf() {
         let data_time = time::parse_str_to_timestamp_micros("2021-01-01T00:00:00.000Z").unwrap();
         let sqls = [
             (
