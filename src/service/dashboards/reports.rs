@@ -210,7 +210,14 @@ impl Report {
 
         // Currently only one `ReportDashboard` can be captured and sent
         let dashboard = &self.dashboards[0];
-        let report = generate_report(dashboard, &self.org_id, &self.user, &self.password).await?;
+        let report = generate_report(
+            dashboard,
+            &self.org_id,
+            &self.user,
+            &self.password,
+            &self.timezone,
+        )
+        .await?;
         self.send_email(&report.0, report.1).await
     }
 
@@ -268,6 +275,7 @@ async fn generate_report(
     org_id: &str,
     user_id: &str,
     user_pass: &str,
+    timezone: &str,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
     // Check if Chrome is enabled, otherwise don't save the report
     if !CONFIG.chrome.chrome_enabled {
@@ -327,7 +335,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&var-__dynamic_filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&period={period}&timezone={timezone}&var-__dynamic_filters=%255B%255D&print=true",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -366,13 +374,13 @@ async fn generate_report(
             };
 
             let email_dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&var-__dynamic_filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-__dynamic_filters=%255B%255D&print=true",
             );
             (dashb_url, email_dashb_url)
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&var-__dynamic_filters=%255B%255D&print=true",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={}&to={}&timezone={timezone}&var-__dynamic_filters=%255B%255D&print=true",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
@@ -410,7 +418,7 @@ async fn generate_report(
         .await
     {
         log::error!(
-            "[REPORT]: Data loading indicator span is not rendered for dashboard {dashboard_id}:{e}"
+            "[REPORT] Data loading indicator span is not rendered for dashboard {dashboard_id}:{e}"
         );
     }
 
