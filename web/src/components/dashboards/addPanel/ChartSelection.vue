@@ -147,6 +147,11 @@ export default defineComponent({
         id: "geomap",
       },
       {
+        image: "img:" + getImageURL("images/dashboard/charts/world-map.png"),
+        title: t("dashboard.worldmapLabel"),
+        id: "maps",
+      },
+      {
         image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
         title: t("dashboard.pieLabel"),
         id: "pie",

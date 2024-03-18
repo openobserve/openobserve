@@ -20,6 +20,7 @@ import {
 } from "@/utils/dashboard/convertSQLData";
 import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertMapData } from "@/utils/dashboard/convertMapData";
+import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertSankeyData } from "./convertSankeyData";
 /**
  * Converts panel data based on the panel schema and data.
@@ -96,6 +97,14 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertMapData(panelSchema, data),
+      };
+    }
+    case "maps": {
+      console.log("maps", panelSchema.type, data);
+      
+      return {
+        chartType: panelSchema.type,
+        ...convertGeoMapData(panelSchema, data),
       };
     }
     case "sankey": {
