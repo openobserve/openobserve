@@ -303,25 +303,25 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   const q = useQuasar();
   const { getStreams } = useStreams();
 
-  if (
-    config.isCloud &&
-    store.state.selectedOrganization.subscription_type == config.freePlan
-  ) {
-    await billings
-      .list_subscription(store.state.selectedOrganization.identifier)
-      .then((res: any) => {
-        if (res.data.data.length == 0) {
-          next({ path: "/billings/plans" });
-        }
+  // if (
+  //   config.isCloud &&
+  //   store.state.selectedOrganization.subscription_type == config.freePlan
+  // ) {
+  //   await billings
+  //     .list_subscription(store.state.selectedOrganization.identifier)
+  //     .then((res: any) => {
+  //       if (res.data.data.length == 0) {
+  //         next({ path: "/billings/plans" });
+  //       }
 
-        if (
-          res.data.data.CustomerBillingObj.customer_id == null ||
-          res.data.data.CustomerBillingObj.customer_id == ""
-        ) {
-          next({ path: "/billings/plans" });
-        }
-      });
-  }
+  //       if (
+  //         res.data.data.CustomerBillingObj.customer_id == null ||
+  //         res.data.data.CustomerBillingObj.customer_id == ""
+  //       ) {
+  //         next({ path: "/billings/plans" });
+  //       }
+  //     });
+  // }
 
   if (
     to.path.indexOf("/ingestion") == -1 &&

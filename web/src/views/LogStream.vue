@@ -388,6 +388,7 @@ export default defineComponent({
 
     const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
+        loadingState.value = true;
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
         const dismiss = $q.notify({
