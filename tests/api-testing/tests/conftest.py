@@ -15,13 +15,25 @@ def random_string(length: int):
     characters = string.ascii_letters + string.digits
     return "".join(random.choices(characters, k=length))
 
-
 def _create_session_inner():
     s = requests.Session()
     username = os.environ["ZO_ROOT_USER_EMAIL"]
     password = os.environ["ZO_ROOT_USER_PASSWORD"]
     s.auth = (username, password)
-    s.post(BASE_URL)
+    resp = s.post(BASE_URL)
+    return s
+
+
+def _create_session_inner_v2():
+    s = requests.Session()
+    username = os.environ["ZO_ROOT_USER_EMAIL"]
+    password = os.environ["ZO_ROOT_USER_PASSWORD"]
+    # s.auth = (username, password)
+    # resp = s.post(BASE_URL)
+    resp = s.post(f"{BASE_URL}auth/login", json={"name": username, "password": password})
+    print (resp.status_code)
+    if resp.status_code != 200:
+        raise Exception("Invalid username/password")
     return s
 
 
@@ -50,4 +62,5 @@ def ingest_data():
     org = "org_pytest_data"
     url = f"{BASE_URL}api/{org}/{stream_name}/_json"
     resp = session.post(url, data=data, headers={"Content-Type": "application/json"})
+    print("Data ingested successfully, status code: ", resp.status_code)
     return resp.status_code == 200
