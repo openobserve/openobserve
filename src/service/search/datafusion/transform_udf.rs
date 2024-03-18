@@ -21,10 +21,10 @@ use datafusion::{
         array::{Array, ArrayRef, StringArray, StructArray},
         datatypes::{DataType, Field, Fields},
     },
-    logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
-    physical_plan::functions::make_scalar_function,
+    logical_expr::{ScalarUDF, Volatility},
     prelude::create_udf,
 };
+use datafusion_expr::ColumnarValue;
 use hashbrown::HashMap;
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{runtime::Runtime, CompilationResult, Program, TargetValueRef, VrlRuntime};
@@ -37,7 +37,7 @@ use crate::{
 fn create_user_df(
     fn_name: &str,
     num_args: u8,
-    pow_scalar: ScalarFunctionImplementation,
+    pow_scalar: Arc<dyn Fn(&[datafusion_expr::ColumnarValue]) -> Result<datafusion_expr::ColumnarValue, datafusion::error::DataFusionError> + Sync + Send>,
     mut output_cols: Vec<String>,
 ) -> ScalarUDF {
     let mut input_vec = vec![];
@@ -114,7 +114,8 @@ fn get_udf_vrl(
     };
     // end pre computation stage
 
-    let pow_calc = move |args: &[ArrayRef]| {
+    let pow_calc = Arc::new(move |args: &[ColumnarValue]| {
+        let args = ColumnarValue::values_to_arrays(args)?;
         let len = args[0].len();
         let in_params = local_fn_params.split(',').collect::<Vec<&str>>();
         let mut is_multi_value = false;
@@ -176,20 +177,20 @@ fn get_udf_vrl(
                 .into();
             let array_ref = data_vec.iter().map(|x| x.1.clone()).collect();
             let result = StructArray::new(fields, array_ref, None);
-            Ok(Arc::new(result) as ArrayRef)
+            Ok(ColumnarValue::from(Arc::new(result) as ArrayRef))
         } else {
             let result = StringArray::from(res_data_vec);
-            Ok(Arc::new(result) as ArrayRef)
+            Ok(ColumnarValue::from(Arc::new(result) as ArrayRef))
         }
 
         // `Ok` because no error occurred during the calculation (we should add
         // one if exponent was [0, 1[ and the base < 0 because that panics!)
         // `Arc` because arrays are immutable, thread-safe, trait objects.
-    };
+    });
     // the function above expects an `ArrayRef`, but DataFusion may pass a scalar to
     // a UDF. thus, we use `make_scalar_function` to decorare the closure so
     // that it can handle both Arrays and Scalar values.
-    let pow_scalar = make_scalar_function(pow_calc);
+    let pow_scalar = pow_calc;
 
     // Next:
     // * give it a name so that it shows nicely when the plan is printed

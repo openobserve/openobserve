@@ -23,7 +23,6 @@ use datafusion::{
     },
     error::DataFusionError,
     logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
-    physical_plan::functions::make_scalar_function,
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
