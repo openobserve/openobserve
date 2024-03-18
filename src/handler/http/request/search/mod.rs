@@ -539,13 +539,16 @@ pub async fn around(
         ])
         .inc();
 
-    let user_id = in_req.headers().get("user_id").unwrap();
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
-        user_email: Some(user_id.to_str().unwrap().to_string()),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -616,7 +619,10 @@ pub async fn values(
         None => "".to_string(),
         Some(v) => base64::decode(v).unwrap_or("".to_string()),
     };
-    let user_id: &str = in_req.headers().get("user_id").unwrap().to_str().unwrap();
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     if fields.len() == 1
         && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
