@@ -99,6 +99,9 @@ describe("Logs testcases", () => {
       .click() // Click on the editor to focus
       .type(" WHERE match_all_indexed_ignore_case('provide_credentials')");
     cy.get('[data-test="logs-search-result-records-per-page"]').click();
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
     cy.get(".q-virtual-scroll__content:last").click();
 
     // Select "25" from the dropdown using contains
