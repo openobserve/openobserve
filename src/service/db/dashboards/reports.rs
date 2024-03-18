@@ -15,19 +15,10 @@
 
 use std::sync::Arc;
 
-use config::{
-    cluster::{is_alert_manager, LOCAL_NODE_ROLE},
-    utils::json,
-};
-use infra::db as infra_db;
+use config::utils::json;
+use infra::{db as infra_db, queue::scheduler};
 
-use crate::{
-    common::{
-        infra::config::DASHBOARD_REPORTS,
-        meta::{alerts::triggers::Trigger, dashboards::reports::Report},
-    },
-    service::alerts::triggers,
-};
+use crate::common::{infra::config::DASHBOARD_REPORTS, meta::dashboards::reports::Report};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
     let report_key = format!("{org_id}/{name}");
@@ -43,10 +34,11 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
     }
 }
 
-pub async fn set(org_id: &str, report: &Report) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/reports/{org_id}/{}", report.name);
-    if let Err(e) = db
+    let schedule_key = format!("{}", report.name);
+    let key = format!("/reports/{org_id}/{}", &schedule_key);
+    match db
         .put(
             &key,
             json::to_vec(report).unwrap().into(),
@@ -54,17 +46,49 @@ pub async fn set(org_id: &str, report: &Report) -> Result<(), anyhow::Error> {
         )
         .await
     {
-        return Err(anyhow::anyhow!("Error saving report: {}", e));
+        Ok(_) => {
+            let trigger = scheduler::Trigger {
+                org: org_id.to_string(),
+                module: scheduler::TriggerModule::Report,
+                key: schedule_key,
+                next_run_at: report.start,
+                ..Default::default()
+            };
+            if create {
+                match scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            } else {
+                match scheduler::update_trigger(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to update trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!("Error saving report: {}", e)),
     }
-    Ok(())
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/reports/{org_id}/{name}");
-    db.delete(&key, false, infra_db::NEED_WATCH)
-        .await
-        .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))
+    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+        Ok(_) => match scheduler::delete(org_id, scheduler::TriggerModule::Report, name).await {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::error!("Failed to delete trigger: {}", e);
+                Ok(())
+            }
+        },
+        Err(e) => Err(anyhow::anyhow!("Error deleting report: {}", e)),
+    }
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Report>, anyhow::Error> {
@@ -99,36 +123,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Report = json::from_slice(&ev.value.unwrap()).unwrap();
-                let start_time = item_value.start;
                 DASHBOARD_REPORTS.insert(item_key.to_owned(), item_value);
-
-                // add to triggers
-                if is_alert_manager(&LOCAL_NODE_ROLE) {
-                    let columns = item_key.split('/').collect::<Vec<&str>>();
-                    let org_id = columns[0];
-                    let report_name = columns[1];
-                    let trigger = Trigger {
-                        // In case of updates, it expects updated start time
-                        next_run_at: start_time,
-                        is_realtime: false,
-                        is_silenced: false,
-                    };
-                    if let Err(e) = triggers::save_report(org_id, report_name, &trigger).await {
-                        log::error!("Failed to save trigger: {}", e);
-                    }
-                }
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 DASHBOARD_REPORTS.remove(item_key);
-
-                // delete from triggers
-                if is_alert_manager(&LOCAL_NODE_ROLE) {
-                    let columns = item_key.split('/').collect::<Vec<&str>>();
-                    let org_id = columns[0];
-                    let report_name = columns[1];
-                    _ = triggers::delete_report(org_id, report_name).await;
-                }
             }
             infra_db::Event::Empty => {}
         }

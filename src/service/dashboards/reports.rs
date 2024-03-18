@@ -127,7 +127,7 @@ pub async fn save(
         return Err(anyhow::anyhow!("Some dashboards/tabs not found"));
     }
 
-    match db::dashboards::reports::set(org_id, &report).await {
+    match db::dashboards::reports::set(org_id, &report, create).await {
         Ok(_) => {
             if name.is_empty() {
                 set_ownership(org_id, "reports", Authz::new(&report.name)).await;
@@ -196,7 +196,7 @@ pub async fn enable(
         }
     };
     report.enabled = value;
-    db::dashboards::reports::set(org_id, &report)
+    db::dashboards::reports::set(org_id, &report, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

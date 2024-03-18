@@ -18,11 +18,11 @@ use std::str::FromStr;
 use chrono::{Duration, FixedOffset, Utc};
 use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType};
 use cron::Schedule;
-use infra::dist_lock;
+use infra::{dist_lock, queue::scheduler};
 
 use crate::{
     common::{
-        infra::{cluster::get_node_by_uuid, config::TRIGGERS},
+        infra::cluster::get_node_by_uuid,
         meta::{
             alerts::{triggers::Trigger, AlertFrequencyType},
             dashboards::reports::ReportFrequencyType,
@@ -63,10 +63,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
     ret?;
 
     let now = Utc::now().timestamp_micros();
-    let cacher = TRIGGERS.read().await;
-    let triggers = infra::queue::scheduler::read(1).await?;
+    // let cacher = TRIGGERS.read().await;
+    let triggers = scheduler::pull(1).await?;
 
-    for trigger in triggers.iter() {
+    for trigger in triggers {
         if trigger.next_run_at > now {
             continue;
         }
@@ -75,9 +75,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if is_realtime && !is_silenced {
             continue; // realtime trigger and not silenced, no need to schedule
         }
-        let key = key.to_string();
         tokio::task::spawn(async move {
-            if let Err(e) = handle_triggers(&key, is_realtime, is_silenced).await {
+            if let Err(e) = handle_triggers(trigger).await {
                 log::error!("[ALERT_MANAGER] Error handling trigger: {}", e);
             }
         });
@@ -85,39 +84,33 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn handle_triggers(
-    key: &str,
-    is_realtime: bool,
-    is_silenced: bool,
-) -> Result<(), anyhow::Error> {
-    let columns = key.split('/').collect::<Vec<&str>>();
-    if columns.len() == 4 {
-        handle_alert_triggers(&columns, is_realtime, is_silenced).await
-    } else {
-        handle_report_triggers(&columns).await
+pub async fn handle_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow::Error> {
+    match trigger.module {
+        scheduler::TriggerModule::Report => handle_report_triggers(trigger).await,
+        scheduler::TriggerModule::Alert => handle_alert_triggers(trigger).await,
     }
 }
 
-async fn handle_alert_triggers(
-    columns: &[&str],
-    is_realtime: bool,
-    is_silenced: bool,
-) -> Result<(), anyhow::Error> {
-    assert_eq!(columns.len(), 4);
-    let org_id = columns[0];
-    let stream_type: StreamType = columns[1].into();
-    let stream_name = columns[2];
-    let alert_name = columns[3];
+async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow::Error> {
+    let columns = trigger.key.split('/').collect::<Vec<&str>>();
+    assert_eq!(columns.len(), 3);
+    let org_id = &trigger.org;
+    let stream_type: StreamType = columns[0].into();
+    let stream_name = columns[1];
+    let alert_name = columns[2];
+    let is_realtime = trigger.is_realtime;
+    let is_silenced = trigger.is_silenced;
 
     if is_realtime && is_silenced {
         // wakeup the trigger
-        let new_trigger = Trigger {
+        let new_trigger = scheduler::Trigger {
             next_run_at: Utc::now().timestamp_micros(),
             is_realtime: true,
             is_silenced: false,
+            status: scheduler::TriggerStatus::Waiting,
+            ..trigger
         };
-        super::triggers::save_alert(org_id, stream_type, stream_name, alert_name, &new_trigger)
-            .await?;
+        scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
 
@@ -134,18 +127,19 @@ async fn handle_alert_triggers(
         }
     };
 
-    let mut new_trigger = Trigger {
+    let mut new_trigger = scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_realtime: false,
         is_silenced: false,
+        status: scheduler::TriggerStatus::Waiting,
+        ..trigger
     };
 
     if !alert.enabled {
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
-        super::triggers::save_alert(org_id, stream_type, stream_name, alert_name, &new_trigger)
-            .await?;
+        scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
 
@@ -179,28 +173,30 @@ async fn handle_alert_triggers(
     }
 
     // update trigger
-    super::triggers::save_alert(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
+    scheduler::update_trigger(new_trigger).await?;
 
     Ok(())
 }
 
-async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
-    assert_eq!(columns.len(), 3);
-    assert_eq!(columns[0], "report");
-    let org_id = columns[1];
-    let report_name = columns[2];
+async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow::Error> {
+    let org_id = &trigger.org;
+    // For report, trigger.key is the report name
+    let report_name = &trigger.key;
 
     let mut report = reports::get(org_id, report_name).await?;
-    let mut new_trigger = Trigger {
+    let mut new_trigger = scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_realtime: false,
         is_silenced: false,
+        status: scheduler::TriggerStatus::Waiting,
+        retries: 0,
+        ..trigger
     };
 
     if !report.enabled {
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
-        super::triggers::save_report(org_id, report_name, &new_trigger).await?;
+        scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
 
@@ -235,7 +231,7 @@ async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
             new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
             // Disable the report
             report.enabled = false;
-            db::dashboards::reports::set(org_id, &report).await?;
+            // TODO: Save the report
         }
         ReportFrequencyType::Cron => {
             let schedule = Schedule::from_str(&report.frequency.cron)?;
@@ -249,13 +245,28 @@ async fn handle_report_triggers(columns: &[&str]) -> Result<(), anyhow::Error> {
         }
     }
 
-    // Report generation can take more than 30 seconds to complete
-    // So, to avoid multiple same report generation, save the trigger now.
-    // And then start processing the report.
-    super::triggers::save_report(org_id, report_name, &new_trigger).await?;
-    report.send_subscribers().await?;
-    // TODO: If the above operation fails, i.e. throws any error,
-    // should we trigger the same event again or just ignore it?
+    match report.send_subscribers().await {
+        Ok(_) => {
+            scheduler::update_status(
+                &trigger.org,
+                trigger.module,
+                &trigger.key,
+                scheduler::TriggerStatus::Completed,
+                trigger.retries,
+            )
+            .await?
+        }
+        Err(_) => {
+            scheduler::update_status(
+                &trigger.org,
+                trigger.module,
+                &trigger.key,
+                scheduler::TriggerStatus::Waiting,
+                trigger.retries + 1,
+            )
+            .await?
+        }
+    }
 
     Ok(())
 }

@@ -677,6 +677,8 @@ pub struct Limit {
     pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
+    #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)] // seconds
+    pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]

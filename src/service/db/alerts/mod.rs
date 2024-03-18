@@ -15,17 +15,10 @@
 
 use std::sync::Arc;
 
-use config::{
-    cluster::{is_alert_manager, LOCAL_NODE_ROLE},
-    meta::stream::StreamType,
-    utils::json,
-};
-use infra::db as infra_db;
+use config::{meta::stream::StreamType, utils::json};
+use infra::{db as infra_db, queue::scheduler};
 
-use crate::common::{
-    infra::config::STREAM_ALERTS,
-    meta::alerts::{triggers::Trigger, Alert},
-};
+use crate::common::{infra::config::STREAM_ALERTS, meta::alerts::Alert};
 
 pub mod alert_manager;
 pub mod destinations;
@@ -57,13 +50,12 @@ pub async fn set(
     stream_type: StreamType,
     stream_name: &str,
     alert: &Alert,
+    create: bool,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!(
-        "/alerts/{org_id}/{stream_type}/{stream_name}/{}",
-        alert.name
-    );
-    if let Err(e) = db
+    let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
+    let key = format!("/alerts/{org_id}/{}", &schedule_key);
+    match db
         .put(
             &key,
             json::to_vec(alert).unwrap().into(),
@@ -72,9 +64,35 @@ pub async fn set(
         )
         .await
     {
-        return Err(anyhow::anyhow!("Error save alert: {}", e));
+        Ok(_) => {
+            let trigger = scheduler::Trigger {
+                org: org_id.to_string(),
+                key: schedule_key,
+                next_run_at: chrono::Utc::now().timestamp_micros(),
+                is_realtime: alert.is_real_time,
+                is_silenced: false,
+                ..Default::default()
+            };
+            if create {
+                match scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            } else {
+                match scheduler::update_trigger(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to update trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!("Error save alert: {}", e)),
     }
-    Ok(())
 }
 
 pub async fn delete(
@@ -84,10 +102,20 @@ pub async fn delete(
     name: &str,
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
-    let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-    db.delete(&key, false, infra_db::NEED_WATCH, None)
-        .await
-        .map_err(|e| anyhow::anyhow!("Error deleting alert: {}", e))
+    let schedule_key = format!("{stream_type}/{stream_name}/{name}");
+    let key = format!("/alerts/{org_id}/{}", &schedule_key);
+    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+        Ok(_) => {
+            match scheduler::delete(org_id, scheduler::TriggerModule::Alert, &schedule_key).await {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    log::error!("Failed to delete trigger: {}", e);
+                    Ok(())
+                }
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!("Error deleting alert: {e}")),
+    }
 }
 
 pub async fn list(
@@ -148,7 +176,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
-                let is_realtime = item_value.is_real_time;
                 let mut cacher = STREAM_ALERTS.write().await;
                 let group = cacher.entry(stream_key.to_string()).or_default();
                 if group.contains(&item_value) {
@@ -158,31 +185,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     group.push(item_value);
                 }
                 drop(cacher);
-
-                // add to triggers
-                if is_alert_manager(&LOCAL_NODE_ROLE) {
-                    let columns = item_key.split('/').collect::<Vec<&str>>();
-                    let org_id = columns[0];
-                    let stream_type: StreamType = columns[1].into();
-                    let stream_name = columns[2];
-                    let alert_name = columns[3];
-                    let trigger = Trigger {
-                        next_run_at: chrono::Utc::now().timestamp_micros(),
-                        is_realtime,
-                        is_silenced: false,
-                    };
-                    if let Err(e) = crate::service::alerts::triggers::save_alert(
-                        org_id,
-                        stream_type,
-                        stream_name,
-                        alert_name,
-                        &trigger,
-                    )
-                    .await
-                    {
-                        log::error!("Failed to save trigger: {}", e);
-                    }
-                }
             }
             infra_db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -199,16 +201,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     cacher.remove(&stream_key);
                 }
                 drop(cacher);
-
-                // delete from triggers
-                if is_alert_manager(&LOCAL_NODE_ROLE) {
-                    let columns = item_key.split('/').collect::<Vec<&str>>();
-                    let org_id = columns[0];
-                    let stream_type: StreamType = columns[1].into();
-                    let stream_name = columns[2];
-                    let alert_name = columns[3];
-                    _ = triggers::delete_alert(org_id, stream_type, stream_name, alert_name).await;
-                }
             }
             infra_db::Event::Empty => {}
         }
