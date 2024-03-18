@@ -522,7 +522,7 @@
     "oneFieldConfigMessage": "Add 1 field or Configure it from the Config",
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
-    "wraptext": "Wrap Text",
+    "wraptext": "Wrap Table Cells",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",

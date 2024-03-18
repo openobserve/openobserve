@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-toggle
       v-if="dashboardPanelData.data.type == 'table'"
-      v-model="dashboardPanelData.data.config.wrap_text"
+      v-model="dashboardPanelData.data.config.wrap_table_cells"
       :label="t('dashboard.wraptext')"
       data-test="dashboard-config-wrap-text"
     />
@@ -735,9 +735,9 @@ export default defineComponent({
         dashboardPanelData.data.config.connect_nulls = false;
       }
 
-      // by default, use wrap_text as false
-      if (!dashboardPanelData.data.config.wrap_text) {
-        dashboardPanelData.data.config.wrap_text = false;
+      // by default, use wrap_table_cells as false
+      if (!dashboardPanelData.data.config.wrap_table_cells) {
+        dashboardPanelData.data.config.wrap_table_cells = false;
       }
     });
 
