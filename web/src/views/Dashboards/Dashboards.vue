@@ -377,6 +377,11 @@ export default defineComponent({
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
 
+    console.log(
+      "store.state.selectedOrganization",
+      store.state.organizationData
+    );
+
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -553,13 +558,21 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
+      console.log("routeToViewD", row);
+      const selectedDashboard = store.state.organizationData.allDashboardList[
+        activeFolderId.value
+      ].find((dashboard) => dashboard.dashboardId === row.id);
+
+      const selectedTabId = selectedDashboard
+        ? selectedDashboard.tabs[0].tabId
+        : null;
       return router.push({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
           folder: activeFolderId.value || "default",
-          tab: "default",
+          tab: selectedTabId,
         },
       });
     };
@@ -746,6 +759,8 @@ export default defineComponent({
     async updateDashboardList(dashboardId: any, folderId: any) {
       this.showAddDashboardDialog = false;
 
+      //on add dashboard route to dashboard view
+      // new dashboard will have single tab which will have id as default
       this.$router.push({
         path: "/dashboards/view/",
         query: {

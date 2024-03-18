@@ -609,7 +609,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
     };
@@ -1156,7 +1156,7 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? "default"
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -1176,7 +1176,7 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? "default"
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -1198,7 +1198,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             dashboard: dashId,
             folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? "default",
+            tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           },
         });
       } catch (error: any) {

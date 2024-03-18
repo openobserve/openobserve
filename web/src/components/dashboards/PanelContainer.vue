@@ -296,7 +296,7 @@ export default defineComponent({
           dashboard: String(route.query.dashboard),
           panelId: data.id,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? data.panels[0]?.tabId,
         },
       });
     };
@@ -324,7 +324,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? "default"
+          route.query.tab ?? data.panels[0]?.tabId
         );
 
         // Show a success notification.
@@ -340,7 +340,7 @@ export default defineComponent({
             dashboard: String(route.query.dashboard),
             panelId: panelId,
             folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? "default",
+            tab: route.query.tab ?? data.panels[0]?.tabId,
           },
         });
         return;

@@ -640,7 +640,7 @@ export default defineComponent({
           const tabId =
             dashboardData.tabs.find(
               (tab: any) => tab.name == drilldownData.data.tab
-            )?.tabId ?? "default";
+            )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
           // else made changes in current router only
