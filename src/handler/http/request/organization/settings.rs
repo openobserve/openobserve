@@ -109,9 +109,27 @@ async fn upload_logo(
     _path: web::Path<String>,
     mut payload: Multipart,
 ) -> Result<HttpResponse, StdErr> {
-    match settings::upload_logo(payload).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    match payload.try_next().await {
+        Ok(field) => {
+            let mut data: Vec<u8> = Vec::<u8>::new();
+            if let Some(mut field) = field {
+                while let Some(chunk) = field.next().await {
+                    let chunk = chunk.unwrap();
+                    data.extend(chunk);
+                }
+                if data.is_empty() {
+                    return Ok(MetaHttpResponse::bad_request("Image data not present"));
+                }
+
+                match settings::upload_logo(data).await {
+                    Ok(_) => Ok(HttpResponse::Ok().json("Successful")),
+                    Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+                }
+            } else {
+                Err(anyhow::anyhow!("Payload file not present"))
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!("Error parsing multipart payload: {e}")),
     }
 }
 
@@ -128,7 +146,7 @@ async fn upload_logo(
 #[delete("/{org_id}/settings/logo")]
 async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
     match settings::delete_logo().await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
+        Ok(_) => Ok(HttpResponse::Ok().json("Successful")),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
 }
