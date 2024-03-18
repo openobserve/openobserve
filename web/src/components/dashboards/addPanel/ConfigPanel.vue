@@ -734,6 +734,11 @@ export default defineComponent({
       if (!dashboardPanelData.data.config.connect_nulls) {
         dashboardPanelData.data.config.connect_nulls = false;
       }
+
+      // by default, use wrap_text as false
+      if (!dashboardPanelData.data.config.wrap_text) {
+        dashboardPanelData.data.config.wrap_text = false;
+      }
     });
 
     const legendWidthValue = computed({
