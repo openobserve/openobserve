@@ -142,13 +142,15 @@ pub async fn merge_by_stream(
     // max_file_retention_time
     if (CONFIG.compact.step_secs < 3600
         && time_now.timestamp_micros() - offset
-            <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+            <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                .unwrap()
                 .num_microseconds()
                 .unwrap())
         || (CONFIG.compact.step_secs >= 3600
             && (offset >= time_now_hour
                 || time_now.timestamp_micros() - time_now_hour
-                    <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                    <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap()
                         * 3))
@@ -161,12 +163,12 @@ pub async fn merge_by_stream(
         if partition_time_level == PartitionTimeLevel::Daily {
             (
                 offset_time_day,
-                offset_time_day + Duration::hours(24).num_microseconds().unwrap() - 1,
+                offset_time_day + Duration::try_hours(24).unwrap().num_microseconds().unwrap() - 1,
             )
         } else {
             (
                 offset_time_hour,
-                offset_time_hour + Duration::hours(1).num_microseconds().unwrap() - 1,
+                offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap() - 1,
             )
         };
     let files = file_list::query(
@@ -184,11 +186,12 @@ pub async fn merge_by_stream(
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
-        // Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() <
+        // Duration::try_hours(CONFIG.limit.allowed_upto).unwrap().num_microseconds().unwrap() <
         // time_now_hour { -- no check it
         // }
         let offset = offset
-            + Duration::seconds(CONFIG.compact.step_secs)
+            + Duration::try_seconds(CONFIG.compact.step_secs)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
         db::compact::files::set_offset(
@@ -310,7 +313,8 @@ pub async fn merge_by_stream(
 
     // write new offset
     let offset = offset
-        + Duration::seconds(CONFIG.compact.step_secs)
+        + Duration::try_seconds(CONFIG.compact.step_secs)
+            .unwrap()
             .num_microseconds()
             .unwrap();
     db::compact::files::set_offset(
@@ -341,7 +345,10 @@ pub async fn merge_by_stream(
         .inc_by(time);
     metrics::COMPACT_DELAY_HOURS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .set((time_now_hour - offset_time_hour) / Duration::hours(1).num_microseconds().unwrap());
+        .set(
+            (time_now_hour - offset_time_hour)
+                / Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
+        );
 
     Ok(())
 }
@@ -730,7 +737,7 @@ mod tests {
     async fn test_compact() {
         infra_db::create_table().await.unwrap();
         infra_file_list::create_table().await.unwrap();
-        let offset = Duration::hours(2).num_microseconds().unwrap();
+        let offset = Duration::try_hours(2).unwrap().num_microseconds().unwrap();
         let _ = db::compact::files::set_offset(
             "default",
             "logs".into(),

@@ -80,8 +80,8 @@ pub async fn ingest(
         items: vec![],
     };
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 

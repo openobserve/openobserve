@@ -125,7 +125,7 @@ pub async fn handle_triggers(
 
     if !alert.enabled {
         // update trigger, check on next week
-        new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
         super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
         return Ok(());
@@ -134,7 +134,8 @@ pub async fn handle_triggers(
     // evaluate alert
     let ret = alert.evaluate(None).await?;
     if ret.is_some() && alert.trigger_condition.silence > 0 {
-        new_trigger.next_run_at += Duration::minutes(alert.trigger_condition.silence)
+        new_trigger.next_run_at += Duration::try_minutes(alert.trigger_condition.silence)
+            .unwrap()
             .num_microseconds()
             .unwrap();
         new_trigger.is_silenced = true;
@@ -148,7 +149,8 @@ pub async fn handle_triggers(
             .unwrap()
             .timestamp_micros();
     } else {
-        new_trigger.next_run_at += Duration::seconds(alert.trigger_condition.frequency)
+        new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
+            .unwrap()
             .num_microseconds()
             .unwrap();
     }
