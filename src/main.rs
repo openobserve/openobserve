@@ -161,7 +161,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // init enterprise
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::init(CONFIG.common.local_mode)
+    o2_enterprise::enterprise::init()
         .await
         .expect("enerprise init failed");
 

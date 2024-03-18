@@ -17,7 +17,7 @@ use bytes::Bytes;
 use hashbrown::HashMap;
 use infra::{db as infra_db, errors::Result};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use {infra::errors::Error, o2_enterprise::enterprise::common::infra::config::O2_CONFIG};
 
 pub mod alerts;
 pub mod compact;
