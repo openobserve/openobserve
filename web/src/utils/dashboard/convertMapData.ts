@@ -220,9 +220,12 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
 
   //min max for visual map
   const seriesData = options.series.flatMap((series: any) => series.data);
+  console.log("seriesData", seriesData);
+  
   if (seriesData.length > 0) {
     const minValue = Math.min(...seriesData.map((item: any) => item[2]));
     const maxValue = Math.max(...seriesData.map((item: any) => item[2]));
+console.log("minValue", minValue, "maxValue", maxValue);
 
     options.visualMap.min = minValue;
     options.visualMap.max = maxValue;
