@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'table'"
       v-model="dashboardPanelData.data.config.wrap_table_cells"
       :label="t('dashboard.wraptext')"
-      data-test="dashboard-config-wrap-text"
+      data-test="dashboard-config-wrap-table-cells"
     />
 
     <div class="space"></div>
