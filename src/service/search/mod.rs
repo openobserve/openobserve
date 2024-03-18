@@ -150,13 +150,19 @@ pub async fn search_partition(
         part_num += 1;
     }
     let mut step = max(
-        Duration::seconds(CONFIG.limit.query_partition_min_secs)
+        Duration::try_seconds(CONFIG.limit.query_partition_min_secs)
+            .unwrap()
             .num_microseconds()
             .unwrap(),
         (req.end_time - req.start_time) / part_num as i64,
     );
     // step must be times of minute
-    step = step - step % Duration::minutes(1).num_microseconds().unwrap();
+    step = step
+        - step
+            % Duration::try_minutes(1)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
 
     // generate partitions
     let mut partitions = Vec::with_capacity(part_num);
@@ -429,7 +435,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let locker_key = "/search/cluster_queue/".to_string() + work_group_str.as_str();
     // get a cluster search queue lock
-    let locker = dist_lock::lock(&locker_key, 0).await?;
+    let locker = if CONFIG.common.local_mode || !CONFIG.common.feature_query_queue_enabled {
+        None
+    } else {
+        dist_lock::lock(&locker_key, 0).await?
+    };
     #[cfg(feature = "enterprise")]
     loop {
         match work_group.as_ref().unwrap().need_wait().await {
