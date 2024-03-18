@@ -400,12 +400,12 @@ impl Sql {
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
                 .to_string();
-            // reset meta fields
-            meta.fields.extend(fields);
             // rewrite distribution sql
             rewrite_sql = RE_ONLY_SELECT
                 .replace(rewrite_sql.as_str(), &select_fields)
                 .to_string();
+            // reset meta fields
+            meta.fields.extend(fields);
         }
 
         // get sql where tokens
@@ -755,7 +755,7 @@ pub(crate) fn generate_fast_mode_fields(
     fts_fields: &[String],
 ) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = match cached_fields.clone() {
+    let schema_fields = match cached_fields {
         Some(v) => v,
         None => schema
             .fields()
