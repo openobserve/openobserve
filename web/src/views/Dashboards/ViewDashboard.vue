@@ -347,12 +347,6 @@ export default defineComponent({
         (tab: any) => tab.tabId === route.query.tab
       );
 
-      console.log("selectedTab", selectedTab);
-      console.log(
-        "currentDashboardData",
-        currentDashboardData?.data?.tabs?.[0]?.tabId
-      );
-
       selectedTabId.value = selectedTab
         ? selectedTab.tabId
         : currentDashboardData?.data?.tabs?.[0]?.tabId;
@@ -524,8 +518,6 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
-      console.log("selectedTabId watch", selectedTabId.value);
-
       router.replace({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,

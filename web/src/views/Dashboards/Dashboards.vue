@@ -377,11 +377,6 @@ export default defineComponent({
     const selectedDashboardIdToMove = ref(null);
     const showMoveDashboardDialog = ref(false);
 
-    console.log(
-      "store.state.selectedOrganization",
-      store.state.organizationData
-    );
-
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -558,7 +553,6 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
-      console.log("routeToViewD", row);
       const selectedDashboard = store.state.organizationData.allDashboardList[
         activeFolderId.value
       ].find((dashboard) => dashboard.dashboardId === row.id);
