@@ -184,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @filter="fieldsFilterFn"
                       :placeholder="filter.name ? '' : 'Select Field'"
                       class="textbox col no-case q-ml-sm"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                     >
                       <template v-slot:no-option>
                         <q-item>
@@ -201,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: auto"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                     />
                     <q-input
                       v-model="filter.value"
@@ -211,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: 125px"
                       class=""
                       data-test="dashboard-query-values-filter-value"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                     />
                     <q-btn
                       class="q-ml-sm"
@@ -420,7 +423,7 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
-        filter: [{ name: "", operator: "=", value: "" }],
+        filter: [],
       },
       value: "",
       options: [],
