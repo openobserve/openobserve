@@ -274,6 +274,7 @@ async fn gc() -> Result<(), anyhow::Error> {
         drop(files);
         return Ok(());
     }
+    drop(files);
     let mut files = FILES.write().await;
     files.gc("global", CONFIG.disk_cache.gc_size).await?;
     drop(files);

@@ -185,7 +185,8 @@ pub async fn merge_by_stream(
 
     // check lookback files
     if CONFIG.compact.lookback_hours > 0 {
-        let lookback_offset = Duration::hours(CONFIG.compact.lookback_hours)
+        let lookback_offset = Duration::try_hours(CONFIG.compact.lookback_hours)
+            .unwrap()
             .num_microseconds()
             .unwrap();
         let lookback_offset_start = partition_offset_start - lookback_offset;
