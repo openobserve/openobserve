@@ -65,18 +65,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
-          <q-label class="q-pt-md">{{ t("settings.customLogoTitle") }}</q-label>
-          <q-img
+          <q-label class="q-pt-md text-bold">{{ t("settings.customLogoText") }}:</q-label>
+          <div v-if="editingText" class="q-gutter-md row items-start">
+            <q-input 
+              class="q-py-md showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+              data-test="settings_ent_logo_custom_text"
+              type="text"
+              v-model="customText"  
+            />
+            <div class="btn-group relative-position vertical-middle" style="margin-top: 38px;">
+            <q-btn
+              data-test="settings_ent_logo_custom_text_save_btn"
+              :loading="onSubmit.isLoading.value"
+              :label="t('dashboard.save')"
+              class="text-bold no-border q-mr-sm"
+              color="primary"
+              size="sm"
+              type="submit"
+              no-caps
+              @click="updateCustomText"
+            />
+            
+              <q-btn type="button" size="sm" :label="t('common.cancel')" @click="editingText=!editingText"></q-btn>
+            </div>
+          </div>
+          <div v-else style="margin-top: 17px;">
+            {{ store.state.zoConfig.custom_logo_text || "<No Text Available>" }}
+              <q-btn
+                data-test="settings_ent_logo_custom_text_edit_btn"
+                :loading="onSubmit.isLoading.value"
+                icon="edit"
+                size="small"
+                class="text-bold"
+                type="submit"
+                @click="editingText=!editingText"
+              />
+          </div>
+          
+        </div>
+        <div class="q-gutter-sm row q-mt-xs">
+          <q-label class="q-pt-md text-bold">{{ t("settings.customLogoTitle") }}: </q-label>
+          <div
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig.custom_logo_img != ''
+              store.state.zoConfig.custom_logo_img != null
             "
-            :src="store.state.custom_logo_img"
-            :alt="t('settings.logoLabel')"
-            style="width: 400px"
-            class="q-mx-md"
-          />
+          >
+            <q-img
+              data-test="setting_ent_custom_logo_img"
+              :src="
+                `data:image; base64, ` + store.state.zoConfig.custom_logo_img
+              "
+              :alt="t('settings.logoLabel')"
+              style="width: 30px"
+              class="q-mx-md"
+            />
+            <q-btn icon="delete"
+            data-test="setting_ent_custom_logo_img_delete_btn"
+@click="confirmDeleteLogo()" class="q-mx-md"
+              ></q-btn
+            >
+          </div>
           <q-file
+          data-test="setting_ent_custom_logo_img_file_upload"
             v-else
             v-model="files"
             :label="t('settings.logoLabel')"
@@ -97,6 +152,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
+  <q-spinner-hourglass
+    v-if="loadingState"
+    class="fixed-center"
+    size="lg"
+    color="primary"
+  ></q-spinner-hourglass>
 </template>
 
 <script lang="ts">
@@ -110,9 +171,28 @@ import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
+import configService from "@/services/config";
 
 export default defineComponent({
   name: "PageGeneralSettings",
+  methods: {
+    confirmDeleteLogo() {
+      this.$q
+        .dialog({
+          title: this.t("settings.deleteLogoTitle"),
+          message: this.t("settings.deleteLogoMessage"),
+          cancel: true,
+          persistent: true,
+          ok: {
+            color: "negative",
+            label: this.t("common.delete"),
+          },
+        })
+        .onOk(() => {
+          this.deleteLogo();
+        });
+    },
+  },
   setup() {
     const { t } = useI18n();
     const q = useQuasar();
@@ -121,6 +201,11 @@ export default defineComponent({
     const scrapeIntereval = ref(
       store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15
     );
+    const loadingState = ref(false);
+    const customText = ref("");
+    const editingText = ref(false);
+
+    customText.value = store.state.zoConfig.custom_logo_text;
 
     onActivated(() => {
       scrapeIntereval.value =
@@ -156,9 +241,10 @@ export default defineComponent({
         });
       }
     });
-    
+
     const uploadImage = (event: Event) => {
       if (config.isEnterprise == "true") {
+        loadingState.value = true;
         const formData = new FormData();
         formData.append("image", event);
         let orgIdentifier = "default";
@@ -169,8 +255,24 @@ export default defineComponent({
         }
         settingsService
           .createLogo(orgIdentifier, formData)
-          .then((res) => {
-            console.log(res);
+          .then(async (res) => {
+            if (res.status == 200) {
+              q.notify({
+                type: "positive",
+                message: "Logo updated successfully.",
+                timeout: 2000,
+              });
+
+              await configService.get_config().then((res: any) => {
+                store.dispatch("setConfig", res.data);
+              });
+            } else {
+              q.notify({
+                type: "negative",
+                message: "Something went wrong.",
+                timeout: 2000,
+              });
+            }
           })
           .catch((e) => {
             q.notify({
@@ -180,7 +282,7 @@ export default defineComponent({
             });
           })
           .finally(() => {
-            console.log("finally");
+            loadingState.value = false;
           });
       } else {
         q.notify({
@@ -189,6 +291,88 @@ export default defineComponent({
           timeout: 2000,
         });
       }
+    };
+
+    const deleteLogo = () => {
+      loadingState.value = true;
+      let orgIdentifier = "default";
+      for (let item of store.state.organizations) {
+        if (item.type == "default") {
+          orgIdentifier = item.identifier;
+        }
+      }
+      settingsService
+        .deleteLogo(orgIdentifier)
+        .then(async (res) => {
+          if (res.status == 200) {
+            q.notify({
+              type: "positive",
+              message: "Logo deleted successfully.",
+              timeout: 2000,
+            });
+
+            await configService.get_config().then((res: any) => {
+              store.dispatch("setConfig", res.data);
+            });
+          } else {
+            q.notify({
+              type: "negative",
+              message: res?.message || "Error while deleting image.",
+              timeout: 2000,
+            });
+          }
+        })
+        .catch(() => {
+          q.notify({
+            type: "negative",
+            message: "Something went wrong.",
+            timeout: 2000,
+          });
+        })
+        .finally(() => {
+          loadingState.value = false;
+        });
+    };
+
+    const updateCustomText = () => {
+      loadingState.value = true;
+      let orgIdentifier = "default";
+      for (let item of store.state.organizations) {
+        if (item.type == "default") {
+          orgIdentifier = item.identifier;
+        }
+      }
+
+      settingsService
+        .updateCustomText(orgIdentifier, "custom_logo_text", customText)
+        .then(async (res) => {
+          if (res.status == 200) {
+            q.notify({
+              type: "positive",
+              message: "Logo text updated successfully.",
+              timeout: 2000,
+            });
+
+            let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
+            stateConfig.custom_logo_text = customText;
+            store.dispatch("setConfig", stateConfig);
+            editingText.value = false;
+          } else {
+            q.notify({
+              type: "negative",
+              message: res?.message || "Error while updating image.",
+              timeout: 2000,
+            });
+          }
+        }).catch(async (err) => {
+          q.notify({
+            type: "negative",
+            message: err?.message || "Something went wrong.",
+            timeout: 2000,
+          });
+        }).finally(async (res) => {
+          loadingState.value = false;
+        });
     };
 
     return {
@@ -216,6 +400,11 @@ export default defineComponent({
         });
       },
       uploadImage,
+      deleteLogo,
+      loadingState,
+      customText,
+      editingText,
+      updateCustomText,
     };
   },
 });

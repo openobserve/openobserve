@@ -798,6 +798,11 @@
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
     "enterpriseTitle": "Enterprise Settings",
     "logoLabel": "Select Logo Image",
-    "customLogoTitle": "Custom Logo"
+    "customLogoTitle": "Custom Logo",
+    "deleteLogoTitle": "Delete Logo",
+    "deleteLogoMessage": "Are you sure you want to delete this logo image?",
+    "deleteLogo": "Delete Logo",
+    "logo": "Logo",
+    "customLogoText": "Custom Logo Text"
   }
 }

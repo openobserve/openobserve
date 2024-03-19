@@ -17,20 +17,17 @@ import http from "./http";
 
 const settings = {
   createLogo: (org_identifier: string, formData: any) => {
-    const url: string = `/api/${org_identifier}/settings/upload-logo`;
+    const url: string = `/api/${org_identifier}/settings/logo`;
     const headers = {
       "Content-Type": "multipart/form-data",
     };
     return http(headers).post(url, formData);
   },
-  deleteLogo: (
-    org_identifier: string,
-    stream_name: string,
-    stream_type: string
-  ) => {
-    return http().delete(
-      `/api/${org_identifier}/streams/${stream_name}?type=${stream_type}`
-    );
+  deleteLogo: (org_identifier: string) => {
+    return http().delete(`/api/${org_identifier}/settings/logo`);
+  },
+  updateCustomText: (org_identifier: string, key: string, value: string) => {
+    return http().post(`/api/${org_identifier}/kv/${key}`, value);
   },
 };
 
