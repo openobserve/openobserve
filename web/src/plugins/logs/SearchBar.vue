@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side
                     @click.stop="handleDeleteSavedView(item)"
                   >
-                    <q-icon name="delete"
-color="grey" size="xs" />
+                    <q-icon name="delete" color="grey" size="xs" />
                   </q-item-section>
                 </q-item>
               </div>
@@ -197,8 +196,7 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -1965,7 +1963,7 @@ export default defineComponent({
       this.resetEditorLayout();
     },
     resetFunction(newVal) {
-      if (newVal == "" && store.state.savedViewFlag == false) {
+      if (newVal == "" && this.store.state.savedViewFlag == false) {
         this.resetFunctionContent();
       }
     },

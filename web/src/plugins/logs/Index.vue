@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar"
             ref="searchBarRef"
             :fieldValues="fieldValues"
-            :key="searchObj.data.transforms.length || -1"
+            :key="searchObj?.data?.transforms?.length || -1"
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
@@ -135,8 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info" color="primary"
-size="md" /> Select a
+                    <q-icon name="info" color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -155,8 +154,7 @@ size="md" /> Select a
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary"
-size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -173,8 +171,7 @@ size="md" />
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary"
-size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -609,45 +606,45 @@ export default defineComponent({
   },
   computed: {
     showFields() {
-      return this.searchObj.meta.showFields;
+      return this.searchObj?.meta?.showFields;
     },
     showHistogram() {
-      return this.searchObj.meta.showHistogram;
+      return this.searchObj?.meta?.showHistogram;
     },
     showQuery() {
-      return this.searchObj.meta.showQuery;
+      return this.searchObj?.meta?.showQuery;
     },
     moveSplitter() {
-      return this.searchObj.config.splitterModel;
+      return this.searchObj?.config?.splitterModel;
     },
     // changeStream() {
     //   return this.searchObj.data.stream.selectedStream;
     // },
     changeRelativeDate() {
       return (
-        this.searchObj.data.datetime.relative.value +
-        this.searchObj.data.datetime.relative.period.value
+        this.searchObj?.data?.datetime.relative.value +
+        this.searchObj?.data?.datetime.relative.period.value
       );
     },
     updateSelectedColumns() {
-      return this.searchObj.data.stream.selectedFields.length;
+      return this.searchObj?.data?.stream?.selectedFields?.length;
     },
     runQuery() {
-      return this.searchObj.runQuery;
+      return this.searchObj?.runQuery;
     },
     changeRefreshInterval() {
-      return this.searchObj.meta.refreshInterval;
+      return this.searchObj?.meta?.refreshInterval;
     },
     fullSQLMode() {
-      return this.searchObj.meta.sqlMode;
+      return this.searchObj?.meta?.sqlMode;
     },
     refreshHistogram() {
-      return this.searchObj.meta.histogramDirtyFlag;
+      return this.searchObj?.meta?.histogramDirtyFlag;
     },
     redrawHistogram() {
       return (
-        this.searchObj.data.histogram.hasOwnProperty("xData") &&
-        this.searchObj.data.histogram.xData.length
+        this.searchObj?.data.histogram.hasOwnProperty("xData") &&
+        this.searchObj?.data.histogram.xData.length
       );
     },
   },

@@ -592,29 +592,37 @@ export default defineComponent({
 
     const getConsumableDateTime = () => {
       if (selectedType.value == "relative") {
-        let period = getPeriodLabel.value.toLowerCase();
-        let periodValue = relativeValue.value;
+        try {
+          let period = getPeriodLabel.value.toLowerCase();
+          let periodValue = relativeValue.value;
 
-        // quasar does not support arithmetic on weeks. convert to days.
-        if (relativePeriod.value === "w") {
-          period = "days";
-          periodValue = periodValue * 7;
+          // quasar does not support arithmetic on weeks. convert to days.
+          if (relativePeriod.value === "w") {
+            period = "days";
+            periodValue = periodValue * 7;
+          }
+
+          const subtractObject = '{"' + period + '":' + periodValue + "}";
+
+          const endTimeStamp = new Date();
+
+          const startTimeStamp = date.subtractFromDate(
+            endTimeStamp,
+            JSON.parse(subtractObject)
+          );
+
+          return {
+            startTime: new Date(startTimeStamp).getTime() * 1000,
+            endTime: new Date(endTimeStamp).getTime() * 1000,
+            relativeTimePeriod: relativeValue.value + relativePeriod.value,
+          };
+        } catch (err) {
+          return {
+            startTime: null,
+            endTime: null,
+            relativeTimePeriod: null,
+          };
         }
-
-        const subtractObject = '{"' + period + '":' + periodValue + "}";
-
-        const endTimeStamp = new Date();
-
-        const startTimeStamp = date.subtractFromDate(
-          endTimeStamp,
-          JSON.parse(subtractObject)
-        );
-
-        return {
-          startTime: new Date(startTimeStamp).getTime() * 1000,
-          endTime: new Date(endTimeStamp).getTime() * 1000,
-          relativeTimePeriod: relativeValue.value + relativePeriod.value,
-        };
       } else {
         if (typeof selectedDate.value === "string") {
           selectedDate.value = {
@@ -627,16 +635,41 @@ export default defineComponent({
         if (!selectedDate.value?.from && !selectedTime.value?.startTime) {
           start = new Date();
         } else {
+          const currDate = new Date();
+          let dateString;
+          if (!selectedDate.value.from) {
+            dateString =
+              currDate.getFullYear +
+              "/" +
+              currDate.getMonth +
+              "/" +
+              currDate.getDate;
+          }
+
           start = new Date(
-            selectedDate.value.from + " " + selectedTime.value.startTime
+            (selectedDate.value?.from || dateString) +
+              " " +
+              (selectedTime.value.startTime || "00:00")
           );
         }
 
         if (selectedDate.value?.to == "" && selectedTime.value?.endTime == "") {
           end = new Date();
         } else {
+          const currDate = new Date();
+          let dateString;
+          if (!selectedDate.value.from) {
+            dateString =
+              currDate.getFullYear +
+              "/" +
+              currDate.getMonth +
+              "/" +
+              currDate.getDate;
+          }
           end = new Date(
-            selectedDate.value.to + " " + selectedTime.value.endTime
+            (selectedDate.value?.to || dateString) +
+              " " +
+              (selectedTime.value.endTime || "23:59")
           );
         }
 
@@ -655,7 +688,6 @@ export default defineComponent({
           selectedDate: JSON.parse(JSON.stringify(selectedDate.value)),
           selectedTime: JSON.parse(JSON.stringify(selectedTime.value)),
         };
-        // console.log(rVal)
         return rVal;
       }
     };
