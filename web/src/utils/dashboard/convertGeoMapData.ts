@@ -25,7 +25,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   //if no name and value than return it
   if (
     !panelSchema.queries[0]?.fields?.name ||
-    !panelSchema.queries[0]?.fields?.valueForMaps ||
+    !panelSchema.queries[0]?.fields?.value_for_maps ||
     !mapData
   ) {
     return { options: null };
@@ -80,13 +80,11 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
           // For custom queries
           return {
             name: item[query.fields.name.alias],
-            valueForMaps: item[query.fields.valueForMaps.alias],
+            value_for_maps: item[query.fields.value_for_maps.alias],
           };
         } else {
-          console.log("name, value", item.name, item.valueForMaps);
-          
           // For auto queries
-          return { name: item.name, valueForMaps: item.valueForMaps };
+          return { name: item.name, value_for_maps: item.value_for_maps };
         }
       }),
       symbolSize: function (val: any) {
@@ -103,8 +101,12 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   const seriesData = options.series.flatMap((series: any) => series.data);
 
   if (seriesData.length > 0) {
-    const minValue = Math.min(...seriesData.map((item: any) => item.valueForMaps));
-    const maxValue = Math.max(...seriesData.map((item: any) => item.valueForMaps));
+    const minValue = Math.min(
+      ...seriesData.map((item: any) => item.value_for_maps)
+    );
+    const maxValue = Math.max(
+      ...seriesData.map((item: any) => item.value_for_maps)
+    );
 
     options.visualMap.min = minValue;
     options.visualMap.max = maxValue;
