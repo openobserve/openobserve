@@ -606,13 +606,13 @@ export default defineComponent({
   },
   computed: {
     showFields() {
-      return this.searchObj.meta.showFields;
+      return this.searchObj?.meta?.showFields;
     },
     showHistogram() {
-      return this.searchObj.meta?.showHistogram;
+      return this.searchObj?.meta?.showHistogram;
     },
     showQuery() {
-      return this.searchObj.meta.showQuery;
+      return this.searchObj?.meta?.showQuery;
     },
     moveSplitter() {
       return this.searchObj.config.splitterModel;
