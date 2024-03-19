@@ -92,10 +92,10 @@ const getDefaultDashboardPanelData: any = () => ({
           longitude: null,
           weight: null,
           name: null,
-          value: null,
+          valueForMaps: null,
           source: null,
           target: null,
-          // value: null,
+          value: null,
         },
         config: {
           promql_legend: "",
@@ -186,10 +186,10 @@ const useDashboardPanelData = () => {
         longitude: null,
         weight: null,
         name: null,
-        value: null,
+        valueForMaps: null,
         source: null,
         target: null,
-        // value: null,
+        value: null,
       },
       config: {
         promql_legend: "",
@@ -597,13 +597,13 @@ const useDashboardPanelData = () => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.value
+      ].fields.valueForMaps
     ) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.value = {
+      ].fields.valueForMaps = {
         label: generateLabelFromName(row.name),
-        alias: "value",
+        alias: "valueForMaps",
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: "count", // You can set the appropriate aggregation function here
@@ -690,7 +690,7 @@ const useDashboardPanelData = () => {
           query.fields.longitude = null;
           query.fields.weight = null;
           query.fields.name = null;
-          query.fields.value = null;
+          query.fields.valueForMaps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -734,7 +734,7 @@ const useDashboardPanelData = () => {
           query.fields.longitude = null;
           query.fields.weight = null;
           query.fields.name = null;
-          query.fields.value = null;
+          query.fields.valueForMaps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -759,7 +759,7 @@ const useDashboardPanelData = () => {
         ].fields.z = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.name = null;
-          query.fields.value = null;
+          query.fields.valueForMaps = null;
         });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -799,6 +799,9 @@ const useDashboardPanelData = () => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
         });
         break;
       case "sankey":
@@ -823,6 +826,8 @@ const useDashboardPanelData = () => {
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.valueForMaps = null;
         });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -960,7 +965,7 @@ const useDashboardPanelData = () => {
   const removeMapValue = () => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.value = null;
+    ].fields.valueForMaps = null;
   }
 
   const removeSource = () => {
@@ -1156,7 +1161,7 @@ const useDashboardPanelData = () => {
       ].fields.name = null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.value = null;
+      ].fields.valueForMaps = null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.source = null;
@@ -1205,10 +1210,10 @@ const useDashboardPanelData = () => {
             field = dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.name;
-          } else if(name === "value"){
+          } else if(name === "valueForMaps"){
             field = dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.value;
+            ].fields.valueForMaps;
           } else if (name === "source") {
             field =
               dashboardPanelData.data.queries[
@@ -1465,7 +1470,7 @@ const useDashboardPanelData = () => {
         field =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.value;
+          ].fields.valueForMaps;
 
         if (field && field.alias == oldName) {
           const newName = newArray[changedIndex[0]]?.name;

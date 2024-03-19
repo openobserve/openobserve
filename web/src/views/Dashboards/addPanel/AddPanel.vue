@@ -947,13 +947,15 @@ export default defineComponent({
           }
           case "maps": {
             if (
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.name == null
-            ){
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.name == null
+            ) {
               errors.push("Add one field for the name");
             }
-            if(
-              dashboardData.data.queries[dashboardData.layout.currentQueryIndex].fields.value == null
-            ){
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.valueForMaps == null
+            ) {
               errors.push("Add one field for the value");
             }
             break;
