@@ -583,6 +583,8 @@
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
     "basemapLabel": "Base Map",
+    "world": "World",
+    "mapTypeLabel": "Map Type",
     "customunitLabel": "Custom Unit",
     "currencyDollar": "Currency - Dollar ($)",
     "currencyEuro": "Currency - Euro (€)",
