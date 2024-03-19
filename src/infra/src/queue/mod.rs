@@ -13,12 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{meta::meta_store::MetaStore, CONFIG};
-use tokio::sync::OnceCell;
+use tokio::sync::{mpsc, OnceCell};
 
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 
 pub mod fake;
 pub mod nats;
@@ -56,6 +58,28 @@ async fn init_super_cluster() -> Box<dyn Queue> {
 pub trait Queue: Sync + Send + 'static {
     async fn create(&self, topic: &str) -> Result<()>;
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()>;
-    async fn sub(&self, topic: &str) -> Result<Bytes>;
+    async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<Message>>>;
     async fn purge(&self, topic: &str, sequence: usize) -> Result<()>;
+}
+
+pub enum Message {
+    Nats(async_nats::jetstream::Message),
+}
+
+impl Message {
+    pub fn message(&self) -> &Bytes {
+        match self {
+            Message::Nats(msg) => &msg.payload,
+        }
+    }
+
+    pub async fn ack(&self) -> Result<()> {
+        match self {
+            Message::Nats(msg) => msg
+                .ack()
+                .await
+                .map_err(|e| Error::Message(format!("ack error:{}", e)))?,
+        }
+        Ok(())
+    }
 }

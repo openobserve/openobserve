@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use bytes::Bytes;
+use tokio::sync::mpsc;
 
 use crate::errors::*;
 
@@ -50,7 +53,7 @@ impl super::Queue for FakeQueue {
         todo!()
     }
 
-    async fn sub(&self, _topic: &str) -> Result<Bytes> {
+    async fn consume(&self, _topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         todo!()
     }
 

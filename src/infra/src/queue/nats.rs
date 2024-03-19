@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use async_nats::jetstream;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{CONFIG, INSTANCE_ID};
 use futures::{StreamExt, TryStreamExt};
+use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::{db::nats::get_nats_client, errors::*};
 
@@ -78,33 +79,36 @@ impl super::Queue for NatsQueue {
         Ok(())
     }
 
-    async fn sub(&self, topic: &str) -> Result<Bytes> {
-        let client = get_nats_client().await.clone();
-        let jetstream = jetstream::new(client);
+    async fn consume(&self, topic: &str) -> Result<Arc<mpsc::Receiver<super::Message>>> {
+        let (tx, rx) = mpsc::channel(1024);
         let stream_name = format!("{}{}", self.prefix, topic);
-        let stream = jetstream.get_stream(&stream_name).await?;
-        let consumer_name = if !CONFIG.common.cluster_name.is_empty() {
-            CONFIG.common.cluster_name.to_string()
-        } else {
-            INSTANCE_ID.get("instance_id").unwrap().to_string()
-        };
-        let config = jetstream::consumer::pull::Config {
-            name: Some(consumer_name.to_string()),
-            ..Default::default()
-        };
-        let consumer = stream
-            .get_or_create_consumer(&consumer_name, config)
-            .await?;
-        // Consume messages from the consumer
-        let mut messages = consumer.messages().await?.take(10);
-        while let Ok(Some(message)) = messages.try_next().await {
-            println!("message receiver: {:?}", message);
-            message
-                .ack()
-                .await
-                .map_err(|e| Error::Message(format!("nats message ack error: {e}")))?;
-        }
-        Ok(Bytes::new())
+        let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            let client = get_nats_client().await.clone();
+            let jetstream = jetstream::new(client);
+            let stream = jetstream.get_stream(&stream_name).await?;
+            let consumer_name = if !CONFIG.common.cluster_name.is_empty() {
+                CONFIG.common.cluster_name.to_string()
+            } else {
+                INSTANCE_ID.get("instance_id").unwrap().to_string()
+            };
+            let config = jetstream::consumer::pull::Config {
+                name: Some(consumer_name.to_string()),
+                ..Default::default()
+            };
+            let consumer = stream
+                .get_or_create_consumer(&consumer_name, config)
+                .await?;
+            // Consume messages from the consumer
+            let mut messages = consumer.messages().await?.take(10);
+            while let Ok(Some(message)) = messages.try_next().await {
+                let message = super::Message::Nats(message);
+                tx.send(message)
+                    .await
+                    .map_err(|e| Error::Message(format!("nats message send error: {e}")))?;
+            }
+            Ok(())
+        });
+        Ok(Arc::new(rx))
     }
 
     async fn purge(&self, _topic: &str, _sequence: usize) -> Result<()> {

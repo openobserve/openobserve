@@ -22,6 +22,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
+default = ["enterprise"]
+enterprise = ["dep:o2_enterprise"]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
@@ -59,6 +61,7 @@ argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 awc = "3.2"
+base64.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
 chrono.workspace = true
@@ -94,6 +97,7 @@ log.workspace = true
 maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
+o2_enterprise = {version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false}
 once_cell.workspace = true
 opentelemetry = "0.21"
 opentelemetry_sdk = { version = "0.21", features = ["rt-tokio", "trace"] }
