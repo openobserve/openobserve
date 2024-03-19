@@ -137,7 +137,7 @@ export default defineComponent({
         // Get the instance of Leaflet
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
-        lmap = lmapComponent.getLeaflet();
+        lmap = lmapComponent?.getLeaflet();
 
         if (lmap) {
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -146,7 +146,7 @@ export default defineComponent({
           }).addTo(lmap);
         }
         if (props.data.options?.lmap?.center) {
-          lmap.setView(
+          lmap?.setView(
             [
               props.data.options?.lmap?.center[1],
               props.data.options?.lmap?.center[0],

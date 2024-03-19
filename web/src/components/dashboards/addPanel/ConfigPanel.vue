@@ -242,6 +242,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row">
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lat"
+            :value="0"
+            @update:model-value="
+              (value) =>
+                (dashboardPanelData.data.config.map_view.lat = value
+                  ? value
+                  : 0)
+            "
             :label="t('dashboard.latitudeLabel')"
             color="input-border"
             bg-color="input-bg"
@@ -257,6 +264,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lng"
+            :value="0"
+            @update:model-value="
+              (value) =>
+                (dashboardPanelData.data.config.map_view.lng = value
+                  ? value
+                  : 0)
+            "
             :label="t('dashboard.longitudeLabel')"
             color="input-border"
             bg-color="input-bg"
@@ -273,6 +287,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-input
           v-model.number="dashboardPanelData.data.config.map_view.zoom"
+          :value="1"
+          @update:model-value="
+            (value) =>
+              (dashboardPanelData.data.config.map_view.zoom = value ? value : 1)
+          "
           :label="t('dashboard.zoomLabel')"
           color="input-border"
           bg-color="input-bg"
@@ -313,6 +332,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model.number="
               dashboardPanelData.data.config.map_symbol_style.size_by_value.min
             "
+            :value="1"
+            @update:model-value="
+              (value) =>
+                (dashboardPanelData.data.config.map_symbol_style.size_by_value.min =
+                  value ? value : 1)
+            "
             :label="t('dashboard.minimum')"
             color="input-border"
             bg-color="input-bg"
@@ -336,6 +361,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model.number="
               dashboardPanelData.data.config.map_symbol_style.size_by_value.max
             "
+            :value="100"
+            @update:model-value="
+              (value) =>
+                (dashboardPanelData.data.config.map_symbol_style.size_by_value.max =
+                  value ? value : 100)
+            "
             :label="t('dashboard.maximum')"
             color="input-border"
             bg-color="input-bg"
@@ -357,6 +388,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           v-model.number="
             dashboardPanelData.data.config.map_symbol_style.size_fixed
+          "
+          :value="2"
+          @update:model-value="
+            (value) =>
+              (dashboardPanelData.data.config.map_symbol_style.size_fixed =
+                value ? value : 2)
           "
           :label="t('dashboard.fixedValue')"
           color="input-border"
@@ -549,6 +586,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].config.weight_fixed
+        "
+        :value="1"
+        @update:model-value="
+          (value) =>
+            (dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].config.weight_fixed =
+              value ? value : 1)
         "
         :label="t('common.weight')"
         color="input-border"
