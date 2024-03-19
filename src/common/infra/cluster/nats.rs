@@ -104,6 +104,7 @@ async fn register() -> Result<()> {
     drop(w);
 
     node_ids.sort();
+    log::debug!("node_ids: {:?}", node_ids);
     for id in node_ids {
         if id == node_id {
             node_id += 1;
@@ -119,7 +120,7 @@ async fn register() -> Result<()> {
     // 5. join the cluster
     let key = format!("/nodes/{}", *LOCAL_NODE_UUID);
     let node = Node {
-        id: node_id,
+        id: unsafe { LOCAL_NODE_ID },
         uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
         http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
