@@ -1070,6 +1070,15 @@ const useLogs = () => {
     }
   };
 
+  function hasAggregation(columns: any) {
+    for (const column of columns) {
+      if (column.expr && column.expr.type === "aggr_func") {
+        return true; // Found aggregation function or non-null groupby property
+      }
+    }
+    return false; // No aggregation function or non-null groupby property found
+  }
+
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false
@@ -1102,6 +1111,12 @@ const useLogs = () => {
           if (parsedSQL.limit.seperator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
+          delete queryReq.query.track_total_hits;
+        }
+
+        // for group by query no need to get total.
+        if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
+          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
       }
