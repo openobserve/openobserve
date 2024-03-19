@@ -615,7 +615,7 @@ export default defineComponent({
       return this.searchObj?.meta?.showQuery;
     },
     moveSplitter() {
-      return this.searchObj.config.splitterModel;
+      return this.searchObj?.config?.splitterModel;
     },
     // changeStream() {
     //   return this.searchObj.data.stream.selectedStream;
