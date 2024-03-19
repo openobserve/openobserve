@@ -21,8 +21,8 @@ use config::utils::json;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
+    futures::{StreamExt, TryStreamExt},
     o2_enterprise::enterprise::common::settings,
-    futures::{StreamExt, TryStreamExt}
 };
 
 use crate::{
@@ -125,7 +125,7 @@ async fn upload_logo(
                 }
 
                 match settings::upload_logo(data).await {
-                    Ok(_) => Ok(HttpResponse::Ok().json("Successful")),
+                    Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
                     Err(e) => Ok(MetaHttpResponse::bad_request(e)),
                 }
             } else {
@@ -149,7 +149,7 @@ async fn upload_logo(
 #[delete("/{org_id}/settings/logo")]
 async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
     match settings::delete_logo().await {
-        Ok(_) => Ok(HttpResponse::Ok().json("Successful")),
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
 }

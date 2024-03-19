@@ -30,6 +30,7 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
+    crate::service::kv,
     actix_web::http::header,
     o2_enterprise::enterprise::{
         common::{infra::config::O2_CONFIG, settings::get_logo},
@@ -123,9 +124,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
     #[cfg(feature = "enterprise")]
-    let custom_logo_text = &O2_CONFIG.common.custom_logo_text;
+    let custom_logo_text = match kv::get("default", "custom_logo_text").await {
+        Ok(data) => String::from_utf8(data.to_vec()).unwrap_or_default(),
+        Err(_) => O2_CONFIG.common.custom_logo_text.clone(),
+    };
     #[cfg(not(feature = "enterprise"))]
-    let custom_logo_text = "";
+    let custom_logo_text = "".to_string();
     #[cfg(feature = "enterprise")]
     let custom_slack_url = &O2_CONFIG.common.custom_slack_url;
     #[cfg(not(feature = "enterprise"))]
@@ -164,7 +168,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         rbac_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
         show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
-        custom_logo_text: custom_logo_text.to_string(),
+        custom_logo_text,
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
