@@ -533,7 +533,7 @@ export default defineComponent({
         ].fields.name,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.value,
+        ].fields.valueForMaps,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.source,
@@ -704,27 +704,27 @@ export default defineComponent({
     };
 
     const mapChart = () => {
-      const { name, value } =
+      const { name, valueForMaps } =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields;
 
       let query = "";
 
-      if (name && value) {
+      if (name && valueForMaps) {
         query = `SELECT ${name.column} as "${name.alias}", `;
 
-        if (value?.aggregationFunction) {
-          switch (value.aggregationFunction) {
+        if (valueForMaps?.aggregationFunction) {
+          switch (valueForMaps.aggregationFunction) {
             case "count-distinct":
-              query += `count(distinct(${value.column})) as "${value.alias}"`;
+              query += `count(distinct(${valueForMaps.column})) as "${valueForMaps.alias}"`;
               break;
             default:
-              query += `${value.aggregationFunction}(${value.column}) as "${value.alias}"`;
+              query += `${valueForMaps.aggregationFunction}(${valueForMaps.column}) as "${valueForMaps.alias}"`;
               break;
           }
         } else {
-          query += `${value.column} as "${value.alias}"`;
+          query += `${valueForMaps.column} as "${valueForMaps.alias}"`;
         }
 
         query += ` FROM "${

@@ -169,12 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           'drop-target': dashboardPanelData.meta.dragAndDrop.dragging,
           'drop-entered':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'value',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'valueForMaps',
         }"
         @dragend="onDragEnd()"
-        @dragover="onDragOver($event, 'value')"
-        @drop="onDrop($event, 'value')"
-        @dragenter="onDragEnter($event, 'value', null)"
+        @dragover="onDragOver($event, 'valueForMaps')"
+        @drop="onDrop($event, 'valueForMaps')"
+        @dragenter="onDragEnter($event, 'valueForMaps', null)"
         data-test="dashboard-y-layout"
       >
         <q-btn-group
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields?.value
+            ].fields?.valueForMaps
           "
           :draggable="true"
           @dragstart="
@@ -190,8 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               $event,
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value.column,
-              'value'
+              ].fields?.valueForMaps.column,
+              'valueForMaps'
             )
           "
         >
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value?.column
+                ].fields?.valueForMaps?.column
               }`"
               class="q-pl-sm"
             >
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-y-item-${
                   dashboardPanelData.data.queries[
                     dashboardPanelData.layout.currentQueryIndex
-                  ].fields?.value?.column
+                  ].fields?.valueForMaps?.column
                 }-menu`"
               >
                 <div>
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.value.aggregationFunction
+                          ].fields.valueForMaps.aggregationFunction
                         "
                         :options="triggerOperators"
                         dense
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop.prevent="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.value.aggregationFunction = null
+                              ].fields.valueForMaps.aggregationFunction = null
                             "
                             class="cursor-pointer"
                           />
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields.value.label
+                      ].fields.valueForMaps.label
                     "
                     :rules="[(val) => val > 0 || 'Required']"
                   />
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :fieldObj="
                         dashboardPanelData.data.queries[
                           dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value
+                        ].fields.valueForMaps
                       "
                     />
                   </div>
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.value?.column
+                ].fields?.valueForMaps?.column
               }-remove`"
               @click="removeMapValue()"
               icon="close"
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.value == null
+            ].fields.valueForMaps == null
           "
         >
           <div class="q-mt-xs">{{ Hint }}</div>
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.filter[index].value
+                              ].fields.filter[index].valueForMaps
                             "
                             data-test="dashboard-filter-condition-input"
                             :label="t('common.value')"
@@ -572,7 +572,7 @@ export default defineComponent({
     const $q = useQuasar();
     const expansionItems = reactive({
       name: true,
-      value: true,
+      valueForMaps: true,
       filter: false,
     });
 
@@ -602,7 +602,7 @@ export default defineComponent({
       (newVal: boolean, oldVal: boolean) => {
         if (oldVal == false && newVal == true) {
           expansionItems.name = true;
-          expansionItems.value = true;
+          expansionItems.valueForMaps = true;
           expansionItems.filter = true;
         }
       }
@@ -622,7 +622,7 @@ export default defineComponent({
           case "name":
             addMapName(dragElement);
             break;
-          case "value":
+          case "valueForMaps":
             addMapValue(dragElement);
             break;
           case "f":
@@ -650,7 +650,7 @@ export default defineComponent({
           if (targetAxis !== "f") {
             if (
               (targetAxis === "name" && currentQueryField.name) ||
-              (targetAxis === "value" && currentQueryField.value)
+              (targetAxis === "valueForMaps" && currentQueryField.valueForMaps)
             ) {
               const maxAllowedAxisFields = 1;
 
@@ -669,7 +669,7 @@ export default defineComponent({
             const dragSource = dashboardPanelData.meta.dragAndDrop.dragSource;
             if (dragSource === "name") {
               removeMapName();
-            } else if (dragSource === "value") {
+            } else if (dragSource === "valueForMaps") {
               removeMapValue();
             }
           }
@@ -680,7 +680,7 @@ export default defineComponent({
         // Add to the new axis
         if (targetAxis === "name") {
           addMapName(dragName || customDragName);
-        } else if (targetAxis === "value") {
+        } else if (targetAxis === "valueForMaps") {
           addMapValue(dragName || customDragName);
         }
       }
@@ -750,7 +750,7 @@ export default defineComponent({
       const valueField =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.value;
+        ].fields.valueForMaps;
       return commonBtnLabel(valueField);
     });
 
