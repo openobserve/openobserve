@@ -1104,8 +1104,17 @@ pub async fn merge_parquet_files(
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
+        // TODO: NOT IN is not efficient, need to optimize
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
+            CONFIG.common.column_timestamp
+        )
+    } else if stream_type == StreamType::Metadata && CONFIG.limit.distinct_values_hourly {
+        // TODO: need check the stream name == distinct_values
+        format!(
+            "SELECT MIN({}) AS {}, SUM(count), field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
+            CONFIG.common.column_timestamp,
+            CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp
         )
     } else {

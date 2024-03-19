@@ -551,6 +551,10 @@ pub struct Limit {
     pub fast_mode_file_list_enabled: bool,
     #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
     pub fast_mode_file_list_interval: i64,
+    #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
+    pub distinct_values_interval: u64,
+    #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
+    pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections

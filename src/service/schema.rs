@@ -558,6 +558,10 @@ async fn handle_diff_schema_local_mode(
 
     // release lock
     drop(lock_acquired);
+    log::info!(
+        "Released lock for local stream {} after setting schema",
+        stream_name
+    );
 
     Some(SchemaEvolution {
         schema_compatible: true,
