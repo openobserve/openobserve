@@ -533,7 +533,7 @@ export default defineComponent({
         ].fields.name,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.valueForMaps,
+        ].fields.value_for_maps,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.source,
@@ -704,27 +704,27 @@ export default defineComponent({
     };
 
     const mapChart = () => {
-      const { name, valueForMaps } =
+      const { name, value_for_maps } =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields;
 
       let query = "";
 
-      if (name && valueForMaps) {
+      if (name && value_for_maps) {
         query = `SELECT ${name.column} as "${name.alias}", `;
 
-        if (valueForMaps?.aggregationFunction) {
-          switch (valueForMaps.aggregationFunction) {
+        if (value_for_maps?.aggregationFunction) {
+          switch (value_for_maps.aggregationFunction) {
             case "count-distinct":
-              query += `count(distinct(${valueForMaps.column})) as "${valueForMaps.alias}"`;
+              query += `count(distinct(${value_for_maps.column})) as "${value_for_maps.alias}"`;
               break;
             default:
-              query += `${valueForMaps.aggregationFunction}(${valueForMaps.column}) as "${valueForMaps.alias}"`;
+              query += `${value_for_maps.aggregationFunction}(${value_for_maps.column}) as "${value_for_maps.alias}"`;
               break;
           }
         } else {
-          query += `${valueForMaps.column} as "${valueForMaps.alias}"`;
+          query += `${value_for_maps.column} as "${value_for_maps.alias}"`;
         }
 
         query += ` FROM "${
