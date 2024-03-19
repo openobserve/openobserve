@@ -954,7 +954,7 @@ export default defineComponent({
             }
             if (
               dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
-                .fields.valueForMaps == null
+                .fields.value_for_maps == null
             ) {
               errors.push("Add one field for the value");
             }
