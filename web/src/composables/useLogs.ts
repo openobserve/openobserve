@@ -190,7 +190,8 @@ const useLogs = () => {
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
 
-  searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
+  searchObj.organizationIdetifier =
+    store.state.selectedOrganization?.identifier;
 
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
@@ -1855,7 +1856,8 @@ const useLogs = () => {
     }
 
     if (queryParams.show_histogram) {
-      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
+      searchObj.meta.showHistogram =
+        queryParams.show_histogram == "true" ? true : false;
     }
 
     searchObj.shouldIgnoreWatcher = false;
