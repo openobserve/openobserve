@@ -29,18 +29,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="flex relative-position q-mr-sm"
           v-if="
-            config.isEnterprise == 'true' &&
-            store.state.zoConfig.custom_logo_text != ''
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig.custom_logo_text != '') ||
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig.custom_logo_img != null)
           "
         >
           <span
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig?.custom_logo_text != ''
+            "
             class="text-h6 text-bold q-pa-none cursor-pointer"
             @click="goToHome"
             >{{ store.state.zoConfig.custom_logo_text }}</span
           >
-          <br />
-          <img v-if="store.state.zoConfig?.custom_logo_img != '' || store.state.zoConfig?.custom_logo_img != null" :src="`data:image; base64, `+store.state.zoConfig?.custom_logo_img"
-size="sm" class="q-pt-xs q-pl-xs" style="width: 30px" />
+          <img
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig?.custom_logo_img != null
+            "
+            :src="
+              `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
+            "
+            size="sm"
+            class="q-pt-xs q-pl-xs"
+            style="width: 30px"
+          />
           <img
             class="appLogo"
             :src="
@@ -165,9 +182,7 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat
-unelevated no-caps
-padding="xs sm">
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"

@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="settings_ent_logo_custom_text_edit_btn"
                 :loading="onSubmit.isLoading.value"
                 icon="edit"
-                size="small"
+                size="sm"
                 class="text-bold"
                 type="submit"
                 @click="editingText=!editingText"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-btn icon="delete"
             data-test="setting_ent_custom_logo_img_delete_btn"
-@click="confirmDeleteLogo()" class="q-mx-md"
+@click="confirmDeleteLogo()" class="q-mx-md" size="sm"
               ></q-btn
             >
         </div>
