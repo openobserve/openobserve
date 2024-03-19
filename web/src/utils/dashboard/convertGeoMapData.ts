@@ -100,11 +100,11 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
           // For custom queries
           return {
             name: item[query.fields.name.alias],
-            value_for_maps: item[query.fields.value_for_maps.alias],
+            value: item[query.fields.value_for_maps.alias],
           };
         } else {
           // For auto queries
-          return { name: item.name, value_for_maps: item.value_for_maps };
+          return { name: item.name, value: item.value_for_maps };
         }
       }),
       symbolSize: function (val: any) {
@@ -128,10 +128,10 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
 
   if (seriesData.length > 0) {
     const minValue = Math.min(
-      ...seriesData.map((item: any) => item.value_for_maps)
+      ...seriesData.map((item: any) => item.value)
     );
     const maxValue = Math.max(
-      ...seriesData.map((item: any) => item.value_for_maps)
+      ...seriesData.map((item: any) => item.value)
     );
 
     options.visualMap.min = minValue;
