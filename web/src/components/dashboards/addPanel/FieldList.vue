@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :disabled="
                       dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ].fields?.valueForMaps != null
+                      ].fields?.value_for_maps != null
                     "
                     no-caps
                     padding="sm"
