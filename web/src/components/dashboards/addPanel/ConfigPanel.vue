@@ -243,7 +243,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lat"
             :value="0"
-            @blur="handleBlur('lat')"
+            @blur="
+              handleBlur(dashboardPanelData.data.config.map_view, 0, 'lat')
+            "
             :label="t('dashboard.latitudeLabel')"
             color="input-border"
             bg-color="input-bg"
@@ -260,7 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model.number="dashboardPanelData.data.config.map_view.lng"
             :value="0"
-            @blur="handleBlur('lng')"
+            @blur="
+              handleBlur(dashboardPanelData.data.config.map_view, 0, 'lng')
+            "
             :label="t('dashboard.longitudeLabel')"
             color="input-border"
             bg-color="input-bg"
@@ -278,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model.number="dashboardPanelData.data.config.map_view.zoom"
           :value="1"
-          @blur="handleBlur('zoom')"
+          @blur="handleBlur(dashboardPanelData.data.config.map_view, 1, 'zoom')"
           :label="t('dashboard.zoomLabel')"
           color="input-border"
           bg-color="input-bg"
@@ -320,7 +324,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.config.map_symbol_style.size_by_value.min
             "
             :value="1"
-            @blur="handleBlur('min')"
+            @blur="
+              handleBlur(
+                dashboardPanelData.data.config.map_symbol_style.size_by_value,
+                1,
+                'min'
+              )
+            "
             :label="t('dashboard.minimum')"
             color="input-border"
             bg-color="input-bg"
@@ -345,7 +355,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.config.map_symbol_style.size_by_value.max
             "
             :value="100"
-            @blur="handleBlur('max')"
+            @blur="
+              handleBlur(
+                dashboardPanelData.data.config.map_symbol_style.size_by_value,
+                100,
+                'max'
+              )
+            "
             :label="t('dashboard.maximum')"
             color="input-border"
             bg-color="input-bg"
@@ -369,7 +385,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.config.map_symbol_style.size_fixed
           "
           :value="2"
-          @blur="handleBlur('fixed')"
+          @blur="
+            handleBlur(
+              dashboardPanelData.data.config.map_symbol_style,
+              2,
+              'size_fixed'
+            )
+          "
           :label="t('dashboard.fixedValue')"
           color="input-border"
           bg-color="input-bg"
@@ -563,7 +585,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.weight_fixed
         "
         :value="1"
-        @blur="handleBlur('weight')"
+        @blur="
+          handleBlur(
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].config,
+            1,
+            'weight_fixed'
+          )
+        "
         :label="t('common.weight')"
         color="input-border"
         bg-color="input-bg"
@@ -877,53 +907,13 @@ export default defineComponent({
         ].fields;
       return !!layoutFields?.weight;
     });
-    
-    const handleBlur = (field) => {
-      const blurData = dashboardPanelData.data;
-      switch (field) {
-        case "lat":
-          !blurData.config.map_view.lat
-            ? (blurData.config.map_view.lat = 0)
-            : null;
-          break;
-        case "lng":
-          !blurData.config.map_view.lng
-            ? (blurData.config.map_view.lng = 0)
-            : null;
-          break;
-        case "zoom":
-          !blurData.config.map_view.zoom
-            ? (blurData.config.map_view.zoom = 1)
-            : null;
-          break;
-        case "min":
-          !blurData.config.map_symbol_style.size_by_value.min
-            ? (blurData.config.map_symbol_style.size_by_value.min = 1)
-            : null;
-          break;
-        case "max":
-          !blurData.config.map_symbol_style.size_by_value.max
-            ? (blurData.config.map_symbol_style.size_by_value.max = 100)
-            : null;
-          break;
-        case "fixed":
-          !blurData.config.map_symbol_style.size_fixed
-            ? (blurData.config.map_symbol_style.size_fixed = 2)
-            : null;
-          break;
-        case "weight":
-          !blurData.queries[dashboardPanelData.layout.currentQueryIndex].config
-            .weight_fixed
-            ? (blurData.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].config.weight_fixed = 1)
-            : null;
-          break;
-        default:
-          break;
+
+    const handleBlur = (field: any, key: any, value: any) => {
+      if (!field[value]) {
+        field[value] = key;
       }
     };
-
+    
     return {
       t,
       dashboardPanelData,
