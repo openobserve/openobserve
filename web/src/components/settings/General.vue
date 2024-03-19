@@ -49,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('dashboard.save')"
             class="q-mb-md text-bold no-border"
             color="secondary"
-            padding="sm xl"
             type="submit"
             no-caps
+            size="md"
           />
         </div>
       </q-form>
@@ -65,25 +65,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
-          <q-label class="q-pt-md text-bold">{{ t("settings.customLogoText") }}:</q-label>
-          <div v-if="editingText" class="q-gutter-md row items-start">
+          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="q-gutter-md row items-start">
             <q-input 
+              color="input-border"
+              bg-color="input-bg"
               class="q-py-md showLabelOnTop"
               stack-label
               outlined
               filled
               dense
               data-test="settings_ent_logo_custom_text"
-              type="text"
+              :label="t('settings.customLogoText')"
               v-model="customText"  
             />
-            <div class="btn-group relative-position vertical-middle" style="margin-top: 38px;">
+            <div class="btn-group relative-position vertical-middle" style="margin-top: 55px;">
             <q-btn
               data-test="settings_ent_logo_custom_text_save_btn"
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
               class="text-bold no-border q-mr-sm"
-              color="primary"
+              color="secondary"
               size="sm"
               type="submit"
               no-caps
@@ -91,9 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             
               <q-btn type="button" size="sm" :label="t('common.cancel')" @click="editingText=!editingText"></q-btn>
+            
             </div>
           </div>
           <div v-else style="margin-top: 17px;">
+            <q-label class="q-pt-md text-bold">{{ t("settings.customLogoText") }}</q-label><br />
             {{ store.state.zoConfig.custom_logo_text || "<No Text Available>" }}
               <q-btn
                 data-test="settings_ent_logo_custom_text_edit_btn"
@@ -107,8 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           
         </div>
+        <q-separator class="q-mt-sm"></q-separator>
         <div class="q-gutter-sm row q-mt-xs">
-          <q-label class="q-pt-md text-bold">{{ t("settings.customLogoTitle") }}: </q-label>
+          <q-label class="q-pt-sm text-bold full-width">{{ t("settings.customLogoTitle") }} </q-label><br />
           <div
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -129,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 @click="confirmDeleteLogo()" class="q-mx-md"
               ></q-btn
             >
-          </div>
+        </div>
           <q-file
           data-test="setting_ent_custom_logo_img_file_upload"
             v-else
@@ -143,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             accept=".png, .jpg, .jpeg, .svg, .jpeg2, image/*"
             @rejected="onRejected"
             @update:model-value="uploadImage"
+            class="q-mx-none"
           >
             <template v-slot:prepend>
               <q-icon name="attach_file" />
