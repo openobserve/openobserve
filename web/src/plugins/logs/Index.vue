@@ -609,7 +609,7 @@ export default defineComponent({
       return this.searchObj.meta.showFields;
     },
     showHistogram() {
-      return this.searchObj.meta.showHistogram;
+      return this.searchObj.meta?.showHistogram;
     },
     showQuery() {
       return this.searchObj.meta.showQuery;
