@@ -37,24 +37,24 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     trigger: "item",
     showDelay: 0,
     transitionDuration: 0.2,
-    // backgroundColor: "rgba(255,255,255,0.8)",
-    // formatter: function (params: any) {
-    //   console.log("params", params);
+    backgroundColor: "rgba(255,255,255,0.8)",
+    formatter: function (params: any) {
+      console.log("params", params);
 
-    //   let formattedValue = params.value[2];
-    //   if (getUnitValue && formatUnitValue) {
-    //     formattedValue = formatUnitValue(
-    //       getUnitValue(
-    //         formattedValue,
-    //         panelSchema.config?.unit,
-    //         panelSchema.config?.unit_custom,
-    //         panelSchema.config?.decimals
-    //       )
-    //     );
-    //   }
+      let formattedValue = params.value;
+      if (getUnitValue && formatUnitValue) {
+        formattedValue = formatUnitValue(
+          getUnitValue(
+            formattedValue,
+            panelSchema.config?.unit,
+            panelSchema.config?.unit_custom,
+            panelSchema.config?.decimals
+          )
+        );
+      }
 
-    //   return `${params.seriesName}: ${formattedValue}`;
-    // },
+      return `${params.seriesName}: ${formattedValue}`;
+    },
   };
 
   options.visualMap = {
