@@ -78,8 +78,8 @@ async fn ingest_inner(
     check_ingestion_allowed(org_id, Some(stream_name))?;
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);

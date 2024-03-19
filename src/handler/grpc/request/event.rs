@@ -140,7 +140,8 @@ async fn cache_latest_fields(stream: &str, file: &str) -> Result<(), anyhow::Err
     drop(fr);
 
     if field_cache_time
-        + Duration::seconds(CONFIG.limit.fast_mode_file_list_interval)
+        + Duration::try_seconds(CONFIG.limit.fast_mode_file_list_interval)
+            .unwrap()
             .num_microseconds()
             .unwrap()
         >= Utc::now().timestamp_micros()

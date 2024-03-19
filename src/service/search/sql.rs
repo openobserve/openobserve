@@ -239,14 +239,22 @@ impl Sql {
 
         // check time_range values
         if req_time_range.0 > 0
-            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
+            && req_time_range.0
+                < Duration::try_seconds(1)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query SQL time_range start_time should be microseconds".to_string(),
             )));
         }
         if req_time_range.1 > 0
-            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
+            && req_time_range.1
+                < Duration::try_seconds(1)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query SQL time_range start_time should be microseconds".to_string(),
@@ -400,12 +408,12 @@ impl Sql {
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
                 .to_string();
-            // reset meta fields
-            meta.fields.extend(fields);
             // rewrite distribution sql
             rewrite_sql = RE_ONLY_SELECT
                 .replace(rewrite_sql.as_str(), &select_fields)
                 .to_string();
+            // reset meta fields
+            meta.fields.extend(fields);
         }
 
         // get sql where tokens
@@ -755,7 +763,7 @@ fn generate_fast_mode_fields(
     fts_fields: &[String],
 ) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = match cached_fields.clone() {
+    let schema_fields = match cached_fields {
         Some(v) => v,
         None => schema
             .fields()
@@ -814,7 +822,10 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
             "{} second",
             std::cmp::max(
                 (time_range.1 - time_range.0)
-                    / Duration::seconds(1).num_microseconds().unwrap()
+                    / Duration::try_seconds(1)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
                     / num as i64,
                 1
             )
@@ -823,23 +834,47 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
 
     let intervals = [
         (
-            Duration::hours(24 * 30).num_microseconds().unwrap(),
+            Duration::try_hours(24 * 30)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "1 day",
         ),
         (
-            Duration::hours(24 * 7).num_microseconds().unwrap(),
+            Duration::try_hours(24 * 7)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "1 hour",
         ),
-        (Duration::hours(24).num_microseconds().unwrap(), "30 minute"),
-        (Duration::hours(6).num_microseconds().unwrap(), "5 minute"),
-        (Duration::hours(2).num_microseconds().unwrap(), "1 minute"),
-        (Duration::hours(1).num_microseconds().unwrap(), "30 second"),
         (
-            Duration::minutes(30).num_microseconds().unwrap(),
+            Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
+            "30 minute",
+        ),
+        (
+            Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
+            "5 minute",
+        ),
+        (
+            Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
+            "1 minute",
+        ),
+        (
+            Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
+            "30 second",
+        ),
+        (
+            Duration::try_minutes(30)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "15 second",
         ),
         (
-            Duration::minutes(15).num_microseconds().unwrap(),
+            Duration::try_minutes(15)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "10 second",
         ),
     ];
