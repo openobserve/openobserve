@@ -627,7 +627,7 @@ export default defineComponent({
       );
     },
     updateSelectedColumns() {
-      return this.searchObj.data.stream.selectedFields.length;
+      return this.searchObj?.data?.stream?.selectedFields?.length;
     },
     runQuery() {
       return this.searchObj.runQuery;
