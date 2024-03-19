@@ -564,6 +564,8 @@
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
     "basemapLabel": "Base Map",
+    "world": "World",
+    "mapTypeLabel": "Map Type",
     "customunitLabel": "Custom Unit",
     "latitudeLabel": "Latitude",
     "longitudeLabel": "Longitude",

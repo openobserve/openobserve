@@ -20,6 +20,8 @@
  * @param {any} mapData - the map data
  * @return {Object} - the option object for rendering the map chart
  */
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+
 export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   console.log("convertGeoMapData", panelSchema, mapData);
   //if no name and value than return it
@@ -35,6 +37,24 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     trigger: "item",
     showDelay: 0,
     transitionDuration: 0.2,
+    // backgroundColor: "rgba(255,255,255,0.8)",
+    // formatter: function (params: any) {
+    //   console.log("params", params);
+
+    //   let formattedValue = params.value[2];
+    //   if (getUnitValue && formatUnitValue) {
+    //     formattedValue = formatUnitValue(
+    //       getUnitValue(
+    //         formattedValue,
+    //         panelSchema.config?.unit,
+    //         panelSchema.config?.unit_custom,
+    //         panelSchema.config?.decimals
+    //       )
+    //     );
+    //   }
+
+    //   return `${params.seriesName}: ${formattedValue}`;
+    // },
   };
 
   options.visualMap = {
@@ -98,6 +118,12 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
     };
   });
+
+  console.log(
+    "options---",
+    options.series.map((series: any) => series.data)
+  );
+
   const seriesData = options.series.flatMap((series: any) => series.data);
 
   if (seriesData.length > 0) {
