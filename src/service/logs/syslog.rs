@@ -163,7 +163,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         None => Utc::now().timestamp_micros(),
     };
     // check ingestion time
-    let earlest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
+    let earlest_time = Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap();
     if timestamp < earlest_time.timestamp_micros() {
         stream_status.status.failed += 1; // to old data, just discard
         stream_status.status.error = get_upto_discard_error().to_string();

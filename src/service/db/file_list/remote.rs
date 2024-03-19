@@ -216,7 +216,7 @@ pub async fn cache_time_range(time_min: i64, time_max: i64) -> Result<(), anyhow
         let offset_time: DateTime<Utc> = Utc.timestamp_nanos(cur_time * 1000);
         let file_list_prefix = offset_time.format("%Y/%m/%d/%H/").to_string();
         cache(&file_list_prefix, false).await?;
-        cur_time += Duration::hours(1).num_microseconds().unwrap();
+        cur_time += Duration::try_hours(1).unwrap().num_microseconds().unwrap();
     }
     Ok(())
 }

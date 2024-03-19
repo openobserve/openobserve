@@ -1,6 +1,7 @@
 ///<reference types="cypress" />
 import * as logstests from "../allfunctions/logs";
-import logsdata from "../../data/logs_data.json";
+import logsdata from "../../../../test-data/logs_data.json"
+// import logsdata from "../../data/logs_data.json";
 // import { login } from "../../support/commons"
 // import { selectStreamAndStreamType } from "../../support/log-commons";
 
@@ -97,6 +98,9 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
       .type(" WHERE match_all_indexed_ignore_case('provide_credentials')");
+    cy.get("[data-test='logs-search-bar-refresh-btn']", {
+      timeout: 2000,
+    }).click({ force: true });
     cy.get('[data-test="logs-search-result-records-per-page"]').click();
     cy.get(".q-virtual-scroll__content:last").click();
 
