@@ -17,63 +17,81 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
-import * as echarts from "echarts";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  watch,
+  onUnmounted,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
-import * as map from "./../../../locales/languages/map.json"
+import * as map from "./../../../locales/languages/map.json";
+import * as echarts from "echarts/core";
+import { MapChart } from "echarts/charts";
+
+echarts.use([
+  MapChart,
+]);
+
 export default defineComponent({
-    name: "GeoJSONMapRenderer",
-    props: {
-        data: {
-            required: true,
-            type: Object,
-            default: () => ({ options: {} })
-        },
+  name: "GeoJSONMapRenderer",
+  props: {
+    data: {
+      required: true,
+      type: Object,
+      default: () => ({ options: {} }),
     },
-    setup(props: any) {
-        const chartRef: any = ref(null);
-        let chart: any;
-        const store = useStore();
-        const windowResizeEventCallback = async () => {
-            console.log('resize from geojsonmap');
-            
-            await nextTick();
-            await nextTick();
-            chart.resize();
-        }
+  },
+  setup(props: any) {
+    const chartRef: any = ref(null);
+    let chart: any;
+    const store = useStore();
+    const windowResizeEventCallback = async () => {
+      console.log("resize from geojsonmap");
 
-        onMounted(async () => {
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
-            await nextTick();
+      await nextTick();
+      await nextTick();
+      chart.resize();
+    };
 
-            if (chartRef.value) {
-                chart = echarts.init(chartRef.value);
-                echarts.registerMap('world', (map) as any);
-                console.log("onMounted props.data.options", props.data.options);
-                
-                chart?.setOption(props?.data?.options || {}, true);
-                window.addEventListener("resize", windowResizeEventCallback);
-            }
-        });
-        onUnmounted(() => {
-            console.log("onUnMounted", props.data.options);
+    onMounted(async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+      await nextTick();
 
-            window.removeEventListener("resize", windowResizeEventCallback);
-            if(chart) chart?.dispose();
-        });
-        watch(() => props.data.options, async () => {
-            await nextTick();
-            chart?.resize();
-            console.log("props.data.options", props.data.options);
-            
-            chart?.setOption(props?.data?.options || {}, true);
-        }, { deep: true });
-        return { chartRef };
-    },
-})
+      if (chartRef.value) {
+        chart = echarts.init(chartRef.value);
+        echarts.registerMap("world", map as any);
+        console.log("onMounted props.data.options", props.data.options);
+
+        chart?.setOption(props?.data?.options || {}, true);
+        window.addEventListener("resize", windowResizeEventCallback);
+      }
+    });
+    onUnmounted(() => {
+      console.log("onUnMounted", props.data.options);
+
+      window.removeEventListener("resize", windowResizeEventCallback);
+      if (chart) chart?.dispose();
+    });
+    watch(
+      () => props.data.options,
+      async () => {
+        await nextTick();
+        chart?.resize();
+        console.log("props.data.options", props.data.options);
+
+        chart?.setOption(props?.data?.options || {}, true);
+        console.log("setOption", props.data.options);
+      },
+      { deep: true }
+    );
+    return { chartRef };
+  },
+});
 </script>

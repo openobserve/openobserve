@@ -117,7 +117,7 @@ const getDefaultDashboardPanelData: any = () => ({
           longitude: null,
           weight: null,
           name: null,
-          valueForMaps: null,
+          value_for_maps: null,
           source: null,
           target: null,
           value: null,
@@ -233,7 +233,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         longitude: null,
         weight: null,
         name: null,
-        valueForMaps: null,
+        value_for_maps: null,
         source: null,
         target: null,
         value: null,
@@ -697,13 +697,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.valueForMaps
+      ].fields.value_for_maps
     ) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.valueForMaps = {
+      ].fields.value_for_maps = {
         label: generateLabelFromName(row.name),
-        alias: "valueForMaps",
+        alias: "value_for_maps",
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: "count", // You can set the appropriate aggregation function here
@@ -799,7 +799,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.longitude = null;
           query.fields.weight = null;
           query.fields.name = null;
-          query.fields.valueForMaps = null;
+          query.fields.value_for_maps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -841,7 +841,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.longitude = null;
           query.fields.weight = null;
           query.fields.name = null;
-          query.fields.valueForMaps = null;
+          query.fields.value_for_maps = null;
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
@@ -905,7 +905,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.z = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.name = null;
-          query.fields.valueForMaps = null;
+          query.fields.value_for_maps = null;
         });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -986,7 +986,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.longitude = null;
           query.fields.weight = null;
           query.fields.name = null;
-          query.fields.valueForMaps = null;
+          query.fields.value_for_maps = null;
         });
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1126,13 +1126,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.name = null;
-  }
+  };
 
   const removeMapValue = () => {
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
-    ].fields.valueForMaps = null;
-  }
+    ].fields.value_for_maps = null;
+  };
 
   const removeSource = () => {
     dashboardPanelData.data.queries[
@@ -1329,7 +1329,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].fields.name = null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.valueForMaps = null;
+      ].fields.value_for_maps = null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.source = null;
@@ -1486,14 +1486,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields.weight;
-          } else if(name === "name"){
-            field = dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.name;
-          } else if(name === "valueForMaps"){
-            field = dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.valueForMaps;
+          } else if (name === "name") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.name;
+          } else if (name === "value_for_maps") {
+            field =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].fields.value_for_maps;
           } else if (name === "source") {
             field =
               dashboardPanelData.data.queries[
@@ -1753,7 +1755,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         field =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.valueForMaps;
+          ].fields.value_for_maps;
 
         if (field && field.alias == oldName) {
           const newName = newArray[changedIndex[0]]?.name;
