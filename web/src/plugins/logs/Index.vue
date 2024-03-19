@@ -622,29 +622,29 @@ export default defineComponent({
     // },
     changeRelativeDate() {
       return (
-        this.searchObj.data.datetime.relative.value +
-        this.searchObj.data.datetime.relative.period.value
+        this.searchObj?.data?.datetime.relative.value +
+        this.searchObj?.data?.datetime.relative.period.value
       );
     },
     updateSelectedColumns() {
       return this.searchObj?.data?.stream?.selectedFields?.length;
     },
     runQuery() {
-      return this.searchObj.runQuery;
+      return this.searchObj?.runQuery;
     },
     changeRefreshInterval() {
-      return this.searchObj.meta.refreshInterval;
+      return this.searchObj?.meta?.refreshInterval;
     },
     fullSQLMode() {
-      return this.searchObj.meta.sqlMode;
+      return this.searchObj?.meta?.sqlMode;
     },
     refreshHistogram() {
-      return this.searchObj.meta.histogramDirtyFlag;
+      return this.searchObj?.meta?.histogramDirtyFlag;
     },
     redrawHistogram() {
       return (
-        this.searchObj.data.histogram.hasOwnProperty("xData") &&
-        this.searchObj.data.histogram.xData.length
+        this.searchObj?.data.histogram.hasOwnProperty("xData") &&
+        this.searchObj?.data.histogram.xData.length
       );
     },
   },
