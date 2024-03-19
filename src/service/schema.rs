@@ -596,7 +596,7 @@ async fn handle_diff_schema_cluster_mode(
     let locker = match dist_lock::lock(&lock_key, 0).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("dist_lock for handle diff schema error: {}", e);
+            log::error!("[SCHEMA] dist_lock schema {} error : {}", lock_key, e);
             return None;
         }
     };
