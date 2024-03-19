@@ -15,17 +15,27 @@
 
 use std::sync::Arc;
 
+use arrow_schema::{Field, Fields};
 use datafusion::{
     arrow::{
-        array::{as_string_array, ArrayRef, BooleanArray},
+        array::{
+            as_large_list_array, as_list_array, as_string_array, Array, ArrayData, ArrayRef,
+            BooleanArray, StringArray, StructArray,
+        },
         datatypes::DataType,
     },
-    error::DataFusionError,
-    logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
+    common::cast::as_generic_string_array,
+    error::{DataFusionError, Result},
+    logical_expr::{
+        ExprSchemable, ScalarFunctionImplementation, ScalarUDF, ScalarUDFImpl, Signature,
+        Volatility,
+    },
+    physical_expr::regex_expressions::regexp_match,
     physical_plan::ColumnarValue,
-    prelude::create_udf,
+    prelude::{create_udf, Expr},
     scalar::ScalarValue,
 };
+use datafusion_expr::TypeSignature::Exact;
 use once_cell::sync::Lazy;
 
 /// Implementation of regexp_match
@@ -51,6 +61,10 @@ pub(crate) static REGEX_NOT_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         regex_match_expr_impl(false),
     )
 });
+
+/// Implementation of regexp_match_to_fields
+pub(crate) static REGEXP_MATCH_TO_FIELDS_UDF: Lazy<ScalarUDF> =
+    Lazy::new(|| ScalarUDF::from(RegxpMatchToFields::new()));
 
 /// Given a column containing string values and a single regex pattern,
 /// `regex_match_expr` determines which values satisfy the pattern and which do
@@ -201,14 +215,190 @@ fn clean_non_meta_escapes(pattern: &str) -> String {
     new_pattern
 }
 
+/// A customized implementation of REGEXP_MATCH() that further process the results
+/// from DataFusion regexp_match() function. Instead of returning all found matches
+/// in a single column, this function unpack the found matches to match Named Capturing
+/// Groups parsed from regex patterns from the second function arguments. If successful,
+/// the function returns a key_value pair struct where keys are field names and values
+/// are found field values.
+///
+/// The number of arguments and data types of arguments are implemented the same as
+/// the native REGEXP_MATCH() function. They can be used the same way, but to get results
+/// back in different formats.
+#[derive(Debug, Clone)]
+struct RegxpMatchToFields {
+    signature: Signature,
+    aliases: Vec<String>,
+}
+
+impl RegxpMatchToFields {
+    fn new() -> Self {
+        Self {
+            signature: Signature::one_of(
+                vec![
+                    Exact(vec![DataType::Utf8, DataType::Utf8]),
+                    Exact(vec![DataType::LargeUtf8, DataType::Utf8]),
+                    Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                    Exact(vec![DataType::LargeUtf8, DataType::Utf8, DataType::Utf8]),
+                ],
+                Volatility::Immutable,
+            ),
+            aliases: vec!["regexp_match_to_fields".to_string()],
+        }
+    }
+}
+
+impl ScalarUDFImpl for RegxpMatchToFields {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn name(&self) -> &str {
+        "regexp_match_to_fields"
+    }
+
+    fn signature(&self) -> &Signature {
+        &self.signature
+    }
+
+    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
+        unreachable!() // since return_type_from_exprs is implemented
+    }
+
+    fn return_type_from_exprs(
+        &self,
+        args: &[Expr],
+        schema: &dyn datafusion::common::ExprSchema,
+    ) -> Result<DataType> {
+        let regexp_pattern = match &args[1] {
+            Expr::Literal(arg2) => arg2.to_string().replace("\"", ""),
+            other => {
+                return Err(DataFusionError::Execution(format!(
+                    "The second argument for regexp_match_to_fields needs to be a string, but got {}",
+                    other.get_type(schema)?
+                )));
+            }
+        };
+        let ret_type = &args[0].get_type(schema)?;
+        let fields = regex_pattern_to_fields(&regexp_pattern, ret_type)?;
+        Ok(DataType::Struct(Fields::from_iter(fields)))
+    }
+
+    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
+        // 1. Get result from datafusion native regexp_match() function
+        let len = args
+            .iter()
+            .fold(Option::<usize>::None, |acc, arg| match arg {
+                ColumnarValue::Scalar(_) => acc,
+                ColumnarValue::Array(arr) => Some(arr.len()),
+            });
+
+        let inferred_length = len.unwrap_or(0);
+        let args_array = args
+            .iter()
+            .map(|arg| arg.clone().into_array(inferred_length))
+            .collect::<Result<Vec<_>>>()?;
+
+        let result = match &args_array[0].data_type() {
+            DataType::Utf8 => regexp_match::<i32>(&args_array)?,
+            DataType::LargeUtf8 => regexp_match::<i64>(&args_array)?,
+            other => {
+                return Err(DataFusionError::Execution(format!(
+                    "Unsupported data type {other:?} for function regexp_match"
+                )));
+            }
+        };
+
+        let (ret_data_type, regexp_pattern) = match &args[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(pattern))) => {
+                (DataType::Utf8, pattern.to_string().replace("\"", ""))
+            }
+            ColumnarValue::Scalar(ScalarValue::LargeUtf8(Some(pattern))) => {
+                (DataType::LargeUtf8, pattern.to_string().replace("\"", ""))
+            }
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings"
+                )));
+            }
+        };
+
+        // 2. Unpack result and argument to construct returning struct
+        let fields = regex_pattern_to_fields(&regexp_pattern, &ret_data_type)?;
+
+        // 3. Build returning struct
+        let mut struct_builder = ArrayData::builder(DataType::Struct(fields.into()));
+        match ret_data_type {
+            // Result is a single column of ListArray of StringArray.
+            // Get the first value of ListArray and iterate the StringArray
+            // and build individual StringArrays
+            DataType::Utf8 => {
+                let result_string_arr = as_list_array(&result).value(0);
+                let result_string_arr_internal =
+                    as_generic_string_array::<i32>(&result_string_arr)?;
+
+                for v in result_string_arr_internal {
+                    let arr = StringArray::from(vec![v]);
+                    struct_builder = struct_builder.len(arr.len()).add_child_data(arr.to_data());
+                }
+            }
+            DataType::LargeUtf8 => {
+                let result_string_arr = as_large_list_array(&result).value(0);
+                let result_string_arr_internal =
+                    as_generic_string_array::<i64>(&result_string_arr)?;
+
+                for v in result_string_arr_internal {
+                    let arr = StringArray::from(vec![v]);
+                    struct_builder = struct_builder.len(arr.len()).add_child_data(arr.to_data());
+                }
+            }
+            _ => unreachable!(), // since checked above
+        }
+
+        let Ok(struct_array_data) = struct_builder.build() else {
+            return Err(DataFusionError::Execution(format!(
+                r"regexp_match_to_fields failed to pack result to fields. Named Capturing groups are
+                required in regexp pattern"
+            )));
+        };
+
+        let struct_array = StructArray::from(struct_array_data);
+        Ok(ColumnarValue::Scalar(ScalarValue::Struct(Arc::new(
+            struct_array,
+        ))))
+    }
+
+    fn aliases(&self) -> &[String] {
+        &self.aliases
+    }
+}
+
+/// Parsing field names from given regex pattern by using Named Capturing Groups
+/// Error if Named Capturing Groups not used in regex pattern.
+fn regex_pattern_to_fields(pattern: &str, ret_type: &DataType) -> Result<Vec<Field>> {
+    let mut field_names = vec![];
+    let re = regex::Regex::new(r"\?<([^>']+)>|\?P<([^>']+)").unwrap();
+    for (_, [field_name]) in re.captures_iter(pattern).map(|cap| cap.extract()) {
+        field_names.push(field_name);
+    }
+
+    if field_names.len() == 0 {
+        Err(DataFusionError::Execution(format!(
+            "Named Capturing Groups must be used to assign field names for regexp_match_to_fields function"
+        )))
+    } else {
+        Ok(field_names
+            .into_iter()
+            .map(|field_name| Field::new(field_name, ret_type.to_owned(), false))
+            .collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use datafusion::{
-        arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{Field, Schema},
-            record_batch::RecordBatch,
-        },
+        arrow::{array::Int64Array, datatypes::Schema, record_batch::RecordBatch},
+        assert_batches_eq,
         datasource::MemTable,
         prelude::SessionContext,
     };
@@ -266,5 +456,47 @@ mod tests {
         assert!(is_valid_character_after_escape('p'));
         assert!(is_valid_character_after_escape('d'));
         assert!(!is_valid_character_after_escape('a'));
+    }
+
+    #[tokio::test]
+    async fn test_regexp_match_to_fields_udf() {
+        let log_line = r#"2024-02-29 00:15:30 15.128.22.213 GET /Administradores_Elina/service-worker.js - 443"#;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![log_line]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let my_udf = ScalarUDF::from(RegxpMatchToFields::new());
+        ctx.register_udf(my_udf);
+
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let sqls = vec![
+            (
+                r#"select regexp_match_to_fields(log, '(?P<timestamp>[^\s]+ [^\s]+) (?P<client_ip>[^\s]+) (?P<http_method>[^\s]+) (?P<requested_path>[^\s]+) (?P<placeholder1>[^\s]+) (?P<server_port>[^\s]+)') as subquery from t"#,
+                vec![
+                    "+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+",
+                    "| subquery                                                                                                                                                                  |",
+                    "+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+",
+                    "| {timestamp: 2024-02-29 00:15:30, client_ip: 15.128.22.213, http_method: GET, requested_path: /Administradores_Elina/service-worker.js, placeholder1: -, server_port: 443} |",
+                    "+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+",
+                ],
+            ),
+            (
+                r#"select regexp_match_to_fields(log, '([^\s]+ [^\s]+) ([^\s]+) ([^\s]+)') as subquery from t"#,
+                vec![],
+            ),
+        ];
+        let test1 = ctx.sql(sqls[0].0).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(sqls[0].1, &test1);
+
+        let test2 = ctx.sql(sqls[1].0).await;
+        assert!(test2.is_err());
     }
 }
