@@ -38,7 +38,7 @@ impl TimeOperationType {
     /// for e.g. month(), year(), day() etc.
     pub fn get_component_from_ts(&self, timestamp: i64) -> u32 {
         let timestamp = parse_i64_to_timestamp_micros(timestamp);
-        let naive_datetime = chrono::NaiveDateTime::from_timestamp_micros(timestamp).unwrap();
+        let naive_datetime = chrono::DateTime::from_timestamp_micros(timestamp).unwrap();
         match self {
             Self::Minute => naive_datetime.minute(),
             Self::Hour => naive_datetime.hour(),

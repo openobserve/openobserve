@@ -397,7 +397,11 @@ pub async fn around(
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
-            start_time: around_key - Duration::seconds(900).num_microseconds().unwrap(),
+            start_time: around_key
+                - Duration::try_seconds(900)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap(),
             end_time: around_key,
             sort_by: Some(format!("{} DESC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
@@ -454,7 +458,11 @@ pub async fn around(
             from: 0,
             size: around_size / 2,
             start_time: around_key,
-            end_time: around_key + Duration::seconds(900).num_microseconds().unwrap(),
+            end_time: around_key
+                + Duration::try_seconds(900)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap(),
             sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
             fast_mode: false,
@@ -539,11 +547,16 @@ pub async fn around(
         ])
         .inc();
 
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -614,7 +627,10 @@ pub async fn values(
         None => "".to_string(),
         Some(v) => base64::decode(v).unwrap_or("".to_string()),
     };
-
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     if fields.len() == 1
         && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
@@ -631,20 +647,39 @@ pub async fn values(
                         &fields[0],
                         Some((column[0], column[1])),
                         &query,
+                        user_id,
                     )
                     .await;
                 }
             } else {
                 // no filter
-                return values_v2(&org_id, stream_type, &stream_name, &fields[0], None, &query)
-                    .await;
+                return values_v2(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &fields[0],
+                    None,
+                    &query,
+                    user_id,
+                )
+                .await;
             }
         } else {
             // no filter
-            return values_v2(&org_id, stream_type, &stream_name, &fields[0], None, &query).await;
+            return values_v2(
+                &org_id,
+                stream_type,
+                &stream_name,
+                &fields[0],
+                None,
+                &query,
+                user_id,
+            )
+            .await;
         }
     }
-    values_v1(&org_id, stream_type, &stream_name, &query).await
+
+    values_v1(&org_id, stream_type, &stream_name, &query, user_id).await
 }
 
 /// search in original data
@@ -653,6 +688,7 @@ async fn values_v1(
     stream_type: StreamType,
     stream_name: &str,
     query: &web::Query<HashMap<String, String>>,
+    user_id: &str,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = ider::uuid();
@@ -843,6 +879,7 @@ async fn values_v1(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -867,6 +904,7 @@ async fn values_v2(
     field: &str,
     filter: Option<(&str, &str)>,
     query: &web::Query<HashMap<String, String>>,
+    user_id: &str,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = ider::uuid();
@@ -1005,6 +1043,7 @@ async fn values_v2(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

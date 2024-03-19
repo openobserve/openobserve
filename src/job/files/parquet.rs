@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
+use anyhow::Context;
 use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
@@ -135,7 +136,11 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
 
         let wal_dir = wal_dir.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .context("[INGESTER:JOB] Failed to acquire semaphore for file uploading")?;
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
             // sort by created time
             let mut files_with_size = files_with_size.to_owned();
@@ -149,7 +154,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 let mut has_expired_files = false;
                 // not enough files to upload, check if some files are too old
                 let min_ts = Utc::now().timestamp_micros()
-                    - Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                    - Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap();
                 for file in files_with_size.iter() {
@@ -174,7 +180,18 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
 
             // get latest schema
-            let latest_schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
+            let latest_schema = db::schema::get(&org_id, &stream_name, stream_type)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[INGESTER:JOB] Failed to get latest schema for stream [{}/{}/{}]: {}",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                        e
+                    );
+                    e
+                })?;
 
             // start merge files and upload to s3
             loop {

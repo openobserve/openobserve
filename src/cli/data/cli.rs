@@ -91,12 +91,13 @@ fn handle_args(app: clap::ArgMatches) -> Cli {
             .date_naive()
             .and_hms_milli_opt(0, 0, 0, 0)
             .unwrap()
+            .and_utc()
             .timestamp_micros(),
     };
 
     let end = match app.get_one::<String>("end_time") {
         Some(time) => time.parse::<i64>().unwrap(),
-        None => (Local::now() - Duration::hours(1)).timestamp_micros(),
+        None => (Local::now() - Duration::try_hours(1).unwrap()).timestamp_micros(),
     };
 
     Cli {

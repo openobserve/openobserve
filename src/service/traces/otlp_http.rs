@@ -104,8 +104,8 @@ pub async fn traces_json(
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 

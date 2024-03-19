@@ -82,8 +82,8 @@ pub async fn usage_ingest(
         return Err(anyhow::anyhow!("stream [{stream_name}] is being deleted"));
     }
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_status = StreamStatus::new(stream_name);
@@ -359,7 +359,8 @@ pub async fn handle_grpc_request(
                 }
 
                 // check ingestion time
-                let earlest_time = Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto);
+                let earlest_time =
+                    Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap();
 
                 let ts = if log_record.time_unix_nano != 0 {
                     log_record.time_unix_nano / 1000

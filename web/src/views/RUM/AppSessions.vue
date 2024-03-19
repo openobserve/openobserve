@@ -328,18 +328,18 @@ const getStreamFields = () => {
         const fieldsToVerify = new Set([
           "geo_info_city",
           "geo_info_country",
-          "usr_email",
-          "usr_id",
-          "usr_name",
+          // "usr_email",
+          // "usr_id",
+          // "usr_name",
         ]);
         streamFields.value = [];
 
-        streamFields.value.push({
-          name: "usr_email",
-          type: "UTF8",
-          stream_name: "_rumdata",
-          showValues: true,
-        });
+        // streamFields.value.push({
+        //   name: "usr_email",
+        //   type: "UTF8",
+        //   stream_name: "_rumdata",
+        //   showValues: true,
+        // });
 
         stream.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name))
