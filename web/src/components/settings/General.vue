@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val) => !!val || 'Scrape interval is required']"
+          :rules="[(val: any) => !!val || 'Scrape interval is required']"
           :lazy-rules="true"
         />
         <span>&nbsp;</span>
@@ -247,7 +247,7 @@ export default defineComponent({
       }
     });
 
-    const uploadImage = (event: Event) => {
+    const uploadImage = (event: any) => {
       if (config.isEnterprise == "true") {
         loadingState.value = true;
         const formData = new FormData();
@@ -308,7 +308,7 @@ export default defineComponent({
       }
       settingsService
         .deleteLogo(orgIdentifier)
-        .then(async (res) => {
+        .then(async (res: any) => {
           if (res.status == 200) {
             q.notify({
               type: "positive",
@@ -349,8 +349,8 @@ export default defineComponent({
       }
 
       settingsService
-        .updateCustomText(orgIdentifier, "custom_logo_text", customText)
-        .then(async (res) => {
+        .updateCustomText(orgIdentifier, "custom_logo_text", customText.value)
+        .then(async (res: any) => {
           if (res.status == 200) {
             q.notify({
               type: "positive",
@@ -359,7 +359,7 @@ export default defineComponent({
             });
 
             let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
-            stateConfig.custom_logo_text = customText;
+            stateConfig.custom_logo_text = customText.value;
             store.dispatch("setConfig", stateConfig);
             editingText.value = false;
           } else {
@@ -369,16 +369,21 @@ export default defineComponent({
               timeout: 2000,
             });
           }
-        }).catch(async (err) => {
+        }).catch((err) => {
           q.notify({
             type: "negative",
             message: err?.message || "Something went wrong.",
             timeout: 2000,
           });
-        }).finally(async (res) => {
+        }).finally(() => {
           loadingState.value = false;
         });
     };
+
+    interface CounterLabelParams {
+      totalSize: string;
+      filesNumber: number;
+    }
 
     return {
       t,
@@ -389,8 +394,8 @@ export default defineComponent({
       scrapeIntereval,
       onSubmit,
       files: ref(null),
-      counterLabelFn({ totalSize, filesNumber }) {
-        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb) ${filesNumber} file | ${totalSize}`;
+      counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any; }) {
+        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),

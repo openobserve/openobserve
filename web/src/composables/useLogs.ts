@@ -1070,7 +1070,7 @@ const useLogs = () => {
     }
   };
 
-  function hasAggregation(columns) {
+  function hasAggregation(columns: any) {
     for (const column of columns) {
       if (column.expr && column.expr.type === "aggr_func") {
         return true; // Found aggregation function or non-null groupby property
