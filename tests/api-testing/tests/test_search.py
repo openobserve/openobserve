@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import time
 
 
-def test_e2e_alerts(create_session, base_url):
+def test_e2e_getsearch(create_session, base_url):
     """Running an E2E test no payload."""
 
     session = create_session
