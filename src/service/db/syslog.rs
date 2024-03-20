@@ -31,7 +31,7 @@ pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
             "/syslog/enabled",
             json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
             infra_db::NEED_WATCH,
-            0,
+            None,
         )
         .await?)
 }
@@ -55,7 +55,7 @@ pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
             &format!("/syslog/route/{}", route.id),
             json::to_vec(route).unwrap().into(),
             infra_db::NEED_WATCH,
-            0,
+            None,
         )
         .await?)
 }

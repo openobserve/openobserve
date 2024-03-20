@@ -100,7 +100,13 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()>;
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()>;
     async fn delete(
         &self,
         key: &str,
@@ -205,7 +211,7 @@ mod tests {
     async fn test_put() {
         create_table().await.unwrap();
         let db = get_db().await;
-        db.put("/foo/put/bar", Bytes::from("hello"), false, 0)
+        db.put("/foo/put/bar", Bytes::from("hello"), false, None)
             .await
             .unwrap();
     }
@@ -215,7 +221,7 @@ mod tests {
         create_table().await.unwrap();
         let db = get_db().await;
         let hello = Bytes::from("hello");
-        db.put("/foo/get/bar", hello.clone(), false, 0)
+        db.put("/foo/get/bar", hello.clone(), false, None)
             .await
             .unwrap();
         assert_eq!(db.get("/foo/get/bar").await.unwrap(), hello);
@@ -227,13 +233,13 @@ mod tests {
         let db = get_db().await;
         let hello = Bytes::from("hello");
 
-        db.put("/foo/del/bar1", hello.clone(), false, 0)
+        db.put("/foo/del/bar1", hello.clone(), false, None)
             .await
             .unwrap();
-        db.put("/foo/del/bar2", hello.clone(), false, 0)
+        db.put("/foo/del/bar2", hello.clone(), false, None)
             .await
             .unwrap();
-        db.put("/foo/del/bar3", hello.clone(), false, 0)
+        db.put("/foo/del/bar3", hello.clone(), false, None)
             .await
             .unwrap();
         db.delete("/foo/del/bar1", false, false, None)
@@ -242,13 +248,13 @@ mod tests {
         assert!(db.delete("/foo/del/bar4", false, false, None).await.is_ok());
         db.delete("/foo/del/", true, false, None).await.unwrap();
 
-        db.put("/foo/del/bar1", hello.clone(), false, 0)
+        db.put("/foo/del/bar1", hello.clone(), false, None)
             .await
             .unwrap();
-        db.put("/foo/del/bar2", hello.clone(), false, 0)
+        db.put("/foo/del/bar2", hello.clone(), false, None)
             .await
             .unwrap();
-        db.put("/foo/del/bar3", hello, false, 0).await.unwrap();
+        db.put("/foo/del/bar3", hello, false, None).await.unwrap();
         assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
     }

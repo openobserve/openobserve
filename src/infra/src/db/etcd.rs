@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2None23 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,13 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool, _start_dt: i64) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
@@ -527,15 +533,15 @@ mod tests {
         }
         let client = Etcd::default();
         client
-            .put("/test/count/1", bytes::Bytes::from("1"), false, 0)
+            .put("/test/count/1", bytes::Bytes::from("1"), false, None)
             .await
             .unwrap();
         client
-            .put("/test/count/2", bytes::Bytes::from("2"), false, 0)
+            .put("/test/count/2", bytes::Bytes::from("2"), false, None)
             .await
             .unwrap();
         client
-            .put("/test/count/3", bytes::Bytes::from("3"), false, 0)
+            .put("/test/count/3", bytes::Bytes::from("3"), false, None)
             .await
             .unwrap();
         let count = client.count("/test/count").await.unwrap();

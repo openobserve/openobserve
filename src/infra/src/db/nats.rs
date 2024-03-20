@@ -118,7 +118,13 @@ impl super::Db for NatsDb {
         }
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool, _start_dt: i64) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = base64::encode_url(new_key);
         _ = bucket.put(&key, value).await?;

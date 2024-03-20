@@ -172,7 +172,7 @@ pub async fn set(
                         &key,
                         json::to_vec(&prev_schema).unwrap().into(),
                         infra_db::NO_NEED_WATCH,
-                        created_at,
+                        Some(created_at),
                     )
                     .await;
             }
@@ -197,7 +197,7 @@ pub async fn set(
                     &key,
                     json::to_vec(&new_schema).unwrap().into(),
                     infra_db::NEED_WATCH,
-                    min_ts,
+                    Some(min_ts),
                 )
                 .await;
 
@@ -232,7 +232,7 @@ pub async fn set(
                     &key,
                     json::to_vec(&new_schema).unwrap().into(),
                     infra_db::NEED_WATCH,
-                    start_dt,
+                    Some(start_dt),
                 )
                 .await;
             return Ok(());
@@ -263,7 +263,7 @@ pub async fn set(
                         &key,
                         json::to_vec(&versions).unwrap().into(),
                         infra_db::NEED_WATCH,
-                        0,
+                        Some(0),
                     )
                     .await;
             }
@@ -275,7 +275,7 @@ pub async fn set(
                     &key,
                     json::to_vec(&versions).unwrap().into(),
                     infra_db::NEED_WATCH,
-                    0,
+                    Some(0),
                 )
                 .await;
         }
@@ -301,7 +301,7 @@ pub async fn set(
             &key,
             json::to_vec(&values).unwrap().into(),
             infra_db::NEED_WATCH,
-            0,
+            Some(0),
         )
         .await
     {

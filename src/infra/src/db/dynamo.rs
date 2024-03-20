@@ -130,7 +130,13 @@ impl super::Db for DynamoDb {
         }
     }
 
-    async fn put(&self, in_key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()> {
+    async fn put(
+        &self,
+        in_key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
         let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
         let client = get_db_client().await.clone();
         match client

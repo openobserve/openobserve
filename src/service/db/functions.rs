@@ -31,7 +31,7 @@ pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), an
             &key,
             json::to_vec(js_func).unwrap().into(),
             infra_db::NEED_WATCH,
-            0,
+            None,
         )
         .await
     {

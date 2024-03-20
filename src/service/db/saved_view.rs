@@ -36,7 +36,7 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         &key,
         json::to_vec(&view).unwrap().into(),
         infra_db::NO_NEED_WATCH,
-        0,
+        None,
     )
     .await?;
     Ok(view)
@@ -63,7 +63,7 @@ pub async fn update_view(
         &key,
         json::to_vec(&updated_view).unwrap().into(),
         infra_db::NO_NEED_WATCH,
-        0,
+        None,
     )
     .await?;
     Ok(updated_view)

@@ -39,7 +39,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 &key,
                 json::to_vec(&vec![schema]).unwrap().into(),
                 NO_NEED_WATCH,
-                start_dt,
+                Some(start_dt),
             )
             .await?;
         }

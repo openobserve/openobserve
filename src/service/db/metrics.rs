@@ -29,7 +29,7 @@ pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<
             &key,
             Bytes::from(members.join(",")),
             infra_db::NO_NEED_WATCH,
-            0,
+            None,
         )
         .await?)
 }
@@ -45,7 +45,7 @@ pub async fn set_prom_cluster_leader(
             &key,
             json::to_vec(&leader).unwrap().into(),
             infra_db::NEED_WATCH,
-            0,
+            None,
         )
         .await
     {

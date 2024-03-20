@@ -206,8 +206,15 @@ impl super::Db for SqliteDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
+        let local_start_dt = start_dt.unwrap_or(0);
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
@@ -217,7 +224,7 @@ impl super::Db for SqliteDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(start_dt)
+        .bind(local_start_dt)
         .execute(&mut *tx)
         .await
         {
@@ -232,7 +239,7 @@ impl super::Db for SqliteDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(start_dt)
+        .bind(local_start_dt)
         .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .execute(&mut *tx)
         .await
@@ -423,32 +430,11 @@ impl super::Db for SqliteDb {
     }
 
     async fn add_start_dt_column(&self) -> Result<()> {
-        println!("[SQLITE] ENTER: add_start_dt_column");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
+        println!("[SQLITE] ENTER: add_start_dt_column");
 
-        // Attempt to add the column, ignoring the error if the column already exists
-        let add_column_result = sqlx::query(
-            r#"
-        ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;
-        "#,
-        )
-        .execute(&*client)
-        .await;
-
-        match add_column_result {
-            Ok(_) => println!("[SQLITE] Column added or already exists."),
-            Err(e) => {
-                // Check if the error is about the duplicate column
-                if e.to_string().contains("duplicate column name") {
-                    // Ignore the duplicate column error and proceed
-                    println!("[SQLITE] Column already exists, proceeding.");
-                } else {
-                    // If the error is not about the duplicate column, return it
-                    return Err(e.into());
-                }
-            }
-        }
+        add_col(&client).await?;
 
         // Proceed to drop the index if it exists and create a new one if it does not exist
         sqlx::query(
@@ -494,6 +480,8 @@ CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
     .execute(&*client)
     .await?;
 
+    add_col(&client).await?;
+
     match sqlx::query(
         r#"
 CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module);
@@ -511,4 +499,33 @@ CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, ke
         }
     }
     Ok(())
+}
+
+async fn add_col(client: &Pool<Sqlite>) -> Result<()> {
+    // Attempt to add the column, ignoring the error if the column already exists
+    let add_column_result = sqlx::query(
+        r#"
+        ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;
+        "#,
+    )
+    .execute(client)
+    .await;
+
+    match add_column_result {
+        Ok(_) => {
+            println!("[SQLITE] Column added or already exists.");
+            Ok(())
+        }
+        Err(e) => {
+            // Check if the error is about the duplicate column
+            if e.to_string().contains("duplicate column name") {
+                // Ignore the duplicate column error and proceed
+                println!("[SQLITE] start_dt Column already exists, proceeding.");
+                Ok(())
+            } else {
+                // If the error is not about the duplicate column, return it
+                Err(e.into())
+            }
+        }
+    }
 }

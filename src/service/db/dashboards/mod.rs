@@ -78,7 +78,7 @@ pub(crate) async fn put(
                 &key,
                 json::to_vec(&dash)?.into(),
                 infra_db::NO_NEED_WATCH,
-                chrono::Utc::now().timestamp_micros(),
+                None,
             )
             .await
         {
@@ -101,7 +101,7 @@ pub(crate) async fn put(
                 &key,
                 json::to_vec(&dash)?.into(),
                 infra_db::NO_NEED_WATCH,
-                chrono::Utc::now().timestamp_micros(),
+                None,
             )
             .await
         {
@@ -124,7 +124,7 @@ pub(crate) async fn put(
                 &key,
                 json::to_vec(&dash)?.into(),
                 infra_db::NO_NEED_WATCH,
-                chrono::Utc::now().timestamp_micros(),
+                None,
             )
             .await
         {

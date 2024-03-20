@@ -33,5 +33,7 @@ pub async fn set_mark(org_id: &str, node: Option<&str>) -> Result<(), anyhow::Er
     } else {
         "NOP".to_string()
     };
-    Ok(db.put(&key, val.into(), infra_db::NO_NEED_WATCH, 0).await?)
+    Ok(db
+        .put(&key, val.into(), infra_db::NO_NEED_WATCH, None)
+        .await?)
 }
