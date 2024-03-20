@@ -16,9 +16,9 @@
 use std::str::FromStr;
 
 use chrono::{Duration, FixedOffset, Utc};
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
 use cron::Schedule;
-use infra::{dist_lock, queue::scheduler};
+use infra::{dist_lock, scheduler};
 
 use crate::{
     common::{
@@ -28,7 +28,7 @@ use crate::{
             dashboards::reports::ReportFrequencyType,
         }
     },
-    service::{dashboards::reports, db},
+    service::db,
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -62,19 +62,17 @@ pub async fn run() -> Result<(), anyhow::Error> {
     drop(locker);
     ret?;
 
-    let now = Utc::now().timestamp_micros();
-    // let cacher = TRIGGERS.read().await;
-    let triggers = scheduler::pull(1).await?;
+    // Scheduler pulls only those triggers that match the conditions-
+    // - trigger.next_run_at <= now
+    // - !(trigger.is_realtime && !trigger.is_silenced)
+    // - trigger.status == "Waiting"
+    let triggers = scheduler::pull(
+        CONFIG.limit.alert_schedule_concurrency,
+        CONFIG.limit.alert_schedule_timeout,
+    )
+    .await?;
 
     for trigger in triggers {
-        if trigger.next_run_at > now {
-            continue;
-        }
-        let is_realtime = trigger.is_realtime;
-        let is_silenced = trigger.is_silenced;
-        if is_realtime && !is_silenced {
-            continue; // realtime trigger and not silenced, no need to schedule
-        }
         tokio::task::spawn(async move {
             if let Err(e) = handle_triggers(trigger).await {
                 log::error!("[ALERT_MANAGER] Error handling trigger: {}", e);
@@ -183,14 +181,14 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
     // For report, trigger.key is the report name
     let report_name = &trigger.key;
 
-    let mut report = reports::get(org_id, report_name).await?;
+    let mut report = db::dashboards::reports::get(org_id, report_name).await?;
     let mut new_trigger = scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_realtime: false,
         is_silenced: false,
         status: scheduler::TriggerStatus::Waiting,
         retries: 0,
-        ..trigger
+        ..trigger.clone()
     };
 
     if !report.enabled {
@@ -199,6 +197,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
         scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
+    let mut run_once = false;
 
     // Update trigger, set `next_run_at` to the
     // frequency interval of this report
@@ -219,9 +218,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
                 .unwrap();
         }
         ReportFrequencyType::Months => {
-            // For now, it assumes each month to be of 30 days.
-            // TODO: handle the case where users wants the report to be sent
-            // on the first/last day of each month.
+            // Assumes each month to be of 30 days.
             new_trigger.next_run_at += Duration::days(report.frequency.interval * 30)
                 .num_microseconds()
                 .unwrap();
@@ -231,7 +228,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
             new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
             // Disable the report
             report.enabled = false;
-            // TODO: Save the report
+            run_once = true;
         }
         ReportFrequencyType::Cron => {
             let schedule = Schedule::from_str(&report.frequency.cron)?;
@@ -247,20 +244,21 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
 
     match report.send_subscribers().await {
         Ok(_) => {
-            scheduler::update_status(
-                &trigger.org,
-                trigger.module,
-                &trigger.key,
-                scheduler::TriggerStatus::Completed,
-                trigger.retries,
-            )
-            .await?
+            // Report generation successful, update the trigger
+            if run_once {
+                new_trigger.status = scheduler::TriggerStatus::Completed;
+                let result = db::dashboards::reports::set(org_id, &report, false).await;
+                if result.is_err() {
+                    log::error!("Failed to disable report: {report_name} with Once frequency");
+                }
+            }
+            scheduler::update_trigger(new_trigger).await?
         }
         Err(_) => {
             scheduler::update_status(
-                &trigger.org,
-                trigger.module,
-                &trigger.key,
+                &new_trigger.org,
+                new_trigger.module,
+                &new_trigger.key,
                 scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
             )

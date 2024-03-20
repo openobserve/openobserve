@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{meta::stream::StreamType, utils::json};
-use infra::{db as infra_db, queue::scheduler};
+use infra::{db as infra_db, scheduler};
 
 use crate::common::{infra::config::STREAM_ALERTS, meta::alerts::Alert};
 

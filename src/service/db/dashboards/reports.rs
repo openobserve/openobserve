@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::{db as infra_db, queue::scheduler};
+use infra::{db as infra_db, scheduler};
 
 use crate::common::{infra::config::DASHBOARD_REPORTS, meta::dashboards::reports::Report};
 
