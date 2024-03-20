@@ -182,6 +182,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     legend_width: Option<LegendWidth>,
     base_map: Option<BaseMap>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    map_type: Option<MapType>,
     map_view: Option<MapView>,
     #[serde(skip_serializing_if = "Option::is_none")]
     map_symbol_style: Option<MapSymbolStyle>,
@@ -312,6 +314,12 @@ pub struct CustomFieldsOption {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct BaseMap {
+    #[serde(rename = "type")]
+    pub type_field: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct MapType {
     #[serde(rename = "type")]
     pub type_field: Option<String>,
 }
