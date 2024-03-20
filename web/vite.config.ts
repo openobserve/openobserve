@@ -125,6 +125,11 @@ export default defineConfig({
     },
   },
   build: {
+    modulePreload: {
+      resolveDependencies: (url, deps, context) => {
+        return [];
+      },
+    },
     sourcemap: false,
     target: "es2020",
     rollupOptions: {
@@ -143,6 +148,18 @@ export default defineConfig({
         "node-sql-parser": ["node-sql-parser/build/mysql"],
         d3: ["d3-hierarchy", "d3-selection"],
         lodash: ["lodash-es", "lodash/lodash.js", "moment"],
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // If the module is from node_modules, put it into a vendor chunk
+            return 'vendor';
+          }
+        },
+        chunkFileNames: ({ name }) => {
+          // Dynamically generate chunk file names for lazy loading
+          return `chunks/${name}.[hash].js`;
+        },
       },
     },
     outDir: path.resolve(__dirname, "dist"),
