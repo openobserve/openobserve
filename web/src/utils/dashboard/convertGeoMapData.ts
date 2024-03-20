@@ -23,7 +23,6 @@
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const convertGeoMapData = (panelSchema: any, mapData: any) => {
-  console.log("convertGeoMapData", panelSchema, mapData);
   //if no name and value than return it
   if (
     !panelSchema.queries[0]?.fields?.name ||
@@ -39,8 +38,6 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     transitionDuration: 0.2,
     backgroundColor: "rgba(255,255,255,0.8)",
     formatter: function (params: any) {
-      console.log("params", params);
-
       let formattedValue = params.value;
       if (getUnitValue && formatUnitValue) {
         formattedValue = formatUnitValue(
@@ -118,11 +115,6 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       },
     };
   });
-
-  console.log(
-    "options---",
-    options.series.map((series: any) => series.data)
-  );
 
   const seriesData = options.series.flatMap((series: any) => series.data);
 

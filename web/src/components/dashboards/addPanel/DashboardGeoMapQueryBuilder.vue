@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <!-- value container -->
+    <!-- value for maps container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.mapvalue") }}
