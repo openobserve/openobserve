@@ -22,8 +22,6 @@ def test_e2e_alerts(create_session, base_url):
 def test_e2e_query(create_session, base_url):
     """Running an E2E test for valid sql query."""
 
-
-
     session = create_session
     url = base_url
     org_id = "org_pytest_data"
@@ -43,8 +41,6 @@ def test_e2e_query(create_session, base_url):
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
    
-
-  
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
@@ -375,8 +371,6 @@ def test_e2e_matchallindexedignorecaseinvalidsearchfeild(create_session, base_ur
 def test_e2e_matchallsql(create_session, base_url):
     """Running an E2E test for valid sql query."""
 
-
-
     session = create_session
     url = base_url
     org_id = "org_pytest_data"
@@ -395,9 +389,7 @@ def test_e2e_matchallsql(create_session, base_url):
             }
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-
-  
+ 
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
@@ -405,8 +397,6 @@ def test_e2e_matchallsql(create_session, base_url):
 
 def test_e2e_matchallindexedsql(create_session, base_url):
     """Running an E2E test for valid sql query."""
-
-
 
     session = create_session
     url = base_url
@@ -426,8 +416,17 @@ def test_e2e_matchallindexedsql(create_session, base_url):
             }
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    response_data = resp_get_allsearch.json()
+        
 
+    log_messages = [hit['log'] for hit in response_data.get('hits', [])]
+        
+        # Asserting that at least one log message contains 'provide_credentials'
+    assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
+   
   
     assert (
         resp_get_allsearch.status_code == 200
@@ -436,8 +435,6 @@ def test_e2e_matchallindexedsql(create_session, base_url):
 
 def test_e2e_matchallindexedignorecasesql(create_session, base_url):
     """Running an E2E test for valid sql query."""
-
-
 
     session = create_session
     url = base_url
@@ -457,9 +454,18 @@ def test_e2e_matchallindexedignorecasesql(create_session, base_url):
             }
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    response_data = resp_get_allsearch.json()
+        
 
-  
+    log_messages = [hit['log'] for hit in response_data.get('hits', [])]
+   
+        
+        # Asserting that at least one log message contains 'provide_credentials'
+    assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
+   
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
@@ -467,8 +473,6 @@ def test_e2e_matchallindexedignorecasesql(create_session, base_url):
 
 def test_e2e_matchallignorecasesql(create_session, base_url):
     """Running an E2E test for valid sql query."""
-
-
 
     session = create_session
     url = base_url
@@ -488,9 +492,17 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
             }
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    response_data = resp_get_allsearch.json()
+        
 
-  
+    log_messages = [hit['log'] for hit in response_data.get('hits', [])]
+        
+        # Asserting that at least one log message contains 'provide_credentials'
+    assert any('provide_credentials' in log for log in log_messages), "No log message contains 'provide_credentials'"
+    
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
