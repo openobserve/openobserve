@@ -906,12 +906,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.common.local_mode_storage = cfg.common.local_mode_storage.to_lowercase();
 
     // format metadata storage
-    if cfg.common.cluster_coordinator.is_empty() {
-        cfg.common.cluster_coordinator = "etcd".to_string();
-    }
-    if cfg.common.queue_store.is_empty() {
-        cfg.common.queue_store = "nats".to_string();
-    }
     if cfg.common.meta_store.is_empty() {
         if cfg.common.local_mode {
             cfg.common.meta_store = "sqlite".to_string();
