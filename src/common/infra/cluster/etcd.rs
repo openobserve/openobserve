@@ -80,7 +80,10 @@ async fn register() -> Result<()> {
     // 1. create a cluster lock for node register
     let locker = dist_lock::lock("/nodes/register", CONFIG.limit.node_heartbeat_ttl as u64).await?;
 
-    // 2. get node list
+    // 2. watch node list
+    tokio::task::spawn(async move { super::watch_node_list().await });
+
+    // 3. get node list
     let node_list = match super::list_nodes().await {
         Ok(v) => v,
         Err(e) => {
@@ -89,7 +92,7 @@ async fn register() -> Result<()> {
         }
     };
 
-    // 3. calculate node_id
+    // 4. calculate node_id
     let mut node_id = 1;
     let mut node_ids = Vec::new();
     let mut w = super::NODES.write().await;
@@ -106,6 +109,7 @@ async fn register() -> Result<()> {
     drop(w);
 
     node_ids.sort();
+    log::debug!("node_ids: {:?}", node_ids);
     for id in node_ids {
         if id == node_id {
             node_id += 1;
@@ -168,9 +172,6 @@ async fn register() -> Result<()> {
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(format!("register node error: {}", e)));
     }
-
-    // 5. watch node list
-    tokio::task::spawn(async move { super::watch_node_list().await });
 
     // 7. register ok, release lock
     dist_lock::unlock(&locker).await?;

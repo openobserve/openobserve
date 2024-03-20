@@ -271,7 +271,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
         schema: &dyn datafusion::common::ExprSchema,
     ) -> Result<DataType> {
         let regexp_pattern = match &args[1] {
-            Expr::Literal(arg2) => arg2.to_string().replace("\"", ""),
+            Expr::Literal(arg2) => arg2.to_string().replace('"', ""),
             other => {
                 return Err(DataFusionError::Execution(format!(
                     "The second argument for regexp_match_to_fields needs to be a string, but got {}",
@@ -311,15 +311,13 @@ impl ScalarUDFImpl for RegxpMatchToFields {
 
         let (ret_data_type, regexp_pattern) = match &args[1] {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(pattern))) => {
-                (DataType::Utf8, pattern.to_string().replace("\"", ""))
+                (DataType::Utf8, pattern.to_string().replace('"', ""))
             }
             ColumnarValue::Scalar(ScalarValue::LargeUtf8(Some(pattern))) => {
-                (DataType::LargeUtf8, pattern.to_string().replace("\"", ""))
+                (DataType::LargeUtf8, pattern.to_string().replace('"', ""))
             }
             _ => {
-                return Err(DataFusionError::Execution(format!(
-                    "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings"
-                )));
+                return Err(DataFusionError::Execution("regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings".to_string()));
             }
         };
 
@@ -356,10 +354,7 @@ impl ScalarUDFImpl for RegxpMatchToFields {
         }
 
         let Ok(struct_array_data) = struct_builder.build() else {
-            return Err(DataFusionError::Execution(format!(
-                r"regexp_match_to_fields failed to pack result to fields. Named Capturing groups are
-                required in regexp pattern"
-            )));
+            return Err(DataFusionError::Execution("regexp_match_to_fields failed to pack result to fields. Named Capturing groups are required in regexp pattern".to_string()));
         };
 
         let struct_array = StructArray::from(struct_array_data);
@@ -382,10 +377,8 @@ fn regex_pattern_to_fields(pattern: &str, ret_type: &DataType) -> Result<Vec<Fie
         field_names.push(field_name);
     }
 
-    if field_names.len() == 0 {
-        Err(DataFusionError::Execution(format!(
-            "Named Capturing Groups must be used to assign field names for regexp_match_to_fields function"
-        )))
+    if field_names.is_empty() {
+        Err(DataFusionError::Execution("Named Capturing Groups must be used to assign field names for regexp_match_to_fields function".to_string()))
     } else {
         Ok(field_names
             .into_iter()

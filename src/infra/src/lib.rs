@@ -18,6 +18,7 @@ pub mod db;
 pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
+pub mod queue;
 pub mod storage;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -25,6 +26,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::create_table().await?;
     cache::init().await?;
     file_list::create_table().await?;
+    queue::init().await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())
