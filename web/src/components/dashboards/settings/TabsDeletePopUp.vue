@@ -137,7 +137,6 @@ export default defineComponent({
       //   label: "Default",
       //   value: "default",
       // };
-      
       moveTabOptions.value = newMoveTabOptions;
     });
 
