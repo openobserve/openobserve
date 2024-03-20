@@ -94,9 +94,16 @@ impl super::Db for MysqlDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
+        let local_start_dt = start_dt.unwrap_or(0);
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
             r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#,
@@ -104,7 +111,7 @@ impl super::Db for MysqlDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(start_dt)
+        .bind(local_start_dt)
         .execute(&mut *tx)
         .await
         {
@@ -121,7 +128,7 @@ impl super::Db for MysqlDb {
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(start_dt)
+            .bind(local_start_dt)
             .execute(&mut *tx)
             .await
             {
@@ -369,6 +376,8 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
 
+    add_col(pool).await?;
+
     match create_index_item(
         "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (start_dt,key2, key1, module);",
     )
@@ -432,8 +441,19 @@ async fn add_start_dt_column() -> Result<()> {
         return Err(e.into());
     }
 
+    add_col(pool).await?;
+
+    create_index_item(
+        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
+    )
+    .await?;
+
+    log::info!("[MYSQL] EXIT: add_start_dt_column");
+    Ok(())
+}
+
+async fn add_col(pool: Pool<MySql>) -> Result<()> {
     let mut tx1 = pool.begin().await?;
-    // add column
     if let Err(e) = sqlx::query(
         r#"
         ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;
@@ -442,10 +462,8 @@ async fn add_start_dt_column() -> Result<()> {
     .execute(&mut *tx1)
     .await
     {
-        log::error!("[MYSQL] Error in  adding column: {}", e);
-
         if e.to_string().contains("Duplicate column name") {
-            log::info!("[MYSQL] Column already exists, continuing.");
+            log::info!("[MYSQL] start_dt Column already exists, continuing.");
         } else {
             // Check for the specific MySQL error code for duplicate column
             log::error!("[MYSQL] Unexpected error in adding column: {}", e);
@@ -453,18 +471,9 @@ async fn add_start_dt_column() -> Result<()> {
             return Err(e.into());
         }
     }
-
-    // Commit transaction
     if let Err(e) = tx1.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());
-    }
-
-    create_index_item(
-        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
-    )
-    .await?;
-
-    log::info!("[MYSQL] EXIT: add_start_dt_column");
+    };
     Ok(())
 }

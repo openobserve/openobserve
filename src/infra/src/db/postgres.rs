@@ -94,9 +94,16 @@ impl super::Db for PostgresDb {
         Ok(Bytes::from(value))
     }
 
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool, start_dt: i64) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
+        let local_start_dt = start_dt.unwrap_or(0);
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
             r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,
@@ -104,7 +111,7 @@ impl super::Db for PostgresDb {
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
-        .bind(start_dt)
+        .bind(local_start_dt)
         .execute(&mut *tx)
         .await
         {
@@ -120,7 +127,7 @@ impl super::Db for PostgresDb {
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
-            .bind(start_dt)
+            .bind(local_start_dt)
             .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .execute(&mut *tx)
             .await
@@ -371,6 +378,9 @@ CREATE TABLE IF NOT EXISTS meta
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
         .await?;
+
+    add_col(pool).await?;
+
     match create_index_item(
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt,key2, key1, module);",
     )
@@ -420,11 +430,21 @@ async fn add_start_dt_column() -> Result<()> {
         return Err(e.into());
     }
 
+    add_col(pool).await?;
+
+    create_index_item(
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
+    ).await?;
+
+    log::info!("[POSTGRES] EXIT: add_start_dt_column");
+    Ok(())
+}
+
+async fn add_col(pool: Pool<Postgres>) -> Result<()> {
     let mut tx1 = pool.begin().await?;
-    // add column
     if let Err(e) = sqlx::query(
         r#"
-        ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;
+        ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;
         "#,
     )
     .execute(&mut *tx1)
@@ -436,17 +456,9 @@ async fn add_start_dt_column() -> Result<()> {
         }
         return Err(e.into());
     }
-
-    // Commit transaction
     if let Err(e) = tx1.commit().await {
         log::info!("[POSTGRES] Error in committing transaction: {}", e);
         return Err(e.into());
-    }
-
-    create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
-    ).await?;
-
-    log::info!("[POSTGRES] EXIT: add_start_dt_column");
+    };
     Ok(())
 }
