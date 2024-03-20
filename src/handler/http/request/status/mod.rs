@@ -30,10 +30,12 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    crate::service::kv,
     actix_web::http::header,
     o2_enterprise::enterprise::{
-        common::{infra::config::O2_CONFIG, settings::get_logo},
+        common::{
+            infra::config::O2_CONFIG,
+            settings::{get_logo, get_logo_text},
+        },
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
     },
     std::io::ErrorKind,
@@ -124,9 +126,9 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
     #[cfg(feature = "enterprise")]
-    let custom_logo_text = match kv::get("default", "custom_logo_text").await {
-        Ok(data) => String::from_utf8(data.to_vec()).unwrap_or_default(),
-        Err(_) => O2_CONFIG.common.custom_logo_text.clone(),
+    let custom_logo_text = match get_logo_text().await {
+        Some(data) => data,
+        None => O2_CONFIG.common.custom_logo_text.clone(),
     };
     #[cfg(not(feature = "enterprise"))]
     let custom_logo_text = "".to_string();

@@ -15,12 +15,12 @@
 
 use std::io::Error as StdErr;
 
-use actix_multipart::Multipart;
 use actix_web::{delete, get, post, web, HttpResponse};
 use config::utils::json;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
+    actix_multipart::Multipart,
     futures::{StreamExt, TryStreamExt},
     o2_enterprise::enterprise::common::settings,
 };
@@ -108,10 +108,7 @@ async fn get(path: web::Path<String>) -> Result<HttpResponse, StdErr> {
 
 #[cfg(feature = "enterprise")]
 #[post("/{org_id}/settings/logo")]
-async fn upload_logo(
-    _path: web::Path<String>,
-    mut payload: Multipart,
-) -> Result<HttpResponse, StdErr> {
+async fn upload_logo(mut payload: Multipart) -> Result<HttpResponse, StdErr> {
     match payload.try_next().await {
         Ok(field) => {
             let mut data: Vec<u8> = Vec::<u8>::new();
@@ -138,16 +135,13 @@ async fn upload_logo(
 
 #[cfg(not(feature = "enterprise"))]
 #[post("/{org_id}/settings/logo")]
-async fn upload_logo(
-    _path: web::Path<String>,
-    _payload: Multipart,
-) -> Result<HttpResponse, StdErr> {
+async fn upload_logo() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
 #[delete("/{org_id}/settings/logo")]
-async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
+async fn delete_logo() -> Result<HttpResponse, StdErr> {
     match settings::delete_logo().await {
         Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
@@ -156,6 +150,36 @@ async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/{org_id}/settings/logo")]
-async fn delete_logo(_path: web::Path<String>) -> Result<HttpResponse, StdErr> {
+async fn delete_logo() -> Result<HttpResponse, StdErr> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[post("/{org_id}/settings/logo/text")]
+async fn set_logo_text(body: web::Bytes) -> Result<HttpResponse, StdErr> {
+    match settings::set_logo_text(body).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/settings/logo/text")]
+async fn set_logo_text() -> Result<HttpResponse, StdErr> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
+#[delete("/{org_id}/settings/logo/text")]
+async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
+    match settings::delete_logo_text().await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
+        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[delete("/{org_id}/settings/logo/text")]
+async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
