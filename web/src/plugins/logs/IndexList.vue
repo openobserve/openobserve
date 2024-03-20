@@ -84,26 +84,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !props.row.isSchemaField ||
                   !props.row.showValues
                 "
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                class="field-container flex content-center ellipsis q-pl-lg full-width"
                 :title="props.row.name"
               >
                 <div
-                  class="field_label ellipsis"
+                  class="field_label ellipsis full-width"
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
                   {{ props.row.name }}
+                  <span class="float-right">
+                    <q-icon
+                      :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                      v-if="searchObj.meta.fastMode"
+                      :name="
+                        props.row.isInterestingField ? 'info' : 'info_outline'
+                      "
+                      class="light-dimmed"
+                      style="margin-right: 0.375rem"
+                      size="1.1rem"
+                      :title="
+                        props.row.isInterestingField
+                          ? 'Remove from interesting fields'
+                          : 'Add to interesting fields'
+                      "
+                    />
+                  </span>
                 </div>
                 <div class="field_overlay">
-                  <q-icon
-                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                    v-if="searchObj.meta.fastMode"
-                    :name="
-                      props.row.isInterestingField ? 'info' : 'info_outline'
-                    "
-                    size="1.1rem"
-                    title="Add to interesting fields"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
                   <q-btn
                     v-if="props.row.isSchemaField"
                     :icon="outlinedAdd"
@@ -122,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     :name="outlinedVisibility"
+                    style="margin-right: 0.375rem"
                     size="1.1rem"
                     title="Add field to table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -134,9 +142,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     :name="outlinedVisibilityOff"
+                    style="margin-right: 0.375rem"
                     size="1.1rem"
                     title="Remove field from table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                  />
+                  <q-icon
+                    :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                    v-if="searchObj.meta.fastMode"
+                    :name="
+                      props.row.isInterestingField ? 'info' : 'info_outline'
+                    "
+                    size="1.1rem"
+                    :title="
+                      props.row.isInterestingField
+                        ? 'Remove from interesting fields'
+                        : 'Add to interesting fields'
+                    "
+                    @click.stop="
+                      addToInterestingFieldList(
+                        props.row,
+                        props.row.isInterestingField
+                      )
+                    "
                   />
                 </div>
               </div>
@@ -156,29 +184,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-slot:header>
                   <div
-                    class="flex content-center ellipsis"
+                    class="flex content-center ellipsis full-width"
                     :title="props.row.name"
                     :data-test="`log-search-expand-${props.row.name}-field-btn`"
                   >
                     <div
-                      class="field_label ellipsis"
+                      class="field_label ellipsis full-width"
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
                       {{ props.row.name }}
-                      
+                      <span class="float-right">
+                        <q-icon
+                          :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                          v-if="searchObj.meta.fastMode"
+                          :name="
+                            props.row.isInterestingField
+                              ? 'info'
+                              : 'info_outline'
+                          "
+                          class="light-dimmed"
+                          style="margin-right: 0.375rem"
+                          size="1.1rem"
+                          :title="
+                            props.row.isInterestingField
+                              ? 'Remove from interesting fields'
+                              : 'Add to interesting fields'
+                          "
+                        />
+                      </span>
                     </div>
-                    <div >test</div>
                     <div class="field_overlay">
-                      <q-icon
-                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                        v-if="searchObj.meta.fastMode"
-                        :name="
-                          props.row.isInterestingField ? 'info' : 'info_outline'
-                        "
-                        size="1.1rem"
-                        title="Add to interesting fields"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
                       <q-btn
                         v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
@@ -197,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :name="outlinedVisibility"
+                        style="margin-right: 0.375rem"
                         size="1.1rem"
                         title="Add field to table"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -209,9 +245,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :name="outlinedVisibilityOff"
+                        style="margin-right: 0.375rem"
                         title="Remove field from table"
                         size="1.1rem"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                      />
+                      <q-icon
+                        :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                        v-if="searchObj.meta.fastMode"
+                        :name="
+                          props.row.isInterestingField ? 'info' : 'info_outline'
+                        "
+                        size="1.1rem"
+                        :title="
+                          props.row.isInterestingField
+                            ? 'Remove from interesting fields'
+                            : 'Add to interesting fields'
+                        "
+                        @click.stop="
+                          addToInterestingFieldList(
+                            props.row,
+                            props.row.isInterestingField
+                          )
+                        "
                       />
                     </div>
                   </div>
@@ -354,6 +410,7 @@ import {
   getImageURL,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
+  useLocalInterestingFields,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser/build/mysql";
@@ -622,6 +679,45 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
+    const addToInterestingFieldList = (field: any, currentState: boolean) => {
+      if (currentState) {
+        const index = searchObj.data.stream.interestingFieldList.indexOf(
+          field.name
+        );
+        if (index > -1) {
+          // only splice array when item is found
+          searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
+        }
+      } else {
+        const index = searchObj.data.stream.interestingFieldList.indexOf(
+          field.name
+        );
+        if (index == -1) {
+          searchObj.data.stream.interestingFieldList.push(field.name);
+        }
+      }
+
+      searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+        if (searchObj.data.stream.interestingFieldList.includes(field.name)) {
+          field.isInterestingField = true;
+        } else {
+          field.isInterestingField = false;
+        }
+      });
+
+      const localInterestingFields: any = useLocalInterestingFields();
+      let localFields: any = {};
+      if (localInterestingFields.value != null) {
+        localFields = localInterestingFields.value;
+      }
+      localFields[
+        searchObj.organizationIdetifier +
+          "_" +
+          searchObj.data.stream.selectedStream.value
+      ] = searchObj.data.stream.interestingFieldList;
+      useLocalInterestingFields(localFields);
+    };
+
     return {
       t,
       store,
@@ -642,6 +738,7 @@ export default defineComponent({
       outlinedVisibility,
       handleQueryData,
       onStreamChange,
+      addToInterestingFieldList,
     };
   },
 });

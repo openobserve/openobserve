@@ -30,6 +30,7 @@ import {
   histogramDateTimezone,
   useLocalWrapContent,
   useLocalTimezone,
+  useLocalInterestingFields,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -131,6 +132,7 @@ const defaultObject = {
       addToFilter: "",
       functions: <any>[],
       streamType: "logs",
+      interestingFieldList: <string[]>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -1463,26 +1465,47 @@ const useLogs = () => {
         }
 
         const fields: any = {};
-        const envInterestingFields =
+        const localInterestingFields: any = useLocalInterestingFields();
+        searchObj.data.stream.interestingFieldList =
+          localInterestingFields.value[
+            searchObj.organizationIdetifier +
+              "_" +
+              searchObj.data.stream.selectedStream.value
+          ].length > 0
+            ? localInterestingFields.value[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream.value
+              ]
+            : [...schemaInterestingFields];
+        const environmentInterestingFields =
           store.state?.zoConfig?.quick_mode_fields.split(",");
-        const finalInterestingFields: string[] = [
-          ...envInterestingFields,
-          ...schemaInterestingFields,
-        ];
+        let index = -1;
         // queryResult.forEach((row: any) => {
         for (const row of queryResult) {
           // let keys = deepKeys(row);
           // for (let i in row) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
+
+            if (environmentInterestingFields.includes(row.name)) {
+              index = searchObj.data.stream.interestingFieldList.indexOf(
+                row.name
+              );
+              if (index == -1) {
+                searchObj.data.stream.interestingFieldList.push(row.name);
+              }
+            }
+
             searchObj.data.stream.selectedStreamFields.push({
               name: row.name,
               ftsKey: ftsKeys?.has(row.name),
               isSchemaField: schemaFields.has(row.name),
               showValues: row.name !== timestampField,
-              isInterestingField: finalInterestingFields.includes(row.name)
-                ? true
-                : false,
+              isInterestingField:
+                searchObj.data.stream.interestingFieldList.includes(row.name)
+                  ? true
+                  : false,
             });
           }
           // }
