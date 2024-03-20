@@ -361,7 +361,7 @@ const useLogs = () => {
           searchObj.data.stream.streamType || "logs",
           true
         ).then((res) => {
-          return res.schema;
+          return res;
         });
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -1413,7 +1413,9 @@ const useLogs = () => {
                 ...stream.schema.map((e: any) => e.name),
               ]);
             } else {
-              const streamSchema: any = await loadStreamFileds(stream.name);
+              const streamData: any = await loadStreamFileds(stream.name);
+              const streamSchema: any = streamData.schema;
+              stream.settings = streamData.settings;
               queryResult.push(...streamSchema);
               schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
             }
