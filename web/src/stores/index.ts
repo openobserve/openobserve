@@ -146,6 +146,9 @@ export default createStore({
       state.organizationData.quotaThresholdMsg = payload;
     },
     setConfig(state, payload) {
+      //#######################Temporary added#########################################
+      payload["quick_mode_fields"] = "job,level";
+      //################################################################
       state.zoConfig = payload;
     },
     setFolders(state, payload) {

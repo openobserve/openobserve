@@ -1403,6 +1403,7 @@ const useLogs = () => {
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
         const timestampField = store.state.zoConfig.timestamp_column;
+        let schemaInterestingFields: string[] = [];
 
         // searchObj.data.streamResults.list.forEach((stream: any) => {
         for (const stream of searchObj.data.streamResults.list) {
@@ -1421,6 +1422,9 @@ const useLogs = () => {
             }
 
             ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+            if (stream.settings.hasOwnProperty("interesting_fields")) {
+              schemaInterestingFields = stream.settings.interesting_fields;
+            }
           }
         }
 
@@ -1459,6 +1463,12 @@ const useLogs = () => {
         }
 
         const fields: any = {};
+        const envInterestingFields =
+          store.state?.zoConfig?.quick_mode_fields.split(",");
+        const finalInterestingFields: string[] = [
+          ...envInterestingFields,
+          ...schemaInterestingFields,
+        ];
         // queryResult.forEach((row: any) => {
         for (const row of queryResult) {
           // let keys = deepKeys(row);
@@ -1470,6 +1480,9 @@ const useLogs = () => {
               ftsKey: ftsKeys?.has(row.name),
               isSchemaField: schemaFields.has(row.name),
               showValues: row.name !== timestampField,
+              isInterestingField: finalInterestingFields.includes(row.name)
+                ? true
+                : false,
             });
           }
           // }
@@ -1872,7 +1885,8 @@ const useLogs = () => {
     }
 
     if (queryParams.show_histogram) {
-      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
+      searchObj.meta.showHistogram =
+        queryParams.show_histogram == "true" ? true : false;
     }
 
     searchObj.shouldIgnoreWatcher = false;
