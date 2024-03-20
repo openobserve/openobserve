@@ -39,7 +39,9 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     backgroundColor: "rgba(255,255,255,0.8)",
     formatter: function (params: any) {
       let formattedValue = params.value;
-      if (getUnitValue && formatUnitValue) {
+      if (formattedValue === "-" || isNaN(formattedValue)) {
+        formattedValue = "-";
+      } else if (getUnitValue && formatUnitValue) {
         formattedValue = formatUnitValue(
           getUnitValue(
             formattedValue,
@@ -50,7 +52,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
         );
       }
 
-      return `${params.seriesName}: ${formattedValue}`;
+      return `${params.name}: ${formattedValue}`;
     },
   };
 
