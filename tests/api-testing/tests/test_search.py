@@ -141,7 +141,6 @@ def test_e2e_validhistogram(create_session, base_url):
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-
 def test_e2e_histogramwithlimit(create_session, base_url):
     """Running an E2E test for invalid query -history with limit  list."""
 
@@ -266,8 +265,8 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
 } 
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
-    
+
+
 def test_e2e_matchallindexedignorecasehistogram(create_session, base_url):
     """Running an E2E test for valid match all histogram query."""
 
@@ -293,13 +292,20 @@ def test_e2e_matchallindexedignorecasehistogram(create_session, base_url):
 } 
 
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
-   
 
     # print(resp_get_allalerts.content)
     assert (
         resp_get_allsearch.status_code == 200
     ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
+    response_data = resp_get_allsearch.json()
+
+    # In histogram type queries, there should be no hits.
+    assert(len(response_data.get("hits")) == 0 )
+
+    # In histogram type queries, there should be agg.histogram type keys.
+    assert len(response_data.get("aggs", {}).get("histogram")) != 0
+ 
 
 def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_url):
     """Running an E2E test for valid match all histogram query."""
@@ -332,7 +338,6 @@ def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_ur
     assert (
         resp_get_allsearch.status_code == 500
     ), f"histogram mode added 500, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-
 
 
 def test_e2e_matchallindexedignorecaseinvalidsearchfeild(create_session, base_url):
@@ -398,7 +403,6 @@ def test_e2e_matchallsql(create_session, base_url):
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-
 def test_e2e_matchallindexedsql(create_session, base_url):
     """Running an E2E test for valid sql query."""
 
@@ -428,8 +432,6 @@ def test_e2e_matchallindexedsql(create_session, base_url):
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-
-
 
 
 def test_e2e_matchallindexedignorecasesql(create_session, base_url):
@@ -463,9 +465,6 @@ def test_e2e_matchallindexedignorecasesql(create_session, base_url):
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
 
 
-
-
-
 def test_e2e_matchallignorecasesql(create_session, base_url):
     """Running an E2E test for valid sql query."""
 
@@ -495,14 +494,3 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
-
-
-
-
-
-
-
-
-
-
-
