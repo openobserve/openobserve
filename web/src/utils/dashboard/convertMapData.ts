@@ -95,7 +95,7 @@ export const convertMapData = (panelSchema: any, mapData: any) => {
       padding: 6,
       backgroundColor: "rgba(255,255,255,0.8)",
       formatter: function (params: any) {
-        let formattedValue = params.value[2].toLocaleString();
+        let formattedValue = params.value[2];
         if (getUnitValue && formatUnitValue) {
           formattedValue = formatUnitValue(
             getUnitValue(
