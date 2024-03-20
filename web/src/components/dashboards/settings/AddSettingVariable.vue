@@ -730,7 +730,7 @@ export default defineComponent({
         // Populate the variablesDependencyGraph
         for (let variableData of variablesData) {
           let name = variableData.name;
-          for (let filter of variableData.query_data.filter ?? []) {
+          for (let filter of variableData.query_data?.filter || []) {
             // Extract variable names from the filter value
             let extactedDependencies = extractVariableNames(
               filter.value,
