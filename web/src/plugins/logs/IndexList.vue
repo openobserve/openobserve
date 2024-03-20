@@ -111,16 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div class="field_overlay">
-                  <q-icon
-                    :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                    v-if="searchObj.meta.fastMode"
-                    :name="
-                      props.row.isInterestingField ? 'info' : 'info_outline'
-                    "
-                    size="1.1rem"
-                    title="Add to interesting fields"
-                    @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                  />
                   <q-btn
                     v-if="props.row.isSchemaField"
                     :icon="outlinedAdd"
@@ -224,16 +214,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                     </div>
                     <div class="field_overlay">
-                      <q-icon
-                        :data-test="`log-search-index-list-add-${props.row.name}-field-btn`"
-                        v-if="searchObj.meta.fastMode"
-                        :name="
-                          props.row.isInterestingField ? 'info' : 'info_outline'
-                        "
-                        size="1.1rem"
-                        title="Add to interesting fields"
-                        @click.stop="clickFieldFn(props.row, props.pageIndex)"
-                      />
                       <q-btn
                         v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
