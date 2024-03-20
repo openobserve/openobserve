@@ -95,9 +95,7 @@ export const convertPanelData = async (
         ...convertMapData(panelSchema, data),
       };
     }
-    case "maps": {
-      console.log("maps", panelSchema.type, data);
-      
+    case "maps": {      
       return {
         chartType: panelSchema.type,
         ...convertGeoMapData(panelSchema, data),

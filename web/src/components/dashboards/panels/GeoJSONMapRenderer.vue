@@ -48,8 +48,6 @@ export default defineComponent({
     let chart: any;
     const store = useStore();
     const windowResizeEventCallback = async () => {
-      console.log("resize from geojsonmap");
-
       await nextTick();
       await nextTick();
       chart.resize();
@@ -67,15 +65,11 @@ export default defineComponent({
       if (chartRef.value) {
         chart = echarts.init(chartRef.value);
         echarts.registerMap("world", map as any);
-        console.log("onMounted props.data.options", props.data.options);
-
         chart?.setOption(props?.data?.options || {}, true);
         window.addEventListener("resize", windowResizeEventCallback);
       }
     });
     onUnmounted(() => {
-      console.log("onUnMounted", props.data.options);
-
       window.removeEventListener("resize", windowResizeEventCallback);
       if (chart) chart?.dispose();
     });
@@ -84,10 +78,7 @@ export default defineComponent({
       async () => {
         await nextTick();
         chart?.resize();
-        console.log("props.data.options", props.data.options);
-
         chart?.setOption(props?.data?.options || {}, true);
-        console.log("setOption", props.data.options);
       },
       { deep: true }
     );
