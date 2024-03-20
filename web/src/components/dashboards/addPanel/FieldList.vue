@@ -776,6 +776,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+
 .metric-explore-metric-icon {
   min-width: 28px !important;
   padding-right: 8px !important;
