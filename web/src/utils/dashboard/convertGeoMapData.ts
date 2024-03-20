@@ -31,7 +31,9 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   ) {
     return { options: null };
   }
+
   const options: any = {};
+  
   options.tooltip = {
     trigger: "item",
     showDelay: 0,
