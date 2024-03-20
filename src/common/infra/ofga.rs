@@ -31,8 +31,6 @@ use {
 
 #[cfg(feature = "enterprise")]
 pub async fn init() {
-    use infra::dist_lock;
-
     let mut migrate_native_objects = false;
     let existing_meta = match db::ofga::get_ofga_model().await {
         Ok(Some(model)) => Some(model),
@@ -42,11 +40,9 @@ pub async fn init() {
         }
     };
     // 1. create a cluster lock
-    let mut dist_locker = None;
-    if !config::CONFIG.common.local_mode {
-        let locker = dist_lock::lock("/ofga/model/", 0).await;
-        dist_locker = Some(locker);
-    }
+    let locker = dist_lock::lock("/ofga/model/", 0)
+        .await
+        .expect("Failed to acquire lock for openFGA");
     match db::ofga::set_ofga_model(existing_meta).await {
         Ok(store_id) => {
             if store_id.is_empty() {
@@ -132,9 +128,7 @@ pub async fn init() {
         }
     }
     // release lock
-    if let Some(locker) = dist_locker {
-        dist_lock::unlock(&locker)
-            .await
-            .expect("Failed to release lock");
-    }
+    dist_lock::unlock(&locker)
+        .await
+        .expect("Failed to release lock");
 }
