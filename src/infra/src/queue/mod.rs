@@ -22,8 +22,8 @@ use tokio::sync::{mpsc, OnceCell};
 
 use crate::errors::{Error, Result};
 
-pub mod fake;
 pub mod nats;
+pub mod nop;
 
 static DEFAULT: OnceCell<Box<dyn Queue>> = OnceCell::const_new();
 static SUPER_CLUSTER: OnceCell<Box<dyn Queue>> = OnceCell::const_new();
@@ -43,14 +43,14 @@ pub async fn init() -> Result<()> {
 async fn default() -> Box<dyn Queue> {
     match CONFIG.common.queue_store.as_str().into() {
         MetaStore::Nats => Box::<nats::NatsQueue>::default(),
-        _ => Box::<fake::FakeQueue>::default(),
+        _ => Box::<nop::NopQueue>::default(),
     }
 }
 
 async fn init_super_cluster() -> Box<dyn Queue> {
     match CONFIG.common.queue_store.as_str().into() {
         MetaStore::Nats => Box::new(nats::NatsQueue::super_cluster()),
-        _ => Box::new(fake::FakeQueue::super_cluster()),
+        _ => Box::new(nop::NopQueue::super_cluster()),
     }
 }
 
