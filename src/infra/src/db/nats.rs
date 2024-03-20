@@ -121,7 +121,7 @@ impl super::Db for NatsDb {
     async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = base64::encode_url(new_key);
-        let _ = bucket.put(&key, value).await?;
+        _ = bucket.put(&key, value).await?;
         Ok(())
     }
 
@@ -317,8 +317,14 @@ pub async fn connect() -> async_nats::Client {
         log::info!("Nats init config: {:?}", CONFIG.etcd);
     }
 
-    let opts = async_nats::ConnectOptions::new()
+    let mut opts = async_nats::ConnectOptions::new()
         .connection_timeout(Duration::from_secs(CONFIG.nats.connect_timeout));
+    if !CONFIG.nats.user.is_empty() {
+        opts = opts.user_and_password(
+            CONFIG.nats.user.to_string(),
+            CONFIG.nats.password.to_string(),
+        );
+    }
     let addrs = CONFIG
         .nats
         .addr

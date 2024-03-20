@@ -59,6 +59,16 @@ pub enum Error {
     #[error("Error# {0}")]
     NatsKJetstreamKvStatusError(#[from] NatsError<jetstream::kv::StatusErrorKind>),
     #[error("Error# {0}")]
+    NatsKJetstreamCreateStreamError(#[from] NatsError<jetstream::context::CreateStreamErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamGetStreamError(#[from] NatsError<jetstream::context::GetStreamErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamPublishError(#[from] NatsError<jetstream::context::PublishErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamStreamConsumerError(#[from] NatsError<jetstream::stream::ConsumerErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamConsumerStreamError(#[from] NatsError<jetstream::consumer::StreamErrorKind>),
+    #[error("Error# {0}")]
     Message(String),
     #[error("ErrorCode# {0}")]
     ErrorCode(ErrorCodes),
