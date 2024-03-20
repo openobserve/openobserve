@@ -230,12 +230,12 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                         )
                         .await?;
                     }
-                    log::warn!(
-                        "[COMPACTOR] the stream [{}/{}/{}] is processing by another node",
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                    );
+                    // log::warn!(
+                    //     "[COMPACTOR] the stream [{}/{}/{}] is processing by another node",
+                    //     &org_id,
+                    //     stream_type,
+                    //     &stream_name,
+                    // );
                     continue; // not this node
                 }
 

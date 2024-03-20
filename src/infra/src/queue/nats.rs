@@ -19,7 +19,7 @@ use async_nats::jetstream;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{CONFIG, INSTANCE_ID};
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::{db::nats::get_nats_client, errors::*};
@@ -93,13 +93,14 @@ impl super::Queue for NatsQueue {
             };
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
+                durable_name: Some(consumer_name.to_string()),
                 ..Default::default()
             };
             let consumer = stream
                 .get_or_create_consumer(&consumer_name, config)
                 .await?;
             // Consume messages from the consumer
-            let mut messages = consumer.messages().await?.take(10);
+            let mut messages = consumer.messages().await.expect("consumer messages error");
             while let Ok(Some(message)) = messages.try_next().await {
                 let message = super::Message::Nats(message);
                 tx.send(message)
