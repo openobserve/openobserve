@@ -102,8 +102,9 @@ describe("Folders testcases", () => {
     cy.contains(randomFolderName).click({ force: true });
     dashboardName = `${dashboardData.DashboardName}_${randomNumber}`;
     cy.wait("@dashboards");
-    cy.contains("New Dashboard").click({ force: true });
     cy.wait(1000);
+    cy.get('[data-test="dashboard-add"]').click({ force: true });
+    cy.wait(2000);
     cy.get('[data-test="add-dashboard-name"]').type(dashboardName);
     cy.get('[data-test="dashboard-add-submit"]').click();
     cy.url().should("include", dashboardData.ViewDashboardUrl);
@@ -169,9 +170,10 @@ describe("Folders testcases", () => {
     cy.contains(randomFolderName).click({ force: true });
 
     // Create a dashboard in the new folder
-    cy.contains("New Dashboard").click({ force: true });
     cy.wait(1000);
-    cy.get('[data-test="add-dashboard-name"]').type('Dashboard in ' + randomFolderName);;
+    cy.get('[data-test="dashboard-add"]').click({ force: true });
+    cy.wait(1000);
+    cy.get('[data-test="add-dashboard-name"]').type('Dashboard in ' + randomFolderName);
     cy.get('[data-test="dashboard-add-submit"]').click();
     cy.url().should("include", dashboardData.ViewDashboardUrl);
     cy.get('.flex.justify-between > :nth-child(1) > .q-btn > .q-btn__content > .q-icon').click();

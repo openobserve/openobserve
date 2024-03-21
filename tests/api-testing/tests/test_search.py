@@ -506,3 +506,102 @@ def test_e2e_matchallignorecasesql(create_session, base_url):
     assert (
         resp_get_allsearch.status_code == 200
     ), f"Sql mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+
+
+
+
+def test_e2e_sqlaggregationquery(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+            "query": {
+                "sql": "SELECT service_name,_timestamp, COUNT(*) AS log_count FROM \"default\" GROUP BY service_name,_timestamp",
+                "start_time": one_min_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 250,
+                "fast_mode": True,
+                "sql_mode": "full"
+            },
+}
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    response_data = resp_get_allsearch.json()
+    # result = execute_sql_query(**query_params)
+
+    # # Perform assertions on the result
+    # assert isinstance(result, list)
+    # assert len(result) > 0
+
+    # for entry in result:
+    #     assert "_timestamp" in entry
+    #     assert "log_count" in entry
+    #     # Optionally, assert that "service_name" is present if available
+    #     if "service_name" in entry:
+    #         assert isinstance(entry["service_name"], str)
+        
+
+def test_e2e_sqlgroupbytimestamp(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+            "query": {
+                "sql": "SELECT count(*), _timestamp FROM \"default\" group by _timestamp",
+                "start_time": one_min_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 250,
+                "fast_mode": True,
+                "sql_mode": "full"
+            },
+}
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    response_data = resp_get_allsearch.json()
+        
+   
+def test_e2e_sqlgroupbytimestampwithk8s(create_session, base_url):
+    """Running an E2E test for valid sql query."""
+
+    session = create_session
+    url = base_url
+    org_id = "org_pytest_data"
+    now = datetime.now(timezone.utc)
+    end_time = int(now.timestamp() * 1000000)
+    one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
+    json_data = {
+            "query": {
+                "sql": "SELECT count(*), k8s_node_name,_timestamp FROM \"default\" group by k8s_node_name,_timestamp",
+                "start_time": one_min_ago,
+                "end_time": end_time,
+                "from": 0,
+                "size": 250,
+                "fast_mode": True,
+                "sql_mode": "full"
+            },
+}
+    resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
+    assert (
+        resp_get_allsearch.status_code == 200
+    ), f"histogram mode added 200, but got {resp_get_allsearch.status_code} {resp_get_allsearch.content}"
+    response_data = resp_get_allsearch.json()
+        
+   
+
+
