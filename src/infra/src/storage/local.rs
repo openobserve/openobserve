@@ -81,7 +81,7 @@ impl ObjectStore for Local {
                         .inc();
                     let time = start.elapsed().as_secs_f64();
                     metrics::STORAGE_TIME
-                        .with_label_values(&[columns[1], columns[2], "put"])
+                        .with_label_values(&[columns[1], columns[2], "put", "local"])
                         .inc_by(time);
                 }
                 Ok(PutResult {
@@ -124,7 +124,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get"])
+                .with_label_values(&[columns[1], columns[2], "get", "local"])
                 .inc_by(time);
         }
 
@@ -151,7 +151,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get"])
+                .with_label_values(&[columns[1], columns[2], "get", "local"])
                 .inc_by(time);
         }
 
@@ -178,7 +178,7 @@ impl ObjectStore for Local {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get"])
+                .with_label_values(&[columns[1], columns[2], "get", "local"])
                 .inc_by(time);
         }
 
