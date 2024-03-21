@@ -777,16 +777,14 @@ pub(crate) fn generate_fast_mode_fields(
             schema_fields.into_iter().skip(skip).collect()
         }
         "both" => {
+            let need_num = std::cmp::min(schema_fields.len(), CONFIG.limit.fast_mode_num_fields);
             let mut inner_fields = schema_fields
                 .iter()
-                .take(CONFIG.limit.fast_mode_num_fields / 2)
+                .take(need_num / 2)
                 .map(|f| f.to_string())
                 .collect::<Vec<_>>();
             if schema_fields.len() > inner_fields.len() {
-                let skip = std::cmp::max(
-                    0,
-                    schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
-                );
+                let skip = std::cmp::max(0, schema_fields.len() + inner_fields.len() - need_num);
                 inner_fields.extend(schema_fields.iter().skip(skip).map(|f| f.to_string()));
             }
             inner_fields
