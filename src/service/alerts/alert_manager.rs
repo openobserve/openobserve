@@ -243,15 +243,12 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
         }
     }
 
+    let now = Utc::now().timestamp_micros();
     match report.send_subscribers().await {
         Ok(_) => {
             // Report generation successful, update the trigger
             if run_once {
                 new_trigger.status = scheduler::TriggerStatus::Completed;
-                let result = db::dashboards::reports::set(org_id, &report, false).await;
-                if result.is_err() {
-                    log::error!("Failed to disable report: {report_name} with Once frequency");
-                }
             }
             scheduler::update_trigger(new_trigger).await?
         }
@@ -265,6 +262,15 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
             )
             .await?
         }
+    }
+
+    report.last_triggered_at = Some(now);
+    let result = db::dashboards::reports::set(org_id, &report, false).await;
+    if result.is_err() {
+        log::error!(
+            "Failed to update report: {report_name} after trigger: {}",
+            result.err().unwrap()
+        );
     }
 
     Ok(())
