@@ -372,43 +372,6 @@ CREATE TABLE IF NOT EXISTS meta
         return Err(e.into());
     }
 
-    let mut tx = pool.begin().await?;
-    // Create the meta_backup table like meta
-    if let Err(e) = sqlx::query(
-        r#"
-CREATE TABLE IF NOT EXISTS meta_backup LIKE meta;
-        "#,
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] rollback create table meta_backup error: {}", e);
-        }
-        return Err(e.into());
-    }
-
-    // Attempt to insert data into meta_backup from meta
-    // Note: This logic assumes you want to copy data unconditionally; adjust as needed.
-    if let Err(e) = sqlx::query(
-        r#"
-INSERT INTO meta_backup SELECT * FROM meta;
-        "#,
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] rollback insert into meta_backup error: {}", e);
-        }
-        return Err(e.into());
-    }
-
-    if let Err(e) = tx.commit().await {
-        log::error!("[MYSQL] commit create table meta_backup error: {}", e);
-        return Err(e.into());
-    }
-
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (key1, module);").await?;
@@ -477,7 +440,7 @@ async fn add_start_dt_column() -> Result<()> {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());
     }
-
+    create_meta_backup(&pool).await?;
     add_col(pool).await?;
 
     create_index_item(
@@ -512,5 +475,52 @@ async fn add_col(pool: Pool<MySql>) -> Result<()> {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());
     };
+    Ok(())
+}
+
+async fn create_meta_backup(pool: &Pool<MySql>) -> Result<()> {
+    let mut tx = pool.begin().await?;
+    // Create the meta_backup table like meta
+    if let Err(e) = sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS meta_backup LIKE meta;
+        "#,
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] rollback create table meta_backup error: {}", e);
+        }
+        return Err(e.into());
+    }
+
+    // Check if meta_backup is empty before attempting to insert data
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM meta_backup")
+        .fetch_one(&mut *tx)
+        .await?;
+
+    if count.0 == 0 {
+        // Attempt to insert data into meta_backup from meta since it's empty
+        if let Err(e) = sqlx::query(
+            r#"
+    INSERT INTO meta_backup SELECT * FROM meta;
+            "#,
+        )
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback insert into meta_backup error: {}", e);
+            }
+            return Err(e.into());
+        }
+    }
+
+    if let Err(e) = tx.commit().await {
+        log::error!("[MYSQL] commit transaction error: {}", e);
+        return Err(e.into());
+    }
+
     Ok(())
 }

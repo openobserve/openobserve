@@ -340,6 +340,7 @@ impl super::Db for PostgresDb {
     }
 
     async fn add_start_dt_column(&self) -> Result<()> {
+        create_meta_backup().await?;
         add_start_dt_column().await
     }
 }
@@ -371,32 +372,6 @@ CREATE TABLE IF NOT EXISTS meta
     }
     if let Err(e) = tx.commit().await {
         log::error!("[POSTGRES] commit create table meta error: {}", e);
-        return Err(e.into());
-    }
-
-    let mut tx = pool.begin().await?;
-
-    // create meta_backup table with data from meta
-    if let Err(e) = sqlx::query(
-        r#"
-CREATE TABLE IF NOT EXISTS meta_backup AS
-SELECT * FROM meta;
-    "#,
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        if let Err(e) = tx.rollback().await {
-            log::error!(
-                "[POSTGRES] rollback create table meta_backup with data error: {}",
-                e
-            );
-        }
-        return Err(e.into());
-    }
-
-    if let Err(e) = tx.commit().await {
-        log::error!("[POSTGRES] commit create table meta_backup error: {}", e);
         return Err(e.into());
     }
 
@@ -486,5 +461,28 @@ async fn add_col(pool: Pool<Postgres>) -> Result<()> {
         log::info!("[POSTGRES] Error in committing transaction: {}", e);
         return Err(e.into());
     };
+    Ok(())
+}
+
+async fn create_meta_backup() -> Result<()> {
+    let pool = CLIENT.clone();
+    let mut tx = pool.begin().await?;
+    if let Err(e) = sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS meta_backup AS SELECT * FROM meta;
+        "#,
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] rollback create table meta_backup error: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!("[POSTGRES] commit create table meta_backup error: {}", e);
+        return Err(e.into());
+    }
     Ok(())
 }
