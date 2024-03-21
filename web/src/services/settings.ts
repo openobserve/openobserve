@@ -27,7 +27,7 @@ const settings = {
     return http().delete(`/api/${org_identifier}/settings/logo`);
   },
   updateCustomText: (org_identifier: string, key: string, value: string) => {
-    return http().post(`/api/${org_identifier}/kv/${key}`, value);
+    return http().post(`/api/${org_identifier}/settings/logo/text`, value);
   },
 };
 
