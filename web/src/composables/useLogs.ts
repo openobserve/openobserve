@@ -472,7 +472,7 @@ const useLogs = () => {
         },
       };
 
-      if (searchObj.meta.fastMode) {
+      if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
         req.query.sql = req.query.sql.replace(
           "[FIELD_LIST]",
           searchObj.data.stream.interestingFieldList.join(",")
