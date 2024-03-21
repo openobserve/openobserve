@@ -23,8 +23,6 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
   "dependencies": {
-    "@datadog/browser-logs": "^5.1.0",
-    "@datadog/browser-rum": "^5.1.0",
     "@esbuild-plugins/node-globals-polyfill": "^0.1.1",
     "@joakimono/echarts-extension-leaflet": "^1.0.1",
     "@openobserve/browser-logs": "^0.2.10",

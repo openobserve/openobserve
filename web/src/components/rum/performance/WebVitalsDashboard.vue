@@ -138,7 +138,6 @@ export default defineComponent({
     });
 
     const updateLayout = async () => {
-      isLoading.value.push(true);
       await nextTick();
       await nextTick();
       await nextTick();
@@ -150,11 +149,8 @@ export default defineComponent({
       // Its an internal bug of vue-grid-layout
       // So adding settimeout of 1 sec to fix the issue
 
-      setTimeout(() => {
-        webVitalsChartsRef.value.layoutUpdate();
-        window.dispatchEvent(new Event("resize"));
-        isLoading.value.pop();
-      }, 1000);
+      webVitalsChartsRef.value.layoutUpdate();
+      window.dispatchEvent(new Event("resize"));
     };
 
     const loadDashboard = async () => {

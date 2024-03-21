@@ -106,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <AppTable
-            v-else
             :columns="columns"
             :rows="errorTrackingState.data.errors"
             class="app-table-container"
@@ -124,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { nextTick, onBeforeMount, onMounted, ref, type Ref } from "vue";
-import AppTable from "@/components/AppTable.vue";
+import AppTable from "@/components/rum/AppTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
@@ -139,6 +138,7 @@ import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
 const dateTime = ref({
@@ -155,6 +155,8 @@ const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
 const { getStream } = useStreams();
+const totalErrorsCount = ref(0);
+const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 const columns = ref([
   {
     name: "error",
@@ -234,6 +236,8 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
+const q = useQuasar();
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
 });
@@ -261,6 +265,9 @@ const getStreamFields = () => {
       .then((stream) => {
         streamFields.value = [];
         stream.schema.forEach((field: any) => {
+          // TODO OK: Convert this to set
+          schemaMapping.value[field.name] = true;
+
           if (userDataSet.has(field.name)) {
             streamFields.value.push({
               ...field,
@@ -299,13 +306,49 @@ const getErrorLogs = () => {
   };
   const req = buildQueryPayload(queryPayload);
 
+  let errorFields = "";
+  let errorWhereClause = "";
+
+  if (schemaMapping.value["error_id"]) {
+    errorFields += "error_id, ";
+    errorWhereClause += "error_id, ";
+  }
+
+  if (schemaMapping.value["error_message"]) {
+    errorFields += "error_message, ";
+    errorWhereClause += "error_message, ";
+  }
+  if (schemaMapping.value["error_handling"]) {
+    errorFields += "error_handling, ";
+    errorWhereClause += "error_handling, ";
+  }
+  schemaMapping.value["error_stack"] = false;
+  schemaMapping.value["error_handling_stack"] = false;
+
+  if (
+    schemaMapping.value["error_handling_stack"] &&
+    schemaMapping.value["error_stack"]
+  ) {
+    errorWhereClause +=
+      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
+    errorFields += "error_stack, ";
+  } else if (schemaMapping.value["error_handling_stack"]) {
+    errorWhereClause +=
+      "MIN(CASE WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
+    errorFields += "error_stack, ";
+  } else if (schemaMapping.value["error_stack"]) {
+    errorWhereClause +=
+      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE NULL END ) AS error_stack, ";
+    errorFields += "error_stack, ";
+  }
+
   req.query.sql = `select max(${
     store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, type, error_message, service, MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE error_handling_stack END ) AS error_stack, COUNT(*) as events, error_handling, max(error_id) as error_id, max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error'${
+  }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from '_rumdata' where type='error'${
     errorTrackingState.data.editorValue.length
       ? " and " + errorTrackingState.data.editorValue
       : ""
-  } GROUP BY type, error_message, service, error_stack, error_handling order by zo_sql_timestamp DESC`;
+  } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
 
   req.query.sql.replace("\n", " ");
   req.query.sql_mode = "full";
@@ -322,6 +365,21 @@ const getErrorLogs = () => {
     })
     .then((res) => {
       errorTrackingState.data.errors = res.data.hits;
+      totalErrorsCount.value = res.data.hits.reduce(
+        (acc: number, curr: any) => {
+          return acc + curr.events;
+        },
+        0
+      );
+    })
+    .catch((err) => {
+      q.notify({
+        message:
+          err.response?.data?.message || "Error while fetching error events",
+        position: "bottom",
+        color: "negative",
+        timeout: 4000,
+      });
     })
     .finally(() => isLoading.value.pop());
 };

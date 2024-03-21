@@ -56,7 +56,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
 
     let mut offset = offset;
     if offset == 0 {
-        // get earilest date from schema
+        // get earliest date from schema
         offset = time_now.timestamp_micros();
         let r = STREAM_SCHEMAS.read().await;
         for (key, val) in r.iter() {
@@ -109,7 +109,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     // offset
     let mut is_waiting_streams = false;
     for (key, val) in offsets {
-        if (val - Duration::hours(1).num_microseconds().unwrap()) < offset {
+        if (val - Duration::try_hours(1).unwrap().num_microseconds().unwrap()) < offset {
             log::info!("[COMPACT] file_list is waiting for stream: {key}, offset: {val}");
             is_waiting_streams = true;
             break;
@@ -126,7 +126,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         // compact last hour, because it just done compaction that generated a lot of
         // small file_list files
-        let time_last_hour = time_now - Duration::hours(1);
+        let time_last_hour = time_now - Duration::try_hours(1).unwrap();
         let time_last_hour = Utc
             .with_ymd_and_hms(
                 time_last_hour.year(),
@@ -165,7 +165,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
     merge_file_list(offset).await?;
 
     // write new sync offset
-    offset = offset_time_hour + Duration::hours(1).num_microseconds().unwrap();
+    offset = offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap();
     db::compact::file_list::set_offset(offset).await
 }
 
@@ -180,7 +180,7 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
         for _hour in 0..24 {
             let offset = t.timestamp_micros();
             merge_file_list(offset).await?;
-            t += Duration::hours(1);
+            t += Duration::try_hours(1).unwrap();
         }
 
         // delete day
@@ -193,10 +193,10 @@ pub async fn run_delete() -> Result<(), anyhow::Error> {
 /// merge and delete the small file list keys in this hour from etcd
 /// upload new file list into storage
 async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
-    let lock_key = format!("compact/file_list/{offset}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let lock_key = format!("/compact/file_list/{offset}");
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::file_list::get_process(offset).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[COMPACT] list_list offset [{offset}] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip

@@ -22,11 +22,11 @@ use datafusion::{
         datatypes::DataType,
     },
     error::DataFusionError,
-    logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
-    physical_plan::functions::make_scalar_function,
+    logical_expr::{ScalarUDF, Volatility},
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
+use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// The name of the time_range UDF given to DataFusion.
@@ -41,85 +41,80 @@ pub(crate) static TIME_RANGE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // returns boolean
         Arc::new(DataType::Boolean),
         Volatility::Immutable,
-        time_range_expr_impl(),
+        Arc::new(time_range_expr_impl),
     )
 });
 
 /// time_range function for datafusion
-pub fn time_range_expr_impl() -> ScalarFunctionImplementation {
-    let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
-        if args.len() != 3 {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(
-                    "UDF params should be: time_range(field, start, end)".to_string(),
-                ),
-                None,
-            ));
-        }
+pub fn time_range_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
+    if args.len() != 3 {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "UDF params should be: time_range(field, start, end)".to_string(),
+            ),
+            None,
+        ));
+    }
 
-        // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-        //    function panics!
-        let base = &args[0]
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .expect("cast failed");
-        let min = &args[1]
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("cast failed");
-        let max = &args[2]
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("cast failed");
+    let args = ColumnarValue::values_to_arrays(args)?;
 
-        // 2. perform the computation
-        let array = zip(base.iter(), zip(min.iter(), max.iter()))
-            .map(|(base, val)| {
-                match (base, val) {
-                    // in arrow, any value can be null.
-                    // Here we decide to make our UDF to return null when either argument is null.
-                    (Some(base), (Some(min), Some(max))) => {
-                        let min = match time::parse_str_to_timestamp_micros(min) {
-                            Ok(v) => v,
-                            Err(_) => return None,
-                        };
-                        let max = match time::parse_str_to_timestamp_micros(max) {
-                            Ok(v) => v,
-                            Err(_) => return None,
-                        };
-                        let result: bool;
-                        if min > 0 && max > 0 {
-                            result = base >= min && base < max;
-                        } else if min > 0 {
-                            result = base >= min;
-                        } else if max > 0 {
-                            result = base < max;
-                        } else {
-                            result = true;
-                        }
-                        Some(result)
+    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
+    //    function panics!
+    let base = &args[0]
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .expect("cast failed");
+    let min = &args[1]
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .expect("cast failed");
+    let max = &args[2]
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .expect("cast failed");
+
+    // 2. perform the computation
+    let array = zip(base.iter(), zip(min.iter(), max.iter()))
+        .map(|(base, val)| {
+            match (base, val) {
+                // in arrow, any value can be null.
+                // Here we decide to make our UDF to return null when either argument is null.
+                (Some(base), (Some(min), Some(max))) => {
+                    let min = match time::parse_str_to_timestamp_micros(min) {
+                        Ok(v) => v,
+                        Err(_) => return None,
+                    };
+                    let max = match time::parse_str_to_timestamp_micros(max) {
+                        Ok(v) => v,
+                        Err(_) => return None,
+                    };
+                    let result: bool;
+                    if min > 0 && max > 0 {
+                        result = base >= min && base < max;
+                    } else if min > 0 {
+                        result = base >= min;
+                    } else if max > 0 {
+                        result = base < max;
+                    } else {
+                        result = true;
                     }
-                    _ => None,
+                    Some(result)
                 }
-            })
-            .collect::<BooleanArray>();
+                _ => None,
+            }
+        })
+        .collect::<BooleanArray>();
 
-        // `Ok` because no error occurred during the calculation
-        // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(Arc::new(array) as ArrayRef)
-    };
-
-    make_scalar_function(func)
+    // `Ok` because no error occurred during the calculation
+    // `Arc` because arrays are immutable, thread-safe, trait objects.
+    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use datafusion::{
         arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
+            datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         datasource::MemTable,

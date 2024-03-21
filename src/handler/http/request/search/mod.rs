@@ -134,18 +134,15 @@ pub async fn search(
     let mut rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
-    let resp: SearchService::sql::Sql = match crate::service::search::sql::Sql::new(&rpc_req).await
-    {
-        Ok(v) => v,
+    let stream_name = match crate::common::meta::sql::Sql::new(&req.query.sql) {
+        Ok(v) => v.source.to_string(),
         Err(e) => {
-            return Ok(match e {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+            return Ok(
+                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     e.to_string(),
                 )),
-            });
+            );
         }
     };
 
@@ -169,7 +166,7 @@ pub async fn search(
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
-                        o2_type: format!("{}:{}", stream_type, resp.stream_name),
+                        o2_type: format!("{}:{}", stream_type, stream_name),
                         org_id: org_id.clone(),
                         bypass_check: false,
                         parent_id: "".to_string(),
@@ -251,7 +248,7 @@ pub async fn search(
             report_request_usage_stats(
                 req_stats,
                 &org_id,
-                &resp.stream_name,
+                &stream_name,
                 StreamType::Logs,
                 UsageType::Search,
                 num_fn,
@@ -281,8 +278,9 @@ pub async fn search(
                 .inc();
             log::error!("search error: {:?}", err);
             Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -399,7 +397,11 @@ pub async fn around(
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
-            start_time: around_key - Duration::seconds(900).num_microseconds().unwrap(),
+            start_time: around_key
+                - Duration::try_seconds(900)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap(),
             end_time: around_key,
             sort_by: Some(format!("{} DESC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
@@ -438,8 +440,9 @@ pub async fn around(
                 .inc();
             log::error!("search around error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -455,7 +458,11 @@ pub async fn around(
             from: 0,
             size: around_size / 2,
             start_time: around_key,
-            end_time: around_key + Duration::seconds(900).num_microseconds().unwrap(),
+            end_time: around_key
+                + Duration::try_seconds(900)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap(),
             sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
             fast_mode: false,
@@ -493,8 +500,9 @@ pub async fn around(
                 .inc();
             log::error!("search around error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -539,11 +547,16 @@ pub async fn around(
         ])
         .inc();
 
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -614,7 +627,10 @@ pub async fn values(
         None => "".to_string(),
         Some(v) => base64::decode(v).unwrap_or("".to_string()),
     };
-
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     if fields.len() == 1
         && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
@@ -631,20 +647,39 @@ pub async fn values(
                         &fields[0],
                         Some((column[0], column[1])),
                         &query,
+                        user_id,
                     )
                     .await;
                 }
             } else {
                 // no filter
-                return values_v2(&org_id, stream_type, &stream_name, &fields[0], None, &query)
-                    .await;
+                return values_v2(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    &fields[0],
+                    None,
+                    &query,
+                    user_id,
+                )
+                .await;
             }
         } else {
             // no filter
-            return values_v2(&org_id, stream_type, &stream_name, &fields[0], None, &query).await;
+            return values_v2(
+                &org_id,
+                stream_type,
+                &stream_name,
+                &fields[0],
+                None,
+                &query,
+                user_id,
+            )
+            .await;
         }
     }
-    values_v1(&org_id, stream_type, &stream_name, &query).await
+
+    values_v1(&org_id, stream_type, &stream_name, &query, user_id).await
 }
 
 /// search in original data
@@ -653,6 +688,7 @@ async fn values_v1(
     stream_type: StreamType,
     stream_name: &str,
     query: &web::Query<HashMap<String, String>>,
+    user_id: &str,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = ider::uuid();
@@ -793,8 +829,9 @@ async fn values_v1(
                 .inc();
             log::error!("search values error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -842,6 +879,7 @@ async fn values_v1(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -866,6 +904,7 @@ async fn values_v2(
     field: &str,
     filter: Option<(&str, &str)>,
     query: &web::Query<HashMap<String, String>>,
+    user_id: &str,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = ider::uuid();
@@ -929,40 +968,42 @@ async fn values_v2(
         encoding: meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_search =
-        match SearchService::search(&session_id, org_id, StreamType::Metadata, &req).await {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_values/v2",
-                        "500",
-                        org_id,
-                        stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_values/v2",
-                        "500",
-                        org_id,
-                        stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .inc();
-                log::error!("search values error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
+    let resp_search = match SearchService::search(&session_id, org_id, StreamType::Metadata, &req)
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_values/v2",
+                    "500",
+                    org_id,
+                    stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_values/v2",
+                    "500",
+                    org_id,
+                    stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search values error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
 
     let mut resp = meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
@@ -1002,6 +1043,7 @@ async fn values_v2(
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1116,8 +1158,9 @@ pub async fn search_partition(
                 .inc();
             log::error!("search error: {:?}", err);
             Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),

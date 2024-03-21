@@ -32,7 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
-          v-if="indexData.schema.length == 0"
+          v-if="loadingState"
+          class="q-pt-md text-center q-w-md q-mx-lg"
+          style="max-width: 450px"
+        >
+          <q-spinner-hourglass color="primary" size="lg" />
+        </div>
+        <div
+          v-else-if="indexData.schema.length == 0"
           class="q-pt-md text-center q-w-md q-mx-lg"
           style="max-width: 450px"
         >
@@ -46,17 +53,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <table class="q-table" data-test="schema-stream-meta-data-table">
               <thead>
                 <tr>
-                  <th>{{ t("logStream.docsCount") }}</th>
+                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
+                    {{ t("logStream.docsCount") }}
+                  </th>
                   <th>{{ t("logStream.storageSize") }}</th>
                   <th v-if="isCloud !== 'true'">
                     {{ t("logStream.compressedSize") }}
                   </th>
-                  <th>{{ t("logStream.time") }}</th>
+                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
+                    {{ t("logStream.time") }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>
+                  <td v-if="store.state.zoConfig.show_stream_stats_doc_num">
                     {{
                       parseInt(indexData.stats.doc_num).toLocaleString("en-US")
                     }}
@@ -67,7 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <td v-if="isCloud !== 'true'">
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </td>
-                  <td class="text-center">
+                  <td
+                    v-if="store.state.zoConfig.show_stream_stats_doc_num"
+                    class="text-center"
+                  >
                     {{ indexData.stats.doc_time_min }}
                     <br />
                     to
@@ -281,11 +295,12 @@ export default defineComponent({
     const deleteFieldList = ref([]);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
+    const loadingState = ref(true);
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
-      { label: "Key partition", value: "keyPartition" },
       { label: "Bloom filter", value: "bloomFilterKey" },
+      { label: "KeyValue partition", value: "keyPartition" },
       { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
       { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
       { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
@@ -361,14 +376,6 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
-          streamResponse.stats.doc_time_max = date.formatDate(
-            parseInt(streamResponse.stats.doc_time_max) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
-          streamResponse.stats.doc_time_min = date.formatDate(
-            parseInt(streamResponse.stats.doc_time_min) / 1000,
-            "YYYY-MM-DDTHH:mm:ss:SSZ"
-          );
           if (
             streamResponse.settings.full_text_search_keys.length == 0 &&
             (showFullTextSearchColumn.value || showPartitionColumn.value)
@@ -379,7 +386,18 @@ export default defineComponent({
           }
 
           indexData.value.schema = streamResponse.schema || [];
-          indexData.value.stats = streamResponse.stats;
+          indexData.value.stats = JSON.parse(
+            JSON.stringify(streamResponse.stats)
+          );
+
+          indexData.value.stats.doc_time_max = date.formatDate(
+            parseInt(streamResponse.stats.doc_time_max) / 1000,
+            "YYYY-MM-DDTHH:mm:ss:SSZ"
+          );
+          indexData.value.stats.doc_time_min = date.formatDate(
+            parseInt(streamResponse.stats.doc_time_min) / 1000,
+            "YYYY-MM-DDTHH:mm:ss:SSZ"
+          );
 
           if (showDataRetention.value)
             dataRetentionDays.value =
@@ -387,6 +405,7 @@ export default defineComponent({
               store.state.zoConfig.data_retention_days;
 
           if (!streamResponse.schema) {
+            loadingState.value = false;
             dismiss();
             return;
           }
@@ -427,7 +446,7 @@ export default defineComponent({
 
               property.level = level;
 
-              if (partition.types === "values")
+              if (partition.types === "value")
                 fieldIndices.push("keyPartition");
 
               if (partition.types?.hash)
@@ -439,9 +458,13 @@ export default defineComponent({
             fieldIndices.length = 0;
           }
 
+          loadingState.value = false;
           dismiss();
         })
-        .catch((err) => console.log(err));
+        .catch((err) => {
+          loadingState.value = false;
+          console.log(err);
+        });
     };
 
     const onSubmit = async () => {
@@ -625,6 +648,7 @@ export default defineComponent({
       formDirtyFlag,
       streamIndexType,
       disableOptions,
+      loadingState,
     };
   },
   created() {
@@ -634,6 +658,8 @@ export default defineComponent({
       this.indexData.stream_type = this.modelValue.stream_type;
 
       this.getSchema();
+    } else {
+      this.loadingState.value = false;
     }
   },
 });

@@ -54,16 +54,17 @@ pub async fn merge_by_stream(
 
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
 
     if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-        let lock_key = format!("compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
-        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
         }
@@ -141,13 +142,15 @@ pub async fn merge_by_stream(
     // max_file_retention_time
     if (CONFIG.compact.step_secs < 3600
         && time_now.timestamp_micros() - offset
-            <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+            <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                .unwrap()
                 .num_microseconds()
                 .unwrap())
         || (CONFIG.compact.step_secs >= 3600
             && (offset >= time_now_hour
                 || time_now.timestamp_micros() - time_now_hour
-                    <= Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                    <= Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap()
                         * 3))
@@ -160,12 +163,12 @@ pub async fn merge_by_stream(
         if partition_time_level == PartitionTimeLevel::Daily {
             (
                 offset_time_day,
-                offset_time_day + Duration::hours(24).num_microseconds().unwrap() - 1,
+                offset_time_day + Duration::try_hours(24).unwrap().num_microseconds().unwrap() - 1,
             )
         } else {
             (
                 offset_time_hour,
-                offset_time_hour + Duration::hours(1).num_microseconds().unwrap() - 1,
+                offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap() - 1,
             )
         };
     let files = file_list::query(
@@ -183,11 +186,12 @@ pub async fn merge_by_stream(
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
-        // Duration::hours(CONFIG.limit.allowed_upto).num_microseconds().unwrap() <
+        // Duration::try_hours(CONFIG.limit.allowed_upto).unwrap().num_microseconds().unwrap() <
         // time_now_hour { -- no check it
         // }
         let offset = offset
-            + Duration::seconds(CONFIG.compact.step_secs)
+            + Duration::try_seconds(CONFIG.compact.step_secs)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
         db::compact::files::set_offset(
@@ -309,7 +313,8 @@ pub async fn merge_by_stream(
 
     // write new offset
     let offset = offset
-        + Duration::seconds(CONFIG.compact.step_secs)
+        + Duration::try_seconds(CONFIG.compact.step_secs)
+            .unwrap()
             .num_microseconds()
             .unwrap();
     db::compact::files::set_offset(
@@ -340,7 +345,10 @@ pub async fn merge_by_stream(
         .inc_by(time);
     metrics::COMPACT_DELAY_HOURS
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .set((time_now_hour - offset_time_hour) / Duration::hours(1).num_microseconds().unwrap());
+        .set(
+            (time_now_hour - offset_time_hour)
+                / Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
+        );
 
     Ok(())
 }
@@ -498,7 +506,8 @@ async fn merge_files(
     }
 
     let mut buf = Vec::new();
-    let (mut new_file_meta, new_file_schema) = datafusion::exec::merge_parquet_files(
+    let mut fts_buf = Vec::new();
+    let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         schema,
@@ -506,6 +515,7 @@ async fn merge_files(
         &full_text_search_fields,
         new_file_size,
         stream_type,
+        &mut fts_buf,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -522,7 +532,7 @@ async fn merge_files(
     let id = ider::generate();
     let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
     log::info!(
-        "[COMPACT] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        "[COMPACT] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -536,14 +546,19 @@ async fn merge_files(
             if CONFIG.common.inverted_index_enabled && stream_type == StreamType::Logs {
                 let (index_file_name, filemeta) = generate_index_on_compactor(
                     &retain_file_list,
-                    buf,
+                    fts_buf,
                     new_file_key.clone(),
                     org_id,
                     stream_name,
-                    new_file_schema.clone(),
                 )
                 .await
-                .map_err(|e| anyhow::anyhow!("generate_index_on_compactor error: {}", e))?;
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "generate_index_on_compactor error: {}, need delete files: {:?}",
+                        e,
+                        retain_file_list
+                    )
+                })?;
                 if !index_file_name.is_empty() {
                     log::info!("Created index file during compaction {}", index_file_name);
                     // Notify that we wrote the index file to the db.
@@ -558,11 +573,17 @@ async fn merge_files(
                     .await
                     {
                         log::error!(
-                            "generate_index_on_compactor write to file list: {}, error: {}",
+                            "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
                             index_file_name,
-                            e.to_string()
+                            e.to_string(),
+                            retain_file_list
                         );
                     }
+                } else {
+                    log::error!(
+                        "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
+                        retain_file_list
+                    );
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
@@ -619,6 +640,13 @@ async fn write_file_list_db_only(org_id: &str, events: &[FileKey]) -> Result<(),
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
+        // send broadcast to other nodes
+        if CONFIG.memory_cache.cache_latest_files {
+            if let Err(e) = db::file_list::broadcast::send(events, None).await {
+                log::error!("[COMPACT] send broadcast for file_list failed: {}", e);
+            }
+        }
+        // broadcast success
         success = true;
         break;
     }
@@ -709,7 +737,7 @@ mod tests {
     async fn test_compact() {
         infra_db::create_table().await.unwrap();
         infra_file_list::create_table().await.unwrap();
-        let offset = Duration::hours(2).num_microseconds().unwrap();
+        let offset = Duration::try_hours(2).unwrap().num_microseconds().unwrap();
         let _ = db::compact::files::set_offset(
             "default",
             "logs".into(),

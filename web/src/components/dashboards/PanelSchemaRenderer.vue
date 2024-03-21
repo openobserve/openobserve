@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @row-click="onChartClick"
           ref="tableRendererRef"
+          :wrap-cells="panelSchema.config?.wrap_table_cells"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -155,17 +156,34 @@ import {
   computed,
   inject,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
-import GeoMapRenderer from "@/components/dashboards/panels/GeoMapRenderer.vue";
-import HTMLRenderer from "./panels/HTMLRenderer.vue";
-import MarkdownRenderer from "./panels/MarkdownRenderer.vue";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
+
+const ChartRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/ChartRenderer.vue");
+});
+
+const TableRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/TableRenderer.vue");
+});
+
+const GeoMapRenderer = defineAsyncComponent(() => {
+  return import("@/components/dashboards/panels/GeoMapRenderer.vue");
+});
+
+const HTMLRenderer = defineAsyncComponent(() => {
+  return import("./panels/HTMLRenderer.vue");
+});
+
+const MarkdownRenderer = defineAsyncComponent(() => {
+  return import("./panels/MarkdownRenderer.vue");
+});
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -622,7 +640,7 @@ export default defineComponent({
           const tabId =
             dashboardData.tabs.find(
               (tab: any) => tab.name == drilldownData.data.tab
-            )?.tabId ?? "default";
+            )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
           // else made changes in current router only

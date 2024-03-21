@@ -27,7 +27,6 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 use flate2::read::GzDecoder;
 use vrl::compiler::runtime::Runtime;
 
@@ -46,7 +45,7 @@ use crate::{
         distinct_values, get_formatted_stream_name,
         ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
         logs::StreamMeta,
-        schema::get_upto_discard_error,
+        schema::{get_upto_discard_error, SchemaCache},
         usage::report_request_usage_stats,
     },
 };
@@ -60,7 +59,7 @@ pub async fn ingest(
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     // check stream
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_params = StreamParams::new(org_id, in_stream_name, StreamType::Logs);
     let stream_name = &get_formatted_stream_name(&mut stream_params, &mut stream_schema_map).await;
     check_ingestion_allowed(org_id, Some(stream_name))?;
@@ -74,8 +73,8 @@ pub async fn ingest(
         });
     }
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     // Start Register Transforms for stream
     let mut runtime = crate::service::ingestion::init_functions_runtime();

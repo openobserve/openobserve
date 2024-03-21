@@ -147,7 +147,7 @@ async fn dispatch(
         .finish();
 
     // send query
-    let new_url = get_url(path);
+    let new_url = get_url(path).await;
 
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
@@ -185,13 +185,13 @@ async fn dispatch(
     Ok(new_resp.body(body))
 }
 
-fn get_url(path: &str) -> URLDetails {
+async fn get_url(path: &str) -> URLDetails {
     let node_type;
     let is_querier_path = check_querier_route(path);
 
     let nodes = if is_querier_path {
         node_type = Role::Querier;
-        let nodes = cluster::get_cached_online_querier_nodes();
+        let nodes = cluster::get_cached_online_querier_nodes().await;
         if is_fixed_querier_route(path) && nodes.is_some() && !nodes.as_ref().unwrap().is_empty() {
             nodes.map(|v| v.into_iter().take(1).collect())
         } else {
@@ -199,7 +199,7 @@ fn get_url(path: &str) -> URLDetails {
         }
     } else {
         node_type = Role::Ingester;
-        cluster::get_cached_online_ingester_nodes()
+        cluster::get_cached_online_ingester_nodes().await
     };
     if nodes.is_none() || nodes.as_ref().unwrap().is_empty() {
         if node_type == Role::Ingester && !CONFIG.route.ingester_srv_url.is_empty() {

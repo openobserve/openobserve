@@ -67,7 +67,7 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 0,
       columns: <any>[],
-      size: 10,
+      size: 150,
     },
     errors: <any>[],
     streamResults: <any>[],

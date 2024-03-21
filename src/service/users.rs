@@ -636,7 +636,6 @@ mod tests {
             "admin@zo.dev",
         )
         .await;
-        println!("resp: {:?}", resp);
         assert!(resp.is_ok());
     }
 

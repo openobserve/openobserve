@@ -15,6 +15,7 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
+use anyhow::Context;
 use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
@@ -33,16 +34,11 @@ use config::{
         parquet::read_metadata_from_file,
         schema_ext::SchemaExt,
     },
-    FxIndexMap, CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
+    FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
-use datafusion::{
-    arrow::json as arrow_json, common::ExprSchema, datasource::MemTable, prelude::*,
-    scalar::ScalarValue,
-};
+use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
 use infra::{cache, storage};
-use parquet::arrow::{
-    arrow_reader::ParquetRecordBatchReaderBuilder, ParquetRecordBatchStreamBuilder,
-};
+use parquet::arrow::ParquetRecordBatchStreamBuilder;
 use tokio::{sync::Semaphore, task::JoinHandle, time};
 
 use crate::{
@@ -50,8 +46,11 @@ use crate::{
     job::files::idx::write_to_disk,
     service::{
         db,
-        search::datafusion::exec::merge_parquet_files,
-        stream::{self, get_stream_setting_fts_fields},
+        schema::SchemaCache,
+        search::datafusion::{
+            exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
+        },
+        stream::{self},
     },
 };
 
@@ -137,7 +136,11 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         }
 
         let wal_dir = wal_dir.clone();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
+        let permit = semaphore
+            .clone()
+            .acquire_owned()
+            .await
+            .context("[INGESTER:JOB] Failed to acquire semaphore for file uploading")?;
         let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
             // sort by created time
             let mut files_with_size = files_with_size.to_owned();
@@ -151,7 +154,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 let mut has_expired_files = false;
                 // not enough files to upload, check if some files are too old
                 let min_ts = Utc::now().timestamp_micros()
-                    - Duration::seconds(CONFIG.limit.max_file_retention_time as i64)
+                    - Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap();
                 for file in files_with_size.iter() {
@@ -176,7 +180,18 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
 
             // get latest schema
-            let latest_schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
+            let latest_schema = db::schema::get(&org_id, &stream_name, stream_type)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[INGESTER:JOB] Failed to get latest schema for stream [{}/{}/{}]: {}",
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                        e
+                    );
+                    e
+                })?;
 
             // start merge files and upload to s3
             loop {
@@ -353,7 +368,8 @@ async fn merge_files(
         stream::get_stream_setting_bloom_filter_fields(latest_schema).unwrap();
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
-    let (mut new_file_meta, new_file_schema) = merge_parquet_files(
+    let mut fts_buf = Vec::new();
+    let (mut new_file_meta, _) = merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
         Arc::new(file_schema.unwrap()),
@@ -361,6 +377,7 @@ async fn merge_files(
         &full_text_search_fields,
         new_file_size,
         stream_type,
+        &mut fts_buf,
     )
     .await?;
     new_file_meta.original_size = new_file_size;
@@ -376,7 +393,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, orginal_size: {}, compressed_size: {}",
+        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,
@@ -384,19 +401,14 @@ async fn merge_files(
     );
 
     let buf = Bytes::from(buf);
+
     // upload file
-    match storage::put(&new_file_key, buf.clone()).await {
+    match storage::put(&new_file_key, buf).await {
         Ok(_) => {
             if CONFIG.common.inverted_index_enabled && stream_type != StreamType::Index {
-                generate_index_on_ingester(
-                    buf,
-                    new_file_key.clone(),
-                    &org_id,
-                    &stream_name,
-                    new_file_schema,
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
+                generate_index_on_ingester(fts_buf, new_file_key.clone(), &org_id, &stream_name)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -406,24 +418,22 @@ async fn merge_files(
 
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_ingester(
-    buf: Bytes,
+    buf: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
-    schema: SchemaRef,
 ) -> Result<(), anyhow::Error> {
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
     let index_record_batches =
-        prepare_index_record_batches(buf, schema.clone(), org_id, stream_name, &new_file_key)
-            .await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let record_batches: Vec<&RecordBatch> = index_record_batches.iter().flatten().collect();
     if record_batches.is_empty() {
         return Ok(());
     }
     let idx_schema: SchemaRef = record_batches.first().unwrap().schema();
 
-    let mut schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let schema_chk = crate::service::schema::stream_schema_exists(
         org_id,
         stream_name,
@@ -487,14 +497,13 @@ pub(crate) async fn generate_index_on_ingester(
 /// Create an inverted index file for the given file
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    buf: Bytes,
+    buf: Vec<RecordBatch>,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
-    schema: SchemaRef,
 ) -> Result<(String, FileMeta), anyhow::Error> {
     let mut index_record_batches =
-        prepare_index_record_batches(buf, schema, org_id, stream_name, &new_file_key).await?;
+        prepare_index_record_batches_v1(buf, org_id, stream_name, &new_file_key).await?;
     let schema = if let Some(first_batch) = index_record_batches.first() {
         first_batch[0].schema()
     } else {
@@ -546,64 +555,43 @@ pub(crate) async fn generate_index_on_compactor(
     Ok((filename, filemeta))
 }
 
-/// Prepares index record batches from the provided Parquet file buffer.
-///
-/// Reads the Parquet data into record batches. Registers the batches as a table.
-/// Generates an index record batch for each text column, by splitting into terms,
-/// filtering, aggregating, etc. Returns the generated index record batches.
-///
-/// # Arguments
-/// * `buf` - The Parquet file buffer with actual data.
-/// * `schema` - The schema of the Parquet file.
-/// * `org_id` - The organization ID.
-/// * `stream_name` - The stream name.
-/// * `new_file_key` - The new file key which is used to generate the index file.
-async fn prepare_index_record_batches(
-    buf: Bytes,
-    schema: Arc<Schema>,
+async fn prepare_index_record_batches_v1(
+    batches: Vec<RecordBatch>, // 10 fields index
     org_id: &str,
     stream_name: &str,
     new_file_key: &str,
 ) -> Result<Vec<Vec<RecordBatch>>, anyhow::Error> {
-    let reader = ParquetRecordBatchReaderBuilder::try_new(buf)
-        .unwrap()
-        .build()
-        .unwrap();
-    let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
+    if batches.is_empty() {
+        return Ok(vec![]);
+    }
+    let local = batches.first().unwrap().schema();
     let ctx = SessionContext::new();
-    let provider = MemTable::try_new(schema.clone(), vec![batches])?;
+    let provider = MemTable::try_new(local.clone(), vec![batches])?;
     ctx.register_table("_tbl_raw_data", Arc::new(provider))?;
-    let fts_fields = get_stream_setting_fts_fields(&schema).unwrap();
-    let columns_to_index = if !fts_fields.is_empty() {
-        fts_fields
-    } else {
-        SQL_FULL_TEXT_SEARCH_FIELDS.to_vec()
-    };
     let prefix_to_remove = format!("files/{}/logs/{}/", org_id, stream_name);
     let file_name_without_prefix = new_file_key.trim_start_matches(&prefix_to_remove);
     let mut indexed_record_batches_to_merge = Vec::new();
-    for column in columns_to_index.iter() {
+    for column in local.fields().iter() {
+        // 1500 columns --> 100 columns of inverted index
         let index_df = ctx.table("_tbl_raw_data").await?;
-        let schema = index_df.schema();
 
-        if !schema.has_column_with_unqualified_name(column) {
+        if column.data_type() != &DataType::Utf8 {
             continue;
         }
 
-        if schema.data_type(&Column::from_name(column)).unwrap() != &DataType::Utf8 {
-            log::warn!(
-                "[JOB]: Index column {} is not of type Utf8. Skipping indexing for this column.",
-                column
-            );
-            continue;
-        }
+        let column_name = column.name();
+        let split_chars = &CONFIG.common.inverted_index_split_chars;
 
-        let split_arr = string_to_array(lower(col(column)), lit(" "), lit(ScalarValue::Null));
+        let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
+        let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
+        let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);
+        let distinct_terms = array_distinct(split_arr);
+
         let record_batch = index_df
-            .with_column("terms", split_arr)?
+            .with_column("terms", distinct_terms)?
             .unnest_column("terms")?
             .with_column_renamed("terms", "term")?
-            .with_column("term", btrim(vec![col("term"), lit(",[]*\"\\/:")]))?
+            .with_column("term", btrim(vec![col("term"), lit(remove_chars_btrim)]))?
             .with_column("file_name", lit(file_name_without_prefix))?
             .aggregate(
                 vec![col("term"), col("file_name")],
@@ -614,7 +602,7 @@ async fn prepare_index_record_batches(
             )?
             .with_column("character_len", character_length(col("term")))?
             .with_column("deleted", lit(false))?
-            .filter(col("character_len").gt_eq(lit(3)))?
+            .filter(col("character_len").gt_eq(lit(INDEX_MIN_CHAR_LEN as i32)))?
             .select_columns(&["term", "file_name", "_timestamp", "_count", "deleted"])?
             .collect()
             .await?;

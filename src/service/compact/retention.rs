@@ -54,7 +54,7 @@ pub async fn delete_by_stream(
 
     // Hack for 1970-01-01
     if lifecycle_start.le("1970-01-01") {
-        let lifecycle_end = created_at + Duration::days(1);
+        let lifecycle_end = created_at + Duration::try_days(1).unwrap();
         let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
         return db::compact::retention::delete_stream(
             org_id,
@@ -80,10 +80,10 @@ pub async fn delete_all(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::error!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
@@ -180,12 +180,12 @@ pub async fn delete_by_date(
     stream_name: &str,
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
-    let lock_key = format!("compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node =
         db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))
             .await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::error!(
             "[COMPACT] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
             date_range
@@ -225,7 +225,7 @@ pub async fn delete_by_date(
             if path.exists() {
                 tokio::fs::remove_dir_all(path).await?;
             }
-            date_start += Duration::days(1);
+            date_start += Duration::try_days(1).unwrap();
         }
     } else {
         // delete files from s3
@@ -266,7 +266,7 @@ pub async fn delete_by_date(
                 }
                 tokio::task::yield_now().await; // yield to other tasks
             }
-            date_start += Duration::days(1);
+            date_start += Duration::try_days(1).unwrap();
         }
     }
 

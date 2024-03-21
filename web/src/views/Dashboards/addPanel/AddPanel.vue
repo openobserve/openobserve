@@ -35,6 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex q-gutter-sm">
         <q-btn
+          outline
+          padding="sm"
+          class="q-mr-sm"
+          no-caps
+          label="Dashboard Tutorial"
+          @click="showTutorial"
+          data-test="dashboard-panel-tutorial-btn"
+        ></q-btn>
+        <q-btn
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           outline
           padding="sm"
@@ -284,25 +293,21 @@ import {
   ref,
   computed,
   toRaw,
-  onActivated,
   nextTick,
   watch,
   reactive,
-  onDeactivated,
   onUnmounted,
   onMounted,
+  defineAsyncComponent,
 } from "vue";
 import PanelSidebar from "../../../components/dashboards/addPanel/PanelSidebar.vue";
-import ConfigPanel from "../../../components/dashboards/addPanel/ConfigPanel.vue";
 import ChartSelection from "../../../components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
-import CustomHTMLEditor from "@/components/dashboards/addPanel/CustomHTMLEditor.vue";
-import { useQuasar, date } from "quasar";
+import { useQuasar } from "quasar";
 
 import { useI18n } from "vue-i18n";
 import {
   addPanel,
-  getConsumableDateTime,
   getDashboard,
   getPanel,
   updatePanel,
@@ -318,9 +323,23 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import { useLoading } from "@/composables/useLoading";
 import _ from "lodash-es";
-import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import { provide } from "vue";
-import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
+
+const ConfigPanel = defineAsyncComponent(() => {
+  return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
+});
+
+const QueryInspector = defineAsyncComponent(() => {
+  return import("@/components/dashboards/QueryInspector.vue");
+});
+
+const CustomHTMLEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomHTMLEditor.vue");
+});
+
+const CustomMarkdownEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
+});
 
 export default defineComponent({
   name: "AddPanel",
@@ -366,9 +385,16 @@ export default defineComponent({
     const metaData = ref(null);
     const showViewPanel = ref(false);
     const metaDataValue = (metadata: any) => {
+      // console.time("metaDataValue");
       metaData.value = metadata;
+      // console.timeEnd("metaDataValue");
     };
 
+    //dashboard tutorial link on click
+    const showTutorial = () => {
+      window.open("https://short.openobserve.ai/dashboard-tutorial");
+    };
+    
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -381,21 +407,26 @@ export default defineComponent({
     const isPanelConfigChanged = ref(false);
 
     const savePanelData = useLoading(async () => {
+      // console.time("savePanelData");
       const dashboardId = route.query.dashboard + "";
       await savePanelChangesToDashboard(dashboardId);
+      // console.timeEnd("savePanelData");
     });
 
     onUnmounted(async () => {
+      // console.time("onUnmounted");
       // clear a few things
       resetDashboardPanelData();
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+      // console.timeEnd("onUnmounted");
     });
 
     onMounted(async () => {
       errorData.errors = [];
 
+      // console.time("onMounted");
       // todo check for the edit more
       if (route.query.panelId) {
         editMode.value = true;
@@ -420,15 +451,16 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
       }
-
+      // console.timeEnd("onMounted");
       // let it call the wathcers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
-
+      // console.time("add panel loadDashboard");
       loadDashboard();
+      // console.timeEnd("add panel loadDashboard");
     });
 
     let list = computed(function () {
@@ -441,6 +473,7 @@ export default defineComponent({
     //   return currentDashboard.dashboardId;
     // };
     const loadDashboard = async () => {
+      // console.time("AddPanel:loadDashboard");
       let data = JSON.parse(
         JSON.stringify(
           await getDashboard(
@@ -450,8 +483,10 @@ export default defineComponent({
           )
         )
       );
-      currentDashboardData.data = data;
+      // console.timeEnd("AddPanel:loadDashboard");
 
+      // console.time("AddPanel:loadDashboard:after");
+      currentDashboardData.data = data;
       // if variables data is null, set it to empty list
       if (
         !(
@@ -462,6 +497,7 @@ export default defineComponent({
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
+      // console.timeEnd("AddPanel:loadDashboard:after");
     };
 
     const isInitailDashboardPanelData = () => {
@@ -507,27 +543,34 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
+        // console.time("watch:dashboardPanelData.data.type");
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+        // console.timeEnd("watch:dashboardPanelData.data.type");
       }
     );
 
     watch(selectedDate, () => {
+      // console.time("watch:selectedDate");
       updateDateTime(selectedDate.value);
+      // console.timeEnd("watch:selectedDate");
     });
 
     // resize the chart when config panel is opened and closed
     watch(
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
+        // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
+        // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
       }
     );
 
-    // resize the chart when config panel is opened and closed
+    // resize the chart when query editor is opened and closed
     watch(
       () => dashboardPanelData.layout.showQueryBar,
       (newValue) => {
+        // console.time("watch:dashboardPanelData.layout.showQueryBar");
         if (!newValue) {
           dashboardPanelData.layout.querySplitter = 41;
         } else {
@@ -536,10 +579,12 @@ export default defineComponent({
               expandedSplitterHeight.value;
           }
         }
+        // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
       }
     );
 
     const runQuery = () => {
+      // console.time("runQuery");
       if (!isValid(true)) {
         return;
       }
@@ -548,6 +593,7 @@ export default defineComponent({
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
       updateDateTime(selectedDate.value);
+      // console.timeEnd("runQuery");
     };
 
     const updateDateTime = (value: object) => {
@@ -563,7 +609,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
     };
@@ -572,9 +618,11 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data,
       () => {
+        // console.time("watch:dashboardPanelData.data");
         if (isPanelConfigWatcherActivated) {
           isPanelConfigChanged.value = true;
         }
+        // console.timeEnd("watch:dashboardPanelData.data");
       },
       { deep: true }
     );
@@ -1101,13 +1149,14 @@ export default defineComponent({
       }
 
       try {
+        // console.time("savePanelChangesToDashboard");
         if (editMode.value) {
           const errorMessageOnSave = await updatePanel(
             store,
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? "default"
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -1127,7 +1176,7 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? "default"
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
@@ -1137,6 +1186,7 @@ export default defineComponent({
             return;
           }
         }
+        // console.timeEnd("savePanelChangesToDashboard");
 
         isPanelConfigWatcherActivated = false;
         isPanelConfigChanged.value = false;
@@ -1148,7 +1198,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             dashboard: dashId,
             folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? "default",
+            tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           },
         });
       } catch (error: any) {
@@ -1184,6 +1234,7 @@ export default defineComponent({
     };
 
     const onDataZoom = (event: any) => {
+      // console.time("onDataZoom");
       const selectedDateObj = {
         start: new Date(event.start),
         end: new Date(event.end),
@@ -1200,6 +1251,7 @@ export default defineComponent({
 
       // set it as a absolute time
       dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
+      // console.timeEnd("onDataZoom");
     };
 
     const hoveredSeriesState = ref({
@@ -1258,6 +1310,7 @@ export default defineComponent({
       metaData,
       panelTitle,
       onDataZoom,
+      showTutorial,
     };
   },
   methods: {

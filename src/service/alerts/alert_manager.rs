@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{Duration, Utc};
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
+use std::str::FromStr;
+
+use chrono::{Duration, FixedOffset, Utc};
+use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType};
+use cron::Schedule;
 use infra::dist_lock;
 
 use crate::{
     common::{
         infra::{cluster::get_node_by_uuid, config::TRIGGERS},
-        meta::alerts::triggers::Trigger,
+        meta::alerts::{triggers::Trigger, AlertFrequencyType},
     },
     service::db,
 };
@@ -30,18 +33,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let org_id = "default";
     // get the working node for the organization
     let node = db::alerts::alert_manager::get_mark(org_id).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[ALERT_MANAGER] is processing by {node}");
         return Ok(());
     }
 
     // before start merging, set current node to lock the organization
-    let lock_key = format!("alert_manager/organization/{org_id}");
-    let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+    let lock_key = format!("/alert_manager/organization/{org_id}");
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     // check the working node for the organization again, maybe other node locked it
     // first
     let node = db::alerts::alert_manager::get_mark(org_id).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::debug!("[ALERT_MANAGER] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(());
@@ -122,7 +125,7 @@ pub async fn handle_triggers(
 
     if !alert.enabled {
         // update trigger, check on next week
-        new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
         super::triggers::save(org_id, stream_type, stream_name, alert_name, &new_trigger).await?;
         return Ok(());
@@ -131,12 +134,23 @@ pub async fn handle_triggers(
     // evaluate alert
     let ret = alert.evaluate(None).await?;
     if ret.is_some() && alert.trigger_condition.silence > 0 {
-        new_trigger.next_run_at += Duration::minutes(alert.trigger_condition.silence)
+        new_trigger.next_run_at += Duration::try_minutes(alert.trigger_condition.silence)
+            .unwrap()
             .num_microseconds()
             .unwrap();
         new_trigger.is_silenced = true;
+    } else if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+        let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
+        // tz_offset is in minutes
+        let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
+        new_trigger.next_run_at = schedule
+            .upcoming(tz_offset)
+            .next()
+            .unwrap()
+            .timestamp_micros();
     } else {
-        new_trigger.next_run_at += Duration::seconds(alert.trigger_condition.frequency)
+        new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
+            .unwrap()
             .num_microseconds()
             .unwrap();
     }

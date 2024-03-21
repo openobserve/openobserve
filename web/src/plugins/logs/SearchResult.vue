@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="col-6 text-right q-pr-md q-gutter-xs pagination-block">
           <q-pagination
+            v-if="searchObj.meta.resultGrid.showPagination"
             :disable="searchObj.loading == true"
             v-model="pageNumberInput"
             :key="
@@ -61,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-result-pagination"
           />
           <q-select
+            v-if="searchObj.meta.resultGrid.showPagination"
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
@@ -94,8 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else-if="searchObj.data.histogram.errorMsg != ''">
         <h6 class="text-center">
-          <q-icon name="warning"
-color="warning" size="30px"></q-icon> Error
+          <q-icon name="warning" color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -334,7 +335,10 @@ color="warning" size="30px"></q-icon> Error
                   class="q-mr-xs"
                   size="6px"
                   @click.prevent.stop="
-                    copyLogToClipboard(column.prop(row, column.name).toString())
+                    copyLogToClipboard(
+                      column.prop(row, column.name).toString(),
+                      false
+                    )
                   "
                   title="Copy"
                   round
@@ -455,6 +459,7 @@ export default defineComponent({
     "remove:searchTerm",
     "search:timeboxed",
     "expandlog",
+    "update:recordsPerPage",
   ],
   props: {
     expandedLogs: {
@@ -490,7 +495,7 @@ export default defineComponent({
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
         this.refreshPartitionPagination(true);
-        this.$emit("update:scroll");
+        this.$emit("update:recordsPerPage");
         this.searchTableRef.scrollTo(0);
       } else if (actionType == "pageChange") {
         if (
@@ -654,8 +659,9 @@ export default defineComponent({
       filterHitsColumns();
     }
 
-    const copyLogToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log)).then(() =>
+    const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
+      const copyData = copyAsJson ? JSON.stringify(log) : log;
+      copyToClipboard(copyData).then(() =>
         $q.notify({
           type: "positive",
           message: "Content Copied Successfully!",

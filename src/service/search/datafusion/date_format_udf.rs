@@ -19,15 +19,16 @@ use chrono::{FixedOffset, TimeZone, Utc};
 use config::utils::time;
 use datafusion::{
     arrow::{
-        array::{ArrayRef, Int64Array, StringArray},
+        array::{ArrayRef, StringArray},
         datatypes::DataType,
     },
+    common::cast::{as_int64_array, as_string_array},
     error::DataFusionError,
-    logical_expr::{ScalarFunctionImplementation, ScalarUDF, Volatility},
-    physical_plan::functions::make_scalar_function,
+    logical_expr::{ScalarUDF, Volatility},
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
+use datafusion_expr::ColumnarValue;
 use once_cell::sync::Lazy;
 
 /// The name of the date_format UDF given to DataFusion.
@@ -42,76 +43,62 @@ pub(crate) static DATE_FORMAT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         // returns string
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
-        date_format_expr_impl(),
+        Arc::new(date_format_expr_impl),
     )
 });
 
 /// date_format function for datafusion
-pub fn date_format_expr_impl() -> ScalarFunctionImplementation {
-    let func = move |args: &[ArrayRef]| -> datafusion::error::Result<ArrayRef> {
-        if args.len() != 3 {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(
-                    "UDF params should be: date_format(field, format, zone)".to_string(),
-                ),
-                None,
-            ));
-        }
+pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
+    if args.len() != 3 {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "UDF params should be: date_format(field, format, zone)".to_string(),
+            ),
+            None,
+        ));
+    }
+    let args = ColumnarValue::values_to_arrays(args)?;
 
-        // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-        //    function panics!
-        let timestamp = &args[0]
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .expect("cast failed");
-        let format = &args[1]
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("cast failed");
-        let timezone = &args[2]
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .expect("cast failed");
+    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
+    //    function panics!
+    let timestamp = as_int64_array(&args[0]).expect("cast failed");
+    let format = as_string_array(&args[1]).expect("cast failed");
+    let timezone = as_string_array(&args[2]).expect("cast failed");
 
-        // 2. perform the computation
-        let array = zip(timestamp.iter(), zip(format.iter(), timezone.iter()))
-            .map(|(timestamp, val)| {
-                match (timestamp, val) {
-                    // in arrow, any value can be null.
-                    // Here we decide to make our UDF to return null when either argument is null.
-                    (Some(timestamp), (Some(format), Some(timezone))) => {
-                        let timestamp = time::parse_i64_to_timestamp_micros(timestamp);
-                        let t = Utc.timestamp_nanos(timestamp * 1000);
-                        let offset = time::parse_timezone_to_offset(timezone) as i32;
-                        let result = if offset == 0 {
-                            t.format(format).to_string()
-                        } else {
-                            let t = t.with_timezone(&FixedOffset::east_opt(offset).unwrap());
-                            t.format(format).to_string()
-                        };
-                        Some(result)
-                    }
-                    _ => None,
+    // 2. perform the computation
+    let array = zip(timestamp.iter(), zip(format.iter(), timezone.iter()))
+        .map(|(timestamp, val)| {
+            match (timestamp, val) {
+                // in arrow, any value can be null.
+                // Here we decide to make our UDF to return null when either argument is null.
+                (Some(timestamp), (Some(format), Some(timezone))) => {
+                    let timestamp = time::parse_i64_to_timestamp_micros(timestamp);
+                    let t = Utc.timestamp_nanos(timestamp * 1000);
+                    let offset = time::parse_timezone_to_offset(timezone) as i32;
+                    let result = if offset == 0 {
+                        t.format(format).to_string()
+                    } else {
+                        let t = t.with_timezone(&FixedOffset::east_opt(offset).unwrap());
+                        t.format(format).to_string()
+                    };
+                    Some(result)
                 }
-            })
-            .collect::<StringArray>();
+                _ => None,
+            }
+        })
+        .collect::<StringArray>();
 
-        // `Ok` because no error occurred during the calculation
-        // `Arc` because arrays are immutable, thread-safe, trait objects.
-        Ok(Arc::new(array) as ArrayRef)
-    };
-
-    make_scalar_function(func)
+    // `Ok` because no error occurred during the calculation
+    // `Arc` because arrays are immutable, thread-safe, trait objects.
+    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
+    use arrow::array::Int64Array;
     use datafusion::{
         arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
+            datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },
         assert_batches_eq,
@@ -122,7 +109,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_date_format() {
+    async fn test_date_format_udf() {
         let data_time = time::parse_str_to_timestamp_micros("2021-01-01T00:00:00.000Z").unwrap();
         let sqls = [
             (

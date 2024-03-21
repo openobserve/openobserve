@@ -47,7 +47,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
         metrics::format_label_name,
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
         search as search_service,
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -81,7 +81,7 @@ pub async fn remote_write(
     }
 
     // let min_ts = (Utc::now() -
-    // Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    // Duration::try_hours(CONFIG.limit.ingest_allowed_upto)).unwrap().timestamp_micros();
     let dedup_enabled = CONFIG.common.metrics_dedup_enabled;
     let election_interval = CONFIG.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
@@ -89,7 +89,7 @@ pub async fn remote_write(
     let mut accept_record: bool;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<alerts::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
@@ -326,7 +326,7 @@ pub async fn remote_write(
             let value_str = config::utils::json::to_string(&val_map).unwrap();
 
             // check for schema evolution
-            if schema_evolved.get(&metric_name).is_none()
+            if !schema_evolved.contains_key(&metric_name)
                 && check_for_schema(
                     org_id,
                     &metric_name,
@@ -344,6 +344,7 @@ pub async fn remote_write(
             let schema = metric_schema_map
                 .get(&metric_name)
                 .unwrap()
+                .schema()
                 .clone()
                 .with_metadata(HashMap::new());
             let schema_key = schema.hash_key();

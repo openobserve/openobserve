@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use datafusion::error::{DataFusionError, Result};
 use rayon::prelude::*;
-use regex::{self, Regex};
+use regex::Regex;
 
 use crate::service::promql::value::{InstantValue, Label, LabelsExt, Value};
 

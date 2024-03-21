@@ -26,7 +26,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
     >
       <q-toolbar>
-        <div class="flex relative-position q-mr-sm">
+        <div
+          class="flex relative-position q-mr-sm"
+          v-if="
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig.custom_logo_text != '') ||
+            (config.isEnterprise == 'true' &&
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig.custom_logo_img != null)
+          "
+        >
+          <span
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
+              store.state.zoConfig?.custom_logo_text != ''
+            "
+            class="text-h6 text-bold q-pa-none cursor-pointer"
+            @click="goToHome"
+            >{{ store.state.zoConfig.custom_logo_text }}</span
+          >
+          <img
+            v-if="
+              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+              store.state.zoConfig?.custom_logo_img != null
+            "
+            :src="
+              `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
+            "
+            size="sm"
+            class="q-pt-xs q-pl-xs"
+            style="width: 30px"
+          />
+          <img
+            class="appLogo"
+            :src="
+              store?.state?.theme == 'dark'
+                ? getImageURL('images/common/open_observe_logo_2.svg')
+                : getImageURL('images/common/open_observe_logo.svg')
+            "
+            @click="goToHome"
+          />
+        </div>
+        <div v-else class="flex relative-position q-mr-sm">
           <img
             class="appLogo"
             :src="
@@ -52,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -142,7 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -281,6 +325,7 @@ import {
   onMounted,
   watch,
   markRaw,
+  nextTick,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -314,6 +359,7 @@ import {
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
+import { openobserveRum } from "@openobserve/browser-rum";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -350,7 +396,14 @@ export default defineComponent({
   },
   methods: {
     navigateToDocs() {
-      window.open("https://openobserve.ai/docs", "_blank");
+      let docURL = "https://openobserve.ai/docs";
+      if (
+        this.config.isEnterprise == "true" &&
+        this.store.state.zoConfig.custom_docs_url != ""
+      ) {
+        docURL = this.store.state.zoConfig.custom_docs_url;
+      }
+      window.open(docURL, "_blank");
     },
     navigateToOpenAPI(zoBackendUrl: string) {
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
@@ -402,6 +455,13 @@ export default defineComponent({
     ];
 
     const orgOptions = ref([{ label: Number, value: String }]);
+    let slackURL = "https://short.openobserve.ai/community";
+    if (
+      config.isEnterprise == "true" &&
+      store.state.zoConfig.custom_slack_url != ""
+    ) {
+      slackURL = store.state.zoConfig.custom_slack_url;
+    }
 
     let user = store.state.userInfo;
 
@@ -466,7 +526,7 @@ export default defineComponent({
       {
         title: t("menu.slack"),
         iconComponent: markRaw(SlackIcon),
-        link: "https://join.slack.com/t/zincobserve/shared_invite/zt-11r96hv2b-UwxUILuSJ1duzl_6mhJwVg",
+        link: slackURL,
         target: "_blank",
         external: true,
       },
@@ -766,13 +826,18 @@ export default defineComponent({
     const getConfig = async () => {
       await configService
         .get_config()
-        .then((res: any) => {
+        .then(async (res: any) => {
           if (res.data.functions_enabled && config.isCloud == "false") {
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
           }
           store.dispatch("setConfig", res.data);
+          await nextTick();
+          // if rum enabled then setUser to capture session details.
+          if (res.data.rum.enabled) {
+            setRumUser();
+          }
         })
         .catch((error) => console.log(error));
     };
@@ -814,6 +879,16 @@ export default defineComponent({
       } else {
         router.push({
           query: { org_identifier: selectedOrg.value.identifier },
+        });
+      }
+    };
+
+    const setRumUser = () => {
+      if (store.state.zoConfig?.rum?.enabled == true) {
+        const userInfo = store.state.userInfo;
+        openobserveRum.setUser({
+          name: userInfo.given_name + " " + userInfo.family_name,
+          email: userInfo.email,
         });
       }
     };
@@ -1142,5 +1217,22 @@ export default defineComponent({
   .q-item {
     padding: 4px 8px;
   }
+}
+
+.text-powered-by {
+  float: left;
+  display: inline-block;
+  position: absolute;
+  margin-top: 16px;
+  margin-left: 0px;
+}
+
+.custom-text-logo {
+  display: inline-block;
+  float: left;
+  position: absolute;
+  margin-left: 72px !important;
+  margin-top: 16px !important;
+  width: 80px !important;
 }
 </style>

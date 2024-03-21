@@ -32,7 +32,10 @@ use {
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
     actix_web::http::header,
     o2_enterprise::enterprise::{
-        common::infra::config::O2_CONFIG,
+        common::{
+            infra::config::O2_CONFIG,
+            settings::{get_logo, get_logo_text},
+        },
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
     },
     std::io::ErrorKind,
@@ -70,6 +73,27 @@ struct ConfigResponse<'a> {
     sso_enabled: bool,
     native_login_enabled: bool,
     rbac_enabled: bool,
+    query_on_stream_selection: bool,
+    show_stream_stats_doc_num: bool,
+    custom_logo_text: String,
+    custom_slack_url: String,
+    custom_docs_url: String,
+    rum: Rum,
+    custom_logo_img: Option<String>,
+}
+
+#[derive(Serialize)]
+struct Rum {
+    pub enabled: bool,
+    pub client_token: String,
+    pub application_id: String,
+    pub site: String,
+    pub service: String,
+    pub env: String,
+    pub version: String,
+    pub organization_identifier: String,
+    pub api_version: String,
+    pub insecure_http: bool,
 }
 
 /// Healthz
@@ -101,6 +125,27 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let rbac_enabled = O2_CONFIG.openfga.enabled;
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
+    #[cfg(feature = "enterprise")]
+    let custom_logo_text = match get_logo_text().await {
+        Some(data) => data,
+        None => O2_CONFIG.common.custom_logo_text.clone(),
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let custom_logo_text = "".to_string();
+    #[cfg(feature = "enterprise")]
+    let custom_slack_url = &O2_CONFIG.common.custom_slack_url;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_slack_url = "";
+    #[cfg(feature = "enterprise")]
+    let custom_docs_url = &O2_CONFIG.common.custom_docs_url;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_docs_url = "";
+
+    #[cfg(feature = "enterprise")]
+    let logo = get_logo().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo = None;
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -123,6 +168,24 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         sso_enabled,
         native_login_enabled,
         rbac_enabled,
+        query_on_stream_selection: CONFIG.common.query_on_stream_selection,
+        show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
+        custom_logo_text,
+        custom_slack_url: custom_slack_url.to_string(),
+        custom_docs_url: custom_docs_url.to_string(),
+        custom_logo_img: logo,
+        rum: Rum {
+            enabled: CONFIG.rum.enabled,
+            client_token: CONFIG.rum.client_token.to_string(),
+            application_id: CONFIG.rum.application_id.to_string(),
+            site: CONFIG.rum.site.to_string(),
+            service: CONFIG.rum.service.to_string(),
+            env: CONFIG.rum.env.to_string(),
+            version: CONFIG.rum.version.to_string(),
+            organization_identifier: CONFIG.rum.organization_identifier.to_string(),
+            api_version: CONFIG.rum.api_version.to_string(),
+            insecure_http: CONFIG.rum.insecure_http,
+        },
     }))
 }
 
@@ -132,7 +195,7 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE_UUID.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&CONFIG.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&CONFIG.common.node_role));
-    let nodes = cluster::get_cached_online_nodes();
+    let nodes = cluster::get_cached_online_nodes().await;
     stats.insert("NODE_LIST", json::json!(nodes));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
@@ -282,7 +345,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 #[put("/enable")]
 async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE_UUID.clone();
-    let Some(mut node) = cluster::get_node_by_uuid(&node_id) else {
+    let Some(mut node) = cluster::get_node_by_uuid(&node_id).await else {
         return Ok(MetaHttpResponse::not_found("node not found"));
     };
 
@@ -292,7 +355,7 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
         None => false,
     };
     node.scheduled = enable;
-    match cluster::update_node(&node_id, &node).await {
+    match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
@@ -308,4 +371,15 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[get("/stream_fields/{org_id}/{stream_type}/{stream_name}")]
+async fn stream_fields(path: web::Path<(String, String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, stream_type, stream_name) = path.into_inner();
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let r = STREAM_SCHEMAS_FIELDS.read().await;
+    Ok(MetaHttpResponse::json(match r.get(&key) {
+        Some((updated, fields)) => json::json!({"updated_at": *updated, "fields": fields}),
+        None => json::json!({"updated_at": 0, "fields": []}),
+    }))
 }

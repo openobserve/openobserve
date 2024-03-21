@@ -28,7 +28,6 @@ use config::{
     utils::{flatten, json, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 
 use super::StreamMeta;
 use crate::{
@@ -44,7 +43,7 @@ use crate::{
     service::{
         db, distinct_values,
         ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-        schema::{get_upto_discard_error, stream_schema_exists},
+        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
 };
@@ -81,13 +80,13 @@ pub async fn ingest(
         items: vec![],
     };
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
 
     let mut stream_vrl_map: HashMap<String, VRLResultResolver> = HashMap::new();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_data_map = HashMap::new();
 
     let mut stream_transform_map: HashMap<String, Vec<StreamTransform>> = HashMap::new();

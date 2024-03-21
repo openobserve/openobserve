@@ -221,7 +221,7 @@ export default defineComponent({
           name: it.name,
           label: it.label,
           type: it.type,
-          value: it.type == "dynamic_filters" ? [] : "",
+          value: it.type == "dynamic_filters" ? [] : null,
           isLoading: ["query_values", "dynamic_filters"].includes(it.type)
             ? true
             : false,
@@ -254,9 +254,18 @@ export default defineComponent({
                   //set options value from the api response
                   obj.options = res.data.hits
                     .find((field: any) => field.field === it.query_data.field)
-                    .values.map((value: any) =>
-                      value.zo_sql_key ? value.zo_sql_key.toString() : "null"
-                    );
+                    .values.filter(
+                      (value: any) =>
+                        value.zo_sql_key || value.zo_sql_key === ""
+                    )
+                    .map((value: any) => ({
+                      label:
+                        value.zo_sql_key !== ""
+                          ? value.zo_sql_key.toString()
+                          : "<blank>",
+                      value: value.zo_sql_key.toString(),
+                    }));
+
                   // find old value is exists in the dropdown
                   let oldVariableObjectSelectedValue = oldVariableValue.find(
                     (it2: any) => it2.name === it.name
@@ -264,16 +273,18 @@ export default defineComponent({
 
                   // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
                   if (oldVariableObjectSelectedValue) {
-                    obj.value = obj.options.includes(
-                      oldVariableObjectSelectedValue.value
+                    obj.value = obj.options.some(
+                      (option: any) =>
+                        option.value === oldVariableObjectSelectedValue.value
                     )
                       ? oldVariableObjectSelectedValue.value
                       : obj.options.length
-                      ? obj.options[0]
+                      ? obj.options[0].value
                       : "";
                   } else {
-                    obj.value = obj.options[0] || "";
+                    obj.value = obj.options.length ? obj.options[0].value : "";
                   }
+                  
                   variablesData.isVariablesLoading = variablesData.values.some(
                     (val: { isLoading: any }) => val.isLoading
                   );

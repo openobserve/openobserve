@@ -31,13 +31,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%"
     >
       <template #no-data>
-        <NoData />
+        <div v-if="!loadingState" class="text-center full-width full-height">
+          <NoData />
+        </div>
+        <div v-else class="text-center full-width full-height q-mt-lg">
+          <q-spinner-hourglass color="primary" size="lg" />
+        </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected"
+size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -198,7 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -268,11 +276,13 @@ export default defineComponent({
     const filterQuery = ref("");
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("all");
+    const loadingState = ref(true);
     const streamFilterValues = [
       { label: t("logStream.labelAll"), value: "all" },
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
+      { label: t("logStream.labelIndex"), value: "index" },
     ];
     const { getStreams, resetStreams, removeStream } = useStreams();
     const columns = ref<QTableProps["columns"]>([
@@ -348,6 +358,12 @@ export default defineComponent({
     let deleteStreamType = "";
 
     onBeforeMount(() => {
+      if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
+        columns.value = columns.value.filter(
+          (column) => column.name !== "doc_num"
+        );
+      }
+
       if (router.currentRoute.value.name === "streamExplorer") {
         router.push({
           name: "streamExplorer",
@@ -372,6 +388,7 @@ export default defineComponent({
 
     const getLogStream = (refresh: boolean = false) => {
       if (store.state.selectedOrganization != null) {
+        loadingState.value = true;
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
         const dismiss = $q.notify({
@@ -421,10 +438,11 @@ export default defineComponent({
             });
 
             onChangeStreamFilter(selectedStreamType.value);
-
+            loadingState.value = false;
             dismiss();
           })
           .catch((err) => {
+            loadingState.value = false;
             dismiss();
             $q.notify({
               type: "negative",
@@ -616,6 +634,7 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
+      loadingState,
     };
   },
 });

@@ -44,7 +44,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
     // check data retention
     if CONFIG.compact.data_retention_days > 0 {
         let now = Utc::now();
-        let date = now - Duration::days(CONFIG.compact.data_retention_days);
+        let date = now - Duration::try_days(CONFIG.compact.data_retention_days).unwrap();
         let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
 
         let orgs = db::schema::list_organizations_from_cache().await;
@@ -59,7 +59,10 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         for org_id in orgs {
             // get the working node for the organization
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            if !node.is_empty()
+                && LOCAL_NODE_UUID.ne(&node)
+                && get_node_by_uuid(&node).await.is_some()
+            {
                 log::debug!(
                     "[COMPACT] run retention: organization {org_id} is processing by {node}"
                 );
@@ -67,12 +70,15 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             }
 
             // before start processing, set current node to lock the organization
-            let lock_key = format!("compact/organization/{org_id}");
-            let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+            let lock_key = format!("/compact/organization/{org_id}");
+            let locker = dist_lock::lock(&lock_key, 0).await?;
             // check the working node for the organization again, maybe other node locked it
             // first
             let (_, node) = db::compact::organization::get_offset(&org_id, "retention").await;
-            if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+            if !node.is_empty()
+                && LOCAL_NODE_UUID.ne(&node)
+                && get_node_by_uuid(&node).await.is_some()
+            {
                 log::debug!(
                     "[COMPACT] run retention: organization {org_id} is processing by {node}"
                 );
@@ -101,7 +107,8 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                     let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
                     let stream_data_retention_end = if stream.settings.data_retention > 0 {
-                        let date = now - Duration::days(stream.settings.data_retention);
+                        let date =
+                            now - Duration::try_days(stream.settings.data_retention).unwrap();
                         date.format("%Y-%m-%d").to_string()
                     } else {
                         data_lifecycle_end.clone()
@@ -223,12 +230,12 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                         )
                         .await?;
                     }
-                    log::warn!(
-                        "[COMPACTOR] the stream [{}/{}/{}] is processing by another node",
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                    );
+                    // log::warn!(
+                    //     "[COMPACTOR] the stream [{}/{}/{}] is processing by another node",
+                    //     &org_id,
+                    //     stream_type,
+                    //     &stream_name,
+                    // );
                     continue; // not this node
                 }
 
@@ -287,7 +294,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
 /// 2. delete files from storage
 pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let now = Utc::now();
-    let time_max = now - Duration::hours(CONFIG.compact.delete_files_delay_hours);
+    let time_max = now - Duration::try_hours(CONFIG.compact.delete_files_delay_hours).unwrap();
     let time_max = Utc
         .with_ymd_and_hms(
             time_max.year(),
@@ -303,7 +310,8 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     for org_id in orgs {
         // get the working node for the organization
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             log::debug!(
                 "[COMPACT] run delay_deletion: organization {org_id} is processing by {node}"
             );
@@ -311,13 +319,14 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         }
 
         // before start processing, set current node to lock the organization
-        let lock_key = format!("compact/organization/{org_id}");
-        let locker = dist_lock::lock(&lock_key, CONFIG.etcd.command_timeout).await?;
+        let lock_key = format!("/compact/organization/{org_id}");
+        let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node for the organization again, maybe other node locked it
         // first
         let (offset, node) =
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).is_some() {
+        if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
             log::debug!(
                 "[COMPACT] run delay_deletion organization {org_id} is processing by {node}"
             );

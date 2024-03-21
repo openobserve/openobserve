@@ -27,7 +27,6 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG, DISTINCT_FIELDS,
 };
-use datafusion::arrow::datatypes::Schema;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
@@ -44,7 +43,7 @@ use crate::{
             evaluate_trigger, get_string_value, get_uint_value, grpc::get_val_for_attr, write_file,
             TriggerAlertData,
         },
-        schema::{check_for_schema, stream_schema_exists},
+        schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -101,12 +100,12 @@ pub async fn traces_json(
     }
 
     let mut runtime = crate::service::ingestion::init_functions_runtime();
-    let mut traces_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
     let mut partial_success = ExportTracePartialSuccess::default();
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
 
@@ -391,6 +390,7 @@ pub async fn traces_json(
                     let rec_schema = traces_schema_map
                         .get(&traces_stream_name)
                         .unwrap()
+                        .schema()
                         .clone()
                         .with_metadata(HashMap::new());
                     let schema_key = rec_schema.hash_key();

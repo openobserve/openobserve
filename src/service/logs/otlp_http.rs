@@ -16,7 +16,6 @@
 use std::collections::HashMap;
 
 use actix_web::{http, web, HttpResponse};
-use arrow_schema::Schema;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -46,7 +45,7 @@ use crate::{
         ingestion::{
             evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
         },
-        schema::{get_upto_discard_error, stream_schema_exists},
+        schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
 };
@@ -121,7 +120,7 @@ pub async fn logs_json_handler(
     }
 
     let start = std::time::Instant::now();
-    let mut stream_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_name = match in_stream_name {
         Some(name) => {
             get_formatted_stream_name(
@@ -146,8 +145,8 @@ pub async fn logs_json_handler(
     let mut stream_status = StreamStatus::new(stream_name);
     let mut trigger: Option<TriggerAlertData> = None;
 
-    let min_ts =
-        (Utc::now() - Duration::hours(CONFIG.limit.ingest_allowed_upto)).timestamp_micros();
+    let min_ts = (Utc::now() - Duration::try_hours(CONFIG.limit.ingest_allowed_upto).unwrap())
+        .timestamp_micros();
 
     let partition_det = crate::service::ingestion::get_stream_partition_keys(
         org_id,

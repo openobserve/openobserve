@@ -31,11 +31,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use super::{
     auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
-    request::{
-        dashboards::{folders::*, *},
-        enrichment_table, functions, kv, logs, metrics, organization, prom, rum, search, status,
-        stream, syslog, traces, users, *,
-    },
+    request::*,
 };
 use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
 
@@ -129,7 +125,8 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .wrap(cors)
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node),
+            .service(status::flush_node)
+            .service(status::stream_fields),
     );
 
     cfg.service(
@@ -219,6 +216,10 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::org::organizations)
             .service(organization::settings::get)
             .service(organization::settings::create)
+            .service(organization::settings::upload_logo)
+            .service(organization::settings::delete_logo)
+            .service(organization::settings::set_logo_text)
+            .service(organization::settings::delete_logo_text)
             .service(organization::org::org_summary)
             .service(organization::org::get_user_passcode)
             .service(organization::org::update_user_passcode)
@@ -318,12 +319,12 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(metrics::ingest::otlp_metrics_write)
             .service(logs::ingest::otlp_logs_write)
             .service(traces::otlp_traces_write)
-            .service(create_folder)
-            .service(list_folders)
-            .service(update_folder)
-            .service(get_folder)
-            .service(delete_folder)
-            .service(move_dashboard)
+            .service(dashboards::folders::create_folder)
+            .service(dashboards::folders::list_folders)
+            .service(dashboards::folders::update_folder)
+            .service(dashboards::folders::get_folder)
+            .service(dashboards::folders::delete_folder)
+            .service(dashboards::move_dashboard)
             .service(traces::get_latest_traces)
             .service(logs::ingest::multi)
             .service(logs::ingest::json)

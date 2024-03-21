@@ -54,6 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </li>
                 <li>
+                  For case-insensitive column search of value 'error' use
+                  <span class="bg-highlight"
+                    >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
+                  >
+                </li>
+                <li>
                   To search value 200 for code column use
                   <span class="bg-highlight">code=200</span>
                 </li>

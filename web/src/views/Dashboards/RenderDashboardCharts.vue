@@ -119,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   onActivated,
   provide,
@@ -137,9 +138,12 @@ import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
-import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
+
+const ViewPanel = defineAsyncComponent(() => {
+  return import("@/components/dashboards/viewPanel/ViewPanel.vue");
+});
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -254,6 +258,7 @@ export default defineComponent({
       // set the initial value as false on component activated
       // also, this function will clear the settimeout if previously set
       setImmediateValue(false);
+      window.dispatchEvent(new Event("resize"));
     });
 
     // Watch for changes in the computed property and update the debouncer accordingly
@@ -354,7 +359,7 @@ export default defineComponent({
         query: {
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
         },
       });
     };

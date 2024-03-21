@@ -146,16 +146,36 @@ size="md" /> Select a
                   v-else-if="
                     searchObj.data.queryResults.hasOwnProperty('hits') &&
                     searchObj.data.queryResults.hits.length == 0 &&
-                    searchObj.loading == false
+                    searchObj.loading == false &&
+                    searchObj.meta.searchApplied == true
                   "
                   class="row"
                 >
-                  <h6 data-test="logs-search-error-message" class="text-center q-mx-auto col-10">
-                    <q-icon
-                      name="info"
-                      color="primary"
-                      size="md"
-                    /> {{ t("search.noRecordFound") }}
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-10"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.noRecordFound") }}
+                  </h6>
+                </div>
+                <div
+                  v-else-if="
+                    searchObj.data.queryResults.hasOwnProperty('hits') &&
+                    searchObj.data.queryResults.hits.length == 0 &&
+                    searchObj.loading == false &&
+                    searchObj.meta.searchApplied == false
+                  "
+                  class="row"
+                >
+                  <h6
+                    data-test="logs-search-error-message"
+                    class="text-center q-mx-auto col-10"
+                  >
+                    <q-icon name="info" color="primary"
+size="md" />
+                    {{ t("search.applySearch") }}
                   </h6>
                 </div>
                 <div
@@ -168,6 +188,7 @@ size="md" /> Select a
                     :expandedLogs="expandedLogs"
                     @update:datetime="setHistogramDate"
                     @update:scroll="getMoreData"
+                    @update:recordsPerPage="getMoreDataRecordsPerPage"
                     @expandlog="toggleExpandLog"
                   />
                 </div>
@@ -243,6 +264,30 @@ export default defineComponent({
           showFields: this.searchObj.meta.showFields,
           page: "Search Logs",
         });
+      }
+    },
+    async getMoreDataRecordsPerPage() {
+      if (this.searchObj.meta.refreshInterval == 0) {
+        // this.searchObj.data.resultGrid.currentPage =
+        //   ((this.searchObj.data.queryResults?.hits?.length || 0) +
+        //     ((this.searchObj.data.queryResults?.hits?.length || 0) + 150)) /
+        //     150 -
+        //   1;
+        // this.searchObj.data.resultGrid.currentPage =
+        //   this.searchObj.data.resultGrid.currentPage + 1;
+        this.searchObj.loading = true;
+        await this.getQueryData(false);
+        this.refreshHistogramChart();
+
+        if (config.isCloud == "true") {
+          segment.track("Button Click", {
+            button: "Get More Data",
+            user_org: this.store.state.selectedOrganization.identifier,
+            user_id: this.store.state.userInfo.email,
+            stream_name: this.searchObj.data.stream.selectedStream.value,
+            page: "Search Logs",
+          });
+        }
       }
     },
     async getMoreData() {
@@ -323,6 +368,7 @@ export default defineComponent({
       generateHistogramData,
       resetSearchObj,
       resetStreamData,
+      getHistogramQueryData,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -558,6 +604,7 @@ export default defineComponent({
       refreshTimezone,
       resetSearchObj,
       resetStreamData,
+      getHistogramQueryData,
     };
   },
   computed: {
@@ -624,7 +671,10 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-      if (this.searchObj.meta.showHistogram == true) {
+      if (
+        this.searchObj.meta.showHistogram == true &&
+        this.searchObj.shouldIgnoreWatcher == false
+      ) {
         if (this.searchObj.meta.sqlMode == false) {
           setTimeout(() => {
             if (this.searchResultRef) this.searchResultRef.reDrawChart();
@@ -633,9 +683,15 @@ export default defineComponent({
 
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
-          this.handleRunQuery();
+          // this.handleRunQuery();
+          this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
+            (res: any) => {
+              this.searchResultRef.reDrawChart();
+            }
+          );
         }
       }
+      this.updateUrlQueryParams();
     },
     moveSplitter() {
       if (this.searchObj.meta.showFields == false) {
@@ -677,13 +733,19 @@ export default defineComponent({
       if (newVal) {
         await nextTick();
         this.setQuery(newVal);
+        this.updateUrlQueryParams();
       } else {
         this.searchObj.meta.sqlMode = false;
         this.searchObj.data.query = "";
         this.searchObj.data.editorValue = "";
+        if (
+          this.searchObj.loading == false &&
+          this.searchObj.shouldIgnoreWatcher == false
+        ) {
+          this.searchObj.loading = true;
+          this.getQueryData();
+        }
       }
-      this.searchObj.loading = true;
-      this.getQueryData();
       // this.searchResultRef.reDrawChart();
     },
     refreshHistogram() {

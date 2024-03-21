@@ -47,7 +47,7 @@ impl LogsService for LogsServer {
         }
 
         // call ingester
-        let grpc_addr = super::get_rand_ingester_addr()?;
+        let grpc_addr = super::get_rand_ingester_addr().await?;
         let mut request = Request::from_parts(metadata, extensions, message);
         opentelemetry::global::get_text_map_propagator(|propagator| {
             propagator.inject_context(

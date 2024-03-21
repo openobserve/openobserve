@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use async_nats::{error::Error as NatsError, jetstream};
 use config::utils::json;
 use thiserror::Error as ThisError;
-
 pub mod grpc;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -40,6 +40,34 @@ pub enum Error {
     StringUTF8Error(#[from] std::string::FromUtf8Error),
     #[error("SqlxError# {0}")]
     SqlxError(#[from] sqlx::Error),
+    #[error("Error# {0}")]
+    NatsKJetstreamContextRequestError(#[from] NatsError<jetstream::context::RequestErrorKind>),
+    #[error("Error# {0}")]
+    NatsJetstreamContextCreateKeyValueError(
+        #[from] NatsError<jetstream::context::CreateKeyValueErrorKind>,
+    ),
+    #[error("Error# {0}")]
+    NatsJetstreamKvEntryError(#[from] NatsError<jetstream::kv::EntryErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamKvPutError(#[from] NatsError<jetstream::kv::PutErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamKvUpdateError(#[from] NatsError<jetstream::kv::UpdateErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamKvWatchError(#[from] NatsError<jetstream::kv::WatchErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamKvWatcherError(#[from] NatsError<jetstream::kv::WatcherErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamKvStatusError(#[from] NatsError<jetstream::kv::StatusErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamCreateStreamError(#[from] NatsError<jetstream::context::CreateStreamErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamGetStreamError(#[from] NatsError<jetstream::context::GetStreamErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamPublishError(#[from] NatsError<jetstream::context::PublishErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamStreamConsumerError(#[from] NatsError<jetstream::stream::ConsumerErrorKind>),
+    #[error("Error# {0}")]
+    NatsKJetstreamConsumerStreamError(#[from] NatsError<jetstream::consumer::StreamErrorKind>),
     #[error("Error# {0}")]
     Message(String),
     #[error("ErrorCode# {0}")]

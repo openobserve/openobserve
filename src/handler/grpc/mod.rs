@@ -210,8 +210,6 @@ impl From<Vec<json::Value>> for cluster_rpc::UsageData {
 mod tests {
     use std::collections::HashMap;
 
-    use config::meta::stream::FileMeta;
-
     use super::*;
 
     #[tokio::test]

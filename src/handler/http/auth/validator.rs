@@ -418,7 +418,8 @@ pub(crate) async fn check_permissions(
     let role = match role {
         Some(role) => {
             if role.eq(&UserRole::Root) {
-                "admin".to_string()
+                // root user should have access to everything , don't check in openfga
+                return true;
             } else {
                 format!("{role}")
             }

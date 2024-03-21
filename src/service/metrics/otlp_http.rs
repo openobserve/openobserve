@@ -25,7 +25,6 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     CONFIG,
 };
-use datafusion::arrow::datatypes::Schema;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{ExportMetricsServiceRequest, ExportMetricsServiceResponse},
@@ -49,7 +48,7 @@ use crate::{
             write_file, TriggerAlertData,
         },
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},
-        schema::{check_for_schema, set_schema_metadata, stream_schema_exists},
+        schema::{check_for_schema, set_schema_metadata, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
     },
@@ -111,7 +110,7 @@ pub async fn metrics_json_handler(
     let start = std::time::Instant::now();
     let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut metric_schema_map: HashMap<String, Schema> = HashMap::new();
+    let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let mut schema_evolved: HashMap<String, bool> = HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
@@ -290,6 +289,24 @@ pub async fn metrics_json_handler(
                         continue;
                     };
 
+                    // udpate schema metadata
+                    if !schema_exists.has_metadata {
+                        if let Err(e) = set_schema_metadata(
+                            org_id,
+                            metric_name,
+                            StreamType::Metrics,
+                            &prom_meta,
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "Failed to set metadata for metric: {} with error: {}",
+                                metric_name,
+                                e
+                            );
+                        }
+                    }
+
                     for mut rec in records {
                         // flattening
                         rec = flatten::flatten(rec).expect("failed to flatten");
@@ -297,17 +314,6 @@ pub async fn metrics_json_handler(
 
                         let local_metric_name =
                             &format_stream_name(rec.get(NAME_LABEL).unwrap().as_str().unwrap());
-
-                        if !schema_exists.has_metadata {
-                            set_schema_metadata(
-                                org_id,
-                                local_metric_name,
-                                StreamType::Metrics,
-                                &prom_meta,
-                            )
-                            .await
-                            .unwrap();
-                        }
 
                         if local_metric_name != metric_name {
                             // check for schema
@@ -381,7 +387,7 @@ pub async fn metrics_json_handler(
                         let value_str = json::to_string(&val_map).unwrap();
 
                         // check for schema evolution
-                        if schema_evolved.get(local_metric_name).is_none()
+                        if !schema_evolved.contains_key(local_metric_name)
                             && check_for_schema(
                                 org_id,
                                 local_metric_name,
@@ -399,6 +405,7 @@ pub async fn metrics_json_handler(
                         let schema = metric_schema_map
                             .get(local_metric_name)
                             .unwrap()
+                            .schema()
                             .clone()
                             .with_metadata(HashMap::new());
                         let schema_key = schema.hash_key();
@@ -785,6 +792,7 @@ fn process_hist_data_point(
         .into();
     }
     process_exemplars(rec, data_point);
+
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = get_float_value(data_point.get("count").unwrap()).into();
@@ -798,7 +806,6 @@ fn process_hist_data_point(
     bucket_recs.push(sum_rec);
 
     // add bucket records
-
     let buckets = data_point.get("bucketCounts").unwrap().as_array().unwrap();
     let explicit_bounds = data_point
         .get("explicitBounds")

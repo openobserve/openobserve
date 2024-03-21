@@ -178,9 +178,10 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             };
             i += 1;
             total += entry.data.len();
-            let schema = infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
-                .context(InferJsonSchemaSnafu)?;
-            memtable.write(Arc::new(schema), entry).await?;
+            let infer_schema =
+                infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
+                    .context(InferJsonSchemaSnafu)?;
+            memtable.write(Arc::new(infer_schema), entry).await?;
         }
         log::warn!(
             "replay wal file: {:?}, entries: {}, records: {}",

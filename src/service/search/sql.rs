@@ -21,7 +21,6 @@ use std::{
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
-    utils::str::find,
     CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -32,9 +31,12 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::meta::{
-        sql::{Sql as MetaSql, SqlOperator},
-        stream::{StreamParams, StreamPartition},
+    common::{
+        infra::config::STREAM_SCHEMAS_FIELDS,
+        meta::{
+            sql::{Sql as MetaSql, SqlOperator},
+            stream::{StreamParams, StreamPartition},
+        },
     },
     handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
@@ -68,13 +70,13 @@ static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
     pub origin_sql: String,
+    pub rewrite_sql: String,
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
     pub meta: MetaSql,
     pub fulltext: Vec<(String, String)>,
     pub aggs: hashbrown::HashMap<String, (String, MetaSql)>,
-    pub fields: Vec<String>,
     pub sql_mode: SqlMode,
     pub fast_mode: bool, /* there is no where, no group by, no aggregatioin, we can just get
                           * data from the latest file */
@@ -119,6 +121,7 @@ impl Sql {
 
         // parse sql
         let mut origin_sql = req_query.sql.clone();
+        let mut rewrite_sql = req_query.sql.clone();
         // log::info!("origin_sql: {:?}", origin_sql);
         origin_sql = origin_sql.replace('\n', " ");
         origin_sql = origin_sql.trim().to_string();
@@ -147,7 +150,7 @@ impl Sql {
 
         // check sql_mode
         let sql_mode: SqlMode = req_query.sql_mode.as_str().into();
-        let track_total_hits = req_query.track_total_hits;
+        let track_total_hits = req_query.track_total_hits && meta.limit == 0;
 
         // check SQL limitation
         // in context mode, disallow, [limit|offset|group by|having|join|union]
@@ -236,14 +239,22 @@ impl Sql {
 
         // check time_range values
         if req_time_range.0 > 0
-            && req_time_range.0 < Duration::seconds(1).num_microseconds().unwrap()
+            && req_time_range.0
+                < Duration::try_seconds(1)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query SQL time_range start_time should be microseconds".to_string(),
             )));
         }
         if req_time_range.1 > 0
-            && req_time_range.1 < Duration::seconds(1).num_microseconds().unwrap()
+            && req_time_range.1
+                < Duration::try_seconds(1)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap()
         {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query SQL time_range start_time should be microseconds".to_string(),
@@ -382,10 +393,24 @@ impl Sql {
             && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
-            let fields = generate_fast_mode_fields(&schema, &match_all_fields);
+            let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
+            let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
+                STREAM_SCHEMAS_FIELDS
+                    .read()
+                    .await
+                    .get(&stream_key)
+                    .map(|v| v.1.clone())
+            } else {
+                None
+            };
+            let fields = generate_fast_mode_fields(&schema, cached_fields, &match_all_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
+                .to_string();
+            // rewrite distribution sql
+            rewrite_sql = RE_ONLY_SELECT
+                .replace(rewrite_sql.as_str(), &select_fields)
                 .to_string();
             // reset meta fields
             meta.fields.extend(fields);
@@ -430,10 +455,7 @@ impl Sql {
         for item in indexed_text.iter() {
             let mut indexed_search = Vec::new();
             for field in &schema_fields {
-                // TODO(ansrivas): Review this again
-                if !CONFIG.common.feature_fulltext_on_all_fields
-                    && !match_all_fields.contains(&field.name().to_lowercase())
-                {
+                if !match_all_fields.contains(&field.name().to_lowercase()) {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
@@ -444,6 +466,7 @@ impl Sql {
                     func = "ILIKE";
                 }
                 indexed_search.push(format!("\"{}\" {} '%{}%'", field.name(), func, item.1));
+
                 fts_terms.insert(item.1.clone());
             }
             if indexed_search.is_empty() {
@@ -456,9 +479,7 @@ impl Sql {
         for item in fulltext.iter() {
             let mut fulltext_search = Vec::new();
             for field in &schema_fields {
-                if !CONFIG.common.feature_fulltext_on_all_fields
-                    && !match_all_fields.contains(&field.name().to_lowercase())
-                {
+                if !match_all_fields.contains(&field.name().to_lowercase()) {
                     continue;
                 }
                 if !field.data_type().eq(&DataType::Utf8) || field.name().starts_with('@') {
@@ -663,15 +684,15 @@ impl Sql {
             Some(req_query.query_fn.clone())
         };
 
-        let mut sql = Sql {
+        Ok(Sql {
             origin_sql,
+            rewrite_sql,
             org_id,
             stream_type,
             stream_name,
             meta,
             fulltext,
             aggs,
-            fields: vec![],
             sql_mode,
             fast_mode,
             schema,
@@ -679,16 +700,7 @@ impl Sql {
             uses_zo_fn: req_query.uses_zo_fn,
             query_fn,
             fts_terms: fts_terms.into_iter().collect(),
-        };
-
-        // calculate all needs fields
-        for field in schema_fields {
-            if check_field_in_use(&sql, field.name()) {
-                sql.fields.push(field.name().to_string());
-            }
-        }
-
-        Ok(sql)
+        })
     }
 
     /// match a source is a valid file or not
@@ -745,57 +757,45 @@ pub fn generate_filter_from_quick_text(
     filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
-fn check_field_in_use(sql: &Sql, field: &str) -> bool {
-    let re = Regex::new(&format!(r"\b{field}\b")).unwrap();
-    if find(sql.origin_sql.as_str(), field) && re.is_match(sql.origin_sql.as_str()) {
-        return true;
-    }
-    for (_, sql) in sql.aggs.iter() {
-        if find(sql.0.as_str(), field) && re.is_match(sql.0.as_str()) {
-            return true;
-        }
-    }
-    false
-}
-
-fn generate_fast_mode_fields(schema: &Schema, fts_fields: &[String]) -> Vec<String> {
+pub(crate) fn generate_fast_mode_fields(
+    schema: &Schema,
+    cached_fields: Option<Vec<String>>,
+    fts_fields: &[String],
+) -> Vec<String> {
     let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
-    let schema_fields = schema.fields();
+    let schema_fields = match cached_fields {
+        Some(v) => v,
+        None => schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect(),
+    };
     let mut fields = match strategy.as_str() {
         "last" => {
             let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
-            schema_fields
-                .iter()
-                .skip(skip)
-                .map(|f| f.name().to_string())
-                .collect()
+            schema_fields.into_iter().skip(skip).collect()
         }
         "both" => {
             let mut inner_fields = schema_fields
                 .iter()
                 .take(CONFIG.limit.fast_mode_num_fields / 2)
-                .map(|f| f.name().to_string())
+                .map(|f| f.to_string())
                 .collect::<Vec<_>>();
             if schema_fields.len() > inner_fields.len() {
                 let skip = std::cmp::max(
                     0,
                     schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
                 );
-                inner_fields.extend(
-                    schema_fields
-                        .iter()
-                        .skip(skip)
-                        .map(|f| f.name().to_string()),
-                );
+                inner_fields.extend(schema_fields.iter().skip(skip).map(|f| f.to_string()));
             }
             inner_fields
         }
         _ => {
             // default is first mode
             schema_fields
-                .iter()
+                .into_iter()
                 .take(CONFIG.limit.fast_mode_num_fields)
-                .map(|f| f.name().to_string())
                 .collect()
         }
     };
@@ -822,7 +822,10 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
             "{} second",
             std::cmp::max(
                 (time_range.1 - time_range.0)
-                    / Duration::seconds(1).num_microseconds().unwrap()
+                    / Duration::try_seconds(1)
+                        .unwrap()
+                        .num_microseconds()
+                        .unwrap()
                     / num as i64,
                 1
             )
@@ -831,23 +834,47 @@ fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> Stri
 
     let intervals = [
         (
-            Duration::hours(24 * 30).num_microseconds().unwrap(),
+            Duration::try_hours(24 * 30)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "1 day",
         ),
         (
-            Duration::hours(24 * 7).num_microseconds().unwrap(),
+            Duration::try_hours(24 * 7)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "1 hour",
         ),
-        (Duration::hours(24).num_microseconds().unwrap(), "30 minute"),
-        (Duration::hours(6).num_microseconds().unwrap(), "5 minute"),
-        (Duration::hours(2).num_microseconds().unwrap(), "1 minute"),
-        (Duration::hours(1).num_microseconds().unwrap(), "30 second"),
         (
-            Duration::minutes(30).num_microseconds().unwrap(),
+            Duration::try_hours(24).unwrap().num_microseconds().unwrap(),
+            "30 minute",
+        ),
+        (
+            Duration::try_hours(6).unwrap().num_microseconds().unwrap(),
+            "5 minute",
+        ),
+        (
+            Duration::try_hours(2).unwrap().num_microseconds().unwrap(),
+            "1 minute",
+        ),
+        (
+            Duration::try_hours(1).unwrap().num_microseconds().unwrap(),
+            "30 second",
+        ),
+        (
+            Duration::try_minutes(30)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "15 second",
         ),
         (
-            Duration::minutes(15).num_microseconds().unwrap(),
+            Duration::try_minutes(15)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
             "10 second",
         ),
     ];
@@ -979,7 +1006,7 @@ mod tests {
         let resp = Sql::new(&rpc_req).await.unwrap();
         assert_eq!(resp.stream_name, table);
         assert_eq!(resp.org_id, org_id);
-        assert!(check_field_in_use(&resp, col));
+        assert!(resp.meta.fields.contains(&col.to_string()));
     }
 
     #[tokio::test]

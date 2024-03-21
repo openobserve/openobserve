@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 use actix_web::http;
 use arrow_schema::DataType;
@@ -27,6 +30,7 @@ use config::{
     },
     CONFIG, SMTP_CLIENT,
 };
+use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
 
 use super::promql;
@@ -35,7 +39,8 @@ use crate::{
         meta::{
             alerts::{
                 destinations::{DestinationType, DestinationWithTemplate, HTTPType},
-                AggFunction, Alert, Condition, Operator, QueryCondition, QueryType,
+                AggFunction, Alert, AlertFrequencyType, Condition, Operator, QueryCondition,
+                QueryType,
             },
             authz::Authz,
             search,
@@ -82,8 +87,11 @@ pub async fn save(
         }
     }
 
-    // default frequency is 60 seconds
-    if alert.trigger_condition.frequency == 0 {
+    if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+        // Check the cron expression
+        Schedule::from_str(&alert.trigger_condition.cron)?;
+    } else if alert.trigger_condition.frequency == 0 {
+        // default frequency is 60 seconds
         alert.trigger_condition.frequency = std::cmp::max(10, CONFIG.limit.alert_schedule_interval);
     }
 
@@ -364,7 +372,8 @@ impl QueryCondition {
                     return Ok(None);
                 }
                 let start = now
-                    - Duration::minutes(alert.trigger_condition.period)
+                    - Duration::try_minutes(alert.trigger_condition.period)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap();
                 let end = now;
@@ -437,7 +446,8 @@ impl QueryCondition {
                 from: 0,
                 size: 100,
                 start_time: now
-                    - Duration::minutes(alert.trigger_condition.period)
+                    - Duration::try_minutes(alert.trigger_condition.period)
+                        .unwrap()
                         .num_microseconds()
                         .unwrap(),
                 end_time: now,
@@ -838,7 +848,11 @@ pub async fn send_http_notification(
     let resp = req.body(msg.clone()).send().await?;
     if !resp.status().is_success() {
         log::error!("Alert body: {}", msg);
-        return Err(anyhow::anyhow!("sent error: {:?}", resp.bytes().await));
+        return Err(anyhow::anyhow!(
+            "sent error status: {}, err: {:?}",
+            resp.status(),
+            resp.bytes().await
+        ));
     }
 
     Ok(())
@@ -1030,17 +1044,28 @@ async fn process_dest_template(
         Utc::now().timestamp_micros()
     } else {
         // the frontend will drop the second, so we add 1 minute to the end time
-        alert_end_time + Duration::minutes(1).num_microseconds().unwrap()
+        alert_end_time
+            + Duration::try_minutes(1)
+                .unwrap()
+                .num_microseconds()
+                .unwrap()
     };
     if alert_start_time == 0 {
         alert_start_time = alert_end_time
-            - Duration::minutes(alert.trigger_condition.period)
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
     }
-    if alert_end_time - alert_start_time < Duration::minutes(1).num_microseconds().unwrap() {
+    if alert_end_time - alert_start_time
+        < Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap()
+    {
         alert_start_time = alert_end_time
-            - Duration::minutes(alert.trigger_condition.period)
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
     }

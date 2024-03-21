@@ -1,5 +1,7 @@
 ///<reference types="cypress" />
-import logsdata from "../../../data/logs_data.json";
+// import logsdata from "../../../data/logs_data.json";
+import logsdata from "../../../../../test-data/logs_data.json"
+
 import { fieldType } from "../../../support/commons";
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;

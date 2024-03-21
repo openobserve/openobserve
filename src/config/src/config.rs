@@ -60,6 +60,9 @@ pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 
+pub const DEFAULT_INDEX_TRIM_CHARS: &str = "!\"#$%&'()*+, -./:;<=>?@[\\]^_`{|}~";
+pub const INDEX_MIN_CHAR_LEN: usize = 3;
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 8] = [
     "log", "message", "msg", "content", "data", "body", "events", "json",
 ];
@@ -187,6 +190,7 @@ pub struct Config {
     pub disk_cache: DiskCache,
     pub log: Log,
     pub etcd: Etcd,
+    pub nats: Nats,
     pub sled: Sled,
     pub dynamo: Dynamo,
     pub s3: S3,
@@ -194,6 +198,7 @@ pub struct Config {
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
+    pub rum: RUM,
 }
 
 #[derive(EnvConfig)]
@@ -259,8 +264,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 4,
-        help = "Max grpc message size in MB, default is 4 MB"
+        default = 16,
+        help = "Max grpc message size in MB, default is 16 MB"
     )]
     pub max_message_size: usize,
 }
@@ -291,6 +296,10 @@ pub struct Common {
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
     #[env_config(name = "ZO_LOCAL_MODE_STORAGE", default = "disk")]
     pub local_mode_storage: String,
+    #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "etcd")]
+    pub cluster_coordinator: String,
+    #[env_config(name = "ZO_QUEUE_STORE", default = "")]
+    pub queue_store: String,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
@@ -332,8 +341,6 @@ pub struct Common {
     pub skip_schema_validation: bool,
     #[env_config(name = "ZO_FEATURE_PER_THREAD_LOCK", default = false)]
     pub feature_per_thread_lock: bool,
-    #[env_config(name = "ZO_FEATURE_FULLTEXT_ON_ALL_FIELDS", default = false)]
-    pub feature_fulltext_on_all_fields: bool,
     #[env_config(name = "ZO_FEATURE_FULLTEXT_EXTRA_FIELDS", default = "")]
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
@@ -375,6 +382,8 @@ pub struct Common {
     pub telemetry_enabled: bool,
     #[env_config(name = "ZO_TELEMETRY_URL", default = "https://e1.zinclabs.dev")]
     pub telemetry_url: String,
+    #[env_config(name = "ZO_TELEMETRY_HEARTBEAT", default = 1800)] // seconds
+    pub telemetry_heartbeat: i64,
     #[env_config(name = "ZO_PROMETHEUS_ENABLED", default = true)]
     pub prometheus_enabled: bool,
     #[env_config(name = "ZO_PRINT_KEY_CONFIG", default = false)]
@@ -436,6 +445,26 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
+
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
+        default = " ;,",
+        help = "Characters which should be used as a delimiter to split the string."
+    )]
+    pub inverted_index_split_chars: String,
+
+    #[env_config(
+        name = "ZO_QUERY_ON_STREAM_SELECTION",
+        default = true,
+        help = "Toggle search to be trigger based on button click event."
+    )]
+    pub query_on_stream_selection: bool,
+    #[env_config(
+        name = "ZO_SHOW_STREAM_DATES_DOCS_NUM",
+        default = true,
+        help = "Show docs count and stream dates"
+    )]
+    pub show_stream_dates_doc_num: bool,
 }
 
 #[derive(EnvConfig)]
@@ -492,32 +521,42 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
-    #[env_config(name = "ZO_HEARTBEAT_INTERVAL", default = 30)] // in minutes
-    pub hb_interval: i64,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
+    #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
+    pub node_heartbeat_ttl: i64,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)] // equals to cpu_num if 0
     pub http_worker_num: usize,
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)] // equals to 1024 if 0
     pub http_worker_max_blocking: usize,
-    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // in seconds
+    #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
     pub calculate_stats_interval: u64,
     #[env_config(name = "ZO_ENRICHMENT_TABLE_LIMIT", default = 10)] // size in mb
     pub enrichment_table_limit: usize,
-    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // in second
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
     pub keep_alive: u64,
-    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // in second
+    #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
+    pub shutdown_timeout: u64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 50)]
+    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 100)]
     pub fast_mode_num_fields: usize,
     #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
     pub fast_mode_strategy: String, // first, last, both
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
+    pub fast_mode_file_list_enabled: bool,
+    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
+    pub fast_mode_file_list_interval: i64,
+    #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
+    pub sql_min_db_connections: u32,
+    #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
+    pub sql_max_db_connections: u32,
 }
 
 #[derive(EnvConfig)]
@@ -615,6 +654,14 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct Sled {
+    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
+    pub data_dir: String,
+    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
+    pub prefix: String,
+}
+
 #[derive(Debug, EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
@@ -643,16 +690,24 @@ pub struct Etcd {
     pub domain_name: String,
     #[env_config(name = "ZO_ETCD_LOAD_PAGE_SIZE", default = 1000)]
     pub load_page_size: i64,
-    #[env_config(name = "ZO_ETCD_NODE_HEARTBEAT_TTL", default = 30)]
-    pub node_heartbeat_ttl: i64,
 }
 
-#[derive(EnvConfig)]
-pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
-    pub data_dir: String,
-    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
+#[derive(Debug, EnvConfig)]
+pub struct Nats {
+    #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
+    pub addr: String,
+    #[env_config(name = "ZO_NATS_PREFIX", default = "o2_")]
     pub prefix: String,
+    #[env_config(name = "ZO_NATS_USER", default = "")]
+    pub user: String,
+    #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
+    pub password: String,
+    #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
+    pub connect_timeout: u64,
+    #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
+    pub command_timeout: u64,
+    #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
+    pub lock_wait_timeout: u64,
 }
 
 #[derive(EnvConfig)]
@@ -712,6 +767,30 @@ pub struct Prometheus {
     pub ha_replica_label: String,
 }
 
+#[derive(Debug, EnvConfig)]
+pub struct RUM {
+    #[env_config(name = "ZO_RUM_ENABLED", default = false)]
+    pub enabled: bool,
+    #[env_config(name = "ZO_RUM_CLIENT_TOKEN", default = "")]
+    pub client_token: String,
+    #[env_config(name = "ZO_RUM_APPLICATION_ID", default = "")]
+    pub application_id: String,
+    #[env_config(name = "ZO_RUM_SITE", default = "")]
+    pub site: String,
+    #[env_config(name = "ZO_RUM_SERVICE", default = "")]
+    pub service: String,
+    #[env_config(name = "ZO_RUM_ENV", default = "")]
+    pub env: String,
+    #[env_config(name = "ZO_RUM_VERSION", default = "")]
+    pub version: String,
+    #[env_config(name = "ZO_RUM_ORGANIZATION_IDENTIFIER", default = "")]
+    pub organization_identifier: String,
+    #[env_config(name = "ZO_RUM_API_VERSION", default = "")]
+    pub api_version: String,
+    #[env_config(name = "ZO_RUM_INSECURE_HTTP", default = false)]
+    pub insecure_http: bool,
+}
+
 pub fn init() -> Config {
     dotenv().ok();
     let mut cfg = Config::init().unwrap();
@@ -731,6 +810,14 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core * 2
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
+    }
+
+    if cfg.limit.sql_min_db_connections == 0 {
+        cfg.limit.sql_min_db_connections = cpu_num as u32
+    }
+
+    if cfg.limit.sql_max_db_connections == 0 {
+        cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
     }
 
     // check common config

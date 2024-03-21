@@ -277,7 +277,8 @@ impl super::FileList for DynamoFileList {
         }
 
         let t1: DateTime<Utc> = Utc.timestamp_nanos(time_start * 1000);
-        let t2: DateTime<Utc> = Utc.timestamp_nanos(time_end * 1000) + Duration::hours(1);
+        let t2: DateTime<Utc> =
+            Utc.timestamp_nanos(time_end * 1000) + Duration::try_hours(1).unwrap();
         let (file_start, file_end) = if time_level == PartitionTimeLevel::Daily {
             (
                 t1.format("%Y/%m/%d/00/").to_string(),
@@ -376,7 +377,11 @@ impl super::FileList for DynamoFileList {
     async fn get_max_pk_value(&self) -> Result<i64> {
         // we subtract 10 minutes to avoid the case that the last file insert at the
         // same time
-        Ok(Utc::now().timestamp_micros() - Duration::minutes(10).num_microseconds().unwrap())
+        Ok(Utc::now().timestamp_micros()
+            - Duration::try_minutes(10)
+                .unwrap()
+                .num_microseconds()
+                .unwrap())
     }
 
     async fn stats(
@@ -401,7 +406,7 @@ impl super::FileList for DynamoFileList {
                     .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
                     .expression_attribute_values(":stream", AttributeValue::S(stream_key))
             } else {
-                let time_start = time_start + 1; // because the beween is [start, end], we don't want to include the start
+                let time_start = time_start + 1; // because the between is [start, end], we don't want to include the start
                 client
                     .query()
                     .table_name(&self.file_list_table)
@@ -425,7 +430,7 @@ impl super::FileList for DynamoFileList {
                 .key_condition_expression("org = :org")
                 .expression_attribute_values(":org", AttributeValue::S(org_id.to_string()))
         } else {
-            let time_start = time_start + 1; // because the beween is [start, end], we don't want to include the start
+            let time_start = time_start + 1; // because the between is [start, end], we don't want to include the start
             client
                 .query()
                 .table_name(&self.file_list_table)

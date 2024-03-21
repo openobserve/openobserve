@@ -19,26 +19,13 @@ use base64::Engine;
 
 #[inline(always)]
 pub fn decode(s: &str) -> Result<String, Error> {
-    let ns = match base64::engine::general_purpose::STANDARD.decode(s.as_bytes()) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                format!("base64 decode error: {e}"),
-            ));
-        }
-    };
-    let s = match String::from_utf8(ns) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                format!("base64 decode error: {e}"),
-            ));
-        }
-    };
-
-    Ok(s)
+    match String::from_utf8(decode_raw(s)?) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(Error::new(
+            ErrorKind::InvalidData,
+            format!("base64 decode error: {e}"),
+        )),
+    }
 }
 
 #[inline(always)]
@@ -50,6 +37,23 @@ pub fn decode_raw(s: &str) -> Result<Vec<u8>, Error> {
 
 pub fn encode(s: &str) -> String {
     base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
+}
+
+pub fn encode_url(s: &str) -> String {
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(s.as_bytes())
+}
+
+pub fn decode_url(s: &str) -> Result<String, Error> {
+    let d = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(s.as_bytes())
+        .map_err(|e| Error::new(ErrorKind::InvalidData, format!("base64 decode error: {e}")))?;
+    match String::from_utf8(d) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(Error::new(
+            ErrorKind::InvalidData,
+            format!("base64 decode error: {e}"),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -95,5 +99,27 @@ mod tests {
         let expected: Vec<u8> = Vec::new();
         let result = decode_raw(input).expect("Failed to decode empty input");
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_encode() {
+        let s = "hello world";
+        assert_eq!(encode(s), "aGVsbG8gd29ybGQ=");
+
+        let s = "/root/defau/root@example.com";
+        assert_eq!(encode(s), "L3Jvb3QvZGVmYXUvcm9vdEBleGFtcGxlLmNvbQ==");
+    }
+
+    #[test]
+    fn test_encode_url() {
+        let s = "hello world";
+        let s_e = "aGVsbG8gd29ybGQ";
+        assert_eq!(encode_url(s), s_e);
+        assert_eq!(decode_url(s_e).unwrap(), s);
+
+        let s = "/root/defau/root@example.com";
+        let s_e = "L3Jvb3QvZGVmYXUvcm9vdEBleGFtcGxlLmNvbQ";
+        assert_eq!(encode_url(s), s_e);
+        assert_eq!(decode_url(s_e).unwrap(), s);
     }
 }

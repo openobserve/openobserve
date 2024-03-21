@@ -208,16 +208,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, defineAsyncComponent } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import QueryInspector from "@/components/dashboards/QueryInspector.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
+
+const QueryInspector = defineAsyncComponent(() => {
+  return import("@/components/dashboards/QueryInspector.vue");
+});
 
 export default defineComponent({
   name: "PanelContainer",
@@ -293,7 +296,7 @@ export default defineComponent({
           dashboard: String(route.query.dashboard),
           panelId: data.id,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? data.panels[0]?.tabId,
         },
       });
     };
@@ -321,7 +324,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? "default"
+          route.query.tab ?? data.panels[0]?.tabId
         );
 
         // Show a success notification.
@@ -337,7 +340,7 @@ export default defineComponent({
             dashboard: String(route.query.dashboard),
             panelId: panelId,
             folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? "default",
+            tab: route.query.tab ?? data.panels[0]?.tabId,
           },
         });
         return;
