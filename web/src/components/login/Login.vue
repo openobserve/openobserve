@@ -228,7 +228,7 @@ export default defineComponent({
                   email: name.value,
                   role: res.data.role,
                 };
-                const encodedUserInfo = b64EncodeUnicode(
+                const encodedUserInfo: any = b64EncodeUnicode(
                   JSON.stringify(userInfo)
                 );
 
