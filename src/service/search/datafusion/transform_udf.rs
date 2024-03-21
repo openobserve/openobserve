@@ -34,7 +34,13 @@ use crate::{
     service::ingestion::{compile_vrl_function, get_string_value},
 };
 
-type FnType = Arc<dyn Fn(&[datafusion_expr::ColumnarValue]) -> Result<datafusion_expr::ColumnarValue, datafusion::error::DataFusionError> + Sync + Send>;
+type FnType = Arc<
+    dyn Fn(
+            &[datafusion_expr::ColumnarValue],
+        ) -> Result<datafusion_expr::ColumnarValue, datafusion::error::DataFusionError>
+        + Sync
+        + Send,
+>;
 
 fn create_user_df(
     fn_name: &str,
