@@ -139,6 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <th width="30px">{{ t("logStream.deleteActionLabel") }}</th>
                   <th>{{ t("logStream.propertyName") }}</th>
                   <th>{{ t("logStream.propertyType") }}</th>
+                  <th v-if="showFullTextSearchColumn" style="width: 150px">
+                    {{ t("logStream.interestedFields") }}
+                  </th>
                   <th v-if="showFullTextSearchColumn" style="width: 220px">
                     {{ t("logStream.indexType") }}
                   </th>
@@ -163,6 +166,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </td>
                   <td>{{ schema.name }}</td>
                   <td>{{ schema.type }}</td>
+                  <td class="text-center">
+                    <q-checkbox
+                      v-if="
+                        schema.name !== store.state.zoConfig.timestamp_column
+                      "
+                      :data-test="`schema-stream-${schema.name}-field-interested-field-checkbox`"
+                      v-model="schema.insteredField"
+                      :disable="schema.defaultInterestedField"
+                      size="sm"
+                      @update:model-value="markFormDirty"
+                    />
+                  </td>
                   <td
                     v-if="showFullTextSearchColumn"
                     data-test="schema-stream-index-select"
@@ -252,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onBeforeMount, ref } from "vue";
+import { Ref, computed, defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
@@ -296,6 +311,7 @@ export default defineComponent({
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
+    const defaultInterestedFields: Ref<string[]> = ref([]);
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
@@ -310,6 +326,8 @@ export default defineComponent({
     const { getStream } = useStreams();
 
     onBeforeMount(() => {
+      defaultInterestedFields.value =
+        store.state?.zoConfig?.quick_mode_fields?.split(",") || ["level"];
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
     });
 
@@ -455,6 +473,19 @@ export default defineComponent({
 
             property.index_type = [...fieldIndices];
 
+            if (streamResponse.settings.interested_fields?.length) {
+              property.insteredField = (
+                streamResponse.settings.interested_fields || []
+              ).includes(property.name);
+            } else {
+              property.insteredField = false;
+            }
+
+            if (defaultInterestedFields.value?.includes(property.name)) {
+              property.insteredField = true;
+              property.defaultInterestedField = true;
+            }
+
             fieldIndices.length = 0;
           }
 
@@ -472,6 +503,7 @@ export default defineComponent({
         partition_keys: [],
         full_text_search_keys: [],
         bloom_filter_fields: [],
+        interested_fields: [],
       };
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
@@ -534,6 +566,10 @@ export default defineComponent({
 
         if (property.delete) {
           deleteFieldList.value.push(property.name);
+        }
+
+        if (property.insteredField && !property.defaultInterestedField) {
+          settings.interested_fields.push(property.name);
         }
       }
       if (added_part_keys.length > 0) {
