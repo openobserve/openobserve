@@ -202,7 +202,11 @@ WHERE org = $6 AND module = $7 AND key = $8;"#,
         let client = client.lock().await;
 
         let now = chrono::Utc::now().timestamp_micros();
-        let max_time = now + Duration::seconds(timeout).num_microseconds().unwrap();
+        let max_time = now
+            + Duration::try_seconds(timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
         let query = r#"UPDATE scheduled_jobs
 SET status = $1, start_time = $2, end_time = $3
 WHERE id IN (

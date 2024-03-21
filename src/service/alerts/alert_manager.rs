@@ -23,10 +23,7 @@ use infra::{dist_lock, scheduler};
 use crate::{
     common::{
         infra::cluster::get_node_by_uuid,
-        meta::{
-            alerts::{triggers::Trigger, AlertFrequencyType},
-            dashboards::reports::ReportFrequencyType,
-        }
+        meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
     },
     service::db,
 };
@@ -193,7 +190,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
 
     if !report.enabled {
         // update trigger, check on next week
-        new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
@@ -203,29 +200,33 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
     // frequency interval of this report
     match report.frequency.frequency_type {
         ReportFrequencyType::Hours => {
-            new_trigger.next_run_at += Duration::hours(report.frequency.interval)
+            new_trigger.next_run_at += Duration::try_hours(report.frequency.interval)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
         }
         ReportFrequencyType::Days => {
-            new_trigger.next_run_at += Duration::days(report.frequency.interval)
+            new_trigger.next_run_at += Duration::try_days(report.frequency.interval)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
         }
         ReportFrequencyType::Weeks => {
-            new_trigger.next_run_at += Duration::weeks(report.frequency.interval)
+            new_trigger.next_run_at += Duration::try_weeks(report.frequency.interval)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
         }
         ReportFrequencyType::Months => {
             // Assumes each month to be of 30 days.
-            new_trigger.next_run_at += Duration::days(report.frequency.interval * 30)
+            new_trigger.next_run_at += Duration::try_days(report.frequency.interval * 30)
+                .unwrap()
                 .num_microseconds()
                 .unwrap();
         }
         ReportFrequencyType::Once => {
             // Check on next week
-            new_trigger.next_run_at += Duration::days(7).num_microseconds().unwrap();
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
             // Disable the report
             report.enabled = false;
             run_once = true;

@@ -343,31 +343,36 @@ async fn generate_report(
             let start_time = match time_unit {
                 "m" => {
                     end_time
-                        - chrono::Duration::minutes(time_duration)
+                        - chrono::Duration::try_minutes(time_duration)
+                            .unwrap()
                             .num_microseconds()
                             .unwrap()
                 }
                 "h" => {
                     end_time
-                        - chrono::Duration::hours(time_duration)
+                        - chrono::Duration::try_hours(time_duration)
+                            .unwrap()
                             .num_microseconds()
                             .unwrap()
                 }
                 "d" => {
                     end_time
-                        - chrono::Duration::days(time_duration)
+                        - chrono::Duration::try_days(time_duration)
+                            .unwrap()
                             .num_microseconds()
                             .unwrap()
                 }
                 "w" => {
                     end_time
-                        - chrono::Duration::weeks(time_duration)
+                        - chrono::Duration::try_weeks(time_duration)
+                            .unwrap()
                             .num_microseconds()
                             .unwrap()
                 }
                 _ => {
                     end_time
-                        - chrono::Duration::days(30 * time_duration)
+                        - chrono::Duration::try_days(30 * time_duration)
+                            .unwrap()
                             .num_microseconds()
                             .unwrap()
                 }

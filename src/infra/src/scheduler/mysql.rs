@@ -194,7 +194,11 @@ WHERE org = ? AND module = ? AND key = ?;"#,
         let pool = CLIENT.clone();
 
         let now = chrono::Utc::now().timestamp_micros();
-        let max_time = now + Duration::seconds(timeout).num_microseconds().unwrap();
+        let max_time = now
+            + Duration::try_seconds(timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
         let query = r#"UPDATE scheduled_jobs
 SET status = ?, start_time = ?, end_time = ?
 WHERE id IN (

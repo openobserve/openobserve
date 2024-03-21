@@ -123,7 +123,8 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
     CLIENT.delete(org, module, key).await
 }
 
-/// Updates the status of the Trigger job
+/// Updates the status of the Trigger job. This method is supposed
+/// to be used only by the node that is currently processing the trigger.
 #[inline]
 pub async fn update_status(
     org: &str,
@@ -137,8 +138,10 @@ pub async fn update_status(
         .await
 }
 
-/// Updates the triggers with given identifiers
-/// Does not update start_time, end_time, org, module and key
+/// Updates the triggers with given identifiers.
+/// Does not update start_time, end_time, org, module and key. Must
+/// only be used by the node that is currently processing the trigger.
+/// Use `pull()` method to set the status of the job from `Waiting` to `Processing`.
 #[inline]
 pub async fn update_trigger(trigger: Trigger) -> Result<()> {
     CLIENT.update_trigger(trigger).await
