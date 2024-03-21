@@ -95,7 +95,9 @@ export const getUserInfo = (loginString: string) => {
       const propArr = token.split("=");
       if (propArr[0] == "id_token") {
         decToken = getDecodedAccessToken(propArr[1]);
-        const encodedSessionData = b64EncodeUnicode(JSON.stringify(decToken));
+        const encodedSessionData: any = b64EncodeUnicode(
+          JSON.stringify(decToken)
+        );
 
         useLocalUserInfo(encodedSessionData);
         useLocalToken("Bearer " + propArr[1]);
@@ -296,8 +298,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-        ? window.location.pathname.slice(0, pos + 5)
-        : "";
+      ? window.location.pathname.slice(0, pos + 5)
+      : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
