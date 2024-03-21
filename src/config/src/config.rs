@@ -1102,6 +1102,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
     }
+    if cfg.memory_cache.gc_size == 0 {
+        cfg.memory_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+    } else {
+        cfg.memory_cache.gc_size *= 1024 * 1024;
+    }
     if cfg.memory_cache.datafusion_max_size == 0 {
         cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
@@ -1179,6 +1184,11 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.disk_cache.release_size = cfg.disk_cache.max_size / 100;
     } else {
         cfg.disk_cache.release_size *= 1024 * 1024;
+    }
+    if cfg.disk_cache.gc_size == 0 {
+        cfg.disk_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+    } else {
+        cfg.disk_cache.gc_size *= 1024 * 1024;
     }
     Ok(())
 }
