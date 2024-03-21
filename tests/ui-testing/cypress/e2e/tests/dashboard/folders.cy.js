@@ -184,6 +184,7 @@ describe("Folders testcases", () => {
       .parent('tr')
       .within(() => {
       // Click on the Move to another Folder button
+      cy.wait(1000);
         cy.get('[data-test="dashboard-move-to-another-folder"]').click({ force: true });
     });
     cy.get('.items-baseline > .q-field > .q-field__inner > .q-field__control > .q-field__append').click()
