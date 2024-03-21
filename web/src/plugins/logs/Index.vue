@@ -541,7 +541,7 @@ export default defineComponent({
             `" ` +
             whereClause;
 
-          if (searchObj.data.stream.interestingFieldList.length > 0) {
+          if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
             searchObj.data.query = searchObj.data.query.replace(
               "[FIELD_LIST]",
               searchObj.data.stream.interestingFieldList.join(",")

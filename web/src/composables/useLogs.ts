@@ -1755,9 +1755,18 @@ const useLogs = () => {
           whereClause = "";
         }
         query_context =
-          `SELECT *${queryFunctions} FROM "` +
+          `SELECT [FIELD_LIST]${queryFunctions} FROM "` +
           searchObj.data.stream.selectedStream.value +
           `" `;
+
+        if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
+          query_context = query_context.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(",")
+          );
+        } else {
+          query_context = query_context.replace("[FIELD_LIST]", "*");
+        }
         query_context = b64EncodeUnicode(query_context);
       }
 
@@ -2072,7 +2081,7 @@ const useLogs = () => {
 
     await extractFields();
 
-    if (searchObj.data.stream.interestingFieldList.length > 0) {
+    if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
       query = query.replace(
         "[FIELD_LIST]",
         searchObj.data.stream.interestingFieldList.join(",")
