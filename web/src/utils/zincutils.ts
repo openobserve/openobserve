@@ -141,17 +141,30 @@ export const getDecodedAccessToken = (token: string) => {
 };
 
 export const b64EncodeUnicode = (str: string) => {
+  // try {
+  //   return btoa(
+  //     encodeURIComponent(str).replace(
+  //       /%([0-9A-F]{2})/g,
+  //       function (match, p1: any) {
+  //         return String.fromCharCode(parseInt(`0x${p1}`));
+  //       }
+  //     )
+  //   );
+  // } catch (e) {
+  //   console.log("Error: getBase64Encode: error while encoding.");
+  // }
   try {
     return btoa(
-      encodeURIComponent(str).replace(
-        /%([0-9A-F]{2})/g,
-        function (match, p1: any) {
-          return String.fromCharCode(parseInt(`0x${p1}`));
-        }
-      )
-    );
+      encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(`0x${p1}`));
+      })
+    )
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
+    return null;
   }
 };
 
