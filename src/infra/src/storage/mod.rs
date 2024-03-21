@@ -101,7 +101,7 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
     if columns[0] == "files" {
         let time = start.elapsed().as_secs_f64();
         metrics::STORAGE_TIME
-            .with_label_values(&[columns[1], columns[2], "del"])
+            .with_label_values(&[columns[1], columns[2], "del", "remote"])
             .inc_by(time);
     }
 
