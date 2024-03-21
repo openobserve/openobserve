@@ -22,6 +22,38 @@ use crate::{
 
 pub const USAGE_STREAM: &str = "usage";
 pub const STATS_STREAM: &str = "stats";
+pub const TRIGGERS_USAGE_STREAM: &str = "triggers";
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum TriggerDataStatus {
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "failed")]
+    Failed,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum TriggerDataType {
+    #[serde(rename = "report")]
+    Report,
+    #[serde(rename = "alert")]
+    Alert,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TriggerData {
+    pub org: String,
+    pub module: TriggerDataType,
+    pub key: String,
+    pub next_run_at: i64,
+    pub is_realtime: bool,
+    pub is_silenced: bool,
+    pub status: TriggerDataStatus,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub retries: i32,
+    pub error: Option<String>,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UsageData {

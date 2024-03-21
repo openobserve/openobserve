@@ -16,7 +16,14 @@
 use std::str::FromStr;
 
 use chrono::{Duration, FixedOffset, Utc};
-use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, CONFIG};
+use config::{
+    cluster::LOCAL_NODE_UUID,
+    meta::{
+        stream::StreamType,
+        usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+    },
+    CONFIG,
+};
 use cron::Schedule;
 use infra::{dist_lock, scheduler};
 
@@ -25,7 +32,7 @@ use crate::{
         infra::cluster::get_node_by_uuid,
         meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
     },
-    service::db,
+    service::{db, usage::publish_triggers_usage},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -103,7 +110,7 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
             is_realtime: true,
             is_silenced: false,
             status: scheduler::TriggerStatus::Waiting,
-            ..trigger
+            ..trigger.clone()
         };
         scheduler::update_trigger(new_trigger).await?;
         return Ok(());
@@ -127,7 +134,7 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
         is_realtime: false,
         is_silenced: false,
         status: scheduler::TriggerStatus::Waiting,
-        ..trigger
+        ..trigger.clone()
     };
 
     if !alert.enabled {
@@ -162,13 +169,46 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
             .unwrap();
     }
 
+    let mut trigger_data_stream = TriggerData {
+        org: trigger.org,
+        module: TriggerDataType::Alert,
+        key: trigger.key,
+        next_run_at: new_trigger.next_run_at,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        status: TriggerDataStatus::Completed,
+        start_time: trigger.start_time,
+        end_time: trigger.end_time,
+        retries: trigger.retries,
+        error: None,
+    };
+
     // send notification
     if let Some(data) = ret {
-        alert.send_notification(&data).await?;
+        match alert.send_notification(&data).await {
+            Ok(_) => {
+                scheduler::update_trigger(new_trigger).await?;
+                trigger_data_stream.end_time = Utc::now().timestamp_micros();
+            }
+            Err(e) => {
+                scheduler::update_status(
+                    &new_trigger.org,
+                    new_trigger.module,
+                    &new_trigger.key,
+                    scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                )
+                .await?;
+                trigger_data_stream.end_time = Utc::now().timestamp_micros();
+                trigger_data_stream.status = TriggerDataStatus::Failed;
+                trigger_data_stream.error =
+                    Some(format!("error sending notification for alert: {e}"));
+            }
+        }
     }
 
-    // update trigger
-    scheduler::update_trigger(new_trigger).await?;
+    // publish the triggers as stream
+    publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())
 }
@@ -243,6 +283,20 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
         }
     }
 
+    let mut trigger_data_stream = TriggerData {
+        org: trigger.org.clone(),
+        module: TriggerDataType::Report,
+        key: trigger.key.clone(),
+        next_run_at: new_trigger.next_run_at,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        status: TriggerDataStatus::Completed,
+        start_time: trigger.start_time,
+        end_time: trigger.end_time,
+        retries: trigger.retries,
+        error: None,
+    };
+
     let now = Utc::now().timestamp_micros();
     match report.send_subscribers().await {
         Ok(_) => {
@@ -250,9 +304,10 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
             if run_once {
                 new_trigger.status = scheduler::TriggerStatus::Completed;
             }
-            scheduler::update_trigger(new_trigger).await?
+            scheduler::update_trigger(new_trigger).await?;
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
         }
-        Err(_) => {
+        Err(e) => {
             scheduler::update_status(
                 &new_trigger.org,
                 new_trigger.module,
@@ -260,7 +315,10 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
                 scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
             )
-            .await?
+            .await?;
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
+            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
 
@@ -272,6 +330,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
             result.err().unwrap()
         );
     }
+    publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())
 }
