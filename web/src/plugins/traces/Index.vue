@@ -783,8 +783,6 @@ export default defineComponent({
               };
             }
 
-            updateDurationFilter();
-
             updateFieldValues(res.data.hits);
 
             generateHistogramData();
@@ -1295,27 +1293,6 @@ export default defineComponent({
       const parsedQuery = parser.astify(defaultQuery + query);
 
       restoreFiltersFromQuery(parsedQuery.where);
-    };
-
-    const updateDurationFilter = () => {
-      let min = 0;
-      let max = 0;
-
-      searchObj.data.queryResults.hits.forEach((result) => {
-        if (result.duration < min) min = result.duration;
-        if (result.duration > max) max = result.duration;
-      });
-
-      // Converting from nano to milli
-      min = Math.floor(min / 1000);
-
-      max = Math.ceil(max / 1000);
-
-      indexListRef.value.duration.slider.min = min;
-      indexListRef.value.duration.slider.max = max;
-
-      indexListRef.value.duration.input.min = min;
-      indexListRef.value.duration.input.max = max;
     };
 
     return {
