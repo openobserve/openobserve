@@ -163,7 +163,7 @@ export const b64DecodeUnicode = (str: string) => {
     return decodeURIComponent(
       Array.prototype.map
         .call(
-          atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/./g, "=")),
+          atob(str.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "=")),
           function (c) {
             return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
           }
