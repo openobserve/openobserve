@@ -75,7 +75,7 @@ impl ObjectStore for Remote {
                         .inc();
                     let time = start.elapsed().as_secs_f64();
                     metrics::STORAGE_TIME
-                        .with_label_values(&[columns[1], columns[2], "put"])
+                        .with_label_values(&[columns[1], columns[2], "put", "remote"])
                         .inc_by(time);
                 }
                 Ok(PutResult {
@@ -118,7 +118,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(time);
         }
         log::debug!("[STORAGE] get remote file: {}", file);
@@ -146,7 +146,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(time);
         }
 
@@ -173,7 +173,7 @@ impl ObjectStore for Remote {
                 .inc();
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get"])
+                .with_label_values(&[columns[1], columns[2], "get", "remote"])
                 .inc_by(time);
         }
 

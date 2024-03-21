@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @row-click="onChartClick"
           ref="tableRendererRef"
+          :wrap-cells="panelSchema.config?.wrap_table_cells"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -639,7 +640,7 @@ export default defineComponent({
           const tabId =
             dashboardData.tabs.find(
               (tab: any) => tab.name == drilldownData.data.tab
-            )?.tabId ?? "default";
+            )?.tabId ?? dashboardData.tabs[0].tabId;
 
           // if targetBlank is true then create new url
           // else made changes in current router only

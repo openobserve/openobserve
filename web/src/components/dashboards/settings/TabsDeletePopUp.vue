@@ -130,11 +130,13 @@ export default defineComponent({
 
       // set action to move as default
       action.value = "move";
-      // set selectedTabToMovePanels to default
-      selectedTabToMovePanels.value = {
-        label: "Default",
-        value: "default",
-      };
+      // set selectedTabToMovePanels to [0]th value
+      selectedTabToMovePanels.value = newMoveTabOptions[0];
+
+      // selectedTabToMovePanels.value = {
+      //   label: "Default",
+      //   value: "default",
+      // };
       moveTabOptions.value = newMoveTabOptions;
     });
 

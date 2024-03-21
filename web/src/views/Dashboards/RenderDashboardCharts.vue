@@ -359,7 +359,7 @@ export default defineComponent({
         query: {
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
         },
       });
     };
