@@ -327,7 +327,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       defaultInterestedFields.value =
-        store.state?.zoConfig?.quick_mode_fields?.split(",") || ["level"];
+        store.state?.zoConfig?.quick_mode_fields?.split(",") || [];
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
     });
 
