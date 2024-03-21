@@ -427,7 +427,7 @@ pub static STORAGE_TIME: Lazy<CounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "method_type"],
+        &["organization", "stream_type", "method_type", "storage_type"],
     )
     .expect("Metric created")
 });
