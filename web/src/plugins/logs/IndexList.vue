@@ -432,7 +432,8 @@ interface Filter {
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: { EqualIcon, NotEqualIcon },
-  setup() {
+  emits: ["setInterestingFieldInSQLQuery"],
+  setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -679,8 +680,21 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
-    const addToInterestingFieldList = (field: any, currentState: boolean) => {
-      if (currentState) {
+    const addToInterestingFieldList = (
+      field: any,
+      isInterestingField: boolean
+    ) => {
+      if (field.name == "_timestamp" && isInterestingField) {
+        $q.notify({
+          type: "negative",
+          message:
+            "Timestamp field cannot be removed from the interesting fields",
+        });
+
+        return false;
+      }
+
+      if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
         );
@@ -716,6 +730,8 @@ export default defineComponent({
           searchObj.data.stream.selectedStream.value
       ] = searchObj.data.stream.interestingFieldList;
       useLocalInterestingFields(localFields);
+
+      emit("setInterestingFieldInSQLQuery", field, isInterestingField);
     };
 
     return {

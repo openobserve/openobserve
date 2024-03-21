@@ -58,6 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchObj.data.stream.selectedStream.value || 'default'
                     "
                     class="full-height"
+                    @setInterestingFieldInSQLQuery="
+                      setInterestingFieldInSQLQuery
+                    "
                   />
                   <q-btn
                     data-test="logs-search-field-list-collapse-btn"
@@ -369,6 +372,7 @@ export default defineComponent({
       resetSearchObj,
       resetStreamData,
       getHistogramQueryData,
+      fnParsedSQL,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -532,10 +536,22 @@ export default defineComponent({
             }
           }
           searchObj.data.query =
-            `SELECT *${selectFields} FROM "` +
+            `SELECT [FIELD_LIST]${selectFields} FROM "` +
             searchObj.data.stream.selectedStream.value +
             `" ` +
             whereClause;
+
+          if (searchObj.data.stream.interestingFieldList.length > 0) {
+            searchObj.data.query = searchObj.data.query.replace(
+              "[FIELD_LIST]",
+              searchObj.data.stream.interestingFieldList.join(",")
+            );
+          } else {
+            searchObj.data.query = searchObj.data.query.replace(
+              "[FIELD_LIST]",
+              "*"
+            );
+          }
 
           searchObj.data.editorValue = searchObj.data.query;
 
@@ -548,6 +564,11 @@ export default defineComponent({
         }
       } catch (e) {
         console.log("Logs : Error in setQuery");
+        $q.notify({
+          message: "Error while setting up query",
+          color: "negative",
+          timeout: 2000,
+        });
       }
     };
 
@@ -573,6 +594,70 @@ export default defineComponent({
     const onChangeInterval = () => {
       updateUrlQueryParams();
       refreshData();
+    };
+
+    function removeFieldByName(data, fieldName, orderby) {
+    const isFieldInOrderby = orderby.some(order => order.expr.column === fieldName);
+    if (isFieldInOrderby) {
+        return false;
+    }
+
+    return data.filter(item => {
+        if (item.expr) {
+            if (item.expr.column === fieldName) {
+                return false;
+            }
+            if (item.expr.type === "aggr_func" && item.expr.args.expr.column === fieldName) {
+                return false;
+            }
+        }
+        return true;
+    });
+}
+
+    const setInterestingFieldInSQLQuery = (
+      field: any,
+      isFieldExistInSQL: boolean
+    ) => {
+      //implement setQuery function using node-sql-parser
+      //isFieldExistInSQL is used to check if the field is already present in the query or not.
+      const parsedSQL = fnParsedSQL();
+      if (parsedSQL) {
+        if (isFieldExistInSQL) {
+          //remove the field from the query
+          let filteredData = removeFieldByName(parsedSQL.columns, field.name, parsedSQL.orderby);
+          if(filteredData == false) {
+            searchObj.data.stream.interestingFieldList.push(field.name);
+            field.isInterestingField = true;
+            $q.notify({
+              message: "Field is present in order by clause",
+              color: "negative",
+              timeout: 2000,
+            });
+
+            return false;
+          } else {
+            parsedSQL.columns = filteredData;
+          }
+        } else {
+          //add the field in the query
+          parsedSQL.columns.push({
+            expr: {
+              type: "column_ref",
+              column: field.name,
+            },
+          });
+        }
+
+        const newQuery = parser.sqlify(parsedSQL).replace(/`/g, "");
+        console.log(newQuery);
+        searchObj.data.query = newQuery;
+        searchObj.data.editorValue = newQuery;
+
+        searchBarRef.value.udpateQuery();
+
+        searchObj.data.parsedQuery = parser.astify(searchObj.data.query);
+      }
     };
 
     return {
@@ -605,6 +690,7 @@ export default defineComponent({
       resetSearchObj,
       resetStreamData,
       getHistogramQueryData,
+      setInterestingFieldInSQLQuery,
     };
   },
   computed: {
@@ -740,7 +826,8 @@ export default defineComponent({
         this.searchObj.data.editorValue = "";
         if (
           this.searchObj.loading == false &&
-          this.searchObj.shouldIgnoreWatcher == false
+          this.searchObj.shouldIgnoreWatcher == false &&
+          this.store.state.zoConfig.query_on_stream_selection == false
         ) {
           this.searchObj.loading = true;
           this.getQueryData();
