@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :rows-per-page-options="[0]"
     :virtual-scroll-sticky-size-start="48"
     dense
+    :wrap-cells="wrapCells"
     :rows="data.rows || []"
     :columns="data.columns"
     row-key="id"
@@ -43,6 +44,11 @@ export default defineComponent({
       required: true,
       type: Object,
       default: () => ({ rows: [], columns: {} }),
+    },
+    wrapCells: {
+      required: false,
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["row-click"],

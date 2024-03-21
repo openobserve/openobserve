@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <q-toggle
+      v-if="dashboardPanelData.data.type == 'table'"
+      v-model="dashboardPanelData.data.config.wrap_table_cells"
+      :label="t('dashboard.wraptext')"
+      data-test="dashboard-config-wrap-table-cells"
+    />
+
+    <div class="space"></div>
+
     <div class="o2-input">
       <q-select
         v-if="
@@ -724,6 +733,11 @@ export default defineComponent({
       // by default, use connect_nulls as false
       if (!dashboardPanelData.data.config.connect_nulls) {
         dashboardPanelData.data.config.connect_nulls = false;
+      }
+
+      // by default, use wrap_table_cells as false
+      if (!dashboardPanelData.data.config.wrap_table_cells) {
+        dashboardPanelData.data.config.wrap_table_cells = false;
       }
     });
 
