@@ -32,7 +32,10 @@ use {
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
     actix_web::http::header,
     o2_enterprise::enterprise::{
-        common::infra::config::O2_CONFIG,
+        common::{
+            infra::config::O2_CONFIG,
+            settings::{get_logo, get_logo_text},
+        },
         dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
     },
     std::io::ErrorKind,
@@ -76,6 +79,7 @@ struct ConfigResponse<'a> {
     custom_slack_url: String,
     custom_docs_url: String,
     rum: Rum,
+    custom_logo_img: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -122,9 +126,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let rbac_enabled = false;
     #[cfg(feature = "enterprise")]
-    let custom_logo_text = &O2_CONFIG.common.custom_logo_text;
+    let custom_logo_text = match get_logo_text().await {
+        Some(data) => data,
+        None => O2_CONFIG.common.custom_logo_text.clone(),
+    };
     #[cfg(not(feature = "enterprise"))]
-    let custom_logo_text = "";
+    let custom_logo_text = "".to_string();
     #[cfg(feature = "enterprise")]
     let custom_slack_url = &O2_CONFIG.common.custom_slack_url;
     #[cfg(not(feature = "enterprise"))]
@@ -133,6 +140,12 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_docs_url = &O2_CONFIG.common.custom_docs_url;
     #[cfg(not(feature = "enterprise"))]
     let custom_docs_url = "";
+
+    #[cfg(feature = "enterprise")]
+    let logo = get_logo().await;
+
+    #[cfg(not(feature = "enterprise"))]
+    let logo = None;
 
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
@@ -157,9 +170,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         rbac_enabled,
         query_on_stream_selection: CONFIG.common.query_on_stream_selection,
         show_stream_stats_doc_num: CONFIG.common.show_stream_dates_doc_num,
-        custom_logo_text: custom_logo_text.to_string(),
+        custom_logo_text,
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
+        custom_logo_img: logo,
         rum: Rum {
             enabled: CONFIG.rum.enabled,
             client_token: CONFIG.rum.client_token.to_string(),

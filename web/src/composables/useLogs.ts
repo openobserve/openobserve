@@ -361,7 +361,7 @@ const useLogs = () => {
           searchObj.data.stream.streamType || "logs",
           true
         ).then((res) => {
-          return res.schema;
+          return res;
         });
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -1070,6 +1070,15 @@ const useLogs = () => {
     }
   };
 
+  function hasAggregation(columns: any) {
+    for (const column of columns) {
+      if (column.expr && column.expr.type === "aggr_func") {
+        return true; // Found aggregation function or non-null groupby property
+      }
+    }
+    return false; // No aggregation function or non-null groupby property found
+  }
+
   const getPaginatedData = async (
     queryReq: any,
     appendResult: boolean = false
@@ -1102,6 +1111,12 @@ const useLogs = () => {
           if (parsedSQL.limit.seperator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
+          delete queryReq.query.track_total_hits;
+        }
+
+        // for group by query no need to get total.
+        if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
+          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
       }
@@ -1398,7 +1413,9 @@ const useLogs = () => {
                 ...stream.schema.map((e: any) => e.name),
               ]);
             } else {
-              const streamSchema: any = await loadStreamFileds(stream.name);
+              const streamData: any = await loadStreamFileds(stream.name);
+              const streamSchema: any = streamData.schema;
+              stream.settings = streamData.settings;
               queryResult.push(...streamSchema);
               schemaFields = new Set([...streamSchema.map((e: any) => e.name)]);
             }

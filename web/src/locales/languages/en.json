@@ -522,6 +522,7 @@
     "oneFieldConfigMessage": "Add 1 field or Configure it from the Config",
     "configLabel": "Config",
     "showLegendsLabel": "Show Legends",
+    "wraptext": "Wrap Table Cells",
     "showBorder": "Show Axis Border",
     "legendsPositionLabel": "Legends Positions",
     "unitLabel": "Unit",
@@ -795,6 +796,14 @@
     "generalLabel": "General",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
-    "scrapintervalLabel": "Scrape Interval (In Seconds) *"
+    "scrapintervalLabel": "Scrape Interval (In Seconds) *",
+    "enterpriseTitle": "Enterprise Settings",
+    "logoLabel": "Select Logo Image",
+    "customLogoTitle": "Custom Logo",
+    "deleteLogoTitle": "Delete Logo",
+    "deleteLogoMessage": "Are you sure you want to delete this logo image?",
+    "deleteLogo": "Delete Logo",
+    "logo": "Logo",
+    "customLogoText": "Custom Logo Text"
   }
 }

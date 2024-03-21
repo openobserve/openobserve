@@ -311,7 +311,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab,
+          tab: selectedTabId.value,
           refresh: generateDurationLabel(refreshInterval.value),
           ...getQueryParamsForDuration(selectedDate.value),
           ...variableObj,
@@ -344,12 +344,12 @@ export default defineComponent({
 
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
-        (tab: any) => tab.tabId === (route.query.tab ?? "default")
+        (tab: any) => tab.tabId === route.query.tab
       );
 
       selectedTabId.value = selectedTab
-        ? selectedTab.tabId ?? "default"
-        : "default";
+        ? selectedTab.tabId
+        : currentDashboardData?.data?.tabs?.[0]?.tabId;
 
       // if variables data is null, set it to empty list
       if (
@@ -438,7 +438,7 @@ export default defineComponent({
         query: {
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? "default",
+          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
     };
@@ -538,7 +538,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? "default"
+          route.query.tab ?? currentDashboardData.data.tabs[0].tabId
         );
         await loadDashboard();
         $q.notify({
@@ -563,7 +563,7 @@ export default defineComponent({
           route.query.dashboard,
           panelId,
           route.query.folder ?? "default",
-          route.query.tab ?? "default",
+          route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           newTabId
         );
         await loadDashboard();

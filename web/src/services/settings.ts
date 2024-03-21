@@ -13,21 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cache;
-pub mod db;
-pub mod dist_lock;
-pub mod errors;
-pub mod file_list;
-pub mod queue;
-pub mod storage;
+import http from "./http";
 
-pub async fn init() -> Result<(), anyhow::Error> {
-    db::init().await?;
-    db::create_table().await?;
-    cache::init().await?;
-    file_list::create_table().await?;
-    queue::init().await?;
-    // because of asynchronous, we need to wait for a while
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    Ok(())
-}
+const settings = {
+  createLogo: (org_identifier: string, formData: any) => {
+    const url: string = `/api/${org_identifier}/settings/logo`;
+    const headers = {
+      "Content-Type": "multipart/form-data",
+    };
+    return http(headers).post(url, formData);
+  },
+  deleteLogo: (org_identifier: string) => {
+    return http().delete(`/api/${org_identifier}/settings/logo`);
+  },
+  updateCustomText: (org_identifier: string, key: string, value: string) => {
+    return http().post(`/api/${org_identifier}/settings/logo/text`, value);
+  },
+};
+
+export default settings;
