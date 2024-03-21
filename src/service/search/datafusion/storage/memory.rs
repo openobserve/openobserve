@@ -17,7 +17,7 @@ use std::ops::Range;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::utils::time::BASE_TIME;
+use config::{utils::time::BASE_TIME, CONFIG};
 use futures::{stream::BoxStream, StreamExt};
 use infra::{cache::file_data, storage};
 use object_store::{
@@ -63,6 +63,7 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
+        let start = std::time::Instant::now();
         let location = &self.format_location(location);
         match self.get_cache(location, None).await {
             Some(data) => {
@@ -86,7 +87,16 @@ impl ObjectStore for FS {
                 })
             }
             None => match storage::LOCAL_CACHE.get(location).await {
-                Ok(data) => Ok(data),
+                Ok(data) => {
+                    if CONFIG.common.print_key_event {
+                        log::warn!(
+                            "datafusion get: {}, took: {}",
+                            location,
+                            start.elapsed().as_millis()
+                        );
+                    }
+                    Ok(data)
+                }
                 Err(_) => storage::DEFAULT.get(location).await,
             },
         }
@@ -142,6 +152,7 @@ impl ObjectStore for FS {
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+        let start = std::time::Instant::now();
         let location = &self.format_location(location);
         match self.get_cache(location, Some(range.clone())).await {
             Some(data) => {
@@ -157,13 +168,23 @@ impl ObjectStore for FS {
                 .get_range(location, range.clone())
                 .await
             {
-                Ok(data) => Ok(data),
+                Ok(data) => {
+                    if CONFIG.common.print_key_event {
+                        log::warn!(
+                            "datafusion get_range: {}, took: {}",
+                            location,
+                            start.elapsed().as_millis()
+                        );
+                    }
+                    Ok(data)
+                }
                 Err(_) => storage::DEFAULT.get_range(location, range).await,
             },
         }
     }
 
     async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
+        let start = std::time::Instant::now();
         if ranges.is_empty() {
             return Ok(vec![]);
         }
@@ -182,7 +203,16 @@ impl ObjectStore for FS {
                 })
                 .collect(),
             None => match storage::LOCAL_CACHE.get_ranges(location, ranges).await {
-                Ok(data) => Ok(data),
+                Ok(data) => {
+                    if CONFIG.common.print_key_event {
+                        log::warn!(
+                            "datafusion get_ranges: {}, took: {}",
+                            location,
+                            start.elapsed().as_millis()
+                        );
+                    }
+                    Ok(data)
+                }
                 Err(_) => storage::DEFAULT.get_ranges(location, ranges).await,
             },
         }

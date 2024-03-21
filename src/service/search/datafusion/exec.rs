@@ -1112,7 +1112,7 @@ pub async fn merge_parquet_files(
     } else if stream_type == StreamType::Metadata && CONFIG.limit.distinct_values_hourly {
         // TODO: need check the stream name == distinct_values
         format!(
-            "SELECT MIN({}) AS {}, SUM(count), field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
+            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
             CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp
