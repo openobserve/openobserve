@@ -374,6 +374,32 @@ CREATE TABLE IF NOT EXISTS meta
         return Err(e.into());
     }
 
+    let mut tx = pool.begin().await?;
+
+    // create meta_backup table with data from meta
+    if let Err(e) = sqlx::query(
+        r#"
+CREATE TABLE IF NOT EXISTS meta_backup AS
+SELECT * FROM meta;
+    "#,
+    )
+    .execute(&mut *tx)
+    .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[POSTGRES] rollback create table meta_backup with data error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+
+    if let Err(e) = tx.commit().await {
+        log::error!("[POSTGRES] commit create table meta_backup error: {}", e);
+        return Err(e.into());
+    }
+
     // create table index
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
