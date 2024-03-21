@@ -50,8 +50,7 @@ pub fn serialize_response(
         for batch in batches {
             let serialized_batch = serialize_record_batch(&batch).map_err(|e| e.to_string())?;
             // Encode the serialized RecordBatch as base64 to embed in JSON
-            let base64_encoded =
-                config::utils::base64::encode_url_safe_no_padding(&serialized_batch);
+            let base64_encoded = config::utils::base64::encode_url(&serialized_batch);
             serialized_batches.push(base64_encoded);
         }
         serialized_data.insert(key, serialized_batches);
@@ -78,7 +77,7 @@ pub fn de_serialize_response(data: Vec<u8>) -> Result<search::SearchFollowerResp
     for (key, value) in data_map {
         let mut batches = Vec::new();
         for encoded_batch in value.as_array().ok_or("Batches missing or invalid")? {
-            let ipc_data = config::utils::base64::decode_url_safe_no_padding(
+            let ipc_data = config::utils::base64::decode_url(
                 encoded_batch
                     .as_str()
                     .ok_or("Batch data missing or invalid")?,
