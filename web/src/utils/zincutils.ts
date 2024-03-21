@@ -141,18 +141,6 @@ export const getDecodedAccessToken = (token: string) => {
 };
 
 export const b64EncodeUnicode = (str: string) => {
-  // try {
-  //   return btoa(
-  //     encodeURIComponent(str).replace(
-  //       /%([0-9A-F]{2})/g,
-  //       function (match, p1: any) {
-  //         return String.fromCharCode(parseInt(`0x${p1}`));
-  //       }
-  //     )
-  //   );
-  // } catch (e) {
-  //   console.log("Error: getBase64Encode: error while encoding.");
-  // }
   try {
     return btoa(
       encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
@@ -161,7 +149,7 @@ export const b64EncodeUnicode = (str: string) => {
     )
       .replace(/\+/g, "-")
       .replace(/\//g, "_")
-      .replace(/=/g, "");
+      .replace(/=/g, ".");
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
     return null;
@@ -172,9 +160,12 @@ export const b64DecodeUnicode = (str: string) => {
   try {
     return decodeURIComponent(
       Array.prototype.map
-        .call(atob(str), function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
+        .call(
+          atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/./g, "=")),
+          function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          }
+        )
         .join("")
     );
   } catch (e) {
@@ -305,8 +296,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-      ? window.location.pathname.slice(0, pos + 5)
-      : "";
+        ? window.location.pathname.slice(0, pos + 5)
+        : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
