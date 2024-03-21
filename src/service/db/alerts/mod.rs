@@ -67,7 +67,7 @@ pub async fn set(
         Ok(_) => {
             let trigger = scheduler::Trigger {
                 org: org_id.to_string(),
-                key: schedule_key,
+                module_key: schedule_key,
                 next_run_at: chrono::Utc::now().timestamp_micros(),
                 is_realtime: alert.is_real_time,
                 is_silenced: false,

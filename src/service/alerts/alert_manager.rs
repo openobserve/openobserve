@@ -94,7 +94,7 @@ pub async fn handle_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow::
 }
 
 async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow::Error> {
-    let columns = trigger.key.split('/').collect::<Vec<&str>>();
+    let columns = trigger.module_key.split('/').collect::<Vec<&str>>();
     assert_eq!(columns.len(), 3);
     let org_id = &trigger.org;
     let stream_type: StreamType = columns[0].into();
@@ -172,7 +172,7 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
     let mut trigger_data_stream = TriggerData {
         org: trigger.org,
         module: TriggerDataType::Alert,
-        key: trigger.key,
+        key: trigger.module_key,
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -194,7 +194,7 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
                 scheduler::update_status(
                     &new_trigger.org,
                     new_trigger.module,
-                    &new_trigger.key,
+                    &new_trigger.module_key,
                     scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                 )
@@ -215,8 +215,8 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
 
 async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow::Error> {
     let org_id = &trigger.org;
-    // For report, trigger.key is the report name
-    let report_name = &trigger.key;
+    // For report, trigger.module_key is the report name
+    let report_name = &trigger.module_key;
 
     let mut report = db::dashboards::reports::get(org_id, report_name).await?;
     let mut new_trigger = scheduler::Trigger {
@@ -286,7 +286,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
     let mut trigger_data_stream = TriggerData {
         org: trigger.org.clone(),
         module: TriggerDataType::Report,
-        key: trigger.key.clone(),
+        key: trigger.module_key.clone(),
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -311,7 +311,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
             scheduler::update_status(
                 &new_trigger.org,
                 new_trigger.module,
-                &new_trigger.key,
+                &new_trigger.module_key,
                 scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
             )

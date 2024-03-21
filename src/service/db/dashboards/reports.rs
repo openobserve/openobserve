@@ -50,7 +50,7 @@ pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyh
             let trigger = scheduler::Trigger {
                 org: org_id.to_string(),
                 module: scheduler::TriggerModule::Report,
-                key: schedule_key,
+                module_key: schedule_key,
                 next_run_at: report.start,
                 ..Default::default()
             };

@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 (
     id           BIGINT not null primary key AUTO_INCREMENT,
     org          VARCHAR(100) not null,
-    module       VARCHAR(100) not null
-    key          VARCHAR(256) not null,
+    module       VARCHAR(100) not null,
+    module_key   VARCHAR(256) not null,
     is_realtime  BOOLEAN default false not null,
     is_silenced  BOOLEAN default false not null,
     status       INT not null,
@@ -100,14 +100,14 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, key, is_realtime, is_silenced, status, next_run_at)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, next_run_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT DO NOTHING;
         "#,
         )
         .bind(&trigger.org)
         .bind(&trigger.module)
-        .bind(&trigger.key)
+        .bind(&trigger.module_key)
         .bind(&trigger.is_realtime)
         .bind(&trigger.is_silenced)
         .bind(&trigger.status)
@@ -131,12 +131,14 @@ INSERT INTO scheduled_jobs (org, module, key, is_realtime, is_silenced, status, 
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        sqlx::query(r#"DELETE FROM scheduled_jobs WHERE org = ? AND module = ? AND key = ?;"#)
-            .bind(org)
-            .bind(module)
-            .bind(key)
-            .execute(&pool)
-            .await?;
+        sqlx::query(
+            r#"DELETE FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#,
+        )
+        .bind(org)
+        .bind(module)
+        .bind(key)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 
@@ -151,7 +153,7 @@ INSERT INTO scheduled_jobs (org, module, key, is_realtime, is_silenced, status, 
     ) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(
-            r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module = ? AND key = ?;"#
+            r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module = ? AND module_key = ?;"#
         )
         .bind(status)
         .bind(retries)
@@ -167,7 +169,7 @@ INSERT INTO scheduled_jobs (org, module, key, is_realtime, is_silenced, status, 
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?
-WHERE org = ? AND module = ? AND key = ?;"#,
+WHERE org = ? AND module = ? AND module_key = ?;"#,
         )
         .bind(trigger.status)
         .bind(trigger.retries)
@@ -176,7 +178,7 @@ WHERE org = ? AND module = ? AND key = ?;"#,
         .bind(trigger.is_silenced)
         .bind(trigger.org)
         .bind(trigger.module)
-        .bind(trigger.key)
+        .bind(trigger.module_key)
         .execute(&pool)
         .await?;
         Ok(())

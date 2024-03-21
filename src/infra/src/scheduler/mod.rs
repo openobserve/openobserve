@@ -78,7 +78,7 @@ pub enum TriggerModule {
 pub struct Trigger {
     pub org: String,
     pub module: TriggerModule,
-    pub key: String,
+    pub module_key: String,
     pub next_run_at: i64,
     pub is_realtime: bool,
     pub is_silenced: bool,
