@@ -1237,6 +1237,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     role: _getRoles,
     dfolder: getFolders,
     dashboard: getDashboards,
+    metadata: getMetadataStreams,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1443,6 +1444,16 @@ const getTraces = async (resource: Resource | Entity) => {
   const traces: any = await getStreams("traces", false);
 
   updateEntityEntities(resource, ["name"], traces.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getMetadataStreams = async (resource: Resource | Entity) => {
+  const metadata: any = await getStreams("metadata", false);
+
+  updateEntityEntities(resource, ["name"], metadata.list);
 
   return new Promise((resolve, reject) => {
     resolve(true);
