@@ -280,6 +280,8 @@ impl Response {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionRequest {
     pub sql: String,
+    #[serde(default)]
+    pub sql_mode: String,
     pub start_time: i64,
     pub end_time: i64,
 }
