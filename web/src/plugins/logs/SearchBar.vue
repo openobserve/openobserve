@@ -657,7 +657,12 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import stream from "@/services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { mergeDeep, b64DecodeUnicode, getImageURL, useLocalInterestingFields } from "@/utils/zincutils";
+import {
+  mergeDeep,
+  b64DecodeUnicode,
+  getImageURL,
+  useLocalInterestingFields,
+} from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
@@ -919,7 +924,7 @@ export default defineComponent({
         //   }
         if (parsedSQL?.columns.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
-          console.log(columnNames)
+          console.log(columnNames);
           searchObj.data.stream.interestingFieldList = [];
           for (const col of columnNames) {
             if (
@@ -930,7 +935,8 @@ export default defineComponent({
               for (const stream of searchObj.data.stream.selectedStreamFields) {
                 if (stream.name == col) {
                   searchObj.data.stream.interestingFieldList.push(col);
-                  const localInterestingFields: any = useLocalInterestingFields();
+                  const localInterestingFields: any =
+                    useLocalInterestingFields();
                   let localFields: any = {};
                   if (localInterestingFields.value != null) {
                     localFields = localInterestingFields.value;
@@ -2050,23 +2056,51 @@ export default defineComponent({
           }
           this.searchObj.data.query = currentQuery.join("| ");
         } else {
-          if (currentQuery != "") {
-            if (
-              this.searchObj.meta.sqlMode == true &&
-              currentQuery.toString().toLowerCase().indexOf("where") == -1
+          // if (currentQuery != "") {
+          //   if (
+          //     this.searchObj.meta.sqlMode == true &&
+          //     currentQuery.toString().toLowerCase().indexOf("where") == -1
+          //   ) {
+          //     currentQuery += " where " + filter;
+          //   } else {
+          //     currentQuery += " and " + filter;
+          //   }
+          // } else {
+          //   if (this.searchObj.meta.sqlMode == true) {
+          //     currentQuery = "where " + filter;
+          //   } else {
+          //     currentQuery = filter;
+          //   }
+          // }
+
+          if (this.searchObj.meta.sqlMode == true) {
+            // if query contains order by clause or limit clause then add where clause before that
+            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
+            // if query does not contain where clause then add where clause before filter
+            if (currentQuery[0].toLowerCase().indexOf("where") != -1) {
+              currentQuery[0] = currentQuery[0].replace(/where/gi, (match) => {
+                return match + " " + filter + " and ";
+              });
+            } else if (
+              currentQuery[0].toLowerCase().indexOf("order by") != -1 ||
+              currentQuery[0].toLowerCase().indexOf("limit") != -1
             ) {
-              currentQuery += " where " + filter;
+              currentQuery[0] = currentQuery[0].replace(
+                /order by|limit/gi,
+                (match) => {
+                  return " where " + filter + " " + match;
+                }
+              );
             } else {
-              currentQuery += " and " + filter;
+              currentQuery[0] += " where " + filter;
             }
           } else {
-            if (this.searchObj.meta.sqlMode == true) {
-              currentQuery = "where " + filter;
-            } else {
-              currentQuery = filter;
-            }
+            currentQuery[0].length == 0
+              ? (currentQuery[0] = filter)
+              : (currentQuery[0] += " and " + filter);
           }
-          this.searchObj.data.query = currentQuery;
+
+          this.searchObj.data.query = currentQuery[0];
         }
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
