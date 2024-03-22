@@ -439,8 +439,6 @@ export default defineComponent({
 
     const filterCycleError: any = ref("");
 
-    console.log("variableData", variableData.query_data);
-
     const addFilter = () => {
       if (!variableData.query_data.filter) {
         variableData.query_data.filter = [];

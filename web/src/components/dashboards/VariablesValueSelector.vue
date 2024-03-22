@@ -364,15 +364,20 @@ export default defineComponent({
             // replace variables placeholders
             // NOTE: must use for of loop because we have return statement in the loop
             for (let variable of variablesData?.values) {
-              if (variable.value !== null) {
+              // if variable is loaded
+              if (variable.isLoading === false) {
+                // replace it's value in the query if it is dependent on query context
                 queryContext = queryContext.replace(
                   `$${variable.name}`,
                   variable.value
                 );
-              } else if (queryContext.includes(`$${variable.name}`)) {
+              }
+              // above condition not matched, means variable is not loaded
+              // so, check if it is dependent on query context
+              else if (queryContext.includes(`$${variable.name}`)) {
                 // there is other variables which is not loaded
                 // and current query is dependent on this variable
-                obj.isLoading = false;
+                obj.isLoading = true;
                 return;
               }
             }
