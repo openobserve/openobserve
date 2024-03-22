@@ -96,6 +96,7 @@ pub async fn search_partition(
         start_time: req.start_time,
         end_time: req.end_time,
         sql: req.sql.to_string(),
+        sql_mode: req.sql_mode.to_string(),
         ..Default::default()
     };
     let search_req = cluster_rpc::SearchRequest {

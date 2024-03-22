@@ -99,8 +99,11 @@ describe("Logs testcases", () => {
   // This test checks that clicking on the histogram toggle button in SQL mode does not toggle the chart
   it("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
     logstests.clickHistogramToggle();
+    cy.wait(3000);
     logstests.clickSearchBarSqlMode();
+    cy.wait(3000);
     logstests.confirmLogsSearchHidden();
+    cy.wait(3000);
     logstests.histogramToggleDisabled();
   });
   it.skip("should toggle chart when clicking on the histogram toggle", () => {

@@ -532,11 +532,6 @@ export default defineComponent({
       displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
       if (isNaN(date.endTime) || isNaN(date.startTime)) {
-        $q.notify({
-          message: `Invalid date. Please select a valid date.`,
-          color: "negative",
-          timeout: 2000,
-        });
         return false;
       }
       datePayload.value = date;
