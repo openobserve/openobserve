@@ -2095,6 +2095,7 @@ export default defineComponent({
               currentQuery[0] += " where " + filter;
             }
           } else {
+            
             currentQuery[0].length == 0
               ? (currentQuery[0] = filter)
               : (currentQuery[0] += " and " + filter);
