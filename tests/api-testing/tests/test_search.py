@@ -120,7 +120,7 @@ def test_e2e_validhistogram(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -153,7 +153,7 @@ def test_e2e_histogramwithlimit(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -186,7 +186,7 @@ def test_e2e_matchallhistogram(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -219,7 +219,7 @@ def test_e2e_matchallindexhistogram(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -252,7 +252,7 @@ def test_e2e_matchallignorecasehistogram(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -279,7 +279,7 @@ def test_e2e_matchallindexedignorecasehistogram(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -319,7 +319,7 @@ def test_e2e_matchallindexedignorecasewithoutsearchfeild(create_session, base_ur
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -352,7 +352,7 @@ def test_e2e_matchallindexedignorecaseinvalidsearchfeild(create_session, base_ur
             "end_time": end_time,
             "from": 0,
             "size": 0,
-            "fast_mode": True,
+            "quick_mode": True,
             "track_total_hits": True
         },
         "aggs": {
@@ -526,7 +526,7 @@ def test_e2e_sqlaggregationquery(create_session, base_url):
                 "end_time": end_time,
                 "from": 0,
                 "size": 250,
-                "fast_mode": True,
+                "quick_mode": True,
                 "sql_mode": "full"
             },
 }
@@ -565,7 +565,7 @@ def test_e2e_sqlgroupbytimestamp(create_session, base_url):
                 "end_time": end_time,
                 "from": 0,
                 "size": 250,
-                "fast_mode": True,
+                "quick_mode": True,
                 "sql_mode": "full"
             },
 }
@@ -592,7 +592,7 @@ def test_e2e_sqlgroupbytimestampwithk8s(create_session, base_url):
                 "end_time": end_time,
                 "from": 0,
                 "size": 250,
-                "fast_mode": True,
+                "quick_mode": True,
                 "sql_mode": "full"
             },
 }
