@@ -82,7 +82,7 @@ describe("Logs testcases", () => {
   it("should display results for limit query", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type("match_all_indexed_ignore_case('provide_credentials') order by _timestamp limit 5");
+      .type("match_all('provide_credentials') order by _timestamp limit 5");
     cy.wait(2000);
     cy.get('[aria-label="SQL Mode"]').click({ force: true });
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content');
@@ -97,7 +97,7 @@ describe("Logs testcases", () => {
     cy.get(".float-right.col > .q-btn--no-uppercase").click();
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type(" WHERE match_all_indexed_ignore_case('provide_credentials')");
+      .type(" WHERE match_all('provide_credentials') order by _timestamp");
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
     }).click({ force: true });
