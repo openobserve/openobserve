@@ -1249,7 +1249,7 @@ const useLogs = () => {
         .catch((err) => {
           searchObj.loading = false;
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg = err.response.data?.error;
           } else {
             searchObj.data.errorMsg = err.message;
           }
@@ -1315,7 +1315,7 @@ const useLogs = () => {
           .catch((err) => {
             searchObj.loadingHistogram = false;
             if (err.response != undefined) {
-              searchObj.data.histogram.errorMsg = err.response.data.error;
+              searchObj.data.histogram.errorMsg = err.response.data?.error;
             } else {
               searchObj.data.histogram.errorMsg = err.message;
             }
@@ -1723,7 +1723,7 @@ const useLogs = () => {
         })
         .catch((err) => {
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg = err.response.data?.error;
           } else {
             searchObj.data.errorMsg = err.message;
           }

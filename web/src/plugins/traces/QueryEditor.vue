@@ -304,7 +304,9 @@ export default defineComponent({
           let filteredSuggestions = [];
           filteredSuggestions = createDependencyProposals(range);
           filteredSuggestions = filteredSuggestions.filter((item) => {
-            return item.label.toLowerCase().includes(word.word.toLowerCase());
+            return item.label
+              ?.toLowerCase()
+              ?.includes(word?.word?.toLowerCase() || "");
           });
 
           // if (filteredSuggestions.length == 0) {
