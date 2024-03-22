@@ -798,7 +798,7 @@
     "generalPageTitle": "General Settings",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
     "enterpriseTitle": "Enterprise Settings",
-    "logoLabel": "Select Logo Image",
+    "logoLabel": "Drag & Drop Logo Image",
     "customLogoTitle": "Custom Logo",
     "deleteLogoTitle": "Delete Logo",
     "deleteLogoMessage": "Are you sure you want to delete this logo image?",
