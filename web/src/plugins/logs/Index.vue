@@ -847,13 +847,16 @@ export default defineComponent({
     },
     quickMode(newVal) {
       if (newVal == true) {
+        let field_list: string = "*";
+        if (this.searchObj.data.stream.interestingFieldList.length > 0) {
+          field_list =
+            this.searchObj.data.stream.interestingFieldList.join(",");
+        }
         if (this.searchObj.meta.sqlMode == true) {
           this.searchObj.data.query = this.searchObj.data.query.replace(
             /SELECT\s+(.*?)\s+FROM/i,
             (match, fields) => {
-              return `SELECT ${this.searchObj.data.stream.interestingFieldList.join(
-                ","
-              )} FROM`;
+              return `SELECT ${field_list} FROM`;
             }
           );
           this.setQuery(newVal);
