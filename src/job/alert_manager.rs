@@ -42,7 +42,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let cluster_name = format!(
             "{}_{}",
             CONFIG.common.cluster_name,
-            INSTANCE_ID.get("instance_id").unwrap().to_string(),
+            *INSTANCE_ID.get("instance_id").unwrap(),
         );
         // regester to super cluster
         o2_enterprise::enterprise::super_cluster::kv::alert_manager::register_job_cluster(

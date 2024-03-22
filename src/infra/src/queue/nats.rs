@@ -90,7 +90,7 @@ impl super::Queue for NatsQueue {
             let consumer_name = format!(
                 "{}_{}",
                 CONFIG.common.cluster_name,
-                INSTANCE_ID.get("instance_id").unwrap().to_string(),
+                *INSTANCE_ID.get("instance_id").unwrap(),
             );
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),

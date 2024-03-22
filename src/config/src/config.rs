@@ -701,7 +701,7 @@ pub struct Nats {
     #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
     pub password: String,
     #[env_config(name = "ZO_NATS_REPLICAS", default = 3)]
-    pub replicas: usize, 
+    pub replicas: usize,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
