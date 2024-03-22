@@ -16,7 +16,7 @@ service Search {
 message SearchQuery {
     string              sql = 1;
     string         sql_mode = 2;
-    bool          fast_mode = 3;
+    bool         quick_mode = 3;
     int32              from = 4;
     int32              size = 5;
     int64        start_time = 6;
