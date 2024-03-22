@@ -246,7 +246,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 = '{}'", sql, key2);
+            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         sql = format!("{} ORDER BY start_dt DESC ", sql);
         let pool = CLIENT.clone();
@@ -294,7 +294,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 = '{}'", sql, key2);
+            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
 
         sql = format!("{} ORDER BY start_dt DESC ", sql);
@@ -323,7 +323,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key1 = '{}'", sql, key1);
         }
         if !key2.is_empty() {
-            sql = format!("{} AND key2 = '{}'", sql, key2);
+            sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         let pool = CLIENT.clone();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
