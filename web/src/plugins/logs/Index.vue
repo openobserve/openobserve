@@ -541,7 +541,10 @@ export default defineComponent({
             `" ` +
             whereClause;
 
-          if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
+          if (
+            searchObj.data.stream.interestingFieldList.length > 0 &&
+            searchObj.meta.quickMode
+          ) {
             searchObj.data.query = searchObj.data.query.replace(
               "[FIELD_LIST]",
               searchObj.data.stream.interestingFieldList.join(",")
@@ -597,23 +600,21 @@ export default defineComponent({
     };
 
     function removeFieldByName(data, fieldName, orderby) {
-    const isFieldInOrderby = orderby.some(order => order.expr.column === fieldName);
-    if (isFieldInOrderby) {
-        return false;
-    }
-
-    return data.filter(item => {
+      return data.filter((item) => {
         if (item.expr) {
-            if (item.expr.column === fieldName) {
-                return false;
-            }
-            if (item.expr.type === "aggr_func" && item.expr.args.expr.column === fieldName) {
-                return false;
-            }
+          if (item.expr.column === fieldName) {
+            return false;
+          }
+          if (
+            item.expr.type === "aggr_func" &&
+            item.expr.args.expr.column === fieldName
+          ) {
+            return false;
+          }
         }
         return true;
-    });
-}
+      });
+    }
 
     const setInterestingFieldInSQLQuery = (
       field: any,
@@ -625,18 +626,20 @@ export default defineComponent({
       if (parsedSQL) {
         if (isFieldExistInSQL) {
           //remove the field from the query
-          let filteredData = removeFieldByName(parsedSQL.columns, field.name, parsedSQL.orderby);
-          if(filteredData == false) {
-            searchObj.data.stream.interestingFieldList.push(field.name);
-            field.isInterestingField = true;
-            $q.notify({
-              message: "Field is present in order by clause",
-              color: "negative",
-              timeout: 2000,
-            });
+          if (parsedSQL.columns.length > 0) {
+            let filteredData = removeFieldByName(
+              parsedSQL.columns,
+              field.name,
+              parsedSQL.orderby
+            );
 
-            return false;
-          } else {
+            const index = searchObj.data.stream.interestingFieldList.indexOf(
+              field.name
+            );
+            if (index > -1) {
+              searchObj.data.stream.interestingFieldList.splice(index, 1);
+              field.isInterestingField = false;
+            }
             parsedSQL.columns = filteredData;
           }
         } else {
@@ -726,6 +729,9 @@ export default defineComponent({
     },
     fullSQLMode() {
       return this.searchObj.meta.sqlMode;
+    },
+    quickMode() {
+      return this.searchObj.meta.quickMode;
     },
     refreshHistogram() {
       return this.searchObj.meta.histogramDirtyFlag;
@@ -834,6 +840,18 @@ export default defineComponent({
         }
       }
       // this.searchResultRef.reDrawChart();
+    },
+    quickMode(newVal) {
+      if (newVal == true) {
+        if (this.searchObj.meta.sqlMode == true) {
+          this.searchObj.data.query = this.searchObj.data.query.replace(
+            "*",
+            this.searchObj.data.stream.interestingFieldList.join(",")
+          );
+          this.setQuery(newVal);
+          this.updateUrlQueryParams();
+        }
+      }
     },
     refreshHistogram() {
       if (

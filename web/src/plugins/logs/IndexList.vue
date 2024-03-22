@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                      v-if="searchObj.meta.fastMode"
+                      v-if="searchObj.meta.quickMode"
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-icon
                     :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                    v-if="searchObj.meta.fastMode"
+                    v-if="searchObj.meta.quickMode"
                     :name="
                       props.row.isInterestingField ? 'info' : 'info_outline'
                     "
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="float-right">
                         <q-icon
                           :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                          v-if="searchObj.meta.fastMode"
+                          v-if="searchObj.meta.quickMode"
                           :name="
                             props.row.isInterestingField
                               ? 'info'
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <q-icon
                         :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                        v-if="searchObj.meta.fastMode"
+                        v-if="searchObj.meta.quickMode"
                         :name="
                           props.row.isInterestingField ? 'info' : 'info_outline'
                         "
@@ -684,15 +684,19 @@ export default defineComponent({
       field: any,
       isInterestingField: boolean
     ) => {
-      if (field.name == "_timestamp" && isInterestingField) {
-        $q.notify({
-          type: "negative",
-          message:
-            "Timestamp field cannot be removed from the interesting fields",
-        });
+      // if (
+      //   field.name == "_timestamp" &&
+      //   isInterestingField &&
+      //   searchObj.data.stream.interestingFieldList.length > 1
+      // ) {
+      //   $q.notify({
+      //     type: "negative",
+      //     message:
+      //       "Timestamp field cannot be removed from the interesting fields",
+      //   });
 
-        return false;
-      }
+      //   return false;
+      // }
 
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(

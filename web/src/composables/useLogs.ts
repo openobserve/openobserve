@@ -472,7 +472,10 @@ const useLogs = () => {
         },
       };
 
-      if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
         req.query.sql = req.query.sql.replace(
           "[FIELD_LIST]",
           searchObj.data.stream.interestingFieldList.join(",")
@@ -1124,12 +1127,22 @@ const useLogs = () => {
   }
 
   const fnParsedSQL = () => {
-    const filteredQuery = searchObj.data.query
-      .split("\n")
-      .filter((line: string) => !line.trim().startsWith("--"))
-      .join("\n");
-    return parser.astify(filteredQuery);
-  }
+    try {
+      const filteredQuery = searchObj.data.query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      return parser.astify(filteredQuery);
+    } catch (e: any) {
+      return {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+    }
+  };
 
   const getPaginatedData = async (
     queryReq: any,
@@ -1521,6 +1534,11 @@ const useLogs = () => {
             searchObj.organizationIdetifier +
               "_" +
               searchObj.data.stream.selectedStream.value
+          ] !== undefined &&
+          localInterestingFields.value[
+            searchObj.organizationIdetifier +
+              "_" +
+              searchObj.data.stream.selectedStream.value
           ].length > 0
             ? localInterestingFields.value[
                 searchObj.organizationIdetifier +
@@ -1528,8 +1546,12 @@ const useLogs = () => {
                   searchObj.data.stream.selectedStream.value
               ]
             : [...schemaInterestingFields];
-        const environmentInterestingFields =
-          store.state?.zoConfig?.quick_mode_fields.split(",");
+
+        let environmentInterestingFields = [];
+        if (store.state.zoConfig.hasOwnProperty("quick_mode_fields")) {
+          environmentInterestingFields =
+            store.state?.zoConfig?.quick_mode_fields.split(",");
+        }
         let index = -1;
         // queryResult.forEach((row: any) => {
         for (const row of queryResult) {
@@ -1759,7 +1781,10 @@ const useLogs = () => {
           searchObj.data.stream.selectedStream.value +
           `" `;
 
-        if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
+        if (
+          searchObj.data.stream.interestingFieldList.length > 0 &&
+          searchObj.meta.quickMode
+        ) {
           query_context = query_context.replace(
             "[FIELD_LIST]",
             searchObj.data.stream.interestingFieldList.join(",")
@@ -1769,6 +1794,7 @@ const useLogs = () => {
         }
         query_context = b64EncodeUnicode(query_context);
       }
+      alert(query_context)
 
       let query_fn: any = "";
       if (
@@ -2078,10 +2104,12 @@ const useLogs = () => {
       ? `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
 
-
     await extractFields();
 
-    if (searchObj.data.stream.interestingFieldList.length > 0 && searchObj.meta.fastMode) {
+    if (
+      searchObj.data.stream.interestingFieldList.length > 0 &&
+      searchObj.meta.quickMode
+    ) {
       query = query.replace(
         "[FIELD_LIST]",
         searchObj.data.stream.interestingFieldList.join(",")
