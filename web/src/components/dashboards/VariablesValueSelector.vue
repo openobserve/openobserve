@@ -207,14 +207,19 @@ export default defineComponent({
       async () => {
         // Find which variables have changed
         // variables should not be of type dynamic_filters
+        // NOTE: changedVariables should not be of type dynamic_filters and either value or isLoading should change
+        // value will change if data will be there
+        // if options is empty array at that time value will be null which is same in oldVariablesData as well. so for that check loading value is changed
         let changedVariables = variablesData.values.filter(
           (newVar: any, index: any) => {
             let oldVar = oldVariablesData.values[index];
             return (
-              newVar.type != "dynamic_filters" && newVar.value !== oldVar.value
+              newVar.type != "dynamic_filters" &&
+              (newVar.isLoading !== oldVar.isLoading ||
+                newVar.value !== oldVar.value)
             );
           }
-        );        
+        );
 
         // loop on all variables
         for (let variable of Object.keys(variablesDependencyGraph)) {
@@ -222,11 +227,19 @@ export default defineComponent({
           // load variable's data
           changedVariables.forEach(async (v: any) => {
             if (variablesDependencyGraph[variable].includes(v.name)) {
-              getSingleVariableData(
-                variablesConfigList.value.findIndex(
-                  (item: any) => item.name == variable
-                )
+              const variableDataIndex = variablesData.values.findIndex(
+                (item: any) => item.name == variable
               );
+
+              // if variable data found
+              if (variableDataIndex >= 0) {
+                // variable loading is true
+                // remove current value because it will call dependent variables with old value
+                // and load new value
+                variablesData.values[variableDataIndex].isLoading = true;
+                variablesData.values[variableDataIndex].value = null;
+                getSingleVariableData(variableDataIndex);
+              }
             }
           });
         }
@@ -310,8 +323,7 @@ export default defineComponent({
     let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
 
     // get single variable data based on index
-    const getSingleVariableData = async (index: any) => {      
-
+    const getSingleVariableData = async (index: any) => {
       // if index is not valid, return
       if (index < 0) return;
 
@@ -350,18 +362,20 @@ export default defineComponent({
             );
 
             // replace variables placeholders
-            variablesData?.values.forEach((variable: any) => {
-              if (variable.value) {
+            // NOTE: must use for of loop because we have return statement in the loop
+            for (let variable of variablesData?.values) {
+              if (variable.value !== null) {
                 queryContext = queryContext.replace(
                   `$${variable.name}`,
                   variable.value
                 );
-              } else {
+              } else if (queryContext.includes(`$${variable.name}`)) {
+                // there is other variables which is not loaded
+                // and current query is dependent on this variable
                 obj.isLoading = false;
-                // there is no value for dependent variable so return
                 return;
               }
-            });
+            }
 
             // base64 encode the query
             queryContext = b64EncodeUnicode(queryContext) || "";
@@ -553,7 +567,7 @@ export default defineComponent({
               )
             : props.initialVariableValues?.value[key],
         }));
-      }      
+      }
 
       variablesConfigList.value.forEach((it: any) => {
         const obj: any = {
@@ -561,7 +575,7 @@ export default defineComponent({
           label: it.label,
           type: it.type,
           value: it.type == "dynamic_filters" ? [] : null,
-          isLoading: false,
+          isLoading: true,
         };
         variablesData.values.push(obj);
         variablesData.isVariablesLoading = true;
