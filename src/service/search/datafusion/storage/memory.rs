@@ -97,12 +97,16 @@ impl ObjectStore for FS {
                     }
                     Ok(data)
                 }
-                Err(_) => storage::DEFAULT.get(location).await,
+                Err(e) => {
+                    log::error!("datafusion get from local cache: {}, err: {}", location, e);
+                    storage::DEFAULT.get(location).await
+                }
             },
         }
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+        let start = std::time::Instant::now();
         let location = &self.format_location(location);
         match self.get_cache(location, None).await {
             Some(data) => {
@@ -145,8 +149,24 @@ impl ObjectStore for FS {
                 )
                 .await
             {
-                Ok(ret) => Ok(ret),
-                Err(_) => storage::DEFAULT.get_opts(location, options).await,
+                Ok(data) => {
+                    if CONFIG.common.print_key_event {
+                        log::warn!(
+                            "datafusion get_opts: {}, took: {}",
+                            location,
+                            start.elapsed().as_millis()
+                        );
+                    }
+                    Ok(data)
+                }
+                Err(e) => {
+                    log::error!(
+                        "datafusion get_opts from local cache: {}, err: {}",
+                        location,
+                        e
+                    );
+                    storage::DEFAULT.get_opts(location, options).await
+                }
             },
         }
     }
