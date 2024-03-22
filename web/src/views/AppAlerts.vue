@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :to="{
                 name: 'alertList',
                 query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
+                  org_identifier: store.state.selectedOrganization?.identifier,
                 },
               }"
               :label="t('alerts.header')"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :to="{
                 name: 'alertDestinations',
                 query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
+                  org_identifier: store.state.selectedOrganization?.identifier,
                 },
               }"
               :label="t('alert_destinations.header')"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :to="{
                 name: 'alertTemplates',
                 query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
+                  org_identifier: store.state.selectedOrganization?.identifier,
                 },
               }"
               :label="t('alert_templates.header')"
@@ -118,7 +118,7 @@ export default defineComponent({
         router.push({
           name: "alertList",
           query: {
-            org_identifier: store.state.selectedOrganization.identifier,
+            org_identifier: store.state.selectedOrganization?.identifier,
           },
         });
       }
@@ -127,7 +127,7 @@ export default defineComponent({
       // if (store.state.selectedOrganization.status == "active") {
       templateService
         .list({
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: store.state.selectedOrganization?.identifier,
         })
         .then((res) => (templates.value = res.data));
       // }
@@ -136,7 +136,7 @@ export default defineComponent({
       // if (store.state.selectedOrganization.status == "active") {
       destinationService
         .list({
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: store.state.selectedOrganization?.identifier,
         })
         .then((res) => (destinations.value = res.data));
       // }
