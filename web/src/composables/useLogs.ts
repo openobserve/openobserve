@@ -732,6 +732,7 @@ const useLogs = () => {
         sql: queryReq.query.sql,
         start_time: queryReq.query.start_time,
         end_time: queryReq.query.end_time,
+        sql_mode: searchObj.meta.sqlMode ? "full" : "context",
       };
 
       await searchService
