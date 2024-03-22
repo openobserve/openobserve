@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             vertical
             transition-prev="fade"
             transition-next="fade"
+            data-test="dashboard-settings-panels"
           >
             <q-tab-panel name="generalSettings" data-test="dashboard-general-settings-panel">
               <GeneralSettings @save="refreshRequired" />
