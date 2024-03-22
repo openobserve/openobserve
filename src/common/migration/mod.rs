@@ -24,6 +24,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     if !CONFIG.common.local_mode || old_ver >= new_ver {
         return Ok(());
     }
+    if new_ver >= "v0.9.1" {
+        schema::run().await?;
+    }
+
     if old_ver >= "v0.5.3" {
         return Ok(());
     }
