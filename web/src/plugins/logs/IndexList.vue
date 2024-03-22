@@ -720,8 +720,24 @@ export default defineComponent({
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
         );
-        if (index == -1) {
-          searchObj.data.stream.interestingFieldList.push(field.name);
+        if (index == -1 && field.name != "*") {
+          // searchObj.data.stream.interestingFieldList.push(field.name);
+          for (const stream of searchObj.data.stream.selectedStreamFields) {
+            if (stream.name == field.name) {
+              searchObj.data.stream.interestingFieldList.push(field.name);
+              const localInterestingFields: any = useLocalInterestingFields();
+              let localFields: any = {};
+              if (localInterestingFields.value != null) {
+                localFields = localInterestingFields.value;
+              }
+              localFields[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream.value
+              ] = searchObj.data.stream.interestingFieldList;
+              useLocalInterestingFields(localFields);
+            }
+          }
         }
       }
 

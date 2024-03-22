@@ -657,7 +657,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import stream from "@/services/stream";
 import { getConsumableDateTime } from "@/utils/commons";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { mergeDeep, b64DecodeUnicode, getImageURL } from "@/utils/zincutils";
+import { mergeDeep, b64DecodeUnicode, getImageURL, useLocalInterestingFields } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { cloneDeep } from "lodash-es";
@@ -897,21 +897,50 @@ export default defineComponent({
           searchObj.data.stream.selectedStreamFields = [];
           onStreamChange();
         }
-        if (
-          parsedSQL.hasOwnProperty("columns") &&
-          parsedSQL?.columns.length > 0
-        ) {
+
+        // if (
+        //   parsedSQL.hasOwnProperty("columns") &&
+        //   parsedSQL?.columns.length > 0
+        // ) {
+        //   const columnNames = getColumnNames(parsedSQL?.columns);
+        //   searchObj.data.stream.interestingFieldList = [];
+        //   for (const [index, col] of columnNames.entries()) {
+        //     if (
+        //       !searchObj.data.stream.interestingFieldList.includes(col) &&
+        //       col != "*"
+        //     ) {
+        //       // searchObj.data.stream.interestingFieldList.push(col);
+        //       for (const stream of searchObj.data.streamResults.list) {
+        //         if (stream.value == col) {
+        //           searchObj.data.stream.interestingFieldList.push(col);
+        //         }
+        //       }
+        //     }
+        //   }
+        if (parsedSQL?.columns.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
+          console.log(columnNames)
           searchObj.data.stream.interestingFieldList = [];
-          for (const [index, col] of columnNames.entries()) {
+          for (const col of columnNames) {
             if (
               !searchObj.data.stream.interestingFieldList.includes(col) &&
               col != "*"
             ) {
               // searchObj.data.stream.interestingFieldList.push(col);
-              for (const stream of searchObj.data.streamResults.list) {
-                if (stream.value == col) {
+              for (const stream of searchObj.data.stream.selectedStreamFields) {
+                if (stream.name == col) {
                   searchObj.data.stream.interestingFieldList.push(col);
+                  const localInterestingFields: any = useLocalInterestingFields();
+                  let localFields: any = {};
+                  if (localInterestingFields.value != null) {
+                    localFields = localInterestingFields.value;
+                  }
+                  localFields[
+                    searchObj.organizationIdetifier +
+                      "_" +
+                      searchObj.data.stream.selectedStream.value
+                  ] = searchObj.data.stream.interestingFieldList;
+                  useLocalInterestingFields(localFields);
                 }
               }
             }
