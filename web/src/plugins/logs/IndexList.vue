@@ -723,7 +723,7 @@ export default defineComponent({
         if (index == -1 && field.name != "*") {
           // searchObj.data.stream.interestingFieldList.push(field.name);
           for (const stream of searchObj.data.stream.selectedStreamFields) {
-            if (stream.name == field.name) {
+            if ((stream as { name: string }).name == field.name) {
               searchObj.data.stream.interestingFieldList.push(field.name);
               const localInterestingFields: any = useLocalInterestingFields();
               let localFields: any = {};

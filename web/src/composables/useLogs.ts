@@ -1568,7 +1568,7 @@ const useLogs = () => {
               if (index == -1 && row.name != "*") {
                 // searchObj.data.stream.interestingFieldList.push(row.name);
                 for (const stream of searchObj.data.stream.selectedStreamFields) {
-                  if (stream.name == row.name) {
+                  if ((stream as { name: string }).name == row.name) {
                     searchObj.data.stream.interestingFieldList.push(row.name);
                     const localInterestingFields: any = useLocalInterestingFields();
                     let localFields: any = {};
