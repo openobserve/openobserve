@@ -19,6 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row">
       <div class="float-right col q-mb-xs">
         <q-toggle
+          v-if="searchObj.meta.sqlMode"
+          data-test="logs-search-bar-show-histogram-toggle-sqlmode-btn"
+          v-bind:disable="searchObj.meta.sqlMode"
+          :model-value="false"
+          :label="t('search.showHistogramLabel')"
+        />
+        <q-toggle
+          v-else
           data-test="logs-search-bar-show-histogram-toggle-btn"
           v-bind:disable="searchObj.meta.sqlMode"
           v-model="searchObj.meta.showHistogram"
@@ -782,6 +790,7 @@ export default defineComponent({
       buildSearch,
       resetStreamData,
       loadStreamLists,
+      fnParsedSQL,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -852,8 +861,49 @@ export default defineComponent({
       getSuggestions();
     };
 
+    function getColumnNames(data) {
+      const columnNames = [];
+      data.forEach((item) => {
+        if (item.expr && item.expr.column) {
+          columnNames.push(item.expr.column);
+        } else if (item.expr && item.expr.args && item.expr.args.expr) {
+          if (item.expr.args.expr.column) {
+            columnNames.push(item.expr.args.expr.column);
+          } else if (item.expr.args.expr.value) {
+            columnNames.push(item.expr.args.expr.value);
+          }
+        }
+      });
+      return columnNames;
+    }
+
     const updateQueryValue = (value: string) => {
       searchObj.data.editorValue = value;
+
+      if (searchObj.meta.quickMode == true) {
+        const parsedSQL = fnParsedSQL();
+
+        if (parsedSQL?.columns.length > 0) {
+          const columnNames = getColumnNames(parsedSQL?.columns);
+
+          searchObj.data.stream.interestingFieldList = [];
+          for (const col of columnNames) {
+            if (!searchObj.data.stream.interestingFieldList.includes(col)) {
+              searchObj.data.stream.interestingFieldList.push(col);
+            }
+          }
+
+          for (const item of searchObj.data.stream.selectedStreamFields) {
+            if (
+              searchObj.data.stream.interestingFieldList.includes(item.name)
+            ) {
+              item.isInterestingField = true;
+            } else {
+              item.isInterestingField = false;
+            }
+          }
+        }
+      }
 
       updateAutoComplete(value);
       try {
@@ -940,8 +990,9 @@ export default defineComponent({
       if (
         value.valueType === "relative" &&
         store.state.zoConfig.query_on_stream_selection == false
-      )
+      ) {
         emit("searchdata");
+      }
     };
 
     const updateTimezone = () => {
@@ -1810,7 +1861,21 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`;
+        if (
+          searchObj.data.stream.interestingFieldList.length > 0 &&
+          searchObj.meta.quickMode
+        ) {
+          searchObj.data.query = searchObj.data.query.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(",")
+          );
+        } else {
+          searchObj.data.query = searchObj.data.query.replace(
+            "[FIELD_LIST]",
+            "*"
+          );
+        }
       } else {
         searchObj.data.query = "";
       }

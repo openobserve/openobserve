@@ -84,14 +84,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !props.row.isSchemaField ||
                   !props.row.showValues
                 "
-                class="field-container flex content-center ellipsis q-pl-lg q-pr-sm"
+                class="field-container flex content-center ellipsis q-pl-lg full-width"
                 :title="props.row.name"
               >
                 <div
-                  class="field_label ellipsis"
+                  class="field_label ellipsis full-width"
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
                   {{ props.row.name }}
+                  <span class="float-right">
+                    <q-icon
+                      :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                      v-if="searchObj.meta.quickMode"
+                      :name="
+                        props.row.isInterestingField ? 'info' : 'info_outline'
+                      "
+                      class="light-dimmed"
+                      style="margin-right: 0.375rem"
+                      size="1.1rem"
+                      :title="
+                        props.row.isInterestingField
+                          ? 'Remove from interesting fields'
+                          : 'Add to interesting fields'
+                      "
+                    />
+                  </span>
                 </div>
                 <div class="field_overlay">
                   <q-btn
@@ -112,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     :name="outlinedVisibility"
+                    style="margin-right: 0.375rem"
                     size="1.1rem"
                     title="Add field to table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -124,9 +142,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                     :name="outlinedVisibilityOff"
+                    style="margin-right: 0.375rem"
                     size="1.1rem"
                     title="Remove field from table"
                     @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                  />
+                  <q-icon
+                    :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                    v-if="searchObj.meta.quickMode"
+                    :name="
+                      props.row.isInterestingField ? 'info' : 'info_outline'
+                    "
+                    size="1.1rem"
+                    :title="
+                      props.row.isInterestingField
+                        ? 'Remove from interesting fields'
+                        : 'Add to interesting fields'
+                    "
+                    @click.stop="
+                      addToInterestingFieldList(
+                        props.row,
+                        props.row.isInterestingField
+                      )
+                    "
                   />
                 </div>
               </div>
@@ -146,15 +184,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-slot:header>
                   <div
-                    class="flex content-center ellipsis"
+                    class="flex content-center ellipsis full-width"
                     :title="props.row.name"
                     :data-test="`log-search-expand-${props.row.name}-field-btn`"
                   >
                     <div
-                      class="field_label ellipsis"
+                      class="field_label ellipsis full-width"
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
                       {{ props.row.name }}
+                      <span class="float-right">
+                        <q-icon
+                          :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                          v-if="searchObj.meta.quickMode"
+                          :name="
+                            props.row.isInterestingField
+                              ? 'info'
+                              : 'info_outline'
+                          "
+                          class="light-dimmed"
+                          style="margin-right: 0.375rem"
+                          size="1.1rem"
+                          :title="
+                            props.row.isInterestingField
+                              ? 'Remove from interesting fields'
+                              : 'Add to interesting fields'
+                          "
+                        />
+                      </span>
                     </div>
                     <div class="field_overlay">
                       <q-btn
@@ -175,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :name="outlinedVisibility"
+                        style="margin-right: 0.375rem"
                         size="1.1rem"
                         title="Add field to table"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
@@ -187,9 +245,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                         :name="outlinedVisibilityOff"
+                        style="margin-right: 0.375rem"
                         title="Remove field from table"
                         size="1.1rem"
                         @click.stop="clickFieldFn(props.row, props.pageIndex)"
+                      />
+                      <q-icon
+                        :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
+                        v-if="searchObj.meta.quickMode"
+                        :name="
+                          props.row.isInterestingField ? 'info' : 'info_outline'
+                        "
+                        size="1.1rem"
+                        :title="
+                          props.row.isInterestingField
+                            ? 'Remove from interesting fields'
+                            : 'Add to interesting fields'
+                        "
+                        @click.stop="
+                          addToInterestingFieldList(
+                            props.row,
+                            props.row.isInterestingField
+                          )
+                        "
                       />
                     </div>
                   </div>
@@ -332,6 +410,7 @@ import {
   getImageURL,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
+  useLocalInterestingFields,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import { Parser } from "node-sql-parser/build/mysql";
@@ -353,7 +432,8 @@ interface Filter {
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: { EqualIcon, NotEqualIcon },
-  setup() {
+  emits: ["setInterestingFieldInSQLQuery"],
+  setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -600,6 +680,64 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
+    const addToInterestingFieldList = (
+      field: any,
+      isInterestingField: boolean
+    ) => {
+      // if (
+      //   field.name == "_timestamp" &&
+      //   isInterestingField &&
+      //   searchObj.data.stream.interestingFieldList.length > 1
+      // ) {
+      //   $q.notify({
+      //     type: "negative",
+      //     message:
+      //       "Timestamp field cannot be removed from the interesting fields",
+      //   });
+
+      //   return false;
+      // }
+
+      if (isInterestingField) {
+        const index = searchObj.data.stream.interestingFieldList.indexOf(
+          field.name
+        );
+        if (index > -1) {
+          // only splice array when item is found
+          searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
+        }
+      } else {
+        const index = searchObj.data.stream.interestingFieldList.indexOf(
+          field.name
+        );
+        if (index == -1) {
+          searchObj.data.stream.interestingFieldList.push(field.name);
+        }
+      }
+
+      searchObj.data.stream.selectedStreamFields.forEach((field: any) => {
+        if (searchObj.data.stream.interestingFieldList.includes(field.name)) {
+          field.isInterestingField = true;
+        } else {
+          field.isInterestingField = false;
+        }
+      });
+
+      const localInterestingFields: any = useLocalInterestingFields();
+      let localFields: any = {};
+      if (localInterestingFields.value != null) {
+        localFields = localInterestingFields.value;
+      }
+      localFields[
+        searchObj.organizationIdetifier +
+          "_" +
+          searchObj.data.stream.selectedStream.value
+      ] = searchObj.data.stream.interestingFieldList;
+      useLocalInterestingFields(localFields);
+
+      emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+    };
+
     return {
       t,
       store,
@@ -620,6 +758,7 @@ export default defineComponent({
       outlinedVisibility,
       handleQueryData,
       onStreamChange,
+      addToInterestingFieldList,
     };
   },
 });

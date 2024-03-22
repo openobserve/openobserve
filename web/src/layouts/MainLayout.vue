@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             size="sm"
             class="q-pt-xs q-pl-xs"
-            style="width: 30px"
+            style="max-width: 150px; max-height: 31px;"
           />
           <img
             class="appLogo"
