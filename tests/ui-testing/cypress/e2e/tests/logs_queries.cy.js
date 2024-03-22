@@ -82,7 +82,7 @@ describe("Logs testcases", () => {
   it("should display results for limit query", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type("match_all_indexed_ignore_case('provide_credentials') limit 5");
+      .type("match_all('provide_credentials') order by _timestamp limit 5");
     cy.wait(2000);
     cy.get('[aria-label="SQL Mode"]').click({ force: true });
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content');
@@ -97,7 +97,8 @@ describe("Logs testcases", () => {
     cy.get(".float-right.col > .q-btn--no-uppercase").click();
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type(" WHERE match_all_indexed_ignore_case('provide_credentials')");
+      .type(" WHERE match_all('provide_credentials') order by _timestamp");
+    cy.wait(2000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
     }).click({ force: true });
@@ -299,7 +300,7 @@ describe("Logs testcases", () => {
           end_time: 1710072243160000,
           from: 0,
           size: 250,
-          fast_mode: true,
+          quick_mode: true,
           sql_mode: "full",
           track_total_hits: true,
         },
@@ -323,7 +324,7 @@ describe("Logs testcases", () => {
             end_time: 1710072108369000,
             from: 0,
             size: 250,
-            fast_mode: true,
+            quick_mode: true,
             sql_mode: "full",
             track_total_hits: true,
           },
@@ -358,7 +359,7 @@ describe("Logs testcases", () => {
           end_time: 1710051528581000,
           from: 0,
           size: 250,
-          fast_mode: true,
+          quick_mode: true,
           sql_mode: "full",
           track_total_hits: true,
         },
@@ -382,7 +383,7 @@ describe("Logs testcases", () => {
             end_time: 1710051692870000,
             from: 0,
             size: 250,
-            fast_mode: true,
+            quick_mode: true,
             sql_mode: "full",
             track_total_hits: true,
           },
@@ -417,7 +418,7 @@ describe("Logs testcases", () => {
           end_time: 1710071054701000,
           from: 0,
           size: 0,
-          fast_mode: true,
+          quick_mode: true,
           track_total_hits: true,
         },
         aggs: {
@@ -444,7 +445,7 @@ describe("Logs testcases", () => {
             end_time: 1710071111382000,
             from: 0,
             size: 0,
-            fast_mode: true,
+            quick_mode: true,
             track_total_hits: true,
           },
           aggs: {
@@ -482,7 +483,7 @@ describe("Logs testcases", () => {
           end_time: 1710071054701000,
           from: 0,
           size: 0,
-          fast_mode: true,
+          quick_mode: true,
           track_total_hits: true,
         },
         aggs: {
@@ -509,7 +510,7 @@ describe("Logs testcases", () => {
             end_time: 1710071111382000,
             from: 0,
             size: 0,
-            fast_mode: true,
+            quick_mode: true,
             track_total_hits: true,
           },
           aggs: {

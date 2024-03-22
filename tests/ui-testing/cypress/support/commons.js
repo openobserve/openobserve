@@ -101,7 +101,7 @@ Cypress.Commands.add("login", () => {
 Cypress.Commands.add("addDashboard", () => {
   cy.wait(2000);
   cy.get('[data-test="dashboard-add"]').click({force:true});
-  cy.get('[data-test="dashboard-name"]').type(dashboardData.DashboardName);
+  cy.get('[data-test="add-dashboard-name"]').type(dashboardData.DashboardName);
   cy.get('[data-test="dashboard-add-submit"]').click();
   cy.url().should("include", dashboardData.ViewDashboardUrl);
 });
