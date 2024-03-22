@@ -1795,7 +1795,6 @@ const useLogs = () => {
         }
         query_context = b64EncodeUnicode(query_context);
       }
-      alert(query_context)
 
       let query_fn: any = "";
       if (
