@@ -1565,8 +1565,12 @@ const useLogs = () => {
               index = searchObj.data.stream.interestingFieldList.indexOf(
                 row.name
               );
-              if (index == -1) {
-                searchObj.data.stream.interestingFieldList.push(row.name);
+              if (index == -1 && row.name != "*") {
+                for (const stream of searchObj.data.streamResults.list) {
+                  if (stream.value == row.name) {
+                    searchObj.data.stream.interestingFieldList.push(row.name);
+                  }
+                }
               }
             }
 
@@ -1795,7 +1799,6 @@ const useLogs = () => {
         }
         query_context = b64EncodeUnicode(query_context);
       }
-      alert(query_context)
 
       let query_fn: any = "";
       if (

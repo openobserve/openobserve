@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @searchdata="searchData"
             @onChangeInterval="onChangeInterval"
             @onChangeTimezone="refreshTimezone"
+            @setQuery="setQuery"
           />
         </template>
         <template v-slot:after>
@@ -567,11 +568,6 @@ export default defineComponent({
         }
       } catch (e) {
         console.log("Logs : Error in setQuery");
-        $q.notify({
-          message: "Error while setting up query",
-          color: "negative",
-          timeout: 2000,
-        });
       }
     };
 
@@ -644,6 +640,14 @@ export default defineComponent({
           }
         } else {
           //add the field in the query
+          if (parsedSQL.columns.length > 0) {
+            // iterate and remove the * from the query
+            parsedSQL.columns = removeFieldByName(
+              parsedSQL.columns,
+              "*",
+              parsedSQL.orderby
+            );
+          }
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
@@ -845,8 +849,12 @@ export default defineComponent({
       if (newVal == true) {
         if (this.searchObj.meta.sqlMode == true) {
           this.searchObj.data.query = this.searchObj.data.query.replace(
-            "*",
-            this.searchObj.data.stream.interestingFieldList.join(",")
+            /SELECT\s+(.*?)\s+FROM/i,
+            (match, fields) => {
+              return `SELECT ${this.searchObj.data.stream.interestingFieldList.join(
+                ","
+              )} FROM`;
+            }
           );
           this.setQuery(newVal);
           this.updateUrlQueryParams();

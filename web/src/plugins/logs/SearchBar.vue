@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
+    {{ searchObj.data.stream.interestingFieldList }}
     <div class="row">
       <div class="float-right col q-mb-xs">
         <q-toggle
@@ -791,6 +792,7 @@ export default defineComponent({
       resetStreamData,
       loadStreamLists,
       fnParsedSQL,
+      onStreamChange,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -878,18 +880,51 @@ export default defineComponent({
     }
 
     const updateQueryValue = (value: string) => {
+      if (searchObj.meta.sqlMode == true) {
+        searchObj.data.query = value;
+      } else {
+        searchObj.data.query =
+          `select ${searchObj.data.stream.interestingFieldList.join(
+            ","
+          )} FROM ${searchObj.data.stream.selectedStream.value || ""}` + value;
+      }
       searchObj.data.editorValue = value;
 
       if (searchObj.meta.quickMode == true) {
         const parsedSQL = fnParsedSQL();
 
-        if (parsedSQL?.columns.length > 0) {
+        if (
+          parsedSQL.hasOwnProperty("from") &&
+          parsedSQL?.from.length > 0 &&
+          parsedSQL?.from[0].table !==
+            searchObj.data.stream.selectedStream.value
+        ) {
+          searchObj.data.stream.selectedStream = {
+            label: parsedSQL.from[0].table,
+            value: parsedSQL.from[0].table,
+          };
+          searchObj.data.stream.selectedStreamFields = [];
+          onStreamChange();
+        }
+
+        if (
+          parsedSQL.hasOwnProperty("columns") &&
+          parsedSQL?.columns.length > 0
+        ) {
           const columnNames = getColumnNames(parsedSQL?.columns);
 
           searchObj.data.stream.interestingFieldList = [];
-          for (const col of columnNames) {
-            if (!searchObj.data.stream.interestingFieldList.includes(col)) {
-              searchObj.data.stream.interestingFieldList.push(col);
+          for (const [index, col] of columnNames.entries()) {
+            if (
+              !searchObj.data.stream.interestingFieldList.includes(col) &&
+              col != "*"
+            ) {
+              // searchObj.data.stream.interestingFieldList.push(col);
+              for (const stream of searchObj.data.streamResults.list) {
+                if (stream.value == col) {
+                  searchObj.data.stream.interestingFieldList.push(col);
+                }
+              }
             }
           }
 
@@ -902,6 +937,8 @@ export default defineComponent({
               item.isInterestingField = false;
             }
           }
+
+          emit("setQuery", true);
         }
       }
 

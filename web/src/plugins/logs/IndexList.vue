@@ -88,10 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="props.row.name"
               >
                 <div
-                  class="field_label ellipsis full-width"
+                  class="field_label full-width"
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
-                  {{ props.row.name }}
+                  <div
+                    class="ellipsis"
+                    style="max-width: 90% !important; display: inline-block"
+                  >
+                    {{ props.row.name }}
+                  </div>
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
@@ -192,7 +197,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="field_label ellipsis full-width"
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
-                      {{ props.row.name }}
+                      <div
+                        class="ellipsis"
+                        style="max-width: 90% !important; display: inline-block"
+                      >
+                        {{ props.row.name }}
+                      </div>
                       <span class="float-right">
                         <q-icon
                           :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
@@ -533,7 +543,7 @@ export default defineComponent({
       if (searchObj.data.stream.streamType === "enrichment_tables") {
         const stream = searchObj.data.streamResults.list.find(
           (stream: any) =>
-            stream.name === searchObj.data.stream.selectedStream.value
+            stream.value === searchObj.data.stream.selectedStream.value
         );
         if (stream.stats) {
           timestamps = {
@@ -710,8 +720,14 @@ export default defineComponent({
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
         );
-        if (index == -1) {
-          searchObj.data.stream.interestingFieldList.push(field.name);
+        alert(field.name)
+        if (index == -1 && field.name != "*") {
+          // searchObj.data.stream.interestingFieldList.push(field.name);
+          for (const stream of searchObj.data.streamResults.list) {
+            if (stream.value == field.name) {
+              searchObj.data.stream.interestingFieldList.push(field.name);
+            }
+          }
         }
       }
 
@@ -735,7 +751,9 @@ export default defineComponent({
       ] = searchObj.data.stream.interestingFieldList;
       useLocalInterestingFields(localFields);
 
-      emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+      if (searchObj.meta.sqlMode) {
+        emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+      }
     };
 
     return {
