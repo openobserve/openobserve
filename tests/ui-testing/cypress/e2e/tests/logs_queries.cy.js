@@ -98,6 +98,7 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
       .type(" WHERE match_all('provide_credentials') order by _timestamp");
+    cy.wait(2000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
     }).click({ force: true });
