@@ -68,6 +68,7 @@ const useStreams = () => {
               "traces",
               "enrichment_tables",
               "index",
+              "metadata",
             ];
 
             const streamsToFetch = streamList.filter(
@@ -312,10 +313,6 @@ const useStreams = () => {
     } else {
       streams[streamName] = streamObject;
     }
-
-    // TODO OK: This is hotfix for metadata stream, need to remove this once we have proper solution
-    // This is due to summary call streams
-    if (streams["metadata"]) delete streams["metadata"];
 
     // Mapping stream index for each stream type
     if (streamName === "all") {

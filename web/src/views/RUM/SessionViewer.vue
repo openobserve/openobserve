@@ -280,7 +280,7 @@ const getSessionEvents = () => {
   };
 
   const req = buildQueryPayload(queryPayload);
-  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and type='error' or type='action' or type='view' order by date asc`;
+  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and (type='error' or type='action' or type='view') order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService
