@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
               "
               :alt="t('settings.logoLabel')"
-              style="width: 30px"
+              style="max-width: 150px; max-height: 31px;"
               class="q-mx-md"
             />
             <q-btn icon="delete"
@@ -395,7 +395,7 @@ export default defineComponent({
       onSubmit,
       files: ref(null),
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any; }) {
-        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),

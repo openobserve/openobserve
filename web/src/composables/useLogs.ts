@@ -30,6 +30,7 @@ import {
   histogramDateTimezone,
   useLocalWrapContent,
   useLocalTimezone,
+  useLocalInterestingFields,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -131,6 +132,7 @@ const defaultObject = {
       addToFilter: "",
       functions: <any>[],
       streamType: "logs",
+      interestingFieldList: <string[]>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -189,6 +191,7 @@ const useLogs = () => {
   const parser = new Parser();
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
+  const notificationMsg = ref("");
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
 
@@ -452,7 +455,7 @@ const useLogs = () => {
       let query = searchObj.data.editorValue;
       const req: any = {
         query: {
-          sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+          sql: 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from:
@@ -469,6 +472,18 @@ const useLogs = () => {
         },
       };
 
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
+        req.query.sql = req.query.sql.replace(
+          "[FIELD_LIST]",
+          searchObj.data.stream.interestingFieldList.join(",")
+        );
+      } else {
+        req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
+      }
+
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
@@ -481,7 +496,8 @@ const useLogs = () => {
         timestamps.endTime != "Invalid Date"
       ) {
         if (timestamps.startTime > timestamps.endTime) {
-          showErrorNotification("Start time cannot be greater than end time");
+          notificationMsg.value = "Start time cannot be greater than end time";
+          // showErrorNotification("Start time cannot be greater than end time");
           return false;
         }
         searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
@@ -528,11 +544,20 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        query = searchObj.data.query
-          .split("\n")
-          .filter((line: string) => !line.trim().startsWith("--"))
-          .join("\n");
-        const parsedSQL: any = parser.astify(query);
+        const parsedSQL: any = fnParsedSQL();
+
+        if (parsedSQL.orderby == null) {
+          // showErrorNotification("Order by clause is required in SQL mode");
+          notificationMsg.value = "Order by clause is required in SQL mode";
+          return false;
+        }
+
+        if (!hasTimeStampColumn(parsedSQL.columns)) {
+          // showErrorNotification("Timestamp column is required in SQL mode");
+          notificationMsg.value = "Timestamp column is required in SQL mode";
+          return false;
+        }
+
         if (parsedSQL.limit != null) {
           req.query.size = parsedSQL.limit.value[0].value;
 
@@ -675,7 +700,8 @@ const useLogs = () => {
 
       return req;
     } catch (e: any) {
-      showErrorNotification("Invalid SQL Syntax");
+      // showErrorNotification("Invalid SQL Syntax");
+      notificationMsg.value = "Invalid SQL Syntax";
     }
   }
 
@@ -695,11 +721,18 @@ const useLogs = () => {
       errorDetail: "",
     };
 
-    if (!searchObj.meta.sqlMode) {
+    const parsedSQL: any = fnParsedSQL();
+    if (
+      !searchObj.meta.sqlMode ||
+      (searchObj.meta.sqlMode &&
+        parsedSQL.groupby == null &&
+        !hasAggregation(parsedSQL.columns))
+    ) {
       const partitionQueryReq: any = {
         sql: queryReq.query.sql,
         start_time: queryReq.query.start_time,
         end_time: queryReq.query.end_time,
+        sql_mode: searchObj.meta.sqlMode ? "full" : "context",
       };
 
       await searchService
@@ -948,7 +981,9 @@ const useLogs = () => {
       }
 
       const queryReq = buildSearch();
-
+      if (queryReq == false) {
+        throw new Error(notificationMsg.value || "Something went wrong.");
+      }
       // reset query data and get partition detail for given query.
       if (!isPagination) {
         resetQueryData();
@@ -1066,7 +1101,8 @@ const useLogs = () => {
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification("Error while fetching data");
+      showErrorNotification(notificationMsg.value || "Something went wrong.");
+      notificationMsg.value = "";
     }
   };
 
@@ -1078,6 +1114,36 @@ const useLogs = () => {
     }
     return false; // No aggregation function or non-null groupby property found
   }
+
+  function hasTimeStampColumn(columns: any) {
+    for (const column of columns) {
+      if (
+        column.expr &&
+        (column.expr.column === "_timestamp" || column.expr.column === "*")
+      ) {
+        return true; // Found _timestamp column
+      }
+    }
+    return false; // No aggregation function or non-null groupby property found
+  }
+
+  const fnParsedSQL = () => {
+    try {
+      const filteredQuery = searchObj.data.query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      return parser.astify(filteredQuery);
+    } catch (e: any) {
+      return {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+    }
+  };
 
   const getPaginatedData = async (
     queryReq: any,
@@ -1098,11 +1164,7 @@ const useLogs = () => {
       }
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        const tempquery = searchObj.data.query
-          .split("\n")
-          .filter((line: string) => !line.trim().startsWith("--"))
-          .join("\n");
-        const parsedSQL: any = parser.astify(tempquery);
+        const parsedSQL: any = fnParsedSQL();
         if (parsedSQL.limit != null) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -1403,6 +1465,7 @@ const useLogs = () => {
         const tempFieldsName: string[] = [];
         const ignoreFields = [store.state.zoConfig.timestamp_column];
         const timestampField = store.state.zoConfig.timestamp_column;
+        let schemaInterestingFields: string[] = [];
 
         // searchObj.data.streamResults.list.forEach((stream: any) => {
         for (const stream of searchObj.data.streamResults.list) {
@@ -1421,6 +1484,9 @@ const useLogs = () => {
             }
 
             ftsKeys = new Set([...stream.settings.full_text_search_keys]);
+            if (stream.settings.hasOwnProperty("interesting_fields")) {
+              schemaInterestingFields = stream.settings.interesting_fields;
+            }
           }
         }
 
@@ -1429,7 +1495,10 @@ const useLogs = () => {
           tempFieldsName.push(field.name);
         }
 
-        if (searchObj.data.queryResults.hits.length > 0) {
+        if (
+          searchObj.data.queryResults.hasOwnProperty("hits") &&
+          searchObj.data.queryResults?.hits.length > 0
+        ) {
           // Find the index of the record with max attributes
           const maxAttributesIndex = searchObj.data.queryResults.hits.reduce(
             (
@@ -1459,17 +1528,57 @@ const useLogs = () => {
         }
 
         const fields: any = {};
+        const localInterestingFields: any = useLocalInterestingFields();
+        searchObj.data.stream.interestingFieldList =
+          localInterestingFields.value != null &&
+          localInterestingFields.value[
+            searchObj.organizationIdetifier +
+              "_" +
+              searchObj.data.stream.selectedStream.value
+          ] !== undefined &&
+          localInterestingFields.value[
+            searchObj.organizationIdetifier +
+              "_" +
+              searchObj.data.stream.selectedStream.value
+          ].length > 0
+            ? localInterestingFields.value[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream.value
+              ]
+            : [...schemaInterestingFields];
+
+        let environmentInterestingFields = [];
+        if (store.state.zoConfig.hasOwnProperty("quick_mode_fields")) {
+          environmentInterestingFields =
+            store.state?.zoConfig?.quick_mode_fields.split(",");
+        }
+        let index = -1;
         // queryResult.forEach((row: any) => {
         for (const row of queryResult) {
           // let keys = deepKeys(row);
           // for (let i in row) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
+
+            if (environmentInterestingFields.includes(row.name)) {
+              index = searchObj.data.stream.interestingFieldList.indexOf(
+                row.name
+              );
+              if (index == -1) {
+                searchObj.data.stream.interestingFieldList.push(row.name);
+              }
+            }
+
             searchObj.data.stream.selectedStreamFields.push({
               name: row.name,
               ftsKey: ftsKeys?.has(row.name),
               isSchemaField: schemaFields.has(row.name),
               showValues: row.name !== timestampField,
+              isInterestingField:
+                searchObj.data.stream.interestingFieldList.includes(row.name)
+                  ? true
+                  : false,
             });
           }
           // }
@@ -1669,11 +1778,24 @@ const useLogs = () => {
           whereClause = "";
         }
         query_context =
-          `SELECT *${queryFunctions} FROM "` +
+          `SELECT [FIELD_LIST]${queryFunctions} FROM "` +
           searchObj.data.stream.selectedStream.value +
           `" `;
+
+        if (
+          searchObj.data.stream.interestingFieldList.length > 0 &&
+          searchObj.meta.quickMode
+        ) {
+          query_context = query_context.replace(
+            "[FIELD_LIST]",
+            searchObj.data.stream.interestingFieldList.join(",")
+          );
+        } else {
+          query_context = query_context.replace("[FIELD_LIST]", "*");
+        }
         query_context = b64EncodeUnicode(query_context);
       }
+      alert(query_context)
 
       let query_fn: any = "";
       if (
@@ -1790,6 +1912,7 @@ const useLogs = () => {
       await getStreamList();
       await getSavedViews();
       await getFunctions();
+      await extractFields();
       await getQueryData();
       refreshData();
     } catch (e: any) {
@@ -1872,7 +1995,8 @@ const useLogs = () => {
     }
 
     if (queryParams.show_histogram) {
-      searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
+      searchObj.meta.showHistogram =
+        queryParams.show_histogram == "true" ? true : false;
     }
 
     searchObj.shouldIgnoreWatcher = false;
@@ -1976,10 +2100,24 @@ const useLogs = () => {
     }
   };
 
-  const onStreamChange = () => {
-    const query = searchObj.meta.sqlMode
-      ? `SELECT * FROM "${searchObj.data.stream.selectedStream.value}"`
+  const onStreamChange = async () => {
+    let query = searchObj.meta.sqlMode
+      ? `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
+
+    await extractFields();
+
+    if (
+      searchObj.data.stream.interestingFieldList.length > 0 &&
+      searchObj.meta.quickMode
+    ) {
+      query = query.replace(
+        "[FIELD_LIST]",
+        searchObj.data.stream.interestingFieldList.join(",")
+      );
+    } else {
+      query = query.replace("[FIELD_LIST]", "*");
+    }
 
     searchObj.data.editorValue = query;
     searchObj.data.query = query;
@@ -2040,6 +2178,7 @@ const useLogs = () => {
     refreshPartitionPagination,
     filterHitsColumns,
     getHistogramQueryData,
+    fnParsedSQL,
   };
 };
 
