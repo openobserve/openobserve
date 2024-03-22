@@ -5,7 +5,7 @@ import logsdata from "../../../../../test-data/logs_data.json"
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
 });
-describe("Create a new dashboard", () => {
+describe("Drilldown testcases", () => {
     let dashboardData;
     let dashboardName;
 
