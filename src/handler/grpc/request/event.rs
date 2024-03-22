@@ -104,7 +104,7 @@ impl Event for Eventer {
                 if infra::cache::file_data::download("download", &item.key)
                     .await
                     .is_ok()
-                    && CONFIG.limit.fast_mode_file_list_enabled
+                    && CONFIG.limit.quick_mode_file_list_enabled
                 {
                     let columns = item.key.split('/').collect::<Vec<&str>>();
                     if columns[2] != "logs" {
@@ -140,7 +140,7 @@ async fn cache_latest_fields(stream: &str, file: &str) -> Result<(), anyhow::Err
     drop(fr);
 
     if field_cache_time
-        + Duration::try_seconds(CONFIG.limit.fast_mode_file_list_interval)
+        + Duration::try_seconds(CONFIG.limit.quick_mode_file_list_interval)
             .unwrap()
             .num_microseconds()
             .unwrap()

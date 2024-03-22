@@ -97,9 +97,9 @@ color="grey" size="xs" />
           </q-btn-dropdown>
         </q-btn-group>
         <q-toggle
-          data-test="logs-search-bar-fast-mode-toggle-btn"
-          v-model="searchObj.meta.fastMode"
-          :label="t('search.fastModeLabel')"
+          data-test="logs-search-bar-quick-mode-toggle-btn"
+          v-model="searchObj.meta.quickMode"
+          :label="t('search.quickModeLabel')"
         />
       </div>
       <div class="float-right col-auto q-mb-xs">

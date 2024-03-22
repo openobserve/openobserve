@@ -41,7 +41,7 @@ describe("Logs testcases", () => {
   }
 
 
-  function fastModeOff() {
+  function quickModeOff() {
     // click on the run query button
     // Type the value of a variable into an input field
     cy.intercept("POST", logData.applyQuery).as("search");
@@ -123,14 +123,14 @@ describe("Logs testcases", () => {
       .click() // Click on the editor to focus
       .type("match_all_indexed('provide_credentials')")
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
-    cy.get('[data-test="logs-search-bar-fast-mode-toggle-btn"]').click()
+    cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').click()
     cy.wait(3000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-    fastModeOff()
+    quickModeOff()
   
   });
 
@@ -139,7 +139,7 @@ describe("Logs testcases", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
       .type("match_all_indexed('provide_credentials')")
-    cy.get('[data-test="logs-search-bar-fast-mode-toggle-btn"]').click()
+    cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').click()
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content')
     cy.wait(3000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
@@ -147,7 +147,7 @@ describe("Logs testcases", () => {
     }).click({ force: true });
     // Type the value of a variable into an input field
     cy.wait(3000);
-   fastModeOff()
+    quickModeOff()
   
   });
 
