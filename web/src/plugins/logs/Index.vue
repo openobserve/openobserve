@@ -567,11 +567,6 @@ export default defineComponent({
         }
       } catch (e) {
         console.log("Logs : Error in setQuery");
-        $q.notify({
-          message: "Error while setting up query",
-          color: "negative",
-          timeout: 2000,
-        });
       }
     };
 
