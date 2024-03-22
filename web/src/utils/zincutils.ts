@@ -95,7 +95,7 @@ export const getUserInfo = (loginString: string) => {
       const propArr = token.split("=");
       if (propArr[0] == "id_token") {
         decToken = getDecodedAccessToken(propArr[1]);
-        const encodedSessionData: any = b64EncodeUnicode(
+        const encodedSessionData: any = b64EncodeStandard(
           JSON.stringify(decToken)
         );
 
@@ -131,7 +131,7 @@ export const getLogoutURL = () => {
 
 export const getDecodedAccessToken = (token: string) => {
   try {
-    const decodedString = b64DecodeUnicode(token.split(".")[1]);
+    const decodedString = b64DecodeStandard(token.split(".")[1]);
     if (typeof decodedString == "string") {
       return JSON.parse(decodedString);
     } else {
@@ -142,6 +142,7 @@ export const getDecodedAccessToken = (token: string) => {
   }
 };
 
+// url safe base64 encode
 export const b64EncodeUnicode = (str: string) => {
   try {
     return btoa(
@@ -158,6 +159,7 @@ export const b64EncodeUnicode = (str: string) => {
   }
 };
 
+//url safe base64 decode
 export const b64DecodeUnicode = (str: string) => {
   try {
     return decodeURIComponent(
@@ -168,6 +170,35 @@ export const b64DecodeUnicode = (str: string) => {
             return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
           }
         )
+        .join("")
+    );
+  } catch (e) {
+    console.log("Error: getBase64Decode: error while decoding.");
+  }
+};
+
+export const b64EncodeStandard = (str: string) => {
+  try {
+    return btoa(
+      encodeURIComponent(str).replace(
+        /%([0-9A-F]{2})/g,
+        function (match, p1: any) {
+          return String.fromCharCode(parseInt(`0x${p1}`));
+        }
+      )
+    );
+  } catch (e) {
+    console.log("Error: getBase64Encode: error while encoding.");
+  }
+};
+
+export const b64DecodeStandard = (str: string) => {
+  try {
+    return decodeURIComponent(
+      Array.prototype.map
+        .call(atob(str), function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
         .join("")
     );
   } catch (e) {
@@ -238,7 +269,7 @@ export const getDecodedUserInfo = () => {
   try {
     if (useLocalUserInfo() != null) {
       const userinfo: any = useLocalUserInfo();
-      return b64DecodeUnicode(userinfo);
+      return b64DecodeStandard(userinfo);
     } else {
       return null;
     }
