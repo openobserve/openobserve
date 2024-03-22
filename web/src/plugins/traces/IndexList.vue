@@ -104,20 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     props.row.name === 'duration'
                   "
                 >
-                  <div class="q-mx-lg q-mt-sm">Duration</div>
-                  <div class="q-mx-lg q-pb-xs" style="margin: 0px 36px">
-                    <q-range
-                      v-model="duration.input"
-                      :min="duration.slider.min"
-                      :max="duration.slider.max"
-                      label
-                      switch-label-side
-                    />
+                  <div class="q-mx-lg q-mt-sm" style="font-size: 14px">
+                    Duration
                   </div>
-                  <div
-                    class="flex justify-between items-center q-px-lg q-mb-md"
-                  >
-                    <div class="flex column">
+                  <div class="flex justify-start items-center q-px-lg q-mb-md">
+                    <div class="flex column q-mr-md q-mt-xs">
                       <label>Min (in ms)</label>
                       <input
                         type="number"
@@ -126,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100px"
                       />
                     </div>
-                    <div class="flex column">
+                    <div class="flex column q-mt-xs">
                       <label>Max (in ms)</label>
                       <input
                         type="number"
@@ -267,7 +258,7 @@ export default defineComponent({
       },
       input: {
         min: 0,
-        max: 0,
+        max: 100000,
       },
     });
 

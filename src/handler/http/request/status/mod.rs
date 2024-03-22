@@ -19,7 +19,7 @@ use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     utils::json,
-    CONFIG, HAS_FUNCTIONS, INSTANCE_ID, SQL_FULL_TEXT_SEARCH_FIELDS,
+    CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashMap;
@@ -62,6 +62,7 @@ struct ConfigResponse<'a> {
     build_date: String,
     functions_enabled: bool,
     default_fts_keys: Vec<String>,
+    default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
     lua_fn_enabled: bool,
@@ -158,6 +159,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             .iter()
             .map(|s| s.to_string())
             .collect(),
+        default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         lua_fn_enabled: false,
         sql_base64_enabled: CONFIG.common.ui_sql_base64_enabled,

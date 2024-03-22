@@ -10,6 +10,9 @@ function removeUTFCharacters(text) {
 const showHistogramToggle = getTestId(
   "logs-search-bar-show-histogram-toggle-btn"
 );
+const showSQLModeHistogramToggle = getTestId(
+  "logs-search-bar-show-histogram-toggle-sqlmode-btn"
+);
 const logsSearchBarChart = getTestId("logs-search-result-bar-chart");
 const vrlFunctionEditor = getTestId("logs-vrl-function-editor");
 const searchBarSqlModeButton = getTestId("logs-search-bar-sql-mode-toggle-btn");
@@ -68,7 +71,7 @@ export function vrlFunctionEditorHidden() {
 
 /** Verify if the vrl function editor is hidden */
 export function histogramToggleDisabled() {
-  cy.get(showHistogramToggle, { timeout: 2000 }).should(
+  cy.get(showSQLModeHistogramToggle, { timeout: 2000 }).should(
     "have.attr",
     "aria-disabled",
     "true"

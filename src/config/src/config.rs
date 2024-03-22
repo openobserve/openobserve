@@ -90,6 +90,25 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
+    let mut fields = CONFIG
+        .common
+        .feature_quick_mode_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
+    fields.sort();
+    fields.dedup();
+    fields
+});
+
 const _DEFAULT_DISTINCT_FIELDS: [&str; 2] = ["service_name", "operation_name"];
 pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
@@ -345,6 +364,8 @@ pub struct Common {
     pub feature_fulltext_extra_fields: String,
     #[env_config(name = "ZO_FEATURE_DISTINCT_EXTRA_FIELDS", default = "")]
     pub feature_distinct_extra_fields: String,
+    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
+    pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
@@ -543,14 +564,14 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_FAST_MODE_NUM_FIELDS", default = 100)]
-    pub fast_mode_num_fields: usize,
-    #[env_config(name = "ZO_FAST_MODE_STRATEGY", default = "")]
-    pub fast_mode_strategy: String, // first, last, both
-    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_ENABLED", default = false)]
-    pub fast_mode_file_list_enabled: bool,
-    #[env_config(name = "ZO_FAST_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
-    pub fast_mode_file_list_interval: i64,
+    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 100)]
+    pub quick_mode_num_fields: usize,
+    #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
+    pub quick_mode_strategy: String, // first, last, both
+    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_ENABLED", default = false)]
+    pub quick_mode_file_list_enabled: bool,
+    #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
+    pub quick_mode_file_list_interval: i64,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections

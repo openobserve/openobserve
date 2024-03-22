@@ -29,8 +29,6 @@ const stream = {
           ? "&fetchSchema=" + schema
           : "?fetchSchema=" + schema;
     }
-
-    console.log("url", url);
     return http().get(url);
   },
 

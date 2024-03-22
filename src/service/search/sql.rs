@@ -21,7 +21,7 @@ use std::{
 use chrono::Duration;
 use config::{
     meta::stream::{FileKey, StreamType},
-    CONFIG, SQL_FULL_TEXT_SEARCH_FIELDS,
+    CONFIG, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
@@ -387,14 +387,14 @@ impl Sql {
                 .collect::<Vec<String>>()
         };
 
-        // Hack for fast_mode
+        // Hack for quick_mode
         // replace `select *` to `select f1,f2,f3`
-        if req_query.fast_mode
-            && schema_fields.len() > CONFIG.limit.fast_mode_num_fields
+        if req_query.quick_mode
+            && schema_fields.len() > CONFIG.limit.quick_mode_num_fields
             && RE_ONLY_SELECT.is_match(&origin_sql)
         {
             let stream_key = format!("{}/{}/{}", org_id, stream_type, meta.source);
-            let cached_fields: Option<Vec<String>> = if CONFIG.limit.fast_mode_file_list_enabled {
+            let cached_fields: Option<Vec<String>> = if CONFIG.limit.quick_mode_file_list_enabled {
                 STREAM_SCHEMAS_FIELDS
                     .read()
                     .await
@@ -403,7 +403,7 @@ impl Sql {
             } else {
                 None
             };
-            let fields = generate_fast_mode_fields(&schema, cached_fields, &match_all_fields);
+            let fields = generate_quick_mode_fields(&schema, cached_fields, &match_all_fields);
             let select_fields = "SELECT ".to_string() + &fields.join(",");
             origin_sql = RE_ONLY_SELECT
                 .replace(origin_sql.as_str(), &select_fields)
@@ -757,12 +757,12 @@ pub fn generate_filter_from_quick_text(
     filters.into_iter().collect::<Vec<(_, _)>>()
 }
 
-fn generate_fast_mode_fields(
+pub(crate) fn generate_quick_mode_fields(
     schema: &Schema,
     cached_fields: Option<Vec<String>>,
     fts_fields: &[String],
 ) -> Vec<String> {
-    let strategy = CONFIG.limit.fast_mode_strategy.to_lowercase();
+    let strategy = CONFIG.limit.quick_mode_strategy.to_lowercase();
     let schema_fields = match cached_fields {
         Some(v) => v,
         None => schema
@@ -773,20 +773,18 @@ fn generate_fast_mode_fields(
     };
     let mut fields = match strategy.as_str() {
         "last" => {
-            let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.fast_mode_num_fields);
+            let skip = std::cmp::max(0, schema_fields.len() - CONFIG.limit.quick_mode_num_fields);
             schema_fields.into_iter().skip(skip).collect()
         }
         "both" => {
+            let need_num = std::cmp::min(schema_fields.len(), CONFIG.limit.quick_mode_num_fields);
             let mut inner_fields = schema_fields
                 .iter()
-                .take(CONFIG.limit.fast_mode_num_fields / 2)
+                .take(need_num / 2)
                 .map(|f| f.to_string())
                 .collect::<Vec<_>>();
             if schema_fields.len() > inner_fields.len() {
-                let skip = std::cmp::max(
-                    0,
-                    schema_fields.len() + inner_fields.len() - CONFIG.limit.fast_mode_num_fields,
-                );
+                let skip = std::cmp::max(0, schema_fields.len() + inner_fields.len() - need_num);
                 inner_fields.extend(schema_fields.iter().skip(skip).map(|f| f.to_string()));
             }
             inner_fields
@@ -795,7 +793,7 @@ fn generate_fast_mode_fields(
             // default is first mode
             schema_fields
                 .into_iter()
-                .take(CONFIG.limit.fast_mode_num_fields)
+                .take(CONFIG.limit.quick_mode_num_fields)
                 .collect()
         }
     };
@@ -805,6 +803,12 @@ fn generate_fast_mode_fields(
     }
     // check fts fields
     for field in fts_fields {
+        if !fields.contains(field) && schema.field_with_name(field).is_ok() {
+            fields.push(field.to_string());
+        }
+    }
+    // check quick mode fields
+    for field in QUICK_MODEL_FIELDS.iter() {
         if !fields.contains(field) && schema.field_with_name(field).is_ok() {
             fields.push(field.to_string());
         }
@@ -982,7 +986,7 @@ mod tests {
             from: 0,
             size: 100,
             sql_mode: "full".to_owned(),
-            fast_mode: false,
+            quick_mode: false,
             query_type: "".to_owned(),
             start_time: 1667978895416,
             end_time: 1667978900217,
@@ -1090,7 +1094,7 @@ mod tests {
                 from: 0,
                 size: 100,
                 sql_mode: "context".to_owned(),
-                fast_mode: false,
+                quick_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
@@ -1210,7 +1214,7 @@ mod tests {
                 from: 0,
                 size: 100,
                 sql_mode: "full".to_owned(),
-                fast_mode: false,
+                quick_mode: false,
                 query_type: "".to_owned(),
                 start_time: 1667978895416,
                 end_time: 1667978900217,
