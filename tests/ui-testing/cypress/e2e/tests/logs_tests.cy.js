@@ -100,6 +100,7 @@ describe("Logs testcases", () => {
   it("should not toggle chart when clicking on the histogram toggle in the sql mode", () => {
     logstests.clickHistogramToggle();
     logstests.clickSearchBarSqlMode();
+    cy.wait(3000);
     logstests.confirmLogsSearchHidden();
     logstests.histogramToggleDisabled();
   });
