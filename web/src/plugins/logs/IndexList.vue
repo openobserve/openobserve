@@ -88,10 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="props.row.name"
               >
                 <div
-                  class="field_label ellipsis full-width"
+                  class="field_label full-width"
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
-                  {{ props.row.name }}
+                  <div
+                    class="ellipsis"
+                    style="max-width: 90% !important; display: inline-block"
+                  >
+                    {{ props.row.name }}
+                  </div>
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
@@ -189,10 +194,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`log-search-expand-${props.row.name}-field-btn`"
                   >
                     <div
-                      class="field_label ellipsis full-width"
+                      class="field_label full-width"
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
-                      {{ props.row.name }}
+                      <div
+                        class="ellipsis"
+                        style="max-width: 90% !important; display: inline-block"
+                      >
+                        {{ props.row.name }}
+                      </div>
                       <span class="float-right">
                         <q-icon
                           :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
