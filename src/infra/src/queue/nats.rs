@@ -41,7 +41,7 @@ impl NatsQueue {
     }
 
     pub fn super_cluster() -> Self {
-        Self::new("super_cluster_")
+        Self::new("super_cluster_queue_")
     }
 }
 
@@ -62,6 +62,7 @@ impl super::Queue for NatsQueue {
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
             retention: jetstream::stream::RetentionPolicy::Limits,
             max_age: Duration::from_secs(60 * 60 * 24 * 30), // 30 days
+            num_replicas: CONFIG.nats.replicas,
             ..Default::default()
         };
         _ = jetstream.get_or_create_stream(config).await?;
@@ -86,11 +87,11 @@ impl super::Queue for NatsQueue {
             let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await?;
-            let consumer_name = if !CONFIG.common.cluster_name.is_empty() {
-                CONFIG.common.cluster_name.to_string()
-            } else {
-                INSTANCE_ID.get("instance_id").unwrap().to_string()
-            };
+            let consumer_name = format!(
+                "{}_{}",
+                CONFIG.common.cluster_name,
+                INSTANCE_ID.get("instance_id").unwrap().to_string(),
+            );
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
                 durable_name: Some(consumer_name.to_string()),

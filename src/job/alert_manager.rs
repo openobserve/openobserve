@@ -15,6 +15,11 @@
 
 use config::cluster;
 use tokio::time;
+#[cfg(feature = "enterprise")]
+use {
+    config::{CONFIG, INSTANCE_ID},
+    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+};
 
 use crate::service;
 
@@ -22,6 +27,30 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
+    // check super cluster
+    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.common.super_cluster_enabled {
+        let cluster_name =
+            o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
+        if !cluster_name.is_empty() {
+            let clusters = o2_enterprise::enterprise::super_cluster::kv::cluster::list().await?;
+            if clusters.iter().any(|c| c.name == cluster_name) {
+                log::info!("[ALERT MANAGER] is running in cluster: {}", cluster_name);
+                return Ok(());
+            }
+        }
+        let cluster_name = format!(
+            "{}_{}",
+            CONFIG.common.cluster_name,
+            INSTANCE_ID.get("instance_id").unwrap().to_string(),
+        );
+        // regester to super cluster
+        o2_enterprise::enterprise::super_cluster::kv::alert_manager::register_job_cluster(
+            &cluster_name,
+        )
+        .await?;
+    }
+
     // should run it every 10 seconds
     let mut interval = time::interval(time::Duration::from_secs(30));
     interval.tick().await; // trigger the first run
