@@ -1528,7 +1528,7 @@ const useLogs = () => {
         }
 
         const fields: any = {};
-        const localInterestingFields: any = useLocalInterestingFields();
+        let localInterestingFields: any = useLocalInterestingFields();
         searchObj.data.stream.interestingFieldList =
           localInterestingFields.value != null &&
           localInterestingFields.value[
@@ -1565,8 +1565,24 @@ const useLogs = () => {
               index = searchObj.data.stream.interestingFieldList.indexOf(
                 row.name
               );
-              if (index == -1) {
-                searchObj.data.stream.interestingFieldList.push(row.name);
+              if (index == -1 && row.name != "*") {
+                // searchObj.data.stream.interestingFieldList.push(row.name);
+                for (const stream of searchObj.data.stream.selectedStreamFields) {
+                  if (stream.name == row.name) {
+                    searchObj.data.stream.interestingFieldList.push(row.name);
+                    const localInterestingFields: any = useLocalInterestingFields();
+                    let localFields: any = {};
+                    if (localInterestingFields.value != null) {
+                      localFields = localInterestingFields.value;
+                    }
+                    localFields[
+                      searchObj.organizationIdetifier +
+                        "_" +
+                        searchObj.data.stream.selectedStream.value
+                    ] = searchObj.data.stream.interestingFieldList;
+                    useLocalInterestingFields(localFields);
+                  }
+                }
               }
             }
 
