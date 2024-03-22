@@ -156,15 +156,13 @@ function deleteDashboard(){
         cy.get('[data-test="dashboard-edit-panel"]').click();
         cy.get("[data-test='dashboard-sidebar']").click();
         cy.get('[data-test="dashboard-addpanel-config-drilldown-add-btn"] > .q-btn__content > .block').click();
-        cy.get('[data-test="dashboard-drilldown-folder-select"]').click();
-        cy.get('.q-virtual-scroll__content') // Locate the container div
-            .contains('div', 'drilldown') // Find the div containing the text 'drilldown'
-             .click(); // Click on the div
+        cy.get('[data-test="dashboard-drilldown-folder-select"]').click({force: true});
+        cy.get(".q-item__label").contains("default").click({force: true});
 
         cy.get('[data-test="confirm-button"]').should('be.disabled');
-        cy.get('[data-test="dashboard-panel-save"]').click( {force: true });
+        cy.get('[data-test="dashboard-panel-save"]').click( {force: true});
         cy.wait(2000)
-        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
         cy.wait(2000)
         deleteDashboard()
     
