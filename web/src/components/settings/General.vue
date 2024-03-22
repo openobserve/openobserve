@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig.custom_logo_img != null
             "
+            class="full-width"
           >
             <q-img
               data-test="setting_ent_custom_logo_img"
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             counter
             :counter-label="counterLabelFn"
-            style="width: 400px"
+            style="width: 550px"
             max-file-size="20481"
             accept=".png, .jpg, .jpeg, .svg, .jpeg2, image/*"
             @rejected="onRejected"
