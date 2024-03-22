@@ -26,12 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.setting") }}
         </div>
       </div>
-      <div class="col-auto">
+      <div class="col-auto" data-test="close-dashboard-settings">
         <q-btn
           v-close-popup="true"
           round
           flat
           :icon="'img:' + getImageURL('images/common/close_icon.svg')"
+          data-test="close-dashboard-settings-popup"
         />
       </div>
     </div>
@@ -49,21 +50,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             indicator-color="transparent"
             inline-label
             vertical
+            data-test="dashboard-settings-tabs"
           >
             <q-tab
               name="generalSettings"
               icon="settings"
               :label="t('dashboard.generalSettings')"
+              data-test="dashboard-general-settings-tab"
             />
             <q-tab
               name="variableSettings"
               icon="data_array"
               :label="t('dashboard.variableSettings')"
+              data-test="dashboard-variable-settings-tab"
             />
             <q-tab
               name="tabSettings"
               icon="tab"
               :label="t('dashboard.tabSettings')"
+              data-test="dashboard-tab-settings-tab"
             />
           </q-tabs>
         </div>
@@ -78,15 +83,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition-prev="fade"
             transition-next="fade"
           >
-            <q-tab-panel name="generalSettings">
+            <q-tab-panel name="generalSettings" data-test="dashboard-general-settings-panel">
               <GeneralSettings @save="refreshRequired" />
             </q-tab-panel>
 
-            <q-tab-panel name="variableSettings">
+            <q-tab-panel name="variableSettings" data-test="dashboard-variable-settings-panel">
               <VariableSettings @save="refreshRequired" />
             </q-tab-panel>
 
-            <q-tab-panel name="tabSettings">
+            <q-tab-panel name="tabSettings" data-test="dashboard-tab-settings-panel">
               <TabsSettings @refresh="refreshRequired" />
             </q-tab-panel>
           </q-tab-panels>
