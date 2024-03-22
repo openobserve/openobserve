@@ -171,14 +171,21 @@ impl ObjectStore for FS {
                 Ok(data) => {
                     if CONFIG.common.print_key_event {
                         log::warn!(
-                            "datafusion get_range: {}, took: {}",
+                            "datafusion get_range from local cache: {}, took: {}",
                             location,
                             start.elapsed().as_millis()
                         );
                     }
                     Ok(data)
                 }
-                Err(_) => storage::DEFAULT.get_range(location, range).await,
+                Err(e) => {
+                    log::error!(
+                        "datafusion get_range from local cache: {}, err: {}",
+                        location,
+                        e
+                    );
+                    storage::DEFAULT.get_range(location, range).await
+                }
             },
         }
     }
@@ -206,14 +213,21 @@ impl ObjectStore for FS {
                 Ok(data) => {
                     if CONFIG.common.print_key_event {
                         log::warn!(
-                            "datafusion get_ranges: {}, took: {}",
+                            "datafusion get_ranges from local cache: {}, took: {}",
                             location,
                             start.elapsed().as_millis()
                         );
                     }
                     Ok(data)
                 }
-                Err(_) => storage::DEFAULT.get_ranges(location, ranges).await,
+                Err(e) => {
+                    log::error!(
+                        "datafusion get_ranges from local cache: {}, err: {}",
+                        location,
+                        e
+                    );
+                    storage::DEFAULT.get_ranges(location, ranges).await
+                }
             },
         }
     }
