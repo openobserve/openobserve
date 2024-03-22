@@ -353,7 +353,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization?.identifier
         )
         .then((res) => {
           var counter = 1;
@@ -434,7 +434,7 @@ export default defineComponent({
     const getDestinations = () => {
       destinationService
         .list({
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: store.state.selectedOrganization?.identifier,
         })
         .then((res) => {
           destinations.value = res.data;
@@ -451,7 +451,7 @@ export default defineComponent({
     const getTemplates = () => {
       templateService
         .list({
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: store.state.selectedOrganization?.identifier,
         })
         .then((res) => {
           templates.value = res.data;
@@ -501,7 +501,7 @@ export default defineComponent({
           name: "alertList",
           query: {
             action: "add",
-            org_identifier: store.state.selectedOrganization.identifier,
+            org_identifier: store.state.selectedOrganization?.identifier,
           },
         });
       } else {
@@ -512,7 +512,7 @@ export default defineComponent({
           query: {
             action: "update",
             name: props.row.name,
-            org_identifier: store.state.selectedOrganization.identifier,
+            org_identifier: store.state.selectedOrganization?.identifier,
           },
         });
       }
@@ -520,7 +520,7 @@ export default defineComponent({
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
           button: action,
-          user_org: store.state.selectedOrganization.identifier,
+          user_org: store.state.selectedOrganization?.identifier,
           user_id: store.state.userInfo.email,
           page: "Alerts",
         });
@@ -535,14 +535,14 @@ export default defineComponent({
       router.push({
         name: "alertList",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: store.state.selectedOrganization?.identifier,
         },
       });
     };
     const deleteAlert = () => {
       alertsService
         .delete(
-          store.state.selectedOrganization.identifier,
+          store.state.selectedOrganization?.identifier,
           selectedDelete.value.stream_name,
           selectedDelete.value.name,
           selectedDelete.value.stream_type
@@ -573,7 +573,7 @@ export default defineComponent({
       if (config.enableAnalytics == "true") {
         segment.track("Button Click", {
           button: "Delete Alert",
-          user_org: store.state.selectedOrganization.identifier,
+          user_org: store.state.selectedOrganization?.identifier,
           user_id: store.state.userInfo.email,
           alert_name: selectedDelete.value.name,
           page: "Alerts",
@@ -592,7 +592,7 @@ export default defineComponent({
       ) as Alert;
       alertsService
         .toggleState(
-          store.state.selectedOrganization.identifier,
+          store.state.selectedOrganization?.identifier,
           alert.stream_name,
           alert.name,
           !alert?.enabled,
@@ -614,7 +614,7 @@ export default defineComponent({
         name: name,
         query: {
           action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
+          org_identifier: store.state.selectedOrganization?.identifier,
         },
       });
     };
