@@ -394,7 +394,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
-    
+
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
     };
@@ -914,6 +914,21 @@ export default defineComponent({
                 .fields.longitude == null
             ) {
               errors.push("Add one field for the longitude");
+            }
+            break;
+          }
+          case "maps": {
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.name == null
+            ) {
+              errors.push("Add one field for the name");
+            }
+            if (
+              dashboardData.data.queries[dashboardData.layout.currentQueryIndex]
+                .fields.value_for_maps == null
+            ) {
+              errors.push("Add one field for the value");
             }
             break;
           }

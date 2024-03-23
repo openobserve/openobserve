@@ -288,6 +288,12 @@ export default defineComponent({
         ].fields.weight,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
         ].fields.source,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -308,6 +314,8 @@ export default defineComponent({
         ) {
           if (dashboardPanelData.data.type == "geomap") {
             query = geoMapChart();
+          } else if (dashboardPanelData.data.type == "maps") {
+            query = mapChart();
           } else if (dashboardPanelData.data.type == "sankey") {
             query = sankeyChartQuery();
           } else {
@@ -408,7 +416,7 @@ export default defineComponent({
       }
 
       // Group By clause
-        if (latitude || longitude) {
+      if (latitude || longitude) {
         const aliases = [latitude?.alias, longitude?.alias]
           .filter(Boolean)
           .join(", ");
@@ -435,6 +443,99 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.limit ?? 0;
       query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+      return query;
+    };
+
+    const mapChart = () => {
+      const { name, value_for_maps } =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields;
+
+      let query = "";
+
+      if (name && value_for_maps) {
+        query = `SELECT ${name.column} as "${name.alias}", `;
+
+        if (value_for_maps?.aggregationFunction) {
+          switch (value_for_maps.aggregationFunction) {
+            case "count-distinct":
+              query += `count(distinct(${value_for_maps.column})) as "${value_for_maps.alias}"`;
+              break;
+            default:
+              query += `${value_for_maps.aggregationFunction}(${value_for_maps.column}) as "${value_for_maps.alias}"`;
+              break;
+          }
+        } else {
+          query += `${value_for_maps.column} as "${value_for_maps.alias}"`;
+        }
+
+        query += ` FROM "${
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream
+        }"`;
+
+        // Add WHERE clause based on applied filters
+        const filterData =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.filter;
+
+        const filterItems = filterData.map((field) => {
+          let selectFilter = "";
+          // Handle different filter types and operators
+          if (field.type == "list" && field.values?.length > 0) {
+            selectFilter += `${field.column} IN (${field.values
+              .map((it) => `'${it}'`)
+              .join(", ")})`;
+          } else if (field.type == "condition" && field.operator != null) {
+            selectFilter += `${field?.column} `;
+            if (["Is Null", "Is Not Null"].includes(field.operator)) {
+              switch (field?.operator) {
+                case "Is Null":
+                  selectFilter += `IS NULL`;
+                  break;
+                case "Is Not Null":
+                  selectFilter += `IS NOT NULL`;
+                  break;
+              }
+            } else if (field.value != null && field.value != "") {
+              switch (field.operator) {
+                case "=":
+                case "<>":
+                case "<":
+                case ">":
+                case "<=":
+                case ">=":
+                  selectFilter += `${field?.operator} ${field?.value}`;
+                  break;
+                case "Contains":
+                  selectFilter += `LIKE '%${field.value}%'`;
+                  break;
+                case "Not Contains":
+                  selectFilter += `NOT LIKE '%${field.value}%'`;
+                  break;
+                default:
+                  selectFilter += `${field.operator} ${field.value}`;
+                  break;
+              }
+            }
+          }
+          return selectFilter;
+        });
+
+        const whereClause = filterItems.filter((it) => it).join(" AND ");
+        if (whereClause) {
+          query += ` WHERE ${whereClause} `;
+        }
+
+        // Group By clause
+        if (name) {
+          query += ` GROUP BY ${name.alias}`;
+        }
+      }
 
       return query;
     };
