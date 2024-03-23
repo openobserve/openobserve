@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
-                      class="light-dimmed"
+                      :class="store.state.theme === 'dark' ? '' : 'light-dimmed'"
                       style="margin-right: 0.375rem"
                       size="1.1rem"
                       :title="
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'info'
                               : 'info_outline'
                           "
-                          class="light-dimmed"
+                          :class="store.state.theme === 'dark' ? '' : 'light-dimmed'"
                           style="margin-right: 0.375rem"
                           size="1.1rem"
                           :title="
