@@ -65,8 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
-          <div v-if="editingText || store.state.zoConfig.custom_logo_text == ''" class="q-gutter-md row items-start">
-            <q-input 
+          <div
+            v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
+            class="q-gutter-md row items-start"
+          >
+            <q-input
               color="input-border"
               bg-color="input-bg"
               class="q-py-md showLabelOnTop"
@@ -76,43 +79,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               data-test="settings_ent_logo_custom_text"
               :label="t('settings.customLogoText')"
-              v-model="customText"  
+              v-model="customText"
             />
-            <div class="btn-group relative-position vertical-middle" style="margin-top: 55px;">
-            <q-btn
-              data-test="settings_ent_logo_custom_text_save_btn"
-              :loading="onSubmit.isLoading.value"
-              :label="t('dashboard.save')"
-              class="text-bold no-border q-mr-sm"
-              color="secondary"
-              size="sm"
-              type="submit"
-              no-caps
-              @click="updateCustomText"
-            />
-            
-              <q-btn type="button" size="sm" :label="t('common.cancel')" @click="editingText=!editingText"></q-btn>
-            
+            <div
+              class="btn-group relative-position vertical-middle"
+              style="margin-top: 55px"
+            >
+              <q-btn
+                data-test="settings_ent_logo_custom_text_save_btn"
+                :loading="onSubmit.isLoading.value"
+                :label="t('dashboard.save')"
+                class="text-bold no-border q-mr-sm"
+                color="secondary"
+                size="sm"
+                type="submit"
+                no-caps
+                @click="updateCustomText"
+              />
+
+              <q-btn
+                type="button"
+                size="sm"
+                :label="t('common.cancel')"
+                @click="editingText = !editingText"
+              ></q-btn>
             </div>
           </div>
-          <div v-else style="margin-top: 17px;">
-            <q-label class="q-pt-md text-bold">{{ t("settings.customLogoText") }}</q-label><br />
-            {{ store.state.zoConfig.custom_logo_text || "<No Text Available>" }}
-              <q-btn
-                data-test="settings_ent_logo_custom_text_edit_btn"
-                :loading="onSubmit.isLoading.value"
-                icon="edit"
-                size="sm"
-                class="text-bold"
-                type="submit"
-                @click="editingText=!editingText"
-              />
+          <div v-else style="margin-top: 17px">
+            <q-label class="q-pt-md text-bold">{{
+              t("settings.customLogoText")
+            }}</q-label
+            ><br />
+            {{ store.state.zoConfig.custom_logo_text || "No Text Available" }}
+            <q-btn
+              data-test="settings_ent_logo_custom_text_edit_btn"
+              :loading="onSubmit.isLoading.value"
+              icon="edit"
+              size="sm"
+              class="text-bold"
+              type="submit"
+              @click="editingText = !editingText"
+            />
           </div>
-          
         </div>
         <q-separator class="q-mt-sm"></q-separator>
         <div class="q-gutter-sm row q-mt-xs">
-          <q-label class="q-pt-sm text-bold full-width">{{ t("settings.customLogoTitle") }} </q-label><br />
+          <q-label class="q-pt-sm text-bold full-width"
+            >{{ t("settings.customLogoTitle") }} </q-label
+          ><br />
           <div
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -126,17 +140,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
               "
               :alt="t('settings.logoLabel')"
-              style="max-width: 150px; max-height: 31px;"
+              style="max-width: 150px; max-height: 31px"
               class="q-mx-md"
             />
-            <q-btn icon="delete"
-            data-test="setting_ent_custom_logo_img_delete_btn"
-@click="confirmDeleteLogo()" class="q-mx-md" size="sm"
-              ></q-btn
-            >
-        </div>
+            <q-btn
+              icon="delete"
+              data-test="setting_ent_custom_logo_img_delete_btn"
+              @click="confirmDeleteLogo()"
+              class="q-mx-md"
+              size="sm"
+            ></q-btn>
+          </div>
           <q-file
-          data-test="setting_ent_custom_logo_img_file_upload"
+            data-test="setting_ent_custom_logo_img_file_upload"
             v-else
             v-model="files"
             :label="t('settings.logoLabel')"
@@ -164,6 +180,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="lg"
     color="primary"
   ></q-spinner-hourglass>
+  <q-dialog v-model="confirmDeleteImage">
+    <q-card>
+      <q-card-section>
+        {{ t("settings.deleteLogoMessage") }}
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <q-btn
+          data-test="logs-search-bar-confirm-dialog-cancel-btn"
+          :label="t('confirmDialog.cancel')"
+          color="primary"
+          @click="cancelConfirmDialog"
+        />
+        <q-btn
+          data-test="logs-search-bar-confirm-dialog-ok-btn"
+          :label="t('confirmDialog.ok')"
+          color="positive"
+          @click="confirmDialogOK"
+        />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -182,21 +220,15 @@ import configService from "@/services/config";
 export default defineComponent({
   name: "PageGeneralSettings",
   methods: {
+    cancelConfirmDialog() {
+      this.confirmDeleteImage = false;
+    },
+    confirmDialogOK() {
+      this.confirmDeleteImage = false;
+      this.deleteLogo();
+    },
     confirmDeleteLogo() {
-      this.$q
-        .dialog({
-          title: this.t("settings.deleteLogoTitle"),
-          message: this.t("settings.deleteLogoMessage"),
-          cancel: true,
-          persistent: true,
-          ok: {
-            color: "negative",
-            label: this.t("common.delete"),
-          },
-        })
-        .onOk(() => {
-          this.deleteLogo();
-        });
+      this.confirmDeleteImage = true;
     },
   },
   setup() {
@@ -210,6 +242,7 @@ export default defineComponent({
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
+    const files = ref(null);
 
     customText.value = store.state.zoConfig.custom_logo_text;
 
@@ -272,6 +305,8 @@ export default defineComponent({
               await configService.get_config().then((res: any) => {
                 store.dispatch("setConfig", res.data);
               });
+
+              files.value = null;
             } else {
               q.notify({
                 type: "negative",
@@ -370,13 +405,15 @@ export default defineComponent({
               timeout: 2000,
             });
           }
-        }).catch((err) => {
+        })
+        .catch((err) => {
           q.notify({
             type: "negative",
             message: err?.message || "Something went wrong.",
             timeout: 2000,
           });
-        }).finally(() => {
+        })
+        .finally(() => {
           loadingState.value = false;
         });
     };
@@ -394,8 +431,8 @@ export default defineComponent({
       router,
       scrapeIntereval,
       onSubmit,
-      files: ref(null),
-      counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any; }) {
+      files,
+      counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
         return `(Only .png, .jpg, .jpeg, .svg formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
@@ -416,6 +453,7 @@ export default defineComponent({
       customText,
       editingText,
       updateCustomText,
+      confirmDeleteImage: ref(false),
     };
   },
 });

@@ -801,7 +801,7 @@
     "logoLabel": "Drag & Drop Logo Image",
     "customLogoTitle": "Custom Logo",
     "deleteLogoTitle": "Delete Logo",
-    "deleteLogoMessage": "Are you sure you want to delete this logo image?",
+    "deleteLogoMessage": "Are you sure you want to delete this logo image? Click Ok to delete.",
     "deleteLogo": "Delete Logo",
     "logo": "Logo",
     "customLogoText": "Custom Logo Text"
