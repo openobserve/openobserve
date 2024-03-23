@@ -313,7 +313,6 @@ async fn add_valid_record(
             records_size: 0,
         }
     });
-    println!("record_val: {:?}", record_val);
     let record_val = Value::Object(record_val);
     let record_size = estimate_json_bytes(&record_val);
     hour_buf.records.push(Arc::new(record_val));
