@@ -58,13 +58,18 @@ impl FileData {
         FileData {
             max_size,
             cur_size: 0,
-            root_dir: CONFIG.common.data_cache_dir.to_string(),
+            root_dir: format!(
+                "{}{}",
+                CONFIG.common.data_cache_dir,
+                storage::format_key("")
+            ),
             data: CacheStrategy::new(strategy),
         }
     }
 
     async fn load(&mut self) -> Result<(), anyhow::Error> {
         log::info!("Loading disk cache start");
+        std::fs::create_dir_all(&self.root_dir).expect("create cache dir success");
         let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
         let files = scan_files(&self.root_dir, "parquet");
         for file in files {
