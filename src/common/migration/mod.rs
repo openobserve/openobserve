@@ -21,7 +21,7 @@ pub mod meta;
 pub mod schema;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
-    if new_ver >= "v0.9.1" {
+    if CONFIG.common.run_schema_migration_on_start_up && new_ver >= "v0.9.1" {
         schema::run().await?;
     }
 
