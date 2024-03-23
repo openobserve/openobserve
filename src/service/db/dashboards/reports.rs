@@ -71,7 +71,7 @@ pub async fn set_without_updating_trigger(
     report: &Report,
 ) -> Result<String, anyhow::Error> {
     let db = infra_db::get_db().await;
-    let schedule_key = format!("{}", report.name);
+    let schedule_key = report.name.to_string();
     let key = format!("/reports/{org_id}/{}", &schedule_key);
     match db
         .put(

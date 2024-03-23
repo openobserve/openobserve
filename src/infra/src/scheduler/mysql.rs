@@ -125,11 +125,11 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         .bind(&trigger.org)
         .bind(&trigger.module)
         .bind(&trigger.module_key)
-        .bind(&trigger.is_realtime)
-        .bind(&trigger.is_silenced)
+        .bind(trigger.is_realtime)
+        .bind(trigger.is_silenced)
         .bind(&trigger.status)
-        .bind(&trigger.retries)
-        .bind(&trigger.next_run_at)
+        .bind(0)
+        .bind(trigger.next_run_at)
         .execute(&mut *tx)
         .await
         {
