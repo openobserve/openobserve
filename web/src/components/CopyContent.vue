@@ -42,7 +42,7 @@ import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
-import { maskText, b64EncodeUnicode } from "../utils/zincutils";
+import { maskText, b64EncodeStandard } from "../utils/zincutils";
 
 export default defineComponent({
   name: "CopyContent",
@@ -67,7 +67,7 @@ export default defineComponent({
     const replaceValues = (data: string, isMask: boolean = false) => {
       email.value = store.state.userInfo.email;
       passcode.value = store.state.organizationData.organizationPasscode;
-      basicPasscode.value = b64EncodeUnicode(
+      basicPasscode.value = b64EncodeStandard(
         `${store.state.userInfo.email}:${store.state.organizationData.organizationPasscode}`
       );
       if (isMask) {
