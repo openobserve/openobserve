@@ -30,13 +30,18 @@ pub fn decode(s: &str) -> Result<String, Error> {
 
 #[inline(always)]
 pub fn decode_raw(s: &str) -> Result<Vec<u8>, Error> {
+    let s = s.replace('-', "+").replace('_', "/").replace('.', "=");
     base64::engine::general_purpose::STANDARD
         .decode(s.as_bytes())
         .map_err(|e| Error::new(ErrorKind::InvalidData, format!("base64 decode error: {e}")))
 }
 
 pub fn encode(s: &str) -> String {
-    base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
+    base64::engine::general_purpose::STANDARD
+        .encode(s.as_bytes())
+        .replace('+', "-")
+        .replace('/', "_")
+        .replace('=', ".")
 }
 
 pub fn encode_url(s: &str) -> String {
@@ -104,10 +109,10 @@ mod tests {
     #[test]
     fn test_encode() {
         let s = "hello world";
-        assert_eq!(encode(s), "aGVsbG8gd29ybGQ=");
+        assert_eq!(encode(s), "aGVsbG8gd29ybGQ.");
 
         let s = "/root/defau/root@example.com";
-        assert_eq!(encode(s), "L3Jvb3QvZGVmYXUvcm9vdEBleGFtcGxlLmNvbQ==");
+        assert_eq!(encode(s), "L3Jvb3QvZGVmYXUvcm9vdEBleGFtcGxlLmNvbQ..");
     }
 
     #[test]
