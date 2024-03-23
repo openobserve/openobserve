@@ -159,72 +159,131 @@ async fn add_valid_record(
     need_trigger: bool,
 ) -> Result<Option<TriggerAlertData>> {
     let mut trigger: TriggerAlertData = Vec::new();
+    let schema_cache;
     let timestamp: i64 = record_val
         .get(&CONFIG.common.column_timestamp)
         .unwrap()
         .as_i64()
         .unwrap();
 
-    // check schema
-    let (schema_evolution, _) = check_for_schema(
-        &stream_meta.org_id,
-        &stream_meta.stream_name,
-        StreamType::Logs,
-        stream_schema_map,
-        &record_val,
-        timestamp,
-    )
-    .await?;
+    let (rec_schema, hour_key) = if !CONFIG.common.all_schema_fields_type_string {
+        // check schema
+        let (schema_evolution, _) = check_for_schema(
+            &stream_meta.org_id,
+            &stream_meta.stream_name,
+            StreamType::Logs,
+            stream_schema_map,
+            &record_val,
+            timestamp,
+        )
+        .await?;
 
-    // get schema
-    let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
-    let schema_key = rec_schema.hash_key();
+        // get schema
+        let rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+        let schema_key = rec_schema.hash_key();
 
-    // get hour key
-    let hour_key = get_wal_time_key(
-        timestamp,
-        stream_meta.partition_keys,
-        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
-        &record_val,
-        Some(schema_key),
-    );
+        // get hour key
+        let hour_key = get_wal_time_key(
+            timestamp,
+            stream_meta.partition_keys,
+            unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
+            &record_val,
+            Some(schema_key),
+        );
 
-    if !schema_evolution.schema_compatible {
-        status.failed += 1;
-        return Ok(None);
-    }
+        if !schema_evolution.schema_compatible {
+            status.failed += 1;
+            return Ok(None);
+        }
 
-    let valid_record = match schema_evolution.types_delta {
-        None => true,
-        Some(delta) => {
-            let ret_val = if !CONFIG.common.widening_schema_evolution
-                || !schema_evolution.is_schema_changed
-            {
-                cast_to_type(&mut record_val, delta)
-            } else {
-                let local_delta = delta
-                    .into_iter()
-                    .filter(|x| x.metadata().contains_key("zo_cast"))
-                    .collect::<Vec<_>>();
-                if !local_delta.is_empty() {
-                    cast_to_type(&mut record_val, local_delta)
+        let valid_record = match schema_evolution.types_delta {
+            None => true,
+            Some(delta) => {
+                let ret_val = if !CONFIG.common.widening_schema_evolution
+                    || !schema_evolution.is_schema_changed
+                {
+                    cast_to_type(&mut record_val, delta)
                 } else {
-                    Ok(())
-                }
-            };
-            match ret_val {
-                Ok(_) => true,
-                Err(e) => {
-                    status.failed += 1;
-                    status.error = e.to_string();
-                    false
+                    let local_delta = delta
+                        .into_iter()
+                        .filter(|x| x.metadata().contains_key("zo_cast"))
+                        .collect::<Vec<_>>();
+                    if !local_delta.is_empty() {
+                        cast_to_type(&mut record_val, local_delta)
+                    } else {
+                        Ok(())
+                    }
+                };
+                match ret_val {
+                    Ok(_) => true,
+                    Err(e) => {
+                        status.failed += 1;
+                        status.error = e.to_string();
+                        false
+                    }
                 }
             }
+        };
+        if !valid_record {
+            return Ok(None);
         }
+        (rec_schema, hour_key)
+    } else {
+        // cast all fields to string
+        for (key, v) in record_val.iter_mut() {
+            if !v.is_string() && key != &CONFIG.common.column_timestamp {
+                *v = Value::String(v.to_string());
+            }
+        }
+        // get schema
+
+        let value_iter = [record_val.clone()].into_iter();
+        let inferred_schema =
+            config::utils::schema::infer_json_schema_from_map(value_iter, StreamType::Logs)
+                .unwrap();
+        let mut rec_schema = stream_schema_map.get(&stream_meta.stream_name).unwrap();
+        if rec_schema.schema().fields().is_empty() {
+            // get infer schema
+            let mut metadata = HashMap::with_capacity(1);
+            metadata.insert("created_at".to_string(), timestamp.to_string());
+            let fields_map = inferred_schema
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name().to_owned(), i))
+                .collect();
+            schema_cache = SchemaCache::new(
+                inferred_schema.clone().with_metadata(metadata.clone()),
+                fields_map,
+            );
+            rec_schema = &schema_cache;
+
+            super::db::schema::set(
+                &stream_meta.org_id,
+                &stream_meta.stream_name,
+                StreamType::Logs,
+                &inferred_schema.clone().with_metadata(metadata),
+                Some(timestamp),
+                false,
+            )
+            .await
+            .unwrap();
+
+            stream_schema_map.insert(stream_meta.stream_name.to_owned(), schema_cache.clone());
+        }
+        let schema_key = rec_schema.hash_key();
+
+        // get hour key
+        let hour_key = get_wal_time_key(
+            timestamp,
+            stream_meta.partition_keys,
+            unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
+            &record_val,
+            Some(schema_key),
+        );
+
+        (rec_schema, hour_key)
     };
-    if !valid_record {
-        return Ok(None);
-    }
 
     if need_trigger && !stream_meta.stream_alerts_map.is_empty() {
         // Start check for alert trigger
@@ -254,6 +313,7 @@ async fn add_valid_record(
             records_size: 0,
         }
     });
+    println!("record_val: {:?}", record_val);
     let record_val = Value::Object(record_val);
     let record_size = estimate_json_bytes(&record_val);
     hour_buf.records.push(Arc::new(record_val));

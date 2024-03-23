@@ -486,6 +486,9 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
+
+    #[env_config(name = "ZO_SCHEMA_FIELDS_TYPE_STRING", default = false)]
+    pub all_schema_fields_type_string: bool,
 }
 
 #[derive(EnvConfig)]

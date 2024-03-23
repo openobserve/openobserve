@@ -282,6 +282,7 @@ fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     allowed_type.contains(to)
 }
 
+#[derive(Clone)]
 pub struct SchemaCache {
     schema: Schema,
     fields_map: HashMap<String, usize>,
