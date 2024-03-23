@@ -48,7 +48,12 @@ pub trait Scheduler: Sync + Send + 'static {
         retries: i32,
     ) -> Result<()>;
     async fn update_trigger(&self, trigger: Trigger) -> Result<()>;
-    async fn pull(&self, concurrency: i64, timeout: i64) -> Result<Vec<Trigger>>;
+    async fn pull(
+        &self,
+        concurrency: i64,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<Vec<Trigger>>;
     async fn clean_complete(&self, interval: u64);
     async fn watch_timeout(&self, interval: u64);
     async fn len_module(&self, module: TriggerModule) -> usize;
@@ -75,6 +80,11 @@ pub enum TriggerModule {
 }
 
 #[derive(sqlx::FromRow, Debug, Clone, Default)]
+pub struct TriggerId {
+    pub id: i64,
+}
+
+#[derive(sqlx::FromRow, Debug, Clone, Default)]
 pub struct Trigger {
     pub org: String,
     pub module: TriggerModule,
@@ -91,6 +101,7 @@ pub struct Trigger {
 /// Initializes the scheduler
 pub(crate) async fn init(clean_interval: u64, watch_interval: u64) -> Result<()> {
     create_table().await?;
+    create_table_index().await?;
     tokio::task::spawn(async move {
         clean_complete(clean_interval).await;
     });
@@ -156,8 +167,14 @@ pub async fn update_trigger(trigger: Trigger) -> Result<()> {
 /// `timeout` - Used to set the maximum time duration the job executation can take.
 ///     This is used to calculate the `end_time` of the trigger.
 #[inline]
-pub async fn pull(concurrency: i64, timeout: i64) -> Result<Vec<Trigger>> {
-    CLIENT.pull(concurrency, timeout).await
+pub async fn pull(
+    concurrency: i64,
+    alert_timeout: i64,
+    report_timeout: i64,
+) -> Result<Vec<Trigger>> {
+    CLIENT
+        .pull(concurrency, alert_timeout, report_timeout)
+        .await
 }
 
 /// Background job that frequently (with the given interval) cleans "Completed" jobs

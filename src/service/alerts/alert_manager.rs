@@ -73,6 +73,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     let triggers = scheduler::pull(
         CONFIG.limit.alert_schedule_concurrency,
         CONFIG.limit.alert_schedule_timeout,
+        CONFIG.limit.report_schedule_timeout,
     )
     .await?;
 
@@ -134,6 +135,7 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
         is_realtime: false,
         is_silenced: false,
         status: scheduler::TriggerStatus::Waiting,
+        retries: 0,
         ..trigger.clone()
     };
 
@@ -172,7 +174,7 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
     let mut trigger_data_stream = TriggerData {
         org: trigger.org,
         module: TriggerDataType::Alert,
-        key: trigger.module_key,
+        key: trigger.module_key.clone(),
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -188,7 +190,6 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
         match alert.send_notification(&data).await {
             Ok(_) => {
                 scheduler::update_trigger(new_trigger).await?;
-                trigger_data_stream.end_time = Utc::now().timestamp_micros();
             }
             Err(e) => {
                 scheduler::update_status(
@@ -199,15 +200,18 @@ async fn handle_alert_triggers(trigger: scheduler::Trigger) -> Result<(), anyhow
                     trigger.retries + 1,
                 )
                 .await?;
-                trigger_data_stream.end_time = Utc::now().timestamp_micros();
                 trigger_data_stream.status = TriggerDataStatus::Failed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
             }
         }
+    } else {
+        scheduler::update_trigger(new_trigger).await?;
+        trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 
     // publish the triggers as stream
+    trigger_data_stream.end_time = Utc::now().timestamp_micros();
     publish_triggers_usage(trigger_data_stream).await;
 
     Ok(())
@@ -323,7 +327,7 @@ async fn handle_report_triggers(trigger: scheduler::Trigger) -> Result<(), anyho
     }
 
     report.last_triggered_at = Some(now);
-    let result = db::dashboards::reports::set(org_id, &report, false).await;
+    let result = db::dashboards::reports::set_without_updating_trigger(org_id, &report).await;
     if result.is_err() {
         log::error!(
             "Failed to update report: {report_name} after trigger: {}",

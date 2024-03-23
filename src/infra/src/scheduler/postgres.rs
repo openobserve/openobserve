@@ -47,16 +47,16 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 (
     id           BIGINT GENERATED ALWAYS AS IDENTITY,
     org          VARCHAR(100) not null,
-    module       VARCHAR(100) not null,
+    module       INT not null,
     module_key   VARCHAR(256) not null,
     is_realtime  BOOLEAN default false not null,
     is_silenced  BOOLEAN default false not null,
     status       INT not null,
     start_time   BIGINT,
     end_time     BIGINT,
-    retries      INT,
+    retries      INT not null,
     next_run_at  BIGINT not null,
-    createdAt    TIMESTAMP default CURRENT_TIMESTAMP
+    created_at   TIMESTAMP default CURRENT_TIMESTAMP
 );
             "#,
         )
@@ -66,6 +66,20 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+
+        let queries = vec![
+            "CREATE INDEX IF NOT EXISTS scheduled_jobs_key_idx on scheduled_jobs (module_key);",
+            "CREATE INDEX IF NOT EXISTS scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
+        ];
+
+        for query in queries {
+            if let Err(e) = sqlx::query(query).execute(&pool).await {
+                log::error!("[POSTGRES] create table scheduled_jobs index error: {}", e);
+                return Err(e.into());
+            }
+        }
         Ok(())
     }
 
@@ -100,8 +114,8 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, next_run_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT DO NOTHING;
         "#,
         )
@@ -111,6 +125,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(&trigger.is_realtime)
         .bind(&trigger.is_silenced)
         .bind(&trigger.status)
+        .bind(&trigger.retries)
         .bind(&trigger.next_run_at)
         .execute(&mut *tx)
         .await
@@ -132,11 +147,11 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(
-            r#"DELETE FROM scheduled_jobs WHERE org = $1 AND module = $2 AND module_key = $3;"#,
+            r#"DELETE FROM scheduled_jobs WHERE org = $1 AND module_key = $2 AND module = $3;"#,
         )
         .bind(org)
-        .bind(module)
         .bind(key)
+        .bind(module)
         .execute(&pool)
         .await?;
         Ok(())
@@ -153,13 +168,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     ) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(
-            r#"UPDATE scheduled_jobs SET status = $1, retries = $2 WHERE org = $3 AND module = $4 AND module_key = $5;"#
+            r#"UPDATE scheduled_jobs SET status = $1, retries = $2 WHERE org = $3 AND module_key = $4 AND module = $5;"#
         )
         .bind(status)
         .bind(retries)
         .bind(org)
-        .bind(module)
         .bind(key)
+        .bind(module)
         .execute(&pool).await?;
         Ok(())
     }
@@ -169,7 +184,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5
-WHERE org = $6 AND module = $7 AND module_key = $8;"#,
+WHERE org = $6 AND module_key = $7 AND module = $8;"#,
         )
         .bind(trigger.status)
         .bind(trigger.retries)
@@ -177,8 +192,8 @@ WHERE org = $6 AND module = $7 AND module_key = $8;"#,
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
         .bind(trigger.org)
-        .bind(trigger.module)
         .bind(trigger.module_key)
+        .bind(trigger.module)
         .execute(&pool)
         .await?;
         Ok(())
@@ -192,31 +207,47 @@ WHERE org = $6 AND module = $7 AND module_key = $8;"#,
     /// - Changes their statuses from "Waiting" to "Processing"
     /// - Commits as a single transaction
     /// - Returns the Trigger jobs
-    async fn pull(&self, concurrency: i64, timeout: i64) -> Result<Vec<Trigger>> {
+    async fn pull(
+        &self,
+        concurrency: i64,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
 
         let now = chrono::Utc::now().timestamp_micros();
-        let max_time = now
-            + Duration::try_seconds(timeout)
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
         let query = r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2, end_time = $3
+SET status = $1, start_time = $2,
+    end_time = CASE
+        WHEN module = $3 THEN $4
+        ELSE $5
+    END
 WHERE id IN (
     SELECT id
     FROM scheduled_jobs
-    WHERE status = $4 AND next_run_at <= $5 AND retries < $6 AND NOT (is_realtime = $7 AND is_silenced = $8)
+    WHERE status = $6 AND next_run_at <= $7 AND retries < $8 AND NOT (is_realtime = $9 AND is_silenced = $10)
     ORDER BY next_run_at
     FOR UPDATE SKIP LOCKED
-    LIMIT $9
+    LIMIT $11
 )
-RETURNING *"#;
+RETURNING *;"#;
 
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
-            .bind(max_time)
+            .bind(TriggerModule::Alert)
+            .bind(alert_max_time)
+            .bind(report_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
             .bind(CONFIG.limit.scheduler_max_retries)
@@ -245,9 +276,11 @@ RETURNING *"#;
 
             if res.is_err() {
                 log::error!(
-                    "[SCHEDULER] error cleaning up completed and dead jobs: {}",
+                    "[POSTGRES] error cleaning up completed and dead scheduled_jobs: {}",
                     res.err().unwrap()
                 );
+            } else {
+                log::info!("[SCHEDULER] clean up complete");
             }
         }
     }
@@ -268,7 +301,7 @@ RETURNING *"#;
             let res = sqlx::query(
                 r#"UPDATE scheduled_jobs
 SET status = $1, retries = retries + 1
-WHERE status = $2 AND end_time <= $3
+WHERE status = $2 AND end_time <= $3;
                 "#,
             )
             .bind(TriggerStatus::Waiting)
@@ -279,9 +312,11 @@ WHERE status = $2 AND end_time <= $3
 
             if res.is_err() {
                 log::error!(
-                    "[SCHEDULER] error during watching for timeout for dead jobs: {}",
+                    "[POSTGRES] error during watching for timeout for dead scheduled_jobs: {}",
                     res.err().unwrap()
                 );
+            } else {
+                log::info!("[SCHEDULER] watch timeout run complete");
             }
         }
     }
@@ -312,6 +347,15 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
     }
 
     async fn clear(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+        match sqlx::query(r#"DELETE FROM scheduled_jobs;"#)
+            .execute(&pool)
+            .await
+        {
+            Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),
+            Err(e) => log::error!("[POSTGRES] error clearing scheduled_jobs table: {}", e),
+        }
+
         Ok(())
     }
 }

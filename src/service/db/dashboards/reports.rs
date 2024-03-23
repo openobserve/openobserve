@@ -35,18 +35,8 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
 }
 
 pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
-    let schedule_key = format!("{}", report.name);
-    let key = format!("/reports/{org_id}/{}", &schedule_key);
-    match db
-        .put(
-            &key,
-            json::to_vec(report).unwrap().into(),
-            infra_db::NEED_WATCH,
-        )
-        .await
-    {
-        Ok(_) => {
+    match set_without_updating_trigger(org_id, report).await {
+        Ok(schedule_key) => {
             let trigger = scheduler::Trigger {
                 org: org_id.to_string(),
                 module: scheduler::TriggerModule::Report,
@@ -73,6 +63,26 @@ pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyh
             }
         }
         Err(e) => Err(anyhow::anyhow!("Error saving report: {}", e)),
+    }
+}
+
+pub async fn set_without_updating_trigger(
+    org_id: &str,
+    report: &Report,
+) -> Result<String, anyhow::Error> {
+    let db = infra_db::get_db().await;
+    let schedule_key = format!("{}", report.name);
+    let key = format!("/reports/{org_id}/{}", &schedule_key);
+    match db
+        .put(
+            &key,
+            json::to_vec(report).unwrap().into(),
+            infra_db::NEED_WATCH,
+        )
+        .await
+    {
+        Ok(_) => Ok(schedule_key),
+        Err(e) => Err(anyhow::anyhow!("{e}")),
     }
 }
 

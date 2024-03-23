@@ -274,8 +274,8 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
     drop(usages);
 
     let mut json_triggers = vec![];
-    for usage_data in &curr_usages {
-        json_triggers.push(json::to_value(usage_data).unwrap());
+    for trigger_data in &curr_usages {
+        json_triggers.push(json::to_value(trigger_data).unwrap());
     }
 
     // report trigger usage data

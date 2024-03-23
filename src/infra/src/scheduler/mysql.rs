@@ -19,7 +19,7 @@ use config::CONFIG;
 use sqlx::Row;
 use tokio::time;
 
-use super::{Trigger, TriggerModule, TriggerStatus};
+use super::{Trigger, TriggerId, TriggerModule, TriggerStatus};
 use crate::{db::mysql::CLIENT, errors::Result};
 
 pub struct MySqlScheduler {}
@@ -47,14 +47,14 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 (
     id           BIGINT not null primary key AUTO_INCREMENT,
     org          VARCHAR(100) not null,
-    module       VARCHAR(100) not null,
+    module       INT not null,
     module_key   VARCHAR(256) not null,
     is_realtime  BOOLEAN default false not null,
     is_silenced  BOOLEAN default false not null,
     status       INT not null,
     start_time   BIGINT,
     end_time     BIGINT,
-    retries      INT,
+    retries      INT not null,
     next_run_at  BIGINT not null,
     created_at   TIMESTAMP default CURRENT_TIMESTAMP
 );
@@ -66,6 +66,24 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     }
 
     async fn create_table_index(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+
+        let queries = vec![
+            "CREATE INDEX scheduled_jobs_key_idx on scheduled_jobs (module_key);",
+            "CREATE INDEX scheduled_jobs_org_key_idx on scheduled_jobs (org, module_key);",
+            "CREATE UNIQUE INDEX scheduled_jobs_org_module_key_idx on scheduled_jobs (org, module, module_key);",
+        ];
+
+        for query in queries {
+            if let Err(e) = sqlx::query(query).execute(&pool).await {
+                if e.to_string().contains("Duplicate key") {
+                    // index already exists
+                    return Ok(());
+                }
+                log::error!("[MYSQL] create table scheduled_jobs index error: {}", e);
+                return Err(e.into());
+            }
+        }
         Ok(())
     }
 
@@ -100,9 +118,8 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
 
         if let Err(e) = sqlx::query(
             r#"
-INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, next_run_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT DO NOTHING;
+INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, status, retries, next_run_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
         "#,
         )
         .bind(&trigger.org)
@@ -111,6 +128,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         .bind(&trigger.is_realtime)
         .bind(&trigger.is_silenced)
         .bind(&trigger.status)
+        .bind(&trigger.retries)
         .bind(&trigger.next_run_at)
         .execute(&mut *tx)
         .await
@@ -153,13 +171,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     ) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(
-            r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module = ? AND module_key = ?;"#
+            r#"UPDATE scheduled_jobs SET status = ?, retries = ? WHERE org = ? AND module_key = ? AND module = ?;"#
         )
         .bind(status)
         .bind(retries)
         .bind(org)
-        .bind(module)
         .bind(key)
+        .bind(module)
         .execute(&pool).await?;
         Ok(())
     }
@@ -169,7 +187,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = ?, retries = ?, next_run_at = ?, is_realtime = ?, is_silenced = ?
-WHERE org = ? AND module = ? AND module_key = ?;"#,
+WHERE org = ? AND module_key = ? AND module = ?;"#,
         )
         .bind(trigger.status)
         .bind(trigger.retries)
@@ -177,8 +195,8 @@ WHERE org = ? AND module = ? AND module_key = ?;"#,
         .bind(trigger.is_realtime)
         .bind(trigger.is_silenced)
         .bind(trigger.org)
-        .bind(trigger.module)
         .bind(trigger.module_key)
+        .bind(trigger.module)
         .execute(&pool)
         .await?;
         Ok(())
@@ -192,37 +210,89 @@ WHERE org = ? AND module = ? AND module_key = ?;"#,
     /// - Changes their statuses from "Waiting" to "Processing"
     /// - Commits as a single transaction
     /// - Returns the Trigger jobs
-    async fn pull(&self, concurrency: i64, timeout: i64) -> Result<Vec<Trigger>> {
+    async fn pull(
+        &self,
+        concurrency: i64,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
 
         let now = chrono::Utc::now().timestamp_micros();
-        let max_time = now
-            + Duration::try_seconds(timeout)
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        let query = r#"UPDATE scheduled_jobs
-SET status = ?, start_time = ?, end_time = ?
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? AND is_silenced = ?)
-    ORDER BY next_run_at
-    FOR UPDATE SKIP LOCKED
-    LIMIT ?
-)
-RETURNING *"#;
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let mut tx = pool.begin().await?;
+        let job_ids: Vec<TriggerId> = match sqlx::query_as::<_, TriggerId>(
+            r#"SELECT id
+FROM scheduled_jobs
+WHERE status = ? AND next_run_at <= ? AND retries < ? AND NOT (is_realtime = ? AND is_silenced = ?)
+ORDER BY next_run_at
+LIMIT ?
+FOR UPDATE SKIP LOCKED;
+        "#,
+        )
+        .bind(TriggerStatus::Waiting)
+        .bind(now)
+        .bind(CONFIG.limit.scheduler_max_retries)
+        .bind(true)
+        .bind(false)
+        .bind(concurrency)
+        .fetch_all(&mut *tx)
+        .await
+        {
+            Ok(ids) => ids,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback select jobs for update error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
+        let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
+
+        if let Err(e) = sqlx::query(
+            r#"UPDATE scheduled_jobs
+SET status = ?, start_time = ?,
+    end_time = CASE
+        WHEN module = ? THEN ?
+        ELSE ?
+    END
+WHERE FIND_IN_SET(id, ?);
+            "#,
+        )
+        .bind(TriggerStatus::Processing)
+        .bind(now)
+        .bind(TriggerModule::Alert)
+        .bind(alert_max_time)
+        .bind(report_max_time)
+        .bind(job_ids.join(","))
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback update scheduled jobs status error: {}", e);
+            }
+            return Err(e.into());
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit scheduler pull update error: {}", e);
+            return Err(e.into());
+        }
+
+        let query = r#"SELECT * FROM scheduled_jobs WHERE FIND_IN_SET(id, ?);"#;
 
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
-            .bind(TriggerStatus::Processing)
-            .bind(now)
-            .bind(max_time)
-            .bind(TriggerStatus::Waiting)
-            .bind(now)
-            .bind(CONFIG.limit.scheduler_max_retries)
-            .bind(true)
-            .bind(false)
-            .bind(concurrency)
+            .bind(job_ids.join(","))
             .fetch_all(&pool)
             .await?;
         Ok(jobs)
@@ -248,6 +318,8 @@ RETURNING *"#;
                     "[SCHEDULER] error cleaning up completed and dead jobs: {}",
                     res.err().unwrap()
                 );
+            } else {
+                log::info!("[SCHEDULER] clean up complete");
             }
         }
     }
@@ -282,6 +354,8 @@ WHERE status = ? AND end_time <= ?
                     "[SCHEDULER] error during watching for timeout for dead jobs: {}",
                     res.err().unwrap()
                 );
+            } else {
+                log::info!("[SCHEDULER] watch timeout run complete");
             }
         }
     }
@@ -312,6 +386,15 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
     }
 
     async fn clear(&self) -> Result<()> {
+        let pool = CLIENT.clone();
+        match sqlx::query(r#"DELETE FROM scheduled_jobs;"#)
+            .execute(&pool)
+            .await
+        {
+            Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),
+            Err(e) => log::error!("[MYSQL] error clearing scheduled_jobs table: {}", e),
+        }
+
         Ok(())
     }
 }

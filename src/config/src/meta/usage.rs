@@ -30,6 +30,8 @@ pub enum TriggerDataStatus {
     Completed,
     #[serde(rename = "failed")]
     Failed,
+    #[serde(rename = "condition_not_satisfied")]
+    ConditionNotSatisfied,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
