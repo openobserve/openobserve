@@ -95,7 +95,9 @@ export const getUserInfo = (loginString: string) => {
       const propArr = token.split("=");
       if (propArr[0] == "id_token") {
         decToken = getDecodedAccessToken(propArr[1]);
-        const encodedSessionData = b64EncodeUnicode(JSON.stringify(decToken));
+        const encodedSessionData: any = b64EncodeStandard(
+          JSON.stringify(decToken)
+        );
 
         useLocalUserInfo(encodedSessionData);
         useLocalToken("Bearer " + propArr[1]);
@@ -129,7 +131,7 @@ export const getLogoutURL = () => {
 
 export const getDecodedAccessToken = (token: string) => {
   try {
-    const decodedString = b64DecodeUnicode(token.split(".")[1]);
+    const decodedString = b64DecodeStandard(token.split(".")[1]);
     if (typeof decodedString == "string") {
       return JSON.parse(decodedString);
     } else {
@@ -140,7 +142,42 @@ export const getDecodedAccessToken = (token: string) => {
   }
 };
 
+// url safe base64 encode
 export const b64EncodeUnicode = (str: string) => {
+  try {
+    return btoa(
+      encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(`0x${p1}`));
+      })
+    )
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, ".");
+  } catch (e) {
+    console.log("Error: getBase64Encode: error while encoding.");
+    return null;
+  }
+};
+
+//url safe base64 decode
+export const b64DecodeUnicode = (str: string) => {
+  try {
+    return decodeURIComponent(
+      Array.prototype.map
+        .call(
+          atob(str.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "=")),
+          function (c) {
+            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+          }
+        )
+        .join("")
+    );
+  } catch (e) {
+    console.log("Error: getBase64Decode: error while decoding.");
+  }
+};
+
+export const b64EncodeStandard = (str: string) => {
   try {
     return btoa(
       encodeURIComponent(str).replace(
@@ -155,7 +192,7 @@ export const b64EncodeUnicode = (str: string) => {
   }
 };
 
-export const b64DecodeUnicode = (str: string) => {
+export const b64DecodeStandard = (str: string) => {
   try {
     return decodeURIComponent(
       Array.prototype.map
@@ -232,7 +269,7 @@ export const getDecodedUserInfo = () => {
   try {
     if (useLocalUserInfo() != null) {
       const userinfo: any = useLocalUserInfo();
-      return b64DecodeUnicode(userinfo);
+      return b64DecodeStandard(userinfo);
     } else {
       return null;
     }
