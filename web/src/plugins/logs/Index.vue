@@ -594,7 +594,7 @@ export default defineComponent({
       refreshData();
     };
 
-    function removeFieldByName(data, fieldName, orderby) {
+    function removeFieldByName(data, fieldName) {
       return data.filter((item) => {
         if (item.expr) {
           if (item.expr.column === fieldName) {
@@ -622,11 +622,7 @@ export default defineComponent({
         if (isFieldExistInSQL) {
           //remove the field from the query
           if (parsedSQL.columns.length > 0) {
-            let filteredData = removeFieldByName(
-              parsedSQL.columns,
-              field.name,
-              parsedSQL.orderby
-            );
+            let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
               field.name
@@ -641,11 +637,7 @@ export default defineComponent({
           //add the field in the query
           if (parsedSQL.columns.length > 0) {
             // iterate and remove the * from the query
-            parsedSQL.columns = removeFieldByName(
-              parsedSQL.columns,
-              "*",
-              parsedSQL.orderby
-            );
+            parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
           }
 
           parsedSQL.columns.push({
@@ -656,8 +648,13 @@ export default defineComponent({
           });
         }
 
-        const newQuery = parser.sqlify(parsedSQL).replace(/`/g, "");
-        console.log(newQuery);
+        const newQuery = parser
+          .sqlify(parsedSQL)
+          .replace(/`/g, "")
+          .replace(
+            searchObj.data.stream.selectedStream.value,
+            `"${searchObj.data.stream.selectedStream.value}"`
+          );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
 
