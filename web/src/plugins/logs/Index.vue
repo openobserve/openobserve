@@ -648,6 +648,15 @@ export default defineComponent({
           });
         }
 
+        if (parsedSQL.columns.length == 0) {
+          parsedSQL.columns.push({
+            expr: {
+              type: "column_ref",
+              column: "*",
+            },
+          });
+        }
+
         const newQuery = parser
           .sqlify(parsedSQL)
           .replace(/`/g, "")
