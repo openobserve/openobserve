@@ -455,7 +455,9 @@ const useLogs = () => {
       let query = searchObj.data.editorValue;
       const req: any = {
         query: {
-          sql: 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+          sql: searchObj.meta.sqlMode
+            ? query
+            : 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from:
@@ -544,6 +546,7 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
+        searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
 
         if (parsedSQL.orderby == null) {
@@ -1528,7 +1531,7 @@ const useLogs = () => {
         }
 
         const fields: any = {};
-        let localInterestingFields: any = useLocalInterestingFields();
+        const localInterestingFields: any = useLocalInterestingFields();
         searchObj.data.stream.interestingFieldList =
           localInterestingFields.value != null &&
           localInterestingFields.value[
@@ -1567,10 +1570,12 @@ const useLogs = () => {
               );
               if (index == -1 && row.name != "*") {
                 // searchObj.data.stream.interestingFieldList.push(row.name);
-                for (const stream of searchObj.data.stream.selectedStreamFields) {
+                for (const stream of searchObj.data.stream
+                  .selectedStreamFields) {
                   if ((stream as { name: string }).name == row.name) {
                     searchObj.data.stream.interestingFieldList.push(row.name);
-                    const localInterestingFields: any = useLocalInterestingFields();
+                    const localInterestingFields: any =
+                      useLocalInterestingFields();
                     let localFields: any = {};
                     if (localInterestingFields.value != null) {
                       localFields = localInterestingFields.value;
@@ -2115,23 +2120,27 @@ const useLogs = () => {
     }
   };
 
-  const onStreamChange = async () => {
+  const onStreamChange = async (queryStr: string) => {
     let query = searchObj.meta.sqlMode
-      ? `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
+      ? queryStr != ""
+        ? queryStr
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
 
     await extractFields();
 
-    if (
-      searchObj.data.stream.interestingFieldList.length > 0 &&
-      searchObj.meta.quickMode
-    ) {
-      query = query.replace(
-        "[FIELD_LIST]",
-        searchObj.data.stream.interestingFieldList.join(",")
-      );
-    } else {
-      query = query.replace("[FIELD_LIST]", "*");
+    if (queryStr == "") {
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
+        query = query.replace(
+          "[FIELD_LIST]",
+          searchObj.data.stream.interestingFieldList.join(",")
+        );
+      } else {
+        query = query.replace("[FIELD_LIST]", "*");
+      }
     }
 
     searchObj.data.editorValue = query;

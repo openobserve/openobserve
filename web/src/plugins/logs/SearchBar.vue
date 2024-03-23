@@ -884,12 +884,11 @@ export default defineComponent({
     }
 
     const updateQueryValue = (value: string) => {
-      searchObj.data.editorValue = value;
-
       if (searchObj.meta.quickMode == true) {
         const parsedSQL = fnParsedSQL();
 
         if (
+          parsedSQL != undefined &&
           parsedSQL.hasOwnProperty("from") &&
           parsedSQL?.from.length > 0 &&
           parsedSQL?.from[0].table !==
@@ -900,9 +899,8 @@ export default defineComponent({
             value: parsedSQL.from[0].table,
           };
           searchObj.data.stream.selectedStreamFields = [];
-          onStreamChange();
+          onStreamChange(value);
         }
-
         // if (
         //   parsedSQL.hasOwnProperty("columns") &&
         //   parsedSQL?.columns.length > 0
@@ -924,7 +922,6 @@ export default defineComponent({
         //   }
         if (parsedSQL?.columns.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
-          console.log(columnNames);
           searchObj.data.stream.interestingFieldList = [];
           for (const col of columnNames) {
             if (
@@ -963,6 +960,8 @@ export default defineComponent({
           }
         }
       }
+
+      searchObj.data.editorValue = value;
 
       updateAutoComplete(value);
       try {

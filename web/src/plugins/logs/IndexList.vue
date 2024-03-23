@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-selected
         fill-input
         @filter="filterStreamFn"
-        @update:model-value="onStreamChange"
+        @update:model-value="onStreamChange('')"
       >
         <template #no-option>
           <q-item>
