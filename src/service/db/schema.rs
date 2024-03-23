@@ -447,13 +447,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match db.list_values(&ev.key).await {
                         Ok(val) => val
                             .iter()
-                            .map(|v| {
+                            .flat_map(|v| {
                                 let values: Vec<Schema> = json::from_slice(v).unwrap();
-                                let test = values.clone();
-                                println!("value inside collect : {:?}", test);
-                                test
+                                values.clone()
                             })
-                            .flatten()
                             .collect::<Vec<Schema>>(),
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
@@ -471,13 +468,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     drop(sl);
                 }
                 let mut sa = STREAM_SCHEMAS.write().await;
-                sa.insert(item_key.to_string(), item_value.clone());
-
-                // print all values form STREAM_SCHEMAS
-                for (key, value) in &*sa {
-                    println!("key: {} -> value: {:?}", key, value);
-                }
-
+                sa.insert(item_key.to_string(), item_value);
                 drop(sa);
 
                 let mut w = STREAM_SETTINGS.write().await;
