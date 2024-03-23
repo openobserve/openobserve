@@ -23,7 +23,6 @@ use crate::common::{infra::config::STREAM_ALERTS, meta::alerts::Alert};
 pub mod alert_manager;
 pub mod destinations;
 pub mod templates;
-pub mod triggers;
 
 pub async fn get(
     org_id: &str,
@@ -104,7 +103,7 @@ pub async fn delete(
     let db = infra_db::get_db().await;
     let schedule_key = format!("{stream_type}/{stream_name}/{name}");
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
         Ok(_) => {
             match scheduler::delete(org_id, scheduler::TriggerModule::Alert, &schedule_key).await {
                 Ok(_) => Ok(()),

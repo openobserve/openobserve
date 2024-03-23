@@ -78,6 +78,7 @@ pub async fn set_without_updating_trigger(
             &key,
             json::to_vec(report).unwrap().into(),
             infra_db::NEED_WATCH,
+            None,
         )
         .await
     {
@@ -89,7 +90,7 @@ pub async fn set_without_updating_trigger(
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/reports/{org_id}/{name}");
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
         Ok(_) => match scheduler::delete(org_id, scheduler::TriggerModule::Report, name).await {
             Ok(_) => Ok(()),
             Err(e) => {
@@ -161,5 +162,5 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn reset() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = "/reports/";
-    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
+    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?)
 }

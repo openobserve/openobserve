@@ -66,8 +66,6 @@ pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
     Lazy::new(Default::default);
-pub static TRIGGERS: Lazy<RwAHashMap<String, alerts::triggers::Trigger>> =
-    Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
     Lazy::new(Default::default);
 pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, alerts::destinations::Destination>> =

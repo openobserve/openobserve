@@ -53,7 +53,6 @@ use crate::{
 pub mod alert_manager;
 pub mod destinations;
 pub mod templates;
-pub mod triggers;
 
 pub async fn save(
     org_id: &str,
