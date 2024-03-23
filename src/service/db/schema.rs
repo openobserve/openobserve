@@ -444,14 +444,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
+                    match db.list_values(&ev.key).await {
+                        Ok(val) => val
+                            .iter()
+                            .map(|v| {
+                                let values: Vec<Schema> = json::from_slice(v).unwrap();
+                                let test = values.clone();
+                                println!("value inside collect : {:?}", test);
+                                test
+                            })
+                            .flatten()
+                            .collect::<Vec<Schema>>(),
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
                             continue;
@@ -461,15 +464,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
 
-                let settings = stream_settings(item_value.last().unwrap()).unwrap_or_default();
-                if let Some(last) = item_value.last() {
+                let settings = stream_settings(item_value.first().unwrap()).unwrap_or_default();
+                if let Some(first) = item_value.first() {
                     let mut sl = STREAM_SCHEMAS_LATEST.write().await;
-                    sl.insert(item_key.to_string(), last.clone());
+                    sl.insert(item_key.to_string(), first.clone());
                     drop(sl);
                 }
                 let mut sa = STREAM_SCHEMAS.write().await;
                 sa.insert(item_key.to_string(), item_value.clone());
+
+                // print all values form STREAM_SCHEMAS
+                for (key, value) in &*sa {
+                    println!("key: {} -> value: {:?}", key, value);
+                }
+
                 drop(sa);
+
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
@@ -564,15 +574,17 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 ));
             }
         };
-        let settings = stream_settings(json_val.last().unwrap()).unwrap_or_default();
+        let settings = stream_settings(json_val.first().unwrap()).unwrap_or_default();
         if let Some(first) = json_val.first() {
             let mut sl = STREAM_SCHEMAS_LATEST.write().await;
             sl.insert(item_key_str.to_string(), first.clone());
             drop(sl);
         }
         let mut sa = STREAM_SCHEMAS.write().await;
-        sa.insert(item_key_str.to_string(), json_val);
+        sa.insert(item_key_str.to_string(), json_val.clone());
+        println!("item_key_str: {} -> schemas {:?}", item_key_str, json_val);
         drop(sa);
+
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key_str.to_string(), settings);
         drop(w);
