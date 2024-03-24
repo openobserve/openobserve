@@ -573,7 +573,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let mut sa = STREAM_SCHEMAS.write().await;
         sa.insert(item_key_str.to_string(), json_val.clone());
-        println!("item_key_str: {} -> schemas {:?}", item_key_str, json_val);
         drop(sa);
 
         let mut w = STREAM_SETTINGS.write().await;
