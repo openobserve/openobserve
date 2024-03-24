@@ -54,10 +54,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         println!("[Schema:Migration]: Start migrating schema: {}", key);
         let schemas: Vec<Schema> = json::from_slice(&val).unwrap();
-
+        let mut prev_end_dt: i64 = 0;
         for schema in schemas {
             let meta = schema.metadata();
-            let start_dt: i64 = meta.get("start_dt").unwrap().clone().parse().unwrap();
+            let start_dt: i64 = match meta.get("start_dt") {
+                Some(val) => val.clone().parse().unwrap(),
+                None => {
+                    if prev_end_dt == 0 {
+                        meta.get("created_at").unwrap().clone().parse().unwrap()
+                    } else {
+                        prev_end_dt + 1
+                    }
+                }
+            };
+            prev_end_dt = meta.get("end_dt").unwrap().clone().parse().unwrap();
             db.put(
                 &key,
                 json::to_vec(&vec![schema]).unwrap().into(),
