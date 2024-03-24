@@ -1584,11 +1584,7 @@ const useLogs = () => {
               index = searchObj.data.stream.interestingFieldList.indexOf(
                 row.name
               );
-              // console.log(index)
               if (index == -1 && row.name != "*") {
-                // searchObj.data.stream.interestingFieldList.push(row.name);
-                // console.log(JSON.parse(JSON.stringify(searchObj.data.stream.selectedStreamFields)));
-
                 for (const [
                   index,
                   stream,
@@ -1614,17 +1610,6 @@ const useLogs = () => {
                 }
               }
             }
-
-            // searchObj.data.stream.selectedStreamFields.push({
-            //   name: row.name,
-            //   ftsKey: ftsKeys?.has(row.name),
-            //   isSchemaField: schemaFields.has(row.name),
-            //   showValues: row.name !== timestampField,
-            //   isInterestingField:
-            //     searchObj.data.stream.interestingFieldList.includes(row.name)
-            //       ? true
-            //       : false,
-            // });
           }
           // }
         }
