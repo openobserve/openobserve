@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         hide-selected
         fill-input
         @filter="filterStreamFn"
-        @update:model-value="onStreamChange"
+        @update:model-value="onStreamChange('')"
       >
         <template #no-option>
           <q-item>
@@ -88,10 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="props.row.name"
               >
                 <div
-                  class="field_label ellipsis full-width"
+                  class="field_label full-width"
                   :data-test="`logs-field-list-item-${props.row.name}`"
                 >
-                  {{ props.row.name }}
+                  <div
+                    class="ellipsis"
+                    style="max-width: 90% !important; display: inline-block"
+                  >
+                    {{ props.row.name }}
+                  </div>
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
@@ -99,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
-                      class="light-dimmed"
+                      :class="store.state.theme === 'dark' ? '' : 'light-dimmed'"
                       style="margin-right: 0.375rem"
                       size="1.1rem"
                       :title="
@@ -189,10 +194,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`log-search-expand-${props.row.name}-field-btn`"
                   >
                     <div
-                      class="field_label ellipsis full-width"
+                      class="field_label full-width"
                       :data-test="`logs-field-list-item-${props.row.name}`"
                     >
-                      {{ props.row.name }}
+                      <div
+                        class="ellipsis"
+                        style="max-width: 90% !important; display: inline-block"
+                      >
+                        {{ props.row.name }}
+                      </div>
                       <span class="float-right">
                         <q-icon
                           :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
@@ -202,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'info'
                               : 'info_outline'
                           "
-                          class="light-dimmed"
+                          :class="store.state.theme === 'dark' ? '' : 'light-dimmed'"
                           style="margin-right: 0.375rem"
                           size="1.1rem"
                           :title="
@@ -710,8 +720,24 @@ export default defineComponent({
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name
         );
-        if (index == -1) {
-          searchObj.data.stream.interestingFieldList.push(field.name);
+        if (index == -1 && field.name != "*") {
+          // searchObj.data.stream.interestingFieldList.push(field.name);
+          for (const stream of searchObj.data.stream.selectedStreamFields) {
+            if ((stream as { name: string }).name == field.name) {
+              searchObj.data.stream.interestingFieldList.push(field.name);
+              const localInterestingFields: any = useLocalInterestingFields();
+              let localFields: any = {};
+              if (localInterestingFields.value != null) {
+                localFields = localInterestingFields.value;
+              }
+              localFields[
+                searchObj.organizationIdetifier +
+                  "_" +
+                  searchObj.data.stream.selectedStream.value
+              ] = searchObj.data.stream.interestingFieldList;
+              useLocalInterestingFields(localFields);
+            }
+          }
         }
       }
 

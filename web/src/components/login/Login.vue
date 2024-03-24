@@ -144,7 +144,7 @@ import organizationsService from "@/services/organizations";
 import {
   useLocalToken,
   getBasicAuth,
-  b64EncodeUnicode,
+  b64EncodeStandard,
   useLocalUserInfo,
   useLocalCurrentUser,
   useLocalOrganization,
@@ -228,7 +228,7 @@ export default defineComponent({
                   email: name.value,
                   role: res.data.role,
                 };
-                const encodedUserInfo = b64EncodeUnicode(
+                const encodedUserInfo: any = b64EncodeStandard(
                   JSON.stringify(userInfo)
                 );
 

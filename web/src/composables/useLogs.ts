@@ -455,7 +455,9 @@ const useLogs = () => {
       let query = searchObj.data.editorValue;
       const req: any = {
         query: {
-          sql: 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+          sql: searchObj.meta.sqlMode
+            ? query
+            : 'select [FIELD_LIST][QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from:
@@ -544,6 +546,7 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
+        searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
 
         if (parsedSQL.orderby == null) {
@@ -1565,8 +1568,26 @@ const useLogs = () => {
               index = searchObj.data.stream.interestingFieldList.indexOf(
                 row.name
               );
-              if (index == -1) {
-                searchObj.data.stream.interestingFieldList.push(row.name);
+              if (index == -1 && row.name != "*") {
+                // searchObj.data.stream.interestingFieldList.push(row.name);
+                for (const stream of searchObj.data.stream
+                  .selectedStreamFields) {
+                  if ((stream as { name: string }).name == row.name) {
+                    searchObj.data.stream.interestingFieldList.push(row.name);
+                    const localInterestingFields: any =
+                      useLocalInterestingFields();
+                    let localFields: any = {};
+                    if (localInterestingFields.value != null) {
+                      localFields = localInterestingFields.value;
+                    }
+                    localFields[
+                      searchObj.organizationIdetifier +
+                        "_" +
+                        searchObj.data.stream.selectedStream.value
+                    ] = searchObj.data.stream.interestingFieldList;
+                    useLocalInterestingFields(localFields);
+                  }
+                }
               }
             }
 
@@ -1795,7 +1816,6 @@ const useLogs = () => {
         }
         query_context = b64EncodeUnicode(query_context);
       }
-      alert(query_context)
 
       let query_fn: any = "";
       if (
@@ -2100,23 +2120,27 @@ const useLogs = () => {
     }
   };
 
-  const onStreamChange = async () => {
+  const onStreamChange = async (queryStr: string) => {
     let query = searchObj.meta.sqlMode
-      ? `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
+      ? queryStr != ""
+        ? queryStr
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
       : "";
 
     await extractFields();
 
-    if (
-      searchObj.data.stream.interestingFieldList.length > 0 &&
-      searchObj.meta.quickMode
-    ) {
-      query = query.replace(
-        "[FIELD_LIST]",
-        searchObj.data.stream.interestingFieldList.join(",")
-      );
-    } else {
-      query = query.replace("[FIELD_LIST]", "*");
+    if (queryStr == "") {
+      if (
+        searchObj.data.stream.interestingFieldList.length > 0 &&
+        searchObj.meta.quickMode
+      ) {
+        query = query.replace(
+          "[FIELD_LIST]",
+          searchObj.data.stream.interestingFieldList.join(",")
+        );
+      } else {
+        query = query.replace("[FIELD_LIST]", "*");
+      }
     }
 
     searchObj.data.editorValue = query;
