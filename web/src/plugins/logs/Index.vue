@@ -567,11 +567,6 @@ export default defineComponent({
         }
       } catch (e) {
         console.log("Logs : Error in setQuery");
-        $q.notify({
-          message: "Error while setting up query",
-          color: "negative",
-          timeout: 2000,
-        });
       }
     };
 
@@ -599,7 +594,7 @@ export default defineComponent({
       refreshData();
     };
 
-    function removeFieldByName(data, fieldName, orderby) {
+    function removeFieldByName(data, fieldName) {
       return data.filter((item) => {
         if (item.expr) {
           if (item.expr.column === fieldName) {
@@ -627,11 +622,7 @@ export default defineComponent({
         if (isFieldExistInSQL) {
           //remove the field from the query
           if (parsedSQL.columns.length > 0) {
-            let filteredData = removeFieldByName(
-              parsedSQL.columns,
-              field.name,
-              parsedSQL.orderby
-            );
+            let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
               field.name
@@ -644,6 +635,11 @@ export default defineComponent({
           }
         } else {
           //add the field in the query
+          if (parsedSQL.columns.length > 0) {
+            // iterate and remove the * from the query
+            parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
+          }
+
           parsedSQL.columns.push({
             expr: {
               type: "column_ref",
@@ -652,8 +648,22 @@ export default defineComponent({
           });
         }
 
-        const newQuery = parser.sqlify(parsedSQL).replace(/`/g, "");
-        console.log(newQuery);
+        if (parsedSQL.columns.length == 0) {
+          parsedSQL.columns.push({
+            expr: {
+              type: "column_ref",
+              column: "*",
+            },
+          });
+        }
+
+        const newQuery = parser
+          .sqlify(parsedSQL)
+          .replace(/`/g, "")
+          .replace(
+            searchObj.data.stream.selectedStream.value,
+            `"${searchObj.data.stream.selectedStream.value}"`
+          );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
 
@@ -843,10 +853,17 @@ export default defineComponent({
     },
     quickMode(newVal) {
       if (newVal == true) {
+        let field_list: string = "*";
+        if (this.searchObj.data.stream.interestingFieldList.length > 0) {
+          field_list =
+            this.searchObj.data.stream.interestingFieldList.join(",");
+        }
         if (this.searchObj.meta.sqlMode == true) {
           this.searchObj.data.query = this.searchObj.data.query.replace(
-            "*",
-            this.searchObj.data.stream.interestingFieldList.join(",")
+            /SELECT\s+(.*?)\s+FROM/i,
+            (match, fields) => {
+              return `SELECT ${field_list} FROM`;
+            }
           );
           this.setQuery(newVal);
           this.updateUrlQueryParams();
