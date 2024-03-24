@@ -1552,9 +1552,9 @@ const useLogs = () => {
             : [...schemaInterestingFields];
 
         let environmentInterestingFields = [];
-        if (store.state.zoConfig.hasOwnProperty("quick_mode_fields")) {
+        if (store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")) {
           environmentInterestingFields =
-            store.state?.zoConfig?.quick_mode_fields.split(",");
+            store.state?.zoConfig?.default_quick_mode_fields.split(",");
         }
         let index = -1;
         // queryResult.forEach((row: any) => {
