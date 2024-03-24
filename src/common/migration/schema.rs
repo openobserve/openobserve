@@ -63,7 +63,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     if prev_end_dt == 0 {
                         meta.get("created_at").unwrap().clone().parse().unwrap()
                     } else {
-                        prev_end_dt + 1
+                        prev_end_dt
                     }
                 }
             };
