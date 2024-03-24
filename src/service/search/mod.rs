@@ -419,10 +419,12 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         )
     };
 
+    let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[session_id {session_id}] search->file_list.get: time_range: {:?}, num: {}",
+        "[session_id {session_id}] search: get file_list time_range: {:?}, num: {}, took: {}",
         meta.meta.time_range,
         file_list.len(),
+        file_list_took,
     );
 
     #[cfg(not(feature = "enterprise"))]
@@ -468,7 +470,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     }
     #[cfg(feature = "enterprise")]
     dist_lock::unlock(&locker).await?;
-    let took_wait = start.elapsed().as_millis() as usize;
+    let took_wait = start.elapsed().as_millis() as usize - file_list_took;
+    log::info!(
+        "[session_id {session_id}] search: wait in queue took: {}",
+        took_wait,
+    );
 
     // set work_group
     req.work_group = work_group_str;
@@ -503,7 +509,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     };
 
     log::info!(
-        "[session_id {session_id}] search->file_list.partition: time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search: file_list done partition, time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
 
