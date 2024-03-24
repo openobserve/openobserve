@@ -40,7 +40,8 @@ pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error>
 pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
     let (cache_key, db_key) = mk_keys(org_id, key);
     let db = infra_db::get_db().await;
-    db.put(&db_key, val.clone(), infra_db::NEED_WATCH).await?;
+    db.put(&db_key, val.clone(), infra_db::NEED_WATCH, None)
+        .await?;
     KVS.insert(cache_key, val);
     Ok(())
 }
@@ -49,7 +50,9 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), anyhow::Error> {
     let (cache_key, db_key) = mk_keys(org_id, key);
     let db = infra_db::get_db().await;
     KVS.remove(&cache_key);
-    Ok(db.delete(&db_key, false, infra_db::NEED_WATCH).await?)
+    Ok(db
+        .delete(&db_key, false, infra_db::NEED_WATCH, None)
+        .await?)
 }
 
 pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {

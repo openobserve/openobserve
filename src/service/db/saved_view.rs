@@ -36,6 +36,7 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         &key,
         json::to_vec(&view).unwrap().into(),
         infra_db::NO_NEED_WATCH,
+        None,
     )
     .await?;
     Ok(view)
@@ -62,6 +63,7 @@ pub async fn update_view(
         &key,
         json::to_vec(&updated_view).unwrap().into(),
         infra_db::NO_NEED_WATCH,
+        None,
     )
     .await?;
     Ok(updated_view)
@@ -97,6 +99,7 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
 pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     let db = &infra_db::get_db().await;
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
-    db.delete(&key, false, infra_db::NO_NEED_WATCH).await?;
+    db.delete(&key, false, infra_db::NO_NEED_WATCH, None)
+        .await?;
     Ok(())
 }

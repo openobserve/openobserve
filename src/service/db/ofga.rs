@@ -53,6 +53,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                             key,
                             json::to_vec(&loc_meta).unwrap().into(),
                             infra_db::NEED_WATCH,
+                            None,
                         )
                         .await
                     {
@@ -79,6 +80,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                         key,
                         json::to_vec(&loc_meta).unwrap().into(),
                         infra_db::NEED_WATCH,
+                        None,
                     )
                     .await
                 {

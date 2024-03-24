@@ -31,6 +31,7 @@ pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
             "/syslog/enabled",
             json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
             infra_db::NEED_WATCH,
+            None,
         )
         .await?)
 }
@@ -54,6 +55,7 @@ pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
             &format!("/syslog/route/{}", route.id),
             json::to_vec(route).unwrap().into(),
             infra_db::NEED_WATCH,
+            None,
         )
         .await?)
 }
@@ -69,7 +71,12 @@ pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
 pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     Ok(db
-        .delete(&format!("/syslog/route/{id}"), false, infra_db::NEED_WATCH)
+        .delete(
+            &format!("/syslog/route/{id}"),
+            false,
+            infra_db::NEED_WATCH,
+            None,
+        )
         .await?)
 }
 
