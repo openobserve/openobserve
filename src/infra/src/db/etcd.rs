@@ -105,14 +105,26 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
         let opt = with_prefix.then(|| DeleteOptions::new().with_prefix());
@@ -320,6 +332,9 @@ impl super::Db for Etcd {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+    async fn add_start_dt_column(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub async fn create_table() -> Result<()> {
@@ -518,15 +533,15 @@ mod tests {
         }
         let client = Etcd::default();
         client
-            .put("/test/count/1", bytes::Bytes::from("1"), false)
+            .put("/test/count/1", bytes::Bytes::from("1"), false, None)
             .await
             .unwrap();
         client
-            .put("/test/count/2", bytes::Bytes::from("2"), false)
+            .put("/test/count/2", bytes::Bytes::from("2"), false, None)
             .await
             .unwrap();
         client
-            .put("/test/count/3", bytes::Bytes::from("3"), false)
+            .put("/test/count/3", bytes::Bytes::from("3"), false, None)
             .await
             .unwrap();
         let count = client.count("/test/count").await.unwrap();

@@ -424,7 +424,7 @@ async fn merge_files(
 
     // convert the file to the latest version of schema
     let schema_versions = db::schema::get_versions(org_id, stream_name, stream_type).await?;
-    let schema_latest = schema_versions.last().unwrap();
+    let schema_latest = schema_versions.first().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields =
         stream::get_stream_setting_bloom_filter_fields(schema_latest).unwrap();

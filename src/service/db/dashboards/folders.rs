@@ -30,7 +30,12 @@ pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::
     let key = format!("/folders/{org_id}/{}", folder.folder_id);
     let db = infra_db::get_db().await;
     match db
-        .put(&key, json::to_vec(&folder)?.into(), infra_db::NO_NEED_WATCH)
+        .put(
+            &key,
+            json::to_vec(&folder)?.into(),
+            infra_db::NO_NEED_WATCH,
+            None,
+        )
         .await
     {
         Ok(_) => Ok(folder),
@@ -53,5 +58,7 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
 pub(crate) async fn delete(org_id: &str, folder_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("/folders/{org_id}/{folder_id}");
     let db = infra_db::get_db().await;
-    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
+    Ok(db
+        .delete(&key, false, infra_db::NO_NEED_WATCH, None)
+        .await?)
 }

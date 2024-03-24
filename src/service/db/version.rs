@@ -30,6 +30,7 @@ pub async fn set() -> Result<(), anyhow::Error> {
         "/meta/kv/version",
         bytes::Bytes::from(config::VERSION),
         infra_db::NO_NEED_WATCH,
+        None,
     )
     .await?;
     Ok(())
