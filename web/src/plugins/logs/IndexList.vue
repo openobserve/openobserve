@@ -59,12 +59,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :filter="searchObj.data.stream.filterField"
         :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
+        :pagination="{ rowsPerPage }"
         hide-header
-        hide-bottom
         :wrap-cells="searchObj.meta.resultGrid.wrapCells"
         class="field-table full-height"
         id="fieldList"
+        :rows-per-page-options="[]"
+        :hidePagination="
+          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage
+        "
       >
         <template #body-cell-name="props">
           <q-tr :props="props">
@@ -104,7 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
-                      :class="store.state.theme === 'dark' ? '' : 'light-dimmed'"
+                      :class="
+                        store.state.theme === 'dark' ? '' : 'light-dimmed'
+                      "
                       style="margin-right: 0.375rem"
                       size="1.1rem"
                       :title="
@@ -212,7 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? 'info'
                               : 'info_outline'
                           "
-                          :class="store.state.theme === 'dark' ? '' : 'light-dimmed'"
+                          :class="
+                            store.state.theme === 'dark' ? '' : 'light-dimmed'
+                          "
                           style="margin-right: 0.375rem"
                           size="1.1rem"
                           :title="
@@ -468,6 +475,7 @@ export default defineComponent({
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
+    const rowsPerPage = ref(250);
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -785,6 +793,7 @@ export default defineComponent({
       handleQueryData,
       onStreamChange,
       addToInterestingFieldList,
+      rowsPerPage,
     };
   },
 });

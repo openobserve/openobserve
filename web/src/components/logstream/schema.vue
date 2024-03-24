@@ -45,7 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No data available.
         </div>
-        <div v-else class="indexDetailsContainer">
+        <div v-else
+class="indexDetailsContainer" style="height: 100vh">
           <div class="title" data-test="schema-stream-title-text">
             {{ indexData.name }}
           </div>
@@ -129,113 +130,132 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-          <div class="q-table__container q-table--cell-separator">
-            <table
-              class="q-table"
+          <div
+            class="q-table__container q-table--cell-separator"
+            style="margin-bottom: 30px"
+          >
+            <q-table
               data-test="schema-log-stream-field-mapping-table"
+              :rows="indexData.schema"
+              :columns="columns"
+              :row-key="(row) => 'tr_' + row.name"
+              :filter="filterField"
+              :filter-method="filterFieldFn"
+              :pagination="{ rowsPerPage }"
+              class="q-table"
+              id="schemaFieldList"
+              :rows-per-page-options="[]"
+              :hidePagination="indexData.schema.length <= rowsPerPage"
+              dense
             >
-              <thead class="sticky-table-header">
-                <tr>
-                  <th width="30px">{{ t("logStream.deleteActionLabel") }}</th>
-                  <th>{{ t("logStream.propertyName") }}</th>
-                  <th>{{ t("logStream.propertyType") }}</th>
-                  <th v-if="showFullTextSearchColumn" style="width: 220px">
-                    {{ t("logStream.indexType") }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(schema, index) in indexData.schema"
-                  :key="index + '_' + schema.name"
-                  class="list-item"
+              <template #top-right>
+                <q-input
+                  data-test="schema-field-search-input"
+                  v-model="filterField"
+                  data-cy="schema-index-field-search-input"
+                  filled
+                  borderless
+                  dense
+                  clearable
+                  debounce="1"
+                  :placeholder="t('search.searchField')"
                 >
-                  <td class="text-center">
-                    <q-checkbox
-                      v-if="
-                        schema.name !== store.state.zoConfig.timestamp_column
-                      "
-                      :data-test="`schema-stream-delete-${schema.name}-field-fts-key-checkbox`"
-                      v-model="schema.delete"
-                      size="sm"
-                      @click="addDeleteField(schema)"
-                    />
-                  </td>
-                  <td>{{ schema.name }}</td>
-                  <td>{{ schema.type }}</td>
-                  <td
-                    v-if="showFullTextSearchColumn"
-                    data-test="schema-stream-index-select"
-                    class="text-center"
-                  >
-                    <q-select
-                      v-if="
-                        schema.name !== store.state.zoConfig.timestamp_column
-                      "
-                      v-model="schema.index_type"
-                      :options="streamIndexType"
-                      :popup-content-style="{ textTransform: 'capitalize' }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm stream-schema-index-select"
-                      :option-disable="
-                        (_option) => disableOptions(schema, _option)
-                      "
-                      multiple
-                      :max-values="2"
-                      map-options
-                      emit-value
-                      clearable
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      style="width: 300px"
-                      @update:model-value="markFormDirty(schema.name, 'fts')"
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  <template #prepend>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+              </template>
+              <template v-slot:body-cell-delete="props">
+                <q-td class="text-center">
+                  <q-checkbox
+                    v-if="
+                      props.row.name !== store.state.zoConfig.timestamp_column
+                    "
+                    :data-test="`schema-stream-delete-${props.row.name}-field-fts-key-checkbox`"
+                    v-model="props.row.delete"
+                    size="sm"
+                    @click="addDeleteField(props.row)"
+                  />
+                </q-td>
+              </template>
+              <template v-slot:body-cell-name="props">
+                <q-td>{{ props.row.name }}</q-td>
+              </template>
+              <template v-slot:body-cell-type="props">
+                <q-td>{{ props.row.type }}</q-td>
+              </template>
+              <template v-slot:body-cell-index_type="props">
+                <q-td
+                  ><q-select
+                    v-if="
+                      props.row.name !== store.state.zoConfig.timestamp_column
+                    "
+                    v-model="props.row.index_type"
+                    :options="streamIndexType"
+                    :popup-content-style="{ textTransform: 'capitalize' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="stream-schema-index-select q-py-xs fit q-pa-xs"
+                    size="xs"
+                    :option-disable="
+                      (_option) => disableOptions(props.row, _option)
+                    "
+                    multiple
+                    :max-values="2"
+                    map-options
+                    emit-value
+                    autoclose
+                    clearable
+                    stack-label
+                    outlined
+                    filled
+                    dense
+                    style="width: 300px;"
+                    @update:model-value="markFormDirty(props.row.name, 'fts')"
+                  />
+                </q-td>
+              </template>
+              <template v-slot:bottom-row>
+                <q-tr
+                  ><q-td colspan="100%">
+                    <div v-if="indexData.schema.length > 0" class="q-mt-sm">
+                      <q-btn
+                        v-bind:disable="deleteFieldList.length == 0"
+                        data-test="schema-delete-button"
+                        class="q-my-sm text-bold btn-delete"
+                        color="warning"
+                        :label="t('logStream.delete')"
+                        text-color="light-text"
+                        padding="sm md"
+                        no-caps
+                        @click="confirmQueryModeChangeDialog = true"
+                      />
+                      <q-btn
+                        v-bind:disable="!formDirtyFlag"
+                        data-test="schema-update-settings-button"
+                        :label="t('logStream.updateSettings')"
+                        class="q-my-sm text-bold no-border q-ml-md float-right"
+                        color="secondary"
+                        padding="sm xl"
+                        type="submit"
+                        no-caps
+                      />
+                      <q-btn
+                        v-close-popup="true"
+                        data-test="schema-cancel-button"
+                        class="q-my-sm text-bold float-right q-ml-md"
+                        :label="t('logStream.cancel')"
+                        text-color="light-text"
+                        padding="sm md"
+                        no-caps
+                      /></div></q-td
+                ></q-tr>
+              </template>
+            </q-table>
           </div>
         </div>
-
-        <div
-          v-if="indexData.schema.length > 0"
-          class="flex q-mt-sm sticky-buttons"
-        >
-          <q-btn
-            v-bind:disable="deleteFieldList.length == 0"
-            data-test="schema-delete-button"
-            class="q-my-sm text-bold btn-delete"
-            color="warning"
-            :label="t('logStream.delete')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="confirmQueryModeChangeDialog = true"
-          />
-          <q-btn
-            v-close-popup="true"
-            data-test="schema-cancel-button"
-            class="q-my-sm text-bold"
-            :label="t('logStream.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-          />
-          <q-btn
-            v-bind:disable="!formDirtyFlag"
-            data-test="schema-update-settings-button"
-            :label="t('logStream.updateSettings')"
-            class="q-my-sm text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
-        </div>
       </q-form>
+      <br /><br /><br />
     </q-card-section>
   </q-card>
   <q-card v-else class="column q-pa-md full-height no-wrap">
@@ -296,6 +316,8 @@ export default defineComponent({
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
+    const rowsPerPage = ref(250);
+    const filterField = ref("");
 
     const streamIndexType = [
       { label: "Inverted Index", value: "fullTextSearchKey" },
@@ -328,6 +350,7 @@ export default defineComponent({
     };
 
     const deleteFields = async () => {
+      loadingState.value = true;
       await streamService
         .deleteFields(
           store.state.selectedOrganization.identifier,
@@ -335,6 +358,7 @@ export default defineComponent({
           deleteFieldList.value
         )
         .then(async (res) => {
+          loadingState.value = false;
           if (res.data.code == 200) {
             q.notify({
               color: "positive",
@@ -359,6 +383,7 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
+          loadingState.value = false;
           console.log(err);
           q.notify({
             color: "negative",
@@ -541,6 +566,7 @@ export default defineComponent({
           settings.partition_keys.concat(added_part_keys);
       }
 
+      loadingState.value = true;
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
@@ -549,6 +575,7 @@ export default defineComponent({
           settings
         )
         .then(async (res) => {
+          loadingState.value = false;
           q.notify({
             color: "positive",
             message: "Stream settings updated successfully.",
@@ -571,6 +598,7 @@ export default defineComponent({
           });
         })
         .catch((err: any) => {
+          loadingState.value = false;
           q.notify({
             color: "negative",
             message: err.response.data.message,
@@ -624,6 +652,46 @@ export default defineComponent({
       return false;
     };
 
+    const filterFieldFn = (rows: any, terms: any) => {
+      var filtered = [];
+      if (terms != "") {
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+      }
+      return filtered;
+    };
+
+    const columns = [
+      {
+        name: "delete",
+        label: t("logStream.deleteActionLabel"),
+        align: "center",
+        sortable: false,
+      },
+      {
+        name: "name",
+        label: t("logStream.propertyName"),
+        align: "center",
+        sortable: true,
+      },
+      {
+        name: "type",
+        label: t("logStream.propertyType"),
+        align: "center",
+        sortable: true,
+      },
+      {
+        name: "index_type",
+        label: t("logStream.indexType"),
+        align: "center",
+        sortable: false,
+      },
+    ];
+
     return {
       t,
       q,
@@ -649,6 +717,10 @@ export default defineComponent({
       streamIndexType,
       disableOptions,
       loadingState,
+      filterFieldFn,
+      rowsPerPage,
+      filterField,
+      columns,
     };
   },
   created() {
@@ -698,7 +770,7 @@ export default defineComponent({
       td {
         font-size: 0.875rem;
         font-weight: 600;
-        height: 35px;
+        height: 25px;
         padding: 0px 5px;
       }
     }
@@ -755,39 +827,39 @@ export default defineComponent({
   }
 }
 
-.sticky-buttons {
-  position: sticky;
-  bottom: 0px;
-  margin: 0 auto;
-  background-color: var(--q-accent);
-  box-shadow: 6px 6px 18px var(--q-accent);
-  justify-content: right;
-  width: 100%;
-  padding-right: 20px;
-}
+// .sticky-buttons {
+//   position: sticky;
+//   bottom: 0px;
+//   margin: 0 auto;
+//   background-color: var(--q-accent);
+//   box-shadow: 6px 6px 18px var(--q-accent);
+//   justify-content: right;
+//   width: 100%;
+//   padding-right: 20px;
+// }
 
-.btn-delete {
-  left: 20px;
-  position: absolute;
-}
+// .btn-delete {
+//   left: 20px;
+//   position: absolute;
+// }
 
-.sticky-table-header {
-  position: sticky;
-  top: 0px;
-  background: var(--q-accent);
-  z-index: 1;
-}
+// .sticky-table-header {
+//   position: sticky;
+//   top: 0px;
+//   background: var(--q-accent);
+//   z-index: 1;
+// }
 
-.body--dark {
-  .sticky-table-header {
-    background: var(--q-dark);
-  }
+// .body--dark {
+//   .sticky-table-header {
+//     background: var(--q-dark);
+//   }
 
-  .sticky-buttons {
-    background-color: var(--q-dark);
-    box-shadow: 6px 6px 18px var(--q-dark);
-  }
-}
+//   .sticky-buttons {
+//     background-color: var(--q-dark);
+//     box-shadow: 6px 6px 18px var(--q-dark);
+//   }
+// }
 </style>
 
 <style lang="scss">
