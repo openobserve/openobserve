@@ -112,6 +112,33 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     }))
 }
 
+/// Healthz of the node for scheduled status
+#[utoipa::path(
+    path = "/schedulez",
+    tag = "Meta",
+    responses(
+        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+    )
+)]
+#[get("/schedulez")]
+pub async fn schedulez() -> Result<HttpResponse, Error> {
+    let node_id = LOCAL_NODE_UUID.clone();
+    let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
+        return Ok(HttpResponse::InternalServerError().json(HealthzResponse {
+            status: "not ok".to_string(),
+        }));
+    };
+    Ok(if node.scheduled {
+        HttpResponse::Ok().json(HealthzResponse {
+            status: "ok".to_string(),
+        })
+    } else {
+        HttpResponse::InternalServerError().json(HealthzResponse {
+            status: "not ok".to_string(),
+        })
+    })
+}
+
 #[get("")]
 pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
