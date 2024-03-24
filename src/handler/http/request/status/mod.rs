@@ -18,6 +18,7 @@ use std::io::Error;
 use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    meta::cluster::NodeStatus,
     utils::json,
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -128,7 +129,7 @@ pub async fn schedulez() -> Result<HttpResponse, Error> {
             status: "not ok".to_string(),
         }));
     };
-    Ok(if node.scheduled {
+    Ok(if node.scheduled && node.status == NodeStatus::Online {
         HttpResponse::Ok().json(HealthzResponse {
             status: "ok".to_string(),
         })
