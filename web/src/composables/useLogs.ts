@@ -1530,7 +1530,7 @@ const useLogs = () => {
           }
         }
 
-        const fields: any = {};
+        let fields: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
         searchObj.data.stream.interestingFieldList =
           localInterestingFields.value != null &&
@@ -1559,19 +1559,40 @@ const useLogs = () => {
         let index = -1;
         // queryResult.forEach((row: any) => {
         for (const row of queryResult) {
+          if (fields[row.name] == undefined) {
+            fields[row.name] = {};
+            searchObj.data.stream.selectedStreamFields.push({
+              name: row.name,
+              ftsKey: ftsKeys?.has(row.name),
+              isSchemaField: schemaFields.has(row.name),
+              showValues: row.name !== timestampField,
+              isInterestingField:
+                searchObj.data.stream.interestingFieldList.includes(row.name)
+                  ? true
+                  : false,
+            });
+          }
+        }
+
+        fields = {};
+        for (const row of queryResult) {
           // let keys = deepKeys(row);
           // for (let i in row) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
-
             if (environmentInterestingFields.includes(row.name)) {
               index = searchObj.data.stream.interestingFieldList.indexOf(
                 row.name
               );
+              // console.log(index)
               if (index == -1 && row.name != "*") {
                 // searchObj.data.stream.interestingFieldList.push(row.name);
-                for (const stream of searchObj.data.stream
-                  .selectedStreamFields) {
+                // console.log(JSON.parse(JSON.stringify(searchObj.data.stream.selectedStreamFields)));
+
+                for (const [
+                  index,
+                  stream,
+                ] of searchObj.data.stream.selectedStreamFields.entries()) {
                   if ((stream as { name: string }).name == row.name) {
                     searchObj.data.stream.interestingFieldList.push(row.name);
                     const localInterestingFields: any =
@@ -1586,21 +1607,24 @@ const useLogs = () => {
                         searchObj.data.stream.selectedStream.value
                     ] = searchObj.data.stream.interestingFieldList;
                     useLocalInterestingFields(localFields);
+                    searchObj.data.stream.selectedStreamFields[
+                      index
+                    ].isInterestingField = true;
                   }
                 }
               }
             }
 
-            searchObj.data.stream.selectedStreamFields.push({
-              name: row.name,
-              ftsKey: ftsKeys?.has(row.name),
-              isSchemaField: schemaFields.has(row.name),
-              showValues: row.name !== timestampField,
-              isInterestingField:
-                searchObj.data.stream.interestingFieldList.includes(row.name)
-                  ? true
-                  : false,
-            });
+            // searchObj.data.stream.selectedStreamFields.push({
+            //   name: row.name,
+            //   ftsKey: ftsKeys?.has(row.name),
+            //   isSchemaField: schemaFields.has(row.name),
+            //   showValues: row.name !== timestampField,
+            //   isInterestingField:
+            //     searchObj.data.stream.interestingFieldList.includes(row.name)
+            //       ? true
+            //       : false,
+            // });
           }
           // }
         }
