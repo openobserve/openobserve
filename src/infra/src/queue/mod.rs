@@ -48,10 +48,10 @@ async fn default() -> Box<dyn Queue> {
 }
 
 async fn init_super_cluster() -> Box<dyn Queue> {
-    match CONFIG.common.queue_store.as_str().into() {
-        MetaStore::Nats => Box::new(nats::NatsQueue::super_cluster()),
-        _ => Box::new(nop::NopQueue::super_cluster()),
+    if CONFIG.common.local_mode {
+        panic!("super cluster is not supported in local mode");
     }
+    Box::new(nats::NatsQueue::super_cluster())
 }
 
 #[async_trait]

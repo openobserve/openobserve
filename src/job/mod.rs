@@ -81,11 +81,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("organization cache sync failed");
 
     // set instance id
-    let instance_id = match db::get_instance().await {
+    let instance_id = match db::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {
             let id = ider::generate();
-            let _ = db::set_instance(&id).await;
+            let _ = db::instance::set(&id).await;
             id
         }
     };

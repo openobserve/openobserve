@@ -15,9 +15,11 @@
 
 use actix_web::web;
 use config::utils::json;
-use infra::db as infra_db;
 
-use crate::common::meta::dashboards::{v1, v2, v3, Dashboard, DashboardVersion};
+use crate::{
+    common::meta::dashboards::{v1, v2, v3, Dashboard, DashboardVersion},
+    service::db,
+};
 
 pub mod folders;
 
@@ -28,8 +30,7 @@ pub(crate) async fn get(
     folder: &str,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
-    let db = infra_db::get_db().await;
-    let bytes = db.get(&key).await?;
+    let bytes = db::get(&key).await?;
     let d_version: DashboardVersion = json::from_slice(&bytes)?;
     if d_version.version == 1 {
         let dash: v1::Dashboard = json::from_slice(&bytes)?;
@@ -63,7 +64,6 @@ pub(crate) async fn put(
     body: web::Bytes,
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{}", dashboard_id);
-    let db = infra_db::get_db().await;
     let d_version: DashboardVersion = json::from_slice(&body)?;
     if d_version.version == 1 {
         let mut dash: v1::Dashboard = json::from_slice(&body)?;
@@ -72,11 +72,7 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-
-        match db
-            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
-            .await
-        {
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH).await {
             Ok(_) => Ok(Dashboard {
                 v1: Some(dash),
                 version: 1,
@@ -91,10 +87,7 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db
-            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
-            .await
-        {
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH).await {
             Ok(_) => Ok(Dashboard {
                 v2: Some(dash),
                 version: 2,
@@ -109,10 +102,7 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db
-            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
-            .await
-        {
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH).await {
             Ok(_) => Ok(Dashboard {
                 v3: Some(dash),
                 version: 3,
@@ -126,8 +116,7 @@ pub(crate) async fn put(
 #[tracing::instrument]
 pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
     let db_key = format!("/dashboard/{org_id}/{folder}/");
-    let db = infra_db::get_db().await;
-    db.list(&db_key)
+    db::list(&db_key)
         .await?
         .into_values()
         .map(|val| {
@@ -165,13 +154,11 @@ pub(crate) async fn delete(
     folder: &str,
 ) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
-    let db = infra_db::get_db().await;
-    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
+    Ok(db::delete(&key, false, db::NO_NEED_WATCH).await?)
 }
 
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
-    let db = infra_db::get_db().await;
-    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
+    Ok(db::delete(key, true, db::NO_NEED_WATCH).await?)
 }

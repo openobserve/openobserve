@@ -22,9 +22,12 @@ use config::{
 };
 use infra::db as infra_db;
 
-use crate::common::{
-    infra::config::STREAM_ALERTS,
-    meta::alerts::{triggers::Trigger, Alert},
+use crate::{
+    common::{
+        infra::config::STREAM_ALERTS,
+        meta::alerts::{triggers::Trigger, Alert},
+    },
+    service::db,
 };
 
 pub mod alert_manager;
@@ -42,9 +45,8 @@ pub async fn get(
     let value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
         v.iter().find(|x| x.name.eq(name)).cloned()
     } else {
-        let db = infra_db::get_db().await;
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-        match db.get(&key).await {
+        match db::get(&key).await {
             Ok(val) => json::from_slice(&val)?,
             Err(_) => None,
         }
@@ -58,19 +60,11 @@ pub async fn set(
     stream_name: &str,
     alert: &Alert,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!(
         "/alerts/{org_id}/{stream_type}/{stream_name}/{}",
         alert.name
     );
-    if let Err(e) = db
-        .put(
-            &key,
-            json::to_vec(alert).unwrap().into(),
-            infra_db::NEED_WATCH,
-        )
-        .await
-    {
+    if let Err(e) = db::put(&key, json::to_vec(alert).unwrap().into(), db::NEED_WATCH).await {
         return Err(anyhow::anyhow!("Error save alert: {}", e));
     }
     Ok(())
@@ -82,9 +76,8 @@ pub async fn delete(
     stream_name: &str,
     name: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-    db.delete(&key, false, infra_db::NEED_WATCH)
+    db::delete(&key, false, db::NEED_WATCH)
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting alert: {}", e))
 }
@@ -94,14 +87,12 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, anyhow::Error> {
-    let db = infra_db::get_db().await;
-
     let loc_stream_type = stream_type.unwrap_or_default();
     let key = match stream_name {
         Some(stream_name) => format!("/alerts/{org_id}/{loc_stream_type}/{stream_name}"),
         None => format!("/alerts/{org_id}/"),
     };
-    let ret = db.list_values(&key).await?;
+    let ret = db::list_values(&key).await?;
     let mut items: Vec<Alert> = Vec::with_capacity(ret.len());
     for item_value in ret {
         let json_val = json::from_slice(&item_value)?;
@@ -130,8 +121,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
                 let item_value: Alert = if config::CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -216,9 +206,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/alerts/";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let new_key = item_key.strip_prefix(key).unwrap();
         let json_val: Alert = match json::from_slice(&item_value) {
@@ -247,13 +236,12 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                     destinations,
                     ..Default::default()
                 };
-                _ = db
-                    .put(
-                        &item_key,
-                        json::to_vec(&alert).unwrap().into(),
-                        infra_db::NO_NEED_WATCH,
-                    )
-                    .await;
+                _ = db::put(
+                    &item_key,
+                    json::to_vec(&alert).unwrap().into(),
+                    db::NO_NEED_WATCH,
+                )
+                .await;
                 alert
             }
         };
@@ -268,7 +256,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/alerts/";
-    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
+    Ok(db::delete(key, true, db::NO_NEED_WATCH).await?)
 }

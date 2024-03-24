@@ -14,8 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE_UUID, meta::stream::StreamType, RwAHashMap};
-use infra::db as infra_db;
 use once_cell::sync::Lazy;
+
+use crate::service::db;
 
 static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
@@ -40,9 +41,7 @@ pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str
         return val.clone();
     }
     drop(r);
-
-    let db = infra_db::get_db().await;
-    let value = match db.get(&key).await {
+    let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
@@ -73,9 +72,7 @@ pub async fn set_offset(
     let key = mk_key(org_id, stream_type, stream_name);
     let Some(node) = node else {
         // release this key from this node
-        let db = infra_db::get_db().await;
-        db.put(&key, offset.to_string().into(), infra_db::NO_NEED_WATCH)
-            .await?;
+        db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH).await?;
         let mut w = CACHES.write().await;
         w.remove(&key);
         drop(w);
@@ -98,17 +95,15 @@ pub async fn del_offset(
     let mut w = CACHES.write().await;
     w.remove(&key);
     drop(w);
-    let db = infra_db::get_db().await;
-    db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
+    db::delete_if_exists(&key, false, db::NO_NEED_WATCH)
         .await
         .map_err(Into::into)
 }
 
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
-    let db = infra_db::get_db().await;
     let key = "/compact/files/";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let value = String::from_utf8_lossy(&item_value).to_string();
@@ -124,7 +119,6 @@ pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
 }
 
 pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let r = CACHES.read().await;
     for (key, (offset, node)) in r.iter() {
         if *offset > 0 {
@@ -133,7 +127,7 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
             } else {
                 offset.to_string()
             };
-            db.put(key, val.into(), infra_db::NO_NEED_WATCH).await?;
+            db::put(key, val.into(), db::NO_NEED_WATCH).await?;
         }
     }
     Ok(())

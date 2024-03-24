@@ -16,7 +16,8 @@
 use std::sync::atomic;
 
 use config::CONFIG;
-use infra::db as infra_db;
+
+use crate::service::db;
 
 static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
 
@@ -26,9 +27,8 @@ pub async fn get_offset() -> (i64, String) {
         return (offset, String::from(""));
     }
 
-    let db = infra_db::get_db().await;
     let key = "/compact/stream_stats/offset";
-    let value = match db.get(key).await {
+    let value = match db::get(key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
@@ -48,12 +48,11 @@ pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::E
         return Ok(());
     }
 
-    let db = infra_db::get_db().await;
     let key = "/compact/stream_stats/offset";
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
         offset.to_string()
     };
-    Ok(db.put(key, val.into(), infra_db::NO_NEED_WATCH).await?)
+    Ok(db::put(key, val.into(), db::NO_NEED_WATCH).await?)
 }

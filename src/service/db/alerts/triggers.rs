@@ -16,9 +16,11 @@
 use std::sync::Arc;
 
 use config::{meta::stream::StreamType, utils::json};
-use infra::db as infra_db;
 
-use crate::common::{infra::config::TRIGGERS, meta::alerts::triggers::Trigger};
+use crate::{
+    common::{infra::config::TRIGGERS, meta::alerts::triggers::Trigger},
+    service::db,
+};
 
 pub async fn get(
     org_id: &str,
@@ -26,9 +28,8 @@ pub async fn get(
     stream_name: &str,
     alert_name: &str,
 ) -> Result<Trigger, anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
-    let val = db.get(&key).await?;
+    let val = db::get(&key).await?;
     let trigger = json::from_slice(&val)?;
     Ok(trigger)
 }
@@ -45,14 +46,12 @@ pub async fn set(
     let db_key = format!("/trigger/{cache_key}");
     TRIGGERS.write().await.insert(cache_key, trigger.clone());
     // save the trigger
-    let db = infra_db::get_db().await;
-    match db
-        .put(
-            &db_key,
-            json::to_vec(trigger).unwrap().into(),
-            infra_db::NEED_WATCH,
-        )
-        .await
+    match db::put(
+        &db_key,
+        json::to_vec(trigger).unwrap().into(),
+        db::NEED_WATCH,
+    )
+    .await
     {
         Ok(_) => {}
         Err(e) => {
@@ -69,19 +68,17 @@ pub async fn delete(
     stream_name: &str,
     alert_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/trigger/{org_id}/{stream_type}/{stream_name}/{alert_name}");
-    Ok(db.delete(&key.clone(), false, infra_db::NEED_WATCH).await?)
+    Ok(db::delete(&key.clone(), false, db::NEED_WATCH).await?)
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/trigger/";
     let mut cacher = TRIGGERS.write().await;
-    let db = infra_db::get_db().await;
-    for (item_key, item_value) in db.list(key).await? {
+    for (item_key, item_value) in db::list(key).await? {
         let new_key = item_key.strip_prefix(key).unwrap();
         if new_key.split('/').count() < 4 {
-            _ = db.delete(&item_key, false, infra_db::NO_NEED_WATCH).await;
+            _ = db::delete(&item_key, false, db::NO_NEED_WATCH).await;
             continue;
         }
         let json_val: Trigger = json::from_slice(&item_value).unwrap();
@@ -93,7 +90,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/trigger/";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching Triggers");
@@ -106,11 +103,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Trigger = if config::CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -131,11 +127,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     .await
                     .insert(item_key.to_string(), item_value.clone());
             }
-            infra_db::Event::Delete(ev) => {
+            db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 TRIGGERS.write().await.remove(item_key);
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())

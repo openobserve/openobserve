@@ -13,23 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::db;
+use config::utils::json;
+use infra::errors::Result;
 
-pub async fn get_mark(org_id: &str) -> String {
-    let key = format!("/alert_manager/organization/{org_id}");
-    let val = match db::get(&key).await {
-        Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
-        Err(_) => "".to_string(),
-    };
-    if val.eq("NOP") { "".to_string() } else { val }
+pub async fn get() -> Result<Option<String>> {
+    let ret = super::get("/instance/").await?;
+    let loc_value = json::from_slice(&ret).unwrap();
+    let value = Some(loc_value);
+    Ok(value)
 }
 
-pub async fn set_mark(org_id: &str, node: Option<&str>) -> Result<(), anyhow::Error> {
-    let key = format!("/alert_manager/organization/{org_id}");
-    let val = if let Some(node) = node {
-        node.to_string()
-    } else {
-        "NOP".to_string()
-    };
-    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH).await?)
+pub async fn set(id: &str) -> Result<()> {
+    super::put(
+        "/instance/",
+        json::to_vec(&id).unwrap().into(),
+        super::NO_NEED_WATCH,
+    )
+    .await
 }
