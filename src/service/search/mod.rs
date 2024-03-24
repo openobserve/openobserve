@@ -509,7 +509,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     };
 
     log::info!(
-        "[session_id {session_id}] search: file_list done partition, time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search: file_list partition, time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
 
