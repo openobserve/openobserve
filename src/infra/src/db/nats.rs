@@ -402,11 +402,8 @@ impl Locker {
                     break;
                 }
                 Err(err) => {
+                    // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    log::error!("nats lock for key: {}, error: {}", self.key, err);
-                    // if !err.to_string().contains("Timeout expired") {
-                    //     break;
-                    // }
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             };
