@@ -1122,7 +1122,10 @@ const useLogs = () => {
     for (const column of columns) {
       if (
         column.expr &&
-        (column.expr.column === "_timestamp" || column.expr.column === "*")
+        (column.expr.column === "_timestamp" ||
+          column.expr.column === "*" ||
+          (column.expr.hasOwnProperty("args") &&
+            column.expr.args.expr.column === "_timestamp"))
       ) {
         return true; // Found _timestamp column
       }
