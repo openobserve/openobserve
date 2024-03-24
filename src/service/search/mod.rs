@@ -262,8 +262,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let is_inverted_index = !meta.fts_terms.is_empty();
 
-    log::warn!(
-        "searching in is_agg_query {:?} is_inverted_index {:?}",
+    log::info!(
+        "[session_id {session_id}] is_agg_query {:?} is_inverted_index {:?}",
         !req.aggs.is_empty(),
         is_inverted_index
     );
@@ -419,7 +419,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         )
     };
 
-    println!("final file_list: {:?}", file_list.len());
+    log::info!(
+        "[session_id {session_id}] search->file_list.get: time_range: {:?}, num: {}",
+        meta.meta.time_range,
+        file_list.len(),
+    );
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
@@ -497,8 +501,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             1
         }
     };
+
     log::info!(
-        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search->file_list.partition: time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
 
