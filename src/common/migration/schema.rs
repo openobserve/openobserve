@@ -40,7 +40,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     };
 
     let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0).await?;
-
+    let default_end_dt = "0".to_string();
     let cc = infra_db::get_coordinator().await;
     cc.add_start_dt_column().await?;
 
@@ -55,6 +55,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         println!("[Schema:Migration]: Start migrating schema: {}", key);
         let schemas: Vec<Schema> = json::from_slice(&val).unwrap();
         let mut prev_end_dt: i64 = 0;
+
         for schema in schemas {
             let meta = schema.metadata();
             let start_dt: i64 = match meta.get("start_dt") {
@@ -67,7 +68,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     }
                 }
             };
-            prev_end_dt = meta.get("end_dt").unwrap().clone().parse().unwrap();
+            prev_end_dt = meta
+                .get("end_dt")
+                .unwrap_or(&default_end_dt)
+                .clone()
+                .parse()
+                .unwrap();
             db.put(
                 &key,
                 json::to_vec(&vec![schema]).unwrap().into(),
