@@ -18,11 +18,17 @@ use config::CONFIG;
 pub mod dashboards;
 pub mod file_list;
 pub mod meta;
+pub mod schema;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
+    if CONFIG.common.run_schema_migration_on_start_up && new_ver >= "v0.9.1" {
+        schema::run().await?;
+    }
+
     if !CONFIG.common.local_mode || old_ver >= new_ver {
         return Ok(());
     }
+
     if old_ver >= "v0.5.3" {
         return Ok(());
     }

@@ -486,6 +486,13 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
+
+    #[env_config(
+        name = "ZO_RUN_SCHEMA_MIGRATION_ON_START_UP",
+        default = false,
+        help = "Run autimatic schema migration on start up"
+    )]
+    pub run_schema_migration_on_start_up: bool,
 }
 
 #[derive(EnvConfig)]
@@ -578,6 +585,8 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
+    #[env_config(name = "ZO_ENTRY_PER_SCHEMA_VERSION_ENABLED", default = true)]
+    pub row_per_schema_version_enabled: bool,
 }
 
 #[derive(EnvConfig)]
