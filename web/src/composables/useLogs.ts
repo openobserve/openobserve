@@ -126,7 +126,7 @@ const defaultObject = {
     stream: {
       streamLists: <object[]>[],
       selectedStream: { label: "", value: "" },
-      selectedStreamFields: <object[]>[],
+      selectedStreamFields: <any>[],
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
