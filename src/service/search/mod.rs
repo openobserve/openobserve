@@ -263,7 +263,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     let is_inverted_index = !meta.fts_terms.is_empty();
 
     log::info!(
-        "[session_id {session_id}] is_agg_query {:?} is_inverted_index {:?}",
+        "[session_id {session_id}] search: is_agg_query {:?} is_inverted_index {:?}",
         !req.aggs.is_empty(),
         is_inverted_index
     );
