@@ -75,7 +75,7 @@ pub async fn search(
             sql.stream_name.clone(),
         )));
     }
-    let schema_latest = schema_versions.last().unwrap();
+    let schema_latest = schema_versions.first().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
 
     let stream_settings = stream::stream_settings(schema_latest).unwrap_or_default();

@@ -156,6 +156,88 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
+    if CONFIG.limit.row_per_schema_version_enabled {
+        let db = infra_db::get_db().await;
+        if min_ts.is_some() && new_version {
+            let last_schema = get(org_id, stream_name, stream_type).await?;
+            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+            if !last_schema.fields().is_empty() {
+                let mut last_meta = last_schema.metadata().clone();
+                let created_at: i64 = last_meta.get("start_dt").unwrap().clone().parse().unwrap();
+                let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
+                last_meta.insert("end_dt".to_string(), min_ts.to_string());
+                let prev_schema = vec![last_schema.clone().with_metadata(last_meta)];
+                let _ = db
+                    .put(
+                        &key,
+                        json::to_vec(&prev_schema).unwrap().into(),
+                        infra_db::NO_NEED_WATCH,
+                        Some(created_at),
+                    )
+                    .await;
+            }
+
+            let mut metadata = last_schema.metadata().clone();
+            if metadata.contains_key("created_at") {
+                metadata.insert(
+                    "created_at".to_string(),
+                    metadata.get("created_at").unwrap().clone(),
+                );
+            } else {
+                metadata.insert("created_at".to_string(), min_ts.to_string());
+            }
+
+            metadata.insert("start_dt".to_string(), min_ts.to_string());
+
+            let new_schema = vec![schema.to_owned().with_metadata(metadata)];
+
+            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
+            let _ = db
+                .put(
+                    &key,
+                    json::to_vec(&new_schema).unwrap().into(),
+                    infra_db::NEED_WATCH,
+                    Some(min_ts),
+                )
+                .await;
+
+            return Ok(());
+        } else {
+            let current_schema = get(org_id, stream_name, stream_type).await?;
+            let mut current_meta = current_schema.metadata().clone();
+            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+            let start_dt = if current_meta.contains_key("created_at") {
+                if !current_meta.contains_key("start_dt") {
+                    current_meta.insert(
+                        "start_dt".to_string(),
+                        current_meta.get("created_at").unwrap().clone(),
+                    );
+                }
+                current_meta
+                    .get("start_dt")
+                    .unwrap()
+                    .clone()
+                    .parse()
+                    .unwrap()
+            } else {
+                current_meta.insert("start_dt".to_string(), min_ts.to_string());
+                current_meta.insert("created_at".to_string(), min_ts.to_string());
+                min_ts
+            };
+
+            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
+            let new_schema = vec![schema.to_owned().with_metadata(current_meta)];
+            let _ = db
+                .put(
+                    &key,
+                    json::to_vec(&new_schema).unwrap().into(),
+                    infra_db::NEED_WATCH,
+                    Some(start_dt),
+                )
+                .await;
+            return Ok(());
+        }
+    }
     let db = infra_db::get_db().await;
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let map_key = key.strip_prefix("/schema/").unwrap();
@@ -181,6 +263,7 @@ pub async fn set(
                         &key,
                         json::to_vec(&versions).unwrap().into(),
                         infra_db::NEED_WATCH,
+                        Some(0),
                     )
                     .await;
             }
@@ -192,6 +275,7 @@ pub async fn set(
                     &key,
                     json::to_vec(&versions).unwrap().into(),
                     infra_db::NEED_WATCH,
+                    Some(0),
                 )
                 .await;
         }
@@ -217,6 +301,7 @@ pub async fn set(
             &key,
             json::to_vec(&values).unwrap().into(),
             infra_db::NEED_WATCH,
+            Some(0),
         )
         .await
     {
@@ -246,7 +331,7 @@ pub async fn delete(
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
     let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
     let db = infra_db::get_db().await;
-    match db.delete(&key, false, infra_db::NEED_WATCH).await {
+    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting schema: {}", e);
@@ -359,14 +444,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Vec<Schema> = if CONFIG.common.meta_store_external {
                     let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
-                            Err(e) => {
-                                log::error!("Error getting value: {}", e);
-                                continue;
-                            }
-                        },
+                    match db.list_values(&ev.key).await {
+                        Ok(val) => val
+                            .iter()
+                            .flat_map(|v| {
+                                let values: Vec<Schema> = json::from_slice(v).unwrap();
+                                values.clone()
+                            })
+                            .collect::<Vec<Schema>>(),
                         Err(e) => {
                             log::error!("Error getting value: {}", e);
                             continue;
@@ -376,15 +461,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
 
-                let settings = stream_settings(item_value.last().unwrap()).unwrap_or_default();
-                if let Some(last) = item_value.last() {
+                let settings = stream_settings(item_value.first().unwrap()).unwrap_or_default();
+                if let Some(first) = item_value.first() {
                     let mut sl = STREAM_SCHEMAS_LATEST.write().await;
-                    sl.insert(item_key.to_string(), last.clone());
+                    sl.insert(item_key.to_string(), first.clone());
                     drop(sl);
                 }
                 let mut sa = STREAM_SCHEMAS.write().await;
-                sa.insert(item_key.to_string(), item_value.clone());
+                sa.insert(item_key.to_string(), item_value);
                 drop(sa);
+
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
@@ -479,15 +565,16 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                 ));
             }
         };
-        let settings = stream_settings(json_val.last().unwrap()).unwrap_or_default();
-        if let Some(last) = json_val.last() {
+        let settings = stream_settings(json_val.first().unwrap()).unwrap_or_default();
+        if let Some(first) = json_val.first() {
             let mut sl = STREAM_SCHEMAS_LATEST.write().await;
-            sl.insert(item_key_str.to_string(), last.clone());
+            sl.insert(item_key_str.to_string(), first.clone());
             drop(sl);
         }
         let mut sa = STREAM_SCHEMAS.write().await;
-        sa.insert(item_key_str.to_string(), json_val);
+        sa.insert(item_key_str.to_string(), json_val.clone());
         drop(sa);
+
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key_str.to_string(), settings);
         drop(w);
