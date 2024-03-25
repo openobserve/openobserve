@@ -16,25 +16,24 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
+use config::{
+    meta::stream::StreamType,
+    utils::{json, schema_ext::SchemaExt},
+    FxIndexMap, CONFIG,
+};
+use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
     sync::{mpsc, RwLock},
     time,
 };
-
-use config::{
-    CONFIG,
-    FxIndexMap,
-    meta::stream::StreamType, utils::{json, schema_ext::SchemaExt},
-};
-use infra::errors::{Error, Result};
 
 use crate::{
     common::meta::stream::SchemaRecords,

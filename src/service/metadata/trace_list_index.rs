@@ -2,20 +2,19 @@ use std::{
     collections::HashMap,
     hash::Hash,
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
+use config::{
+    meta::stream::StreamType,
+    utils::{json, schema_ext::SchemaExt},
+    CONFIG,
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-
-use config::{
-    CONFIG
-    ,
-    meta::stream::StreamType, utils::{json, schema_ext::SchemaExt},
-};
 
 use crate::{
     common::meta::stream::{SchemaRecords, StreamPartition, StreamSettings},
@@ -29,9 +28,8 @@ use crate::{
 
 const STREAM_NAME: &str = "trace_list_index";
 
-static PARTITION_KEYS: Lazy<[StreamPartition; 1]> = Lazy::new(|| {
-    [StreamPartition::new("service_name")]
-});
+static PARTITION_KEYS: Lazy<[StreamPartition; 1]> =
+    Lazy::new(|| [StreamPartition::new("service_name")]);
 
 pub struct TraceListIndex {
     schema: Arc<Schema>,
@@ -131,7 +129,10 @@ impl Metadata for TraceListIndex {
 impl TraceListIndex {
     pub fn new() -> Self {
         let mut res = Self {
-            schema: Arc::new(Schema { fields: Default::default(), metadata: Default::default() }),
+            schema: Arc::new(Schema {
+                fields: Default::default(),
+                metadata: Default::default(),
+            }),
             db_schema_init: AtomicBool::new(false),
         };
 
@@ -156,7 +157,7 @@ impl TraceListIndex {
                 None,
                 false,
             )
-                .await
+            .await
             {
                 log::error!("[TraceListIndex] error while setting schema: {}", e);
             }
@@ -183,15 +184,15 @@ impl TraceListIndex {
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
-    use config::{CONFIG, meta::stream::StreamType, utils::json};
+    use config::{meta::stream::StreamType, utils::json, CONFIG};
 
     use crate::{
         common::meta::stream::SchemaRecords,
         service::{
             ingestion, metadata,
             metadata::{
-                Metadata,
-                MetadataItem, trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
+                trace_list_index::{TraceListIndex, TraceListItem, STREAM_NAME},
+                Metadata, MetadataItem,
             },
             stream::unwrap_partition_time_level,
         },
