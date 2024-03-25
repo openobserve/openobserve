@@ -16,18 +16,12 @@
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use arrow_schema::{DataType, Field, Schema};
-use config::{
-    meta::stream::StreamType,
-    utils::{json, schema_ext::SchemaExt},
-    FxIndexMap, CONFIG,
-};
-use infra::errors::{Error, Result};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -35,8 +29,16 @@ use tokio::{
     time,
 };
 
+use config::{
+    CONFIG,
+    FxIndexMap,
+    meta::stream::StreamType, utils::{json, schema_ext::SchemaExt},
+};
+use infra::errors::{Error, Result};
+
 use crate::{
     common::meta::stream::SchemaRecords,
+    service,
     service::{ingestion, stream::unwrap_partition_time_level},
 };
 
@@ -143,12 +145,12 @@ impl DistinctValues {
             }
 
             // check for schema
-            let db_schema = super::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+            let db_schema = service::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
                 .await
                 .unwrap();
             if db_schema.fields().is_empty() {
                 let schema = schema.as_ref().clone();
-                if let Err(e) = super::db::schema::set(
+                if let Err(e) = service::db::schema::set(
                     &org_id,
                     STREAM_NAME,
                     StreamType::Metadata,
