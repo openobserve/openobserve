@@ -213,16 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       color="input-border"
                       bg-color="input-bg"
                       class="q-py-sm showLabelOnTop no-case"
-                      multiple
-                      :max-values="1"
-                      map-options
-                      emit-value
-                      clearable
-                      stack-label
-                      outlined
                       filled
+                      emit-value
+                      map-options
+                      stack-label
                       dense
                       use-input
+                      hide-selected
                       fill-input
                       :input-debounce="400"
                       :rules="[(val: any) => !!val.length || 'Field is required!']"
@@ -808,7 +805,7 @@ const defaultReport = {
     {
       folder: "",
       dashboard: "",
-      tabs: [],
+      tabs: "" as string | string[],
       variables: [] as { key: string; value: string; id: string }[],
       timerange: {
         type: "relative",
@@ -1221,6 +1218,12 @@ const saveReport = async () => {
     email: email.trim(),
   }));
 
+  // This is unitil we support multiple dashboards and tabs
+  if (formData.value.dashboards[0]?.tabs)
+    formData.value.dashboards[0].tabs = [
+      formData.value.dashboards[0].tabs as string,
+    ];
+
   if (frequency.value.type === "custom") {
     formData.value.frequency.type = frequency.value.custom.period;
     formData.value.frequency.interval = Number(frequency.value.custom.interval);
@@ -1396,6 +1399,10 @@ const filterOptions = (options: any[], val: String, update: Function) => {
 
 const setupEditingReport = async (report: any) => {
   formData.value = report;
+
+  // This is unitil we support multiple dashboards and tabs
+  formData.value.dashboards[0].tabs = report.dashboards[0].tabs[0];
+
   // set date, time and timezone in scheduling
   const date = new Date(report.start / 1000);
 
