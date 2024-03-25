@@ -169,6 +169,12 @@ pub async fn search_parquet(
         scan_stats.original_size
     );
 
+    // construct latest schema map
+    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
+    for field in schema_latest.fields() {
+        schema_latest_map.insert(field.name(), field.data_type());
+    }
+
     let mut tasks = Vec::new();
     let is_single_group = files_group.len() == 1;
     for (ver, files) in files_group {
@@ -196,9 +202,9 @@ pub async fn search_parquet(
         let mut diff_fields = HashMap::new();
         let group_fields = inferred_schema.fields();
         for field in group_fields {
-            if let Ok(v) = schema_latest.field_with_name(field.name()) {
-                if v.data_type() != field.data_type() {
-                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+            if let Some(data_type) = schema_latest_map.get(field.name()) {
+                if *data_type != field.data_type() {
+                    diff_fields.insert(field.name().clone(), (*data_type).clone());
                 }
             }
         }
@@ -388,15 +394,21 @@ pub async fn search_memtable(
             .with_metadata(std::collections::HashMap::new()),
     );
 
+    // construct latest schema map
+    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
+    for field in schema_latest.fields() {
+        schema_latest_map.insert(field.name(), field.data_type());
+    }
+
     let mut tasks = Vec::new();
     for (ver, (mut schema, mut record_batches)) in batch_groups.into_iter().enumerate() {
         // calulate schema diff
         let mut diff_fields = HashMap::new();
         let group_fields = schema.fields();
         for field in group_fields {
-            if let Ok(v) = schema_latest.field_with_name(field.name()) {
-                if v.data_type() != field.data_type() {
-                    diff_fields.insert(v.name().clone(), v.data_type().clone());
+            if let Some(data_type) = schema_latest_map.get(field.name()) {
+                if *data_type != field.data_type() {
+                    diff_fields.insert(field.name().clone(), (*data_type).clone());
                 }
             }
         }
