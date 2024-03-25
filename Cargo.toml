@@ -71,8 +71,8 @@ clap = { version = "4.1", default-features = false, features = [
   "cargo",
 ] }
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
-csv = "1.2.1"
 cron = "0.12.1"
+csv = "1.2.1"
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-expr.workspace = true
@@ -154,6 +154,7 @@ zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+chromiumoxide.workspace = true
 lettre.workspace = true
 
 [build-dependencies]
@@ -216,6 +217,7 @@ getrandom = "0.2.11"
 gxhash = "~3.0.0"
 hashlink = "0.8.4"
 hashbrown = { version = "0.14", features = ["serde"] }
+chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = ["tokio-runtime", "_fetcher-rusttls-tokio"], default-features = false, branch = "main"}
 hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"

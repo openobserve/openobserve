@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod folders;
+pub mod reports;
 
 /// CreateDashboard
 #[utoipa::path(

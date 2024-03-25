@@ -20,7 +20,6 @@ use utoipa::ToSchema;
 
 pub mod destinations;
 pub mod templates;
-pub mod triggers;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
