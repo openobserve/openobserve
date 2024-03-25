@@ -251,7 +251,7 @@ describe("Logs testcases", () => {
 
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[data-test="streams-search-stream-input"]').type("e2e_automate");
-    cy.get('[title="Stream Detail"]').click({ force: true });
+    cy.get('[title="Stream Detail"]:first').click({ force: true });
     cy.get(':nth-child(2) > [data-test="schema-stream-index-select"]').click();
     cy.get(".q-virtual-scroll__content").within(() => {
       cy.contains("Inverted Index").click();
@@ -261,7 +261,7 @@ describe("Logs testcases", () => {
       force: true,
     });
     cy.get(".col-auto > .q-btn > .q-btn__content").click({ force: true });
-    cy.get('[title="Explore"]').click({ force: true });
+    cy.get('[title="Explore"]:first').click({ force: true });
     cy.get('[data-test="log-table-column-0-@timestamp"]').should("exist");
   });
   it("should display error if blank spaces added under stream name and clicked create stream ", () => {
