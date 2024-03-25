@@ -50,5 +50,7 @@ pub async fn write(org_id: &str, data: Vec<MetadataItem>) -> infra::errors::Resu
 }
 
 pub async fn close() -> infra::errors::Result<()> {
+    // flush distinct values
+    _ = distinct_values::close().await;
     Ok(MetadataManager.close().await?)
 }
