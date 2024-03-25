@@ -45,8 +45,10 @@ use crate::{
         traces::{Event, Span, SpanRefType},
     },
     service::{
-        db, distinct_values, format_stream_name,
+        db, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
+        metadata,
+        metadata::{distinct_values, trace_list_index::TraceListItem},
         schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -160,6 +162,7 @@ pub async fn handle_trace_request(
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
+    let mut trace_index = Vec::with_capacity(res_spans.len());
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let resource = res_span.resource.unwrap();
@@ -300,6 +303,16 @@ pub async fn handle_trace_request(
                     }
                 }
 
+                // build trace metadata
+                trace_index.push(metadata::MetadataItem::TraceListIndexer(TraceListItem {
+                    stream_type: StreamType::Traces,
+                    stream_name: traces_stream_name.to_string(),
+                    service_name: service_name.clone(),
+                    trace_id,
+                    start_time,
+                    end_time,
+                }));
+
                 // check schema
                 let _ = check_for_schema(
                     org_id,
@@ -375,6 +388,13 @@ pub async fn handle_trace_request(
     // send distinct_values
     if !distinct_values.is_empty() {
         if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
+    // send trace metadata
+    if !trace_index.is_empty() {
+        if let Err(e) = metadata::write(org_id, trace_index).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }

@@ -60,7 +60,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, distinct_values},
+    service::{db, metadata::distinct_values},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -87,6 +87,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use openobserve::service::metadata;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -201,13 +202,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
-    // flush distinct values
-    _ = distinct_values::close().await;
+
     // flush compact offset cache to disk disk
     _ = db::compact::files::sync_cache_to_db().await;
     // flush db
     let db = infra::db::get_db().await;
     _ = db.close().await;
+    // flush metadata
+    _ = metadata::close().await;
 
     // stop telemetry
     meta::telemetry::Telemetry::new()

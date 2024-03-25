@@ -38,11 +38,13 @@ use crate::{
         traces::{Event, ExportTracePartialSuccess, ExportTraceServiceResponse, Span, SpanRefType},
     },
     service::{
-        db, distinct_values, format_stream_name,
+        db, format_stream_name,
         ingestion::{
             evaluate_trigger, get_string_value, get_uint_value, grpc::get_val_for_attr, write_file,
             TriggerAlertData,
         },
+        metadata,
+        metadata::{distinct_values, trace_list_index::TraceListItem},
         schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -181,6 +183,7 @@ pub async fn traces_json(
             )));
         }
     };
+    let mut trace_index = Vec::with_capacity(spans.len());
     for res_span in spans.iter() {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         if res_span.get("resource").is_some() {
@@ -359,6 +362,16 @@ pub async fn traces_json(
                         }
                     }
 
+                    // build trace metadata
+                    trace_index.push(metadata::MetadataItem::TraceListIndexer(TraceListItem {
+                        stream_type: StreamType::Traces,
+                        stream_name: traces_stream_name.to_string(),
+                        service_name: service_name.clone(),
+                        trace_id,
+                        start_time,
+                        end_time,
+                    }));
+
                     // check schema
                     let _ = check_for_schema(
                         org_id,
@@ -431,6 +444,13 @@ pub async fn traces_json(
     // send distinct_values
     if !distinct_values.is_empty() {
         if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
+    // send trace metadata
+    if !trace_index.is_empty() {
+        if let Err(e) = metadata::write(org_id, trace_index).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }

@@ -35,9 +35,10 @@ use crate::{
         stream::{SchemaRecords, StreamParams},
     },
     service::{
-        distinct_values, get_formatted_stream_name,
+        get_formatted_stream_name,
         ingestion::{check_ingestion_allowed, evaluate_trigger, write_file, TriggerAlertData},
         logs::StreamMeta,
+        metadata::distinct_values,
         schema::{get_upto_discard_error, SchemaCache},
         usage::report_request_usage_stats,
     },

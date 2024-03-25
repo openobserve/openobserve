@@ -1,0 +1,280 @@
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+use arrow_schema::{DataType, Field, Schema};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+
+use config::{
+    CONFIG
+    ,
+    meta::stream::StreamType, utils::{json, schema_ext::SchemaExt},
+};
+
+use crate::{
+    common::meta::stream::{SchemaRecords, StreamPartition, StreamSettings},
+    service::{
+        db, ingestion,
+        metadata::{Metadata, MetadataItem},
+        stream,
+        stream::{stream_settings, unwrap_partition_time_level},
+    },
+};
+
+const STREAM_NAME: &str = "trace_list_index";
+
+static PARTITION_KEYS: Lazy<[StreamPartition; 1]> = Lazy::new(|| {
+    [StreamPartition::new("service_name")]
+});
+
+pub struct TraceListIndex {
+    schema: Arc<Schema>,
+    db_schema_init: AtomicBool,
+}
+
+#[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
+pub struct TraceListItem {
+    pub stream_type: StreamType,
+    pub stream_name: String,
+    pub service_name: String,
+    pub trace_id: String,
+    pub start_time: u64,
+    pub end_time: u64,
+}
+
+impl Metadata for TraceListIndex {
+    fn generate_schema(&self) -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new(
+                CONFIG.common.column_timestamp.as_str(),
+                DataType::Int64,
+                false,
+            ),
+            Field::new("stream_name", DataType::Utf8, false),
+            Field::new("stream_type", DataType::Utf8, false),
+            Field::new("service_name", DataType::Utf8, false),
+            Field::new("trace_id", DataType::Utf8, false),
+            Field::new("start_time", DataType::UInt64, false),
+            Field::new("end_time", DataType::UInt64, false),
+        ]))
+    }
+    async fn write(&self, org_id: &str, items: Vec<MetadataItem>) -> infra::errors::Result<()> {
+        if items.is_empty() {
+            return Ok(());
+        }
+
+        // write to wal
+        let timestamp = chrono::Utc::now().timestamp_micros();
+        let schema_key = self.schema.hash_key();
+
+        if !self.db_schema_init.load(Ordering::Relaxed) {
+            self.set_db_schema(org_id).await?
+        }
+
+        let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+        for item in items {
+            let MetadataItem::TraceListIndexer(item) = item;
+            let start_time = item.start_time / 1000;
+            let mut data = json::to_value(item).unwrap();
+            let data = data.as_object_mut().unwrap();
+            data.insert(
+                CONFIG.common.column_timestamp.clone(),
+                json::Value::Number(start_time.into()),
+            );
+            let hour_key = ingestion::get_wal_time_key(
+                timestamp,
+                PARTITION_KEYS.to_vec().as_ref(),
+                unwrap_partition_time_level(None, StreamType::Metadata),
+                data,
+                Some(&schema_key),
+            );
+            let data = json::Value::Object(data.clone());
+            let data_size = json::to_vec(&data).unwrap_or_default().len();
+
+            let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+                schema_key: schema_key.clone(),
+                schema: self.schema.clone(),
+                records: vec![],
+                records_size: 0,
+            });
+
+            hour_buf.records.push(Arc::new(data));
+            hour_buf.records_size += data_size;
+        }
+
+        let writer = ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string()).await;
+        _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
+        if let Err(e) = writer.sync().await {
+            log::error!("[TraceListIndex] error while syncing writer: {}", e);
+        }
+
+        Ok(())
+    }
+    async fn flush(&self) -> infra::errors::Result<()> {
+        // do nothing
+        return Ok(());
+    }
+    async fn stop(&self) -> infra::errors::Result<()> {
+        if let Err(e) = self.flush().await {
+            log::error!("[TraceListIndex] flush error: {}", e);
+        }
+        Ok(())
+    }
+}
+
+impl TraceListIndex {
+    pub fn new() -> Self {
+        let mut res = Self {
+            schema: Arc::new(Schema { fields: Default::default(), metadata: Default::default() }),
+            db_schema_init: AtomicBool::new(false),
+        };
+
+        res.schema = res.generate_schema();
+        res
+    }
+
+    async fn set_db_schema(&self, org_id: &str) -> infra::errors::Result<()> {
+        // check for schema
+        let db_schema = db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+            .await
+            .unwrap();
+        let schema_settings = stream_settings(&db_schema).unwrap_or_default();
+        let mut partition_keys = schema_settings.partition_keys;
+        if db_schema.fields().is_empty() {
+            let schema = self.schema.as_ref().clone();
+            if let Err(e) = db::schema::set(
+                &org_id,
+                STREAM_NAME,
+                StreamType::Metadata,
+                &schema,
+                None,
+                false,
+            )
+                .await
+            {
+                log::error!("[TraceListIndex] error while setting schema: {}", e);
+            }
+
+            let settings = StreamSettings {
+                partition_keys: PARTITION_KEYS.to_vec(),
+                partition_time_level: None,
+                full_text_search_keys: vec![],
+                bloom_filter_fields: vec!["trace_id".to_string()],
+                data_retention: 0,
+            };
+            partition_keys = settings.partition_keys.clone();
+            stream::save_stream_settings(&org_id, STREAM_NAME, StreamType::Metadata, settings)
+                .await?;
+        }
+
+        self.db_schema_init.store(true, Ordering::Release);
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, sync::Arc};
+
+    use config::{CONFIG, meta::stream::StreamType, utils::json};
+
+    use crate::{
+        common::meta::stream::SchemaRecords,
+        service::{
+            ingestion, metadata,
+            metadata::{
+                Metadata,
+                MetadataItem, trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
+            },
+            stream::unwrap_partition_time_level,
+        },
+    };
+
+    #[tokio::test]
+    async fn test_write() {
+        let t = TraceListIndex::new();
+        let data = vec![MetadataItem::TraceListIndexer(TraceListItem::default())];
+
+        let res = t.write("default", data).await;
+        assert_eq!((), res.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_write_file() {
+        let t = TraceListIndex::new();
+        let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+        let item = metadata::MetadataItem::TraceListIndexer(TraceListItem {
+            stream_type: StreamType::Traces,
+            stream_name: "default".to_string(),
+            service_name: "oojaeger".to_string(),
+            trace_id: "b09e986672880927996155acd4ef113c".to_string(),
+            start_time: 1711267573271256000,
+            end_time: 1711267573271714542,
+        });
+        let schema_key = "9d384d5af30d1657";
+        let timestamp = chrono::Utc::now().timestamp_micros();
+        let mut data = json::to_value(item).unwrap();
+        let data = data.as_object_mut().unwrap();
+        data.insert(
+            CONFIG.common.column_timestamp.clone(),
+            json::Value::Number(timestamp.into()),
+        );
+        let hour_key = ingestion::get_wal_time_key(
+            timestamp,
+            &vec![],
+            unwrap_partition_time_level(None, StreamType::Metadata),
+            data,
+            Some(schema_key.clone()),
+        );
+        let data = json::Value::Object(data.clone());
+        let data_size = json::to_vec(&data).unwrap_or_default().len();
+        let schema = t.generate_schema().await;
+        let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
+            schema_key: schema_key.to_string(),
+            schema: schema.clone(),
+            records: vec![],
+            records_size: 0,
+        });
+        hour_buf.records.push(Arc::new(data.clone()));
+        hour_buf.records.push(Arc::new(data));
+        hour_buf.records_size += data_size;
+
+        let writer =
+            ingester::get_writer(0, "openobserve", &StreamType::Metadata.to_string()).await;
+        for (key, val) in buf.iter() {
+            println!(
+                "key: {key} val: {:?} schema: {}, records_size: {}, records: {:?}",
+                val.schema_key, val.schema, val.records_size, val.records
+            );
+        }
+        let r = ingestion::write_file(&writer, STREAM_NAME, buf).await;
+        println!("r: {:?}", r);
+    }
+
+    #[tokio::test]
+    async fn test_run_flush() {
+        let t = TraceListIndex::new();
+        let data = vec![MetadataItem::TraceListIndexer(TraceListItem {
+            stream_type: StreamType::Metadata,
+            stream_name: STREAM_NAME.to_string(),
+            service_name: "APISIX".to_string(),
+            trace_id: "1710150117252223083801d3b7ccdec7".to_string(),
+            start_time: 0,
+            end_time: 0,
+        })];
+
+        let res = t.write("default", data).await;
+        assert_eq!((), res.unwrap());
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(100));
+        loop {
+            interval.tick().await;
+        }
+    }
+}
