@@ -165,6 +165,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 "dashboard" => {
                     db::dashboards::reset().await?;
                 }
+                "report" => {
+                    db::dashboards::reports::reset().await?;
+                }
                 "function" => {
                     db::functions::reset().await?;
                 }
