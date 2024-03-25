@@ -392,6 +392,16 @@ pub async fn around(
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let around_start_time = around_key
+        - Duration::try_seconds(900)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+    let around_end_time = around_key
+        + Duration::try_seconds(900)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
 
     // search forward
     let req = meta::search::Request {
@@ -399,11 +409,7 @@ pub async fn around(
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
-            start_time: around_key
-                - Duration::try_seconds(900)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap(),
+            start_time: around_start_time,
             end_time: around_key,
             sort_by: Some(format!("{} DESC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
@@ -460,11 +466,7 @@ pub async fn around(
             from: 0,
             size: around_size / 2,
             start_time: around_key,
-            end_time: around_key
-                + Duration::try_seconds(900)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap(),
+            end_time: around_end_time,
             sort_by: Some(format!("{} ASC", CONFIG.common.column_timestamp)),
             sql_mode: "".to_string(),
             quick_mode: false,
@@ -559,6 +561,8 @@ pub async fn around(
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
+        min_ts: Some(around_start_time),
+        max_ts: Some(around_end_time),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -882,6 +886,8 @@ async fn values_v1(
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
+        min_ts: Some(start_time),
+        max_ts: Some(end_time),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
@@ -1046,6 +1052,8 @@ async fn values_v2(
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
+        min_ts: Some(start_time),
+        max_ts: Some(end_time),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;
