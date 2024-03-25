@@ -41,10 +41,11 @@ use crate::{
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
-        db, distinct_values, get_formatted_stream_name,
+        db, get_formatted_stream_name,
         ingestion::{
             evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
         },
+        metadata::distinct_values,
         schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
