@@ -172,7 +172,7 @@ pub async fn search_parquet(
     // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field.data_type().clone());
+        schema_latest_map.insert(field.name(), field.data_type());
     }
 
     let mut tasks = Vec::new();
@@ -203,8 +203,8 @@ pub async fn search_parquet(
         let group_fields = inferred_schema.fields();
         for field in group_fields {
             if let Some(data_type) = schema_latest_map.get(field.name()) {
-                if data_type != field.data_type() {
-                    diff_fields.insert(field.name().clone(), data_type.clone());
+                if *data_type != field.data_type() {
+                    diff_fields.insert(field.name().clone(), (*data_type).clone());
                 }
             }
         }
@@ -397,7 +397,7 @@ pub async fn search_memtable(
     // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
-        schema_latest_map.insert(field.name(), field.data_type().clone());
+        schema_latest_map.insert(field.name(), field.data_type());
     }
 
     let mut tasks = Vec::new();
@@ -407,8 +407,8 @@ pub async fn search_memtable(
         let group_fields = schema.fields();
         for field in group_fields {
             if let Some(data_type) = schema_latest_map.get(field.name()) {
-                if data_type != field.data_type() {
-                    diff_fields.insert(field.name().clone(), data_type.clone());
+                if *data_type != field.data_type() {
+                    diff_fields.insert(field.name().clone(), (*data_type).clone());
                 }
             }
         }
