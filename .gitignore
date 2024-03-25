@@ -28,6 +28,7 @@ flamegraph.html
 /.env
 /.env*
 /integration-tests
+/download/
 
 #web distribution
 /web/dist

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -39,6 +40,7 @@ pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,
 }
 
+pub mod reports;
 pub mod v1;
 pub mod v2;
 pub mod v3;
@@ -65,3 +67,9 @@ pub struct FolderList {
 }
 
 pub const DEFAULT_FOLDER: &str = "default";
+
+pub fn datetime_now() -> DateTime<FixedOffset> {
+    Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(
+        "BUG", // This can't possibly fail. Can it?
+    ))
+}
