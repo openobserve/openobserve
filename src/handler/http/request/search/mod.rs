@@ -242,6 +242,8 @@ pub async fn search(
                 size: res.scan_size as f64,
                 request_body: Some(req.query.sql),
                 user_email: Some(user_id.to_str().unwrap().to_string()),
+                min_ts: Some(req.query.start_time),
+                max_ts: Some(req.query.end_time),
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
