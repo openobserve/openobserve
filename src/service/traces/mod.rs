@@ -48,7 +48,7 @@ use crate::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
         metadata,
-        metadata::{distinct_values, trace_list_index::TraceListItem},
+        metadata::{distinct_values, trace_list_index::TraceListItem, MetadataType},
         schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -394,7 +394,7 @@ pub async fn handle_trace_request(
 
     // send trace metadata
     if !trace_index.is_empty() {
-        if let Err(e) = metadata::write(org_id, trace_index).await {
+        if let Err(e) = metadata::write(org_id, MetadataType::TraceListIndexer, trace_index).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
