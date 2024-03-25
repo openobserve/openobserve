@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="folderOptions"
                       :label="t('reports.dashboardFolder') + ' *'"
                       :loading="isFetchingFolders"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      :popup-content-style="{ textTransform: 'none' }"
                       color="input-border"
                       bg-color="input-bg"
                       class="q-py-sm showLabelOnTop no-case"
@@ -148,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       hide-selected
                       fill-input
                       :input-debounce="400"
+                      input-style="text-transform: none;"
                       @update:model-value="onFolderSelection(dashboard.folder)"
                       @filter="
                         (...args) =>
@@ -171,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="dashboardOptions"
                       :label="t('reports.dashboard') + ' *'"
                       :loading="isFetchingDashboard || isFetchingFolders"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      :popup-content-style="{ textTransform: 'none' }"
                       color="input-border"
                       bg-color="input-bg"
                       class="q-py-sm showLabelOnTop no-case"
@@ -183,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       use-input
                       hide-selected
                       fill-input
+                      input-style="text-transform: none;"
                       :input-debounce="400"
                       @update:model-value="
                         onDashboardSelection(dashboard.dashboard)
@@ -209,10 +211,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :options="dashboardTabOptions"
                       :label="t('reports.dashboardTab') + ' *'"
                       :loading="isFetchingDashboard || isFetchingFolders"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      :popup-content-style="{ textTransform: 'none' }"
                       color="input-border"
                       bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
+                      class="q-py-sm showLabelOnTop"
                       filled
                       emit-value
                       map-options
@@ -221,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       use-input
                       hide-selected
                       fill-input
+                      input-style="text-transform: none;"
                       :input-debounce="400"
                       :rules="[(val: any) => !!val.length || 'Field is required!']"
                       @filter="
@@ -991,6 +994,14 @@ const isValidName = computed(() => {
 });
 
 const onFolderSelection = (id: string) => {
+  formData.value.dashboards.forEach((dashboard: any) => {
+    dashboard.dashboard = "";
+    dashboard.tabs = "";
+  });
+  setDashboardOptions(id);
+};
+
+const setDashboardOptions = (id: string) => {
   dashboardOptions.value.length = 0;
   isFetchingDashboard.value = true;
   return new Promise((resolve, reject) => {
@@ -1034,6 +1045,13 @@ const onFolderSelection = (id: string) => {
 };
 
 const onDashboardSelection = (dashboardId: any) => {
+  formData.value.dashboards.forEach((dashboard: any) => {
+    dashboard.tabs = "";
+  });
+  setDashboardTabOptions(dashboardId);
+};
+
+const setDashboardTabOptions = (dashboardId: any) => {
   const defaultTabs = [{ label: "Default", value: "default" }];
 
   dashboardTabOptions.value =
@@ -1219,6 +1237,7 @@ const saveReport = async () => {
   }));
 
   // This is unitil we support multiple dashboards and tabs
+  console.log(formData.value.dashboards[0].tabs);
   if (formData.value.dashboards[0]?.tabs)
     formData.value.dashboards[0].tabs = [
       formData.value.dashboards[0].tabs as string,
@@ -1442,9 +1461,9 @@ const setupEditingReport = async (report: any) => {
     frequency.value.type = report.frequency.type;
   }
 
-  await onFolderSelection(formData.value.dashboards[0].folder);
+  await setDashboardOptions(formData.value.dashboards[0].folder);
 
-  onDashboardSelection(formData.value.dashboards[0].dashboard);
+  setDashboardTabOptions(formData.value.dashboards[0].dashboard);
 };
 
 const openCancelDialog = () => {
