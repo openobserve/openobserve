@@ -54,6 +54,7 @@ const defaultObject = {
   runQuery: false,
   loading: false,
   loadingHistogram: false,
+  loadingStream: false,
   shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
@@ -124,6 +125,7 @@ const defaultObject = {
     errorCode: 0,
     additionalErrorMsg: "",
     stream: {
+      loading: false,
       streamLists: <object[]>[],
       selectedStream: { label: "", value: "" },
       selectedStreamFields: <any>[],
@@ -359,11 +361,13 @@ const useLogs = () => {
   async function loadStreamFileds(streamName: string) {
     try {
       if (streamName != "") {
+        searchObj.loadingStream = true;
         return await getStream(
           streamName,
           searchObj.data.stream.streamType || "logs",
           true
         ).then((res) => {
+          searchObj.loadingStream = false;
           return res;
         });
       } else {
@@ -371,6 +375,7 @@ const useLogs = () => {
       }
       return;
     } catch (e: any) {
+      searchObj.loadingStream = false;
       console.log("Error while loading stream fields");
     }
   }
