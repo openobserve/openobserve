@@ -110,7 +110,7 @@ async fn proxy(
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(status::healthz);
+    cfg.service(status::healthz).service(status::schedulez);
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
