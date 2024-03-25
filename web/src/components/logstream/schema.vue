@@ -186,6 +186,7 @@ class="indexDetailsContainer" style="height: 100vh">
               </template>
               <template v-slot:body-cell-index_type="props">
                 <q-td
+                  data-test="schema-stream-index-select"
                   ><q-select
                     v-if="
                       props.row.name !== store.state.zoConfig.timestamp_column
