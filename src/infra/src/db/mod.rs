@@ -100,12 +100,24 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
-    async fn put(&self, key: &str, value: Bytes, need_watch: bool) -> Result<()>;
-    async fn delete(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()>;
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()>;
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        need_watch: bool,
+        updated_at: Option<i64>,
+    ) -> Result<()>;
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.
     async fn delete_if_exists(&self, key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
-        match self.delete(key, with_prefix, need_watch).await {
+        match self.delete(key, with_prefix, need_watch, None).await {
             Ok(()) | Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(()),
             Err(e) => Err(e),
         }
@@ -117,6 +129,7 @@ pub trait Db: Sync + Send + 'static {
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
     async fn close(&self) -> Result<()>;
+    async fn add_start_dt_column(&self) -> Result<()>;
 }
 
 pub fn parse_key(mut key: &str) -> (String, String, String) {
@@ -198,7 +211,7 @@ mod tests {
     async fn test_put() {
         create_table().await.unwrap();
         let db = get_db().await;
-        db.put("/foo/put/bar", Bytes::from("hello"), false)
+        db.put("/foo/put/bar", Bytes::from("hello"), false, None)
             .await
             .unwrap();
     }
@@ -208,7 +221,9 @@ mod tests {
         create_table().await.unwrap();
         let db = get_db().await;
         let hello = Bytes::from("hello");
-        db.put("/foo/get/bar", hello.clone(), false).await.unwrap();
+        db.put("/foo/get/bar", hello.clone(), false, None)
+            .await
+            .unwrap();
         assert_eq!(db.get("/foo/get/bar").await.unwrap(), hello);
     }
 
@@ -218,16 +233,28 @@ mod tests {
         let db = get_db().await;
         let hello = Bytes::from("hello");
 
-        db.put("/foo/del/bar1", hello.clone(), false).await.unwrap();
-        db.put("/foo/del/bar2", hello.clone(), false).await.unwrap();
-        db.put("/foo/del/bar3", hello.clone(), false).await.unwrap();
-        db.delete("/foo/del/bar1", false, false).await.unwrap();
-        assert!(db.delete("/foo/del/bar4", false, false).await.is_ok());
-        db.delete("/foo/del/", true, false).await.unwrap();
+        db.put("/foo/del/bar1", hello.clone(), false, None)
+            .await
+            .unwrap();
+        db.put("/foo/del/bar2", hello.clone(), false, None)
+            .await
+            .unwrap();
+        db.put("/foo/del/bar3", hello.clone(), false, None)
+            .await
+            .unwrap();
+        db.delete("/foo/del/bar1", false, false, None)
+            .await
+            .unwrap();
+        assert!(db.delete("/foo/del/bar4", false, false, None).await.is_ok());
+        db.delete("/foo/del/", true, false, None).await.unwrap();
 
-        db.put("/foo/del/bar1", hello.clone(), false).await.unwrap();
-        db.put("/foo/del/bar2", hello.clone(), false).await.unwrap();
-        db.put("/foo/del/bar3", hello, false).await.unwrap();
+        db.put("/foo/del/bar1", hello.clone(), false, None)
+            .await
+            .unwrap();
+        db.put("/foo/del/bar2", hello.clone(), false, None)
+            .await
+            .unwrap();
+        db.put("/foo/del/bar3", hello, false, None).await.unwrap();
         assert_eq!(db.list_keys("/foo/del/").await.unwrap().len(), 3);
         assert_eq!(db.list_values("/foo/del/").await.unwrap().len(), 3);
     }

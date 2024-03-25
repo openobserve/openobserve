@@ -54,6 +54,7 @@ const defaultObject = {
   runQuery: false,
   loading: false,
   loadingHistogram: false,
+  loadingStream: false,
   shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
@@ -124,9 +125,10 @@ const defaultObject = {
     errorCode: 0,
     additionalErrorMsg: "",
     stream: {
+      loading: false,
       streamLists: <object[]>[],
       selectedStream: { label: "", value: "" },
-      selectedStreamFields: <object[]>[],
+      selectedStreamFields: <any>[],
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
@@ -359,11 +361,13 @@ const useLogs = () => {
   async function loadStreamFileds(streamName: string) {
     try {
       if (streamName != "") {
+        searchObj.loadingStream = true;
         return await getStream(
           streamName,
           searchObj.data.stream.streamType || "logs",
           true
         ).then((res) => {
+          searchObj.loadingStream = false;
           return res;
         });
       } else {
@@ -371,6 +375,7 @@ const useLogs = () => {
       }
       return;
     } catch (e: any) {
+      searchObj.loadingStream = false;
       console.log("Error while loading stream fields");
     }
   }
@@ -1122,7 +1127,12 @@ const useLogs = () => {
     for (const column of columns) {
       if (
         column.expr &&
-        (column.expr.column === "_timestamp" || column.expr.column === "*")
+        (column.expr.column === "_timestamp" ||
+          column.expr.column === "*" ||
+          (column.expr.hasOwnProperty("args") &&
+            column.expr.args.expr.column === "_timestamp") || 
+          (column.hasOwnProperty("as") &&
+          column.as === "_timestamp"))
       ) {
         return true; // Found _timestamp column
       }
@@ -1530,7 +1540,7 @@ const useLogs = () => {
           }
         }
 
-        const fields: any = {};
+        let fields: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
         searchObj.data.stream.interestingFieldList =
           localInterestingFields.value != null &&
@@ -1552,26 +1562,43 @@ const useLogs = () => {
             : [...schemaInterestingFields];
 
         let environmentInterestingFields = [];
-        if (store.state.zoConfig.hasOwnProperty("quick_mode_fields")) {
+        if (store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")) {
           environmentInterestingFields =
-            store.state?.zoConfig?.quick_mode_fields.split(",");
+            store.state?.zoConfig?.default_quick_mode_fields;
         }
         let index = -1;
         // queryResult.forEach((row: any) => {
+        for (const row of queryResult) {
+          if (fields[row.name] == undefined) {
+            fields[row.name] = {};
+            searchObj.data.stream.selectedStreamFields.push({
+              name: row.name,
+              ftsKey: ftsKeys?.has(row.name),
+              isSchemaField: schemaFields.has(row.name),
+              showValues: row.name !== timestampField,
+              isInterestingField:
+                searchObj.data.stream.interestingFieldList.includes(row.name)
+                  ? true
+                  : false,
+            });
+          }
+        }
+
+        fields = {};
         for (const row of queryResult) {
           // let keys = deepKeys(row);
           // for (let i in row) {
           if (fields[row.name] == undefined) {
             fields[row.name] = {};
-
             if (environmentInterestingFields.includes(row.name)) {
               index = searchObj.data.stream.interestingFieldList.indexOf(
                 row.name
               );
               if (index == -1 && row.name != "*") {
-                // searchObj.data.stream.interestingFieldList.push(row.name);
-                for (const stream of searchObj.data.stream
-                  .selectedStreamFields) {
+                for (const [
+                  index,
+                  stream,
+                ] of searchObj.data.stream.selectedStreamFields.entries()) {
                   if ((stream as { name: string }).name == row.name) {
                     searchObj.data.stream.interestingFieldList.push(row.name);
                     const localInterestingFields: any =
@@ -1586,21 +1613,13 @@ const useLogs = () => {
                         searchObj.data.stream.selectedStream.value
                     ] = searchObj.data.stream.interestingFieldList;
                     useLocalInterestingFields(localFields);
+                    searchObj.data.stream.selectedStreamFields[
+                      index
+                    ].isInterestingField = true;
                   }
                 }
               }
             }
-
-            searchObj.data.stream.selectedStreamFields.push({
-              name: row.name,
-              ftsKey: ftsKeys?.has(row.name),
-              isSchemaField: schemaFields.has(row.name),
-              showValues: row.name !== timestampField,
-              isInterestingField:
-                searchObj.data.stream.interestingFieldList.includes(row.name)
-                  ? true
-                  : false,
-            });
           }
           // }
         }

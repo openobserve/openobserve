@@ -68,6 +68,7 @@ pub async fn set(
             &key,
             json::to_vec(alert).unwrap().into(),
             infra_db::NEED_WATCH,
+            None,
         )
         .await
     {
@@ -84,7 +85,7 @@ pub async fn delete(
 ) -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
-    db.delete(&key, false, infra_db::NEED_WATCH)
+    db.delete(&key, false, infra_db::NEED_WATCH, None)
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting alert: {}", e))
 }
@@ -252,6 +253,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         &item_key,
                         json::to_vec(&alert).unwrap().into(),
                         infra_db::NO_NEED_WATCH,
+                        None,
                     )
                     .await;
                 alert
@@ -270,5 +272,5 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn reset() -> Result<(), anyhow::Error> {
     let db = infra_db::get_db().await;
     let key = "/alerts/";
-    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
+    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?)
 }
