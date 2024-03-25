@@ -18,6 +18,7 @@ use std::io::Error;
 use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    meta::cluster::NodeStatus,
     utils::json,
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -110,6 +111,33 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(HealthzResponse {
         status: "ok".to_string(),
     }))
+}
+
+/// Healthz of the node for scheduled status
+#[utoipa::path(
+    path = "/schedulez",
+    tag = "Meta",
+    responses(
+        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+    )
+)]
+#[get("/schedulez")]
+pub async fn schedulez() -> Result<HttpResponse, Error> {
+    let node_id = LOCAL_NODE_UUID.clone();
+    let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
+        return Ok(HttpResponse::InternalServerError().json(HealthzResponse {
+            status: "not ok".to_string(),
+        }));
+    };
+    Ok(if node.scheduled && node.status == NodeStatus::Online {
+        HttpResponse::Ok().json(HealthzResponse {
+            status: "ok".to_string(),
+        })
+    } else {
+        HttpResponse::InternalServerError().json(HealthzResponse {
+            status: "not ok".to_string(),
+        })
+    })
 }
 
 #[get("")]
