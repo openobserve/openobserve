@@ -16,7 +16,7 @@
 use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
-use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
+use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
 use config::{get_chrome_launch_options, CONFIG, SMTP_CLIENT};
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
@@ -397,9 +397,15 @@ async fn generate_report(
     page.wait_for_navigation().await?;
 
     log::info!("waiting for data to load for dashboard {dashboard_id}");
-    // Sleep for specified time to let the dashboard load
-    tokio::time::sleep(Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into())).await;
-    log::info!("data is assumed to be loaded for dashboard {dashboard_id}");
+
+    // If the span element is not rendered yet, capture whatever is loaded till now
+    if let Err(e) = wait_for_panel_data_load(&page).await {
+        log::error!(
+            "[REPORT] error occured while finding the span element for dashboard {dashboard_id}:{e}"
+        );
+    } else {
+        log::info!("[REPORT] all panel data loaded for report dashboard: {dashboard_id}");
+    }
 
     if let Err(e) = page.find_element("main").await {
         browser.close().await?;
@@ -417,16 +423,6 @@ async fn generate_report(
     }
 
     // Last two elements loaded means atleast the metric components have loaded.
-    // If the span element is not rendered yet, capture whatever is loaded till now
-    if let Err(e) = page
-        .find_element("span#dashboardVariablesAndPanelsDataLoaded")
-        .await
-    {
-        log::error!(
-            "[REPORT] Data loading indicator span is not rendered for dashboard {dashboard_id}:{e}"
-        );
-    }
-
     // Convert the page into pdf
     let pdf_data = page
         .pdf(PrintToPdfParams {
@@ -438,4 +434,25 @@ async fn generate_report(
     browser.close().await?;
     handle.await?;
     Ok((pdf_data, email_dashb_url))
+}
+
+async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
+    let start = std::time::Instant::now();
+    let timeout = Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
+    loop {
+        if let Ok(_) = page
+            .find_element("span#dashboardVariablesAndPanelsDataLoaded")
+            .await
+        {
+            return Ok(());
+        }
+
+        if start.elapsed() >= timeout {
+            return Err(anyhow::anyhow!(
+                "span element indicator for data load not rendered yet"
+            ));
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
