@@ -440,9 +440,10 @@ async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
     loop {
-        if let Ok(_) = page
+        if page
             .find_element("span#dashboardVariablesAndPanelsDataLoaded")
             .await
+            .is_ok()
         {
             return Ok(());
         }
