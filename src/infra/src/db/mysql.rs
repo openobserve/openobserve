@@ -106,7 +106,7 @@ impl super::Db for MysqlDb {
         let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#,
+             r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#
         )
         .bind(&module)
         .bind(&key1)
@@ -120,9 +120,9 @@ impl super::Db for MysqlDb {
             }
             return Err(e.into());
         }
-        if module == "schema" {
-            if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#,
+
+        if let Err(e) = sqlx::query(
+              r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#
             )
             .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .bind(&module)
@@ -137,30 +137,9 @@ impl super::Db for MysqlDb {
                 }
                 return Err(e.into());
             }
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit put meta error: {}", e);
-                return Err(e.into());
-            }
-        } else {
-            if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ?;"#,
-            )
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .execute(&mut *tx)
-            .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback put meta error: {}", e);
-                }
-                return Err(e.into());
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit put meta error: {}", e);
-                return Err(e.into());
-            }
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit put meta error: {}", e);
+            return Err(e.into());
         }
 
         // event watch
@@ -181,68 +160,77 @@ impl super::Db for MysqlDb {
         start_dt: Option<i64>,
         update_fn: super::UpdateFn,
     ) -> Result<()> {
-        let value = self.get(key).await?;
-        let value = update_fn(value)?;
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
-        if let Err(e) = sqlx::query(
-            r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(local_start_dt)
-        .execute(&mut *tx)
-        .await
-        {
+        let value = if let Some(start_dt) = start_dt {
+            match sqlx::query_scalar::<_,String>(
+                r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ? FOR UPDATE;"#
+            )
+              .bind(&module)
+              .bind(&key1)
+              .bind(&key2)
+            .bind(start_dt)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(Bytes::from(v)),
+                Err(e) => {
+                    log::error!("[MYSQL] get_for_update error: {}", e);
+                    None
+                }
+            }
+        } else {
+            match sqlx::query_scalar::<_,String>(
+                r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC FOR UPDATE;"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(Bytes::from(v)),
+                Err(e) => {
+                    log::error!("[MYSQL] get_for_update error: {}", e);
+                    None
+                }
+            }
+        };
+        let exist = value.is_some();
+        let value = update_fn(value)?;
+        let ret = if exist {
+            sqlx::query(
+                r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#
+            )
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+        } else {
+            sqlx::query(
+                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, ?);"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+        };
+        if let Err(e) = ret {
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback put meta error: {}", e);
             }
             return Err(e.into());
         }
-        if module == "schema" {
-            if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#,
-            )
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(local_start_dt)
-            .execute(&mut *tx)
-            .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback put meta error: {}", e);
-                }
-                return Err(e.into());
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit put meta error: {}", e);
-                return Err(e.into());
-            }
-        } else {
-            if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=? WHERE module = ? AND key1 = ? AND key2 = ?;"#,
-            )
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .execute(&mut *tx)
-            .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback put meta error: {}", e);
-                }
-                return Err(e.into());
-            }
-            if let Err(e) = tx.commit().await {
-                log::error!("[MYSQL] commit put meta error: {}", e);
-                return Err(e.into());
-            }
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit put meta error: {}", e);
+            return Err(e.into());
         }
 
         // event watch
@@ -331,6 +319,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         sql = format!("{} ORDER BY start_dt DESC ", sql);
+
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)

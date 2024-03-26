@@ -179,7 +179,7 @@ impl super::Db for DynamoDb {
         start_dt: Option<i64>,
         update_fn: super::UpdateFn,
     ) -> Result<()> {
-        let value = self.get(in_key).await?;
+        let value = self.get(in_key).await.ok();
         let value = update_fn(value)?;
         self.put(in_key, value, need_watch, start_dt).await
     }

@@ -125,7 +125,7 @@ impl super::Db for Etcd {
         start_dt: Option<i64>,
         update_fn: super::UpdateFn,
     ) -> Result<()> {
-        let value = self.get(key).await?;
+        let value = self.get(key).await.ok();
         let value = update_fn(value)?;
         self.put(key, value, need_watch, start_dt).await
     }

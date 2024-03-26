@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{cluster, FxIndexMap, CONFIG};
+use config::{cluster, utils::json, FxIndexMap, CONFIG};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -219,7 +219,7 @@ impl super::Db for SqliteDb {
         let client = client.lock().await;
         let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT OR IGNORE INTO meta (module, key1, key2,  start_dt, value) VALUES ($1, $2, $3,  $4, '');"#,
+            r#"INSERT OR IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '');"#
         )
         .bind(&module)
         .bind(&key1)
@@ -234,13 +234,13 @@ impl super::Db for SqliteDb {
             return Err(e.into());
         }
         if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#,
+            r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
         )
+        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
         .bind(local_start_dt)
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .execute(&mut *tx)
         .await
         {
@@ -282,39 +282,70 @@ impl super::Db for SqliteDb {
         start_dt: Option<i64>,
         update_fn: super::UpdateFn,
     ) -> Result<()> {
-        let value = self.get(key).await?;
-        let value = update_fn(value)?;
         let (module, key1, key2) = super::parse_key(key);
-        let local_start_dt = start_dt.unwrap_or_default();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
-        if let Err(e) = sqlx::query(
-            r#"INSERT OR IGNORE INTO meta (module, key1, key2,  start_dt, value) VALUES ($1, $2, $3,  $4, '');"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(local_start_dt)
-        .execute(&mut *tx)
-        .await
-        {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback put meta error: {}", e);
+        let value = if let Some(start_dt) = start_dt {
+            match sqlx::query_scalar::<_,String>(
+                r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4 FOR UPDATE;"#
+            )
+              .bind(&module)
+              .bind(&key1)
+              .bind(&key2)
+            .bind(start_dt)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(Bytes::from(v)),
+                Err(e) => {
+                    log::error!("[SQLITE] get_for_update error: {}", e);
+                    None
+                }
             }
-            return Err(e.into());
-        }
-        if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#,
-        )
-        .bind(&module)
-        .bind(&key1)
-        .bind(&key2)
-        .bind(local_start_dt)
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-        .execute(&mut *tx)
-        .await
-        {
+        } else {
+            match sqlx::query_scalar::<_,String>(
+                r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC FOR UPDATE;"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(Bytes::from(v)),
+                Err(e) => {
+                    log::error!("[SQLITE] get_for_update error: {}", e);
+                    None
+                }
+            }
+        };
+        let exist = value.is_some();
+        let value = update_fn(value)?;
+        let ret = if exist {
+            sqlx::query(
+                r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
+            )
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+        } else {
+            sqlx::query(
+                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+        };
+        if let Err(e) = ret {
             if let Err(e) = tx.rollback().await {
                 log::error!("[SQLITE] rollback put meta error: {}", e);
             }
@@ -425,19 +456,40 @@ impl super::Db for SqliteDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
         sql = format!("{} ORDER BY start_dt DESC ", sql);
+
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| {
-                (
-                    super::build_key(&r.module, &r.key1, &r.key2),
-                    Bytes::from(r.value),
-                )
-            })
-            .collect())
+        if module == "schema" {
+            let mut grouped_values: HashMap<String, Vec<datafusion::arrow::datatypes::Schema>> =
+                HashMap::new();
+            for record in ret {
+                let key = format!("/{}/{}/{}", record.module, record.key1, record.key2);
+                let mut parsed: Vec<datafusion::arrow::datatypes::Schema> =
+                    json::from_str(&record.value).unwrap();
+
+                grouped_values
+                    .entry(key.to_owned())
+                    .or_insert_with(Vec::new)
+                    .append(&mut parsed);
+            }
+
+            Ok(grouped_values
+                .into_iter()
+                .map(|(key, vec)| (key, json::to_vec(&vec).unwrap().into()))
+                .collect())
+        } else {
+            Ok(ret
+                .into_iter()
+                .map(|r| {
+                    (
+                        super::build_key(&r.module, &r.key1, &r.key2),
+                        Bytes::from(r.value),
+                    )
+                })
+                .collect())
+        }
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
