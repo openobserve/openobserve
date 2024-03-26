@@ -316,7 +316,7 @@ pub async fn check_for_schema(
     stream_name: &str,
     stream_type: StreamType,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
-    record_val: &Map<String, Value>,
+    record_val: Vec<&Map<String, Value>>,
     record_ts: i64,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
@@ -347,7 +347,7 @@ pub async fn check_for_schema(
     }
 
     // get infer schema
-    let value_iter = [record_val].into_iter();
+    let value_iter = record_val.into_iter();
     let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
 
     // fast path
@@ -413,7 +413,7 @@ pub async fn check_for_schema(
     Ok((ret, Some(inferred_schema)))
 }
 
-async fn get_merged_schema(
+pub async fn get_merged_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -522,8 +522,9 @@ async fn handle_diff_schema_local_mode(
         return None;
     };
     log::info!(
-        "Acquired lock for local stream {} to update schema",
-        stream_name
+        "Acquired lock for local stream {} to {} schema",
+        stream_name,
+        if is_new { "create" } else { "update" }
     );
     db::schema::set(
         org_id,
@@ -960,7 +961,7 @@ mod tests {
             stream_name,
             StreamType::Logs,
             &mut map,
-            record.as_object().unwrap(),
+            vec![record.as_object().unwrap()],
             1234234234234,
         )
         .await
