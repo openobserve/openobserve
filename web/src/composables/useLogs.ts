@@ -126,6 +126,7 @@ const defaultObject = {
     errorMsg: "",
     errorCode: 0,
     additionalErrorMsg: "",
+    savedViewFilterFields: "",
     stream: {
       loading: false,
       streamLists: <object[]>[],

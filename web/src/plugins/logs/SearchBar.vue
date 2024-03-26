@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :visible-columns="['view_name']"
                     :rows="searchObj.data.savedViews"
                     :row-key="(row) => 'saved_view_' + row.view_name"
-                    :filter="filteredSavedViews"
-                    :filter-method="filteredSavedViewsFn"
+                    :filter="searchObj.data.savedViewFilterFields"
+                    :filter-method="filterSavedViewFn"
                     :pagination="{ rowsPerPage }"
                     hide-header
                     :wrap-cells="searchObj.meta.resultGrid.wrapCells"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="full-width">
                         <q-input
                           data-test="log-search-saved-view-field-search-input"
-                          v-model="filteredSavedViews"
+                          v-model="searchObj.data.savedViewFilterFields"
                           data-cy="index-field-search-input"
                           filled
                           borderless
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="applySavedView(props.row)"
                             v-close-popup
                           >
-                            <q-item-label>{{
+                            <q-item-label class="ellipsis" style="max-width: 185px;">{{
                               props.row.view_name
                             }}</q-item-label>
                           </q-item-section>
@@ -217,7 +217,7 @@ color="grey" size="xs" />
                             @click.stop="applySavedView(props.row)"
                             v-close-popup
                           >
-                            <q-item-label>{{
+                            <q-item-label class="ellipsis" style="max-width: 185px;">{{
                               props.row.view_name
                             }}</q-item-label>
                           </q-item-section>
@@ -968,7 +968,6 @@ export default defineComponent({
     const parser = new Parser();
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
-    const filteredSavedViews = ref("");
     const favoriteViews = ref([]);
 
     const localSavedViews = ref([]);
@@ -2111,19 +2110,6 @@ export default defineComponent({
       }
     };
 
-    const filteredSavedViewsFn = async (rows: any, terms: any) => {
-      var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["view_name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      }
-      return filtered;
-    };
-
     const handleFavoriteSavedView = (row: any, flag: boolean) => {
       let localSavedView: any = {};
       let savedViews = useLocalSavedView();
@@ -2195,6 +2181,19 @@ export default defineComponent({
       }
     };
 
+    const filterSavedViewFn = (rows: any, terms: any) => {
+      var filtered = [];
+      if (terms != "") {
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i]["view_name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+      }
+      return filtered;
+    };
+
     return {
       t,
       store,
@@ -2256,12 +2255,11 @@ export default defineComponent({
       buildSearch,
       confirmSavedViewDialogVisible,
       rowsPerPage,
-      filteredSavedViews,
-      filteredSavedViewsFn,
       handleFavoriteSavedView,
       favoriteViews,
       localSavedViews,
       loadSavedView,
+      filterSavedViewFn,
     };
   },
   computed: {
