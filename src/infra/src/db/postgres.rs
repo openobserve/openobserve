@@ -459,13 +459,13 @@ CREATE TABLE IF NOT EXISTS meta
 
     // create table index
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
+    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
         .await?;
 
     add_col(pool).await?;
 
     match create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt,key2, key1, module);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
     )
     .await{
         Ok(_) => {}
@@ -516,7 +516,7 @@ async fn add_start_dt_column() -> Result<()> {
     add_col(pool).await?;
 
     create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
     ).await?;
 
     log::info!("[POSTGRES] EXIT: add_start_dt_column");
