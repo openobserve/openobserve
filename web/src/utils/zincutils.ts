@@ -624,7 +624,7 @@ export function getUUID() {
 }
 
 export const maskText = (text: string) => {
-  // Disabled masking as it was not great usefull
+  // Disabled masking as it was not great useful
   // const visibleChars = 4; // Number of characters to keep visible at the beginning and end
   // const maskedChars = text.length - visibleChars * 2;
 
