@@ -142,9 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="applySavedView(props.row)"
                             v-close-popup
                           >
-                            <q-item-label class="ellipsis" style="max-width: 185px;">{{
-                              props.row.view_name
-                            }}</q-item-label>
+                            <q-item-label
+                              class="ellipsis"
+                              style="max-width: 185px"
+                              >{{ props.row.view_name }}</q-item-label
+                            >
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
@@ -217,9 +219,11 @@ color="grey" size="xs" />
                             @click.stop="applySavedView(props.row)"
                             v-close-popup
                           >
-                            <q-item-label class="ellipsis" style="max-width: 185px;">{{
-                              props.row.view_name
-                            }}</q-item-label>
+                            <q-item-label
+                              class="ellipsis"
+                              style="max-width: 185px"
+                              >{{ props.row.view_name }}</q-item-label
+                            >
                           </q-item-section>
                           <q-item-section
                             :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
@@ -2329,23 +2333,45 @@ export default defineComponent({
             // if query contains order by clause or limit clause then add where clause before that
             // if query contains where clause then add filter after that with and operator and keep order by or limit after that
             // if query does not contain where clause then add where clause before filter
-            if (currentQuery[0].toLowerCase().indexOf("where") != -1) {
-              currentQuery[0] = currentQuery[0].replace(/where/gi, (match) => {
-                return match + " " + filter + " and ";
-              });
-            } else if (
-              currentQuery[0].toLowerCase().indexOf("order by") != -1 ||
-              currentQuery[0].toLowerCase().indexOf("limit") != -1
-            ) {
-              currentQuery[0] = currentQuery[0].replace(
-                /order by[^]*?limit/gi,
-                (match) => {
-                  return " where " + filter + " " + match;
-                }
-              );
+            let query = currentQuery[0].toLowerCase();
+            if (query.includes("where")) {
+              if (query.includes("order by")) {
+                const [beforeOrderBy, afterOrderBy] = query.split("order by");
+                query =
+                  beforeOrderBy.trim() +
+                  " AND " +
+                  filter +
+                  " order by" +
+                  afterOrderBy;
+              } else if (query.includes("limit")) {
+                const [beforeLimit, afterLimit] = query.split("limit");
+                query =
+                  beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
+              } else {
+                query = query + " AND " + filter;
+              }
             } else {
-              currentQuery[0] += " where " + filter;
+              if (query.includes("order by")) {
+                const [beforeOrderBy, afterOrderBy] = query.split("order by");
+                query =
+                  beforeOrderBy.trim() +
+                  " where " +
+                  filter +
+                  " order by" +
+                  afterOrderBy;
+              } else if (query.includes("limit")) {
+                const [beforeLimit, afterLimit] = query.split("limit");
+                query =
+                  beforeLimit.trim() +
+                  " where " +
+                  filter +
+                  " limit" +
+                  afterLimit;
+              } else {
+                query = query + " where " + filter;
+              }
             }
+            currentQuery[0] = query;
           } else {
             currentQuery[0].length == 0
               ? (currentQuery[0] = filter)
