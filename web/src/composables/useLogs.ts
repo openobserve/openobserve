@@ -1130,9 +1130,8 @@ const useLogs = () => {
         (column.expr.column === "_timestamp" ||
           column.expr.column === "*" ||
           (column.expr.hasOwnProperty("args") &&
-            column.expr.args.expr.column === "_timestamp") || 
-          (column.hasOwnProperty("as") &&
-          column.as === "_timestamp"))
+            column.expr.args.expr.column === "_timestamp") ||
+          (column.hasOwnProperty("as") && column.as === "_timestamp"))
       ) {
         return true; // Found _timestamp column
       }
@@ -2143,7 +2142,7 @@ const useLogs = () => {
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
         ? queryStr
-        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
       : "";
 
     await extractFields();
@@ -2191,6 +2190,62 @@ const useLogs = () => {
     }
   };
 
+  const addOrderByToQuery = (
+    sql: string,
+    column: string,
+    type: "ASC" | "DESC"
+  ) => {
+    // Parse the SQL query into an AST
+    const parsedQuery: any = parser.astify(sql);
+
+    // Check for the presence of an ORDER BY clause
+    const hasOrderBy = !!(
+      parsedQuery.orderby && parsedQuery.orderby.length > 0
+    );
+
+    // Check if _timestamp is in the SELECT clause if not SELECT *
+    const includesTimestamp = !!parsedQuery.columns.find(
+      (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
+    );
+
+    console.log(
+      "has order by",
+      hasOrderBy,
+      "includesTimestamp",
+      includesTimestamp
+    );
+    // If ORDER BY is present and doesn't include _timestamp, append it
+    if (!hasOrderBy) {
+      // If no ORDER BY clause, add it
+      parsedQuery.orderby = [
+        {
+          expr: {
+            type: "column_ref",
+            table: null,
+            column: column,
+          },
+          type: type,
+        },
+      ];
+    }
+
+    // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
+    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""));
+  };
+
+  function quoteTableNameDirectly(sql: string) {
+    // This regular expression looks for the FROM keyword followed by
+    // an optional schema name, a table name, and handles optional spaces.
+    // It captures the table name to be replaced with double quotes.
+    const regex = /FROM\s+([a-zA-Z_][\w]*)/gi;
+
+    // Replace the captured table name with the same name enclosed in double quotes
+    const modifiedSql = sql.replace(regex, (match, tableName) => {
+      return `FROM "${tableName}"`;
+    });
+
+    return modifiedSql;
+  }
   return {
     searchObj,
     getStreams,
@@ -2222,6 +2277,7 @@ const useLogs = () => {
     filterHitsColumns,
     getHistogramQueryData,
     fnParsedSQL,
+    addOrderByToQuery,
   };
 };
 
