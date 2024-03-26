@@ -274,6 +274,8 @@ async fn search_in_cluster(
         response_time: op_start.elapsed().as_secs_f64(),
         request_body: Some(req.query.unwrap().query),
         user_email: Some(user_email.to_string()),
+        min_ts: Some(start),
+        max_ts: Some(end),
         ..Default::default()
     };
 
