@@ -53,7 +53,6 @@ use crate::{
 pub mod alert_manager;
 pub mod destinations;
 pub mod templates;
-pub mod triggers;
 
 pub async fn save(
     org_id: &str,
@@ -167,7 +166,7 @@ pub async fn save(
     _ = &alert.evaluate(None).await?;
 
     // save the alert
-    match db::alerts::set(org_id, stream_type, stream_name, &alert).await {
+    match db::alerts::set(org_id, stream_type, stream_name, &alert, create).await {
         Ok(_) => {
             if name.is_empty() {
                 set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
@@ -257,7 +256,7 @@ pub async fn enable(
         }
     };
     alert.enabled = value;
-    db::alerts::set(org_id, stream_type, stream_name, &alert)
+    db::alerts::set(org_id, stream_type, stream_name, &alert, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
