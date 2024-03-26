@@ -309,8 +309,6 @@ describe("Logs testcases", () => {
       .its("response.statusCode")
       .should("eq", 200);
     cy.get("@value").its("response.body.hits").should("be.an", "array");
-    logstests.addSecondFieldOnEditor();
-    logstests.clickOnEqualToButton();
     logstests.bothFieldAddedOnEqualToClick();
     cy.get('[aria-label="SQL Mode"]').click({ force: true });
     cy.get('[data-test="logs-search-bar-query-editor"]').then((editor) => {
