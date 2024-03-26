@@ -2195,14 +2195,6 @@ export default defineComponent({
       }
     };
 
-    const columns: any = ref<QTableProps["columns"]>([
-      {
-        name: "view_name",
-        field: "view_name",
-        align: "left",
-      },
-    ]);
-
     return {
       t,
       store,
@@ -2270,7 +2262,6 @@ export default defineComponent({
       favoriteViews,
       localSavedViews,
       loadSavedView,
-      columns,
     };
   },
   computed: {
