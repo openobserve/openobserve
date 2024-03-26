@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-table
                     data-test="log-search-saved-view-list-fields-table"
                     :visible-columns="['view_name']"
-                    :rows="allSavedViews"
+                    :rows="searchObj.data.savedViews"
                     :row-key="(row) => 'saved_view_' + row.view_name"
                     :filter="filteredSavedViews"
                     :filter-method="filteredSavedViewsFn"
@@ -2121,7 +2121,6 @@ export default defineComponent({
           }
         }
       }
-      allSavedViews.value = filtered;
       return filtered;
     };
 
@@ -2204,9 +2203,6 @@ export default defineComponent({
       },
     ]);
 
-    const allSavedViews = ref([]);
-    allSavedViews.value = searchObj.data.savedViews;
-
     return {
       t,
       store,
@@ -2275,7 +2271,6 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       columns,
-      allSavedViews,
     };
   },
   computed: {
@@ -2296,9 +2291,6 @@ export default defineComponent({
     },
     resetFunctionDefination() {
       return this.searchObj.data.tempFunctionContent;
-    },
-    refreshAllSavedViews() {
-      return this.searchObj.data.savedViews;
     },
   },
   watch: {
@@ -2392,9 +2384,6 @@ export default defineComponent({
     },
     resetFunctionDefination(newVal) {
       if (newVal == "") this.resetFunctionContent();
-    },
-    refreshAllSavedViews() {
-      this.allSavedViews = this.searchObj.data.savedViews;
     },
   },
 });
