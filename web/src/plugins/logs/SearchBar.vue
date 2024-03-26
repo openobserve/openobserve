@@ -972,9 +972,11 @@ export default defineComponent({
 
     const localSavedViews = ref([]);
     let savedViews = useLocalSavedView();
-    favoriteViews.value.push(...Object.keys(savedViews.value));
-    const favoriteValues = Object.values(savedViews.value);
-    localSavedViews.value.push(...favoriteValues);
+    if (savedViews.value != null) {
+      favoriteViews.value.push(...Object.keys(savedViews.value));
+      const favoriteValues = Object.values(savedViews.value);
+      localSavedViews.value.push(...favoriteValues);
+    }
 
     const {
       autoCompleteData,
