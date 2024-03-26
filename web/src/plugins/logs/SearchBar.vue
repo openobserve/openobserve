@@ -53,54 +53,199 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn-dropdown
             data-test="logs-search-saved-views-btn"
             v-model="savedViewDropdownModel"
-            auto-close
             size="12px"
             icon="save"
             icon-right="saved_search"
             :title="t('search.savedViewsLabel')"
             @click="fnSavedView"
+            @show="loadSavedView"
             split
             class="no-outline saved-views-dropdown no-border"
           >
             <q-list data-test="logs-search-saved-view-list">
-              <q-item-label header class="q-pa-sm">{{
-                t("search.savedViewDropdownLabel")
-              }}</q-item-label>
-              <q-separator inset></q-separator>
-
-              <div v-if="searchObj.data.savedViews.length">
-                <q-item
-                  class="q-pa-sm saved-view-item"
-                  clickable
-                  v-for="(item, i) in searchObj.data.savedViews"
-                  :key="'saved-view-' + i"
-                  v-close-popup
+              <q-item
+                style="padding: 0px 0px 0px 0px"
+                :style="
+                  localSavedViews.length > 0 ? 'width: 30vw' : 'width: 15vw'
+                "
+              >
+                <q-item-section
+                  class="column"
+                  style="width: 60%; border-right: 1px solid lightgray"
                 >
-                  <q-item-section
-                    @click.stop="applySavedView(item)"
-                    v-close-popup
+                  <q-table
+                    data-test="log-search-saved-view-list-fields-table"
+                    :visible-columns="['view_name']"
+                    :rows="allSavedViews"
+                    :row-key="(row) => 'saved_view_' + row.view_name"
+                    :filter="filteredSavedViews"
+                    :filter-method="filteredSavedViewsFn"
+                    :pagination="{ rowsPerPage }"
+                    hide-header
+                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
+                    class="saved-view-table full-height"
+                    id="savedViewList"
+                    :rows-per-page-options="[]"
+                    :hide-bottom="
+                      searchObj.data.savedViews.length <= rowsPerPage ||
+                      searchObj.data.savedViews.length == 0
+                    "
                   >
-                    <q-item-label>{{ item.view_name }}</q-item-label>
-                  </q-item-section>
-                  <q-item-section
-                    :data-test="`logs-search-bar-delete-${item.view_name}-saved-view-btn`"
-                    side
-                    @click.stop="handleDeleteSavedView(item)"
-                  >
-                    <q-icon name="delete"
+                    <template #top-right>
+                      <div class="full-width">
+                        <q-input
+                          data-test="log-search-saved-view-field-search-input"
+                          v-model="filteredSavedViews"
+                          data-cy="index-field-search-input"
+                          filled
+                          borderless
+                          dense
+                          clearable
+                          debounce="1"
+                          :placeholder="t('search.searchSavedView')"
+                        >
+                          <template #prepend>
+                            <q-icon name="search" />
+                          </template>
+                        </q-input>
+                      </div>
+                      <div
+                        v-if="searchObj.loadingSavedView == true"
+                        class="full-width float-left"
+                      >
+                        <div class="text-subtitle2 text-weight-bold float-left">
+                          <q-spinner-hourglass size="20px" />
+                          {{ t("confirmDialog.loading") }}
+                        </div>
+                      </div>
+                      <q-tr>
+                        <q-td
+                          v-if="
+                            searchObj.data.savedViews.length == 0 &&
+                            searchObj.loadingSavedView == false
+                          "
+                        >
+                          <q-item-label class="q-pl-sm q-pt-sm">{{
+                            t("search.savedViewsNotFound")
+                          }}</q-item-label>
+                        </q-td>
+                      </q-tr>
+                    </template>
+                    <template v-slot:body-cell-view_name="props">
+                      <q-td :props="props" class="field_list">
+                        <q-item
+                          class="q-pa-sm saved-view-item"
+                          clickable
+                          v-close-popup
+                        >
+                          <q-item-section
+                            @click.stop="applySavedView(props.row)"
+                            v-close-popup
+                          >
+                            <q-item-label>{{
+                              props.row.view_name
+                            }}</q-item-label>
+                          </q-item-section>
+                          <q-item-section
+                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                            side
+                            @click.stop="
+                              handleFavoriteSavedView(
+                                props.row,
+                                favoriteViews.includes(props.row.view_id)
+                              )
+                            "
+                          >
+                            <q-icon
+                              :name="
+                                favoriteViews.includes(props.row.view_id)
+                                  ? 'favorite'
+                                  : 'favorite_border'
+                              "
+                              color="grey"
+                              size="xs"
+                            />
+                          </q-item-section>
+                          <q-item-section
+                            :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
+                            side
+                            @click.stop="handleDeleteSavedView(props.row)"
+                          >
+                            <q-icon name="delete"
 color="grey" size="xs" />
-                  </q-item-section>
-                </q-item>
-              </div>
-              <div v-else>
-                <q-item>
-                  <q-item-section>
-                    <q-item-label>{{
-                      t("search.savedViewsNotFound")
-                    }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </div>
+                          </q-item-section>
+                        </q-item> </q-td
+                    ></template>
+                  </q-table>
+                </q-item-section>
+
+                <q-item-section
+                  class="column"
+                  style="width: 40%; margin-left: 0px"
+                  v-if="localSavedViews.length > 0"
+                >
+                  <q-table
+                    data-test="log-search-saved-view-favorite-list-fields-table"
+                    :visible-columns="['view_name']"
+                    :rows="localSavedViews"
+                    :row-key="(row) => 'favorite_saved_view_' + row.view_name"
+                    hide-header
+                    hide-bottom
+                    :wrap-cells="searchObj.meta.resultGrid.wrapCells"
+                    class="saved-view-table full-height"
+                    id="savedViewFavoriteList"
+                    :rows-per-page-options="[0]"
+                  >
+                    <template #top-right>
+                      <q-item style="padding: 0px"
+                        ><q-item-label
+                          header
+                          class="q-pa-sm text-bold favorite-label"
+                          >Favorite Views</q-item-label
+                        ></q-item
+                      >
+                      <q-separator horizontal inset></q-separator>
+                    </template>
+                    <template v-slot:body-cell-view_name="props">
+                      <q-td :props="props" class="field_list q-pa-xs">
+                        <q-item
+                          class="q-pa-sm saved-view-item"
+                          clickable
+                          v-close-popup
+                        >
+                          <q-item-section
+                            @click.stop="applySavedView(props.row)"
+                            v-close-popup
+                          >
+                            <q-item-label>{{
+                              props.row.view_name
+                            }}</q-item-label>
+                          </q-item-section>
+                          <q-item-section
+                            :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                            side
+                            @click.stop="
+                              handleFavoriteSavedView(
+                                props.row,
+                                favoriteViews.includes(props.row.view_id)
+                              )
+                            "
+                          >
+                            <q-icon
+                              :name="
+                                favoriteViews.includes(props.row.view_id)
+                                  ? 'favorite'
+                                  : 'favorite_border'
+                              "
+                              color="grey"
+                              size="xs"
+                            />
+                          </q-item-section>
+                        </q-item> </q-td
+                    ></template>
+                  </q-table>
+                </q-item-section>
+              </q-item>
             </q-list>
           </q-btn-dropdown>
         </q-btn-group>
@@ -662,6 +807,7 @@ import {
   b64DecodeUnicode,
   getImageURL,
   useLocalInterestingFields,
+  useLocalSavedView,
 } from "@/utils/zincutils";
 import savedviewsService from "@/services/saved_views";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -729,7 +875,7 @@ export default defineComponent({
         this.$q.notify({
           message: "Initial number must be positive number.",
           color: "negative",
-          position: "top",
+          position: "bottom",
           timeout: 2000,
         });
         return;
@@ -781,6 +927,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
+    const rowsPerPage = ref(10);
 
     const {
       searchObj,
@@ -797,6 +944,7 @@ export default defineComponent({
       loadStreamLists,
       fnParsedSQL,
       onStreamChange,
+      moveItemsToTop,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -820,6 +968,14 @@ export default defineComponent({
     const parser = new Parser();
     const dateTimeRef = ref(null);
     const saveViewLoader = ref(false);
+    const filteredSavedViews = ref("");
+    const favoriteViews = ref([]);
+
+    const localSavedViews = ref([]);
+    let savedViews = useLocalSavedView();
+    favoriteViews.value.push(...Object.keys(savedViews.value));
+    const favoriteValues = Object.values(savedViews.value);
+    localSavedViews.value.push(...favoriteValues);
 
     const {
       autoCompleteData,
@@ -1949,6 +2105,108 @@ export default defineComponent({
     const downloadCustomRange = ref(100);
     const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
 
+    const loadSavedView = () => {
+      if (searchObj.data.savedViews.length == 0) {
+        getSavedViews();
+      }
+    };
+
+    const filteredSavedViewsFn = async (rows: any, terms: any) => {
+      var filtered = [];
+      if (terms != "") {
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i]["view_name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+      }
+      allSavedViews.value = filtered;
+      return filtered;
+    };
+
+    const handleFavoriteSavedView = (row: any, flag: boolean) => {
+      let localSavedView: any = {};
+      let savedViews = useLocalSavedView();
+
+      if (savedViews.value != null) {
+        localSavedView = savedViews.value;
+      }
+
+      Object.keys(localSavedView).forEach((item, key) => {
+        if (item == row.view_id) {
+          if (flag) {
+            delete localSavedView[item];
+            useLocalSavedView(localSavedView);
+            const index = favoriteViews.value.indexOf(row.view_id);
+            if (index > -1) {
+              favoriteViews.value.splice(index, 1);
+            }
+
+            let favoriteViewsList = localSavedViews.value;
+            if (favoriteViewsList.length > 0) {
+              favoriteViewsList = favoriteViewsList.filter(
+                (item) => item.view_id != row.view_id
+              );
+              // for (const [key, item] of favoriteViewsList.entries()) {
+              //   console.log(item, key);
+              //   if (item.view_id == row.view_id) {
+              //     delete favoriteViewsList[key];
+              //   }
+              // }
+              console.log(favoriteViewsList);
+              localSavedViews.value = favoriteViewsList;
+            }
+          }
+        }
+      });
+
+      if (!flag) {
+        if (favoriteViews.value.length >= 10) {
+          $q.notify({
+            message: "You can only save 10 views.",
+            color: "warning",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return;
+        }
+        localSavedView[row.view_id] = JSON.parse(JSON.stringify(row));
+        favoriteViews.value.push(row.view_id);
+        localSavedViews.value.push(row);
+
+        // moveItemsToTop(localSavedView, favoriteViews.value);
+
+        useLocalSavedView(localSavedView);
+        $q.notify({
+          message: "View added to favorites.",
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
+        });
+      } else {
+        // alert(favoriteViews.value.length)
+        // moveItemsToTop(localSavedView, favoriteViews.value);
+        $q.notify({
+          message: "View removed from favorites.",
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
+        });
+      }
+    };
+
+    const columns: any = ref<QTableProps["columns"]>([
+      {
+        name: "view_name",
+        field: "view_name",
+        align: "left",
+      },
+    ]);
+
+    const allSavedViews = ref([]);
+    allSavedViews.value = searchObj.data.savedViews;
+
     return {
       t,
       store,
@@ -2009,6 +2267,15 @@ export default defineComponent({
       downloadCustomRangeOptions,
       buildSearch,
       confirmSavedViewDialogVisible,
+      rowsPerPage,
+      filteredSavedViews,
+      filteredSavedViewsFn,
+      handleFavoriteSavedView,
+      favoriteViews,
+      localSavedViews,
+      loadSavedView,
+      columns,
+      allSavedViews,
     };
   },
   computed: {
@@ -2029,6 +2296,9 @@ export default defineComponent({
     },
     resetFunctionDefination() {
       return this.searchObj.data.tempFunctionContent;
+    },
+    refreshAllSavedViews() {
+      return this.searchObj.data.savedViews;
     },
   },
   watch: {
@@ -2085,7 +2355,7 @@ export default defineComponent({
               currentQuery[0].toLowerCase().indexOf("limit") != -1
             ) {
               currentQuery[0] = currentQuery[0].replace(
-                /order by|limit/gi,
+                /order by[^]*?limit/gi,
                 (match) => {
                   return " where " + filter + " " + match;
                 }
@@ -2094,7 +2364,6 @@ export default defineComponent({
               currentQuery[0] += " where " + filter;
             }
           } else {
-            
             currentQuery[0].length == 0
               ? (currentQuery[0] = filter)
               : (currentQuery[0] += " and " + filter);
@@ -2123,6 +2392,9 @@ export default defineComponent({
     },
     resetFunctionDefination(newVal) {
       if (newVal == "") this.resetFunctionContent();
+    },
+    refreshAllSavedViews() {
+      this.allSavedViews = this.searchObj.data.savedViews;
     },
   },
 });
@@ -2374,5 +2646,70 @@ export default defineComponent({
 .q-pagination__middle > .q-btn {
   min-width: 30px !important;
   max-width: 30px !important;
+}
+</style>
+<style lang="scss">
+.saved-view-table {
+  td {
+    padding: 0;
+    height: 25px !important;
+    min-height: 25px !important;
+  }
+
+  .q-table__control {
+    margin: 0px !important;
+    width: 100% !important;
+    text-align: right;
+  }
+
+  .q-table__bottom {
+    padding: 0px !important;
+    min-height: 35px;
+
+    .q-table__control {
+      padding: 0px 10px !important;
+    }
+  }
+
+  .q-table__top {
+    padding: 0px !important;
+    margin: 0px !important;
+    left: 0px;
+    width: 100%;
+
+    .q-table__separator {
+      display: none;
+    }
+
+    .q-table__control {
+      padding: 0px !important;
+    }
+  }
+
+  .q-field--filled .q-field__control {
+    padding: 0px 5px !important;
+  }
+
+  .saved-view-item {
+    padding: 4px 5px 4px 10px !important;
+  }
+
+  .q-item__section--main ~ .q-item__section--side {
+    padding-left: 5px !important;
+  }
+}
+.logs-search-bar-component {
+  .q-item {
+    padding: 0px !important;
+  }
+
+  .q-focus-helper:hover {
+    background: transparent !important;
+  }
+}
+
+.favorite-label {
+  line-height: 24px !important;
+  font-weight: bold !important;
 }
 </style>
