@@ -214,7 +214,78 @@ impl super::Db for SqliteDb {
         start_dt: Option<i64>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let local_start_dt = start_dt.unwrap_or(0);
+        let local_start_dt = start_dt.unwrap_or_default();
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let mut tx = client.begin().await?;
+        if let Err(e) = sqlx::query(
+            r#"INSERT OR IGNORE INTO meta (module, key1, key2,  start_dt, value) VALUES ($1, $2, $3,  $4, '');"#,
+        )
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .bind(local_start_dt)
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback put meta error: {}", e);
+            }
+            return Err(e.into());
+        }
+        if let Err(e) = sqlx::query(
+            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#,
+        )
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .bind(local_start_dt)
+        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[SQLITE] rollback put meta error: {}", e);
+            }
+            return Err(e.into());
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit put meta error: {}", e);
+            return Err(e.into());
+        }
+
+        // release lock
+        drop(client);
+
+        // event watch
+        if need_watch {
+            if let Err(e) = CHANNEL
+                .watch_tx
+                .clone()
+                .send(Event::Put(EventData {
+                    key: key.to_string(),
+                    value: Some(value),
+                }))
+                .await
+            {
+                log::error!("[SQLITE] send event error: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: super::UpdateFn,
+    ) -> Result<()> {
+        let value = self.get(key).await?;
+        let value = update_fn(value)?;
+        let (module, key1, key2) = super::parse_key(key);
+        let local_start_dt = start_dt.unwrap_or_default();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;

@@ -118,6 +118,18 @@ impl super::Db for Etcd {
         Ok(())
     }
 
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: super::UpdateFn,
+    ) -> Result<()> {
+        let value = self.get(key).await?;
+        let value = update_fn(value)?;
+        self.put(key, value, need_watch, start_dt).await
+    }
+
     async fn delete(
         &self,
         key: &str,

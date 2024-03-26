@@ -103,7 +103,89 @@ impl super::Db for PostgresDb {
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let local_start_dt = start_dt.unwrap_or(0);
+        let local_start_dt = start_dt.unwrap_or_default();
+        let mut tx = pool.begin().await?;
+        if let Err(e) = sqlx::query(
+            r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,
+        )
+        .bind(&module)
+        .bind(&key1)
+        .bind(&key2)
+        .bind(local_start_dt)
+        .execute(&mut *tx)
+        .await
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback put meta error: {}", e);
+            }
+            return Err(e.into());
+        }
+        if module == "schema" {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(local_start_dt)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback put meta error: {}", e);
+                }
+                return Err(e.into());
+            }
+            if let Err(e) = tx.commit().await {
+                log::error!("[POSTGRES] commit put meta error: {}", e);
+                return Err(e.into());
+            }
+        } else {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback put meta error: {}", e);
+                }
+                return Err(e.into());
+            }
+            if let Err(e) = tx.commit().await {
+                log::error!("[POSTGRES] commit put meta error: {}", e);
+                return Err(e.into());
+            }
+        }
+
+        // event watch
+        if need_watch {
+            let cluster_coordinator = super::get_coordinator().await;
+            cluster_coordinator
+                .put(key, Bytes::from(""), true, start_dt)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: super::UpdateFn,
+    ) -> Result<()> {
+        let value = self.get(key).await?;
+        let value = update_fn(value)?;
+        let (module, key1, key2) = super::parse_key(key);
+        let pool = CLIENT.clone();
+        let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
             r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,

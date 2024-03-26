@@ -172,6 +172,18 @@ impl super::Db for DynamoDb {
         Ok(())
     }
 
+    async fn get_for_update(
+        &self,
+        in_key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: super::UpdateFn,
+    ) -> Result<()> {
+        let value = self.get(in_key).await?;
+        let value = update_fn(value)?;
+        self.put(in_key, value, need_watch, start_dt).await
+    }
+
     // TODO: support prefix mode
     async fn delete(
         &self,

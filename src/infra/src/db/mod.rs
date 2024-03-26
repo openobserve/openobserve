@@ -95,6 +95,8 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
+pub type UpdateFn = fn(Bytes) -> Result<Bytes>;
+
 #[async_trait]
 pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
@@ -106,6 +108,13 @@ pub trait Db: Sync + Send + 'static {
         value: Bytes,
         need_watch: bool,
         start_dt: Option<i64>,
+    ) -> Result<()>;
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: UpdateFn,
     ) -> Result<()>;
     async fn delete(
         &self,
