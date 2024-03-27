@@ -39,14 +39,11 @@ use itertools::Itertools;
 use serde_json::{Map, Value};
 
 use crate::{
-    common::{
-        infra::config::LOCAL_SCHEMA_LOCKER,
-        meta::{
-            authz::Authz,
-            ingestion::StreamSchemaChk,
-            prom::METADATA_LABEL,
-            stream::{SchemaEvolution, StreamPartition},
-        },
+    common::meta::{
+        authz::Authz,
+        ingestion::StreamSchemaChk,
+        prom::METADATA_LABEL,
+        stream::{SchemaEvolution, StreamPartition},
     },
     service::db,
 };
@@ -440,11 +437,10 @@ async fn get_merged_schema(
 // handle_diff_schema is a slow path, it acquires a lock to update schema
 // steps:
 // 1. get schema from db, if schema is empty, set schema and return
-// 2. acquire locks
-// 3. get schema from db,
-// 4. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
-// 5. if db_schema is not identical to inferred_schema, merge schema and update db
-// 6. release locks
+// 2. get schema from db for update,
+// 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
+// 4. if db_schema is not identical to inferred_schema, merge schema and update db
+
 async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
@@ -504,27 +500,11 @@ async fn handle_diff_schema_local_mode(
         );
     }
 
-    let lock_key = format!("/lock/schema/{org_id}/{stream_type}/{stream_name}",);
-    let local_map = LOCAL_SCHEMA_LOCKER.clone();
-    let mut schema_locker = local_map.write().await;
-    let locker = schema_locker
-        .entry(lock_key)
-        .or_insert_with(|| Arc::new(tokio::sync::RwLock::new(false)));
-    let locker = locker.clone();
-    drop(schema_locker);
-    // lock acquired
-    let lock_acquired = locker.write().await;
-
     let Some((field_datatype_delta, final_schema)) =
         get_merged_schema(org_id, stream_name, stream_type, inferred_schema).await
     else {
-        drop(lock_acquired);
         return None;
     };
-    log::info!(
-        "Acquired lock for local stream {} to update schema",
-        stream_name
-    );
     db::schema::set(
         org_id,
         stream_name,
@@ -555,9 +535,6 @@ async fn handle_diff_schema_local_mode(
         stream_name.to_string(),
         SchemaCache::new(final_schema, fields_map),
     );
-
-    // release lock
-    drop(lock_acquired);
 
     Some(SchemaEvolution {
         schema_compatible: true,

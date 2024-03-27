@@ -96,8 +96,11 @@ impl super::Db for SledDb {
         update_fn: super::UpdateFn,
     ) -> Result<()> {
         let value = self.get(key).await.ok();
-        let value = update_fn(value)?;
-        self.put(key, value, need_watch, start_dt).await
+        if let Some(value) = update_fn(value)? {
+            self.put(key, value, need_watch, start_dt).await
+        } else {
+            Ok(())
+        }
     }
 
     async fn delete(

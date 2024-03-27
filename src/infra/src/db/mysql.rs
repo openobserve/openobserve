@@ -198,7 +198,21 @@ impl super::Db for MysqlDb {
             }
         };
         let exist = value.is_some();
-        let value = update_fn(value)?;
+        let value = match update_fn(value) {
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                }
+                return Err(e);
+            }
+            Ok(None) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                }
+                return Ok(());
+            }
+            Ok(Some(v)) => v,
+        };
         let ret = if exist {
             sqlx::query(
                 r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#
@@ -224,12 +238,12 @@ impl super::Db for MysqlDb {
         };
         if let Err(e) = ret {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback put meta error: {}", e);
+                log::error!("[MYSQL] rollback get_for_update error: {}", e);
             }
             return Err(e.into());
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[MYSQL] commit put meta error: {}", e);
+            log::error!("[MYSQL] commit get_for_update error: {}", e);
             return Err(e.into());
         }
 

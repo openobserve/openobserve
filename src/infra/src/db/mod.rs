@@ -95,7 +95,7 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub type UpdateFn = fn(Option<Bytes>) -> Result<Bytes>;
+pub type UpdateFn = fn(Option<Bytes>) -> Result<Option<Bytes>>;
 
 #[async_trait]
 pub trait Db: Sync + Send + 'static {

@@ -154,15 +154,21 @@ impl super::Db for NatsDb {
 
         // get value and update
         let value = self.get(key).await.ok();
-        let value = update_fn(value)?;
-        self.put(key, value, need_watch, start_dt).await?;
+        let ret = match update_fn(value) {
+            Err(e) => Err(e),
+            Ok(None) => Ok(()),
+            Ok(Some(value)) => match self.put(key, value, need_watch, start_dt).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            },
+        };
 
         // release lock
         if let Err(e) = dist_lock::unlock(&locker).await {
             log::error!("dist_lock unlock err: {}", e);
         }
         log::info!("Released lock for cluster key: {}", lock_key);
-        Ok(())
+        ret
     }
 
     async fn delete(

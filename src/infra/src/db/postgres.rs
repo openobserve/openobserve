@@ -198,7 +198,21 @@ impl super::Db for PostgresDb {
             }
         };
         let exist = value.is_some();
-        let value = update_fn(value)?;
+        let value = match update_fn(value) {
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                }
+                return Err(e);
+            }
+            Ok(None) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                }
+                return Ok(());
+            }
+            Ok(Some(v)) => v,
+        };
         let ret = if exist {
             sqlx::query(
                 r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
@@ -224,12 +238,12 @@ impl super::Db for PostgresDb {
         };
         if let Err(e) = ret {
             if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback put meta error: {}", e);
+                log::error!("[POSTGRES] rollback get_for_update error: {}", e);
             }
             return Err(e.into());
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit put meta error: {}", e);
+            log::error!("[POSTGRES] commit get_for_update error: {}", e);
             return Err(e.into());
         }
 
