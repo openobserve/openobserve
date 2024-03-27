@@ -378,6 +378,7 @@ pub async fn ingest(
         // new flow for schema inferrence at stream level
         stream_data.data = if CONFIG.common.infer_schema_per_request {
             let mut new_stream_buf = HashMap::new();
+            let mut trigger: TriggerAlertData = Vec::new();
             for schema_records in stream_data.data.values_mut() {
                 // check schema
                 let mut timestamp = 0;
@@ -461,7 +462,7 @@ pub async fn ingest(
                             records_size: 0,
                         }
                     });
-                    let mut trigger: TriggerAlertData = Vec::new();
+
                     if !stream_alerts_map.is_empty() {
                         // Start check for alert trigger
                         let key = format!(
@@ -479,11 +480,15 @@ pub async fn ingest(
                         }
                         // End check for alert trigger
                     }
+
                     let record_val = json::Value::Object(local_rec);
                     let record_size = json::estimate_json_bytes(&record_val);
                     hour_buf.records.push(Arc::new(record_val));
                     hour_buf.records_size += record_size;
                 }
+            }
+            if !trigger.is_empty() {
+                stream_trigger_map.insert(stream_name.clone(), Some(trigger));
             }
             new_stream_buf
         } else {
