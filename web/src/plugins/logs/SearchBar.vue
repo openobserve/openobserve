@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('search.sqlModeLabel')"
         />
         <q-btn
+          data-test="logs-search-bar-reset-filters-btn"
           label="Reset Filters"
           no-caps
           size="sm"
