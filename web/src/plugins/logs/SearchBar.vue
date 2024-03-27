@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('search.sqlModeLabel')"
         />
         <q-btn
+          data-test="logs-search-bar-reset-filters-btn"
           label="Reset Filters"
           no-caps
           size="sm"
@@ -62,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             split
             class="no-outline saved-views-dropdown no-border"
           >
-            <q-list data-test="logs-search-saved-view-list">
-              <q-item
-                style="padding: 0px 0px 0px 0px"
-                :style="
-                  localSavedViews.length > 0 ? 'width: 30vw' : 'width: 15vw'
-                "
-              >
+            <q-list
+              :style="
+                localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
+              "
+              data-test="logs-search-saved-view-list"
+            >
+              <q-item style="padding: 0px 0px 0px 0px">
                 <q-item-section
                   class="column"
                   style="width: 60%; border-right: 1px solid lightgray"
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="log-search-saved-view-list-fields-table"
                     :visible-columns="['view_name']"
                     :rows="searchObj.data.savedViews"
-                    :row-key="(row) => 'saved_view_' + row.view_name"
+                    :row-key="(row) => 'saved_view_' + row.view_id"
                     :filter="searchObj.data.savedViewFilterFields"
                     :filter-method="filterSavedViewFn"
                     :pagination="{ rowsPerPage }"
@@ -141,10 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-section
                             @click.stop="applySavedView(props.row)"
                             v-close-popup
+                            :title="props.row.view_name"
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 185px"
+                              style="max-width: 188px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
@@ -173,8 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete"
-color="grey" size="xs" />
+                            <q-icon name="delete" color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -354,8 +355,7 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -977,8 +977,14 @@ export default defineComponent({
     const localSavedViews = ref([]);
     let savedViews = useLocalSavedView();
     if (savedViews.value != null) {
-      favoriteViews.value.push(...Object.keys(savedViews.value));
-      const favoriteValues = Object.values(savedViews.value);
+      const favoriteValues = [];
+      Object.values(savedViews.value).forEach((view) => {
+        if (view.org_id === store.state.selectedOrganization.identifier) {
+          favoriteViews.value.push(view.view_id);
+          favoriteValues.push(view);
+        }
+      });
+
       localSavedViews.value.push(...favoriteValues);
     }
 
@@ -1081,7 +1087,7 @@ export default defineComponent({
         //       }
         //     }
         //   }
-        if (parsedSQL?.columns.length > 0) {
+        if (parsedSQL?.columns?.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
           searchObj.data.stream.interestingFieldList = [];
           for (const col of columnNames) {
@@ -2080,7 +2086,7 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
         if (
           searchObj.data.stream.interestingFieldList.length > 0 &&
           searchObj.meta.quickMode
@@ -2156,7 +2162,7 @@ export default defineComponent({
         if (favoriteViews.value.length >= 10) {
           $q.notify({
             message: "You can only save 10 views.",
-            color: "warning",
+            color: "info",
             position: "bottom",
             timeout: 2000,
           });
