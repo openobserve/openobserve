@@ -32,6 +32,7 @@ use tokio::sync::{mpsc, OnceCell};
 
 use crate::{
     db::{Event, Stats},
+    dist_lock,
     errors::*,
 };
 
@@ -170,6 +171,42 @@ impl super::Db for DynamoDb {
         }
 
         Ok(())
+    }
+
+    async fn get_for_update(
+        &self,
+        in_key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: super::UpdateFn,
+    ) -> Result<()> {
+        // acquire lock and update
+        let lock_key = format!("/meta/{in_key}/{}", start_dt.unwrap_or_default());
+        let locker = match dist_lock::lock(&lock_key, 0).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::Message(format!(
+                    "dist_lock key: {}, acquire error: {}",
+                    lock_key, e
+                )));
+            }
+        };
+        log::info!("Acquired lock for cluster key: {}", lock_key);
+
+        // get value and update
+        let value = self.get(in_key).await.ok();
+        let ret = match update_fn(value) {
+            Err(e) => Err(e),
+            Ok(None) => Ok(()),
+            Ok(Some(value)) => self.put(in_key, value, need_watch, start_dt).await,
+        };
+
+        // release lock
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            log::error!("dist_lock unlock err: {}", e);
+        }
+        log::info!("Released lock for cluster key: {}", lock_key);
+        ret
     }
 
     // TODO: support prefix mode

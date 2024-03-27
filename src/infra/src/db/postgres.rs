@@ -103,10 +103,10 @@ impl super::Db for PostgresDb {
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-        let local_start_dt = start_dt.unwrap_or(0);
+        let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#,
+            r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#
         )
         .bind(&module)
         .bind(&key1)
@@ -120,15 +120,15 @@ impl super::Db for PostgresDb {
             }
             return Err(e.into());
         }
-        if module == "schema" {
-            if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#,
+
+        if let Err(e) = sqlx::query(
+                r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
             )
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
             .bind(local_start_dt)
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .execute(&mut *tx)
             .await
             {
@@ -137,30 +137,114 @@ impl super::Db for PostgresDb {
                 }
                 return Err(e.into());
             }
-            if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit put meta error: {}", e);
-                return Err(e.into());
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit put meta error: {}", e);
+            return Err(e.into());
+        }
+
+        // event watch
+        if need_watch {
+            let cluster_coordinator = super::get_coordinator().await;
+            cluster_coordinator
+                .put(key, Bytes::from(""), true, start_dt)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: super::UpdateFn,
+    ) -> Result<()> {
+        let (module, key1, key2) = super::parse_key(key);
+        let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
+        let value = if let Some(start_dt) = start_dt {
+            match sqlx::query_scalar::<_,String>(
+                r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4 FOR UPDATE;"#
+            )
+              .bind(&module)
+              .bind(&key1)
+              .bind(&key2)
+            .bind(start_dt)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(Bytes::from(v)),
+                Err(e) => {
+                    log::error!("[POSTGRES] get_for_update error: {}", e);
+                    None
+                }
             }
         } else {
-            if let Err(e) = sqlx::query(
-                r#"UPDATE meta SET value=$4 WHERE module = $1 AND key1 = $2 AND key2 = $3;"#,
+            match sqlx::query_scalar::<_,String>(
+                r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC FOR UPDATE;"#
             )
             .bind(&module)
             .bind(&key1)
             .bind(&key2)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(Bytes::from(v)),
+                Err(e) => {
+                    log::error!("[POSTGRES] get_for_update error: {}", e);
+                    None
+                }
+            }
+        };
+        let exist = value.is_some();
+        let value = match update_fn(value) {
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                }
+                return Err(e);
+            }
+            Ok(None) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                }
+                return Ok(());
+            }
+            Ok(Some(v)) => v,
+        };
+        let ret = if exist {
+            sqlx::query(
+                r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
+            )
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+        } else {
+            sqlx::query(
+                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
             .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
             .execute(&mut *tx)
             .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback put meta error: {}", e);
-                }
-                return Err(e.into());
+        };
+        if let Err(e) = ret {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback get_for_update error: {}", e);
             }
-            if let Err(e) = tx.commit().await {
-                log::error!("[POSTGRES] commit put meta error: {}", e);
-                return Err(e.into());
-            }
+            return Err(e.into());
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[POSTGRES] commit get_for_update error: {}", e);
+            return Err(e.into());
         }
 
         // event watch
@@ -238,7 +322,7 @@ impl super::Db for PostgresDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2,  start_dt, value FROM meta".to_string();
+        let mut sql = "SELECT module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -248,7 +332,6 @@ impl super::Db for PostgresDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-
         sql = format!("{} ORDER BY start_dt DESC ", sql);
 
         let pool = CLIENT.clone();
@@ -288,7 +371,7 @@ impl super::Db for PostgresDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2,  start_dt, '' AS value FROM meta ".to_string();
+        let mut sql = "SELECT module, key1, key2, start_dt, '' AS value FROM meta ".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -377,13 +460,13 @@ CREATE TABLE IF NOT EXISTS meta
 
     // create table index
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
-    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);")
+    create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
         .await?;
 
     add_col(pool).await?;
 
     match create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt,key2, key1, module);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
     )
     .await{
         Ok(_) => {}
@@ -434,7 +517,7 @@ async fn add_start_dt_column() -> Result<()> {
     add_col(pool).await?;
 
     create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
     ).await?;
 
     log::info!("[POSTGRES] EXIT: add_start_dt_column");

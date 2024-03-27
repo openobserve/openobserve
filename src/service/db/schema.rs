@@ -15,13 +15,13 @@
 
 use std::sync::Arc;
 
+use arrow_schema::{Field, Schema};
 use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
-use datafusion::arrow::datatypes::Schema;
 use hashbrown::{HashMap, HashSet};
 use infra::{
-    cache,
-    db::{self as infra_db},
+    cache, db as infra_db,
+    errors::{DbError, Error},
 };
 
 use crate::{
@@ -35,7 +35,7 @@ use crate::{
     service::{enrichment::StreamTable, stream::stream_settings},
 };
 
-fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
+pub fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
     format!("/schema/{org_id}/{stream_type}/{stream_name}")
 }
 
@@ -45,49 +45,15 @@ pub async fn get(
     stream_type: StreamType,
 ) -> Result<Schema, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let map_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix("/schema/").unwrap();
 
     let r = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(schema) = r.get(map_key) {
+    if let Some(schema) = r.get(cache_key) {
         return Ok(schema.clone());
     }
     drop(r);
-
-    let db = infra_db::get_db().await;
-    Ok(match db.get(&key).await {
-        Err(err) => {
-            if !err.to_string().ends_with("does not exist") {
-                log::error!("get schema from db error: {}, {}", key, err);
-            }
-            let r = STREAM_SCHEMAS_LATEST.read().await;
-            if let Some(schema) = r.get(map_key) {
-                return Ok(schema.clone());
-            }
-            drop(r);
-            Schema::empty()
-        }
-        Ok(v) => {
-            let local_val: json::Value = json::from_slice(&v).unwrap();
-            // for backward compatibility check if value in etcd is vec or schema based on
-            // it return value
-            if local_val.is_array() {
-                let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
-                local_vec.last().unwrap().clone()
-            } else {
-                json::from_slice(&v).unwrap()
-            }
-        }
-    })
-}
-
-pub async fn get_settings(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
-) -> Option<StreamSettings> {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
-    let r = STREAM_SETTINGS.read().await;
-    r.get(&key).cloned()
+    // if not found in cache, get from db
+    get_from_db(org_id, stream_name, stream_type).await
 }
 
 pub async fn get_from_db(
@@ -98,19 +64,23 @@ pub async fn get_from_db(
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
-        Err(_) => {
-            // REVIEW: shouldn't we report the error?
-            Schema::empty()
+        Err(e) => {
+            if let Error::DbError(DbError::KeyNotExists(_)) = e {
+                Schema::empty()
+            } else {
+                return Err(anyhow::anyhow!("Error getting schema: {}", e));
+            }
         }
         Ok(v) => {
-            let local_val: json::Value = json::from_slice(&v).unwrap();
-            // for backward compatibility check if value in etcd is vec or schema based on
-            // it return value
-            if local_val.is_array() {
-                let local_vec: Vec<Schema> = json::from_slice(&v).unwrap();
-                local_vec.last().unwrap().clone()
+            let schemas: Result<Vec<Schema>, _> = json::from_slice(&v);
+            if let Ok(mut schemas) = schemas {
+                if schemas.is_empty() {
+                    Schema::empty()
+                } else {
+                    schemas.remove(schemas.len() - 1)
+                }
             } else {
-                json::from_slice(&v).unwrap()
+                json::from_slice(&v)?
             }
         }
     })
@@ -122,30 +92,49 @@ pub async fn get_versions(
     stream_type: StreamType,
 ) -> Result<Vec<Schema>, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
-    let map_key = key.strip_prefix("/schema/").unwrap();
+    let cache_key = key.strip_prefix("/schema/").unwrap();
 
     let r = STREAM_SCHEMAS.read().await;
-    if let Some(schema) = r.get(map_key) {
+    if let Some(schema) = r.get(cache_key) {
         return Ok(schema.clone());
     }
 
     let db = infra_db::get_db().await;
     Ok(match db.get(&key).await {
-        Err(_) => {
-            // REVIEW: shouldn't we report the error?
-            vec![]
+        Err(e) => {
+            if let Error::DbError(DbError::KeyNotExists(_)) = e {
+                vec![Schema::empty()]
+            } else {
+                return Err(anyhow::anyhow!("Error getting schema versions: {}", e));
+            }
         }
         Ok(v) => {
-            // for backward compatibility check if value in etcd is vec or schema based on
-            // it return value
-            let local_val: json::Value = json::from_slice(&v).unwrap();
-            if local_val.is_array() {
-                json::from_slice(&v).unwrap()
+            let schemas: Result<Vec<Schema>, _> = json::from_slice(&v);
+            if let Ok(schemas) = schemas {
+                schemas
             } else {
-                vec![json::from_slice(&v).unwrap()]
+                vec![json::from_slice(&v)?]
             }
         }
     })
+}
+
+pub async fn get_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Option<StreamSettings> {
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let r = STREAM_SETTINGS.read().await;
+    if let Some(v) = r.get(&key) {
+        return Some(v.clone());
+    }
+    // if not found in cache, get from db
+    get(org_id, stream_name, stream_type)
+        .await
+        .ok()
+        .map(|schema| stream_settings(&schema))
+        .flatten()
 }
 
 pub async fn set(
@@ -239,6 +228,16 @@ pub async fn set(
             .await;
         Ok(())
     }
+}
+
+pub async fn merge(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    schema: &Schema,
+    min_ts: Option<i64>,
+) -> Result<Option<(Schema, Vec<Field>)>, anyhow::Error> {
+    todo!()
 }
 
 pub async fn delete(

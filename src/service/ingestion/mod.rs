@@ -137,7 +137,7 @@ pub async fn get_stream_partition_keys(
     stream_type: &StreamType,
     stream_name: &str,
 ) -> PartitioningDetails {
-    let stream_settings = db::schema::get_settings(org_id, stream_type, stream_name)
+    let stream_settings = db::schema::get_settings(org_id, stream_name, *stream_type)
         .await
         .unwrap_or_default();
     PartitioningDetails {
