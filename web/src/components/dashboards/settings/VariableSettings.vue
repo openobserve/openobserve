@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="secondary"
             :label="t(`dashboard.newVariable`)"
             @click="addVariables"
+            data-test="dashboard-variables-settings-add-variable"
           />
         </template>
       </DashboardHeader>

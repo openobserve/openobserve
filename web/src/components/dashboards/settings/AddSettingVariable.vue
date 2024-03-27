@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 option-value="value"
                 map-options
                 emit-value
+                data-test="dashboard-variable-type-selector"
               ></q-select>
             </div>
             <div class="text-body1 text-bold q-mt-lg">
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   stack-label
                   :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                  data-test="dashboard-variable-name"
                 ></q-input>
               </div>
               <div class="textbox col">
@@ -64,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   outlined
                   stack-label
+                  data-test="dashboard-variable-label"
                 ></q-input>
               </div>
             </div>
@@ -88,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="textbox showLabelOnTop col no-case q-mr-sm"
                   @update:model-value="streamTypeUpdated"
                   :rules="[(val: any) => !!val || 'Field is required!']"
+                  data-test="dashboard-variable-stream-type-selector"
                 ></q-select>
                 <q-select
                   v-model="variableData.query_data.stream"
@@ -107,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   emit-value
                   class="textbox showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
+                  data-test="dashboard-variable-stream-selector"
                 >
                 </q-select>
               </div>
@@ -128,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 option-value="name"
                 option-label="name"
                 emit-value
+                data-test="dashboard-variable-field-selector"
                 :rules="[(val: any) => !!val || 'Field is required!']"
               >
               </q-select>
@@ -141,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   outlined
                   stack-label
+                  data-test="dashboard-variable-max-record-size"
                 >
                   <q-btn
                     padding="xs"
@@ -149,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-sm"
                     no-caps
                     icon="info"
+                    data-test="dashboard-variable-max-record-size-info"
                   >
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
                   </q-btn>
@@ -165,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               outlined
               stack-label
+              data-test="dashboard-variable-value"
               :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
             ></q-input>
           </div>
@@ -177,6 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               outlined
               stack-label
+              data-test="dashboard-variable-default-value"
             ></q-input>
           </div>
           <!-- show the auto add variables for the custom fields -->
@@ -196,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="variableData.options[index].label"
                 :label="'Label ' + (index + 1) + ' *'"
                 name="label"
+                data-test="dashboard-variable-option-label"
               />
               <q-input
                 dense
@@ -207,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="variableData.options[index].value"
                 :label="'Value ' + (index + 1) + ' *'"
                 name="value"
+                data-test="dashboard-variable-option-value"
               />
               <div>
                 <q-btn
@@ -215,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   round
                   @click="removeField(index)"
                   icon="cancel"
+                  data-test="dashboard-variable-option-remove"
                 />
               </div>
             </div>
@@ -225,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 no-outline
                 class="q-mt-md"
                 @click="addField()"
+                data-test="dashboard-variable-option-add"
                 >Add Option</q-btn
               >
             </div>
@@ -237,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="sm md"
               no-caps
               @click="close"
+              data-test="dashboard-variable-cancel"
             />
             <div>
               <q-btn
@@ -246,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="secondary"
                 padding="sm xl"
                 no-caps
+                data-test="dashboard-variable-save"
                 >Save</q-btn
               >
             </div>
