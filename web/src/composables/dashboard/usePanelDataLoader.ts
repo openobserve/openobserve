@@ -438,7 +438,7 @@ export const usePanelDataLoader = (
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
-        const variableValue = variable.value === null ? "" : variable.value
+        const variableValue = variable.value === null ? "" : variable.value;
         if (query.includes(variableName)) {
           metadata.push({
             type: "variable",
@@ -594,12 +594,17 @@ export const usePanelDataLoader = (
   // [START] Variables functions
   const areDynamicVariablesStillLoading = () =>
     variablesData.value?.values?.some(
-      (it: any) => it.type === "dynamic_filters" && it.isLoading
+      (it: any) =>
+        it.type === "dynamic_filters" &&
+        (it.isLoading || it.isVariableLoadingPending)
     );
 
   const areDependentVariablesStillLoadingWith = (
     newDependentVariablesData: any
-  ) => newDependentVariablesData?.some((it: any) => it.isLoading);
+  ) =>
+    newDependentVariablesData?.some(
+      (it: any) => it.isLoading || it.isVariableLoadingPending
+    );
 
   const getDependentVariablesData = () =>
     variablesData.value?.values
