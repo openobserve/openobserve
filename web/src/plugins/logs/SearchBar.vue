@@ -62,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             split
             class="no-outline saved-views-dropdown no-border"
           >
-            <q-list data-test="logs-search-saved-view-list">
-              <q-item
-                style="padding: 0px 0px 0px 0px"
-                :style="
-                  localSavedViews.length > 0 ? 'width: 30vw' : 'width: 15vw'
-                "
-              >
+            <q-list
+              :style="
+                localSavedViews.length > 0 ? 'width: 500px' : 'width: 250px'
+              "
+              data-test="logs-search-saved-view-list"
+            >
+              <q-item style="padding: 0px 0px 0px 0px">
                 <q-item-section
                   class="column"
                   style="width: 60%; border-right: 1px solid lightgray"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="log-search-saved-view-list-fields-table"
                     :visible-columns="['view_name']"
                     :rows="searchObj.data.savedViews"
-                    :row-key="(row) => 'saved_view_' + row.view_name"
+                    :row-key="(row) => 'saved_view_' + row.view_id"
                     :filter="searchObj.data.savedViewFilterFields"
                     :filter-method="filterSavedViewFn"
                     :pagination="{ rowsPerPage }"
@@ -141,10 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-section
                             @click.stop="applySavedView(props.row)"
                             v-close-popup
+                            :title="props.row.view_name"
                           >
                             <q-item-label
                               class="ellipsis"
-                              style="max-width: 185px"
+                              style="max-width: 188px"
                               >{{ props.row.view_name }}</q-item-label
                             >
                           </q-item-section>
