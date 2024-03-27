@@ -732,15 +732,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, onBeforeMount } from "vue";
+import { computed, defineComponent, onBeforeMount, reactive, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import { useSelectAutoComplete2 } from "@/composables/useSelectAutocomplete2";
+import useStreams from "@/composables/useStreams";
 
 export default defineComponent({
   components: { Drilldown },
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
+
+    const optionName = dashboardPanelData.meta.stream.selectedStreamFields.map(
+      (item: any) => item?.name
+    );
+    console.log("optionName", optionName);
+    
+    const options = toRef(optionName, "options");
+    console.log(JSON.stringify(options._object));
+
+    // const { getStreams, getStream } = useStreams();
+    // const streamList: any = getStreams(dashboardPanelData, true);
+    // console.log("streamList", streamList);
+
+    const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
+      useSelectAutoComplete2(options, "name");
+      console.log("fieldsFilteredOptions", fieldsFilteredOptions);
+      
+      
 
     const basemapTypeOptions = [
       {
@@ -927,6 +947,8 @@ export default defineComponent({
       setUnit,
       handleBlur,
       legendWidthValue,
+      fieldsFilterFn,
+      fieldsFilteredOptions,
     };
   },
 });
