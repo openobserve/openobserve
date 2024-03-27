@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { getCurrentInstance, onMounted, watch, computed } from "vue";
+import { getCurrentInstance, onMounted, watch } from "vue";
 import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
@@ -141,14 +141,15 @@ export default defineComponent({
     // variables dependency graph
     let variablesDependencyGraph: any = {};
 
+    // track old variables data
+    const oldVariablesData: any = {};
+
     // reset variables data
     // it will executed once on mount
     const resetVariablesData = () => {
       variablesData.isVariablesLoading = false;
       variablesData.values = [];
     };
-
-    const oldVariablesData: any = {};
 
     const initializeVariablesData = () => {
       // reset the values
@@ -186,6 +187,16 @@ export default defineComponent({
         variablesData.values
       );
     };
+
+    onMounted(() => {
+      // reset variables data
+      resetVariablesData();
+      // make list of variables using variables config list
+      initializeVariablesData();
+
+      // load all variables
+      loadAllVariablesData();
+    });
 
     watch(
       () => props.variablesConfig,
@@ -278,14 +289,17 @@ export default defineComponent({
     const changeInitialVariableValues = async (
       newInitialVariableValues: any
     ) => {
-      // reset the values
-      variablesData.values = [];
-      variablesData.isVariablesLoading = false;
-
       // set initial variables values
       props.initialVariableValues.value = newInitialVariableValues;
 
       // NOTE: need to re-initialize variables data
+      resetVariablesData();
+
+      // make list of variables using variables config list
+      initializeVariablesData();
+
+      // load all variables
+      loadAllVariablesData();
     };
 
     // get single variable data based on index
@@ -293,8 +307,10 @@ export default defineComponent({
       return new Promise(async (resolve) => {
         // if variableIndex is not valid, return
         if (variableIndex < 0) resolve(false);
+
         // variables data
         const currentVariable = variablesData.values[variableIndex];
+
         // if currentVariable is undefined, return
         if (!currentVariable) {
           return resolve(false);
@@ -309,6 +325,7 @@ export default defineComponent({
         const isAnyDepndentVariableLoadingPending = variablesDependencyGraph[
           currentVariable.name
         ].parentVariables.find((parentVariable: any) => {
+          // get whole parent variable object from parent variable name
           const variableData = variablesData?.values?.find(
             (variable: any) => variable?.name == parentVariable
           );
@@ -406,7 +423,7 @@ export default defineComponent({
                   }));
 
                 // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-                if (oldVariablesData[currentVariable.name] !== null) {
+                if (oldVariablesData[currentVariable.name] !== undefined) {
                   currentVariable.value = currentVariable.options.some(
                     (option: any) =>
                       option.value === oldVariablesData[currentVariable.name]
@@ -427,6 +444,8 @@ export default defineComponent({
                 // no response hits found
                 // set value as empty string
                 currentVariable.value = null;
+                // set options as empty array
+                currentVariable.options = [];
 
                 resolve(true);
                 break;
@@ -435,6 +454,8 @@ export default defineComponent({
               // some error occured
               // set value as empty string
               currentVariable.value = null;
+              // set options as empty array
+              currentVariable.options = [];
 
               resolve(true);
               break;
@@ -449,7 +470,12 @@ export default defineComponent({
             break;
           }
           case "custom": {
+            // assign options
             currentVariable["options"] = currentVariable?.options;
+
+            // if the old value exist in dropdown set the old value
+            // otherwise set first value of drop down
+            // otherwise set null value
             let oldVariableObjectSelectedValue = currentVariable.options.find(
               (option: any) =>
                 option.value === oldVariablesData[currentVariable.name]
@@ -465,7 +491,6 @@ export default defineComponent({
             break;
           }
           case "dynamic_filters": {
-            // currentVariable.isLoading = false; // Set loading state
             let oldVariableObjectSelectedValue = oldVariablesData.find(
               (it2: any) => it2.name === currentVariable.name
             );
@@ -527,8 +552,8 @@ export default defineComponent({
           emitVariablesData();
 
           Promise.all(
-            childVariableIndices.map((childValue: number) =>
-              loadSingleVariableDataByIndex(childValue)
+            childVariableIndices.map((childIndex: number) =>
+              loadSingleVariableDataByIndex(childIndex)
             )
           );
         }
@@ -576,6 +601,11 @@ export default defineComponent({
         return;
       }
 
+      // currentVariable value changed.
+      // so, set it to oldVariablesData
+      oldVariablesData[currentVariable.name] = currentVariable.value;
+
+      // set all child variables to loading state
       setLoadingStateToAllChildNode(currentVariable.name);
 
       Promise.all(
