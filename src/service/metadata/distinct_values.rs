@@ -37,6 +37,7 @@ use tokio::{
 
 use crate::{
     common::meta::stream::SchemaRecords,
+    service,
     service::{ingestion, stream::unwrap_partition_time_level},
 };
 
@@ -143,12 +144,12 @@ impl DistinctValues {
             }
 
             // check for schema
-            let db_schema = super::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+            let db_schema = service::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
                 .await
                 .unwrap();
             if db_schema.fields().is_empty() {
                 let schema = schema.as_ref().clone();
-                if let Err(e) = super::db::schema::set(
+                if let Err(e) = service::db::schema::set(
                     &org_id,
                     STREAM_NAME,
                     StreamType::Metadata,

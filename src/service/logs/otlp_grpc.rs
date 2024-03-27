@@ -41,12 +41,13 @@ use crate::{
         stream::{SchemaRecords, StreamParams},
     },
     service::{
-        db, distinct_values, get_formatted_stream_name,
+        db, get_formatted_stream_name,
         ingestion::{
             evaluate_trigger,
             grpc::{get_val, get_val_with_type_retained},
             write_file, TriggerAlertData,
         },
+        metadata::distinct_values,
         schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
