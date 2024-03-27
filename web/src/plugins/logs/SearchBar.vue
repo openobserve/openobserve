@@ -976,8 +976,14 @@ export default defineComponent({
     const localSavedViews = ref([]);
     let savedViews = useLocalSavedView();
     if (savedViews.value != null) {
-      favoriteViews.value.push(...Object.keys(savedViews.value));
-      const favoriteValues = Object.values(savedViews.value);
+      const favoriteValues = [];
+      Object.values(savedViews.value).forEach((view) => {
+        if (view.org_id === store.state.selectedOrganization.identifier) {
+          favoriteViews.value.push(view.view_id);
+          favoriteValues.push(view);
+        }
+      });
+
       localSavedViews.value.push(...favoriteValues);
     }
 
