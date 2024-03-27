@@ -319,7 +319,7 @@ WHERE FIND_IN_SET(id, ?);
                     res.err().unwrap()
                 );
             } else {
-                log::info!("[SCHEDULER] clean up complete");
+                log::debug!("[JOBS SCHEDULER] clean up complete");
             }
         }
     }
@@ -355,7 +355,7 @@ WHERE status = ? AND end_time <= ?
                     res.err().unwrap()
                 );
             } else {
-                log::info!("[SCHEDULER] watch timeout run complete");
+                log::debug!("[JOBS SCHEDULER] watch timeout run complete");
             }
         }
     }

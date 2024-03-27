@@ -236,7 +236,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes, thread_id: usize) -> Result<
             &stream_name,
             StreamType::Metrics,
             &mut stream_schema_map,
-            record,
+            vec![record],
             timestamp,
         )
         .await;
