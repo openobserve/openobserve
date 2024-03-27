@@ -10,6 +10,8 @@ import "cluster/common.proto";
 
 service Search {
   rpc Search (SearchRequest) returns (SearchResponse) {}
+  rpc GetJobStatus(GetJobStatusRequest) returns (GetJobStatusResponse) {}
+  rpc CancelJob(CancelJobRequest) returns (CancelJobResponse) {}
 }
 
 // Search request query
@@ -62,4 +64,26 @@ message SearchAggRequest {
 message SearchAggResponse {
     string name = 1;
     bytes  hits = 2;
+}
+
+message GetJobStatusRequest {
+    int32 job_id = 1;
+}
+
+message GetJobStatusResponse {
+    repeated JobStatus status = 1;
+}
+
+message JobStatus {
+    int32 job_id = 1;
+    int32 run_time = 2;
+}
+
+message CancelJobRequest {
+    int32 job_id = 1;
+}
+
+message CancelJobResponse {
+    int32 job_id = 1;
+    bool success = 2;
 }

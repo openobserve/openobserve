@@ -110,6 +110,7 @@ pub async fn search(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
+    _grpc_server: web::Data<crate::service::search::Searcher>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = ider::uuid();

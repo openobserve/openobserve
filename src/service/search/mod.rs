@@ -54,7 +54,9 @@ use crate::{
             stream::{ScanStats, StreamParams, StreamPartition},
         },
     },
-    handler::grpc::cluster_rpc,
+    handler::grpc::cluster_rpc::{
+        self, CancelJobRequest, CancelJobResponse, GetJobStatusRequest, GetJobStatusResponse,
+    },
     service::{file_list, format_partition_key, stream},
 };
 
@@ -79,7 +81,7 @@ use crate::{
     service::search as SearchService,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Searcher {
     #[allow(dead_code)]
     task_manager: Arc<TaskManager>,
@@ -93,7 +95,7 @@ impl Searcher {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TaskManager {
     pub task_manager: Arc<DashMap<Arc<String>, Vec<AbortHandle>>>,
 }
@@ -150,6 +152,20 @@ impl Search for Searcher {
                 Err(Status::internal(message))
             }
         }
+    }
+
+    async fn get_job_status(
+        &self,
+        _req: Request<GetJobStatusRequest>,
+    ) -> Result<Response<GetJobStatusResponse>, Status> {
+        unimplemented!()
+    }
+
+    async fn cancel_job(
+        &self,
+        _req: Request<CancelJobRequest>,
+    ) -> Result<Response<CancelJobResponse>, Status> {
+        unimplemented!()
     }
 }
 
