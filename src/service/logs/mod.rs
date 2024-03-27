@@ -181,7 +181,7 @@ pub fn cast_to_schema_v1(
                     Ok(val) => {
                         value.insert(field_name_str, Value::Number(val.into()));
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, &data_type),
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
                 };
             }
             DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
@@ -193,7 +193,7 @@ pub fn cast_to_schema_v1(
                     Ok(val) => {
                         value.insert(field_name_str, Value::Number(val.into()));
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, &data_type),
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
                 };
             }
             DataType::Float64 | DataType::Float32 | DataType::Float16 => {
@@ -208,7 +208,7 @@ pub fn cast_to_schema_v1(
                             Value::Number(serde_json::Number::from_f64(val).unwrap()),
                         );
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, &data_type),
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
                 };
             }
             DataType::Boolean => {
@@ -220,10 +220,10 @@ pub fn cast_to_schema_v1(
                     Ok(val) => {
                         value.insert(field_name_str, Value::Bool(val));
                     }
-                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, &data_type),
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
                 };
             }
-            _ => set_parsing_error_v1(&mut parse_error, &field_name_str, &data_type),
+            _ => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
         };
     }
     if !parse_error.is_empty() {
