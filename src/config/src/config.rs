@@ -604,12 +604,9 @@ pub struct Common {
         help = "Run autimatic schema migration on start up"
     )]
     pub run_schema_migration_on_start_up: bool,
-
     #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
     pub blocked_streams: String,
-
     #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
-    // use comma to split
     pub infer_schema_per_request: bool,
 }
 
