@@ -82,7 +82,7 @@ describe("Logs testcases", () => {
   it("should display results for limit query", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
-      .type("match_all('provide_credentials') order by _timestamp limit 5");
+      .type("match_all('provide_credentials') limit 5");
     cy.wait(2000);
     cy.get('[aria-label="SQL Mode"]').click({ force: true });
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content');
@@ -94,10 +94,13 @@ describe("Logs testcases", () => {
     cy.get(".search-list > :nth-child(1) > .text-left").contains(
       "Showing 1 to 5 out of 5"
     );
-    cy.get(".float-right.col > .q-btn--no-uppercase").click();
+
+    cy.get('[aria-label="SQL Mode"]').click({ force: true });
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
-      .click() // Click on the editor to focus
-      .type(" WHERE match_all('provide_credentials') order by _timestamp");
+    .click() // Click on the editor to focus
+    .type("match_all('provide_credentials')");
+    cy.get('[aria-label="SQL Mode"]').click({ force: true });
+
     cy.wait(2000);
     cy.get("[data-test='logs-search-bar-refresh-btn']", {
       timeout: 2000,
@@ -126,14 +129,18 @@ describe("Logs testcases", () => {
     cy.get('[data-test="date-time-relative-15-m-btn"]').click();
     cy.get('[data-cy="search-bar-refresh-button"]').click();
     cy.get('[data-test="logs-search-saved-views-btn"]').click();
+    cy.wait(2000);
     cy.get('[data-test="add-alert-name-input"]').type("streamlogsnavigate");
     cy.get('[data-test="saved-view-dialog-save-btn"]').click();
     cy.get('[data-test="menu-link-/streams-item"]').click({ force: true });
     cy.get('[title="Explore"]:first').click({ force: true });
     cy.url().should("include", "logs");
+    cy.wait(2000);
+    cy.wait("@allsearch");
     cy.get(
       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon'
-    ).click();
+    ).click({ force: true });
+    cy.wait(2000);
     cy.contains("streamlogsnavigate").click();
     cy.wait(200);
     cy.get('[data-test="logs-search-bar-query-editor"]').then((editor) => {
