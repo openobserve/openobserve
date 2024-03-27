@@ -102,7 +102,7 @@ describe("Settings testcases", () => {
       cy.wait(1000);
       cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
       cy.wait(1000);
-      cy.get('[data-test="dashboard-general-settings-panel"]').should("be.visible");
+      cy.get('[data-test="dashboard-general-settings-tab"]').should("be.visible");
       cy.wait(1000);
       cy.get('[data-test="dashboard-general-settings-panel"]')
       .find('[data-test="edit-settings-dashboard-name"]')
