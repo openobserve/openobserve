@@ -29,6 +29,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
+use hashbrown::HashSet;
 
 use super::{add_record, cast_to_schema_v1, StreamMeta};
 use crate::{
@@ -101,6 +102,8 @@ pub async fn ingest(
     let mut doc_id = String::from("");
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
+    let mut blocked_stream_warnings: HashSet<String> = HashSet::new();
+
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
@@ -118,6 +121,16 @@ pub async fn ingest(
                 continue; // skip
             }
             (action, stream_name, doc_id) = ret.unwrap();
+
+            // skip blocked streams
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+            if CONFIG.common.blocked_streams.contains(&key) {
+                if blocked_stream_warnings.insert(key) {
+                    log::warn!("stream [{stream_name}] is blocked from ingestion");
+                }
+                continue; // skip
+            }
+
             next_line_is_data = true;
 
             // Start Register Transfoms for stream
