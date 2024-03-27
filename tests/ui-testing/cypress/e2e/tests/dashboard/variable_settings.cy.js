@@ -131,6 +131,64 @@ describe("Settings testcases", () => {
   })
 
 // should go to variables setting tab and click on add variable and from dropdown select query values and check its UI
+it("should go to variables setting tab and click on add variable and from dropdown select query values", () => {
+  cy.addDashboard();
+  cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+  cy.contains(
+      '[data-test="dashboard-table"] td',
+      dashboardData.DashboardName
+    ).click({force:true});
+    cy.url().should("include", dashboardData.ViewDashboardUrl);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+    cy.wait(2000);
+    cy.get('[data-test="dashboard-variable-settings-tab"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variables-settings-add-variable"]').click({force: true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-type-selector"]').click({force:true})
+    cy.wait(1000);
+    cy.get(':nth-child(1) > :nth-child(1) > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon')
+    cy.wait(200)
+    cy.contains("Query Values").click({force:true})
+    cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-name"]')
+      .type(randomDashboardName);
+    cy.wait(1000);
+    cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-label"]')
+      .type(randomDashboardName);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-stream-type-selector"]').should("be.visible")
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-stream-type-selector"]').click({force:true})
+    cy.contains("logs").click()
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-stream-selector"]').should("be.visible")
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-stream-selector"]').click({force:true})
+    cy.contains("e2e_automate").click()
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-field-selector"]').should("be.visible")
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-field-selector"]').click({force:true})
+    cy.contains("_timestamp").click();
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-settings-panel"]').find('[data-test="dashboard-variable-max-record-size"]').type(randomNumber);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-max-record-size-info"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-save"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+    cy.wait(2000)
+      cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+      cy.wait(2000)
+      deleteDashboard()
+})
+
 // should go to variables setting tab and click on add variable and from dropdown select constant and check its UI
 // should go to variables setting tab and click on add variable and from dropdown select textbox and check its UI
 // should go to variables setting tab and click on add variable and from dropdown select custom and check its UI
