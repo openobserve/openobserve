@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex q-mt-xs q-ml-xs"
   >
     <div
-      v-for="item in variablesData.values"
+      v-for="(item, index) in variablesData.values"
       :key="
         item.name +
         item.value +
@@ -32,7 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`dashboard-variable-${item}-selector`"
     >
       <div v-if="item.type == 'query_values'">
-        <VariableQueryValueSelector v-model="item.value" :variableItem="item" />
+        <VariableQueryValueSelector
+          v-model="item.value"
+          :variableItem="item"
+          @update:model-value="onVariablesValueUpdated(index)"
+        />
       </div>
       <div v-else-if="item.type == 'constant'">
         <q-input
@@ -43,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           readonly
           data-test="dashboard-variable-constant-selector"
+          @update:model-value="onVariablesValueUpdated(index)"
         ></q-input>
       </div>
       <div v-else-if="item.type == 'textbox'">
@@ -54,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           outlined
           data-test="dashboard-variable-textbox-selector"
+          @update:model-value="onVariablesValueUpdated(index)"
         ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
@@ -79,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           option-label="label"
           emit-value
           data-test="dashboard-variable-custom-selector"
+          @update:model-value="onVariablesValueUpdated(index)"
         >
           <template v-slot:no-option>
             <q-item>
@@ -129,123 +136,79 @@ export default defineComponent({
       values: [],
     });
 
-    // old variables data to compare with new variables data
-    // used in watcher when variables values changes
-    let oldVariablesData = JSON.parse(JSON.stringify(variablesData));
-
     // variables dependency graph
     let variablesDependencyGraph: any = {};
 
-    onMounted(async () => {
-      // build variables dependency graph
-      if (props.variablesConfig?.list) {
-        variablesDependencyGraph = buildVariablesDependencyGraph(
-          props.variablesConfig.list
-        );
-      }
+    // reset variables data
+    // it will executed once on mount
+    const resetVariablesData = () => {
+      variablesData.isVariablesLoading = false;
+      variablesData.values = [];
+    };
 
-      // get independent variables data
-      await getVariablesData();
-    });
+    const oldVariablesData: any = {};
 
-    // variables config list
-    // which will have all variables and dynamic filters
-    // it will executed once on mount, because currently props variablesConfig is not changed
-    const variablesConfigList = computed(() => {
-      const configList =
-        JSON.parse(JSON.stringify(props.variablesConfig?.list ?? [])) || [];
+    const initializeVariablesData = () => {
+      // reset the values
+      resetVariablesData();
 
-      if (props.showDynamicFilters) {
-        configList.push({
-          name: "__dynamic_filters",
-          label: "Dynamic Filters",
-          type: "dynamic_filters",
-          value: [],
+      // make list of variables using variables config list
+      // set initial variables values from props
+      props?.variablesConfig?.list?.forEach((item: any) => {
+        const initialValue =
+          item.type == "dynamic_filters"
+            ? JSON.parse(
+                decodeURIComponent(
+                  props.initialVariableValues?.value[item.name]
+                ) ?? []
+              ) ?? []
+            : props.initialVariableValues?.value[item.name] ?? null ?? null;
+
+        // push the variable to the list
+        variablesData.values.push({
+          ...item,
+          name: item.name,
+          type: item.type,
+          value: initialValue,
+          options: item.options || [],
+          isLoading: false,
+          isVariableLoadingPending: true,
         });
-      }
 
-      return configList;
-    });
+        // set old variables data
+        oldVariablesData[item.name] = initialValue;
+      });
 
-    // on variablesConfigList change, build variables dependency graph
-    // currently, watcher will not be triggered because props variablesConfig is not changed. so, variablesConfigList will not change.
+      // need to build variables dependency graph on variables config list change
+      variablesDependencyGraph = buildVariablesDependencyGraph(
+        variablesData.values
+      );
+    };
+
     watch(
-      () => variablesConfigList.value,
+      () => props.variablesConfig,
       async () => {
-        // build variables dependency graph
-        if (props.variablesConfig?.list) {
-          variablesDependencyGraph = buildVariablesDependencyGraph(
-            variablesConfigList.value
-          );
-        }
-      },
-      {
-        deep: true,
+        // reset variables data
+        resetVariablesData();
+        // make list of variables using variables config list
+        initializeVariablesData();
+
+        // load all variables
+        loadAllVariablesData();
       }
     );
 
     // you may need to query the data if the variable configs or the data/time changes
     watch(
-      () => [props.variablesConfig, props.selectedTimeDate],
-      async () => {
-        await getVariablesData();
+      () => props.selectedTimeDate,
+      () => {
+        loadAllVariablesData();
       }
     );
     watch(
       () => variablesData,
       () => {
         emitVariablesData();
-      },
-      { deep: true }
-    );
-
-    // on variablesData change, find which variables have changed based on oldVariablesData
-    // loop on all changed variables
-    // and load it's dependent variables synchronously
-    watch(
-      () => variablesData,
-      async () => {
-        // Find which variables have changed
-        // variables should not be of type dynamic_filters
-        // NOTE: changedVariables should not be of type dynamic_filters and either value or isLoading should change
-        // value will change if data will be there
-        // if options is empty array at that time value will be null which is same in oldVariablesData as well. so for that check loading value is changed
-        let changedVariables = variablesData.values.filter(
-          (newVar: any, index: any) => {
-            let oldVar = oldVariablesData.values[index];
-            return (
-              newVar.type != "dynamic_filters" &&
-              (newVar.isLoading !== oldVar.isLoading ||
-                newVar.value !== oldVar.value)
-            );
-          }
-        );
-
-        // loop on all variables
-        for (let variable of Object.keys(variablesDependencyGraph)) {
-          // if variable is dependent on changedVariables
-          // load variable's data
-          changedVariables.forEach(async (v: any) => {
-            if (variablesDependencyGraph[variable].includes(v.name)) {
-              const variableDataIndex = variablesData.values.findIndex(
-                (item: any) => item.name == variable
-              );
-
-              // if variable data found
-              if (variableDataIndex >= 0) {
-                // variable loading is true
-                // remove current value because it will call dependent variables with old value
-                // and load new value
-                variablesData.values[variableDataIndex].isLoading = true;
-                variablesData.values[variableDataIndex].value = null;
-                getSingleVariableData(variableDataIndex);
-              }
-            }
-          });
-        }
-
-        // update oldVariablesData
-        oldVariablesData = JSON.parse(JSON.stringify(variablesData));
       },
       { deep: true }
     );
@@ -261,26 +224,28 @@ export default defineComponent({
 
       // Initialize the graph with empty arrays
       for (let item of variables) {
-        graph[item.name] = [];
+        graph[item.name] = { parentVariables: [], childVariables: [] };
       }
 
       // Populate the graph
       for (let item of variables) {
         let name = item.name;
         if (item.type == "query_values") {
-          for (let filter of item.query_data.filter ?? []) {
+          for (let filter of item?.query_data?.filter ?? []) {
             let dependencies = extractVariableNames(
               filter.value,
               variablesNameList
             );
-            if (graph[name]) {
-              graph[name].push(...dependencies);
-            } else {
-              graph[name] = dependencies;
-            }
+            // loop on all dependencies and append them as child
+            dependencies.forEach((dep: any) => {
+              graph[dep].childVariables.push(name);
+            });
+
+            // append all dependencies as parent
+            graph[name].parentVariables.push(...dependencies);
           }
         } else {
-          graph[name] = [];
+          graph[item.name] = { parentVariables: [], childVariables: [] };
         }
       }
 
@@ -317,225 +282,258 @@ export default defineComponent({
 
       // set initial variables values
       props.initialVariableValues.value = newInitialVariableValues;
-    };
 
-    // for each variable, there will be intitial values which will come from parent component(query params)
-    let oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
+      // NOTE: need to re-initialize variables data
+    };
 
     // get single variable data based on index
-    const getSingleVariableData = async (index: any) => {
-      // if index is not valid, return
-      if (index < 0) return;
+    const loadSingleVariableDataByIndex = async (variableIndex: number) => {
+      return new Promise(async (resolve) => {
+        // if variableIndex is not valid, return
+        if (variableIndex < 0) resolve(false);
+        // variables data
+        const currentVariable = variablesData.values[variableIndex];
+        // if currentVariable is undefined, return
+        if (!currentVariable) {
+          return resolve(false);
+        }
 
-      // variables data
-      const it = variablesConfigList.value[index];
+        // need to load the current variable
+        if (currentVariable.isVariableLoadingPending == false) {
+          return resolve(false);
+        }
 
-      // if it is not valid, return
-      if (!it) {
-        return;
-      }
+        // check if all dependencies are loaded
+        const isAnyDepndentVariableLoadingPending = variablesDependencyGraph[
+          currentVariable.name
+        ].parentVariables.find((parentVariable: any) => {
+          const variableData = variablesData?.values?.find(
+            (variable: any) => variable?.name == parentVariable
+          );
 
-      // based on it.name find that variable from variablsData
-      const currentVariableIndex = index;
+          // if parentVariable is not loaded, return
+          return (
+            variableData?.isLoading || variableData?.isVariableLoadingPending
+          );
+        });
 
-      const obj = variablesData.values[currentVariableIndex];
+        // if any dependent variable is loading, return
+        if (isAnyDepndentVariableLoadingPending) {
+          return resolve(false);
+        }
 
-      switch (it.type) {
-        case "query_values": {
-          try {
-            console.log("it.type", it);
-            obj.isLoading = true;
-            console.log("query_data", it.query_data.filter);
-            const filterConditions = it.query_data.filter || [];
+        switch (currentVariable.type) {
+          case "query_values": {
+            try {
+              // set loading as true
+              currentVariable.isLoading = true;
 
-            let dummyQuery = `SELECT * FROM '${it.query_data.stream}'`;
-            const constructedFilter = filterConditions.map(
-              (condition: any) => ({
-                name: condition.name,
-                operator: condition.operator,
-                value: condition.value,
-              })
-            );
-            let queryContext = addLabelsToSQlQuery(
-              dummyQuery,
-              constructedFilter
-            );
-
-            // replace variables placeholders
-            // NOTE: must use for of loop because we have return statement in the loop
-            for (let variable of variablesData?.values) {
-              // if variable is loaded
-              if (variable.isLoading === false) {
-                // replace it's value in the query if it is dependent on query context
-                queryContext = queryContext.replace(
-                  `$${variable.name}`,
-                  variable.value
-                );
-              }
-              // above condition not matched, means variable is not loaded
-              // so, check if it is dependent on query context
-              else if (queryContext.includes(`$${variable.name}`)) {
-                // there is other variables which is not loaded
-                // and current query is dependent on this variable
-                obj.isLoading = true;
-                return;
-              }
-            }
-
-            // base64 encode the query
-            queryContext = b64EncodeUnicode(queryContext) || "";
-
-            const res = await streamService.fieldValues({
-              org_identifier: store.state.selectedOrganization.identifier,
-              stream_name: it.query_data.stream,
-              start_time: new Date(
-                props.selectedTimeDate?.start_time?.toISOString()
-              ).getTime(),
-              end_time: new Date(
-                props.selectedTimeDate?.end_time?.toISOString()
-              ).getTime(),
-              fields: [it.query_data.field],
-              size: it?.query_data?.max_record_size
-                ? it?.query_data?.max_record_size
-                : 10,
-              type: it.query_data.stream_type,
-              query_context: queryContext,
-            });
-
-            obj.isLoading = false;
-
-            if (res.data.hits.length) {
-              //set options value from the api response
-              obj.options = res.data.hits
-                .find((field: any) => field.field === it.query_data.field)
-                .values.filter(
-                  (value: any) => value.zo_sql_key || value.zo_sql_key === ""
-                )
-                .map((value: any) => ({
-                  label:
-                    value.zo_sql_key !== ""
-                      ? value.zo_sql_key.toString()
-                      : "<blank>",
-                  value: value.zo_sql_key.toString(),
-                }));
-
-              // find old value is exists in the dropdown
-              let oldVariableObjectSelectedValue = oldVariableValue.find(
-                (it2: any) => it2.name === it.name
+              const filterConditions =
+                currentVariable?.query_data?.filter ?? [];
+              let dummyQuery = `SELECT * FROM '${currentVariable?.query_data?.stream}'`;
+              const constructedFilter = filterConditions.map(
+                (condition: any) => ({
+                  name: condition.name,
+                  operator: condition.operator,
+                  value: condition.value,
+                })
               );
+              let queryContext = addLabelsToSQlQuery(
+                dummyQuery,
+                constructedFilter
+              );
+              // replace variables placeholders
+              // NOTE: must use for of loop because we have return statement in the loop
+              for (let variable of variablesData?.values) {
+                // if variable is loaded
+                if (
+                  variable.isLoading === false &&
+                  variable.isVariableLoadingPending === false
+                ) {
+                  // replace it's value in the query if it is dependent on query context
+                  queryContext = queryContext.replace(
+                    `$${variable.name}`,
+                    variable.value
+                  );
+                }
+                // above condition not matched, means variable is not loaded
+                // so, check if it is dependent on query context
+                else if (queryContext.includes(`$${variable.name}`)) {
+                  // mark isLoading as false
+                  currentVariable.isLoading = false;
+                  currentVariable.isVariableLoadingPending = true;
+                  resolve(false);
+                }
+              }
 
-              // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-              if (oldVariableObjectSelectedValue) {
-                obj.value = obj.options.some(
-                  (option: any) =>
-                    option.value === oldVariableObjectSelectedValue.value
-                )
-                  ? oldVariableObjectSelectedValue.value
-                  : obj.options.length
-                  ? obj.options[0].value
-                  : "";
+              // base64 encode the query
+              queryContext = b64EncodeUnicode(queryContext) || "";
+              const res = await streamService.fieldValues({
+                org_identifier: store.state.selectedOrganization.identifier,
+                stream_name: currentVariable.query_data.stream,
+                start_time: new Date(
+                  props.selectedTimeDate?.start_time?.toISOString()
+                ).getTime(),
+                end_time: new Date(
+                  props.selectedTimeDate?.end_time?.toISOString()
+                ).getTime(),
+                fields: [currentVariable.query_data.field],
+                size: currentVariable?.query_data?.max_record_size
+                  ? currentVariable?.query_data?.max_record_size
+                  : 10,
+                type: currentVariable.query_data.stream_type,
+                query_context: queryContext,
+              });
+
+              if (res.data.hits.length) {
+                //set options value from the api response
+                currentVariable.options = res.data.hits
+                  .find(
+                    (field: any) =>
+                      field.field === currentVariable.query_data.field
+                  )
+                  .values.filter(
+                    (value: any) => value.zo_sql_key || value.zo_sql_key === ""
+                  )
+                  .map((value: any) => ({
+                    label:
+                      value.zo_sql_key !== ""
+                        ? value.zo_sql_key.toString()
+                        : "<blank>",
+                    value: value.zo_sql_key.toString(),
+                  }));
+
+                // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+                if (oldVariablesData[currentVariable.name] !== null) {
+                  currentVariable.value = currentVariable.options.some(
+                    (option: any) =>
+                      option.value === oldVariablesData[currentVariable.name]
+                  )
+                    ? oldVariablesData[currentVariable.name]
+                    : currentVariable.options.length
+                    ? currentVariable.options[0].value
+                    : null;
+                } else {
+                  currentVariable.value = currentVariable.options.length
+                    ? currentVariable.options[0].value
+                    : null;
+                }
+
+                resolve(true);
+                break;
               } else {
-                obj.value = obj.options.length ? obj.options[0].value : "";
+                // no response hits found
+                // set value as empty string
+                currentVariable.value = null;
+
+                resolve(true);
+                break;
               }
+            } catch (err: any) {
+              // some error occured
+              // set value as empty string
+              currentVariable.value = null;
 
-              variablesData.isVariablesLoading = variablesData.values.some(
-                (val: { isLoading: any }) => val.isLoading
-              );
-
-              // triggers rerendering in the current component
-              variablesData.values[currentVariableIndex] = obj;
-
-              emitVariablesData();
-              // return obj;
-              break;
-            } else {
-              obj.isLoading = false;
-              variablesData.isVariablesLoading = variablesData.values.some(
-                (val: { isLoading: any }) => val.isLoading
-              );
-
-              // triggers rerendering in the current component
-              variablesData.values[currentVariableIndex] = obj;
-
-              emitVariablesData();
-
-              // return obj;
+              resolve(true);
               break;
             }
-          } catch (err: any) {
-            console.log("error", err);
-            obj.isLoading = false;
-
-            variablesData.isVariablesLoading = variablesData.values.some(
-              (val: { isLoading: any }) => val.isLoading
-            );
-
-            // triggers rerendering in the current component
-            variablesData.values[currentVariableIndex] = obj;
-
-            emitVariablesData();
-            // return obj;
+          }
+          case "constant": {
+            resolve(true);
             break;
           }
-        }
-        case "constant": {
-          obj.value = it.value;
-          // return obj;
-          break;
-        }
-        case "textbox": {
-          let oldVariableObjectSelectedValue = oldVariableValue.find(
-            (it2: any) => it2.name === it.name
-          );
-          if (oldVariableObjectSelectedValue) {
-            obj.value = oldVariableObjectSelectedValue.value;
-          } else {
-            obj.value = it.value;
+          case "textbox": {
+            resolve(true);
+            break;
           }
-          // return obj;
-          break;
-        }
-        case "custom": {
-          obj["options"] = it?.options;
-          let oldVariableObjectSelectedValue = oldVariableValue.find(
-            (it2: any) => it2.name === it.name
-          );
-          // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-          if (oldVariableObjectSelectedValue) {
-            obj.value = oldVariableObjectSelectedValue.value;
-          } else {
-            obj.value = obj.options[0]?.value || "";
-          }
-          // return obj;
-          break;
-        }
-        case "dynamic_filters": {
-          obj.isLoading = false; // Set loading state
-          let oldVariableObjectSelectedValue = oldVariableValue.find(
-            (it2: any) => it2.name === it.name
-          );
-          if (oldVariableObjectSelectedValue) {
-            obj.value = oldVariableObjectSelectedValue.value;
-          } else {
-            obj.value = it.value;
-          }
-          emitVariablesData();
-          // return obj;
-          break;
-        }
-        default:
-          obj.value = it.value;
-          // return obj;
-          break;
-      }
+          case "custom": {
+            currentVariable["options"] = currentVariable?.options;
+            let oldVariableObjectSelectedValue = currentVariable.options.find(
+              (option: any) =>
+                option.value === oldVariablesData[currentVariable.name]
+            );
+            // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+            if (oldVariableObjectSelectedValue) {
+              currentVariable.value = oldVariableObjectSelectedValue.value;
+            } else {
+              currentVariable.value = currentVariable.options[0]?.value ?? null;
+            }
 
-      variablesData.isVariablesLoading = variablesData.values.some(
-        (val: { isLoading: any }) => val.isLoading
-      );
-      emitVariablesData();
+            resolve(true);
+            break;
+          }
+          case "dynamic_filters": {
+            // currentVariable.isLoading = false; // Set loading state
+            let oldVariableObjectSelectedValue = oldVariablesData.find(
+              (it2: any) => it2.name === currentVariable.name
+            );
+            if (oldVariableObjectSelectedValue) {
+              currentVariable.value = oldVariableObjectSelectedValue.value;
+            }
+
+            resolve(true);
+            break;
+          }
+          default:
+            resolve(true);
+            break;
+        }
+
+        resolve(true);
+      }).then((res) => {
+        if (res) {
+          // if (!res) return;
+          // if variableIndex is not valid, return
+          if (variableIndex < 0) return;
+          // variables data
+          const currentVariable = variablesData.values[variableIndex];
+          // if currentVariable is undefined, return
+          if (!currentVariable) {
+            return;
+          }
+
+          // set old variables data
+          oldVariablesData[currentVariable.name] = currentVariable.value;
+
+          // mark current variable as loaded
+          currentVariable.isLoading = false;
+          currentVariable.isVariableLoadingPending = false;
+
+          // check all variables are loaded?
+          // if all variables are loaded, set isVariablesLoading to false
+          variablesData.isVariablesLoading = variablesData.values.some(
+            (val: { isLoading: any; isVariableLoadingPending: any }) =>
+              val.isLoading || val.isVariableLoadingPending
+          );
+
+          // now, load all it's child variables
+          const childVariableIndices = variablesData.values.reduce(
+            (indices: number[], variable: any, index: number) => {
+              if (
+                variablesDependencyGraph[
+                  currentVariable.name
+                ].childVariables.includes(variable.name)
+              ) {
+                indices.push(index);
+              }
+              return indices;
+            },
+            []
+          );
+
+          // will force update the variables data
+          emitVariablesData();
+
+          Promise.all(
+            childVariableIndices.map((childValue: number) =>
+              loadSingleVariableDataByIndex(childValue)
+            )
+          );
+        }
+      });
     };
 
-    const getVariablesData = async () => {
+    const loadAllVariablesData = async () => {
       if (
         isInvalidDate(props.selectedTimeDate?.start_time) ||
         isInvalidDate(props.selectedTimeDate?.end_time)
@@ -543,69 +541,53 @@ export default defineComponent({
         return;
       }
 
-      // do we have variables & date?
-      if (!props.variablesConfig?.list || !props.selectedTimeDate?.start_time) {
-        variablesData.values = [];
-        variablesData.isVariablesLoading = false;
-        emitVariablesData();
+      // set isVariableLoadingPending as true for all variables
+      variablesData.values.forEach((variable: any) => {
+        variable.isVariableLoadingPending = true;
+      });
+
+      Promise.all(
+        variablesData.values.map((it: any, index: number) =>
+          loadSingleVariableDataByIndex(index)
+        )
+      );
+    };
+
+    const setLoadingStateToAllChildNode = (currentVariable: string) => {
+      for (const variableName of variablesDependencyGraph[currentVariable]
+        .childVariables) {
+        const variableObj = variablesData.values.find(
+          (it: any) => it.name === variableName
+        );
+        variableObj.isVariableLoadingPending = true;
+        setLoadingStateToAllChildNode(variableObj.name);
+      }
+    };
+
+    const onVariablesValueUpdated = (variableIndex: number) => {
+      // if variableIndex is not valid, return
+      if (variableIndex < 0) return;
+      // variables data
+      const currentVariable = variablesData.values[variableIndex];
+      // if currentVariable is undefined, return
+      if (!currentVariable) {
         return;
       }
 
-      // reset the values
-      variablesData.values = [];
-      variablesData.isVariablesLoading = false;
+      setLoadingStateToAllChildNode(currentVariable.name);
 
-      // get old variable values
-      oldVariableValue = JSON.parse(JSON.stringify(variablesData.values));
-      if (!oldVariableValue.length) {
-        const dynamicVariables =
-          variablesConfigList.value
-            ?.filter((it: any) => it.type == "dynamic_filters")
-            ?.map((it: any) => it.name) || [];
-        oldVariableValue = Object.keys(
-          props?.initialVariableValues?.value ?? []
-        ).map((key: any) => ({
-          name: key,
-          value: dynamicVariables.includes(key)
-            ? JSON.parse(
-                decodeURIComponent(props.initialVariableValues?.value[key])
-              )
-            : props.initialVariableValues?.value[key],
-        }));
-      }
-
-      variablesConfigList.value.forEach((it: any) => {
-        const obj: any = {
-          name: it.name,
-          label: it.label,
-          type: it.type,
-          value: it.type == "dynamic_filters" ? [] : null,
-          isLoading: true,
-        };
-        variablesData.values.push(obj);
-        variablesData.isVariablesLoading = true;
-      });
-
-      oldVariablesData = JSON.parse(JSON.stringify(variablesData));
-
-      // load independent variables only.
-      // if independent variables are not loaded, dependent variables will be automatically loaded due to watcher on variablesData.values change
-
-      for (let index = 0; index < variablesConfigList.value.length; index++) {
-        // if dependency is not there then load
-        if (
-          variablesDependencyGraph[variablesConfigList.value[index].name] &&
-          variablesDependencyGraph[variablesConfigList.value[index].name]
-            .length == 0
-        ) {
-          getSingleVariableData(index);
-        }
-      }
+      Promise.all(
+        variablesData.values.map((it: any, index: number) =>
+          loadSingleVariableDataByIndex(index)
+        )
+      );
     };
+
     return {
       props,
       variablesData,
       changeInitialVariableValues,
+      onVariablesValueUpdated,
     };
   },
 });
