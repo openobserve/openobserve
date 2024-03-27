@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         item.value +
         item.type +
         item.options?.length +
-        item.isLoading
+        item.isLoading +
+        item.isVariableLoadingPending +
+        index
       "
       class="q-mr-lg q-mt-xs"
       :data-test="`dashboard-variable-${item}-selector`"
