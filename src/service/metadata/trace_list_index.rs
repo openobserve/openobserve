@@ -22,7 +22,7 @@ use crate::{
         db, ingestion,
         metadata::{Metadata, MetadataItem},
         stream,
-        stream::{stream_settings, unwrap_partition_time_level},
+        stream::unwrap_partition_time_level,
     },
 };
 
@@ -106,7 +106,7 @@ impl Metadata for TraceListIndex {
             hour_buf.records_size += data_size;
         }
 
-        let writer = ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string()).await;
+        let writer = ingester::get_writer(0, org_id, &StreamType::Metadata.to_string()).await;
         _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
         if let Err(e) = writer.sync().await {
             log::error!("[TraceListIndex] error while syncing writer: {}", e);
@@ -116,13 +116,19 @@ impl Metadata for TraceListIndex {
     }
     async fn flush(&self) -> infra::errors::Result<()> {
         // do nothing
-        return Ok(());
+        Ok(())
     }
     async fn stop(&self) -> infra::errors::Result<()> {
         if let Err(e) = self.flush().await {
             log::error!("[TraceListIndex] flush error: {}", e);
         }
         Ok(())
+    }
+}
+
+impl Default for TraceListIndex {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -142,15 +148,13 @@ impl TraceListIndex {
 
     async fn set_db_schema(&self, org_id: &str) -> infra::errors::Result<()> {
         // check for schema
-        let db_schema = db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+        let db_schema = db::schema::get(org_id, STREAM_NAME, StreamType::Metadata)
             .await
             .unwrap();
-        let schema_settings = stream_settings(&db_schema).unwrap_or_default();
-        let mut partition_keys = schema_settings.partition_keys;
         if db_schema.fields().is_empty() {
             let schema = self.schema.as_ref().clone();
             if let Err(e) = db::schema::set(
-                &org_id,
+                org_id,
                 STREAM_NAME,
                 StreamType::Metadata,
                 &schema,
@@ -169,8 +173,8 @@ impl TraceListIndex {
                 bloom_filter_fields: vec!["trace_id".to_string()],
                 data_retention: 0,
             };
-            partition_keys = settings.partition_keys.clone();
-            stream::save_stream_settings(&org_id, STREAM_NAME, StreamType::Metadata, settings)
+
+            stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
                 .await?;
         }
 
@@ -258,5 +262,4 @@ mod tests {
         let r = ingestion::write_file(&writer, STREAM_NAME, buf).await;
         println!("r: {:?}", r);
     }
-
 }

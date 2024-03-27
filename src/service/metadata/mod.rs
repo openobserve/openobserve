@@ -4,15 +4,12 @@ use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-use crate::service::metadata::{
-    distinct_values::{DistinctValues, DvItem},
-    trace_list_index::{TraceListIndex, TraceListItem},
-};
+use crate::service::metadata::trace_list_index::{TraceListIndex, TraceListItem};
 
 pub mod distinct_values;
 pub mod trace_list_index;
 
-static MetadataManager: Lazy<MetadataManager> = Lazy::new(MetadataManager::new);
+static METADATA_MANAGER: Lazy<MetadataManager> = Lazy::new(MetadataManager::new);
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub enum MetadataItem {
@@ -30,9 +27,19 @@ pub struct MetadataManager {
 
 pub trait Metadata {
     fn generate_schema(&self) -> Arc<Schema>;
-    async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> infra::errors::Result<()>;
-    async fn flush(&self) -> infra::errors::Result<()>;
-    async fn stop(&self) -> infra::errors::Result<()>;
+    fn write(
+        &self,
+        org_id: &str,
+        data: Vec<MetadataItem>,
+    ) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
+    fn flush(&self) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
+    fn stop(&self) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
+}
+
+impl Default for MetadataManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetadataManager {
@@ -43,7 +50,7 @@ impl MetadataManager {
     }
 
     pub async fn close(&self) -> infra::errors::Result<()> {
-        Ok(self.trace_list_indexer.stop().await?)
+        self.trace_list_indexer.stop().await
     }
 }
 
@@ -53,7 +60,7 @@ pub async fn write(
     data: Vec<MetadataItem>,
 ) -> infra::errors::Result<()> {
     match mt {
-        MetadataType::TraceListIndexer => Ok(MetadataManager
+        MetadataType::TraceListIndexer => Ok(METADATA_MANAGER
             .trace_list_indexer
             .write(org_id, data)
             .await?),
@@ -68,5 +75,5 @@ pub async fn close() -> infra::errors::Result<()> {
     // flush distinct values, todo it will be close in MetadataManager
     _ = distinct_values::close().await;
     // flush metadata
-    Ok(MetadataManager.close().await?)
+    METADATA_MANAGER.close().await
 }

@@ -60,7 +60,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata::distinct_values},
+    service::db,
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -212,7 +212,6 @@ async fn main() -> Result<(), anyhow::Error> {
     // flush db
     let db = infra::db::get_db().await;
     _ = db.close().await;
-
 
     // stop telemetry
     meta::telemetry::Telemetry::new()
