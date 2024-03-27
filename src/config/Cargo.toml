@@ -17,6 +17,7 @@ bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
 cityhasher.workspace = true
+chromiumoxide.workspace = true
 dashmap.workspace = true
 dotenv_config.workspace = true
 dotenvy.workspace = true

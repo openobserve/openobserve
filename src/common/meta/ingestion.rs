@@ -162,7 +162,7 @@ impl BulkResponseItem {
         _index: String,
         _id: String,
         error: BulkResponseError,
-        orig_record: json::Value,
+        orig_record: Option<json::Value>,
         stream_name: String,
     ) -> Self {
         BulkResponseItem {
@@ -175,14 +175,14 @@ impl BulkResponseItem {
             _primary_term: None,
             status: 422,
             error: Some(error),
-            original_record: Some(orig_record),
+            original_record: orig_record,
         }
     }
 
     pub fn new(
         _index: String,
         _id: String,
-        _orig_record: json::Value,
+        _orig_record: Option<json::Value>,
         stream_name: String,
     ) -> Self {
         BulkResponseItem {
