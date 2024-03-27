@@ -225,6 +225,7 @@ const useLogs = () => {
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
+    searchObj.data.savedViews = [];
   };
 
   const updatedLocalLogFilterField = (): void => {
