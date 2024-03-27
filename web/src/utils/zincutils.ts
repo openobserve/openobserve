@@ -242,6 +242,10 @@ export const useLocalInterestingFields = (val = "", isDelete = false) => {
   return useLocalStorage("interestingFields", val, isDelete, true);
 };
 
+export const useLocalSavedView = (val = "", isDelete = false) => {
+  return useLocalStorage("savedViews", val, isDelete, true);
+};
+
 export const useLocalUserInfo = (val = "", isDelete = false) => {
   const userInfo: any = useLocalStorage("userInfo", val, isDelete);
   return userInfo.value;

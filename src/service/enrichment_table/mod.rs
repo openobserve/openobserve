@@ -150,7 +150,7 @@ pub async fn save_enrichment_data(
                         stream_name,
                         StreamType::EnrichmentTables,
                         &mut stream_schema_map,
-                        &json_record,
+                        vec![&json_record],
                         timestamp,
                     )
                     .await
