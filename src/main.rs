@@ -205,11 +205,14 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush compact offset cache to disk disk
     _ = db::compact::files::sync_cache_to_db().await;
+
+    // flush metadata
+    _ = metadata::close().await;
+
     // flush db
     let db = infra::db::get_db().await;
     _ = db.close().await;
-    // flush metadata
-    _ = metadata::close().await;
+
 
     // stop telemetry
     meta::telemetry::Telemetry::new()
