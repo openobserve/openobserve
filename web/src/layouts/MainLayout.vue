@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
               store.state.zoConfig?.custom_logo_text != ''
             "
-            class="text-h6 text-bold q-pa-none cursor-pointer"
+            class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm"
             @click="goToHome"
             >{{ store.state.zoConfig.custom_logo_text }}</span
           >

@@ -20,6 +20,7 @@ use infra::db as infra_db;
 use crate::common::meta::dashboards::{v1, v2, v3, Dashboard, DashboardVersion};
 
 pub mod folders;
+pub mod reports;
 
 #[tracing::instrument]
 pub(crate) async fn get(
@@ -74,7 +75,12 @@ pub(crate) async fn put(
         dash.dashboard_id = dashboard_id.to_string();
 
         match db
-            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
+            .put(
+                &key,
+                json::to_vec(&dash)?.into(),
+                infra_db::NO_NEED_WATCH,
+                None,
+            )
             .await
         {
             Ok(_) => Ok(Dashboard {
@@ -92,7 +98,12 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         match db
-            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
+            .put(
+                &key,
+                json::to_vec(&dash)?.into(),
+                infra_db::NO_NEED_WATCH,
+                None,
+            )
             .await
         {
             Ok(_) => Ok(Dashboard {
@@ -110,7 +121,12 @@ pub(crate) async fn put(
         };
         dash.dashboard_id = dashboard_id.to_string();
         match db
-            .put(&key, json::to_vec(&dash)?.into(), infra_db::NO_NEED_WATCH)
+            .put(
+                &key,
+                json::to_vec(&dash)?.into(),
+                infra_db::NO_NEED_WATCH,
+                None,
+            )
             .await
         {
             Ok(_) => Ok(Dashboard {
@@ -166,12 +182,14 @@ pub(crate) async fn delete(
 ) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let db = infra_db::get_db().await;
-    Ok(db.delete(&key, false, infra_db::NO_NEED_WATCH).await?)
+    Ok(db
+        .delete(&key, false, infra_db::NO_NEED_WATCH, None)
+        .await?)
 }
 
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
     let db = infra_db::get_db().await;
-    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH).await?)
+    Ok(db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?)
 }

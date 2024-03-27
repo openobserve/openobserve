@@ -118,14 +118,26 @@ impl super::Db for NatsDb {
         }
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = base64::encode_url(new_key);
         _ = bucket.put(&key, value).await?;
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         if !with_prefix {
             let key = base64::encode_url(new_key);
@@ -306,6 +318,9 @@ impl super::Db for NatsDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+    async fn add_start_dt_column(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub async fn create_table() -> Result<()> {
@@ -387,11 +402,8 @@ impl Locker {
                     break;
                 }
                 Err(err) => {
+                    // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    log::error!("nats lock for key: {}, error: {}", self.key, err);
-                    // if !err.to_string().contains("Timeout expired") {
-                    //     break;
-                    // }
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             };

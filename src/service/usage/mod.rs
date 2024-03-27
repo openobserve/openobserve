@@ -20,8 +20,8 @@ use config::{
     meta::{
         stream::StreamType,
         usage::{
-            AggregatedData, GroupKey, RequestStats, UsageData, UsageEvent, UsageType, STATS_STREAM,
-            USAGE_STREAM,
+            AggregatedData, GroupKey, RequestStats, TriggerData, UsageData, UsageEvent, UsageType,
+            STATS_STREAM, TRIGGERS_USAGE_STREAM, USAGE_STREAM,
         },
     },
     metrics,
@@ -38,6 +38,8 @@ pub mod ingestion_service;
 pub mod stats;
 
 pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
+    Lazy::new(|| Arc::new(RwLock::new(vec![])));
+pub static TRIGGERS_USAGE_DATA: Lazy<Arc<RwLock<Vec<TriggerData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
 
 pub async fn report_request_usage_stats(
@@ -123,8 +125,8 @@ pub async fn report_request_usage_stats(
             num_records: stats.records,
             stream_type,
             stream_name: stream_name.to_owned(),
-            min_ts: None,
-            max_ts: None,
+            min_ts: stats.min_ts,
+            max_ts: stats.max_ts,
             compressed_size: None,
         });
     };
@@ -254,6 +256,37 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
         log::error!("Error in ingesting usage data {:?}", e);
         // on error in ingesting usage data, push back the data
         let mut usages = USAGE_DATA.write().await;
+        let mut curr_usages = curr_usages.clone();
+        usages.append(&mut curr_usages);
+        drop(usages);
+    }
+}
+
+pub async fn publish_triggers_usage(trigger: TriggerData) {
+    let mut usages = TRIGGERS_USAGE_DATA.write().await;
+    usages.push(trigger);
+    if usages.len() < CONFIG.common.usage_batch_size {
+        return;
+    }
+
+    let curr_usages = std::mem::take(&mut *usages);
+    // release the write lock
+    drop(usages);
+
+    let mut json_triggers = vec![];
+    for trigger_data in &curr_usages {
+        json_triggers.push(json::to_value(trigger_data).unwrap());
+    }
+
+    // report trigger usage data
+    let req = cluster_rpc::UsageRequest {
+        stream_name: TRIGGERS_USAGE_STREAM.to_owned(),
+        data: Some(cluster_rpc::UsageData::from(json_triggers)),
+    };
+    if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+        log::error!("Error in ingesting triggers usage data {:?}", e);
+        // on error in ingesting usage data, push back the data
+        let mut usages = TRIGGERS_USAGE_DATA.write().await;
         let mut curr_usages = curr_usages.clone();
         usages.append(&mut curr_usages);
         drop(usages);

@@ -138,8 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-auto"
                   >
-                    <q-icon name="info" color="primary"
-size="md" /> Select a
+                    <q-icon name="info" color="primary" size="md" /> Select a
                     stream and press 'Run query' to continue. Additionally, you
                     can apply additional filters and adjust the date range to
                     enhance search.
@@ -158,8 +157,7 @@ size="md" /> Select a
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary"
-size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.noRecordFound") }}
                   </h6>
                 </div>
@@ -176,8 +174,7 @@ size="md" />
                     data-test="logs-search-error-message"
                     class="text-center q-mx-auto col-10"
                   >
-                    <q-icon name="info" color="primary"
-size="md" />
+                    <q-icon name="info" color="primary" size="md" />
                     {{ t("search.applySearch") }}
                   </h6>
                 </div>
@@ -373,6 +370,7 @@ export default defineComponent({
       resetStreamData,
       getHistogramQueryData,
       fnParsedSQL,
+      addOrderByToQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -556,6 +554,12 @@ export default defineComponent({
             );
           }
 
+          searchObj.data.query = addOrderByToQuery(
+            searchObj.data.query,
+            store.state.zoConfig.timestamp_column,
+            "DESC"
+          ).replace(/`/g, '"');
+
           searchObj.data.editorValue = searchObj.data.query;
 
           searchBarRef.value.udpateQuery();
@@ -566,6 +570,7 @@ export default defineComponent({
           searchBarRef.value.udpateQuery();
         }
       } catch (e) {
+        console.log(e);
         console.log("Logs : Error in setQuery");
       }
     };
@@ -594,7 +599,7 @@ export default defineComponent({
       refreshData();
     };
 
-    function removeFieldByName(data, fieldName, orderby) {
+    function removeFieldByName(data, fieldName) {
       return data.filter((item) => {
         if (item.expr) {
           if (item.expr.column === fieldName) {
@@ -622,11 +627,7 @@ export default defineComponent({
         if (isFieldExistInSQL) {
           //remove the field from the query
           if (parsedSQL.columns.length > 0) {
-            let filteredData = removeFieldByName(
-              parsedSQL.columns,
-              field.name,
-              parsedSQL.orderby
-            );
+            let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
               field.name
@@ -641,11 +642,7 @@ export default defineComponent({
           //add the field in the query
           if (parsedSQL.columns.length > 0) {
             // iterate and remove the * from the query
-            parsedSQL.columns = removeFieldByName(
-              parsedSQL.columns,
-              "*",
-              parsedSQL.orderby
-            );
+            parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
           }
 
           parsedSQL.columns.push({
@@ -656,8 +653,22 @@ export default defineComponent({
           });
         }
 
-        const newQuery = parser.sqlify(parsedSQL).replace(/`/g, "");
-        console.log(newQuery);
+        if (parsedSQL.columns.length == 0) {
+          parsedSQL.columns.push({
+            expr: {
+              type: "column_ref",
+              column: "*",
+            },
+          });
+        }
+
+        const newQuery = parser
+          .sqlify(parsedSQL)
+          .replace(/`/g, "")
+          .replace(
+            searchObj.data.stream.selectedStream.value,
+            `"${searchObj.data.stream.selectedStream.value}"`
+          );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
 

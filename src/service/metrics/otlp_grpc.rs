@@ -295,7 +295,7 @@ pub async fn handle_grpc_request(
                             local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
-                            val_map,
+                            vec![val_map],
                             timestamp,
                         )
                         .await

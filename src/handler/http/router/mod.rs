@@ -110,7 +110,7 @@ async fn proxy(
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(status::healthz);
+    cfg.service(status::healthz).service(status::schedulez);
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -288,6 +288,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(dashboards::folders::update_folder)
             .service(dashboards::folders::get_folder)
             .service(dashboards::folders::delete_folder)
+            .service(dashboards::reports::create_report)
+            .service(dashboards::reports::update_report)
+            .service(dashboards::reports::get_report)
+            .service(dashboards::reports::list_reports)
+            .service(dashboards::reports::delete_report)
+            .service(dashboards::reports::enable_report)
+            .service(dashboards::reports::trigger_report)
             .service(alerts::save_alert)
             .service(alerts::update_alert)
             .service(alerts::get_alert)

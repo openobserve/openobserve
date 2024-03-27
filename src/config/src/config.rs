@@ -15,6 +15,12 @@
 
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
+use chromiumoxide::{
+    browser::BrowserConfig,
+    detection::{default_executable, DetectionOptions},
+    fetcher::{BrowserFetcher, BrowserFetcherOptions},
+    handler::viewport::Viewport,
+};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
@@ -168,6 +174,87 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     )
 });
 
+static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
+    tokio::sync::OnceCell::const_new();
+
+pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
+    CHROME_LAUNCHER_OPTIONS
+        .get_or_init(init_chrome_launch_options)
+        .await
+}
+
+async fn init_chrome_launch_options() -> Option<BrowserConfig> {
+    if !CONFIG.chrome.chrome_enabled {
+        None
+    } else {
+        let mut browser_config = BrowserConfig::builder()
+            .window_size(
+                CONFIG.chrome.chrome_window_width,
+                CONFIG.chrome.chrome_window_height,
+            )
+            .viewport(Viewport {
+                width: CONFIG.chrome.chrome_window_width,
+                height: CONFIG.chrome.chrome_window_height,
+                device_scale_factor: Some(1.0),
+                ..Viewport::default()
+            });
+
+        if CONFIG.chrome.chrome_no_sandbox {
+            browser_config = browser_config.no_sandbox();
+        }
+
+        if !CONFIG.chrome.chrome_path.is_empty() {
+            browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
+        } else {
+            let mut should_download = false;
+
+            if !CONFIG.chrome.chrome_check_default {
+                should_download = true;
+            } else {
+                // Check if chrome is available on default paths
+                // 1. Check the CHROME env
+                // 2. Check usual chrome file names in user path
+                // 3. (Windows) Registry
+                // 4. (Windows & MacOS) Usual installations paths
+                if let Ok(exec_path) = default_executable(DetectionOptions::default()) {
+                    browser_config = browser_config.chrome_executable(exec_path);
+                } else {
+                    should_download = true;
+                }
+            }
+            if should_download {
+                // Download known good chrome version
+                let download_path = &CONFIG.chrome.chrome_download_path;
+                log::info!("fetching chrome at: {download_path}");
+                tokio::fs::create_dir_all(download_path).await.unwrap();
+                let fetcher = BrowserFetcher::new(
+                    BrowserFetcherOptions::builder()
+                        .with_path(download_path)
+                        .build()
+                        .unwrap(),
+                );
+
+                // Fetches the browser revision, either locally if it was previously
+                // installed or remotely. Returns error when the download/installation
+                // fails. Since it doesn't retry on network errors during download,
+                // if the installation fails, it might leave the cache in a bad state
+                // and it is advised to wipe it.
+                // Note: Does not work on LinuxArm platforms.
+                let info = fetcher
+                    .fetch()
+                    .await
+                    .expect("chrome could not be downloaded");
+                log::info!(
+                    "chrome fetched at path {:#?}",
+                    info.executable_path.as_path()
+                );
+                browser_config = browser_config.chrome_executable(info.executable_path);
+            }
+        }
+        Some(browser_config.build().unwrap())
+    }
+}
+
 pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy::new(|| {
     if !CONFIG.smtp.smtp_enabled {
         None
@@ -196,6 +283,9 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
+pub static BLOCKED_STREAMS: Lazy<Vec<&str>> =
+    Lazy::new(|| CONFIG.common.blocked_streams.split(',').collect());
+
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
@@ -218,6 +308,27 @@ pub struct Config {
     pub profiling: Pyroscope,
     pub smtp: Smtp,
     pub rum: RUM,
+    pub chrome: Chrome,
+}
+
+#[derive(EnvConfig)]
+pub struct Chrome {
+    #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
+    pub chrome_enabled: bool,
+    #[env_config(name = "ZO_CHROME_PATH", default = "")]
+    pub chrome_path: String,
+    #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
+    pub chrome_check_default: bool,
+    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
+    pub chrome_download_path: String,
+    #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
+    pub chrome_no_sandbox: bool,
+    #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
+    pub chrome_sleep_secs: u16,
+    #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
+    pub chrome_window_width: u32,
+    #[env_config(name = "ZO_CHROME_WINDOW_HEIGHT", default = 730)]
+    pub chrome_window_height: u32,
 }
 
 #[derive(EnvConfig)]
@@ -486,6 +597,17 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
+
+    #[env_config(
+        name = "ZO_RUN_SCHEMA_MIGRATION_ON_START_UP",
+        default = false,
+        help = "Run autimatic schema migration on start up"
+    )]
+    pub run_schema_migration_on_start_up: bool,
+    #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
+    pub blocked_streams: String,
+    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
+    pub infer_schema_per_request: bool,
 }
 
 #[derive(EnvConfig)]
@@ -562,6 +684,18 @@ pub struct Limit {
     pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
+    pub alert_schedule_concurrency: i64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
+    pub alert_schedule_timeout: i64,
+    #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
+    pub report_schedule_timeout: i64,
+    #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
+    pub scheduler_max_retries: i32,
+    #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
+    pub scheduler_clean_interval: u64,
+    #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
+    pub scheduler_watch_interval: u64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
@@ -578,6 +712,8 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
+    #[env_config(name = "ZO_ENTRY_PER_SCHEMA_VERSION_ENABLED", default = true)]
+    pub row_per_schema_version_enabled: bool,
 }
 
 #[derive(EnvConfig)]

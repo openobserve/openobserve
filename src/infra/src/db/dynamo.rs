@@ -130,7 +130,13 @@ impl super::Db for DynamoDb {
         }
     }
 
-    async fn put(&self, in_key: &str, value: Bytes, need_watch: bool) -> Result<()> {
+    async fn put(
+        &self,
+        in_key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
         let table: DynamoTableDetails = get_dynamo_key(in_key, DbOperation::Put);
         let client = get_db_client().await.clone();
         match client
@@ -159,7 +165,7 @@ impl super::Db for DynamoDb {
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
             cluster_coordinator
-                .put(in_key, Bytes::from(""), true)
+                .put(in_key, Bytes::from(""), true, start_dt)
                 .await?;
         }
 
@@ -167,11 +173,20 @@ impl super::Db for DynamoDb {
     }
 
     // TODO: support prefix mode
-    async fn delete(&self, in_key: &str, _with_prefix: bool, need_watch: bool) -> Result<()> {
+    async fn delete(
+        &self,
+        in_key: &str,
+        _with_prefix: bool,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
         // event watch
         if need_watch {
             let cluster_coordinator = super::get_coordinator().await;
-            if let Err(e) = cluster_coordinator.delete(in_key, false, true).await {
+            if let Err(e) = cluster_coordinator
+                .delete(in_key, false, true, start_dt)
+                .await
+            {
                 log::error!("[DYNAMODB] send event error: {}", e);
             }
         }
@@ -442,6 +457,9 @@ impl super::Db for DynamoDb {
     }
 
     async fn close(&self) -> Result<()> {
+        Ok(())
+    }
+    async fn add_start_dt_column(&self) -> Result<()> {
         Ok(())
     }
 }
