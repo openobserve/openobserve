@@ -52,7 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   outlined
                   stack-label
-                  :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                  :rules="[
+                    (val: any) => !!(val.trim()) || 'Field is required!',
+                    (val: any) => !val.includes(' ') || 'Only word characters are allowed in variable names'
+                ]"
                 ></q-input>
               </div>
               <div class="textbox col">
@@ -153,6 +156,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
                   </q-btn>
                 </q-input>
+              </div>
+              <div>
+                <div
+                  data-test="dashboard-query-values-filter"
+                  class="text-body1 text-bold q-mt-lg"
+                >
+                  Filters
+                </div>
+                <div class="row items-center">
+                  <div
+                    class="row no-wrap items-center q-mb-xs"
+                    v-for="(filter, index) in variableData.query_data.filter"
+                    :key="index"
+                  >
+                    <q-select
+                      filled
+                      outlined
+                      dense
+                      v-model="filter.name"
+                      :display-value="filter.name ? filter.name : ''"
+                      :options="fieldsFilteredOptions"
+                      input-debounce="0"
+                      behavior="menu"
+                      @update:model-value="filterUpdated(index, $event)"
+                      use-input
+                      stack-label
+                      option-label="name"
+                      data-test="dashboard-query-values-filter-name-selector"
+                      @filter="fieldsFilterFn"
+                      :placeholder="filter.name ? '' : 'Select Field'"
+                      class="textbox col no-case q-ml-sm"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                    >
+                      <template v-slot:no-option>
+                        <q-item>
+                          <q-item-section class="text-italic text-grey"
+                            >No Data Found</q-item-section
+                          >
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <q-select
+                      dense
+                      filled
+                      v-model="filter.operator"
+                      :display-value="filter.operator ? filter.operator : ''"
+                      style="width: auto"
+                      class="operator"
+                      data-test="dashboard-query-values-filter-operator-selector"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                    />
+                    <q-input
+                      v-model="filter.value"
+                      placeholder="Enter Value"
+                      dense
+                      filled
+                      debounce="1000"
+                      style="width: 125px"
+                      class=""
+                      data-test="dashboard-query-values-filter-value"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                    />
+                    <q-btn
+                      class="q-ml-sm"
+                      size="sm"
+                      padding="13px 2px"
+                      square
+                      flat
+                      dense
+                      @click="removeFilter(index)"
+                      icon="close"
+                      :data-test="`dashboard-variable-adhoc-close-${index}`"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <q-btn
+                    no-caps
+                    icon="add"
+                    no-outline
+                    class="q-mt-md"
+                    @click="addFilter"
+                    data-test="dashboard-add-filter-btn"
+                  >
+                    Add Filter
+                  </q-btn>
+                </div>
+
+                <!-- show error if filter has cycle -->
+                <div v-show="filterCycleError" style="color: red">
+                  {{ filterCycleError }}
+                </div>
               </div>
             </div>
           </div>
@@ -336,10 +431,32 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
+        filter: [],
       },
       value: "",
       options: [],
     });
+
+    const filterCycleError: any = ref("");
+
+    const addFilter = () => {
+      if (!variableData.query_data.filter) {
+        variableData.query_data.filter = [];
+      }
+      variableData.query_data.filter.push({
+        name: "",
+        operator: "=",
+        value: "",
+      });
+    };
+
+    const filterUpdated = (index: number, filter: any) => {
+      variableData.query_data.filter[index].name = filter.name;
+    };
+
+    const removeFilter = (index: any) => {
+      variableData.query_data.filter.splice(index, 1);
+    };
 
     const editMode = ref(false);
 
@@ -353,6 +470,7 @@ export default defineComponent({
             await getDashboard(store, route.query.dashboard, route.query.folder)
           )
         )?.variables?.list;
+
         // Find the variable to edit
         const edit = (data || []).find(
           (it: any) => it.name === props.variableName
@@ -478,12 +596,197 @@ export default defineComponent({
         }
       }
     };
+
+    // Function to detect cycle in a graph
+    // will be called recursively
+    function isGraphHasCyclicUtil(
+      node: any,
+      visited: any,
+      recStack: any,
+      graph: any,
+      path: any
+    ) {
+      // node should be not visited
+      if (!visited[node]) {
+        // Mark the current node as visited and part of recursion stack
+        visited[node] = true;
+        recStack[node] = true;
+        path.push(node);
+
+        // Recur for all the vertices adjacent to this vertex
+        // recursion call to all it's child node
+        for (let i = 0; i < graph[node].length; i++) {
+          let child = graph[node][i];
+
+          // if child is not visited and not part of recursion stack
+          // if child is already visited and part of recursion stack. so it means there is a cycle in the graph
+          if (
+            !visited[child] &&
+            isGraphHasCyclicUtil(child, visited, recStack, graph, path)
+          ) {
+            return true;
+          } else if (recStack[child]) {
+            return true;
+          }
+        }
+      }
+      // Remove the vertex from recursion stack and path
+      recStack[node] = false;
+      path.pop();
+      return false;
+    }
+
+    // Function to detect cycle in a graph
+    function isGraphHasCyclic(graph: any) {
+      // Mark all the vertices as not visited and not part of recursion stack
+
+      // visited object is used to check if a vertex is visited or not
+      let visited: any = {};
+      // recStack object is used to check if a vertex is part of recursion stack
+      let recStack: any = {};
+      // path array is used to store the path
+      let path: any = [];
+
+      // Initialize all vertices as not visited and not part of recursion stack
+      for (let node in graph) {
+        visited[node] = false;
+        recStack[node] = false;
+      }
+
+      // Call the recursive helper function to detect cycle in different DFS trees
+      for (let node in graph) {
+        // Start from all vertices one by one and check if a cycle is formed
+        if (isGraphHasCyclicUtil(node, visited, recStack, graph, path)) {
+          // Cycle found
+          // so, return path
+          return path;
+        }
+      }
+      // no cycle found
+      return null;
+    }
+
+    // A helper function to extract variable names from a string
+    function extractVariableNames(str: any, variableNames: any) {
+      let regex = /\$(\w+)/g;
+      let match;
+      let names = [];
+      while ((match = regex.exec(str)) !== null) {
+        // Only include the variable name if it exists in the list of variables
+        if (variableNames.has(match[1])) {
+          names.push(match[1]);
+        }
+      }
+      // Remove duplicates by converting to a set and back to an array
+      return [...new Set(names)];
+    }
+
+    // check if filter has cycle
+    const isFilterHasCycle = async () => {
+      try {
+        // need all variables to check for cycle
+        // get all variables data.
+        let variablesData: any = JSON.parse(
+          JSON.stringify(
+            await getDashboard(store, route.query.dashboard, route.query.folder)
+          )
+        )?.variables?.list;
+
+        // current updated variable data need to merge/update in above variablesData.
+        // temporary update variable list
+        // if edit mode, then update the variable data
+        if (editMode.value) {
+          //if name already exists
+          const variableIndex = variablesData.findIndex(
+            (variable: any) => variable.name == props.variableName
+          );
+
+          // Update the variable data in the list
+          variablesData[variableIndex] = variableData;
+        }
+        // else, it's a new variable.
+        else {
+          variablesData.push(variableData);
+        }
+
+        // need list of variable names
+        // Create a set of variable names
+        let variablesNameList = new Set(
+          variablesData.map((variable: any) => variable.name)
+        );
+
+        // now, need to check whether filter has cycle or not
+        // key: variable name
+        // value: list of dependencies(variable names)
+        let variablesDependencyGraph: any = {};
+
+        // Initialize all variables has empty dependency list in the variablesDependencyGraph
+        for (let variable of variablesData) {
+          variablesDependencyGraph[variable.name] = [];
+        }
+
+        // Populate the variablesDependencyGraph
+        for (let variableData of variablesData) {
+          let name = variableData.name;
+          for (let filter of variableData.query_data?.filter || []) {
+            // Extract variable names from the filter value
+            let extactedDependencies = extractVariableNames(
+              filter.value,
+              variablesNameList
+            );
+            // Add the dependencies to the variablesDependencyGraph
+            if (variablesDependencyGraph[name]) {
+              variablesDependencyGraph[name].push(...extactedDependencies);
+            } else {
+              variablesDependencyGraph[name] = extactedDependencies;
+            }
+          }
+        }
+
+        // if graph has cycle, it will return the cycle path
+        // else it will return null
+        const hasCycle = isGraphHasCyclic(variablesDependencyGraph);
+        if (hasCycle) {
+          // filter has cycle, so show error and return
+          filterCycleError.value = `Variables has cycle: ${hasCycle.join(
+            "->"
+          )}`;
+          return true;
+        }
+
+        // above conditions passed, so remove filter cycle error and return false
+        filterCycleError.value = "";
+        return false;
+      } catch (err: any) {
+        $q.notify({
+          type: "negative",
+          message:
+            err?.message ??
+            (editMode.value
+              ? "Variable update failed"
+              : "Variable creation failed"),
+        });
+        return true;
+      }
+    };
+
     const onSubmit = () => {
-      addVariableForm.value.validate().then((valid: any) => {
+      // first, validate form values
+      addVariableForm.value.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
 
+        // check if filter has cycle
+        if (await isFilterHasCycle()) {
+          // filter has cycle, so show error and return
+          return false;
+        }
+
+        // above conditions passed, so remove filter cycle error
+        filterCycleError.value = "";
+
+        // save the variable
         saveVariableApiCall.execute().catch((err: any) => {
           $q.notify({
             type: "negative",
@@ -582,6 +885,10 @@ export default defineComponent({
       title,
       onSubmit,
       addVariableForm,
+      addFilter,
+      removeFilter,
+      filterUpdated,
+      filterCycleError,
     };
   },
 });
