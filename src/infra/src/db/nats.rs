@@ -145,7 +145,7 @@ impl super::Db for NatsDb {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(
-                    "[SCHEMA] dist_lock key: {}, error: {}",
+                    "dist_lock key: {}, acquire error: {}",
                     lock_key, e
                 )));
             }
