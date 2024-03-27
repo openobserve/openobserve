@@ -137,7 +137,8 @@ describe("Logs testcases", () => {
     cy.url().should("include", "logs");
     cy.get(
       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon'
-    ).click();
+    ).click({ force: true });
+    cy.wait(2000);
     cy.contains("streamlogsnavigate").click();
     cy.wait(200);
     cy.get('[data-test="logs-search-bar-query-editor"]').then((editor) => {
