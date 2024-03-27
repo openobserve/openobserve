@@ -16,6 +16,7 @@
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
+    sync::Arc,
 };
 
 use actix_web::web;
@@ -25,11 +26,11 @@ use config::{
     cluster,
     meta::{stream::StreamType, usage::UsageType},
     metrics,
-    utils::{flatten, json, time::parse_timestamp_micro_from_value},
+    utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
     CONFIG, DISTINCT_FIELDS,
 };
 
-use super::StreamMeta;
+use super::{add_record, cast_to_schema_v1, StreamMeta};
 use crate::{
     common::meta::{
         alerts::Alert,
@@ -38,7 +39,7 @@ use crate::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
             StreamSchemaChk,
         },
-        stream::PartitioningDetails,
+        stream::{PartitioningDetails, StreamParams},
     },
     service::{
         db, distinct_values,
@@ -100,6 +101,8 @@ pub async fn ingest(
     let mut doc_id = String::from("");
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
+    let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
+
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
     for line in reader.lines() {
@@ -117,6 +120,17 @@ pub async fn ingest(
                 continue; // skip
             }
             (action, stream_name, doc_id) = ret.unwrap();
+
+            // skip blocked streams
+            let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
+            if !CONFIG.common.blocked_streams.contains(&key)
+                && !blocked_stream_warnings.contains_key(&key)
+            {
+                blocked_stream_warnings.insert(key, true);
+                log::warn!("stream [{stream_name}] is blocked from ingestion");
+                continue; // skip
+            }
+
             next_line_is_data = true;
 
             // Start Register Transfoms for stream
@@ -193,7 +207,7 @@ pub async fn ingest(
                         stream_name.clone(),
                         doc_id.clone(),
                         action.clone(),
-                        value,
+                        Some(value),
                         &mut bulk_res,
                         Some(TRANSFORM_FAILED.to_owned()),
                         Some(TRANSFORM_FAILED.to_owned()),
@@ -226,7 +240,7 @@ pub async fn ingest(
                             stream_name.clone(),
                             doc_id.clone(),
                             action.clone(),
-                            value,
+                            Some(value),
                             &mut bulk_res,
                             Some(TS_PARSE_FAILED.to_string()),
                             Some(TS_PARSE_FAILED.to_string()),
@@ -244,7 +258,7 @@ pub async fn ingest(
                     stream_name.clone(),
                     doc_id.clone(),
                     action.clone(),
-                    value,
+                    Some(value),
                     &mut bulk_res,
                     Some(TS_PARSE_FAILED.to_string()),
                     failure_reason,
@@ -285,65 +299,82 @@ pub async fn ingest(
                 }
             }
 
-            let local_trigger = match super::add_valid_record(
-                &StreamMeta {
-                    org_id: org_id.to_string(),
-                    stream_name: stream_name.clone(),
-                    partition_keys: &partition_keys,
-                    partition_time_level: &partition_time_level,
-                    stream_alerts_map: &stream_alerts_map,
-                },
-                &mut stream_schema_map,
-                &mut status,
-                buf,
-                local_val,
-                need_trigger,
-            )
-            .await
-            {
-                Ok(v) => v,
-                Err(e) => {
+            // this is for schema inference at stream level , which avoids locks in case schema
+            // changes are frequent within request
+            if CONFIG.common.infer_schema_per_request {
+                let _ = add_record(
+                    &StreamMeta {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.clone(),
+                        partition_keys: &partition_keys,
+                        partition_time_level: &partition_time_level,
+                        stream_alerts_map: &stream_alerts_map,
+                    },
+                    buf,
+                    local_val,
+                )
+                .await;
+            } else {
+                let local_trigger = match super::add_valid_record(
+                    &StreamMeta {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.clone(),
+                        partition_keys: &partition_keys,
+                        partition_time_level: &partition_time_level,
+                        stream_alerts_map: &stream_alerts_map,
+                    },
+                    &mut stream_schema_map,
+                    &mut status,
+                    buf,
+                    local_val,
+                    need_trigger,
+                )
+                .await
+                {
+                    Ok(v) => v,
+                    Err(e) => {
+                        bulk_res.errors = true;
+                        add_record_status(
+                            stream_name.clone(),
+                            doc_id.clone(),
+                            action.clone(),
+                            Some(value),
+                            &mut bulk_res,
+                            Some(TS_PARSE_FAILED.to_string()),
+                            Some(e.to_string()),
+                        );
+                        continue;
+                    }
+                };
+                if local_trigger.is_some() {
+                    stream_trigger_map.insert(stream_name.clone(), local_trigger);
+                }
+
+                // get distinct_value item
+                distinct_values.extend(to_add_distinct_values);
+
+                if status.failed > 0 {
                     bulk_res.errors = true;
                     add_record_status(
                         stream_name.clone(),
                         doc_id.clone(),
                         action.clone(),
-                        value,
+                        Some(value),
                         &mut bulk_res,
-                        Some(TS_PARSE_FAILED.to_string()),
-                        Some(e.to_string()),
+                        Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
+                        Some(status.error),
                     );
-                    continue;
+                } else {
+                    add_record_status(
+                        stream_name.clone(),
+                        doc_id.clone(),
+                        action.clone(),
+                        None,
+                        &mut bulk_res,
+                        None,
+                        None,
+                    );
                 }
-            };
-            if local_trigger.is_some() {
-                stream_trigger_map.insert(stream_name.clone(), local_trigger);
-            }
-
-            // get distinct_value item
-            distinct_values.extend(to_add_distinct_values);
-
-            if status.failed > 0 {
-                bulk_res.errors = true;
-                add_record_status(
-                    stream_name.clone(),
-                    doc_id.clone(),
-                    action.clone(),
-                    value,
-                    &mut bulk_res,
-                    Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
-                    Some(status.error),
-                );
-            } else {
-                add_record_status(
-                    stream_name.clone(),
-                    doc_id.clone(),
-                    action.clone(),
-                    value,
-                    &mut bulk_res,
-                    None,
-                    None,
-                );
             }
         }
     }
@@ -351,13 +382,34 @@ pub async fn ingest(
     // write data to wal
     let time = start.elapsed().as_secs_f64();
     let writer = ingester::get_writer(thread_id, org_id, &StreamType::Logs.to_string()).await;
-    for (stream_name, stream_data) in stream_data_map {
+    for (stream_name, mut stream_data) in stream_data_map {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
             continue;
         }
+
+        // new flow for schema inference at stream level
+        stream_data.data = if CONFIG.common.infer_schema_per_request {
+            process_record(
+                &mut stream_data,
+                &StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_name: stream_name.to_owned().into(),
+                    stream_type: StreamType::Logs,
+                },
+                &mut stream_schema_map,
+                &stream_partition_keys_map,
+                &stream_alerts_map,
+                &mut bulk_res,
+                &mut stream_trigger_map,
+            )
+            .await?
+        } else {
+            stream_data.data
+        };
+
         // write to file
         let mut req_stats = write_file(&writer, &stream_name, stream_data.data).await;
         req_stats.response_time += time;
@@ -413,11 +465,168 @@ pub async fn ingest(
     Ok(bulk_res)
 }
 
+async fn process_record(
+    stream_data: &mut BulkStreamData,
+    stream: &StreamParams,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    stream_partition_keys_map: &HashMap<String, (StreamSchemaChk, PartitioningDetails)>,
+    stream_alerts_map: &HashMap<String, Vec<Alert>>,
+    bulk_res: &mut BulkResponse,
+    stream_trigger_map: &mut HashMap<String, Option<TriggerAlertData>>,
+) -> Result<HashMap<String, crate::common::meta::stream::SchemaRecords>, Error> {
+    let mut new_stream_buf = HashMap::new();
+    let mut trigger: TriggerAlertData = Vec::new();
+    for schema_records in stream_data.data.values_mut() {
+        // check schema
+        let mut timestamp = 0;
+        let mut records: Vec<&serde_json::Map<std::string::String, serde_json::Value>> =
+            schema_records
+                .records
+                .iter()
+                .map(|record| {
+                    let rec = record.as_ref();
+                    let rec_ts = rec
+                        .get(&CONFIG.common.column_timestamp)
+                        .unwrap()
+                        .as_i64()
+                        .unwrap();
+                    if timestamp == 0 || timestamp < rec_ts {
+                        timestamp = rec_ts;
+                    };
+                    rec.as_object().unwrap()
+                })
+                .collect();
+        let _ = crate::service::schema::check_for_schema(
+            &stream.org_id,
+            &stream.stream_name,
+            StreamType::Logs,
+            stream_schema_map,
+            records.clone(),
+            timestamp,
+        )
+        .await?;
+
+        // get schema
+        let rec_schema = stream_schema_map
+            .get(&stream.stream_name.to_string())
+            .unwrap();
+        let schema_key = rec_schema.hash_key();
+
+        let mut schema_latest_map = HashMap::with_capacity(rec_schema.schema().fields().len());
+        for field in rec_schema.schema().fields() {
+            schema_latest_map.insert(field.name(), field.data_type());
+        }
+
+        for rec in records.iter_mut() {
+            let mut local_rec = rec.to_owned();
+            let doc_id = match &local_rec.get("_id") {
+                Some(v) => v.as_str().unwrap().to_string(),
+                None => "".to_string(),
+            };
+
+            match cast_to_schema_v1(&mut local_rec, &schema_latest_map) {
+                Ok(_) => {
+                    let timestamp: i64 = local_rec
+                        .get(&CONFIG.common.column_timestamp)
+                        .unwrap()
+                        .as_i64()
+                        .unwrap();
+
+                    let (partition_keys, partition_time_level) =
+                        match stream_partition_keys_map.get(&stream.stream_name.to_string()) {
+                            Some((_, partition_det)) => (
+                                partition_det.partition_keys.clone(),
+                                partition_det.partition_time_level,
+                            ),
+                            None => (vec![], None),
+                        };
+
+                    // get hour key
+                    let hour_key = crate::service::ingestion::get_wal_time_key(
+                        timestamp,
+                        &partition_keys,
+                        crate::service::stream::unwrap_partition_time_level(
+                            partition_time_level,
+                            StreamType::Logs,
+                        ),
+                        &local_rec,
+                        Some(schema_key),
+                    );
+
+                    let hour_buf = new_stream_buf.entry(hour_key).or_insert_with(|| {
+                        let schema =
+                            Arc::new(rec_schema.schema().clone().with_metadata(HashMap::new()));
+                        let schema_key = schema.hash_key();
+                        crate::common::meta::stream::SchemaRecords {
+                            schema_key,
+                            schema,
+                            records: vec![],
+                            records_size: 0,
+                        }
+                    });
+
+                    if !stream_alerts_map.is_empty() {
+                        // Start check for alert trigger
+                        let key = format!(
+                            "{}/{}/{}",
+                            &stream.org_id,
+                            StreamType::Logs,
+                            &stream.stream_name,
+                        );
+                        if let Some(alerts) = stream_alerts_map.get(&key) {
+                            for alert in alerts {
+                                if let Ok(Some(v)) = alert.evaluate(Some(&local_rec)).await {
+                                    trigger.push((alert.clone(), v));
+                                }
+                            }
+                        }
+                        // End check for alert trigger
+                    }
+
+                    let record_val = json::Value::Object(local_rec);
+                    let record_size = json::estimate_json_bytes(&record_val);
+                    hour_buf.records.push(Arc::new(record_val));
+                    hour_buf.records_size += record_size;
+
+                    add_record_status(
+                        stream.stream_name.to_string(),
+                        doc_id,
+                        "".to_string(),
+                        None,
+                        bulk_res,
+                        None,
+                        None,
+                    );
+                }
+                Err(e) => {
+                    bulk_res.errors = true;
+
+                    let record_val = json::Value::Object(local_rec);
+                    add_record_status(
+                        stream.stream_name.to_string(),
+                        doc_id,
+                        "".to_string(),
+                        Some(record_val),
+                        bulk_res,
+                        Some(SCHEMA_CONFORMANCE_FAILED.to_string()),
+                        Some(e.to_string()),
+                    );
+                    continue;
+                }
+            }
+        }
+    }
+    if !trigger.is_empty() {
+        stream_trigger_map.insert(stream.stream_name.to_string(), Some(trigger));
+    }
+    Ok(new_stream_buf)
+}
+
 fn add_record_status(
     stream_name: String,
     doc_id: String,
     action: String,
-    value: json::Value,
+    value: Option<json::Value>,
     bulk_res: &mut BulkResponse,
     failure_type: Option<String>,
     failure_reason: Option<String>,
@@ -469,7 +678,7 @@ mod tests {
             "olympics".to_string(),
             "1".to_string(),
             "create".to_string(),
-            json::Value::Null,
+            None,
             &mut bulk_res,
             None,
             None,

@@ -189,32 +189,35 @@ pub async fn set(
             )
             .await;
 
-        return Ok(());
+        Ok(())
     } else {
-        let current_schema = get(org_id, stream_name, stream_type).await?;
-        let mut current_meta = current_schema.metadata().clone();
-        let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-        let start_dt = if current_meta.contains_key("created_at") {
-            if !current_meta.contains_key("start_dt") {
-                current_meta.insert(
-                    "start_dt".to_string(),
-                    current_meta.get("created_at").unwrap().clone(),
-                );
-            }
+        let incoming_meta = schema.metadata();
+        let meta = if incoming_meta.is_empty() {
+            let current_schema = get(org_id, stream_name, stream_type).await?;
+            let mut current_meta = current_schema.metadata().clone();
+            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+            if current_meta.contains_key("created_at") {
+                if !current_meta.contains_key("start_dt") {
+                    current_meta.insert(
+                        "start_dt".to_string(),
+                        current_meta.get("created_at").unwrap().clone(),
+                    );
+                }
+            } else {
+                current_meta.insert("start_dt".to_string(), min_ts.to_string());
+                current_meta.insert("created_at".to_string(), min_ts.to_string());
+            };
             current_meta
-                .get("start_dt")
-                .unwrap()
-                .clone()
-                .parse()
-                .unwrap()
         } else {
-            current_meta.insert("start_dt".to_string(), min_ts.to_string());
-            current_meta.insert("created_at".to_string(), min_ts.to_string());
-            min_ts
+            incoming_meta.clone()
         };
-
+        let start_dt = meta
+            .get("start_dt")
+            .unwrap_or(&Utc::now().timestamp_micros().to_string())
+            .parse()
+            .unwrap();
         let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
-        let new_schema = vec![schema.to_owned().with_metadata(current_meta)];
+        let new_schema = vec![schema.to_owned().with_metadata(meta)];
         let _ = db
             .put(
                 &key,
@@ -223,7 +226,7 @@ pub async fn set(
                 Some(start_dt),
             )
             .await;
-        return Ok(());
+        Ok(())
     }
 }
 
