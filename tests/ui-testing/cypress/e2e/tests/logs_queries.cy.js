@@ -136,6 +136,7 @@ describe("Logs testcases", () => {
     cy.get('[title="Explore"]:first').click({ force: true });
     cy.url().should("include", "logs");
     cy.wait(2000);
+    cy.wait("@allsearch");
     cy.get(
       '[data-test="logs-search-saved-views-btn"] > .q-btn-dropdown__arrow-container > .q-btn__content > .q-icon'
     ).click({ force: true });
