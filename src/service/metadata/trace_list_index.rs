@@ -236,7 +236,7 @@ mod tests {
         );
         let data = json::Value::Object(data.clone());
         let data_size = json::to_vec(&data).unwrap_or_default().len();
-        let schema = t.generate_schema().await;
+        let schema = t.generate_schema();
         let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
             schema_key: schema_key.to_string(),
             schema: schema.clone(),
@@ -259,23 +259,4 @@ mod tests {
         println!("r: {:?}", r);
     }
 
-    #[tokio::test]
-    async fn test_run_flush() {
-        let t = TraceListIndex::new();
-        let data = vec![MetadataItem::TraceListIndexer(TraceListItem {
-            stream_type: StreamType::Metadata,
-            stream_name: STREAM_NAME.to_string(),
-            service_name: "APISIX".to_string(),
-            trace_id: "1710150117252223083801d3b7ccdec7".to_string(),
-            start_time: 0,
-            end_time: 0,
-        })];
-
-        let res = t.write("default", data).await;
-        assert_eq!((), res.unwrap());
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(100));
-        loop {
-            interval.tick().await;
-        }
-    }
 }
