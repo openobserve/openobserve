@@ -748,7 +748,7 @@ export default defineComponent({
             .fields.filter.length > 0
         ) {
           errors.push(
-            "Filters are not supported for PromQL. Remove anything added to the Fitlers."
+            "Filters are not supported for PromQL. Remove anything added to the Filters."
           );
         }
 
