@@ -2161,7 +2161,7 @@ export default defineComponent({
         if (favoriteViews.value.length >= 10) {
           $q.notify({
             message: "You can only save 10 views.",
-            color: "warning",
+            color: "info",
             position: "bottom",
             timeout: 2000,
           });
