@@ -156,170 +156,88 @@ pub async fn set(
     min_ts: Option<i64>,
     new_version: bool,
 ) -> Result<(), anyhow::Error> {
-    if CONFIG.limit.row_per_schema_version_enabled {
-        let db = infra_db::get_db().await;
-        if min_ts.is_some() && new_version {
-            let last_schema = get(org_id, stream_name, stream_type).await?;
-            let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-            if !last_schema.fields().is_empty() {
-                let mut last_meta = last_schema.metadata().clone();
-                let created_at: i64 = last_meta.get("start_dt").unwrap().clone().parse().unwrap();
-                let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
-                last_meta.insert("end_dt".to_string(), min_ts.to_string());
-                let prev_schema = vec![last_schema.clone().with_metadata(last_meta)];
-                let _ = db
-                    .put(
-                        &key,
-                        json::to_vec(&prev_schema).unwrap().into(),
-                        infra_db::NO_NEED_WATCH,
-                        Some(created_at),
-                    )
-                    .await;
-            }
-
-            let mut metadata = last_schema.metadata().clone();
-            if metadata.contains_key("created_at") {
-                metadata.insert(
-                    "created_at".to_string(),
-                    metadata.get("created_at").unwrap().clone(),
-                );
-            } else {
-                metadata.insert("created_at".to_string(), min_ts.to_string());
-            }
-
-            metadata.insert("start_dt".to_string(), min_ts.to_string());
-
-            let new_schema = vec![schema.to_owned().with_metadata(metadata)];
-
-            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
+    let db = infra_db::get_db().await;
+    if min_ts.is_some() && new_version {
+        let last_schema = get(org_id, stream_name, stream_type).await?;
+        let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
+        if !last_schema.fields().is_empty() {
+            let mut last_meta = last_schema.metadata().clone();
+            let created_at: i64 = last_meta.get("start_dt").unwrap().clone().parse().unwrap();
+            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
+            last_meta.insert("end_dt".to_string(), min_ts.to_string());
+            let prev_schema = vec![last_schema.clone().with_metadata(last_meta)];
             let _ = db
                 .put(
                     &key,
-                    json::to_vec(&new_schema).unwrap().into(),
-                    infra_db::NEED_WATCH,
-                    Some(min_ts),
+                    json::to_vec(&prev_schema).unwrap().into(),
+                    infra_db::NO_NEED_WATCH,
+                    Some(created_at),
                 )
                 .await;
+        }
 
-            return Ok(());
+        let mut metadata = last_schema.metadata().clone();
+        if metadata.contains_key("created_at") {
+            metadata.insert(
+                "created_at".to_string(),
+                metadata.get("created_at").unwrap().clone(),
+            );
         } else {
+            metadata.insert("created_at".to_string(), min_ts.to_string());
+        }
+
+        metadata.insert("start_dt".to_string(), min_ts.to_string());
+
+        let new_schema = vec![schema.to_owned().with_metadata(metadata)];
+
+        let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
+        let _ = db
+            .put(
+                &key,
+                json::to_vec(&new_schema).unwrap().into(),
+                infra_db::NEED_WATCH,
+                Some(min_ts),
+            )
+            .await;
+
+        Ok(())
+    } else {
+        let incoming_meta = schema.metadata();
+        let meta = if incoming_meta.is_empty() {
             let current_schema = get(org_id, stream_name, stream_type).await?;
             let mut current_meta = current_schema.metadata().clone();
             let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-            let start_dt = if current_meta.contains_key("created_at") {
+            if current_meta.contains_key("created_at") {
                 if !current_meta.contains_key("start_dt") {
                     current_meta.insert(
                         "start_dt".to_string(),
                         current_meta.get("created_at").unwrap().clone(),
                     );
                 }
-                current_meta
-                    .get("start_dt")
-                    .unwrap()
-                    .clone()
-                    .parse()
-                    .unwrap()
             } else {
                 current_meta.insert("start_dt".to_string(), min_ts.to_string());
                 current_meta.insert("created_at".to_string(), min_ts.to_string());
-                min_ts
             };
-
-            let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
-            let new_schema = vec![schema.to_owned().with_metadata(current_meta)];
-            let _ = db
-                .put(
-                    &key,
-                    json::to_vec(&new_schema).unwrap().into(),
-                    infra_db::NEED_WATCH,
-                    Some(start_dt),
-                )
-                .await;
-            return Ok(());
-        }
-    }
-    let db = infra_db::get_db().await;
-    let key = format!("/schema/{org_id}/{stream_type}/{stream_name}");
-    let map_key = key.strip_prefix("/schema/").unwrap();
-    let r = STREAM_SCHEMAS.read().await;
-    if let Some(versions) = r.get(map_key) {
-        let mut versions = versions.clone();
-        if min_ts.is_some() && new_version {
-            // update last schema to add end date
-            let last_schema = versions.pop().unwrap();
-            if !last_schema.fields.eq(&schema.fields) {
-                let mut last_meta = last_schema.metadata().clone();
-                let created_at = last_meta.get("created_at").unwrap().to_string();
-                last_meta.insert("end_dt".to_string(), min_ts.unwrap().to_string());
-                versions.push(last_schema.with_metadata(last_meta));
-
-                // update current schema to add start date
-                let mut metadata = schema.metadata().clone();
-                metadata.insert("start_dt".to_string(), min_ts.unwrap().to_string());
-                metadata.insert("created_at".to_string(), created_at);
-                versions.push(schema.clone().with_metadata(metadata));
-                let _ = db
-                    .put(
-                        &key,
-                        json::to_vec(&versions).unwrap().into(),
-                        infra_db::NEED_WATCH,
-                        Some(0),
-                    )
-                    .await;
-            }
+            current_meta
         } else {
-            versions.pop().unwrap();
-            versions.push(schema.clone());
-            let _ = db
-                .put(
-                    &key,
-                    json::to_vec(&versions).unwrap().into(),
-                    infra_db::NEED_WATCH,
-                    Some(0),
-                )
-                .await;
-        }
-        return Ok(());
-    }
-    drop(r);
-
-    // create new schema
-    let mut metadata = schema.metadata().clone();
-    if metadata.contains_key("created_at") {
-        metadata.insert(
-            "start_dt".to_string(),
-            metadata.get("created_at").unwrap().clone(),
-        );
-    } else {
-        let min_ts = min_ts.unwrap_or_else(|| Utc::now().timestamp_micros());
-        metadata.insert("start_dt".to_string(), min_ts.to_string());
-        metadata.insert("created_at".to_string(), min_ts.to_string());
-    }
-    let values = vec![schema.to_owned().with_metadata(metadata)];
-    match db
-        .put(
-            &key,
-            json::to_vec(&values).unwrap().into(),
-            infra_db::NEED_WATCH,
-            Some(0),
-        )
-        .await
-    {
-        Ok(_) => {
-            let settings = stream_settings(values.last().unwrap()).unwrap_or_default();
-            let mut w = STREAM_SCHEMAS.write().await;
-            w.insert(map_key.to_string(), values);
-            drop(w);
-            let mut w = STREAM_SETTINGS.write().await;
-            w.insert(map_key.to_string(), settings);
-            drop(w);
-
-            Ok(())
-        }
-        Err(e) => {
-            log::error!("Error putting schema: {}", e);
-            Err(anyhow::anyhow!("Error putting schema: {}", e))
-        }
+            incoming_meta.clone()
+        };
+        let start_dt = meta
+            .get("start_dt")
+            .unwrap_or(&Utc::now().timestamp_micros().to_string())
+            .parse()
+            .unwrap();
+        let key = format!("/schema/{org_id}/{stream_type}/{stream_name}",);
+        let new_schema = vec![schema.to_owned().with_metadata(meta)];
+        let _ = db
+            .put(
+                &key,
+                json::to_vec(&new_schema).unwrap().into(),
+                infra_db::NEED_WATCH,
+                Some(start_dt),
+            )
+            .await;
+        Ok(())
     }
 }
 
