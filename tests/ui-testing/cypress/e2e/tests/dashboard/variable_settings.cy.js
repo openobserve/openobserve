@@ -229,7 +229,7 @@ it("should go to variables setting tab and click on add variable and from dropdo
       deleteDashboard()
 })
 // should go to variables setting tab and click on add variable and from dropdown select textbox and check its UI
-it.only("should go to variables setting tab and click on add variable and from dropdown select textbox", () => {
+it("should go to variables setting tab and click on add variable and from dropdown select textbox", () => {
   cy.addDashboard();
   cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
   cy.contains(
@@ -270,6 +270,53 @@ it.only("should go to variables setting tab and click on add variable and from d
       deleteDashboard()
 })
 // should go to variables setting tab and click on add variable and from dropdown select custom and check its UI
+it.only("should go to variables setting tab and click on add variable and from dropdown select custom", () => {
+  cy.addDashboard();
+  cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+  cy.contains(
+      '[data-test="dashboard-table"] td',
+      dashboardData.DashboardName
+    ).click({force:true});
+    cy.url().should("include", dashboardData.ViewDashboardUrl);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+    cy.wait(2000);
+    cy.get('[data-test="dashboard-variable-settings-tab"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variables-settings-add-variable"]').click({force: true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-type-selector"]').click({force:true})
+    cy.wait(1000);
+    cy.contains("Custom").click({force:true})
+    cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-name"]')
+      .type(randomDashboardName);
+    cy.wait(1000);
+    cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-label"]')
+      .type(randomDashboardName);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-option-add"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-option-label"]')
+      .type(randomDashboardName);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-option-value"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-option-remove"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-save"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+    cy.wait(2000)
+      cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+      cy.wait(2000)
+      deleteDashboard()
+})
 // should go to variables setting tab and click on add variable and cancel in UI
 // should go to variables setting tab and add all variables once and try to edit and delete it
   it.skip("Delete All", () => {
