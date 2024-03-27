@@ -59,11 +59,99 @@ use crate::{
 };
 
 pub(crate) mod datafusion;
-pub(crate) mod grpc;
+pub mod grpc;
 pub(crate) mod sql;
 
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
+
+use config::metrics;
+use dashmap::DashMap;
+use infra::errors;
+use tokio::task::AbortHandle;
+use tonic::{Response, Status};
+
+use crate::{
+    handler::grpc::{
+        cluster_rpc::{search_server::Search, SearchRequest, SearchResponse},
+        request::MetadataMap as RequestMetadataMap,
+    },
+    service::search as SearchService,
+};
+
+#[derive(Clone)]
+pub struct Searcher {
+    #[allow(dead_code)]
+    task_manager: Arc<TaskManager>,
+}
+
+impl Searcher {
+    pub fn new() -> Self {
+        Self {
+            task_manager: Arc::new(TaskManager::new()),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TaskManager {
+    pub task_manager: Arc<DashMap<Arc<String>, Vec<AbortHandle>>>,
+}
+
+impl TaskManager {
+    pub fn new() -> Self {
+        Self {
+            task_manager: Arc::new(DashMap::new()),
+        }
+    }
+}
+
+#[tonic::async_trait]
+impl Search for Searcher {
+    #[tracing::instrument(name = "grpc:search:enter", skip_all, fields(session_id=req.get_ref().job.as_ref().unwrap().session_id, org_id = req.get_ref().org_id))]
+    async fn search(
+        &self,
+        req: Request<SearchRequest>,
+    ) -> Result<Response<SearchResponse>, Status> {
+        let start = std::time::Instant::now();
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&RequestMetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx);
+
+        let req = req.get_ref().to_owned();
+        let org_id = req.org_id.clone();
+        let stream_type = req.stream_type.clone();
+        match SearchService::grpc::search(&req).await {
+            Ok(res) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
+                    .inc();
+
+                Ok(Response::new(res))
+            }
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
+                    .inc();
+                let message = if let errors::Error::ErrorCode(code) = err {
+                    code.to_json()
+                } else {
+                    err.to_string()
+                };
+                Err(Status::internal(message))
+            }
+        }
+    }
+}
 
 #[tracing::instrument(name = "service:search:enter", skip(req))]
 pub async fn search(
