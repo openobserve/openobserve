@@ -317,7 +317,7 @@ it("should go to variables setting tab and click on add variable and from dropdo
       deleteDashboard()
 })
 // should go to variables setting tab and click on add variable and cancel in UI
-it.only("should go to variables setting tab and click on add variable and cancel in UI", () => {
+it("should go to variables setting tab and click on add variable and cancel in UI", () => {
   cy.addDashboard();
     cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
     cy.contains(
@@ -349,7 +349,57 @@ it.only("should go to variables setting tab and click on add variable and cancel
       cy.wait(2000)
       deleteDashboard()
 })
-// should go to variables setting tab and add all variables once and try to edit and delete it
+// should go to variables setting tab and add any variables once and try to edit and delete it
+it("should go to variables setting tab and add any variables once and try to edit and delete it", () => {
+  cy.addDashboard();
+  cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+  cy.contains(
+      '[data-test="dashboard-table"] td',
+      dashboardData.DashboardName
+    ).click({force:true});
+    cy.url().should("include", dashboardData.ViewDashboardUrl);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+    cy.wait(2000);
+    cy.get('[data-test="dashboard-variable-settings-tab"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variables-settings-add-variable"]').click({force: true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-type-selector"]').click({force:true})
+    cy.wait(1000);
+    cy.contains("Textbox").click({force:true})
+    cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-name"]')
+      .type(randomDashboardName);
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variable-save"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+    cy.wait(2000);
+    cy.get('[data-test="dashboard-variable-settings-tab"]').click({force:true})
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-variables-settings-variable-edit-btn"]').click({force: true})
+    cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-settings-panel"]')
+      .find('[data-test="dashboard-variable-name"]')
+      .clear()
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-variable-save"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-variables-settings-variable-delete-btn"]').click({ force: true })
+      cy.wait(1000);
+        cy.get('[data-test="confirm-button"]').click();
+    cy.wait(1000);
+    cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+    cy.wait(2000)
+      cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+      cy.wait(2000)
+      deleteDashboard()
+})
+
+//delete all dashboards
   it.skip("Delete All", () => {
     cy.get('[data-test="dashboard-table"]')
       .find("td")
