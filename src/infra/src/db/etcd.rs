@@ -144,10 +144,7 @@ impl super::Db for Etcd {
         let ret = match update_fn(value) {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
-            Ok(Some(value)) => match self.put(key, value, need_watch, start_dt).await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
-            },
+            Ok(Some(value)) => self.put(key, value, need_watch, start_dt).await,
         };
 
         // release lock
