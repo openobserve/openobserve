@@ -23,7 +23,7 @@ pub mod search;
 pub mod traces;
 pub mod usage;
 
-pub struct MetadataMap<'a>(&'a tonic::metadata::MetadataMap);
+pub struct MetadataMap<'a>(pub &'a tonic::metadata::MetadataMap);
 
 impl<'a> Extractor for MetadataMap<'a> {
     /// Get a value for a key from the MetadataMap.  If the value can't be
