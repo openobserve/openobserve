@@ -557,6 +557,11 @@ const useLogs = () => {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
 
+        if (!parsedSQL?.columns?.length) {
+          notificationMsg.value = "Invalid SQL Syntax";
+          return false;
+        }
+
         if (parsedSQL.orderby == null) {
           // showErrorNotification("Order by clause is required in SQL mode");
           notificationMsg.value = "Order by clause is required in SQL mode";
@@ -2221,12 +2226,6 @@ const useLogs = () => {
       (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
     );
 
-    console.log(
-      "has order by",
-      hasOrderBy,
-      "includesTimestamp",
-      includesTimestamp
-    );
     // If ORDER BY is present and doesn't include _timestamp, append it
     if (!hasOrderBy) {
       // If no ORDER BY clause, add it
