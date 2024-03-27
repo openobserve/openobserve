@@ -200,7 +200,7 @@ pub async fn set(
             )
             .await;
 
-        return Ok(());
+        Ok(())
     } else {
         let incoming_meta = schema.metadata();
         let meta = if incoming_meta.is_empty() {
@@ -237,7 +237,7 @@ pub async fn set(
                 Some(start_dt),
             )
             .await;
-        return Ok(());
+        Ok(())
     }
 }
 
