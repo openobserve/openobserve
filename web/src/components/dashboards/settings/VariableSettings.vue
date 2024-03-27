@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="secondary"
             :label="t(`dashboard.newVariable`)"
             @click="addVariables"
+            data-test="dashboard-variables-settings-add-variable"
           />
         </template>
       </DashboardHeader>
@@ -61,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('dashboard.edit')"
                 @click="editVariableFn(props.row.name)"
+                data-test="dashboard-variables-settings-variable-edit-btn"
               ></q-btn>
               <q-btn
                 :icon="outlinedDelete"
@@ -72,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 @click.stop="showDeleteDialogFn(props)"
+                data-test="dashboard-variables-settings-variable-delete-btn"
               ></q-btn>
             </q-td>
           </template>

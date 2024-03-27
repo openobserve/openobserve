@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
           :rules="[(val) => !!val.trim() || t('dashboard.nameRequired')]"
+          data-test="edit-settings-dashboard-name"
         />
         <span>&nbsp;</span>
         <q-input
@@ -42,10 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
+          data-test="edit-settings-dashboard-description"
         />
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
+          data-test="toggle-dashboard-dynamic-filter"
         ></q-toggle>
         <div class="flex justify-center q-mt-lg">
           <q-btn
@@ -56,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             text-color="light-text"
             padding="sm md"
             no-caps
+            data-test="dashboard-general-settings-cancel"
           />
           <q-btn
             :disable="dashboardData.title.trim() === ''"
@@ -66,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             no-caps
             :loading="saveDashboardApi.isLoading.value"
+            data-test="dashboard-general-settings-save"
           />
         </div>
       </q-form>
