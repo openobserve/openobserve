@@ -213,8 +213,8 @@ impl Report {
         let report = generate_report(
             dashboard,
             &self.org_id,
-            &self.user,
-            &self.password,
+            &CONFIG.common.report_user_name,
+            &CONFIG.common.report_user_password,
             &self.timezone,
         )
         .await?;

@@ -18,6 +18,7 @@ const MainLayoutOpenSourceMixin = {
         title: t("menu.function"),
         iconComponent: markRaw(FunctionIcon),
         link: "/functions",
+        name: "functions",
       });
 
       return linksList.value;
