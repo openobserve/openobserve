@@ -39,7 +39,10 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use tokio::sync::Mutex;
+use tokio::sync::{
+    oneshot::{self, Receiver, Sender},
+    Mutex,
+};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -70,7 +73,6 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
 use config::metrics;
 use dashmap::DashMap;
 use infra::errors;
-use tokio::task::AbortHandle;
 use tonic::{Response, Status};
 
 use crate::{
@@ -97,7 +99,7 @@ impl Searcher {
 
 #[derive(Clone, Debug)]
 pub struct TaskManager {
-    pub task_manager: Arc<DashMap<String, Vec<AbortHandle>>>,
+    pub task_manager: Arc<DashMap<String, Vec<Sender<()>>>>,
 }
 
 impl TaskManager {
@@ -547,6 +549,20 @@ impl Searcher {
                 node_id = node.id,
                 node_addr = node_addr.as_str(),
             );
+
+            let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+            if self.task_manager.task_manager.contains_key(&session_id) {
+                self.task_manager
+                    .task_manager
+                    .get_mut(&session_id)
+                    .unwrap()
+                    .push(abort_sender);
+            } else {
+                self.task_manager
+                    .task_manager
+                    .insert(session_id.clone(), vec![abort_sender]);
+            }
+
             let task = tokio::task::spawn(
             async move {
                 let org_id: MetadataValue<_> = req
@@ -590,17 +606,26 @@ impl Searcher {
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
-                let response: cluster_rpc::SearchResponse = match client.search(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!("[session_id {session_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
+                let response;
+                tokio::select! {
+                    result = client.search(request) => {
+                        match result {
+                            Ok(res) => {response = res.into_inner()},
+                            Err(err) => {
+                                log::error!("[session_id {session_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
+                                if err.code() == tonic::Code::Internal {
+                                    let err = ErrorCodes::from_json(err.message())?;
+                                    return Err(Error::ErrorCode(err));
+                                }
+                                return Err(server_internal_error("search node error"));
+                            }
                         }
-                        return Err(server_internal_error("search node error"));
                     }
-                };
+                    _ = abort_receiver => {
+                        log::info!("[session_id {session_id}] search->grpc: cancel search in node: {:?}", &node.grpc_addr);
+                        return Err(Error::Message(format!("[session_id {session_id}] search->grpc: search canceled")));
+                    }
+                }
 
                 log::info!(
                     "[session_id {session_id}] search->grpc: response node: {}, is_querier: {}, total: {}, took: {}, files: {}, scan_size: {}",
@@ -914,6 +939,9 @@ impl Searcher {
             result.took,
             result.scan_size,
         );
+
+        // remove task because task if finished
+        self.task_manager.task_manager.remove(&session_id);
 
         Ok(result)
     }
