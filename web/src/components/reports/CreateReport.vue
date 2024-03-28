@@ -1191,7 +1191,6 @@ const saveReport = async () => {
   }));
 
   // This is unitil we support multiple dashboards and tabs
-  console.log(formData.value.dashboards[0].tabs);
   if (formData.value.dashboards[0]?.tabs)
     formData.value.dashboards[0].tabs = [
       formData.value.dashboards[0].tabs as string,
@@ -1262,6 +1261,10 @@ const saveReport = async () => {
       });
     })
     .finally(() => {
+      // TODO OK : Remove this after multi tab support in reports, this is a workaround
+      formData.value.dashboards[0].tabs =
+        formData.value?.dashboards[0]?.tabs[0];
+
       dismiss();
     });
 };
