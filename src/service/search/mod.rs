@@ -85,28 +85,20 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Searcher {
-    #[allow(dead_code)]
-    task_manager: Arc<TaskManager>,
+    task_manager: Arc<DashMap<String, Vec<Sender<()>>>>,
 }
 
 impl Searcher {
     pub fn new() -> Self {
         Self {
-            task_manager: Arc::new(TaskManager::new()),
+            task_manager: Arc::new(DashMap::new()),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct TaskManager {
-    pub task_manager: Arc<DashMap<String, Vec<Sender<()>>>>,
-}
-
-impl TaskManager {
-    pub fn new() -> Self {
-        Self {
-            task_manager: Arc::new(DashMap::new()),
-        }
+impl Default for Searcher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -126,7 +118,7 @@ impl Search for Searcher {
         let req = req.get_ref().to_owned();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.clone();
-        match SearchService::grpc::search(&req).await {
+        match SearchService::grpc::search(self.clone(), &req).await {
             Ok(res) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
@@ -551,15 +543,13 @@ impl Searcher {
             );
 
             let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-            if self.task_manager.task_manager.contains_key(&session_id) {
+            if self.task_manager.contains_key(&session_id) {
                 self.task_manager
-                    .task_manager
                     .get_mut(&session_id)
                     .unwrap()
                     .push(abort_sender);
             } else {
                 self.task_manager
-                    .task_manager
                     .insert(session_id.clone(), vec![abort_sender]);
             }
 
@@ -610,7 +600,7 @@ impl Searcher {
                 tokio::select! {
                     result = client.search(request) => {
                         match result {
-                            Ok(res) => {response = res.into_inner()},
+                            Ok(res) => response = res.into_inner(),
                             Err(err) => {
                                 log::error!("[session_id {session_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
                                 if err.code() == tonic::Code::Internal {
@@ -741,35 +731,53 @@ impl Searcher {
                 }
                 (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
             };
-            let batch = match datafusion::exec::merge(
-                &sql.org_id,
-                sql.meta.offset,
-                sql.meta.limit,
-                &merge_sql,
-                &batch,
-                &select_fields,
-                true,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    // search done, release lock
-                    #[cfg(not(feature = "enterprise"))]
-                    dist_lock::unlock(&locker).await?;
-                    #[cfg(feature = "enterprise")]
-                    work_group
-                        .as_ref()
-                        .unwrap()
-                        .done(&session_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
+
+            let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+            if self.task_manager.contains_key(&session_id) {
+                self.task_manager
+                    .get_mut(&session_id)
+                    .unwrap()
+                    .push(abort_sender);
+            } else {
+                self.task_manager
+                    .insert(session_id.clone(), vec![abort_sender]);
+            }
+
+            let merge_batch;
+            tokio::select! {
+                res = datafusion::exec::merge(
+                    &sql.org_id,
+                    sql.meta.offset,
+                    sql.meta.limit,
+                    &merge_sql,
+                    &batch,
+                    &select_fields,
+                    true,
+                ) => {
+                    match res {
+                        Ok(res) => merge_batch = res,
+                        Err(err) => {
+                            // search done, release lock
+                            #[cfg(not(feature = "enterprise"))]
+                            dist_lock::unlock(&locker).await?;
+                            #[cfg(feature = "enterprise")]
+                            work_group
+                                .as_ref()
+                                .unwrap()
+                                .done(&session_id)
+                                .await
+                                .map_err(|e| Error::Message(e.to_string()))?;
+                            return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())));
+                        }
+                    }
                 }
-            };
-            merge_batches.insert(name, batch);
+                _ = abort_receiver => {
+                    log::info!("[session_id {session_id}] search->grpc: cancel merge");
+                    return Err(Error::Message(format!("[session_id {session_id}] search->grpc: merge canceled")));
+                }
+            }
+
+            merge_batches.insert(name, merge_batch);
         }
 
         // search done, release lock
@@ -941,7 +949,7 @@ impl Searcher {
         );
 
         // remove task because task if finished
-        self.task_manager.task_manager.remove(&session_id);
+        self.task_manager.remove(&session_id);
 
         Ok(result)
     }
