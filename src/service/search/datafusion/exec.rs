@@ -1093,9 +1093,9 @@ pub async fn merge_parquet_files(
     let file_meta = if record.is_empty() {
         FileMeta::default()
     } else {
-        match record["min_ts"].as_i64() {
+        match record.get("min_ts") {
             Some(min_ts) => FileMeta {
-                min_ts,
+                min_ts: min_ts.as_i64().unwrap(),
                 max_ts: record["max_ts"].as_i64().unwrap(),
                 records: record["num_records"].as_i64().unwrap(),
                 original_size,
