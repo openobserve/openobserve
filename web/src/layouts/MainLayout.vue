@@ -468,74 +468,74 @@ export default defineComponent({
         icon: outlinedHome,
         link: "/",
         exact: true,
-        key: "home",
+        name: "home",
       },
       {
         title: t("menu.search"),
         icon: outlinedSearch,
         link: "/logs",
-        key: "logs",
+        name: "logs",
       },
       {
         title: t("menu.metrics"),
         icon: outlinedBarChart,
         link: "/metrics",
-        key: "metrics",
+        name: "metrics",
       },
       {
         title: t("menu.traces"),
         icon: outlinedAccountTree,
         link: "/traces",
-        key: "traces",
+        name: "traces",
       },
       {
         title: t("menu.rum"),
         icon: "devices",
         link: "/rum/performance/overview",
-        key: "rum",
+        name: "rum",
       },
       {
         title: t("menu.dashboard"),
         icon: outlinedDashboard,
         link: "/dashboards",
-        key: "dashboards",
+        name: "dashboards",
       },
       {
         title: t("menu.report"),
         icon: outlinedDescription,
         link: "/reports",
-        key: "reports",
+        name: "reports",
       },
       {
         title: t("menu.index"),
         icon: outlinedWindow,
         link: "/streams",
-        key: "streams",
+        name: "streams",
       },
       {
         title: t("menu.alerts"),
         icon: outlinedReportProblem,
         link: "/alerts",
-        key: "alerts",
+        name: "alerts",
       },
       {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
         link: "/ingestion",
-        key: "ingestion",
+        name: "ingestion",
       },
       {
         title: t("menu.iam"),
         icon: outlinedManageAccounts,
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
-        key: "iam",
+        name: "iam",
       },
       {
         title: t("menu.settings"),
         icon: outlinedSettings,
         link: "/settings/",
-        key: "settings",
+        name: "settings",
       },
       {
         title: t("menu.slack"),
@@ -543,13 +543,13 @@ export default defineComponent({
         link: slackURL,
         target: "_blank",
         external: true,
-        key: "slack",
+        name: "slack",
       },
       {
         title: t("menu.about"),
         icon: outlinedFormatListBulleted,
         link: "/about",
-        key: "about",
+        name: "about",
       },
     ]);
 
@@ -623,10 +623,10 @@ export default defineComponent({
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
           ?.split(",")
-          .map((val: string) => val?.trim())
+          ?.map((val: string) => val?.trim()) || []
       );
       linksList.value = linksList.value.filter(
-        (link: { key: string }) => !disableMenus.has(link.key)
+        (link: { name: string }) => !disableMenus.has(link.name)
       );
     };
 
