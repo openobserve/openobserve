@@ -240,6 +240,7 @@ pub async fn merge(
     let db = infra_db::get_db().await;
     let inferred_schema = schema.clone();
     let start_dt = min_ts;
+    let (tx, rx) = tokio::sync::oneshot::channel();
     db.get_for_update(
         &key.clone(),
         infra_db::NEED_WATCH,
@@ -250,6 +251,7 @@ pub async fn merge(
                     json::to_vec(&vec![{
                         // there is no schema, just set the new schema
                         let schema_metadata = inferred_schema.metadata();
+                        tx.send(None).unwrap();
                         if schema_metadata.contains_key("created_at")
                             && schema_metadata.contains_key("start_dt")
                         {
@@ -290,6 +292,7 @@ pub async fn merge(
                     let (is_schema_changed, field_datatype_delta, merged_fields) =
                         get_merge_schema_changes(latest_schema, &inferred_schema);
                     if !is_schema_changed {
+                        tx.send(None).unwrap();
                         return Ok(None); // no change, return
                     }
                     let metadata = std::mem::take(&mut latest_schema.metadata);
@@ -302,7 +305,8 @@ pub async fn merge(
                         let prev_schema = vec![latest_schema.clone().with_metadata(metadata)];
                         let mut new_metadata = latest_schema.metadata().clone();
                         new_metadata.insert("start_dt".to_string(), start_dt.unwrap().to_string());
-                        let new_schema = vec![final_schema.with_metadata(new_metadata)];
+                        let new_schema = vec![final_schema.clone().with_metadata(new_metadata)];
+                        tx.send(Some((final_schema, field_datatype_delta))).unwrap();
                         Ok(Some((
                             json::to_vec(&prev_schema).unwrap().into(),
                             Some((
@@ -313,6 +317,7 @@ pub async fn merge(
                         )))
                     } else {
                         // just update the latest schema
+                        tx.send(Some((final_schema.clone(), vec![]))).unwrap();
                         Ok(Some((
                             json::to_vec(&vec![final_schema]).unwrap().into(),
                             None,
@@ -323,7 +328,87 @@ pub async fn merge(
         }),
     )
     .await?;
-    Ok(None)
+    Ok(rx.await?)
+}
+
+pub async fn update_metadata(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    metadata: HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let db = infra_db::get_db().await;
+    db.get_for_update(
+        &key.clone(),
+        infra_db::NEED_WATCH,
+        None,
+        Box::new(move |value| {
+            let latest_schema = match value {
+                None => Schema::empty(),
+                Some(value) => {
+                    let mut schemas: Vec<Schema> = json::from_slice(&value)?;
+                    if schemas.is_empty() {
+                        Schema::empty()
+                    } else {
+                        schemas.remove(schemas.len() - 1)
+                    }
+                }
+            };
+            let mut schema_metadata = latest_schema.metadata().clone();
+            for (k, v) in metadata.iter() {
+                schema_metadata.insert(k.clone(), v.clone());
+            }
+            let new_schema = vec![latest_schema.with_metadata(schema_metadata)];
+            Ok(Some((json::to_vec(&new_schema).unwrap().into(), None)))
+        }),
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_fields(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    deleted_fields: Vec<String>,
+) -> Result<(), anyhow::Error> {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let db = infra_db::get_db().await;
+    db.get_for_update(
+        &key.clone(),
+        infra_db::NEED_WATCH,
+        None,
+        Box::new(move |value| {
+            let Some(value) = value else {
+                return Ok(None);
+            };
+            let mut schemas: Vec<Schema> = json::from_slice(&value)?;
+            let latest_schema = if schemas.is_empty() {
+                return Ok(None);
+            } else {
+                schemas.remove(schemas.len() - 1)
+            };
+            let fields = latest_schema
+                .fields()
+                .iter()
+                .filter_map(|f| {
+                    if deleted_fields.contains(&f.name().to_string()) {
+                        None
+                    } else {
+                        Some(f.clone())
+                    }
+                })
+                .collect::<Vec<_>>();
+            let new_schema = vec![Schema::new_with_metadata(
+                fields,
+                latest_schema.metadata().clone(),
+            )];
+            Ok(Some((json::to_vec(&new_schema).unwrap().into(), None)))
+        }),
+    )
+    .await?;
+    Ok(())
 }
 
 pub async fn delete(
