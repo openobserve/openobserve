@@ -673,52 +673,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-
-                <div class="q-mt-md">
-                  <div
-                    data-test="add-report-name-input"
-                    class="report-name-input o2-input"
-                  >
-                    <q-input
-                      v-model="formData.user"
-                      :label="t('login.userEmail') + ' *'"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      v-bind:readonly="isEditingReport"
-                      v-bind:disable="isEditingReport"
-                      :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                      tabindex="0"
-                      style="width: 400px"
-                    />
-                  </div>
-                  <div
-                    data-test="add-report-name-input"
-                    class="report-name-input o2-input"
-                  >
-                    <q-input
-                      v-model="formData.password"
-                      :label="t('login.password') + ' *'"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      type="password"
-                      dense
-                      v-bind:readonly="isEditingReport"
-                      v-bind:disable="isEditingReport"
-                      :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                      tabindex="0"
-                      style="width: 400px"
-                    />
-                  </div>
-                </div>
               </div>
               <q-stepper-navigation>
                 <q-btn
