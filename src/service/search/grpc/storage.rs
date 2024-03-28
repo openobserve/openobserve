@@ -30,7 +30,13 @@ use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
 };
-use tokio::{sync::Semaphore, time::Duration};
+use tokio::{
+    sync::{
+        oneshot::{self, Receiver, Sender},
+        Semaphore,
+    },
+    time::Duration,
+};
 use tracing::{info_span, Instrument};
 
 use crate::{
@@ -52,6 +58,7 @@ use crate::{
 /// search in remote object storage
 #[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
+    search_server: crate::service::search::Searcher,
     session_id: &str,
     sql: Arc<Sql>,
     file_list: &[FileKey],
@@ -244,19 +251,40 @@ pub async fn search(
             stream_type = stream_type.to_string(),
         );
         let schema = Arc::new(schema);
+
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        if search_server.task_manager.contains_key(session_id) {
+            search_server
+                .task_manager
+                .get_mut(session_id)
+                .unwrap()
+                .push(abort_sender);
+        } else {
+            search_server
+                .task_manager
+                .insert(session_id.to_string(), vec![abort_sender]);
+        }
+
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        None,
+                        FileType::PARQUET,
+                    ) => ret,
+                    _ = abort_receiver => {
+                        log::info!("[session_id {session_id}] search->storage: task aborted");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search->storage: task is cancel"
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );

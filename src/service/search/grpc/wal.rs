@@ -38,7 +38,10 @@ use infra::{
     errors::{Error, ErrorCodes},
 };
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
-use tokio::time::Duration;
+use tokio::{
+    sync::oneshot::{self, Receiver, Sender},
+    time::Duration,
+};
 use tracing::{info_span, Instrument};
 
 use crate::{
@@ -63,6 +66,7 @@ use crate::{
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
+    search_server: crate::service::search::Searcher,
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
@@ -270,19 +274,40 @@ pub async fn search_parquet(
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
         );
+
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        if search_server.task_manager.contains_key(session_id) {
+            search_server
+                .task_manager
+                .get_mut(session_id)
+                .unwrap()
+                .push(abort_sender);
+        } else {
+            search_server
+                .task_manager
+                .insert(session_id.to_string(), vec![abort_sender]);
+        }
+
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        None,
+                        FileType::PARQUET,
+                    ) => ret,
+                    _ = abort_receiver => {
+                        log::info!("abort search task");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search_parquet: task is cancel"
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );
@@ -327,6 +352,7 @@ pub async fn search_parquet(
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:mem:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_memtable(
+    search_server: crate::service::search::Searcher,
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
@@ -457,19 +483,40 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        if search_server.task_manager.contains_key(session_id) {
+            search_server
+                .task_manager
+                .get_mut(session_id)
+                .unwrap()
+                .push(abort_sender);
+        } else {
+            search_server
+                .task_manager
+                .insert(session_id.to_string(), vec![abort_sender]);
+        }
+
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &Vec::new(),
-                    Some(record_batches),
-                    FileType::ARROW,
-                )
-                .await
+                let files = vec![];
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        Some(record_batches),
+                        FileType::ARROW,
+                    ) => ret,
+                    _ = abort_receiver => {
+                        log::info!("abort search task");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search_memtable: task is cancel"
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );
