@@ -300,7 +300,7 @@ pub async fn merge(
                         tx.send(None).unwrap();
                         return Ok(None); // no change, return
                     }
-                    let metadata = std::mem::take(&mut latest_schema.metadata);
+                    let metadata = latest_schema.metadata().clone();
                     let final_schema = Schema::new(merged_fields).with_metadata(metadata);
                     let need_new_version = !field_datatype_delta.is_empty();
                     if need_new_version && start_dt.is_some() {
