@@ -262,7 +262,7 @@ impl super::Db for NatsDb {
         let bucket_name = bucket.status().await?.bucket;
         let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
         let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
-        let keys = keys
+        let mut keys = keys
             .into_iter()
             .filter_map(|k| {
                 let key = base64::decode_url(&k).unwrap();
@@ -273,6 +273,7 @@ impl super::Db for NatsDb {
                 }
             })
             .collect::<Vec<String>>();
+        keys.sort();
         Ok(keys)
     }
 
@@ -280,7 +281,7 @@ impl super::Db for NatsDb {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
         let bucket = &bucket;
         let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
-        let keys = keys
+        let mut keys = keys
             .into_iter()
             .filter_map(|k| {
                 let key = base64::decode_url(&k).unwrap();
@@ -295,6 +296,7 @@ impl super::Db for NatsDb {
         if keys_len == 0 {
             return Ok(vec![]);
         }
+        keys.sort();
         let values = futures::stream::iter(keys)
             .map(|key| async move {
                 let encoded_key = base64::encode_url(&key);

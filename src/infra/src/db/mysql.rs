@@ -355,7 +355,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        sql = format!("{} ORDER BY start_dt DESC ", sql);
+        sql = format!("{} ORDER BY start_dt ASC", sql);
 
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -385,7 +385,7 @@ impl super::Db for MysqlDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
 
-        sql = format!("{} ORDER BY start_dt DESC ", sql);
+        sql = format!("{} ORDER BY start_dt ASC", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -397,8 +397,13 @@ impl super::Db for MysqlDb {
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
-        let items = self.list(prefix).await?;
-        Ok(items.into_values().collect())
+        let mut items = self.list(prefix).await?;
+        let mut keys = items.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+        keys.sort();
+        Ok(keys
+            .into_iter()
+            .map(|k| items.remove(&k).unwrap())
+            .collect())
     }
 
     async fn count(&self, prefix: &str) -> Result<i64> {

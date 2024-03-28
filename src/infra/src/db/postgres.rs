@@ -355,7 +355,7 @@ impl super::Db for PostgresDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        sql = format!("{} ORDER BY start_dt DESC ", sql);
+        sql = format!("{} ORDER BY start_dt ASC", sql);
 
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -384,7 +384,7 @@ impl super::Db for PostgresDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        sql = format!("{} ORDER BY start_dt DESC ", sql);
+        sql = format!("{} ORDER BY start_dt ASC", sql);
         let pool = CLIENT.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
