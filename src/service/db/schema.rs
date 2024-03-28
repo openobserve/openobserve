@@ -248,32 +248,36 @@ pub async fn merge(
         Box::new(move |value| {
             match value {
                 None => Ok(Some((
-                    json::to_vec(&vec![{
-                        // there is no schema, just set the new schema
-                        let schema_metadata = inferred_schema.metadata();
-                        tx.send(None).unwrap();
-                        if schema_metadata.contains_key("created_at")
-                            && schema_metadata.contains_key("start_dt")
-                        {
-                            inferred_schema
-                        } else {
-                            let start_dt =
-                                start_dt.unwrap_or_else(|| Utc::now().timestamp_micros());
-                            let mut schema_metadata = inferred_schema.metadata().clone();
-                            if !schema_metadata.contains_key("created_at") {
-                                schema_metadata
-                                    .insert("created_at".to_string(), start_dt.to_string());
-                            }
-                            if !schema_metadata.contains_key("start_dt") {
-                                schema_metadata
-                                    .insert("start_dt".to_string(), start_dt.to_string());
-                            }
-                            inferred_schema.with_metadata(schema_metadata)
-                        }
-                    }])
-                    .unwrap()
-                    .into(),
                     None,
+                    Some((
+                        key,
+                        json::to_vec(&vec![{
+                            // there is no schema, just set the new schema
+                            let schema_metadata = inferred_schema.metadata();
+                            tx.send(None).unwrap();
+                            if schema_metadata.contains_key("created_at")
+                                && schema_metadata.contains_key("start_dt")
+                            {
+                                inferred_schema
+                            } else {
+                                let start_dt =
+                                    start_dt.unwrap_or_else(|| Utc::now().timestamp_micros());
+                                let mut schema_metadata = inferred_schema.metadata().clone();
+                                if !schema_metadata.contains_key("created_at") {
+                                    schema_metadata
+                                        .insert("created_at".to_string(), start_dt.to_string());
+                                }
+                                if !schema_metadata.contains_key("start_dt") {
+                                    schema_metadata
+                                        .insert("start_dt".to_string(), start_dt.to_string());
+                                }
+                                inferred_schema.with_metadata(schema_metadata)
+                            }
+                        }])
+                        .unwrap()
+                        .into(),
+                        start_dt,
+                    )),
                 ))),
                 Some(value) => {
                     // there is schema, merge the schema
@@ -308,7 +312,7 @@ pub async fn merge(
                         let new_schema = vec![final_schema.clone().with_metadata(new_metadata)];
                         tx.send(Some((final_schema, field_datatype_delta))).unwrap();
                         Ok(Some((
-                            json::to_vec(&prev_schema).unwrap().into(),
+                            Some(json::to_vec(&prev_schema).unwrap().into()),
                             Some((
                                 key,
                                 json::to_vec(&vec![new_schema]).unwrap().into(),
@@ -319,7 +323,7 @@ pub async fn merge(
                         // just update the latest schema
                         tx.send(Some((final_schema.clone(), vec![]))).unwrap();
                         Ok(Some((
-                            json::to_vec(&vec![final_schema]).unwrap().into(),
+                            Some(json::to_vec(&vec![final_schema]).unwrap().into()),
                             None,
                         )))
                     }
@@ -335,7 +339,7 @@ pub async fn update_metadata(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    metadata: HashMap<String, String>,
+    metadata: std::collections::HashMap<String, String>,
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
@@ -360,7 +364,10 @@ pub async fn update_metadata(
                 schema_metadata.insert(k.clone(), v.clone());
             }
             let new_schema = vec![latest_schema.with_metadata(schema_metadata)];
-            Ok(Some((json::to_vec(&new_schema).unwrap().into(), None)))
+            Ok(Some((
+                Some(json::to_vec(&new_schema).unwrap().into()),
+                None,
+            )))
         }),
     )
     .await?;
@@ -389,6 +396,14 @@ pub async fn delete_fields(
             } else {
                 schemas.remove(schemas.len() - 1)
             };
+            let start_dt = Utc::now().timestamp_micros();
+            // update previous version schema
+            let mut latest_metadata = latest_schema.metadata().clone();
+            latest_metadata.insert("end_dt".to_string(), start_dt.to_string());
+            let prev_schema = vec![latest_schema.clone().with_metadata(latest_metadata)];
+            // new version schema
+            let mut new_metadata = latest_schema.metadata().clone();
+            new_metadata.insert("start_dt".to_string(), start_dt.to_string());
             let fields = latest_schema
                 .fields()
                 .iter()
@@ -400,11 +415,15 @@ pub async fn delete_fields(
                     }
                 })
                 .collect::<Vec<_>>();
-            let new_schema = vec![Schema::new_with_metadata(
-                fields,
-                latest_schema.metadata().clone(),
-            )];
-            Ok(Some((json::to_vec(&new_schema).unwrap().into(), None)))
+            let new_schema = vec![Schema::new_with_metadata(fields, new_metadata)];
+            Ok(Some((
+                Some(json::to_vec(&prev_schema).unwrap().into()),
+                Some((
+                    key,
+                    json::to_vec(&new_schema).unwrap().into(),
+                    Some(start_dt),
+                )),
+            )))
         }),
     )
     .await?;

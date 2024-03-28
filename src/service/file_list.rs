@@ -313,7 +313,7 @@ pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), 
 }
 
 async fn delete_parquet_file_db_only(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
-    // delete from file list in dynamo
+    // delete from file list in metastore
     file_list::batch_remove(&[key.to_string()]).await?;
 
     // delete the parquet whaterever the file is exists or not

@@ -145,10 +145,26 @@ impl super::Db for Etcd {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
-                self.put(key, value, need_watch, start_dt).await?;
+                if let Some(value) = value {
+                    if let Err(e) = self.put(key, value, need_watch, start_dt).await {
+                        if let Err(e) = dist_lock::unlock(&locker).await {
+                            log::error!("dist_lock unlock err: {}", e);
+                        }
+                        log::info!("Released lock for cluster key: {}", lock_key);
+                        return Err(e);
+                    }
+                }
                 if let Some((new_key, new_value, new_start_dt)) = new_value {
-                    self.put(&new_key, new_value, need_watch, new_start_dt)
-                        .await?;
+                    if let Err(e) = self
+                        .put(&new_key, new_value, need_watch, new_start_dt)
+                        .await
+                    {
+                        if let Err(e) = dist_lock::unlock(&locker).await {
+                            log::error!("dist_lock unlock err: {}", e);
+                        }
+                        log::info!("Released lock for cluster key: {}", lock_key);
+                        return Err(e);
+                    }
                 }
                 Ok(())
             }

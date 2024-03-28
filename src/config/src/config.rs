@@ -301,7 +301,6 @@ pub struct Config {
     pub etcd: Etcd,
     pub nats: Nats,
     pub sled: Sled,
-    pub dynamo: Dynamo,
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
@@ -865,19 +864,6 @@ pub struct Nats {
     pub lock_wait_timeout: u64,
 }
 
-#[derive(EnvConfig)]
-pub struct Dynamo {
-    #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
-    pub prefix: String,
-    pub file_list_table: String,
-    pub file_list_deleted_table: String,
-    pub stream_stats_table: String,
-    pub org_meta_table: String,
-    pub meta_table: String,
-    pub schema_table: String,
-    pub compact_table: String,
-}
-
 #[derive(Debug, EnvConfig)]
 pub struct S3 {
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
@@ -1008,11 +994,6 @@ pub fn init() -> Config {
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
-    }
-
-    // check dynamo config
-    if let Err(e) = check_dynamo_config(&mut cfg) {
-        panic!("dynamo config error: {e}");
     }
 
     cfg
@@ -1355,25 +1336,6 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
-
-    Ok(())
-}
-
-fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.common.meta_store.starts_with("dynamo") && cfg.dynamo.prefix.is_empty() {
-        cfg.dynamo.prefix = if cfg.s3.bucket_name.is_empty() {
-            "default".to_string()
-        } else {
-            cfg.s3.bucket_name.clone()
-        };
-    }
-    cfg.dynamo.file_list_table = format!("{}-file-list", cfg.dynamo.prefix);
-    cfg.dynamo.file_list_deleted_table = format!("{}-file-list-deleted", cfg.dynamo.prefix);
-    cfg.dynamo.stream_stats_table = format!("{}-stream-stats", cfg.dynamo.prefix);
-    cfg.dynamo.org_meta_table = format!("{}-org-meta", cfg.dynamo.prefix);
-    cfg.dynamo.meta_table = format!("{}-meta", cfg.dynamo.prefix);
-    cfg.dynamo.schema_table = format!("{}-schema", cfg.dynamo.prefix);
-    cfg.dynamo.compact_table = format!("{}-compact", cfg.dynamo.prefix);
 
     Ok(())
 }

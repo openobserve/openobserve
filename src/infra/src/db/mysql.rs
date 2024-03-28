@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{utils::json, CONFIG};
+use config::CONFIG;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -165,7 +165,7 @@ impl super::Db for MysqlDb {
         let mut tx = pool.begin().await?;
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, '', '', '', value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ? FOR UPDATE;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ? FOR UPDATE;"#
             )
               .bind(&module)
               .bind(&key1)
@@ -182,7 +182,7 @@ impl super::Db for MysqlDb {
             }
         } else {
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, '', '', '', value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC FOR UPDATE;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC FOR UPDATE;"#
             )
             .bind(&module)
             .bind(&key1)
@@ -216,30 +216,33 @@ impl super::Db for MysqlDb {
             Ok(Some(v)) => v,
         };
 
-        let ret = if exist {
-            sqlx::query(r#"UPDATE meta SET value = ? WHERE id = ?;"#)
+        // update value
+        if let Some(value) = value {
+            let ret = if exist {
+                sqlx::query(r#"UPDATE meta SET value = ? WHERE id = ?;"#)
+                    .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+                    .bind(row_id.unwrap())
+                    .execute(&mut *tx)
+                    .await
+            } else {
+                sqlx::query(
+                    r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, ?);"#,
+                )
+                .bind(&module)
+                .bind(&key1)
+                .bind(&key2)
+                .bind(start_dt.unwrap_or_default())
                 .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-                .bind(row_id.unwrap())
                 .execute(&mut *tx)
                 .await
-        } else {
-            sqlx::query(
-                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, ?);"#,
-            )
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(start_dt.unwrap_or_default())
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .execute(&mut *tx)
-            .await
-        };
-        if let Err(e) = ret {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback get_for_update error: {}", e);
+            };
+            if let Err(e) = ret {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                }
+                return Err(e.into());
             }
-            return Err(e.into());
-        }
+        };
 
         // new value
         if let Some((new_key, new_value, new_start_dt)) = new_value {
@@ -358,35 +361,15 @@ impl super::Db for MysqlDb {
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
-        if module == "schema" {
-            let mut grouped_values: HashMap<String, Vec<datafusion::arrow::datatypes::Schema>> =
-                HashMap::new();
-            for record in ret {
-                let key = format!("/{}/{}/{}", record.module, record.key1, record.key2);
-                let mut parsed: Vec<datafusion::arrow::datatypes::Schema> =
-                    json::from_str(&record.value).unwrap();
-
-                grouped_values
-                    .entry(key.to_owned())
-                    .or_insert_with(Vec::new)
-                    .append(&mut parsed);
-            }
-
-            Ok(grouped_values
-                .into_iter()
-                .map(|(key, vec)| (key, json::to_vec(&vec).unwrap().into()))
-                .collect())
-        } else {
-            Ok(ret
-                .into_iter()
-                .map(|r| {
-                    (
-                        super::build_key(&r.module, &r.key1, &r.key2),
-                        Bytes::from(r.value),
-                    )
-                })
-                .collect())
-        }
+        Ok(ret
+            .into_iter()
+            .map(|r| {
+                (
+                    super::build_key(&r.module, &r.key1, &r.key2, r.start_dt),
+                    Bytes::from(r.value),
+                )
+            })
+            .collect())
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
