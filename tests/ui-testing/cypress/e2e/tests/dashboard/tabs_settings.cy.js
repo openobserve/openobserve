@@ -107,6 +107,273 @@ describe("Tabs settings testcases", () => {
         deleteDashboard()
   });
 
+  //should go to tabs setting tab and click on add tab
+  it("should go to tabs setting tab and click on add tab", () => {
+    cy.addDashboard();
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+
+  //should go to tabs, click on add tab, add its name and save it
+  it("should go to tabs, click on add tab, add its name and save it", () => {
+    cy.addDashboard();
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-tab-submit"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+
+  //should go to tabs setting tab, add name and click on cancel and close it
+  it("should go to tabs setting tab, add name and click on cancel and close it", () => {
+    cy.addDashboard();
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-cancel"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+  //should edit tab name and save it 
+  it("should edit tab name and save it", () => {
+    cy.addDashboard();
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-tab-submit"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-edit-btn"]:first').click({ force: true });
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-panel"]')
+      .find('[data-test="dashboard-tab-settings-tab-name-edit"]')
+      .clear()
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-name-edit-save"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+
+  //should edit tab name and cancel it
+  it("should edit tab name and cancel it", () => {
+    cy.addDashboard();
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-tab-submit"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-edit-btn"]:first').click({ force: true });
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-panel"]')
+      .find('[data-test="dashboard-tab-settings-tab-name-edit"]')
+      .clear()
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+
+  //should drag and drop the tabs
+  it.skip("should drag and drop the tabs", () => {
+    cy.addDashboard();
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-tab-submit"]').click({force: true});
+
+      // Get the draggable element
+      cy.get('[data-test="dashboard-tab-settings-drag-row"]:first').as("draggable");
+      cy.wait(1000);
+      // Get the droppable area
+      cy.get('[data-test="dashboard-tab-settings-drag-row"]:last').as("droppable");
+      cy.wait(1000);
+      // Trigger dragstart on draggable
+      cy.get("@draggable").trigger("dragstart");
+      cy.wait(1000);
+      // Trigger drop on droppable
+      cy.get("@droppable").trigger("drop");
+
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+  //should delete tab, move panels to another tab and delete all panels popup, cancel and confirm it
+  it("should delete tab, move panels to another tab and delete all panels popup, cancel and confirm it", () => {
+    cy.addDashboard();
+    cy.wait(1000);
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.wait(2000);
+      cy.addAreaChartPanel();
+    cy.wait(1000);
+    cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true })
+    cy.wait(1000);
+    cy.contains(
+        '[data-test="dashboard-table"] td',
+        dashboardData.DashboardName
+      ).click({force:true});
+      cy.url().should("include", dashboardData.ViewDashboardUrl);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-tab-submit"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab"]').click({force: true})/
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .find('[data-test="dashboard-add-tab-name"]')
+      .type(randomDashboardName);
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-add-tab-submit"]').click({force: true});
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-delete-btn"]:first').click({force: true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-delete-tab-panels-move"]').click();
+      cy.wait(1000);
+      cy.get('[data-test="confirm-button"] > .q-btn__content').click({force: true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      cy.wait(2000);
+      cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-delete-btn"]:first').click({force: true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-delete-tab-panels-delete"]').click();
+      cy.wait(1000);
+      cy.get('[data-test="cancel-button"]').click({force: true})
+      // cy.wait(1000);
+      // cy.get('[data-test="dashboard-setting-btn"]').click({ force: true })
+      // cy.wait(2000);
+      // cy.get('[data-test="dashboard-tab-settings-tab"]').click({force:true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-settings-tab-delete-btn"]:first').click({force: true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-tab-delete-tab-panels-delete"]').click();
+      cy.wait(1000);
+      cy.get('[data-test="confirm-button"] > .q-btn__content').click({force: true})
+      cy.wait(1000);
+      cy.get('[data-test="dashboard-back-btn"]').click({ force: true });  
+      cy.wait(2000)
+        cy.get('[data-test="menu-link-/dashboards-item"]').click({ force: true})
+        cy.wait(2000)
+        deleteDashboard()
+  })
+
+
 //delete all dashboards
   it.skip("Delete All", () => {
     cy.get('[data-test="dashboard-table"]')
