@@ -377,6 +377,10 @@ import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
+import {
+  buildVariablesDependencyGraph,
+  isGraphHasCyclic,
+} from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -597,90 +601,6 @@ export default defineComponent({
       }
     };
 
-    // Function to detect cycle in a graph
-    // will be called recursively
-    function isGraphHasCyclicUtil(
-      node: any,
-      visited: any,
-      recStack: any,
-      graph: any,
-      path: any
-    ) {
-      // node should be not visited
-      if (!visited[node]) {
-        // Mark the current node as visited and part of recursion stack
-        visited[node] = true;
-        recStack[node] = true;
-        path.push(node);
-
-        // Recur for all the vertices adjacent to this vertex
-        // recursion call to all it's child node
-        for (let i = 0; i < graph[node].length; i++) {
-          let child = graph[node][i];
-
-          // if child is not visited and not part of recursion stack
-          // if child is already visited and part of recursion stack. so it means there is a cycle in the graph
-          if (
-            !visited[child] &&
-            isGraphHasCyclicUtil(child, visited, recStack, graph, path)
-          ) {
-            return true;
-          } else if (recStack[child]) {
-            return true;
-          }
-        }
-      }
-      // Remove the vertex from recursion stack and path
-      recStack[node] = false;
-      path.pop();
-      return false;
-    }
-
-    // Function to detect cycle in a graph
-    function isGraphHasCyclic(graph: any) {
-      // Mark all the vertices as not visited and not part of recursion stack
-
-      // visited object is used to check if a vertex is visited or not
-      let visited: any = {};
-      // recStack object is used to check if a vertex is part of recursion stack
-      let recStack: any = {};
-      // path array is used to store the path
-      let path: any = [];
-
-      // Initialize all vertices as not visited and not part of recursion stack
-      for (let node in graph) {
-        visited[node] = false;
-        recStack[node] = false;
-      }
-
-      // Call the recursive helper function to detect cycle in different DFS trees
-      for (let node in graph) {
-        // Start from all vertices one by one and check if a cycle is formed
-        if (isGraphHasCyclicUtil(node, visited, recStack, graph, path)) {
-          // Cycle found
-          // so, return path
-          return path;
-        }
-      }
-      // no cycle found
-      return null;
-    }
-
-    // A helper function to extract variable names from a string
-    function extractVariableNames(str: any, variableNames: any) {
-      let regex = /\$(\w+)/g;
-      let match;
-      let names = [];
-      while ((match = regex.exec(str)) !== null) {
-        // Only include the variable name if it exists in the list of variables
-        if (variableNames.has(match[1])) {
-          names.push(match[1]);
-        }
-      }
-      // Remove duplicates by converting to a set and back to an array
-      return [...new Set(names)];
-    }
-
     // check if filter has cycle
     const isFilterHasCycle = async () => {
       try {
@@ -709,39 +629,11 @@ export default defineComponent({
           variablesData.push(variableData);
         }
 
-        // need list of variable names
-        // Create a set of variable names
-        let variablesNameList = new Set(
-          variablesData.map((variable: any) => variable.name)
-        );
-
         // now, need to check whether filter has cycle or not
         // key: variable name
-        // value: list of dependencies(variable names)
-        let variablesDependencyGraph: any = {};
-
-        // Initialize all variables has empty dependency list in the variablesDependencyGraph
-        for (let variable of variablesData) {
-          variablesDependencyGraph[variable.name] = [];
-        }
-
-        // Populate the variablesDependencyGraph
-        for (let variableData of variablesData) {
-          let name = variableData.name;
-          for (let filter of variableData.query_data?.filter || []) {
-            // Extract variable names from the filter value
-            let extactedDependencies = extractVariableNames(
-              filter.value,
-              variablesNameList
-            );
-            // Add the dependencies to the variablesDependencyGraph
-            if (variablesDependencyGraph[name]) {
-              variablesDependencyGraph[name].push(...extactedDependencies);
-            } else {
-              variablesDependencyGraph[name] = extactedDependencies;
-            }
-          }
-        }
+        // value: { parentVariables: list of parent variable names, childVariables: list of child variable names }
+        let variablesDependencyGraph: any =
+          buildVariablesDependencyGraph(variablesData);
 
         // if graph has cycle, it will return the cycle path
         // else it will return null

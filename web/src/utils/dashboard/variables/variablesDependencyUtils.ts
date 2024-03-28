@@ -76,3 +76,84 @@ export const buildVariablesDependencyGraph = (
 
   return graph;
 };
+
+/**
+ * Recursive function to detect cycle in a graph
+ *
+ * @param {string} node current node
+ * @param {Object} visited object to keep track of visited nodes
+ * @param {Object} recStack object to keep track of nodes in recursion stack
+ * @param {Object} graph graph data structure
+ * @param {Array} path path to be returned in case of cycle
+ * @returns {boolean} true if cycle is detected and false otherwise
+ */
+export const isGraphHasCyclicUtil = (
+  node: string,
+  visited: any,
+  recStack: any,
+  graph: any,
+  path: any
+) => {
+  // If node is not visited then recur for all the vertices
+  // adjacent to this vertex
+  if (!visited[node]) {
+    // Mark the current node as visited and part of recursion stack
+    visited[node] = true;
+    recStack[node] = true;
+    path.push(node);
+
+    // Recur for all the vertices adjacent to this vertex
+    // recursion call to all it's child node
+    for (let i = 0; i < graph[node].parentVariables.length; i++) {
+      const child = graph[node].parentVariables[i];
+
+      // if child is not visited and not part of recursion stack
+      // if child is already visited and part of recursion stack. so it means there is a cycle in the graph
+      if (
+        !visited[child] &&
+        isGraphHasCyclicUtil(child, visited, recStack, graph, path)
+      ) {
+        return true;
+      } else if (recStack[child]) {
+        return true;
+      }
+    }
+  }
+
+  // Remove the vertex from recursion stack and path
+  recStack[node] = false;
+  path.pop();
+  return false;
+};
+
+/**
+ * Detect cycle in a graph
+ *
+ * @param {Object} graph graph data structure
+ * @returns {Array} path array storing the path of the cycle if any
+ * or null if no cycle is found
+ */
+export const isGraphHasCyclic = (graph: any) => {
+  // Initialize a dictionary to mark all the vertices as not visited and not part of recursion stack
+  const visited: any = {};
+  const recStack: any = {}; // dictionary to keep track of vertices in recursion stack
+  const path: any = []; // array to store the path
+
+  // Initialize all vertices as not visited and not part of recursion stack
+  for (const node of Object.keys(graph)) {
+    visited[node] = false;
+    recStack[node] = false;
+  }
+
+  // Call the recursive helper function to detect cycle in different DFS trees
+  for (const node of Object.keys(graph)) {
+    // Start from all vertices one by one and check if a cycle is formed
+    if (isGraphHasCyclicUtil(node, visited, recStack, graph, path)) {
+      // Cycle found
+      // so, return path
+      return path;
+    }
+  }
+  // no cycle found
+  return null;
+};
