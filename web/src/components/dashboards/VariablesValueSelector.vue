@@ -155,6 +155,9 @@ export default defineComponent({
       // reset the values
       resetVariablesData();
 
+      // check if variables config list is not empty
+      if (!props?.variablesConfig) return;
+
       // make list of variables using variables config list
       // set initial variables values from props
       props?.variablesConfig?.list?.forEach((item: any) => {
@@ -162,25 +165,56 @@ export default defineComponent({
           item.type == "dynamic_filters"
             ? JSON.parse(
                 decodeURIComponent(
-                  props.initialVariableValues?.value[item.name]
-                ) ?? []
+                  props.initialVariableValues?.value[item.name] ?? "[]"
+                )
               ) ?? []
             : props.initialVariableValues?.value[item.name] ?? null ?? null;
 
-        // push the variable to the list
-        variablesData.values.push({
+        const variableData = {
           ...item,
-          name: item.name,
-          type: item.type,
-          value: initialValue,
-          options: item.options || [],
           isLoading: false,
           isVariableLoadingPending: true,
-        });
+        };
+
+        // if initial value is not null, we need to update it
+        // also, constant type variable should not be updated
+        if (initialValue && item.type != "constant") {
+          // update the initial value
+          variableData.value = initialValue ?? null;
+        }
+
+        // push the variable to the list
+        variablesData.values.push(variableData);
 
         // set old variables data
         oldVariablesData[item.name] = initialValue;
       });
+
+      // if showDynamicFilters is true, add the Dynamic filters variable
+      if (props.showDynamicFilters) {
+        // get the initial value
+        // need to decode the initial value from base64
+        const initialValue =
+          JSON.parse(
+            decodeURIComponent(
+              props.initialVariableValues?.value["Dynamic filters"] ?? "[]"
+            )
+          ) ?? [];
+
+        // push the variable to the list
+        variablesData.values.push({
+          name: "Dynamic filters",
+          type: "dynamic_filters",
+          label: "Dynamic filters",
+          value: initialValue,
+          isLoading: false,
+          isVariableLoadingPending: true,
+          options: [],
+        });
+
+        // set old variables data
+        oldVariablesData["Dynamic filters"] = initialValue;
+      }
 
       // need to build variables dependency graph on variables config list change
       variablesDependencyGraph = buildVariablesDependencyGraph(
@@ -423,7 +457,10 @@ export default defineComponent({
                   }));
 
                 // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-                if (oldVariablesData[currentVariable.name] !== undefined) {
+                if (
+                  oldVariablesData[currentVariable.name] !== undefined ||
+                  oldVariablesData[currentVariable.name] !== null
+                ) {
                   currentVariable.value = currentVariable.options.some(
                     (option: any) =>
                       option.value === oldVariablesData[currentVariable.name]
@@ -491,13 +528,6 @@ export default defineComponent({
             break;
           }
           case "dynamic_filters": {
-            let oldVariableObjectSelectedValue = oldVariablesData.find(
-              (it2: any) => it2.name === currentVariable.name
-            );
-            if (oldVariableObjectSelectedValue) {
-              currentVariable.value = oldVariableObjectSelectedValue.value;
-            }
-
             resolve(true);
             break;
           }
