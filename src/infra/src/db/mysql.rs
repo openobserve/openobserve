@@ -176,8 +176,11 @@ impl super::Db for MysqlDb {
             {
                 Ok(v) => Some(v),
                 Err(e) => {
-                    log::error!("[MYSQL] get_for_update error: {}", e);
-                    None
+                    if e.to_string().contains("no rows returned") {
+                        None
+                    } else {
+                        return Err(Error::Message(format!("[MYSQL] get_for_update error: {}", e))); 
+                    }
                 }
             }
         } else {
@@ -192,8 +195,11 @@ impl super::Db for MysqlDb {
             {
                 Ok(v) => Some(v),
                 Err(e) => {
-                    log::error!("[MYSQL] get_for_update error: {}", e);
-                    None
+                    if e.to_string().contains("no rows returned") {
+                        None
+                    } else {
+                        return Err(Error::Message(format!("[MYSQL] get_for_update error: {}", e))); 
+                    }
                 }
             }
         };

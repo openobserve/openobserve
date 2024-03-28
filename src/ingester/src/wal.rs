@@ -20,7 +20,10 @@ use std::{
     sync::Arc,
 };
 
-use config::{utils::schema::infer_json_schema_from_values, CONFIG};
+use config::{
+    utils::{schema::infer_json_schema_from_values, schema_ext::SchemaExt},
+    CONFIG,
+};
 use snafu::ResultExt;
 
 use crate::{errors::*, immutable, memtable, writer::WriterKey};
@@ -163,10 +166,10 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
                     return Err(Error::WalError { source: e });
                 }
             };
-            let Some(entry) = entry else {
+            let Some(entry_bytes) = entry else {
                 break;
             };
-            let entry = match super::Entry::from_bytes(&entry) {
+            let entry = match super::Entry::from_bytes(&entry_bytes) {
                 Ok(v) => v,
                 Err(Error::ReadDataError { source }) => {
                     log::error!("Unable to read entry from: {}, skip the entry", source);
@@ -181,7 +184,13 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
             let infer_schema =
                 infer_json_schema_from_values(entry.data.iter().cloned(), stream_type)
                     .context(InferJsonSchemaSnafu)?;
-            memtable.write(Arc::new(infer_schema), entry).await?;
+            let infer_schema = Arc::new(infer_schema);
+            if memtable.write(infer_schema.clone(), entry).await.is_err() {
+                // Reset the hash_key and try again
+                let mut entry = super::Entry::from_bytes(&entry_bytes).unwrap();
+                entry.schema_key = infer_schema.hash_key().into();
+                memtable.write(infer_schema, entry).await?;
+            }
         }
         log::warn!(
             "replay wal file: {:?}, entries: {}, records: {}",

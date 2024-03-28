@@ -175,9 +175,12 @@ impl super::Db for PostgresDb {
             .await
             {
                 Ok(v) => Some(v),
-                Err(e) => {
-                    log::error!("[POSTGRES] get_for_update error: {}", e);
-                    None
+                Err(e) => { 
+                    if e.to_string().contains("no rows returned") {
+                        None
+                    } else {
+                        return Err(Error::Message(format!("[POSTGRES] get_for_update error: {}", e))); 
+                    }
                 }
             }
         } else {
@@ -192,8 +195,11 @@ impl super::Db for PostgresDb {
             {
                 Ok(v) => Some(v),
                 Err(e) => {
-                    log::error!("[POSTGRES] get_for_update error: {}", e);
-                    None
+                    if e.to_string().contains("no rows returned") {
+                        None
+                    } else {
+                        return Err(Error::Message(format!("[POSTGRES] get_for_update error: {}", e))); 
+                    }
                 }
             }
         };
