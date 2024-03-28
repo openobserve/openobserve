@@ -5,7 +5,7 @@ import logsdata from "../../../../../test-data/logs_data.json"
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
 });
-describe("Settings testcases", () => {
+describe("Variables settings testcases", () => {
   let dashboardData;
   let dashboardName;
   const randomDashboardName = `dashboard_${Math.floor(Math.random() * 100000)}`;
