@@ -681,7 +681,6 @@ async fn add_col(client: &Pool<Sqlite>) -> Result<()> {
             // Check if the error is about the duplicate column
             if e.to_string().contains("duplicate column name") {
                 // Ignore the duplicate column error and proceed
-                println!("[SQLITE] start_dt Column already exists, proceeding.");
                 Ok(())
             } else {
                 // If the error is not about the duplicate column, return it

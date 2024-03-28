@@ -561,9 +561,7 @@ async fn add_col(pool: Pool<MySql>) -> Result<()> {
     .execute(&mut *tx1)
     .await
     {
-        if e.to_string().contains("Duplicate column name") {
-            log::info!("[MYSQL] start_dt Column already exists, continuing.");
-        } else {
+        if !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column
             log::error!("[MYSQL] Unexpected error in adding column: {}", e);
             tx1.rollback().await?;

@@ -160,6 +160,7 @@ impl super::Db for PostgresDb {
         start_dt: Option<i64>,
         update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
+        println!("i am try to get lock");
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
@@ -175,7 +176,7 @@ impl super::Db for PostgresDb {
             .await
             {
                 Ok(v) => Some(v),
-                Err(e) => { 
+                Err(e) => {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
@@ -203,6 +204,7 @@ impl super::Db for PostgresDb {
                 }
             }
         };
+        println!("i got lock");
         let exist = row.is_some();
         let row_id = row.as_ref().map(|r| r.id);
         let value = row.map(|r| Bytes::from(r.value));
@@ -217,6 +219,7 @@ impl super::Db for PostgresDb {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[POSTGRES] rollback get_for_update error: {}", e);
                 }
+                println!("i don't need update schema, now you can acquire lock again");
                 return Ok(());
             }
             Ok(Some(v)) => v,
@@ -271,10 +274,15 @@ impl super::Db for PostgresDb {
             }
         }
 
+        // TODO: delete
+        println!("i am sleeping 5s");
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
         if let Err(e) = tx.commit().await {
             log::error!("[POSTGRES] commit get_for_update error: {}", e);
             return Err(e.into());
         }
+        println!("i commited, now you can acquire lock again");
 
         // event watch
         if need_watch {
