@@ -1094,12 +1094,19 @@ pub async fn merge_parquet_files(
         FileMeta::default()
     } else {
         match record.get("min_ts") {
-            Some(min_ts) => FileMeta {
-                min_ts: min_ts.as_i64().unwrap(),
-                max_ts: record["max_ts"].as_i64().unwrap(),
-                records: record["num_records"].as_i64().unwrap(),
-                original_size,
-                compressed_size: 0,
+            Some(min_ts) => match min_ts.as_i64() {
+                Some(min_ts) => FileMeta {
+                    min_ts,
+                    max_ts: record["max_ts"].as_i64().unwrap(),
+                    records: record["num_records"].as_i64().unwrap(),
+                    original_size,
+                    compressed_size: 0,
+                },
+                None => {
+                    return Err(DataFusionError::Execution(
+                        "merge_parquet_files: Invalid file meta data".to_string(),
+                    ));
+                }
             },
             None => {
                 return Err(DataFusionError::Execution(
