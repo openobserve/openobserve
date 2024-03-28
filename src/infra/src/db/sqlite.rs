@@ -280,15 +280,15 @@ impl super::Db for SqliteDb {
         key: &str,
         need_watch: bool,
         start_dt: Option<i64>,
-        update_fn: super::UpdateFn,
+        update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
-        let value = if let Some(start_dt) = start_dt {
-            match sqlx::query_scalar::<_,String>(
-                r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4 FOR UPDATE;"#
+        let row = if let Some(start_dt) = start_dt {
+            match sqlx::query_as::<_,super::MetaRecord>(
+                r#"SELECT id, '', '', '', value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4 FOR UPDATE;"#
             )
               .bind(&module)
               .bind(&key1)
@@ -297,15 +297,15 @@ impl super::Db for SqliteDb {
             .fetch_one(&mut *tx)
             .await
             {
-                Ok(v) => Some(Bytes::from(v)),
+                Ok(v) => Some(v),
                 Err(e) => {
                     log::error!("[SQLITE] get_for_update error: {}", e);
                     None
                 }
             }
         } else {
-            match sqlx::query_scalar::<_,String>(
-                r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC FOR UPDATE;"#
+            match sqlx::query_as::<_,super::MetaRecord>(
+                r#"SELECT id, '', '', '', value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC FOR UPDATE;"#
             )
             .bind(&module)
             .bind(&key1)
@@ -313,15 +313,17 @@ impl super::Db for SqliteDb {
             .fetch_one(&mut *tx)
             .await
             {
-                Ok(v) => Some(Bytes::from(v)),
+                Ok(v) => Some(v),
                 Err(e) => {
                     log::error!("[SQLITE] get_for_update error: {}", e);
                     None
                 }
             }
         };
-        let exist = value.is_some();
-        let value = match update_fn(value) {
+        let exist = row.is_some();
+        let row_id = row.as_ref().map(|r| r.id);
+        let value = row.map(|r| Bytes::from(r.value));
+        let (value, new_value) = match update_fn(value) {
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[SQLITE] rollback get_for_update error: {}", e);
@@ -336,17 +338,13 @@ impl super::Db for SqliteDb {
             }
             Ok(Some(v)) => v,
         };
+
         let ret = if exist {
-            sqlx::query(
-                r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
-            )
-            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
-            .bind(&module)
-            .bind(&key1)
-            .bind(&key2)
-            .bind(start_dt.unwrap_or_default())
-            .execute(&mut *tx)
-            .await
+            sqlx::query(r#"UPDATE meta SET value = $1 WHERE id = $2;"#)
+                .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+                .bind(row_id.unwrap())
+                .execute(&mut *tx)
+                .await
         } else {
             sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
@@ -365,6 +363,28 @@ impl super::Db for SqliteDb {
             }
             return Err(e.into());
         }
+
+        // new value
+        if let Some((new_key, new_value, new_start_dt)) = new_value {
+            let (module, key1, key2) = super::parse_key(&new_key);
+            if let Err(e) = sqlx::query(
+                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(new_start_dt.unwrap_or_default())
+            .bind(String::from_utf8(new_value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                }
+                return Err(e.into());
+            }
+        }
+
         if let Err(e) = tx.commit().await {
             log::error!("[SQLITE] commit get_for_update error: {}", e);
             return Err(e.into());
@@ -459,7 +479,7 @@ impl super::Db for SqliteDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, start_dt, value FROM meta".to_string();
+        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -508,7 +528,7 @@ impl super::Db for SqliteDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, start_dt, '' AS value FROM meta".to_string();
+        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }

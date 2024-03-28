@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use arrow_schema::{Field, Schema};
+use arrow_schema::{DataType, Field, Schema};
 use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use hashbrown::{HashMap, HashSet};
@@ -133,8 +133,7 @@ pub async fn get_settings(
     get(org_id, stream_name, stream_type)
         .await
         .ok()
-        .map(|schema| stream_settings(&schema))
-        .flatten()
+        .and_then(|schema| stream_settings(&schema))
 }
 
 pub async fn set(
@@ -237,7 +236,94 @@ pub async fn merge(
     schema: &Schema,
     min_ts: Option<i64>,
 ) -> Result<Option<(Schema, Vec<Field>)>, anyhow::Error> {
-    todo!()
+    let key = mk_key(org_id, stream_type, stream_name);
+    let db = infra_db::get_db().await;
+    let inferred_schema = schema.clone();
+    let start_dt = min_ts;
+    db.get_for_update(
+        &key.clone(),
+        infra_db::NEED_WATCH,
+        None,
+        Box::new(move |value| {
+            match value {
+                None => Ok(Some((
+                    json::to_vec(&vec![{
+                        // there is no schema, just set the new schema
+                        let schema_metadata = inferred_schema.metadata();
+                        if schema_metadata.contains_key("created_at")
+                            && schema_metadata.contains_key("start_dt")
+                        {
+                            inferred_schema
+                        } else {
+                            let start_dt =
+                                start_dt.unwrap_or_else(|| Utc::now().timestamp_micros());
+                            let mut schema_metadata = inferred_schema.metadata().clone();
+                            if !schema_metadata.contains_key("created_at") {
+                                schema_metadata
+                                    .insert("created_at".to_string(), start_dt.to_string());
+                            }
+                            if !schema_metadata.contains_key("start_dt") {
+                                schema_metadata
+                                    .insert("start_dt".to_string(), start_dt.to_string());
+                            }
+                            inferred_schema.with_metadata(schema_metadata)
+                        }
+                    }])
+                    .unwrap()
+                    .into(),
+                    None,
+                ))),
+                Some(value) => {
+                    // there is schema, merge the schema
+                    // parse latest schema
+                    let mut schemas: Vec<Schema> = json::from_slice(&value)?;
+                    let latest_schema = match schemas.last_mut() {
+                        Some(s) => s,
+                        None => {
+                            return Err(Error::Message(format!(
+                                "Error parsing latest schema for schema: {}",
+                                key
+                            )));
+                        }
+                    };
+                    // merge schema
+                    let (is_schema_changed, field_datatype_delta, merged_fields) =
+                        get_merge_schema_changes(latest_schema, &inferred_schema);
+                    if !is_schema_changed {
+                        return Ok(None); // no change, return
+                    }
+                    let metadata = std::mem::take(&mut latest_schema.metadata);
+                    let final_schema = Schema::new(merged_fields).with_metadata(metadata);
+                    let need_new_version = !field_datatype_delta.is_empty();
+                    if need_new_version && start_dt.is_some() {
+                        // update old version end_dt
+                        let mut metadata = latest_schema.metadata().clone();
+                        metadata.insert("end_dt".to_string(), start_dt.unwrap().to_string());
+                        let prev_schema = vec![latest_schema.clone().with_metadata(metadata)];
+                        let mut new_metadata = latest_schema.metadata().clone();
+                        new_metadata.insert("start_dt".to_string(), start_dt.unwrap().to_string());
+                        let new_schema = vec![final_schema.with_metadata(new_metadata)];
+                        Ok(Some((
+                            json::to_vec(&prev_schema).unwrap().into(),
+                            Some((
+                                key,
+                                json::to_vec(&vec![new_schema]).unwrap().into(),
+                                start_dt,
+                            )),
+                        )))
+                    } else {
+                        // just update the latest schema
+                        Ok(Some((
+                            json::to_vec(&vec![final_schema]).unwrap().into(),
+                            None,
+                        )))
+                    }
+                }
+            }
+        }),
+    )
+    .await?;
+    Ok(None)
 }
 
 pub async fn delete(
@@ -606,4 +692,106 @@ pub async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> V
         names.insert(cur_stream_name);
     }
     names.into_iter().collect::<Vec<String>>()
+}
+
+fn get_merge_schema_changes(
+    latest_schema: &Schema,
+    inferred_schema: &Schema,
+) -> (bool, Vec<Field>, Vec<Field>) {
+    let mut is_schema_changed = false;
+    let mut field_datatype_delta: Vec<_> = vec![];
+
+    let mut merged_fields = latest_schema.fields().iter().collect::<Vec<_>>();
+    let mut merged_fields_chk = hashbrown::HashMap::with_capacity(merged_fields.len());
+    for (i, f) in merged_fields.iter().enumerate() {
+        merged_fields_chk.insert(f.name(), i);
+    }
+
+    for item in inferred_schema.fields.iter() {
+        let item_name = item.name();
+        let item_data_type = item.data_type();
+
+        match merged_fields_chk.get(item_name) {
+            None => {
+                is_schema_changed = true;
+                merged_fields.push(item);
+                merged_fields_chk.insert(item_name, merged_fields.len() - 1);
+            }
+            Some(idx) => {
+                let existing_field = &merged_fields[*idx];
+                if existing_field.data_type() != item_data_type {
+                    if !CONFIG.common.widening_schema_evolution {
+                        field_datatype_delta.push(existing_field.as_ref().clone());
+                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
+                        is_schema_changed = true;
+                        merged_fields[*idx] = item;
+                        field_datatype_delta.push((**item).clone());
+                    } else {
+                        let mut meta = existing_field.metadata().clone();
+                        meta.insert("zo_cast".to_owned(), true.to_string());
+                        field_datatype_delta
+                            .push(existing_field.as_ref().clone().with_metadata(meta));
+                    }
+                }
+            }
+        }
+    }
+    if !is_schema_changed {
+        (false, field_datatype_delta, vec![])
+    } else {
+        (
+            true,
+            field_datatype_delta,
+            merged_fields
+                .into_iter()
+                .map(|f| f.as_ref().clone())
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
+fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
+    let allowed_type = match from {
+        DataType::Boolean => vec![DataType::Utf8],
+        DataType::Int8 => vec![
+            DataType::Utf8,
+            DataType::Int16,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Int16 => vec![
+            DataType::Utf8,
+            DataType::Int32,
+            DataType::Int64,
+            DataType::Float16,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Int32 => vec![
+            DataType::Utf8,
+            DataType::Int64,
+            DataType::UInt32,
+            DataType::UInt64,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Int64 => vec![DataType::Utf8, DataType::UInt64, DataType::Float64],
+        DataType::UInt8 => vec![
+            DataType::Utf8,
+            DataType::UInt16,
+            DataType::UInt32,
+            DataType::UInt64,
+        ],
+        DataType::UInt16 => vec![DataType::Utf8, DataType::UInt32, DataType::UInt64],
+        DataType::UInt32 => vec![DataType::Utf8, DataType::UInt64],
+        DataType::UInt64 => vec![DataType::Utf8],
+        DataType::Float16 => vec![DataType::Utf8, DataType::Float32, DataType::Float64],
+        DataType::Float32 => vec![DataType::Utf8, DataType::Float64],
+        DataType::Float64 => vec![DataType::Utf8],
+        _ => vec![DataType::Utf8],
+    };
+    allowed_type.contains(to)
 }

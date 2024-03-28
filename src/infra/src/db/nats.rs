@@ -137,7 +137,7 @@ impl super::Db for NatsDb {
         key: &str,
         need_watch: bool,
         start_dt: Option<i64>,
-        update_fn: super::UpdateFn,
+        update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         // acquire lock and update
         let lock_key = format!("/meta/{key}/{}", start_dt.unwrap_or_default());
@@ -157,7 +157,14 @@ impl super::Db for NatsDb {
         let ret = match update_fn(value) {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
-            Ok(Some(value)) => self.put(key, value, need_watch, start_dt).await,
+            Ok(Some((value, new_value))) => {
+                self.put(key, value, need_watch, start_dt).await?;
+                if let Some((new_key, new_value, new_start_dt)) = new_value {
+                    self.put(&new_key, new_value, need_watch, new_start_dt)
+                        .await?;
+                }
+                Ok(())
+            }
         };
 
         // release lock

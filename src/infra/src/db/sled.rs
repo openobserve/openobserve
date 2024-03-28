@@ -93,14 +93,17 @@ impl super::Db for SledDb {
         key: &str,
         need_watch: bool,
         start_dt: Option<i64>,
-        update_fn: super::UpdateFn,
+        update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         let value = self.get(key).await.ok();
-        if let Some(value) = update_fn(value)? {
-            self.put(key, value, need_watch, start_dt).await
-        } else {
-            Ok(())
+        if let Some((value, new_value)) = update_fn(value)? {
+            self.put(key, value, need_watch, start_dt).await?;
+            if let Some((new_key, new_value, new_start_dt)) = new_value {
+                self.put(&new_key, new_value, need_watch, new_start_dt)
+                    .await?;
+            }
         }
+        Ok(())
     }
 
     async fn delete(

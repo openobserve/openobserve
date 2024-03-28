@@ -95,7 +95,8 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub type UpdateFn = fn(Option<Bytes>) -> Result<Option<Bytes>>;
+pub type UpdateFn = dyn FnOnce(Option<Bytes>) -> Result<Option<(Bytes, Option<(String, Bytes, Option<i64>)>)>>
+    + Send;
 
 #[async_trait]
 pub trait Db: Sync + Send + 'static {
@@ -114,7 +115,7 @@ pub trait Db: Sync + Send + 'static {
         key: &str,
         need_watch: bool,
         start_dt: Option<i64>,
-        update_fn: UpdateFn,
+        update_fn: Box<UpdateFn>,
     ) -> Result<()>;
     async fn delete(
         &self,
@@ -206,6 +207,7 @@ pub struct EventData {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct MetaRecord {
+    pub id: i64,
     pub module: String,
     pub key1: String,
     pub key2: String,
