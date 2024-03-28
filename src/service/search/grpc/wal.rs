@@ -302,7 +302,7 @@ pub async fn search_parquet(
                         FileType::PARQUET,
                     ) => ret,
                     _ = abort_receiver => {
-                        log::info!("abort search task");
+                        log::info!("[session_id {session_id}] search->parquet: search canceled");
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {session_id}] search_parquet: task is cancel"
                         )))
@@ -511,7 +511,7 @@ pub async fn search_memtable(
                         FileType::ARROW,
                     ) => ret,
                     _ = abort_receiver => {
-                        log::info!("abort search task");
+                        log::info!("[session_id {session_id}] search->storage: search canceled");
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {session_id}] search_memtable: task is cancel"
                         )))
