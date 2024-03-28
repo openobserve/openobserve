@@ -106,7 +106,7 @@ impl super::Db for MysqlDb {
         let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
-             r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#
+            r#"INSERT IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES (?, ?, ?, ?, '');"#
         )
         .bind(&module)
         .bind(&key1)
