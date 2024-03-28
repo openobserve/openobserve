@@ -176,11 +176,13 @@ export default defineComponent({
           isVariableLoadingPending: true,
         };
 
-        // if initial value is not null, we need to update it
+        // need to use initial value
         // also, constant type variable should not be updated
-        if (initialValue && item.type != "constant") {
+        if (item.type != "constant") {
           // update the initial value
-          variableData.value = initialValue ?? null;
+          // if initial value is not exist, use the default value
+          // default value will be in variableData.value itself
+          variableData.value = initialValue ?? variableData.value;
         }
 
         // push the variable to the list
