@@ -27,7 +27,7 @@ use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
-    CONFIG, DISTINCT_FIELDS,
+    BLOCKED_STREAMS, CONFIG, DISTINCT_FIELDS,
 };
 
 use super::{add_record, cast_to_schema_v1, StreamMeta};
@@ -123,12 +123,12 @@ pub async fn ingest(
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-            if CONFIG.common.blocked_streams.contains(&key) {
+            if BLOCKED_STREAMS.contains(&key.as_str()) {
                 // print warning only once
-                if !blocked_stream_warnings.contains_key(&key) {
+                blocked_stream_warnings.entry(key).or_insert_with(|| {
                     log::warn!("stream [{stream_name}] is blocked from ingestion");
-                    blocked_stream_warnings.insert(key, true);
-                }
+                    true
+                });
                 continue; // skip
             }
 
