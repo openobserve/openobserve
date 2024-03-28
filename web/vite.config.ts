@@ -94,6 +94,10 @@ export default defineConfig({
   },
   server: {
     port: 8081,
+    headers: {
+      "Content-Security-Policy":
+        "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
+    },
   },
   base: "./",
   plugins: [
