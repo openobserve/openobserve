@@ -115,6 +115,7 @@ import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vu
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -168,7 +169,7 @@ export default defineComponent({
                   props.initialVariableValues?.value[item.name] ?? "[]"
                 )
               ) ?? []
-            : props.initialVariableValues?.value[item.name] ?? null ?? null;
+            : props.initialVariableValues?.value[item.name] ?? null;
 
         const variableData = {
           ...item,
@@ -179,10 +180,13 @@ export default defineComponent({
         // need to use initial value
         // also, constant type variable should not be updated
         if (item.type != "constant") {
-          // update the initial value
-          // if initial value is not exist, use the default value
-          // default value will be in variableData.value itself
-          variableData.value = initialValue ?? variableData.value;
+          // for textbox type variable, if initial value is not exist, use the default value
+          if (item.type == "textbox") {
+            variableData.value = initialValue ?? variableData.value;
+          }
+
+          // use the initial value
+          variableData.value = initialValue;
         }
 
         // push the variable to the list
@@ -225,8 +229,6 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      // reset variables data
-      resetVariablesData();
       // make list of variables using variables config list
       initializeVariablesData();
 
@@ -237,8 +239,6 @@ export default defineComponent({
     watch(
       () => props.variablesConfig,
       async () => {
-        // reset variables data
-        resetVariablesData();
         // make list of variables using variables config list
         initializeVariablesData();
 
@@ -262,74 +262,18 @@ export default defineComponent({
       { deep: true }
     );
 
-    // build variables dependency graph
-    const buildVariablesDependencyGraph = (variables: any) => {
-      let graph: any = {};
-
-      // Create a set of variable names
-      let variablesNameList = new Set(
-        variables.map((variable: any) => variable.name)
-      );
-
-      // Initialize the graph with empty arrays
-      for (let item of variables) {
-        graph[item.name] = { parentVariables: [], childVariables: [] };
-      }
-
-      // Populate the graph
-      for (let item of variables) {
-        let name = item.name;
-        if (item.type == "query_values") {
-          for (let filter of item?.query_data?.filter ?? []) {
-            let dependencies = extractVariableNames(
-              filter.value,
-              variablesNameList
-            );
-            // loop on all dependencies and append them as child
-            dependencies.forEach((dep: any) => {
-              graph[dep].childVariables.push(name);
-            });
-
-            // append all dependencies as parent
-            graph[name].parentVariables.push(...dependencies);
-          }
-        } else {
-          graph[item.name] = { parentVariables: [], childVariables: [] };
-        }
-      }
-
-      return graph;
-    };
-
     const emitVariablesData = () => {
       instance?.proxy?.$forceUpdate();
       emit("variablesData", JSON.parse(JSON.stringify(variablesData)));
     };
 
-    // A helper function to extract variable names from a string
-    function extractVariableNames(str: any, variableNames: any) {
-      let regex = /\$(\w+)/g;
-      let match;
-      let names = [];
-      while ((match = regex.exec(str)) !== null) {
-        // Only include the variable name if it exists in the list of variables
-        if (variableNames.has(match[1])) {
-          names.push(match[1]);
-        }
-      }
-      // Remove duplicates by converting to a set and back to an array
-      return [...new Set(names)];
-    }
-
     // it is used to change/update initial variables values from outside the component
     const changeInitialVariableValues = async (
       newInitialVariableValues: any
     ) => {
+      // NOTE: need to re-initialize variables data
       // set initial variables values
       props.initialVariableValues.value = newInitialVariableValues;
-
-      // NOTE: need to re-initialize variables data
-      resetVariablesData();
 
       // make list of variables using variables config list
       initializeVariablesData();
