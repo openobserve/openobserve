@@ -82,6 +82,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_hide_menus: String,
 }
 
 #[derive(Serialize)]
@@ -176,6 +177,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let logo = None;
 
+    #[cfg(feature = "enterprise")]
+    let custom_hide_menus = &O2_CONFIG.common.custom_hide_menus;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_hide_menus = "";
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
@@ -204,6 +210,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_hide_menus: custom_hide_menus.to_string(),
         rum: Rum {
             enabled: CONFIG.rum.enabled,
             client_token: CONFIG.rum.client_token.to_string(),
