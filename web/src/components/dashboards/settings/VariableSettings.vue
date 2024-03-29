@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-toolbar>
               <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <q-btn flat round dense icon="close" v-close-popup />
+              <q-btn flat round dense icon="close" v-close-popup="true" />
             </q-toolbar>
             <q-card-section style="width: 100%; height: calc(100% - 50px)">
               <VariablesDependenciesGraph
