@@ -270,6 +270,7 @@ export default defineComponent({
     };
 
     // it is used to change/update initial variables values from outside the component
+    // NOTE: right now, it is not used after variables in variables feature
     const changeInitialVariableValues = async (
       newInitialVariableValues: any
     ) => {
