@@ -166,7 +166,8 @@ export default defineComponent({
           item.type == "dynamic_filters"
             ? JSON.parse(
                 decodeURIComponent(
-                  props.initialVariableValues?.value[item.name] ?? "[]"
+                  // if initial value is not exist, use the default value : %5B%5D(which is [] in base64)
+                  props.initialVariableValues?.value[item.name] ?? "%5B%5D"
                 )
               ) ?? []
             : props.initialVariableValues?.value[item.name] ?? null;
@@ -203,7 +204,8 @@ export default defineComponent({
         const initialValue =
           JSON.parse(
             decodeURIComponent(
-              props.initialVariableValues?.value["Dynamic filters"] ?? "[]"
+              // if initial value is not exist, use the default value : %5B%5D(which is [] in base64)
+              props.initialVariableValues?.value["Dynamic filters"] ?? "%5B%5D"
             )
           ) ?? [];
 
@@ -272,6 +274,8 @@ export default defineComponent({
       newInitialVariableValues: any
     ) => {
       // NOTE: need to re-initialize variables data
+      resetVariablesData();
+
       // set initial variables values
       props.initialVariableValues.value = newInitialVariableValues;
 
