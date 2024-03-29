@@ -554,9 +554,12 @@ export default defineComponent({
             );
           }
 
-          searchObj.data.query =
-            searchObj.data.query.trimEnd() +
-            ` ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
+          searchObj.data.query = addOrderByToQuery(
+            searchObj.data.query,
+            store.state.zoConfig.timestamp_column,
+            "DESC",
+            searchObj.data.stream.selectedStream.value
+          );
 
           searchObj.data.editorValue = searchObj.data.query;
 
