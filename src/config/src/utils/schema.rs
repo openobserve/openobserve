@@ -111,15 +111,15 @@ fn infer_json_schema_from_object(
     for (key, value) in value.iter() {
         match value {
             Value::String(_) => {
-                convet_data_type(fields, key, DataType::Utf8)?;
+                convert_data_type(fields, key, DataType::Utf8)?;
             }
             Value::Number(v) => {
                 if v.is_i64() {
-                    convet_data_type(fields, key, DataType::Int64)?;
+                    convert_data_type(fields, key, DataType::Int64)?;
                 } else if v.is_u64() {
-                    convet_data_type(fields, key, DataType::UInt64)?;
+                    convert_data_type(fields, key, DataType::UInt64)?;
                 } else if v.is_f64() {
-                    convet_data_type(fields, key, DataType::Float64)?;
+                    convert_data_type(fields, key, DataType::Float64)?;
                 } else {
                     return Err(ArrowError::SchemaError(
                         "Cannot infer schema from non-basic-number type value".to_string(),
@@ -127,7 +127,7 @@ fn infer_json_schema_from_object(
                 }
             }
             Value::Bool(_) => {
-                convet_data_type(fields, key, DataType::Boolean)?;
+                convert_data_type(fields, key, DataType::Boolean)?;
             }
             Value::Null => {}
             _ => {
@@ -140,7 +140,7 @@ fn infer_json_schema_from_object(
     Ok(())
 }
 
-fn convet_data_type(
+fn convert_data_type(
     fields: &mut FxIndexMap<String, Field>,
     key: &str,
     data_type: DataType,
@@ -155,6 +155,9 @@ fn convet_data_type(
     }
     match (f_type, &data_type) {
         (DataType::Utf8, _) => {}
+        (DataType::Float64, DataType::UInt64)
+        | (DataType::Float64, DataType::Int64)
+        | (DataType::Float64, DataType::Boolean) => {}
         (DataType::Int64, DataType::UInt64)
         | (DataType::Int64, DataType::Float64)
         | (DataType::Int64, DataType::Utf8) => {
@@ -166,6 +169,7 @@ fn convet_data_type(
         (DataType::Float64, DataType::Utf8) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
+
         (DataType::Boolean, _) => {
             fields.insert(key.to_string(), Field::new(key, data_type, true));
         }
