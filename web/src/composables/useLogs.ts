@@ -2212,7 +2212,8 @@ const useLogs = () => {
   const addOrderByToQuery = (
     sql: string,
     column: string,
-    type: "ASC" | "DESC"
+    type: "ASC" | "DESC",
+    streamName: string
   ) => {
     // Parse the SQL query into an AST
     const parsedQuery: any = parser.astify(sql);
@@ -2243,22 +2244,22 @@ const useLogs = () => {
     }
 
     // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""));
+    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""), streamName);
   };
 
-  function quoteTableNameDirectly(sql: string) {
+  function quoteTableNameDirectly(sql: string, streamName: string) {
     // This regular expression looks for the FROM keyword followed by
     // an optional schema name, a table name, and handles optional spaces.
     // It captures the table name to be replaced with double quotes.
-    const regex = /FROM\s+([a-zA-Z_][\w]*)/gi;
+    const regex = new RegExp(`FROM\\s+${streamName}`, 'gi')
 
     // Replace the captured table name with the same name enclosed in double quotes
-    const modifiedSql = sql.replace(regex, (match, tableName) => {
-      return `FROM "${tableName}"`;
-    });
+    const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
+
 
     return modifiedSql;
   }
+
   return {
     searchObj,
     getStreams,
