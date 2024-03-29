@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   :rules="[
                     (val: any) => !!(val.trim()) || 'Field is required!',
-                    (val: any) => /^[a-zA-Z0-9_-]*$/.test(val) || 'Only word characters are allowed in variable names'
+                    (val: any) => /^[a-zA-Z0-9_-]*$/.test(val) || 'Only letters, numbers, hyphens (-), and underscores (_) are allowed.'
                 ]"
                 ></q-input>
               </div>
@@ -379,7 +379,7 @@ import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
-  isGraphHasCyclic,
+  isGraphHasCycle,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 export default defineComponent({
@@ -637,7 +637,7 @@ export default defineComponent({
 
         // if graph has cycle, it will return the cycle path
         // else it will return null
-        const hasCycle = isGraphHasCyclic(variablesDependencyGraph);
+        const hasCycle = isGraphHasCycle(variablesDependencyGraph);
         if (hasCycle) {
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(

@@ -174,7 +174,10 @@ export default defineComponent({
 
         const variableData = {
           ...item,
+          // isLoading is used to check that currently, if the variable is loading(it is used to show the loading icon)
           isLoading: false,
+          // isVariableLoadingPending is used to check that variable loading is pending
+          // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: true,
         };
 
@@ -303,6 +306,13 @@ export default defineComponent({
 
         // need to load the current variable
         if (currentVariable.isVariableLoadingPending == false) {
+          return resolve(false);
+        }
+
+        if (
+          isInvalidDate(props.selectedTimeDate?.start_time) ||
+          isInvalidDate(props.selectedTimeDate?.end_time)
+        ) {
           return resolve(false);
         }
 

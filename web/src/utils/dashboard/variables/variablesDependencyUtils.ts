@@ -89,7 +89,7 @@ export const buildVariablesDependencyGraph = (
  * @param {Array} path path to be returned in case of cycle
  * @returns {boolean} true if cycle is detected and false otherwise
  */
-export const isGraphHasCyclicUtil = (
+export const isGraphHasCycleUtil = (
   node: string,
   visited: any,
   recStack: any,
@@ -113,7 +113,7 @@ export const isGraphHasCyclicUtil = (
       // if child is already visited and part of recursion stack. so it means there is a cycle in the graph
       if (
         !visited[child] &&
-        isGraphHasCyclicUtil(child, visited, recStack, graph, path)
+        isGraphHasCycleUtil(child, visited, recStack, graph, path)
       ) {
         return true;
       } else if (recStack[child]) {
@@ -135,7 +135,7 @@ export const isGraphHasCyclicUtil = (
  * @returns {Array} path array storing the path of the cycle if any
  * or null if no cycle is found
  */
-export const isGraphHasCyclic = (graph: any) => {
+export const isGraphHasCycle = (graph: any) => {
   // Initialize a dictionary to mark all the vertices as not visited and not part of recursion stack
   const visited: any = {};
   const recStack: any = {}; // dictionary to keep track of vertices in recursion stack
@@ -150,7 +150,7 @@ export const isGraphHasCyclic = (graph: any) => {
   // Call the recursive helper function to detect cycle in different DFS trees
   for (const node of Object.keys(graph)) {
     // Start from all vertices one by one and check if a cycle is formed
-    if (isGraphHasCyclicUtil(node, visited, recStack, graph, path)) {
+    if (isGraphHasCycleUtil(node, visited, recStack, graph, path)) {
       // Cycle found
       // so, return path
       return path;
