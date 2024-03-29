@@ -988,7 +988,6 @@ mod tests {
         record_val.push(record.as_object().unwrap());
         let stream_type = StreamType::Logs;
         let value_iter = record_val.into_iter();
-        let inferred_schema = infer_json_schema_from_map(value_iter, stream_type).unwrap();
-        println!("{:?}", inferred_schema);
+        infer_json_schema_from_map(value_iter, stream_type).unwrap();
     }
 }
