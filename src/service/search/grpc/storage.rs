@@ -279,7 +279,7 @@ pub async fn search(
                         FileType::PARQUET,
                     ) => ret,
                     _ = abort_receiver => {
-                        log::info!("[session_id {session_id}] search->storage: search canceled");
+                        log::info!("[session_id {session_id}-{ver}] search->storage: search canceled");
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {session_id}] search->storage: task is cancel"
                         )))

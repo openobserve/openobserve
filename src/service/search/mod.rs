@@ -152,14 +152,34 @@ impl Search for Searcher {
         &self,
         _req: Request<GetJobStatusRequest>,
     ) -> Result<Response<GetJobStatusResponse>, Status> {
-        unimplemented!()
+        let mut id = "".to_string();
+        if let Some(pair) = self.task_manager.iter().next() {
+            id = pair.key().clone();
+        }
+        Err(Status::internal(format!(
+            "id: {:?}, task size: {:?}",
+            id,
+            self.task_manager.len()
+        )))
     }
 
     async fn cancel_job(
         &self,
         _req: Request<CancelJobRequest>,
     ) -> Result<Response<CancelJobResponse>, Status> {
-        unimplemented!()
+        let mut id = "".to_string();
+        if let Some(pair) = self.task_manager.iter().next() {
+            id = pair.key().clone();
+        }
+        match self.task_manager.remove(&id) {
+            Some((_, senders)) => {
+                for sender in senders.into_iter().rev() {
+                    let _ = sender.send(());
+                }
+                Err(Status::internal("cancel task".to_string()))
+            }
+            None => Err(Status::internal("No senders found.".to_string())),
+        }
     }
 }
 
@@ -732,16 +752,16 @@ impl Searcher {
                 (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
             };
 
-            let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-            if self.task_manager.contains_key(&session_id) {
-                self.task_manager
-                    .get_mut(&session_id)
-                    .unwrap()
-                    .push(abort_sender);
-            } else {
-                self.task_manager
-                    .insert(session_id.clone(), vec![abort_sender]);
+            if !self.task_manager.contains_key(&session_id) {
+                return Err(Error::Message(format!(
+                    "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
+                )));
             }
+            let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+            self.task_manager
+                .get_mut(&session_id)
+                .unwrap()
+                .push(abort_sender);
 
             let merge_batch;
             tokio::select! {
@@ -772,8 +792,8 @@ impl Searcher {
                     }
                 }
                 _ = abort_receiver => {
-                    log::info!("[session_id {session_id}] search->grpc: cancel merge");
-                    return Err(Error::Message(format!("[session_id {session_id}] search->grpc: merge canceled")));
+                    log::info!("[session_id {session_id}] search->cluster: final merge task is cancel");
+                    return Err(Error::Message(format!("[session_id {session_id}] search->cluster: final merge task is cancel")));
                 }
             }
 

@@ -213,18 +213,17 @@ pub async fn search(
             )
         };
 
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        if search_server.task_manager.contains_key(session_id.as_ref()) {
-            search_server
-                .task_manager
-                .get_mut(session_id.as_ref())
-                .unwrap()
-                .push(abort_sender);
-        } else {
-            search_server
-                .task_manager
-                .insert(session_id.as_ref().clone(), vec![abort_sender]);
+        if !search_server.task_manager.contains_key(session_id.as_ref()) {
+            return Err(Error::Message(format!(
+                "[session_id {session_id}] task is cancel after get first stage result"
+            )));
         }
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        search_server
+            .task_manager
+            .get_mut(session_id.as_ref())
+            .unwrap()
+            .push(abort_sender);
 
         let merge_batches;
         tokio::select! {
@@ -246,8 +245,8 @@ pub async fn search(
                 }
             },
             _ = abort_receiver => {
-                log::info!("[session_id {session_id}] search cancel");
-                return Err(Error::Message("task is cancel".to_string()));
+                log::info!("[session_id {session_id}] in node merge task is cancel");
+                return Err(Error::Message(format!("[session_id {session_id}] in node merge task is cancel")));
             }
         }
         merge_results.insert(name.to_string(), merge_batches);
