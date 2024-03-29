@@ -184,10 +184,10 @@ export default defineComponent({
           // for textbox type variable, if initial value is not exist, use the default value
           if (item.type == "textbox") {
             variableData.value = initialValue ?? variableData.value;
+          } else {
+            // use the initial value
+            variableData.value = initialValue;
           }
-
-          // use the initial value
-          variableData.value = initialValue;
         }
 
         // push the variable to the list
