@@ -2248,7 +2248,6 @@ const useLogs = () => {
   };
 
   function quoteTableNameDirectly(sql: string, streamName: string) {
-    console.log("streamName", streamName);
     // This regular expression looks for the FROM keyword followed by
     // an optional schema name, a table name, and handles optional spaces.
     // It captures the table name to be replaced with double quotes.
@@ -2260,7 +2259,7 @@ const useLogs = () => {
 
     return modifiedSql;
   }
-  
+
   return {
     searchObj,
     getStreams,
