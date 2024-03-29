@@ -64,6 +64,7 @@ export default defineComponent({
       }
 
       options.value = {
+        backgroundColor: "transparent",
         tooltip: {
           show: false,
         },

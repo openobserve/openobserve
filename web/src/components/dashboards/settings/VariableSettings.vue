@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader title="Variables">
         <template #right>
           <div>
+            <!-- show variables dependencies if variables exist -->
             <q-btn
+              v-if="dashboardVariablesList.length > 0"
               class="text-bold no-border q-ml-md"
               no-caps
               no-outline
@@ -106,7 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <VariablesDependenciesGraph
                 :variablesList="dashboardVariablesList"
                 :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-                @closePopUp="() => (showVariablesDependenciesGraphPopUp = false)"
+                @closePopUp="
+                  () => (showVariablesDependenciesGraphPopUp = false)
+                "
               />
             </q-card-section>
           </q-card>

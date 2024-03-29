@@ -8,11 +8,13 @@ const extractVariableNames = (
   str: string,
   variableNames: Set<string>
 ): string[] => {
-  const regex = /\$(\w+)/g; // find all occurrences of $<variable_name>
+  const regex = /\$([a-zA-Z0-9_-]+)/g; // find all occurrences of $<variable_name>
   const names: string[] = [];
   let match: RegExpExecArray | null;
   // loop over all matches
   while ((match = regex.exec(str)) !== null) {
+    // match[0]: This will log: $a-k8s_namespace_name
+    // match[1]: This will log: a-k8s_namespace_name
     // only include the variable name if it exists in the list of variables
     if (variableNames.has(match[1])) {
       names.push(match[1]);

@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   stack-label
                   :rules="[
                     (val: any) => !!(val.trim()) || 'Field is required!',
-                    (val: any) => !val.includes(' ') || 'Only word characters are allowed in variable names'
+                    (val: any) => /^[a-zA-Z0-9_-]*$/.test(val) || 'Only word characters are allowed in variable names'
                 ]"
                 ></q-input>
               </div>
