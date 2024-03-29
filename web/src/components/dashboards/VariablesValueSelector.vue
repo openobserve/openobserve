@@ -145,6 +145,11 @@ export default defineComponent({
     // track old variables data
     const oldVariablesData: any = {};
 
+    // currently executing promise
+    // obj will have variable name as key
+    // and reject object of promise as value
+    const currentlyExecutingPromises: any = {};
+
     // reset variables data
     // it will executed once on mount
     const resetVariablesData = () => {
@@ -233,9 +238,19 @@ export default defineComponent({
       );
     };
 
+    const rejectAllPromises = () => {
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
+        if (currentlyExecutingPromises[key])
+          currentlyExecutingPromises[key](false);
+      });
+    };
+
     onMounted(() => {
       // make list of variables using variables config list
       initializeVariablesData();
+
+      // reject all promises
+      rejectAllPromises();
 
       // load all variables
       loadAllVariablesData();
@@ -247,6 +262,9 @@ export default defineComponent({
         // make list of variables using variables config list
         initializeVariablesData();
 
+        // reject all promises
+        rejectAllPromises();
+
         // load all variables
         loadAllVariablesData();
       }
@@ -256,6 +274,9 @@ export default defineComponent({
     watch(
       () => props.selectedTimeDate,
       () => {
+        // reject all promises
+        rejectAllPromises();
+
         loadAllVariablesData();
       }
     );
@@ -286,13 +307,16 @@ export default defineComponent({
       // make list of variables using variables config list
       initializeVariablesData();
 
+      // reject all promises
+      rejectAllPromises();
+
       // load all variables
       loadAllVariablesData();
     };
 
     // get single variable data based on index
     const loadSingleVariableDataByIndex = async (variableIndex: number) => {
-      return new Promise(async (resolve) => {
+      return new Promise(async (resolve, reject) => {
         // if variableIndex is not valid, return
         if (variableIndex < 0) resolve(false);
 
@@ -303,6 +327,14 @@ export default defineComponent({
         if (!currentVariable) {
           return resolve(false);
         }
+
+        // assign current promise reject object to currentlyExecutingPromises object
+        if (currentlyExecutingPromises[currentVariable.name]) {
+          // if the variable is already loading, reject that promise
+          currentlyExecutingPromises[currentVariable.name](false);
+        }
+        // assign current promise reject object to currentlyExecutingPromises object
+        currentlyExecutingPromises[currentVariable.name] = reject;
 
         // need to load the current variable
         if (currentVariable.isVariableLoadingPending == false) {
@@ -498,8 +530,62 @@ export default defineComponent({
         }
 
         resolve(true);
-      }).then((res) => {
-        if (res) {
+      })
+        .then((res) => {
+          if (res) {
+            // if (!res) return;
+            // if variableIndex is not valid, return
+            if (variableIndex < 0) return;
+            // variables data
+            const currentVariable = variablesData.values[variableIndex];
+            // if currentVariable is undefined, return
+            if (!currentVariable) {
+              return;
+            }
+
+            // remove the current promise from currentlyExecutingPromises
+            currentlyExecutingPromises[currentVariable.name] = null;
+
+            // set old variables data
+            oldVariablesData[currentVariable.name] = currentVariable.value;
+
+            // mark current variable as loaded
+            currentVariable.isLoading = false;
+            currentVariable.isVariableLoadingPending = false;
+
+            // check all variables are loaded?
+            // if all variables are loaded, set isVariablesLoading to false
+            variablesData.isVariablesLoading = variablesData.values.some(
+              (val: { isLoading: any; isVariableLoadingPending: any }) =>
+                val.isLoading || val.isVariableLoadingPending
+            );
+
+            // now, load all it's child variables
+            const childVariableIndices = variablesData.values.reduce(
+              (indices: number[], variable: any, index: number) => {
+                if (
+                  variablesDependencyGraph[
+                    currentVariable.name
+                  ].childVariables.includes(variable.name)
+                ) {
+                  indices.push(index);
+                }
+                return indices;
+              },
+              []
+            );
+
+            // will force update the variables data
+            emitVariablesData();
+
+            Promise.all(
+              childVariableIndices.map((childIndex: number) =>
+                loadSingleVariableDataByIndex(childIndex)
+              )
+            );
+          }
+        })
+        .catch((res) => {
           // if (!res) return;
           // if variableIndex is not valid, return
           if (variableIndex < 0) return;
@@ -510,45 +596,12 @@ export default defineComponent({
             return;
           }
 
-          // set old variables data
-          oldVariablesData[currentVariable.name] = currentVariable.value;
+          // remove the current promise from currentlyExecutingPromises
+          currentlyExecutingPromises[currentVariable.name] = null;
 
-          // mark current variable as loaded
+          // set isLoading as false
           currentVariable.isLoading = false;
-          currentVariable.isVariableLoadingPending = false;
-
-          // check all variables are loaded?
-          // if all variables are loaded, set isVariablesLoading to false
-          variablesData.isVariablesLoading = variablesData.values.some(
-            (val: { isLoading: any; isVariableLoadingPending: any }) =>
-              val.isLoading || val.isVariableLoadingPending
-          );
-
-          // now, load all it's child variables
-          const childVariableIndices = variablesData.values.reduce(
-            (indices: number[], variable: any, index: number) => {
-              if (
-                variablesDependencyGraph[
-                  currentVariable.name
-                ].childVariables.includes(variable.name)
-              ) {
-                indices.push(index);
-              }
-              return indices;
-            },
-            []
-          );
-
-          // will force update the variables data
-          emitVariablesData();
-
-          Promise.all(
-            childVariableIndices.map((childIndex: number) =>
-              loadSingleVariableDataByIndex(childIndex)
-            )
-          );
-        }
-      });
+        });
     };
 
     const loadAllVariablesData = async () => {

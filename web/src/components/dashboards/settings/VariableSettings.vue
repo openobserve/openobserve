@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-outline
               rounded
               color="primary"
-              label="Show Variables Dependencies"
+              label="Show Dependencies"
               @click="showVariablesDependenciesGraphPopUp = true"
             />
             <q-btn
