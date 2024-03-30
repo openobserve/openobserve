@@ -164,20 +164,17 @@ impl Search for Searcher {
 
     async fn cancel_job(
         &self,
-        _req: Request<CancelJobRequest>,
+        req: Request<CancelJobRequest>,
     ) -> Result<Response<CancelJobResponse>, Status> {
-        let mut id = "".to_string();
-        if let Some(pair) = self.task_manager.iter().next() {
-            id = pair.key().clone();
-        }
-        match self.task_manager.remove(&id) {
+        let session_id = req.into_inner().session_id;
+        match self.task_manager.remove(&session_id) {
             Some((_, senders)) => {
                 for sender in senders.into_iter().rev() {
                     let _ = sender.send(());
                 }
-                Err(Status::internal("cancel task".to_string()))
+                Ok(Response::new(CancelJobResponse { success: true }))
             }
-            None => Err(Status::internal("No senders found.".to_string())),
+            None => Ok(Response::new(CancelJobResponse { success: false })),
         }
     }
 }
@@ -224,7 +221,6 @@ impl Searcher {
             let task = tokio::task::spawn(
                 async move {
                     let mut request = tonic::Request::new(JobStatusRequest {});
-                    // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
                     opentelemetry::global::get_text_map_propagator(|propagator| {
                         propagator.inject_context(
@@ -310,8 +306,119 @@ impl Searcher {
         Ok(search::JobStatusResponse { status })
     }
 
-    pub async fn cancel_job_enter(&self, _session_id: &str) -> Result<search::Response, Error> {
-        Ok(search::Response::new(0, 0))
+    pub async fn cancel_job_enter(
+        &self,
+        session_id: &str,
+    ) -> Result<search::CancelJobResponse, Error> {
+        // get nodes from cluster
+        let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
+        // sort nodes by node_id this will improve hit cache ratio
+        nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+        let nodes = nodes;
+
+        // make cluster request
+        let mut tasks = Vec::new();
+        for (_, node) in nodes.iter().cloned().enumerate() {
+            let node_addr = node.grpc_addr.clone();
+            let grpc_span = info_span!(
+                "service:search:cluster:grpc_search",
+                node_id = node.id,
+                node_addr = node_addr.as_str(),
+            );
+
+            let session_id = session_id.to_string();
+            let task = tokio::task::spawn(
+                async move {
+                    let mut request = tonic::Request::new(CancelJobRequest { session_id });
+                    // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+
+                    opentelemetry::global::get_text_map_propagator(|propagator| {
+                        propagator.inject_context(
+                            &tracing::Span::current().context(),
+                            &mut MetadataMap(request.metadata_mut()),
+                        )
+                    });
+
+                    let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                        .parse()
+                        .map_err(|_| Error::Message("invalid token".to_string()))?;
+                    let channel = Channel::from_shared(node_addr)
+                        .unwrap()
+                        .connect()
+                        .await
+                        .map_err(|err| {
+                            log::error!(
+                                "search->grpc: node: {}, connect err: {:?}",
+                                &node.grpc_addr,
+                                err
+                            );
+                            server_internal_error("connect search node error")
+                        })?;
+                    let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
+                        channel,
+                        move |mut req: Request<()>| {
+                            req.metadata_mut().insert("authorization", token.clone());
+                            //  req.metadata_mut()
+                            //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                            Ok(req)
+                        },
+                    );
+                    client = client
+                        .send_compressed(CompressionEncoding::Gzip)
+                        .accept_compressed(CompressionEncoding::Gzip)
+                        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+                        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                    let response = match client.cancel_job(request).await {
+                        Ok(res) => res.into_inner(),
+                        Err(err) => {
+                            log::error!(
+                                "search->grpc: node: {}, search err: {:?}",
+                                &node.grpc_addr,
+                                err
+                            );
+                            if err.code() == tonic::Code::Internal {
+                                let err = ErrorCodes::from_json(err.message())?;
+                                return Err(Error::ErrorCode(err));
+                            }
+                            return Err(server_internal_error("search node error"));
+                        }
+                    };
+                    Ok(response)
+                }
+                .instrument(grpc_span),
+            );
+            tasks.push(task);
+        }
+
+        let mut results = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok(res) => match res {
+                    Ok(res) => results.push(res),
+                    Err(err) => {
+                        return Err(err);
+                    }
+                },
+                Err(e) => {
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        e.to_string(),
+                    )));
+                }
+            }
+        }
+
+        let mut success = false;
+        for res in results {
+            if res.success {
+                success = true;
+                break;
+            }
+        }
+
+        Ok(search::CancelJobResponse {
+            session_id: session_id.to_string(),
+            success,
+        })
     }
 
     #[async_recursion]
