@@ -306,7 +306,7 @@ pub async fn handle_trace_request(
                     &traces_stream_name,
                     StreamType::Traces,
                     &mut traces_schema_map,
-                    &record_val,
+                    vec![&record_val],
                     timestamp.try_into().unwrap(),
                 )
                 .await;

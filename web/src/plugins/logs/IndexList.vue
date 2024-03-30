@@ -65,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="field-table full-height"
         id="fieldList"
         :rows-per-page-options="[]"
-        :hidePagination="
-          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage
+        :hide-bottom="
+          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage || searchObj.data.stream.selectedStreamFields.length == 0
         "
       >
         <template #body-cell-name="props">

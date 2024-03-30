@@ -285,7 +285,7 @@ RETURNING *;"#;
                     res.err().unwrap()
                 );
             } else {
-                log::info!("[SCHEDULER] clean up complete");
+                log::debug!("[JOBS SCHEDULER] clean up complete");
             }
         }
     }
@@ -322,7 +322,7 @@ WHERE status = $2 AND end_time <= $3;
                     res.err().unwrap()
                 );
             } else {
-                log::info!("[SCHEDULER] watch timeout run complete");
+                log::debug!("[JOBS SCHEDULER] watch timeout run complete");
             }
         }
     }

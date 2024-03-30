@@ -283,6 +283,9 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
+pub static BLOCKED_STREAMS: Lazy<Vec<&str>> =
+    Lazy::new(|| CONFIG.common.blocked_streams.split(',').collect());
+
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
@@ -601,6 +604,14 @@ pub struct Common {
         help = "Run autimatic schema migration on start up"
     )]
     pub run_schema_migration_on_start_up: bool,
+    #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
+    pub blocked_streams: String,
+    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
+    pub infer_schema_per_request: bool,
+    #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]
+    pub report_user_name: String,
+    #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
+    pub report_user_password: String,
 }
 
 #[derive(EnvConfig)]
@@ -705,8 +716,6 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
-    #[env_config(name = "ZO_ENTRY_PER_SCHEMA_VERSION_ENABLED", default = true)]
-    pub row_per_schema_version_enabled: bool,
 }
 
 #[derive(EnvConfig)]

@@ -16,7 +16,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, Schema};
 use config::{
     meta::stream::{PartitionTimeLevel, StreamType},
     utils::{
@@ -150,6 +150,110 @@ pub fn cast_to_type(
     }
 }
 
+pub fn cast_to_schema_v1(
+    value: &mut Map<String, Value>,
+    schema_map: &HashMap<&String, &DataType>,
+) -> Result<(), anyhow::Error> {
+    let mut parse_error = String::new();
+    for (field_name, data_type) in schema_map {
+        let field_name_str = field_name.to_owned().to_owned();
+        // let field_name = field_name_str.to_owned();
+        let Some(val) = value.get(&field_name_str) else {
+            continue;
+        };
+        if val.is_null() {
+            value.insert(field_name_str, Value::Null);
+            continue;
+        }
+        match data_type {
+            DataType::Utf8 => {
+                if val.is_string() {
+                    continue;
+                }
+                value.insert(field_name_str, Value::String(get_string_value(val)));
+            }
+            DataType::Int64 | DataType::Int32 | DataType::Int16 | DataType::Int8 => {
+                if val.is_i64() {
+                    continue;
+                }
+                if val.is_boolean() {
+                    value.insert(
+                        field_name_str,
+                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    );
+                    continue;
+                }
+                let val = get_string_value(val);
+                match val.parse::<i64>() {
+                    Ok(val) => {
+                        value.insert(field_name_str, Value::Number(val.into()));
+                    }
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                };
+            }
+            DataType::UInt64 | DataType::UInt32 | DataType::UInt16 | DataType::UInt8 => {
+                if val.is_u64() {
+                    continue;
+                }
+                if val.is_boolean() {
+                    value.insert(
+                        field_name_str,
+                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    );
+                    continue;
+                }
+                let val = get_string_value(val);
+                match val.parse::<u64>() {
+                    Ok(val) => {
+                        value.insert(field_name_str, Value::Number(val.into()));
+                    }
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                };
+            }
+            DataType::Float64 | DataType::Float32 | DataType::Float16 => {
+                if val.is_f64() {
+                    continue;
+                }
+                if val.is_boolean() {
+                    value.insert(
+                        field_name_str,
+                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    );
+                    continue;
+                }
+                let val = get_string_value(val);
+                match val.parse::<f64>() {
+                    Ok(val) => {
+                        value.insert(
+                            field_name_str,
+                            Value::Number(serde_json::Number::from_f64(val).unwrap()),
+                        );
+                    }
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                };
+            }
+            DataType::Boolean => {
+                if val.is_boolean() {
+                    continue;
+                }
+                let val = get_string_value(val);
+                match val.parse::<bool>() {
+                    Ok(val) => {
+                        value.insert(field_name_str, Value::Bool(val));
+                    }
+                    Err(_) => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+                };
+            }
+            _ => set_parsing_error_v1(&mut parse_error, &field_name_str, data_type),
+        };
+    }
+    if !parse_error.is_empty() {
+        Err(anyhow::Error::msg(parse_error))
+    } else {
+        Ok(())
+    }
+}
+
 async fn add_valid_record(
     stream_meta: &StreamMeta<'_>,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
@@ -171,7 +275,7 @@ async fn add_valid_record(
         &stream_meta.stream_name,
         StreamType::Logs,
         stream_schema_map,
-        &record_val,
+        vec![&record_val],
         timestamp,
     )
     .await?;
@@ -273,6 +377,52 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
         field.name(),
         field.data_type()
     ));
+}
+
+fn set_parsing_error_v1(parse_error: &mut String, field_name: &str, field_data_type: &DataType) {
+    parse_error.push_str(&format!(
+        "Failed to cast {} to type {} ",
+        field_name, field_data_type
+    ));
+}
+
+async fn add_record(
+    stream_meta: &StreamMeta<'_>,
+    write_buf: &mut HashMap<String, SchemaRecords>,
+    record_val: Map<String, Value>,
+) -> Result<()> {
+    let timestamp: i64 = record_val
+        .get(&CONFIG.common.column_timestamp)
+        .unwrap()
+        .as_i64()
+        .unwrap();
+    // get hour key
+    let hour_key = get_wal_time_key(
+        timestamp,
+        stream_meta.partition_keys,
+        unwrap_partition_time_level(*stream_meta.partition_time_level, StreamType::Logs),
+        &record_val,
+        None,
+    );
+
+    let hour_buf = write_buf.entry(hour_key).or_insert_with(|| {
+        let schema = Arc::new(Schema::empty());
+        let schema_key = schema.hash_key();
+        SchemaRecords {
+            schema_key,
+            schema,
+            records: vec![],
+            records_size: 0,
+        }
+    });
+    let record_value = Value::Object(record_val.clone());
+    hour_buf.records.push(Arc::new(record_value));
+    Ok(())
+}
+
+fn bool_to_serde_json_number(value: bool) -> serde_json::Number {
+    let num = value as i64;
+    serde_json::Number::from(num)
 }
 
 struct StreamMeta<'a> {

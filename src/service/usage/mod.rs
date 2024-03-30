@@ -125,8 +125,8 @@ pub async fn report_request_usage_stats(
             num_records: stats.records,
             stream_type,
             stream_name: stream_name.to_owned(),
-            min_ts: None,
-            max_ts: None,
+            min_ts: stats.min_ts,
+            max_ts: stats.max_ts,
             compressed_size: None,
         });
     };

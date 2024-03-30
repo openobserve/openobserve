@@ -31,6 +31,7 @@ import {
   useLocalWrapContent,
   useLocalTimezone,
   useLocalInterestingFields,
+  useLocalSavedView,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -55,6 +56,7 @@ const defaultObject = {
   loading: false,
   loadingHistogram: false,
   loadingStream: false,
+  loadingSavedView: false,
   shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
@@ -124,6 +126,7 @@ const defaultObject = {
     errorMsg: "",
     errorCode: 0,
     additionalErrorMsg: "",
+    savedViewFilterFields: "",
     stream: {
       loading: false,
       streamLists: <object[]>[],
@@ -222,6 +225,7 @@ const useLogs = () => {
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
+    searchObj.data.savedViews = [];
   };
 
   const updatedLocalLogFilterField = (): void => {
@@ -553,6 +557,11 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
+
+        if (!parsedSQL?.columns?.length) {
+          notificationMsg.value = "Invalid SQL Syntax";
+          return false;
+        }
 
         if (parsedSQL.orderby == null) {
           // showErrorNotification("Order by clause is required in SQL mode");
@@ -1130,9 +1139,8 @@ const useLogs = () => {
         (column.expr.column === "_timestamp" ||
           column.expr.column === "*" ||
           (column.expr.hasOwnProperty("args") &&
-            column.expr.args.expr.column === "_timestamp") || 
-          (column.hasOwnProperty("as") &&
-          column.as === "_timestamp"))
+            column.expr.args.expr.column === "_timestamp") ||
+          (column.hasOwnProperty("as") && column.as === "_timestamp"))
       ) {
         return true; // Found _timestamp column
       }
@@ -1468,6 +1476,7 @@ const useLogs = () => {
   async function extractFields() {
     try {
       searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.stream.interestingFieldList = [];
       let ftsKeys: Set<any> = new Set();
       let schemaFields: Set<any> = new Set();
       if (searchObj.data.streamResults.list.length > 0) {
@@ -1949,7 +1958,7 @@ const useLogs = () => {
     try {
       resetFunctions();
       await getStreamList();
-      await getSavedViews();
+      // await getSavedViews();
       await getFunctions();
       await extractFields();
       await getQueryData();
@@ -2126,24 +2135,33 @@ const useLogs = () => {
 
   const getSavedViews = async () => {
     try {
+      searchObj.loadingSavedView = true;
+      const favoriteViews: any = [];
       savedviewsService
         .get(store.state.selectedOrganization.identifier)
         .then((res) => {
+          searchObj.loadingSavedView = false;
           searchObj.data.savedViews = res.data.views;
         })
         .catch((err) => {
+          searchObj.loadingSavedView = false;
           console.log(err);
         });
     } catch (e: any) {
+      searchObj.loadingSavedView = false;
       console.log("Error while getting saved views", e);
     }
   };
 
   const onStreamChange = async (queryStr: string) => {
+    searchObj.data.queryResults = {
+      hits: [],
+    };
+
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
         ? queryStr
-        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}"`
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
       : "";
 
     await extractFields();
@@ -2191,6 +2209,57 @@ const useLogs = () => {
     }
   };
 
+  const addOrderByToQuery = (
+    sql: string,
+    column: string,
+    type: "ASC" | "DESC",
+    streamName: string
+  ) => {
+    // Parse the SQL query into an AST
+    const parsedQuery: any = parser.astify(sql);
+
+    // Check for the presence of an ORDER BY clause
+    const hasOrderBy = !!(
+      parsedQuery.orderby && parsedQuery.orderby.length > 0
+    );
+
+    // Check if _timestamp is in the SELECT clause if not SELECT *
+    const includesTimestamp = !!parsedQuery.columns.find(
+      (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
+    );
+
+    // If ORDER BY is present and doesn't include _timestamp, append it
+    if (!hasOrderBy) {
+      // If no ORDER BY clause, add it
+      parsedQuery.orderby = [
+        {
+          expr: {
+            type: "column_ref",
+            table: null,
+            column: column,
+          },
+          type: type,
+        },
+      ];
+    }
+
+    // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
+    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""), streamName);
+  };
+
+  function quoteTableNameDirectly(sql: string, streamName: string) {
+    // This regular expression looks for the FROM keyword followed by
+    // an optional schema name, a table name, and handles optional spaces.
+    // It captures the table name to be replaced with double quotes.
+    const regex = new RegExp(`FROM\\s+${streamName}`, 'gi')
+
+    // Replace the captured table name with the same name enclosed in double quotes
+    const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
+
+
+    return modifiedSql;
+  }
+
   return {
     searchObj,
     getStreams,
@@ -2222,6 +2291,7 @@ const useLogs = () => {
     filterHitsColumns,
     getHistogramQueryData,
     fnParsedSQL,
+    addOrderByToQuery,
   };
 };
 
