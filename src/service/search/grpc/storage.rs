@@ -252,18 +252,17 @@ pub async fn search(
         );
         let schema = Arc::new(schema);
 
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        if search_server.task_manager.contains_key(session_id) {
-            search_server
-                .task_manager
-                .get_mut(session_id)
-                .unwrap()
-                .push(abort_sender);
-        } else {
-            search_server
-                .task_manager
-                .insert(session_id.to_string(), vec![abort_sender]);
+        if !search_server.task_manager.contains_key(session_id) {
+            return Err(Error::Message(format!(
+                "[session_id {session_id}-{ver}] search->storage: search canceled before call search->storage"
+            )));
         }
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        search_server
+            .task_manager
+            .get_mut(session_id)
+            .unwrap()
+            .push(abort_sender);
 
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),

@@ -85,7 +85,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Searcher {
-    task_manager: Arc<DashMap<String, Vec<Sender<()>>>>,
+    pub task_manager: Arc<DashMap<String, TaskStatus>>,
 }
 
 impl Searcher {
@@ -99,6 +99,35 @@ impl Searcher {
 impl Default for Searcher {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[derive(Debug)]
+pub struct TaskStatus {
+    pub abort_senders: Vec<Sender<()>>,
+    pub time: std::time::Instant,
+    pub is_leader: bool,
+}
+
+impl TaskStatus {
+    pub fn new(is_leader: bool, abort_senders: Vec<Sender<()>>) -> Self {
+        Self {
+            abort_senders,
+            time: std::time::Instant::now(),
+            is_leader,
+        }
+    }
+
+    pub fn push(&mut self, sender: Sender<()>) {
+        self.abort_senders.push(sender);
+    }
+
+    pub fn is_leader(&self) -> bool {
+        self.is_leader
+    }
+
+    pub fn elapsed_time(&self) -> i64 {
+        self.time.elapsed().as_secs_f64() as i64
     }
 }
 
@@ -118,7 +147,24 @@ impl Search for Searcher {
         let req = req.get_ref().to_owned();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.clone();
-        match SearchService::grpc::search(self.clone(), &req).await {
+        let session_id = req.job.as_ref().unwrap().session_id.to_string();
+
+        // set search task
+        if !self.task_manager.contains_key(&session_id) {
+            self.task_manager
+                .insert(session_id.clone(), TaskStatus::new(false, vec![]));
+        }
+
+        let result = SearchService::grpc::search(self.clone(), &req).await;
+
+        // remove task
+        if self.task_manager.get(&session_id).is_some()
+            && !self.task_manager.get(&session_id).unwrap().is_leader()
+        {
+            self.task_manager.remove(&session_id);
+        }
+
+        match result {
             Ok(res) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
@@ -156,7 +202,7 @@ impl Search for Searcher {
         for pair in self.task_manager.iter() {
             status.push(JobStatus {
                 session_id: pair.key().clone(),
-                running_time: pair.value().len() as i64,
+                running_time: pair.value().elapsed_time(),
             });
         }
         Ok(Response::new(JobStatusResponse { status }))
@@ -169,7 +215,7 @@ impl Search for Searcher {
         let session_id = req.into_inner().session_id;
         match self.task_manager.remove(&session_id) {
             Some((_, senders)) => {
-                for sender in senders.into_iter().rev() {
+                for sender in senders.abort_senders.into_iter().rev() {
                     let _ = sender.send(());
                 }
                 Ok(Response::new(CancelJobResponse { success: true }))
@@ -193,12 +239,22 @@ impl Searcher {
         } else {
             session_id.to_string()
         };
+
+        // set search task
+        self.task_manager
+            .insert(session_id.clone(), TaskStatus::new(true, vec![]));
+
         let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
-        req.job.as_mut().unwrap().session_id = session_id;
+        req.job.as_mut().unwrap().session_id = session_id.clone();
         req.org_id = org_id.to_string();
         req.stype = cluster_rpc::SearchType::User as i32;
         req.stream_type = stream_type.to_string();
-        self.search_in_cluster(req).await
+        let res = self.search_in_cluster(req).await;
+
+        // remove task because task if finished
+        self.task_manager.remove(&session_id);
+
+        res
     }
 
     pub async fn job_status_enter(&self) -> Result<search::JobStatusResponse, Error> {
@@ -210,7 +266,7 @@ impl Searcher {
 
         // make cluster request
         let mut tasks = Vec::new();
-        for (_, node) in nodes.iter().cloned().enumerate() {
+        for node in nodes.iter().cloned() {
             let node_addr = node.grpc_addr.clone();
             let grpc_span = info_span!(
                 "service:search:cluster:grpc_search",
@@ -318,7 +374,7 @@ impl Searcher {
 
         // make cluster request
         let mut tasks = Vec::new();
-        for (_, node) in nodes.iter().cloned().enumerate() {
+        for node in nodes.iter().cloned() {
             let node_addr = node.grpc_addr.clone();
             let grpc_span = info_span!(
                 "service:search:cluster:grpc_search",
@@ -778,16 +834,16 @@ impl Searcher {
                 node_addr = node_addr.as_str(),
             );
 
-            let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-            if self.task_manager.contains_key(&session_id) {
-                self.task_manager
-                    .get_mut(&session_id)
-                    .unwrap()
-                    .push(abort_sender);
-            } else {
-                self.task_manager
-                    .insert(session_id.clone(), vec![abort_sender]);
+            if !self.task_manager.contains_key(&session_id) {
+                return Err(Error::Message(format!(
+                    "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
+                )));
             }
+            let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+            self.task_manager
+                .get_mut(&session_id)
+                .unwrap()
+                .push(abort_sender);
 
             let task = tokio::task::spawn(
             async move {
@@ -1183,9 +1239,6 @@ impl Searcher {
             result.took,
             result.scan_size,
         );
-
-        // remove task because task if finished
-        self.task_manager.remove(&session_id);
 
         Ok(result)
     }
