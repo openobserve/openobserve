@@ -1,13 +1,25 @@
 //<reference types="cypress" />
 import * as logstests from "../allfunctions/logs";
-import logsdata from "../../../../test-data/logs_data.json"
+import logsdata from "../../../../test-data/logs_data.json";
 // import logsdata from "../../data/logs_data.json";
 // import { login } from "../../support/commons"
 // import { selectStreamAndStreamType } from "../../support/log-commons";
 Cypress.on("uncaught:exception", (err, runnable) => {
   return false;
 });
-describe("Logs testcases", () => {
+
+function generateRandomName() {
+  const characters = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let randomName = "e2e_automate-";
+  for (let i = 0; i < 5; i++) {
+    randomName += characters.charAt(
+      Math.floor(Math.random() * characters.length)
+    );
+  }
+  randomName += "-1";
+  return randomName;
+}
+describe("Logs Quickmode testcases", () => {
   let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -67,41 +79,104 @@ describe("Logs testcases", () => {
     cy.visit(`${logData.logsUrl}?org_identifier=${Cypress.env("ORGNAME")}`);
     cy.intercept("POST", "**/api/default/_search**").as("allsearch");
     cy.selectStreamAndStreamTypeForLogs(logData.Stream);
-    applyQueryButton()
+    applyQueryButton();
     cy.wait("@allsearch");
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });
   it("should click on interesting fields icon and display query in editor", () => {
-    cy.get('[data-cy="index-field-search-input"]').type('_timestamp')
-    cy.wait(2000)
-    cy.get('.field-container').find('[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last').click({force:true});
+    cy.get('[data-cy="index-field-search-input"]').type("_timestamp");
+    cy.wait(2000);
+    cy.get(".field-container")
+      .find(
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
+      )
+      .click({ force: true });
     cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
-    cy.get('[data-test="logs-search-bar-query-editor"]').contains('_timestamp');
+    cy.get('[data-test="logs-search-bar-query-editor"]').contains("_timestamp");
   });
   it("should display quick mode toggle button", () => {
-    cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').should("be.visible")  
+    cy.get('[data-test="logs-search-bar-quick-mode-toggle-btn"]').should(
+      "be.visible"
+    );
   });
 
   it("should click on interesting fields icon in histogram mode and run query", () => {
-    cy.get('[data-cy="index-field-search-input"]').type('_timestamp')
-    cy.wait(2000)
-    cy.get('.field-container').find('[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last').click({force:true});
+    cy.get('[data-cy="index-field-search-input"]').type("_timestamp");
+    cy.wait(2000);
+    cy.get(".field-container")
+      .find(
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
+      )
+      .click({ force: true });
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content').click();
-    cy.get('[data-test="log-table-column-0-source"]').contains('_timestamp');
+    cy.get('[data-test="log-table-column-0-source"]').contains("_timestamp");
   });
 
   it("should display error on entering random text in histogram mode when quick mode is on", () => {
-    cy.get('[data-test="logs-search-bar-query-editor"]').type('oooo')
-    cy.wait(2000)
-    // cy.get('.field-container').find('[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last').click({force:true});
+    cy.get('[data-test="logs-search-bar-query-editor"]').type("oooo");
+    cy.wait(2000);
     cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content').click();
-    cy.get('[data-test="logs-search-error-message"]').contains('Error: Search field not found.');
+    cy.get('[data-test="logs-search-error-message"]').contains(
+      "Error: Search field not found."
+    );
   });
 
-  it("should click on interesting fields icon and display query in editor", () => {
-
-    cy.get('.field-container').find('[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last').click({force:true});
+  it("should display selected interestesing field and order by - as default in editor", () => {
+    cy.get(".field-container")
+      .find(
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
+      )
+      .click({ force: true });
     cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
-    cy.get('[data-test="logs-search-bar-query-editor"]').contains('_timestamp');
+    cy.get('[data-test="logs-search-bar-query-editor"]').contains(
+      '_timestamp FROM "e2e_automate" ORDER BY _timestamp DESC'
+    );
   });
-})  
+
+  it("should adding/removing interesting field removes it from editor and results too", () => {
+    cy.get('[data-cy="index-field-search-input"]').type("_timestamp");
+    cy.wait(2000);
+    cy.get(".field-container")
+      .find(
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
+      )
+      .click({ force: true });
+    cy.get('[data-cy="index-field-search-input"]').clear();
+    cy.get('[data-cy="index-field-search-input"]').type("kubernetes_pod_id");
+    cy.wait(2000);
+    cy.get(
+      '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]:last'
+    ).click({ force: true });
+    cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content').click();
+    cy.get('[data-test="log-table-column-0-source"]').contains(
+      "kubernetes_pod_id"
+    );
+    cy.get(
+      '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]:last'
+    ).click({ force: true });
+    cy.get('[data-test="logs-search-bar-query-editor"]').should(
+      "not.contain",
+      "kubernetes_pod_id"
+    );
+    cy.get('[data-cy="search-bar-refresh-button"] > .q-btn__content').click();
+    cy.get('[data-test="log-table-column-0-source"]').should(
+      "not.contain",
+      "kubernetes_pod_id"
+    );
+  });
+
+  it("should display order by in sql mode by default even after page reload", () => {
+    cy.get('[data-cy="index-field-search-input"]').type("_timestamp");
+    cy.wait(2000);
+    cy.get(".field-container")
+      .find(
+        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]:last'
+      )
+      .click({ force: true });
+    cy.get('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    cy.reload();
+    cy.wait(2000)
+    cy.get('[data-test="logs-search-bar-query-editor"]').contains('SELECT _timestamp FROM "e2e_automate" ORDER BY _timestamp DESC')
+  });
+});
