@@ -642,7 +642,7 @@ export default defineComponent({
           // filter has cycle, so show error and return
           filterCycleError.value = `Variables has cycle: ${hasCycle.join(
             "->"
-          )}`;
+          )} -> ${hasCycle[0]}`;
           return true;
         }
 
