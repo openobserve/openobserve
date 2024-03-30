@@ -900,6 +900,8 @@ pub async fn set_schema_metadata(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]
@@ -967,5 +969,25 @@ mod tests {
         .await
         .unwrap();
         assert!(result.0.schema_compatible);
+    }
+
+    #[tokio::test]
+    async fn test_infer_schema() {
+        let mut record_val: Vec<&Map<String, Value>> = vec![];
+
+        let record1: serde_json::Value = serde_json::Value::from_str(
+            r#"{"Year": 1896.99, "City": "Athens", "_timestamp": 1234234234234}"#,
+        )
+        .unwrap();
+        record_val.push(record1.as_object().unwrap());
+
+        let record: serde_json::Value = serde_json::Value::from_str(
+            r#"{"Year": 1896, "City": "Athens", "_timestamp": 1234234234234}"#,
+        )
+        .unwrap();
+        record_val.push(record.as_object().unwrap());
+        let stream_type = StreamType::Logs;
+        let value_iter = record_val.into_iter();
+        infer_json_schema_from_map(value_iter, stream_type).unwrap();
     }
 }
