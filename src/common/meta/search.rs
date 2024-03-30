@@ -298,7 +298,14 @@ pub struct SearchPartitionResponse {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct JobStatusResponse {
-    pub status: Vec<(String, i64)>,
+    pub status: Vec<JobStatus>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct JobStatus {
+    pub session_id: String,
+    pub running_time: i64,
+    pub is_queue: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
