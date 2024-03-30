@@ -305,6 +305,7 @@ pub async fn handle_trace_request(
 
                 // build trace metadata
                 trace_index.push(metadata::MetadataItem::TraceListIndexer(TraceListItem {
+                    stream_name: traces_stream_name.to_string(),
                     service_name: service_name.clone(),
                     trace_id,
                     _timestamp: start_time / 1000,
