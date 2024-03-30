@@ -38,6 +38,7 @@ pub struct TraceListIndex {
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub struct TraceListItem {
+    pub stream_name: String,
     pub service_name: String,
     pub trace_id: String,
     pub _timestamp: u64,
@@ -51,6 +52,7 @@ impl Metadata for TraceListIndex {
                 DataType::Int64,
                 false,
             ),
+            Field::new("stream_name", DataType::Utf8, false),
             Field::new("service_name", DataType::Utf8, false),
             Field::new("trace_id", DataType::Utf8, false),
         ]))
@@ -204,11 +206,9 @@ mod tests {
         let t = TraceListIndex::new();
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
         let item = metadata::MetadataItem::TraceListIndexer(TraceListItem {
-            stream_type: StreamType::Traces,
             stream_name: "default".to_string(),
             service_name: "oojaeger".to_string(),
             trace_id: "b09e986672880927996155acd4ef113c".to_string(),
-            // start_time: 1711267573271256000,
             _timestamp: 1711267573271714542,
         });
         let schema_key = "9d384d5af30d1657";
