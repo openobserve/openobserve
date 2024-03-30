@@ -35,7 +35,10 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{functions, http::get_stream_type_from_request},
     },
-    service::{search as SearchService, usage::report_request_usage_stats},
+    service::{
+        search::{self as SearchService, TaskStatus},
+        usage::report_request_usage_stats,
+    },
 };
 
 pub mod job;
@@ -198,6 +201,12 @@ pub async fn search(
             break;
         }
     }
+
+    // set search task
+    grpc_server
+        .get_ref()
+        .task_manager
+        .insert(session_id.clone(), TaskStatus::new(true, vec![]));
 
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
