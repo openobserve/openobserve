@@ -104,7 +104,7 @@ pub async fn get_versions(
     Ok(match db.get(&key).await {
         Err(e) => {
             if let Error::DbError(DbError::KeyNotExists(_)) = e {
-                vec![Schema::empty()]
+                vec![]
             } else {
                 return Err(anyhow::anyhow!("Error getting schema versions: {}", e));
             }
