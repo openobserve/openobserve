@@ -305,12 +305,9 @@ pub async fn handle_trace_request(
 
                 // build trace metadata
                 trace_index.push(metadata::MetadataItem::TraceListIndexer(TraceListItem {
-                    stream_type: StreamType::Traces,
-                    stream_name: traces_stream_name.to_string(),
                     service_name: service_name.clone(),
                     trace_id,
-                    start_time,
-                    end_time,
+                    _timestamp: start_time / 1000,
                 }));
 
                 // check schema
