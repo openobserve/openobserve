@@ -296,6 +296,11 @@ pub struct SearchPartitionResponse {
     pub partitions: Vec<[i64; 2]>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct JobStatusResponse {
+    pub status: Vec<(String, i64)>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
