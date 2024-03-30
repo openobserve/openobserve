@@ -352,12 +352,16 @@ impl Searcher {
                 }
             }
         }
-        let mut status = vec![];
+        let mut task_map: HashMap<String, i64> = HashMap::new();
         for res in results {
-            for statu in res.status {
-                status.push((statu.session_id, statu.running_time));
+            for s in res.status {
+                task_map
+                    .entry(s.session_id)
+                    .and_modify(|v| *v = (*v).max(s.running_time))
+                    .or_insert(s.running_time);
             }
         }
+        let status = task_map.into_iter().map(|(k, v)| (k, v)).collect();
 
         Ok(search::JobStatusResponse { status })
     }
