@@ -176,6 +176,13 @@ pub fn cast_to_schema_v1(
                 if val.is_i64() {
                     continue;
                 }
+                if val.is_boolean() {
+                    value.insert(
+                        field_name_str,
+                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    );
+                    continue;
+                }
                 let val = get_string_value(val);
                 match val.parse::<i64>() {
                     Ok(val) => {
@@ -188,6 +195,13 @@ pub fn cast_to_schema_v1(
                 if val.is_u64() {
                     continue;
                 }
+                if val.is_boolean() {
+                    value.insert(
+                        field_name_str,
+                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    );
+                    continue;
+                }
                 let val = get_string_value(val);
                 match val.parse::<u64>() {
                     Ok(val) => {
@@ -198,6 +212,13 @@ pub fn cast_to_schema_v1(
             }
             DataType::Float64 | DataType::Float32 | DataType::Float16 => {
                 if val.is_f64() {
+                    continue;
+                }
+                if val.is_boolean() {
+                    value.insert(
+                        field_name_str,
+                        Value::Number(bool_to_serde_json_number(val.as_bool().unwrap())),
+                    );
                     continue;
                 }
                 let val = get_string_value(val);
@@ -397,6 +418,11 @@ async fn add_record(
     let record_value = Value::Object(record_val.clone());
     hour_buf.records.push(Arc::new(record_value));
     Ok(())
+}
+
+fn bool_to_serde_json_number(value: bool) -> serde_json::Number {
+    let num = value as i64;
+    serde_json::Number::from(num)
 }
 
 struct StreamMeta<'a> {
