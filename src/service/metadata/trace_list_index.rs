@@ -38,12 +38,9 @@ pub struct TraceListIndex {
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub struct TraceListItem {
-    pub stream_type: StreamType,
-    pub stream_name: String,
     pub service_name: String,
     pub trace_id: String,
-    pub start_time: u64,
-    pub end_time: u64,
+    pub _timestamp: u64,
 }
 
 impl Metadata for TraceListIndex {
@@ -54,12 +51,8 @@ impl Metadata for TraceListIndex {
                 DataType::Int64,
                 false,
             ),
-            Field::new("stream_name", DataType::Utf8, false),
-            Field::new("stream_type", DataType::Utf8, false),
             Field::new("service_name", DataType::Utf8, false),
             Field::new("trace_id", DataType::Utf8, false),
-            Field::new("start_time", DataType::UInt64, false),
-            Field::new("end_time", DataType::UInt64, false),
         ]))
     }
     async fn write(&self, org_id: &str, items: Vec<MetadataItem>) -> infra::errors::Result<()> {
@@ -78,13 +71,8 @@ impl Metadata for TraceListIndex {
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
         for item in items {
             let MetadataItem::TraceListIndexer(item) = item;
-            let start_time = item.start_time / 1000;
             let mut data = json::to_value(item).unwrap();
             let data = data.as_object_mut().unwrap();
-            data.insert(
-                CONFIG.common.column_timestamp.clone(),
-                json::Value::Number(start_time.into()),
-            );
             let hour_key = ingestion::get_wal_time_key(
                 timestamp,
                 PARTITION_KEYS.to_vec().as_ref(),
@@ -220,8 +208,8 @@ mod tests {
             stream_name: "default".to_string(),
             service_name: "oojaeger".to_string(),
             trace_id: "b09e986672880927996155acd4ef113c".to_string(),
-            start_time: 1711267573271256000,
-            end_time: 1711267573271714542,
+            // start_time: 1711267573271256000,
+            _timestamp: 1711267573271714542,
         });
         let schema_key = "9d384d5af30d1657";
         let timestamp = chrono::Utc::now().timestamp_micros();
