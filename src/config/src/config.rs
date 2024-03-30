@@ -600,6 +600,10 @@ pub struct Common {
     pub blocked_streams: String,
     #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
     pub infer_schema_per_request: bool,
+    #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]
+    pub report_user_name: String,
+    #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
+    pub report_user_password: String,
 }
 
 #[derive(EnvConfig)]

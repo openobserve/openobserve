@@ -557,8 +557,9 @@ export default defineComponent({
           searchObj.data.query = addOrderByToQuery(
             searchObj.data.query,
             store.state.zoConfig.timestamp_column,
-            "DESC"
-          ).replace(/`/g, '"');
+            "DESC",
+            searchObj.data.stream.selectedStream.value
+          );
 
           searchObj.data.editorValue = searchObj.data.query;
 
