@@ -78,7 +78,6 @@ impl super::Db for MysqlDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let query = r#"SELECT value FROM meta WHERE module = ? AND key1 = ? AND key2 = ? ORDER BY start_dt DESC;"#;
-
         let value: String = match sqlx::query_scalar(query)
             .bind(module)
             .bind(key1)
@@ -179,7 +178,10 @@ impl super::Db for MysqlDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[MYSQL] get_for_update error: {}", e))); 
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                        }
+                        return Err(e.into());
                     }
                 }
             }
@@ -198,7 +200,10 @@ impl super::Db for MysqlDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[MYSQL] get_for_update error: {}", e))); 
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                        }
+                        return Err(e.into());
                     }
                 }
             }
@@ -449,12 +454,12 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id      BIGINT not null primary key AUTO_INCREMENT,
-    module  VARCHAR(100) not null,
-    key1    VARCHAR(256) not null,
-    key2    VARCHAR(256) not null,
-    start_dt    BIGINT not null,
-    value   LONGTEXT not null
+    id       BIGINT not null primary key AUTO_INCREMENT,
+    module   VARCHAR(100) not null,
+    key1     VARCHAR(256) not null,
+    key2     VARCHAR(256) not null,
+    start_dt BIGINT not null,
+    value    LONGTEXT not null
 );
         "#,
     )

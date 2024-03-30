@@ -465,15 +465,37 @@ async fn handle_diff_schema(
         );
     }
 
-    let Some((final_schema, field_datatype_delta)) = db::schema::merge(
-        org_id,
-        stream_name,
-        stream_type,
-        inferred_schema,
-        Some(record_ts),
-    )
-    .await?
-    else {
+    let mut retries = 0;
+    let mut err: Option<anyhow::Error> = None;
+    let mut ret: Option<_> = None;
+    // retry 3 times for update schema
+    while retries < 3 {
+        match db::schema::merge(
+            org_id,
+            stream_name,
+            stream_type,
+            inferred_schema,
+            Some(record_ts),
+        )
+        .await
+        {
+            Err(e) => {
+                log::error!("handle_diff_schema error: {}, retrying...{}", e, retries);
+                err = Some(e);
+                retries += 1;
+                continue;
+            }
+            Ok(v) => {
+                ret = v;
+                err = None;
+                break;
+            }
+        };
+    }
+    if let Some(e) = err {
+        return Err(e);
+    }
+    let Some((final_schema, field_datatype_delta)) = ret else {
         return Ok(None);
     };
 

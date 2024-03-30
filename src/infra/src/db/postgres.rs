@@ -17,7 +17,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::CONFIG;
+use config::{utils::hash::Sum32, CONFIG};
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use sqlx::{
@@ -76,9 +76,7 @@ impl super::Db for PostgresDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
-
         let query = r#"SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;"#;
-
         let value: String = match sqlx::query_scalar(query)
             .bind(module)
             .bind(key1)
@@ -160,17 +158,25 @@ impl super::Db for PostgresDb {
         start_dt: Option<i64>,
         update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
-        println!("i am try to get lock");
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
+        let lock_key = format!("get_for_update_{}", key);
+        let lock_id = config::utils::hash::gxhash::new().sum32(&lock_key);
+        let lock_sql = format!("SELECT pg_advisory_xact_lock({})", lock_id as i64);
+        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+            }
+            return Err(e.into());
+        };
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
                 r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4 FOR UPDATE;"#
             )
-              .bind(&module)
-              .bind(&key1)
-              .bind(&key2)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
             .bind(start_dt)
             .fetch_one(&mut *tx)
             .await
@@ -180,7 +186,10 @@ impl super::Db for PostgresDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[POSTGRES] get_for_update error: {}", e))); 
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                        }
+                        return Err(e.into());
                     }
                 }
             }
@@ -199,12 +208,14 @@ impl super::Db for PostgresDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[POSTGRES] get_for_update error: {}", e))); 
+                        if let Err(e) = tx.rollback().await {
+                            log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                        }
+                        return Err(e.into());
                     }
                 }
             }
         };
-        println!("i got lock");
         let exist = row.is_some();
         let row_id = row.as_ref().map(|r| r.id);
         let value = row.map(|r| Bytes::from(r.value));
@@ -219,7 +230,6 @@ impl super::Db for PostgresDb {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[POSTGRES] rollback get_for_update error: {}", e);
                 }
-                println!("i don't need update schema, now you can acquire lock again");
                 return Ok(());
             }
             Ok(Some(v)) => v,
@@ -274,15 +284,10 @@ impl super::Db for PostgresDb {
             }
         }
 
-        // TODO: delete
-        println!("i am sleeping 5s");
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-
         if let Err(e) = tx.commit().await {
             log::error!("[POSTGRES] commit get_for_update error: {}", e);
             return Err(e.into());
         }
-        println!("i commited, now you can acquire lock again");
 
         // event watch
         if need_watch {
@@ -453,12 +458,12 @@ pub async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id      BIGINT GENERATED ALWAYS AS IDENTITY,
-    module  VARCHAR(100) not null,
-    key1    VARCHAR(256) not null,
-    key2    VARCHAR(256) not null,
-    start_dt    BIGINT not null,
-    value   TEXT not null
+    id       BIGINT GENERATED ALWAYS AS IDENTITY,
+    module   VARCHAR(100) not null,
+    key1     VARCHAR(256) not null,
+    key2     VARCHAR(256) not null,
+    start_dt BIGINT not null,
+    value    TEXT not null
 );
         "#,
     )

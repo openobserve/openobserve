@@ -620,12 +620,12 @@ async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id      INTEGER  not null primary key autoincrement,
-    module  VARCHAR  not null,
-    key1    VARCHAR not null,
-    key2    VARCHAR not null,
-    start_dt    INTEGER not null,
-    value   TEXT not null
+    id       INTEGER not null primary key autoincrement,
+    module   VARCHAR not null,
+    key1     VARCHAR not null,
+    key2     VARCHAR not null,
+    start_dt INTEGER not null,
+    value    TEXT not null
 );
         "#,
     )
