@@ -543,18 +543,21 @@ async fn add_start_dt_column() -> Result<()> {
 
     // delete old index meta_module_key2_idx
     let mut tx = pool.begin().await?;
-    if let Err(e) = sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+    if let Err(e) = sqlx::query(r#"DROP INDEX meta_module_key2_idx ON meta;"#)
         .execute(&mut *tx)
         .await
     {
-        log::error!(
-            "[MYSQL] Error in dropping index meta_module_key2_idx: {}",
-            e
-        );
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+        if !e.to_string().contains("check that column/key exists") {
+            // Check for the specific MySQL error code for duplicate column
+            log::error!(
+                "[MYSQL] Error in dropping index meta_module_key2_idx: {}",
+                e
+            );
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+            }
+            return Err(e.into());
         }
-        return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
@@ -567,7 +570,7 @@ async fn create_meta_backup() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
     // Create the meta_backup table like meta
-    if let Err(e) = sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330;"#)
+    if let Err(e) = sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 like meta;"#)
         .execute(&mut *tx)
         .await
     {

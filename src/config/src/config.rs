@@ -596,13 +596,6 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
-
-    #[env_config(
-        name = "ZO_RUN_SCHEMA_MIGRATION_ON_START_UP",
-        default = false,
-        help = "Run autimatic schema migration on start up"
-    )]
-    pub run_schema_migration_on_start_up: bool,
     #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
     pub blocked_streams: String,
     #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
