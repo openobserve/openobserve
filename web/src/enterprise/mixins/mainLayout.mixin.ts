@@ -28,6 +28,7 @@ const MainLayoutCloudMixin = {
         title: t("menu.function"),
         iconComponent: markRaw(FunctionIcon),
         link: "/functions",
+        name: 'functions',
       });
       linksList.value.splice(10, 0, {
         title: t("menu.billings"),
