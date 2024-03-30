@@ -17,36 +17,28 @@ use std::io::Error;
 
 use actix_web::{post, web, HttpResponse};
 
-use crate::handler::grpc::cluster_rpc::search_server::Search;
-
-#[post("/{org_id}/_cancel_job")]
+#[post("/_cancel_job/{session_id}")]
 pub async fn cancel_job(
-    _org_id: web::Path<String>,
+    session_id: web::Path<String>,
     grpc_server: web::Data<crate::service::search::Searcher>,
 ) -> Result<HttpResponse, Error> {
-    let request = crate::handler::grpc::cluster_rpc::CancelJobRequest { job_id: 0 };
     let res = grpc_server
         .get_ref()
-        .cancel_job(tonic::Request::new(request))
+        .cancel_job_enter(&session_id.into_inner())
         .await;
     match res {
-        Ok(_) => Ok(HttpResponse::Ok().body("hello")),
+        Ok(status) => Ok(HttpResponse::Ok().json(status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
     }
 }
 
-#[post("/{org_id}/_job_status")]
+#[post("/_job_status")]
 pub async fn job_status(
-    _org_id: web::Path<String>,
     grpc_server: web::Data<crate::service::search::Searcher>,
 ) -> Result<HttpResponse, Error> {
-    let request = crate::handler::grpc::cluster_rpc::GetJobStatusRequest { job_id: 0 };
-    let res = grpc_server
-        .get_ref()
-        .get_job_status(tonic::Request::new(request))
-        .await;
+    let res = grpc_server.get_ref().job_status_enter().await;
     match res {
-        Ok(_) => Ok(HttpResponse::Ok().body("hello")),
+        Ok(job_status) => Ok(HttpResponse::Ok().json(job_status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
     }
 }
