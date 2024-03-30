@@ -225,6 +225,7 @@ const useLogs = () => {
     searchObj.data.editorValue = "";
     searchObj.meta.sqlMode = false;
     searchObj.runQuery = false;
+    searchObj.data.savedViews = [];
   };
 
   const updatedLocalLogFilterField = (): void => {
@@ -556,6 +557,11 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
+
+        if (!parsedSQL?.columns?.length) {
+          notificationMsg.value = "Invalid SQL Syntax";
+          return false;
+        }
 
         if (parsedSQL.orderby == null) {
           // showErrorNotification("Order by clause is required in SQL mode");
@@ -2206,7 +2212,8 @@ const useLogs = () => {
   const addOrderByToQuery = (
     sql: string,
     column: string,
-    type: "ASC" | "DESC"
+    type: "ASC" | "DESC",
+    streamName: string
   ) => {
     // Parse the SQL query into an AST
     const parsedQuery: any = parser.astify(sql);
@@ -2221,12 +2228,6 @@ const useLogs = () => {
       (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
     );
 
-    console.log(
-      "has order by",
-      hasOrderBy,
-      "includesTimestamp",
-      includesTimestamp
-    );
     // If ORDER BY is present and doesn't include _timestamp, append it
     if (!hasOrderBy) {
       // If no ORDER BY clause, add it
@@ -2243,22 +2244,22 @@ const useLogs = () => {
     }
 
     // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""));
+    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""), streamName);
   };
 
-  function quoteTableNameDirectly(sql: string) {
+  function quoteTableNameDirectly(sql: string, streamName: string) {
     // This regular expression looks for the FROM keyword followed by
     // an optional schema name, a table name, and handles optional spaces.
     // It captures the table name to be replaced with double quotes.
-    const regex = /FROM\s+([a-zA-Z_][\w]*)/gi;
+    const regex = new RegExp(`FROM\\s+${streamName}`, 'gi')
 
     // Replace the captured table name with the same name enclosed in double quotes
-    const modifiedSql = sql.replace(regex, (match, tableName) => {
-      return `FROM "${tableName}"`;
-    });
+    const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
+
 
     return modifiedSql;
   }
+
   return {
     searchObj,
     getStreams,

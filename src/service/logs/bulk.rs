@@ -27,9 +27,8 @@ use config::{
     meta::{stream::StreamType, usage::UsageType},
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt, time::parse_timestamp_micro_from_value},
-    CONFIG, DISTINCT_FIELDS,
+    BLOCKED_STREAMS, CONFIG, DISTINCT_FIELDS,
 };
-use hashbrown::HashSet;
 
 use super::{add_record, cast_to_schema_v1, StreamMeta};
 use crate::{
@@ -102,7 +101,7 @@ pub async fn ingest(
     let mut doc_id = String::from("");
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
-    let mut blocked_stream_warnings: HashSet<String> = HashSet::new();
+    let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -124,10 +123,12 @@ pub async fn ingest(
 
             // skip blocked streams
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
-            if CONFIG.common.blocked_streams.contains(&key) {
-                if blocked_stream_warnings.insert(key) {
+            if BLOCKED_STREAMS.contains(&key.as_str()) {
+                // print warning only once
+                blocked_stream_warnings.entry(key).or_insert_with(|| {
                     log::warn!("stream [{stream_name}] is blocked from ingestion");
-                }
+                    true
+                });
                 continue; // skip
             }
 

@@ -608,6 +608,10 @@ pub struct Common {
     pub blocked_streams: String,
     #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
     pub infer_schema_per_request: bool,
+    #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]
+    pub report_user_name: String,
+    #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
+    pub report_user_password: String,
 }
 
 #[derive(EnvConfig)]
@@ -712,8 +716,6 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
-    #[env_config(name = "ZO_ENTRY_PER_SCHEMA_VERSION_ENABLED", default = true)]
-    pub row_per_schema_version_enabled: bool,
 }
 
 #[derive(EnvConfig)]

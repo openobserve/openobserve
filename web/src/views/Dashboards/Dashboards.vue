@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="q-table__title">{{ t("dashboard.header") }}</div>
+
       <q-input
         v-model="filterQuery"
         filled

@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :src="
               `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
             "
-            style="max-width: 150px; max-height: 31px;"
+            style="max-width: 150px; max-height: 31px"
           />
           <img
             class="appLogo"
@@ -92,8 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning"
-size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -183,8 +182,7 @@ size="xs" class="warning" />{{
           <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md"
-color="grey" text-color="white">
+                <q-avatar size="md" color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -353,6 +351,7 @@ import {
   outlinedFormatListBulleted,
   outlinedSettings,
   outlinedManageAccounts,
+  outlinedDescription,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import organizations from "@/services/organizations";
@@ -469,57 +468,74 @@ export default defineComponent({
         icon: outlinedHome,
         link: "/",
         exact: true,
+        name: "home",
       },
       {
         title: t("menu.search"),
         icon: outlinedSearch,
         link: "/logs",
+        name: "logs",
       },
       {
         title: t("menu.metrics"),
         icon: outlinedBarChart,
         link: "/metrics",
+        name: "metrics",
       },
       {
         title: t("menu.traces"),
         icon: outlinedAccountTree,
         link: "/traces",
+        name: "traces",
       },
       {
         title: t("menu.rum"),
         icon: "devices",
         link: "/rum/performance/overview",
+        name: "rum",
       },
       {
         title: t("menu.dashboard"),
         icon: outlinedDashboard,
         link: "/dashboards",
+        name: "dashboards",
+      },
+      {
+        title: t("menu.report"),
+        icon: outlinedDescription,
+        link: "/reports",
+        name: "reports",
       },
       {
         title: t("menu.index"),
         icon: outlinedWindow,
         link: "/streams",
+        name: "streams",
       },
       {
         title: t("menu.alerts"),
         icon: outlinedReportProblem,
         link: "/alerts",
+        name: "alerts",
       },
       {
         title: t("menu.ingestion"),
         icon: outlinedFilterAlt,
         link: "/ingestion",
+        name: "ingestion",
       },
       {
         title: t("menu.iam"),
         icon: outlinedManageAccounts,
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
+        name: "iam",
       },
       {
         title: t("menu.settings"),
         icon: outlinedSettings,
         link: "/settings/",
+        name: "settings",
       },
       {
         title: t("menu.slack"),
@@ -527,11 +543,13 @@ export default defineComponent({
         link: slackURL,
         target: "_blank",
         external: true,
+        name: "slack",
       },
       {
         title: t("menu.about"),
         icon: outlinedFormatListBulleted,
         link: "/about",
+        name: "about",
       },
     ]);
 
@@ -593,16 +611,31 @@ export default defineComponent({
       },
     ];
 
-    onMounted(() => (miniMode.value = true));
+    onMounted(() => {
+      miniMode.value = true;
+      filterMenus();
+    });
 
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
+
+    const filterMenus = () => {
+      const disableMenus = new Set(
+        store.state.zoConfig?.custom_hide_menus
+          ?.split(",")
+          ?.map((val: string) => val?.trim()) || []
+      );
+      linksList.value = linksList.value.filter(
+        (link: { name: string }) => !disableMenus.has(link.name)
+      );
+    };
 
     // additional links based on environment and conditions
     if (config.isCloud == "true") {
       linksList.value = mainLayoutMixin
         .setup()
         .leftNavigationLinks(linksList, t);
+      filterMenus();
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
@@ -829,6 +862,7 @@ export default defineComponent({
             linksList.value = mainLayoutMixin
               .setup()
               .leftNavigationLinks(linksList, t);
+            filterMenus();
           }
           store.dispatch("setConfig", res.data);
           await nextTick();

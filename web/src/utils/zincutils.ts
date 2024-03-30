@@ -594,6 +594,7 @@ export const localTimeSelectedTimezoneUTCTime = (
   // Convert the moment object to a Unix timestamp (in seconds)
   const unixTimestamp = convertedDate.unix() * 1000000;
 
+  console.log(unixTimestamp);
   return unixTimestamp;
 };
 
