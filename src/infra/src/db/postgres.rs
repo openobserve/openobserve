@@ -446,7 +446,8 @@ impl super::Db for PostgresDb {
 
     async fn add_start_dt_column(&self) -> Result<()> {
         create_meta_backup().await?;
-        add_start_dt_column().await
+        add_start_dt_column().await?;
+        Ok(())
     }
 }
 
@@ -480,22 +481,17 @@ CREATE TABLE IF NOT EXISTS meta
         return Err(e.into());
     }
 
+    // create start_dt cloumn for old version <= 0.9.2
+    add_start_dt_column().await?;
+
     // create table index
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);")
         .await?;
-
-    add_col(pool).await?;
-
-    match create_index_item(
+    create_index_item(
         "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
     )
-    .await{
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("[POSTGRES] create table meta meta_module_start_dt_idx error: {}", e);
-        }
-    }
+    .await?;
 
     Ok(())
 }
@@ -510,59 +506,48 @@ async fn create_index_item(sql: &str) -> Result<()> {
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    log::info!("[POSTGRES] ENTER: add_start_dt_column");
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
-
-    // Drop index if exists
     if let Err(e) = sqlx::query(
-        r#"
-        DROP INDEX IF EXISTS meta_module_key2_idx;
-        "#,
+        r#"ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;"#,
     )
     .execute(&mut *tx)
     .await
     {
-        log::error!("[POSTGRES] Error in dropping index : {}", e);
+        log::error!("[POSTGRES] Error in adding column start_dt: {}", e);
         if let Err(e) = tx.rollback().await {
             log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
         }
         return Err(e.into());
     }
 
-    // Commit transaction
-    if let Err(e) = tx.commit().await {
-        log::info!("[POSTGRES] Error in committing transaction: {}", e);
-        return Err(e.into());
-    }
-
-    add_col(pool).await?;
-
-    create_index_item(
-        "CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
-    ).await?;
-
-    log::info!("[POSTGRES] EXIT: add_start_dt_column");
-    Ok(())
-}
-
-async fn add_col(pool: Pool<Postgres>) -> Result<()> {
-    let mut tx1 = pool.begin().await?;
+    // Proceed to drop the index if it exists and create a new one if it does not exist
     if let Err(e) = sqlx::query(
-        r#"
-        ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;
-        "#,
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);"#
     )
-    .execute(&mut *tx1)
-    .await
-    {
-        log::error!("[POSTGRES] Error in  adding column: {}", e);
-        if let Err(e) = tx1.rollback().await {
+    .execute(&mut *tx)
+    .await {
+        log::error!("[POSTGRES] Error in adding index meta_module_start_dt_idx: {}", e);
+        if let Err(e) = tx.rollback().await {
             log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
         }
         return Err(e.into());
     }
-    if let Err(e) = tx1.commit().await {
+    if let Err(e) = sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+        .execute(&mut *tx)
+        .await
+    {
+        log::error!(
+            "[POSTGRES] Error in dropping index meta_module_key2_idx: {}",
+            e
+        );
+        if let Err(e) = tx.rollback().await {
+            log::error!("[POSTGRES] Error in rolling back transaction: {}", e);
+        }
+        return Err(e.into());
+    }
+
+    if let Err(e) = tx.commit().await {
         log::info!("[POSTGRES] Error in committing transaction: {}", e);
         return Err(e.into());
     };
@@ -572,21 +557,24 @@ async fn add_col(pool: Pool<Postgres>) -> Result<()> {
 async fn create_meta_backup() -> Result<()> {
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
-    if let Err(e) = sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS meta_backup AS SELECT * FROM meta;
-        "#,
-    )
-    .execute(&mut *tx)
-    .await
+    if let Err(e) =
+        sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
+            .execute(&mut *tx)
+            .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] rollback create table meta_backup error: {}", e);
+            log::error!(
+                "[POSTGRES] rollback create table meta_backup_20240330 error: {}",
+                e
+            );
         }
         return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::error!("[POSTGRES] commit create table meta_backup error: {}", e);
+        log::error!(
+            "[POSTGRES] commit create table meta_backup_20240330 error: {}",
+            e
+        );
         return Err(e.into());
     }
     Ok(())

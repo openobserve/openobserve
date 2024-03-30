@@ -441,8 +441,11 @@ impl super::Db for MysqlDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+
     async fn add_start_dt_column(&self) -> Result<()> {
-        add_start_dt_column().await
+        create_meta_backup().await?;
+        add_start_dt_column().await?;
+        Ok(())
     }
 }
 
@@ -476,25 +479,16 @@ CREATE TABLE IF NOT EXISTS meta
         return Err(e.into());
     }
 
+    // create start_dt cloumn for old version <= 0.9.2
+    add_start_dt_column().await?;
+
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
     create_index_item("CREATE INDEX meta_module_key1_idx on meta (module, key1);").await?;
-
-    add_col(pool).await?;
-
-    match create_index_item(
-        "CREATE UNIQUE INDEX  meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
+    create_index_item(
+        "CREATE UNIQUE INDEX meta_module_start_dt_idx on meta (module, key1, key2, start_dt);",
     )
-    .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!(
-                "[MYSQL] create table meta meta_module_start_dt_idx error: {}",
-                e
-            );
-        }
-    }
+    .await?;
 
     Ok(())
 }
@@ -513,107 +507,95 @@ async fn create_index_item(sql: &str) -> Result<()> {
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    log::info!("[MYSQL] ENTER: add_start_dt_column");
     let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
-
-    // Drop index if exists
-    if let Err(e) = sqlx::query(
-        r#"
-         DROP INDEX meta_module_key2_idx ON meta;
-         "#,
-    )
-    .execute(&mut *tx)
-    .await
-    {
-        log::error!("[MYSQL] Error in dropping index : {}", e);
-
-        if e.to_string().contains("Can't DROP") || e.to_string().contains("doesn't exist") {
-            log::info!("[MYSQL] Index did not exist, continuing.");
-        } else {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-            }
-
-            return Err(e.into());
-        }
-    }
-
-    // Commit transaction
-    if let Err(e) = tx.commit().await {
-        log::info!("[MYSQL] Error in committing transaction: {}", e);
-        return Err(e.into());
-    }
-    create_meta_backup(&pool).await?;
-    add_col(pool).await?;
-
-    create_index_item(
-        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
-    )
-    .await?;
-
-    log::info!("[MYSQL] EXIT: add_start_dt_column");
-    Ok(())
-}
-
-async fn add_col(pool: Pool<MySql>) -> Result<()> {
-    let mut tx1 = pool.begin().await?;
-    if let Err(e) = sqlx::query(
-        r#"
-        ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;
-        "#,
-    )
-    .execute(&mut *tx1)
-    .await
+    if let Err(e) =
+        sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;"#)
+            .execute(&mut *tx)
+            .await
     {
         if !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column
             log::error!("[MYSQL] Unexpected error in adding column: {}", e);
-            tx1.rollback().await?;
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+            }
             return Err(e.into());
         }
     }
-    if let Err(e) = tx1.commit().await {
+    if let Err(e) = tx.commit().await {
+        log::info!("[MYSQL] Error in committing transaction: {}", e);
+        return Err(e.into());
+    };
+
+    // create new index meta_module_start_dt_idx
+    if let Err(e) = create_index_item(
+        "CREATE UNIQUE INDEX meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);",
+    )
+    .await
+    {
+        log::error!(
+            "[MYSQL] Error in adding index meta_module_start_dt_idx: {}",
+            e
+        );
+        return Err(e);
+    }
+
+    // delete old index meta_module_key2_idx
+    let mut tx = pool.begin().await?;
+    if let Err(e) = sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+        .execute(&mut *tx)
+        .await
+    {
+        log::error!(
+            "[MYSQL] Error in dropping index meta_module_key2_idx: {}",
+            e
+        );
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());
     };
     Ok(())
 }
 
-async fn create_meta_backup(pool: &Pool<MySql>) -> Result<()> {
+async fn create_meta_backup() -> Result<()> {
+    let pool = CLIENT.clone();
     let mut tx = pool.begin().await?;
     // Create the meta_backup table like meta
-    if let Err(e) = sqlx::query(
-        r#"
-CREATE TABLE IF NOT EXISTS meta_backup LIKE meta;
-        "#,
-    )
-    .execute(&mut *tx)
-    .await
+    if let Err(e) = sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330;"#)
+        .execute(&mut *tx)
+        .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] rollback create table meta_backup error: {}", e);
+            log::error!(
+                "[MYSQL] rollback create table meta_backup_20240330 error: {}",
+                e
+            );
         }
         return Err(e.into());
     }
 
     // Check if meta_backup is empty before attempting to insert data
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM meta_backup")
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meta_backup_20240330")
         .fetch_one(&mut *tx)
         .await?;
 
-    if count.0 == 0 {
+    if count == 0 {
         // Attempt to insert data into meta_backup from meta since it's empty
-        if let Err(e) = sqlx::query(
-            r#"
-    INSERT INTO meta_backup SELECT * FROM meta;
-            "#,
-        )
-        .execute(&mut *tx)
-        .await
+        if let Err(e) = sqlx::query(r#"INSERT INTO meta_backup_20240330 SELECT * FROM meta;"#)
+            .execute(&mut *tx)
+            .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback insert into meta_backup error: {}", e);
+                log::error!(
+                    "[MYSQL] rollback insert into meta_backup_20240330 error: {}",
+                    e
+                );
             }
             return Err(e.into());
         }

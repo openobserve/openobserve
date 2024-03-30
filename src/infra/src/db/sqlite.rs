@@ -593,21 +593,8 @@ impl super::Db for SqliteDb {
     async fn add_start_dt_column(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        println!("[SQLITE] ENTER: add_start_dt_column");
-
-        add_col(&client).await?;
-
-        // Proceed to drop the index if it exists and create a new one if it does not exist
-        sqlx::query(
-        r#"
-        DROP INDEX IF EXISTS meta_module_key2_idx;
-        CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);
-        "#
-    )
-    .execute(&*client)
-    .await?;
-
-        println!("[SQLITE] EXIT: add_start_dt_column");
+        create_meta_backup(&client).await?;
+        add_start_dt_column(&client).await?;
         Ok(())
     }
 }
@@ -631,6 +618,10 @@ CREATE TABLE IF NOT EXISTS meta
     )
     .execute(&*client)
     .await?;
+
+    // create start_dt cloumn for old version <= 0.9.2
+    add_start_dt_column(&client).await?;
+
     // create table index
     sqlx::query(
         r#"
@@ -640,8 +631,6 @@ CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
     )
     .execute(&*client)
     .await?;
-
-    add_col(&client).await?;
 
     match sqlx::query(
         r#"
@@ -662,30 +651,54 @@ CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1
     Ok(())
 }
 
-async fn add_col(client: &Pool<Sqlite>) -> Result<()> {
+async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
     // Attempt to add the column, ignoring the error if the column already exists
-    let add_column_result = sqlx::query(
-        r#"
-        ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;
-        "#,
-    )
-    .execute(client)
-    .await;
-
-    match add_column_result {
-        Ok(_) => {
-            println!("[SQLITE] Column added or already exists.");
-            Ok(())
-        }
-        Err(e) => {
-            // Check if the error is about the duplicate column
-            if e.to_string().contains("duplicate column name") {
-                // Ignore the duplicate column error and proceed
-                Ok(())
-            } else {
-                // If the error is not about the duplicate column, return it
-                Err(e.into())
-            }
+    if let Err(e) =
+        sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
+            .execute(client)
+            .await
+    {
+        // Check if the error is about the duplicate column
+        if !e.to_string().contains("duplicate column name") {
+            // If the error is not about the duplicate column, return it
+            return Err(e.into());
         }
     }
+
+    // Proceed to drop the index if it exists and create a new one if it does not exist
+    sqlx::query(
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);"#
+        )
+        .execute(client)
+        .await?;
+    sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+        .execute(client)
+        .await?;
+
+    Ok(())
+}
+
+async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
+    let mut tx = client.begin().await?;
+    if let Err(e) =
+        sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
+            .execute(&mut *tx)
+            .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[SQLITE] rollback create table meta_backup_20240330 error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!(
+            "[SQLITE] commit create table meta_backup_20240330 error: {}",
+            e
+        );
+        return Err(e.into());
+    }
+    Ok(())
 }
