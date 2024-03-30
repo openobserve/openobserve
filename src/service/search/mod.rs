@@ -107,6 +107,7 @@ pub struct TaskStatus {
     pub abort_senders: Vec<Sender<()>>,
     pub time: std::time::Instant,
     pub is_leader: bool,
+    pub is_queue: bool,
 }
 
 impl TaskStatus {
@@ -115,10 +116,14 @@ impl TaskStatus {
             abort_senders,
             time: std::time::Instant::now(),
             is_leader,
+            is_queue: true,
         }
     }
 
     pub fn push(&mut self, sender: Sender<()>) {
+        if self.is_queue {
+            self.is_queue = false;
+        }
         self.abort_senders.push(sender);
     }
 
@@ -203,6 +208,7 @@ impl Search for Searcher {
             status.push(JobStatus {
                 session_id: pair.key().clone(),
                 running_time: pair.value().elapsed_time(),
+                is_queue: pair.value().is_queue,
             });
         }
         Ok(Response::new(JobStatusResponse { status }))
@@ -354,16 +360,26 @@ impl Searcher {
                 }
             }
         }
-        let mut task_map: HashMap<String, i64> = HashMap::new();
+        let mut task_map: HashMap<String, (i64, bool)> = HashMap::new();
         for res in results {
             for s in res.status {
                 task_map
                     .entry(s.session_id)
-                    .and_modify(|v| *v = (*v).max(s.running_time))
-                    .or_insert(s.running_time);
+                    .and_modify(|(running_time, is_queue)| {
+                        *running_time = (*running_time).max(s.running_time);
+                        *is_queue = *is_queue || s.is_queue
+                    })
+                    .or_insert((s.running_time, s.is_queue));
             }
         }
-        let status = task_map.into_iter().map(|(k, v)| (k, v)).collect();
+        let status = task_map
+            .into_iter()
+            .map(|(session_id, (running_time, is_queue))| search::JobStatus {
+                session_id,
+                running_time,
+                is_queue,
+            })
+            .collect();
 
         Ok(search::JobStatusResponse { status })
     }
