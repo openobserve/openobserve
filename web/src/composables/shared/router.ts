@@ -46,6 +46,9 @@ const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
 
+const ReportList = () => import("@/components/reports/ReportList.vue");
+const CreateReport = () => import("@/components/reports/CreateReport.vue");
+
 const PerformanceSummary = () =>
   import("@/components/rum/performance/PerformanceSummary.vue");
 const WebVitalsDashboard = () =>
@@ -183,6 +186,24 @@ const useRoutes = () => {
       meta: {
         // keepAlive: true,
       },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/reports",
+      name: "reports",
+      component: ReportList,
+      props: true,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "/reports/create",
+      name: "createReport",
+      component: CreateReport,
+      props: true,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
