@@ -318,11 +318,11 @@ WHERE status = $2 AND end_time <= $3;
 
             if res.is_err() {
                 log::error!(
-                    "[SQLITE] error during watching for timeout for dead scheduled_jobs: {}",
+                    "[SCHEDULER] error during watching timeout jobs: {}",
                     res.err().unwrap()
                 );
             } else {
-                log::debug!("[JOBS SCHEDULER] watch timeout run complete");
+                log::debug!("[SCHEDULER] watching timeout jobs run complete");
             }
         }
     }
