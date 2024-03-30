@@ -301,6 +301,11 @@ pub struct JobStatusResponse {
     pub status: Vec<(String, i64)>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct CancelJobResponse {
+    pub session_id: String,
+    pub success: bool,
+}
 #[cfg(test)]
 mod tests {
     use super::*;
