@@ -275,18 +275,17 @@ pub async fn search_parquet(
             stream_type = stream_type.to_string(),
         );
 
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        if search_server.task_manager.contains_key(session_id) {
-            search_server
-                .task_manager
-                .get_mut(session_id)
-                .unwrap()
-                .push(abort_sender);
-        } else {
-            search_server
-                .task_manager
-                .insert(session_id.to_string(), vec![abort_sender]);
+        if !search_server.task_manager.contains_key(session_id) {
+            return Err(Error::Message(format!(
+                "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
+            )));
         }
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        search_server
+            .task_manager
+            .get_mut(session_id)
+            .unwrap()
+            .push(abort_sender);
 
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
@@ -483,18 +482,17 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        if search_server.task_manager.contains_key(session_id) {
-            search_server
-                .task_manager
-                .get_mut(session_id)
-                .unwrap()
-                .push(abort_sender);
-        } else {
-            search_server
-                .task_manager
-                .insert(session_id.to_string(), vec![abort_sender]);
+        if !search_server.task_manager.contains_key(session_id) {
+            return Err(Error::Message(format!(
+                "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
+            )));
         }
+        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        search_server
+            .task_manager
+            .get_mut(session_id)
+            .unwrap()
+            .push(abort_sender);
 
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
