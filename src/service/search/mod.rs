@@ -240,9 +240,11 @@ impl Searcher {
             session_id.to_string()
         };
 
-        // set search task
-        self.task_manager
-            .insert(session_id.clone(), TaskStatus::new(true, vec![]));
+        if !self.task_manager.contains_key(&session_id) {
+            return Err(Error::Message(format!(
+                "[session_id {session_id}] search: search canceled before call search_in_cluster",
+            )));
+        }
 
         let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
         req.job.as_mut().unwrap().session_id = session_id.clone();
