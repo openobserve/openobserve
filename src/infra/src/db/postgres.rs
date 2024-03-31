@@ -415,8 +415,13 @@ impl super::Db for PostgresDb {
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
-        let items = self.list(prefix).await?;
-        Ok(items.into_values().collect())
+        let mut items = self.list(prefix).await?;
+        let mut keys = items.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+        keys.sort();
+        Ok(keys
+            .into_iter()
+            .map(|k| items.remove(&k).unwrap())
+            .collect())
     }
 
     async fn count(&self, prefix: &str) -> Result<i64> {

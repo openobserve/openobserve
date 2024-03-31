@@ -249,7 +249,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                     if let Err(e) = merge::merge_by_stream(&org_id, stream_type, &stream_name).await
                     {
                         log::error!(
-                            "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
+                            "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
                             org_id,
                             stream_type,
                             stream_name,

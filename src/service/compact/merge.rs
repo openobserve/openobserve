@@ -53,7 +53,7 @@ pub async fn merge_by_stream(
     let start = std::time::Instant::now();
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}:{}:{}] start",
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] start",
         org_id,
         stream_type,
         stream_name,
@@ -105,7 +105,7 @@ pub async fn merge_by_stream(
     }
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}:{}:{}] offset: {}",
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] offset: {}",
         org_id,
         stream_type,
         stream_name,
@@ -200,7 +200,7 @@ pub async fn merge_by_stream(
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
 
     log::debug!(
-        "[COMPACTOR] merge_by_stream [{}:{}:{}] time range: [{},{}], files: {}",
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] time range: [{},{}], files: {}",
         org_id,
         stream_type,
         stream_name,
