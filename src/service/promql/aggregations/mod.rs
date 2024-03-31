@@ -15,11 +15,23 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+pub(crate) use avg::avg;
+pub(crate) use bottomk::bottomk;
 use config::FxIndexMap;
+pub(crate) use count::count;
+pub(crate) use count_values::count_values;
 use datafusion::error::{DataFusionError, Result};
+pub(crate) use group::group;
 use itertools::Itertools;
+pub(crate) use max::max;
+pub(crate) use min::min;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
+pub(crate) use quantile::quantile;
 use rayon::prelude::*;
+pub(crate) use stddev::stddev;
+pub(crate) use stdvar::stdvar;
+pub(crate) use sum::sum;
+pub(crate) use topk::topk;
 
 use crate::{
     common::meta::prom::{HASH_LABEL, NAME_LABEL},
@@ -41,19 +53,6 @@ mod stddev;
 mod stdvar;
 mod sum;
 mod topk;
-
-pub(crate) use avg::avg;
-pub(crate) use bottomk::bottomk;
-pub(crate) use count::count;
-pub(crate) use count_values::count_values;
-pub(crate) use group::group;
-pub(crate) use max::max;
-pub(crate) use min::min;
-pub(crate) use quantile::quantile;
-pub(crate) use stddev::stddev;
-pub(crate) use stdvar::stdvar;
-pub(crate) use sum::sum;
-pub(crate) use topk::topk;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ArithmeticItem {

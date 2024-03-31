@@ -47,8 +47,10 @@ use crate::{
     service::{
         db, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
-        metadata,
-        metadata::{distinct_values, trace_list_index::TraceListItem, MetadataType},
+        metadata::{
+            distinct_values::DvItem, trace_list_index::TraceListItem, write, MetadataItem,
+            MetadataType,
+        },
         schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -291,20 +293,20 @@ pub async fn handle_trace_request(
                             } else {
                                 ("".to_string(), "".to_string())
                             };
-                            distinct_values.push(distinct_values::DvItem {
+                            distinct_values.push(MetadataItem::DistinctValues(DvItem {
                                 stream_type: StreamType::Traces,
                                 stream_name: traces_stream_name.to_string(),
                                 field_name: field.to_string(),
                                 field_value: val.to_string(),
                                 filter_name,
                                 filter_value,
-                            });
+                            }));
                         }
                     }
                 }
 
                 // build trace metadata
-                trace_index.push(metadata::MetadataItem::TraceListIndexer(TraceListItem {
+                trace_index.push(MetadataItem::TraceListIndexer(TraceListItem {
                     stream_name: traces_stream_name.to_string(),
                     service_name: service_name.clone(),
                     trace_id,
@@ -385,14 +387,14 @@ pub async fn handle_trace_request(
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
 
     // send trace metadata
     if !trace_index.is_empty() {
-        if let Err(e) = metadata::write(org_id, MetadataType::TraceListIndexer, trace_index).await {
+        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }

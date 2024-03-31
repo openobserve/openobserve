@@ -38,7 +38,11 @@ use tokio::{
 use crate::{
     common::meta::stream::SchemaRecords,
     service,
-    service::{ingestion, stream::unwrap_partition_time_level},
+    service::{
+        ingestion,
+        metadata::{Metadata, MetadataItem},
+        stream::unwrap_partition_time_level,
+    },
 };
 
 const CHANNEL_SIZE: usize = 10240;
@@ -54,7 +58,7 @@ pub struct DistinctValues {
     mem_table: Arc<RwLock<MemTable>>,
 }
 
-#[derive(Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub struct DvItem {
     pub stream_type: StreamType,
     pub stream_name: String,
@@ -112,12 +116,60 @@ impl DistinctValues {
             mem_table: Arc::new(RwLock::new(FxIndexMap::default())),
         }
     }
+}
 
-    async fn write(&self, org_id: &str, data: Vec<DvItem>) -> Result<()> {
+fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
+    let (tx, mut rx) = mpsc::channel::<DvEvent>(CHANNEL_SIZE);
+    tokio::task::spawn(async move {
+        loop {
+            let event = match rx.recv().await {
+                Some(v) => v,
+                None => {
+                    log::info!("[DISTINCT_VALUES] event channel closed");
+                    break;
+                }
+            };
+            if let DvEventType::Shutudown = event.ev_type {
+                if let Err(e) = CHANNEL.flush().await {
+                    log::error!("[DISTINCT_VALUES] flush error: {}", e);
+                }
+                CHANNEL.shutdown.store(true, Ordering::Release);
+                break;
+            }
+            let mut mem_table = CHANNEL.mem_table.write().await;
+            let entry = mem_table.entry(event.org_id).or_default();
+            let field_entry = entry.entry(event.item).or_default();
+            *field_entry += event.count;
+        }
+        log::info!("[DISTINCT_VALUES] event loop exit");
+    });
+    Arc::new(tx)
+}
+
+impl Metadata for DistinctValues {
+    fn generate_schema(&self) -> Arc<Schema> {
+        Arc::new(Schema::new(vec![
+            Field::new(
+                CONFIG.common.column_timestamp.as_str(),
+                DataType::Int64,
+                false,
+            ),
+            Field::new("count", DataType::Int64, false),
+            Field::new("stream_name", DataType::Utf8, false),
+            Field::new("stream_type", DataType::Utf8, false),
+            Field::new("field_name", DataType::Utf8, false),
+            Field::new("field_value", DataType::Utf8, true),
+            Field::new("filter_name", DataType::Utf8, true),
+            Field::new("filter_value", DataType::Utf8, true),
+        ]))
+    }
+    async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            let count = group_items.entry(item).or_default();
-            *count += 1;
+            if let MetadataItem::DistinctValues(item) = item {
+                let count = group_items.entry(item).or_default();
+                *count += 1;
+            }
         }
         for (item, count) in group_items {
             self.channel
@@ -136,7 +188,7 @@ impl DistinctValues {
 
         // write to wal
         let timestamp = chrono::Utc::now().timestamp_micros();
-        let schema = generate_schema();
+        let schema = self.generate_schema();
         let schema_key = schema.hash_key();
         for (org_id, items) in new_table {
             if items.is_empty() {
@@ -219,34 +271,6 @@ impl DistinctValues {
     }
 }
 
-fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
-    let (tx, mut rx) = mpsc::channel::<DvEvent>(CHANNEL_SIZE);
-    tokio::task::spawn(async move {
-        loop {
-            let event = match rx.recv().await {
-                Some(v) => v,
-                None => {
-                    log::info!("[DISTINCT_VALUES] event channel closed");
-                    break;
-                }
-            };
-            if let DvEventType::Shutudown = event.ev_type {
-                if let Err(e) = CHANNEL.flush().await {
-                    log::error!("[DISTINCT_VALUES] flush error: {}", e);
-                }
-                CHANNEL.shutdown.store(true, Ordering::Release);
-                break;
-            }
-            let mut mem_table = CHANNEL.mem_table.write().await;
-            let entry = mem_table.entry(event.org_id).or_default();
-            let field_entry = entry.entry(event.item).or_default();
-            *field_entry += event.count;
-        }
-        log::info!("[DISTINCT_VALUES] event loop exit");
-    });
-    Arc::new(tx)
-}
-
 async fn run_flush() {
     let mut interval = time::interval(time::Duration::from_secs(10));
     interval.tick().await; // trigger the first run
@@ -256,30 +280,4 @@ async fn run_flush() {
             log::error!("[DISTINCT_VALUES] errot flush data to wal: {}", e);
         }
     }
-}
-
-pub async fn write(org_id: &str, data: Vec<DvItem>) -> Result<()> {
-    CHANNEL.write(org_id, data).await
-}
-
-pub async fn close() -> Result<()> {
-    CHANNEL.stop().await?;
-    Ok(())
-}
-
-fn generate_schema() -> Arc<Schema> {
-    Arc::new(Schema::new(vec![
-        Field::new(
-            CONFIG.common.column_timestamp.as_str(),
-            DataType::Int64,
-            false,
-        ),
-        Field::new("count", DataType::Int64, false),
-        Field::new("stream_name", DataType::Utf8, false),
-        Field::new("stream_type", DataType::Utf8, false),
-        Field::new("field_name", DataType::Utf8, false),
-        Field::new("field_value", DataType::Utf8, true),
-        Field::new("filter_name", DataType::Utf8, true),
-        Field::new("filter_value", DataType::Utf8, true),
-    ]))
 }

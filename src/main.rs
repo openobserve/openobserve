@@ -60,7 +60,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::db,
+    service::{db, metadata},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -74,10 +74,12 @@ use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, 
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]
 use pyroscope_pprofrs::{pprof_backend, PprofConfig};
-use tokio::sync::oneshot;
+use tokio::{signal::ctrl_c, sync::oneshot};
 use tonic::codec::CompressionEncoding;
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{
+    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter, Registry,
+};
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -86,11 +88,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-use openobserve::service::metadata;
-use tracing_subscriber::{
-    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
-};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -374,7 +371,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         }
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id%10))
+            .app_data(web::Data::new(local_id % 10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,

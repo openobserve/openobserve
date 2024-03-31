@@ -3,8 +3,12 @@ use std::{hash::Hash, sync::Arc};
 use arrow_schema::Schema;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use tokio::try_join;
 
-use crate::service::metadata::trace_list_index::{TraceListIndex, TraceListItem};
+use crate::service::metadata::{
+    distinct_values::{DistinctValues, DvItem},
+    trace_list_index::{TraceListIndex, TraceListItem},
+};
 
 pub mod distinct_values;
 pub mod trace_list_index;
@@ -14,6 +18,7 @@ static METADATA_MANAGER: Lazy<MetadataManager> = Lazy::new(MetadataManager::new)
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Serialize, Deserialize)]
 pub enum MetadataItem {
     TraceListIndexer(TraceListItem),
+    DistinctValues(DvItem),
 }
 
 pub enum MetadataType {
@@ -23,6 +28,7 @@ pub enum MetadataType {
 
 pub struct MetadataManager {
     trace_list_indexer: TraceListIndex,
+    distinct_values: DistinctValues,
 }
 
 pub trait Metadata {
@@ -46,11 +52,19 @@ impl MetadataManager {
     pub fn new() -> Self {
         Self {
             trace_list_indexer: TraceListIndex::new(),
+            distinct_values: DistinctValues::new(),
         }
     }
 
     pub async fn close(&self) -> infra::errors::Result<()> {
-        self.trace_list_indexer.stop().await
+        match try_join!(self.trace_list_indexer.stop(), self.distinct_values.stop()) {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!("[METADATA] error while closing: {}", e);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -60,20 +74,20 @@ pub async fn write(
     data: Vec<MetadataItem>,
 ) -> infra::errors::Result<()> {
     match mt {
-        MetadataType::TraceListIndexer => Ok(METADATA_MANAGER
-            .trace_list_indexer
-            .write(org_id, data)
-            .await?),
+        MetadataType::TraceListIndexer => {
+            METADATA_MANAGER
+                .trace_list_indexer
+                .write(org_id, data)
+                .await
+        }
         MetadataType::DistinctValues => {
             // todo distinct write move here
-            todo!()
+            METADATA_MANAGER.distinct_values.write(org_id, data).await
         }
     }
 }
 
 pub async fn close() -> infra::errors::Result<()> {
-    // flush distinct values, todo it will be close in MetadataManager
-    _ = distinct_values::close().await;
     // flush metadata
     METADATA_MANAGER.close().await
 }
