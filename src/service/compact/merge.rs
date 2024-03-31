@@ -52,6 +52,13 @@ pub async fn merge_by_stream(
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}:{}:{}] start",
+        org_id,
+        stream_type,
+        stream_name,
+    );
+
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -96,6 +103,15 @@ pub async fn merge_by_stream(
     if offset == 0 {
         return Ok(()); // no data
     }
+
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}:{}:{}] offset: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        offset
+    );
+
     let offset = offset;
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let offset_time_hour = Utc
@@ -182,6 +198,16 @@ pub async fn merge_by_stream(
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}:{}:{}] time range: [{},{}], files: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        partition_offset_start,
+        partition_offset_end,
+        files.len(),
+    );
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
