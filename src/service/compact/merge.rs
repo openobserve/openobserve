@@ -611,7 +611,7 @@ async fn merge_files(
                         );
                     }
                 } else {
-                    log::error!(
+                    log::warn!(
                         "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
                         retain_file_list
                     );
