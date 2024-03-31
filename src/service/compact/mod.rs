@@ -338,9 +338,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
                     if affected == 0 {
                         break;
                     }
-                    if CONFIG.common.print_key_event {
-                        log::info!("[COMPACTOR] deleted from file_list_deleted {affected} files");
-                    }
+                    log::debug!("[COMPACTOR] deleted from file_list_deleted {affected} files");
                 }
                 Err(e) => {
                     log::error!("[COMPACTOR] delete files error: {}", e);

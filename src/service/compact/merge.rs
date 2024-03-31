@@ -279,12 +279,6 @@ pub async fn merge_by_stream(
                     }
                 };
                 if new_file_name.is_empty() {
-                    if CONFIG.common.print_key_event {
-                        log::info!(
-                            "[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, new merge file is empty, new_file_list is {}",
-                            new_file_list.len()
-                        );
-                    }
                     if new_file_list.is_empty() {
                         // no file need to merge
                         break;
