@@ -537,7 +537,15 @@ async fn merge_files(
         stream_type,
         &mut fts_buf,
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        let files = tmp_dir.list("all").unwrap();
+        let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
+        DataFusionError::Plan(format!(
+            "merge_parquet_files err: {}, files: {:?}",
+            e, files
+        ))
+    })?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
