@@ -19,10 +19,7 @@ use chrono::Utc;
 use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFIG};
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::{HashMap, HashSet};
-use infra::{
-    cache,
-    db::{self as infra_db},
-};
+use infra::{cache, db as infra_db};
 
 use crate::{
     common::{

@@ -72,7 +72,13 @@ impl Metadata for TraceListIndex {
 
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
         for item in items {
-            let MetadataItem::TraceListIndexer(item) = item;
+            let item = match item {
+                MetadataItem::TraceListIndexer(item) => item,
+                _ => {
+                    continue;
+                }
+            };
+
             let mut data = json::to_value(item).unwrap();
             let data = data.as_object_mut().unwrap();
             let hour_key = ingestion::get_wal_time_key(

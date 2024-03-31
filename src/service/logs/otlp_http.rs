@@ -45,7 +45,7 @@ use crate::{
         ingestion::{
             evaluate_trigger, get_int_value, get_val_for_attr, write_file, TriggerAlertData,
         },
-        metadata::distinct_values,
+        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
         schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
@@ -195,7 +195,7 @@ pub async fn logs_json_handler(
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     "Invalid json: the structure must be {{\"resourceLogs\":[]}}".to_string(),
-                )))
+                )));
             }
         },
         None => match body.get("resource_logs") {
@@ -205,14 +205,14 @@ pub async fn logs_json_handler(
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                         http::StatusCode::BAD_REQUEST.into(),
                         "Invalid json: the structure must be {{\"resource_logs\":[]}}".to_string(),
-                    )))
+                    )));
                 }
             },
             None => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST.into(),
                     "Invalid json: the structure must be {{\"resourceLogs\":[]}} or {{\"resource_logs\":[]}}".to_string(),
-                )))
+                )));
             }
         },
     };
@@ -376,14 +376,14 @@ pub async fn logs_json_handler(
                 for field in DISTINCT_FIELDS.iter() {
                     if let Some(val) = local_val.get(field) {
                         if !val.is_null() {
-                            to_add_distinct_values.push(distinct_values::DvItem {
+                            to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
                                 stream_type: StreamType::Logs,
                                 stream_name: stream_name.to_string(),
                                 field_name: field.to_string(),
                                 field_value: val.as_str().unwrap().to_string(),
                                 filter_name: "".to_string(),
                                 filter_value: "".to_string(),
-                            });
+                            }));
                         }
                     }
                 }
@@ -433,7 +433,7 @@ pub async fn logs_json_handler(
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
