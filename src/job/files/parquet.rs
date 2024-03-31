@@ -508,7 +508,7 @@ pub(crate) async fn generate_index_on_ingester(
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-    log::warn!("[INGESTER:JOB] Written index wal file successfully");
+    log::info!("[INGESTER:JOB] Written index wal file successfully");
     Ok(())
 }
 
