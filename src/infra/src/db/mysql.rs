@@ -547,7 +547,9 @@ async fn add_start_dt_column() -> Result<()> {
         .execute(&mut *tx)
         .await
     {
-        if !e.to_string().contains("check that column/key exists") {
+        if !e.to_string().contains("check that column/key exists")
+            && !e.to_string().contains("check that it exists")
+        {
             // Check for the specific MySQL error code for duplicate column
             log::error!(
                 "[MYSQL] Error in dropping index meta_module_key2_idx: {}",
