@@ -530,7 +530,7 @@ async fn merge_files(
     let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
         &mut buf,
-        schema,
+        schema.clone(),
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
@@ -541,10 +541,13 @@ async fn merge_files(
     .map_err(|e| {
         let files = tmp_dir.list("all").unwrap();
         let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
-        DataFusionError::Plan(format!(
-            "merge_parquet_files err: {}, files: {:?}",
-            e, files
-        ))
+        log::error!(
+            "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
+            e,
+            files,
+            schema
+        );
+        DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
     })?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
