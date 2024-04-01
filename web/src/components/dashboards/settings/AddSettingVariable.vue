@@ -158,11 +158,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <div>
-                <div
-                  data-test="dashboard-query-values-filter"
-                  class="text-body1 text-bold q-mt-lg"
-                >
-                  Filters
+                <div class="flex flex-row">
+                  <div
+                    data-test="dashboard-query-values-filter"
+                    class="text-body1 text-bold q-mt-lg"
+                  >
+                    Filters
+                  </div>
+                  <q-icon
+                    class=""
+                    style="margin-top: 25px; margin-left: 5px"
+                    size="20px"
+                    name="info_outline"
+                    data-test="dashboard-variables-setting-filter-info"
+                  >
+                    <q-tooltip
+                      anchor="top middle"
+                      self="bottom middle"
+                      style="width: 250px"
+                    >
+                      In filters, you can use the value of another variable to
+                      filter the current variable's value. This can be done by
+                      using the other variable's name. For example:
+                      <span class="bg-highlight">$variableName</span>.
+                    </q-tooltip>
+                  </q-icon>
                 </div>
                 <div class="row items-center">
                   <div
@@ -219,10 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
                     />
                     <q-btn
-                      class="q-ml-sm"
                       size="sm"
-                      padding="13px 2px"
-                      square
+                      padding="12px 5px"
+                      style="margin-bottom: 20px"
                       flat
                       dense
                       @click="removeFilter(index)"
@@ -759,6 +778,7 @@ export default defineComponent({
 
     return {
       variableData,
+      store,
       t,
       data,
       streamsFilterFn,
@@ -794,5 +814,13 @@ export default defineComponent({
 .textbox {
   margin-top: 5px;
   margin-bottom: 5px;
+}
+
+.theme-dark .bg-highlight {
+  background-color: #747474;
+}
+
+.theme-light .bg-highlight {
+  background-color: #e7e6e6;
 }
 </style>
