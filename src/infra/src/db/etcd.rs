@@ -157,7 +157,7 @@ impl super::Db for Etcd {
         update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         // acquire lock and update
-        let lock_key = format!("/meta/{key}/{}", start_dt.unwrap_or_default());
+        let lock_key = format!("/meta{key}/{}", start_dt.unwrap_or_default());
         let locker = match dist_lock::lock(&lock_key, 0).await {
             Ok(v) => v,
             Err(e) => {
