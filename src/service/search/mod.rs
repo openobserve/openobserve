@@ -73,7 +73,7 @@ use crate::{
 };
 
 pub(crate) mod datafusion;
-pub mod grpc;
+pub(crate) mod grpc;
 pub(crate) mod sql;
 
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
@@ -102,19 +102,41 @@ impl Default for Searcher {
 
 #[derive(Debug)]
 pub struct TaskStatus {
+    // handle cancel query task
     pub abort_senders: Vec<Sender<()>>,
+    // start time of the query task
     pub time: std::time::Instant,
+    // is leader
     pub is_leader: bool,
+    // is query in queue
     pub is_queue: bool,
+    // the sql the task query
+    pub sql: Option<String>,
+    // time range of the task query
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    // the user of the query task
+    pub user: Option<String>,
 }
 
 impl TaskStatus {
-    pub fn new(is_leader: bool, abort_senders: Vec<Sender<()>>) -> Self {
+    pub fn new(
+        is_leader: bool,
+        abort_senders: Vec<Sender<()>>,
+        sql: Option<String>,
+        start_time: Option<i64>,
+        end_time: Option<i64>,
+        user: Option<String>,
+    ) -> Self {
         Self {
             abort_senders,
             time: std::time::Instant::now(),
             is_leader,
             is_queue: true,
+            sql,
+            start_time,
+            end_time,
+            user,
         }
     }
 
@@ -154,8 +176,10 @@ impl Search for Searcher {
 
         // set search task
         if !self.task_manager.contains_key(&session_id) {
-            self.task_manager
-                .insert(session_id.clone(), TaskStatus::new(false, vec![]));
+            self.task_manager.insert(
+                session_id.clone(),
+                TaskStatus::new(false, vec![], None, None, None, None),
+            );
         }
 
         let result = SearchService::grpc::search(&req).await;
@@ -203,10 +227,19 @@ impl Search for Searcher {
     ) -> Result<Response<JobStatusResponse>, Status> {
         let mut status = vec![];
         for pair in self.task_manager.iter() {
+            if !pair.value().is_leader() {
+                continue;
+            }
+            let session_id = pair.key();
+            let value = pair.value();
             status.push(JobStatus {
-                session_id: pair.key().clone(),
-                running_time: pair.value().elapsed_time(),
-                is_queue: pair.value().is_queue,
+                session_id: session_id.clone(),
+                running_time: value.elapsed_time(),
+                is_queue: value.is_queue,
+                sql: value.sql.clone(),
+                start_time: value.start_time,
+                end_time: value.end_time,
+                user: value.user.clone(),
             });
         }
         Ok(Response::new(JobStatusResponse { status }))
@@ -324,26 +357,25 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
             }
         }
     }
-    let mut task_map: HashMap<String, (i64, bool)> = HashMap::new();
-    for res in results {
-        for s in res.status {
-            task_map
-                .entry(s.session_id)
-                .and_modify(|(running_time, is_queue)| {
-                    *running_time = (*running_time).max(s.running_time);
-                    *is_queue = *is_queue || s.is_queue
-                })
-                .or_insert((s.running_time, s.is_queue));
+
+    let mut status = vec![];
+    let mut set = HashSet::new();
+    for result in results.into_iter().flat_map(|v| v.status.into_iter()) {
+        if set.contains(&result.session_id) {
+            continue;
+        } else {
+            set.insert(result.session_id.clone());
         }
+        status.push(search::JobStatus {
+            session_id: result.session_id,
+            running_time: result.running_time,
+            is_queue: result.is_queue,
+            sql: result.sql,
+            start_time: result.start_time,
+            end_time: result.end_time,
+            user: result.user,
+        });
     }
-    let status = task_map
-        .into_iter()
-        .map(|(session_id, (running_time, is_queue))| search::JobStatus {
-            session_id,
-            running_time,
-            is_queue,
-        })
-        .collect();
 
     Ok(search::JobStatusResponse { status })
 }
@@ -465,6 +497,7 @@ pub async fn search(
     session_id: &str,
     org_id: &str,
     stream_type: StreamType,
+    // user_id: Option<String>,
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let session_id = if session_id.is_empty() {
@@ -473,10 +506,14 @@ pub async fn search(
         session_id.to_string()
     };
 
+    let sql = Some(req.query.sql.clone());
+    let start_time = Some(req.query.start_time);
+    let end_time = Some(req.query.end_time);
     // set search task
-    SEARCH_SERVER
-        .task_manager
-        .insert(session_id.clone(), TaskStatus::new(true, vec![]));
+    SEARCH_SERVER.task_manager.insert(
+        session_id.clone(),
+        TaskStatus::new(true, vec![], sql, start_time, end_time, None),
+    );
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().session_id = session_id.clone();
