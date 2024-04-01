@@ -112,7 +112,7 @@ impl NatsDb {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => {
                 let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
-                let key = bucket_prefix.to_string() + &key;
+                let key = bucket_prefix.to_string() + key;
                 Ok((key, v))
             }
         }
