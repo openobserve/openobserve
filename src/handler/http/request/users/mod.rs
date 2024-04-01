@@ -210,6 +210,17 @@ pub async fn delete(
 )]
 #[post("/login")]
 pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+    #[cfg(feature = "enterprise")]
+    let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let native_login_enabled = true;
+
+    if !native_login_enabled {
+        return Ok(HttpResponse::Forbidden().json("Not Supported"));
+    }
+
     let mut resp = SignInResponse::default();
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
