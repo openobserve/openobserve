@@ -77,6 +77,10 @@ message JobStatus {
     string session_id = 1;
     int64 running_time = 2;
     bool is_queue = 3;
+    optional string sql = 4;
+    optional int64 start_time = 5;
+    optional int64 end_time = 6;
+    optional string user = 7;
 }
 
 message CancelJobRequest {

@@ -306,6 +306,10 @@ pub struct JobStatus {
     pub session_id: String,
     pub running_time: i64,
     pub is_queue: bool,
+    pub sql: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub user: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

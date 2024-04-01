@@ -15,9 +15,9 @@
 
 use std::io::Error;
 
-use actix_web::{post, web, HttpResponse};
+use actix_web::{delete, get, web, HttpResponse};
 
-#[post("/_cancel_job/{session_id}")]
+#[delete("/job/{session_id}")]
 pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
     match res {
@@ -26,7 +26,7 @@ pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, E
     }
 }
 
-#[post("/_job_status")]
+#[get("/job/status")]
 pub async fn job_status() -> Result<HttpResponse, Error> {
     let res = crate::service::search::job_status().await;
     match res {
