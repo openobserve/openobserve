@@ -19,23 +19,42 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::{
-        atomic::{AtomicU16, Ordering},
         Arc,
+        atomic::{AtomicU16, Ordering},
     },
     time::Duration,
 };
 
-use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
+use actix_web::{App, dev::ServerHandle, http::KeepAlive, HttpServer, middleware, web};
 use actix_web_opentelemetry::RequestTracing;
+use log::LevelFilter;
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
+    trace::v1::trace_service_server::TraceServiceServer,
+};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource, trace as sdktrace};
+#[cfg(feature = "profiling")]
+use pyroscope::PyroscopeAgent;
+#[cfg(feature = "profiling")]
+use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use tokio::sync::oneshot;
+use tonic::codec::CompressionEncoding;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{
+    EnvFilter, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, Registry,
+};
+
 use config::{
     cluster::{is_router, LOCAL_NODE_ROLE},
     CONFIG,
 };
-use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{self as common_infra, cluster, config::VERSION},
+        infra::{cluster, config::VERSION, self as common_infra},
         meta, migration,
         utils::zo_logger,
     },
@@ -62,24 +81,6 @@ use openobserve::{
     job, router,
     service::{db, metadata},
 };
-use opentelemetry::KeyValue;
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_proto::tonic::collector::{
-    logs::v1::logs_service_server::LogsServiceServer,
-    metrics::v1::metrics_service_server::MetricsServiceServer,
-    trace::v1::trace_service_server::TraceServiceServer,
-};
-use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
-#[cfg(feature = "profiling")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
-use tokio::{signal::ctrl_c, sync::oneshot};
-use tonic::codec::CompressionEncoding;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{
-    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter, Registry,
-};
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -92,16 +93,16 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     #[cfg(feature = "profiling")]
-    let agent = PyroscopeAgent::builder(
+        let agent = PyroscopeAgent::builder(
         &CONFIG.profiling.pyroscope_server_url,
         &CONFIG.profiling.pyroscope_project_name,
     )
-    .tags([("Host", "Rust")].to_vec())
-    .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-    .build()
-    .expect("Failed to setup pyroscope agent");
+        .tags([("Host", "Rust")].to_vec())
+        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+        .build()
+        .expect("Failed to setup pyroscope agent");
     #[cfg(feature = "profiling")]
-    let agent_running = agent.start().expect("Failed to start pyroscope agent");
+        let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
     // cli mode
     if cli::cli().await? {
@@ -218,7 +219,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     #[cfg(feature = "profiling")]
-    let agent_ready = agent_running.stop().unwrap();
+        let agent_ready = agent_running.stop().unwrap();
     #[cfg(feature = "profiling")]
     agent_ready.shutdown();
 
@@ -378,13 +379,13 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        5,
-        CONFIG.limit.keep_alive,
-    ))))
-    .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
-    .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
-    .bind(haddr)?;
+        .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
+            5,
+            CONFIG.limit.keep_alive,
+        ))))
+        .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
+        .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
+        .bind(haddr)?;
 
     let server = server
         .workers(CONFIG.limit.http_worker_num)
