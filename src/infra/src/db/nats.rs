@@ -80,6 +80,43 @@ impl NatsDb {
             prefix: prefix.to_string(),
         }
     }
+
+    async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        let bucket_name = bucket.status().await?.bucket;
+        let en_key = base64::encode_url(new_key);
+        if let Some(v) = bucket.get(&en_key).await? {
+            return Ok((key.to_string(), v));
+        }
+        // try as prefix, with start_dt
+        let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
+        let mut keys = keys
+            .into_iter()
+            .filter_map(|k| {
+                let key = base64::decode_url(&k).unwrap();
+                if key.starts_with(new_key) {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        let keys_len = keys.len();
+        if keys_len == 0 {
+            return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+        }
+        keys.sort();
+        let key = keys.last().unwrap();
+        let en_key = base64::encode_url(key);
+        match bucket.get(&en_key).await? {
+            None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
+            Some(v) => {
+                let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
+                let key = bucket_prefix.to_string() + &key;
+                Ok((key, v))
+            }
+        }
+    }
 }
 
 impl Default for NatsDb {
@@ -180,13 +217,15 @@ impl super::Db for NatsDb {
         log::info!("Acquired lock for cluster key: {}", lock_key);
 
         // get value and update
-        let value = self.get(key).await.ok();
-        let ret = match update_fn(value) {
+        let value = self.get_key_value(key).await.ok();
+        let old_key = value.as_ref().map(|v| v.0.clone());
+        let old_value = value.map(|v| v.1);
+        let ret = match update_fn(old_value) {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
                 if let Some(value) = value {
-                    if let Err(e) = self.put(key, value, need_watch, start_dt).await {
+                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
                         if let Err(e) = dist_lock::unlock(&locker).await {
                             log::error!("dist_lock unlock err: {}", e);
                         }

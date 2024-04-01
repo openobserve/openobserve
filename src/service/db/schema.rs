@@ -573,9 +573,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         match ev {
             infra_db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
+                let key_cloumns = ev.key.split('/').collect::<Vec<&str>>();
+                let ev_key = if key_cloumns.len() > 5 {
+                    key_cloumns[..5].join("/")
+                } else {
+                    ev.key.to_string()
+                };
+                let item_key = ev_key.strip_prefix(key).unwrap();
                 let db = infra_db::get_db().await;
-                let schema_versions = match db.list_values(&ev.key).await {
+                let schema_versions = match db.list_values(&ev_key).await {
                     Ok(val) => val
                         .iter()
                         .flat_map(|v| json::from_slice::<Vec<Schema>>(v).unwrap())

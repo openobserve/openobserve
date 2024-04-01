@@ -65,6 +65,28 @@ impl Etcd {
             prefix: prefix.to_string(),
         }
     }
+
+    async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
+        let key = format!("{}{}", self.prefix, key);
+        let mut client = get_etcd_client().await.clone();
+        let opt = GetOptions::new()
+            .with_prefix()
+            .with_sort(SortTarget::Key, SortOrder::Descend)
+            .with_limit(1);
+        let ret = client.get(key.as_str(), Some(opt)).await?;
+        if ret.kvs().is_empty() {
+            return Err(Error::from(DbError::KeyNotExists(key)));
+        }
+        let item_key = ret.kvs()[0]
+            .key_str()
+            .unwrap()
+            .strip_prefix(&self.prefix)
+            .unwrap();
+        Ok((
+            item_key.to_string(),
+            Bytes::from(ret.kvs()[0].value().to_vec()),
+        ))
+    }
 }
 
 impl Default for Etcd {
@@ -148,13 +170,15 @@ impl super::Db for Etcd {
         log::info!("Acquired lock for cluster key: {}", lock_key);
 
         // get value and update
-        let value = self.get(key).await.ok();
-        let ret = match update_fn(value) {
+        let value = self.get_key_value(key).await.ok();
+        let old_key = value.as_ref().map(|v| v.0.clone());
+        let old_value = value.map(|v| v.1);
+        let ret = match update_fn(old_value) {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
                 if let Some(value) = value {
-                    if let Err(e) = self.put(key, value, need_watch, start_dt).await {
+                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
                         if let Err(e) = dist_lock::unlock(&locker).await {
                             log::error!("dist_lock unlock err: {}", e);
                         }

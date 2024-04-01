@@ -97,7 +97,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let rt_handle = tokio::runtime::Handle::current();
     std::thread::spawn(move || {
         loop {
-            std::thread::sleep(Duration::from_secs(20));
+            std::thread::sleep(Duration::from_secs(10));
             rt_handle.spawn(std::future::ready(()));
         }
     });
