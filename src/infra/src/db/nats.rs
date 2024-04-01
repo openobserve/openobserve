@@ -113,7 +113,29 @@ impl super::Db for NatsDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = base64::encode_url(new_key);
-        match bucket.get(&key).await? {
+        if let Some(v) = bucket.get(&key).await? {
+            return Ok(v);
+        }
+        // try as prefix, with start_dt
+        let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
+        let mut keys = keys
+            .into_iter()
+            .filter_map(|k| {
+                let key = base64::decode_url(&k).unwrap();
+                if key.starts_with(new_key) {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        let keys_len = keys.len();
+        if keys_len == 0 {
+            return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+        }
+        keys.sort();
+        let key = keys.last().unwrap();
+        match bucket.get(key).await? {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => Ok(v),
         }
@@ -124,9 +146,14 @@ impl super::Db for NatsDb {
         key: &str,
         value: Bytes,
         _need_watch: bool,
-        _start_dt: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()> {
-        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        let key = if start_dt.is_some() {
+            format!("{}/{}", key, start_dt.unwrap())
+        } else {
+            key.to_string()
+        };
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, &key).await?;
         let key = base64::encode_url(new_key);
         _ = bucket.put(&key, value).await?;
         Ok(())

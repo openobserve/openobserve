@@ -99,7 +99,11 @@ impl super::Db for Etcd {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
-        let ret = client.get(key.as_str(), None).await?;
+        let opt = GetOptions::new()
+            .with_prefix()
+            .with_sort(SortTarget::Key, SortOrder::Descend)
+            .with_limit(1);
+        let ret = client.get(key.as_str(), Some(opt)).await?;
         if ret.kvs().is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key)));
         }
@@ -111,9 +115,13 @@ impl super::Db for Etcd {
         key: &str,
         value: Bytes,
         _need_watch: bool,
-        _start_dt: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()> {
-        let key = format!("{}{}", self.prefix, key);
+        let key = if start_dt.is_some() {
+            format!("{}{}/{}", self.prefix, key, start_dt.unwrap())
+        } else {
+            format!("{}{}", self.prefix, key)
+        };
         let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
         Ok(())

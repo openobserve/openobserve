@@ -93,6 +93,16 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // let tokio steal the thread
+    let rt_handle = tokio::runtime::Handle::current();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_secs(20));
+            rt_handle.spawn(std::future::ready(()));
+        }
+    });
+
+    // setup profiling
     #[cfg(feature = "profiling")]
     let agent = PyroscopeAgent::builder(
         &CONFIG.profiling.pyroscope_server_url,
