@@ -28,7 +28,11 @@ use tokio::sync::oneshot::{self, Receiver, Sender};
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::{common::meta::stream::ScanStats, handler::grpc::cluster_rpc, service::db};
+use crate::{
+    common::meta::stream::ScanStats,
+    handler::grpc::cluster_rpc,
+    service::{db, search::SEARCH_SERVER},
+};
 
 mod storage;
 mod wal;
@@ -37,7 +41,6 @@ pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, ScanStats), E
 
 #[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(session_id = req.job.as_ref().unwrap().session_id, org_id = req.org_id))]
 pub async fn search(
-    search_server: crate::service::search::Searcher,
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
     let start = std::time::Instant::now();
@@ -74,7 +77,6 @@ pub async fn search(
     let work_group1 = work_group.clone();
     let session_id1 = session_id.clone();
     let sql1 = sql.clone();
-    let search_server1 = search_server.clone();
     let wal_parquet_span = info_span!(
         "service:search:grpc:in_wal_parquet",
         session_id = session_id1.as_ref().clone(),
@@ -85,15 +87,7 @@ pub async fn search(
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_parquet(
-                    search_server1,
-                    &session_id1,
-                    sql1,
-                    stream_type,
-                    &work_group1,
-                    timeout,
-                )
-                .await
+                wal::search_parquet(&session_id1, sql1, stream_type, &work_group1, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -105,7 +99,6 @@ pub async fn search(
     let work_group2 = work_group.clone();
     let session_id2 = session_id.clone();
     let sql2 = sql.clone();
-    let search_server2 = search_server.clone();
     let wal_mem_span = info_span!(
         "service:search:grpc:in_wal_memory",
         session_id = session_id2.as_ref().clone(),
@@ -116,15 +109,7 @@ pub async fn search(
     let task2 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_memtable(
-                    search_server2,
-                    &session_id2,
-                    sql2,
-                    stream_type,
-                    &work_group2,
-                    timeout,
-                )
-                .await
+                wal::search_memtable(&session_id2, sql2, stream_type, &work_group2, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -137,7 +122,6 @@ pub async fn search(
     let work_group3 = work_group.clone();
     let session_id3 = session_id.clone();
     let sql3 = sql.clone();
-    let search_server3 = search_server.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     let storage_span = info_span!(
         "service:search:grpc:in_storage",
@@ -152,7 +136,6 @@ pub async fn search(
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
                 storage::search(
-                    search_server3,
                     &session_id3,
                     sql3,
                     &file_list,
@@ -213,13 +196,13 @@ pub async fn search(
             )
         };
 
-        if !search_server.task_manager.contains_key(session_id.as_ref()) {
+        if !SEARCH_SERVER.task_manager.contains_key(session_id.as_ref()) {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] task is cancel after get first stage result"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        search_server
+        SEARCH_SERVER
             .task_manager
             .get_mut(session_id.as_ref())
             .unwrap()

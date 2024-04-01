@@ -35,10 +35,7 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{functions, http::get_stream_type_from_request},
     },
-    service::{
-        search::{self as SearchService, TaskStatus},
-        usage::report_request_usage_stats,
-    },
+    service::{search as SearchService, usage::report_request_usage_stats},
 };
 
 pub mod job;
@@ -114,7 +111,6 @@ pub async fn search(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
-    grpc_server: web::Data<crate::service::search::Searcher>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let session_id = ider::uuid();
@@ -202,12 +198,6 @@ pub async fn search(
         }
     }
 
-    // set search task
-    grpc_server
-        .get_ref()
-        .task_manager
-        .insert(session_id.clone(), TaskStatus::new(true, vec![]));
-
     // get a local search queue lock
     #[cfg(not(feature = "enterprise"))]
     let locker = SearchService::QUEUE_LOCKER.clone();
@@ -223,11 +213,7 @@ pub async fn search(
     let took_wait = 0;
 
     // do search
-    match grpc_server
-        .get_ref()
-        .search_enter(&session_id, &org_id, stream_type, &req)
-        .await
-    {
+    match SearchService::search(&session_id, &org_id, stream_type, &req).await {
         Ok(mut res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
