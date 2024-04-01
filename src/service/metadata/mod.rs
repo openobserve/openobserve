@@ -37,9 +37,9 @@ pub trait Metadata {
         &self,
         org_id: &str,
         data: Vec<MetadataItem>,
-    ) -> impl std::future::Future<Output=infra::errors::Result<()>> + Send;
-    fn flush(&self) -> impl std::future::Future<Output=infra::errors::Result<()>> + Send;
-    fn stop(&self) -> impl std::future::Future<Output=infra::errors::Result<()>> + Send;
+    ) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
+    fn flush(&self) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
+    fn stop(&self) -> impl std::future::Future<Output = infra::errors::Result<()>> + Send;
 }
 
 impl Default for MetadataManager {
@@ -80,9 +80,7 @@ pub async fn write(
                 .write(org_id, data)
                 .await
         }
-        MetadataType::DistinctValues => {
-            METADATA_MANAGER.distinct_values.write(org_id, data).await
-        }
+        MetadataType::DistinctValues => METADATA_MANAGER.distinct_values.write(org_id, data).await,
     }
 }
 
