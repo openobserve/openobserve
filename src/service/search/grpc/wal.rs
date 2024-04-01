@@ -58,6 +58,7 @@ use crate::{
         search::{
             datafusion::{exec, storage::StorageType},
             sql::Sql,
+            SEARCH_SERVER,
         },
         stream::{stream_settings, unwrap_partition_time_level},
     },
@@ -66,7 +67,6 @@ use crate::{
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
-    search_server: crate::service::search::Searcher,
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
@@ -275,13 +275,13 @@ pub async fn search_parquet(
             stream_type = stream_type.to_string(),
         );
 
-        if !search_server.task_manager.contains_key(session_id) {
+        if !SEARCH_SERVER.task_manager.contains_key(session_id) {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        search_server
+        SEARCH_SERVER
             .task_manager
             .get_mut(session_id)
             .unwrap()
@@ -351,7 +351,6 @@ pub async fn search_parquet(
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:mem:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_memtable(
-    search_server: crate::service::search::Searcher,
     session_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
@@ -482,13 +481,13 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
-        if !search_server.task_manager.contains_key(session_id) {
+        if !SEARCH_SERVER.task_manager.contains_key(session_id) {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        search_server
+        SEARCH_SERVER
             .task_manager
             .get_mut(session_id)
             .unwrap()

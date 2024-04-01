@@ -18,14 +18,8 @@ use std::io::Error;
 use actix_web::{post, web, HttpResponse};
 
 #[post("/_cancel_job/{session_id}")]
-pub async fn cancel_job(
-    session_id: web::Path<String>,
-    grpc_server: web::Data<crate::service::search::Searcher>,
-) -> Result<HttpResponse, Error> {
-    let res = grpc_server
-        .get_ref()
-        .cancel_job_enter(&session_id.into_inner())
-        .await;
+pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
     match res {
         Ok(status) => Ok(HttpResponse::Ok().json(status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
@@ -33,10 +27,8 @@ pub async fn cancel_job(
 }
 
 #[post("/_job_status")]
-pub async fn job_status(
-    grpc_server: web::Data<crate::service::search::Searcher>,
-) -> Result<HttpResponse, Error> {
-    let res = grpc_server.get_ref().job_status_enter().await;
+pub async fn job_status() -> Result<HttpResponse, Error> {
+    let res = crate::service::search::job_status().await;
     match res {
         Ok(job_status) => Ok(HttpResponse::Ok().json(job_status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),

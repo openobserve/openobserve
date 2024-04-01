@@ -60,7 +60,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, distinct_values, search::Searcher},
+    service::{db, distinct_values, search::SEARCH_SERVER},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -162,11 +162,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
-    let mut search_server = None;
     if is_router(&LOCAL_NODE_ROLE) {
         init_router_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     } else {
-        search_server = init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?.into();
+        init_common_grpc_server(grpc_shutdown_rx, grpc_stopped_tx)?;
     }
 
     // let node online
@@ -186,7 +185,7 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // init http server
-    if let Err(e) = init_http_server(search_server).await {
+    if let Err(e) = init_http_server().await {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
@@ -228,18 +227,17 @@ async fn main() -> Result<(), anyhow::Error> {
 fn init_common_grpc_server(
     shutdown_rx: oneshot::Receiver<()>,
     stopped_tx: oneshot::Sender<()>,
-) -> Result<Searcher, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     let ip = if !CONFIG.grpc.addr.is_empty() {
         CONFIG.grpc.addr.clone()
     } else {
         "0.0.0.0".to_string()
     };
-    let search_server = Searcher::new();
     let gaddr: SocketAddr = format!("{}:{}", ip, CONFIG.grpc.port).parse()?;
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let search_svc = SearchServer::new(search_server.clone())
+    let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let filelist_svc = FilelistServer::new(Filelister)
@@ -282,7 +280,7 @@ fn init_common_grpc_server(
             .expect("gRPC server init failed");
         stopped_tx.send(()).ok();
     });
-    Ok(search_server)
+    Ok(())
 }
 
 fn init_router_grpc_server(
@@ -320,7 +318,7 @@ fn init_router_grpc_server(
     Ok(())
 }
 
-async fn init_http_server(search_server: Option<Searcher>) -> Result<(), anyhow::Error> {
+async fn init_http_server() -> Result<(), anyhow::Error> {
     // metrics
     let prometheus = config::metrics::create_prometheus_handler();
 
@@ -347,9 +345,6 @@ async fn init_http_server(search_server: Option<Searcher>) -> Result<(), anyhow:
             local_id
         );
         let mut app = App::new().wrap(prometheus.clone());
-        if let Some(ref search_server) = search_server {
-            app = app.app_data(web::Data::new(search_server.clone()));
-        }
         if is_router(&LOCAL_NODE_ROLE) {
             app = app.service(
                 // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
