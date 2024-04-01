@@ -172,11 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="info_outline"
                     data-test="dashboard-variables-setting-filter-info"
                   >
-                    <q-tooltip
-                      anchor="top middle"
-                      self="bottom middle"
-                      style="width: 250px"
-                    >
+                    <q-tooltip style="width: 250px">
                       In filters, you can use the value of another variable to
                       filter the current variable's value. This can be done by
                       using the other variable's name. For example:
