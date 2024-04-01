@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster;
+use config::{cluster, config::CONFIG};
+use infra::scheduler;
 use tokio::time;
 
 use crate::service;
@@ -22,6 +23,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
+
+    scheduler::init(
+        CONFIG.limit.scheduler_clean_interval,
+        CONFIG.limit.scheduler_watch_interval,
+    )
+    .await?;
+
     // should run it every 10 seconds
     let mut interval = time::interval(time::Duration::from_secs(30));
     interval.tick().await; // trigger the first run
