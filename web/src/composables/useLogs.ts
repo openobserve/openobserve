@@ -724,6 +724,14 @@ const useLogs = () => {
     }
   }
 
+  const isNonAggregatedQuery = (parsedSQL: any = null) => {
+    return (
+      searchObj.meta.sqlMode &&
+      parsedSQL.groupby == null &&
+      !hasAggregation(parsedSQL.columns)
+    );
+  };
+
   const getQueryPartitions = async (queryReq: any) => {
     // const queryReq = buildSearch();
     searchObj.data.queryResults.hits = [];
@@ -741,12 +749,7 @@ const useLogs = () => {
     };
 
     const parsedSQL: any = fnParsedSQL();
-    if (
-      !searchObj.meta.sqlMode ||
-      (searchObj.meta.sqlMode &&
-        parsedSQL.groupby == null &&
-        !hasAggregation(parsedSQL.columns))
-    ) {
+    if (!searchObj.meta.sqlMode || isNonAggregatedQuery(parsedSQL)) {
       const partitionQueryReq: any = {
         sql: queryReq.query.sql,
         start_time: queryReq.query.start_time,
@@ -1051,6 +1054,10 @@ const useLogs = () => {
 
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
+
+        // Removing sql_mode from histogram query, as it is not required
+        delete searchObj.data.histogramQuery.query.sql_mode;
+
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = queryReq;
         // get the current page detail and set it into query request
@@ -1102,12 +1109,13 @@ const useLogs = () => {
 
         // based on pagination request, get the data
         await getPaginatedData(queryReq);
+        const parsedSQL: any = fnParsedSQL();
         if (
           (searchObj.data.queryResults.aggs == undefined &&
             searchObj.data.resultGrid.currentPage == 1 &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
-            searchObj.meta.sqlMode == false) ||
+            (!searchObj.meta.sqlMode || isNonAggregatedQuery(parsedSQL))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&

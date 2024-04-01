@@ -500,7 +500,6 @@ export default defineComponent({
       nextTick(() => {
         if (
           searchObj.meta.showHistogram &&
-          !searchObj.meta.sqlMode &&
           searchResultRef.value?.reDrawChart
         ) {
           searchResultRef.value.reDrawChart();
@@ -782,14 +781,12 @@ export default defineComponent({
     },
     showHistogram() {
       if (
-        this.searchObj.meta.showHistogram == true &&
-        this.searchObj.shouldIgnoreWatcher == false
+        this.searchObj.meta.showHistogram &&
+        !this.searchObj.shouldIgnoreWatcher
       ) {
-        if (this.searchObj.meta.sqlMode == false) {
-          setTimeout(() => {
-            if (this.searchResultRef) this.searchResultRef.reDrawChart();
-          }, 100);
-        }
+        setTimeout(() => {
+          if (this.searchResultRef) this.searchResultRef.reDrawChart();
+        }, 100);
 
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;

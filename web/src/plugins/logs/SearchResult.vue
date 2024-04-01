@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-if="searchObj.data.histogram.errorMsg == ''">
         <ChartRenderer
-          v-if="searchObj.meta.showHistogram && !searchObj.meta.sqlMode"
+          v-if="searchObj.meta.showHistogram"
           data-test="logs-search-result-bar-chart"
           :data="plotChart"
           style="max-height: 100px"
