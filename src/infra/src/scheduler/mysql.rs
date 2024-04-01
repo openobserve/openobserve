@@ -319,7 +319,7 @@ WHERE FIND_IN_SET(id, ?);
                     res.err().unwrap()
                 );
             } else {
-                log::debug!("[JOBS SCHEDULER] clean up complete");
+                log::debug!("[SCHEDULER] clean up complete");
             }
         }
     }

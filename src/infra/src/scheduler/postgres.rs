@@ -280,7 +280,7 @@ RETURNING *;"#;
                     res.err().unwrap()
                 );
             } else {
-                log::debug!("[JOBS SCHEDULER] clean up complete");
+                log::debug!("[SCHEDULER] clean up complete");
             }
         }
     }

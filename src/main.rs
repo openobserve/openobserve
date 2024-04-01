@@ -356,18 +356,29 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
-            app = app.service(
-                // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
-                web::scope(&CONFIG.common.base_uri)
-                    .service(router::http::config)
-                    .service(router::http::config_paths)
-                    .service(router::http::api)
-                    .service(router::http::aws)
-                    .service(router::http::gcp)
-                    .service(router::http::rum)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
-            )
+            let client = awc::Client::builder()
+                .connector(
+                    awc::Connector::new()
+                        .timeout(Duration::from_secs(CONFIG.route.timeout))
+                        .limit(1024),
+                )
+                .timeout(Duration::from_secs(CONFIG.route.timeout))
+                .disable_redirects()
+                .finish();
+            app = app
+                .service(
+                    // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
+                    web::scope(&CONFIG.common.base_uri)
+                        .service(router::http::config)
+                        .service(router::http::config_paths)
+                        .service(router::http::api)
+                        .service(router::http::aws)
+                        .service(router::http::gcp)
+                        .service(router::http::rum)
+                        .configure(get_basic_routes)
+                        .configure(get_proxy_routes),
+                )
+                .app_data(web::Data::new(client))
         } else {
             app = app.service(
                 web::scope(&CONFIG.common.base_uri)
