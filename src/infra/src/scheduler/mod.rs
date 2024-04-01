@@ -99,7 +99,7 @@ pub struct Trigger {
 }
 
 /// Initializes the scheduler
-pub(crate) async fn init(clean_interval: u64, watch_interval: u64) -> Result<()> {
+pub async fn init(clean_interval: u64, watch_interval: u64) -> Result<()> {
     create_table().await?;
     create_table_index().await?;
     tokio::task::spawn(async move {
