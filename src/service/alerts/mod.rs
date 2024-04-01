@@ -464,14 +464,15 @@ impl QueryCondition {
             timeout: 0,
         };
         let session_id = ider::uuid();
-        let resp = match SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req)
-            .await
-        {
-            Ok(v) => v,
-            Err(_) => {
-                return Ok(None);
-            }
-        };
+        let resp =
+            match SearchService::search(&session_id, &alert.org_id, alert.stream_type, None, &req)
+                .await
+            {
+                Ok(v) => v,
+                Err(_) => {
+                    return Ok(None);
+                }
+            };
         if resp.total < alert.trigger_condition.threshold as usize {
             Ok(None)
         } else {

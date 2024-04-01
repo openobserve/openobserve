@@ -497,7 +497,7 @@ pub async fn search(
     session_id: &str,
     org_id: &str,
     stream_type: StreamType,
-    // user_id: Option<String>,
+    user_id: Option<String>,
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let session_id = if session_id.is_empty() {
@@ -512,7 +512,7 @@ pub async fn search(
     // set search task
     SEARCH_SERVER.task_manager.insert(
         session_id.clone(),
-        TaskStatus::new(true, vec![], sql, start_time, end_time, None),
+        TaskStatus::new(true, vec![], sql, start_time, end_time, user_id),
     );
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
