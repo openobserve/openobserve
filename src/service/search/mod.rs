@@ -39,6 +39,7 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -54,7 +55,6 @@ use crate::{
             stream::{ScanStats, StreamParams, StreamPartition},
         },
     },
-    handler::grpc::cluster_rpc,
     service::{file_list, format_partition_key, stream},
 };
 

@@ -2197,6 +2197,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "parquet",
  "prometheus",
+ "proto",
  "rand",
  "reqwest",
  "segment",
@@ -4999,6 +5000,7 @@ dependencies = [
  "promql-parser",
  "prost 0.11.9",
  "prost-build 0.11.9",
+ "proto",
  "pyroscope",
  "pyroscope_pprofrs",
  "rand",
@@ -5809,6 +5811,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "193898f59edcf43c26227dcd4c8427f00d99d61e95dcde58dabd49fa291d470e"
 dependencies = [
  "prost 0.12.3",
+]
+
+[[package]]
+name = "proto"
+version = "0.1.0"
+dependencies = [
+ "prost 0.11.9",
+ "prost-build 0.11.9",
+ "serde",
+ "serde_json",
+ "tonic 0.9.2",
+ "tonic-build 0.9.2",
 ]
 
 [[package]]

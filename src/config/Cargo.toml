@@ -34,6 +34,7 @@ once_cell.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
 prometheus.workspace = true
+proto.workspace = true
 reqwest.workspace = true
 rand.workspace = true
 getrandom.workspace = true

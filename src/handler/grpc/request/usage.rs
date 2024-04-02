@@ -15,9 +15,8 @@
 
 use async_trait::async_trait;
 use config::CONFIG;
+use proto::cluster_rpc::{usage_server::Usage, UsageRequest, UsageResponse};
 use tonic::{Request, Response, Status};
-
-use crate::handler::grpc::cluster_rpc::{usage_server::Usage, UsageRequest, UsageResponse};
 
 #[derive(Debug, Default)]
 pub struct UsageServerImpl;
