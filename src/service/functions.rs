@@ -16,7 +16,6 @@
 use std::io::Error;
 
 use actix_web::{
-    cookie::Cookie,
     http::{self, StatusCode},
     HttpResponse,
 };
@@ -75,22 +74,11 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             );
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
-            let mut access_cookie = Cookie::new("access_token", "");
-            access_cookie.set_http_only(true);
-            access_cookie.set_secure(true);
-            access_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
-            let mut refresh_cookie = Cookie::new("refresh_token", "");
-            refresh_cookie.set_http_only(true);
-            refresh_cookie.set_secure(true);
-            refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
 
-            Ok(HttpResponse::Ok()
-                .cookie(access_cookie)
-                .cookie(refresh_cookie)
-                .json(MetaHttpResponse::message(
-                    http::StatusCode::OK.into(),
-                    FN_SUCCESS.to_string(),
-                )))
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                FN_SUCCESS.to_string(),
+            )))
         }
     }
 }

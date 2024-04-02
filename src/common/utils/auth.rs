@@ -301,7 +301,11 @@ impl FromRequest for AuthExtractor {
 
         let auth_str = if let Some(cookie) = req.cookie("access_token") {
             let access_token = cookie.value().to_string();
-            format!("Bearer {}", access_token)
+            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                access_token
+            } else {
+                format!("Bearer {}", access_token)
+            }
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 auth_str.to_owned()
@@ -406,18 +410,35 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Ok(auth_str) = auth_header.to_str() {
-                return ready(Ok(AuthExtractor {
-                    auth: auth_str.to_owned(),
-                    method: "".to_string(),
-                    o2_type: "".to_string(),
-                    org_id: "".to_string(),
-                    bypass_check: true, // bypass check permissions
-                    parent_id: "".to_string(),
-                }));
+        let auth_str = if let Some(cookie) = req.cookie("access_token") {
+            let access_token = cookie.value().to_string();
+            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                access_token
+            } else {
+                format!("Bearer {}", access_token)
             }
+        } else if let Some(auth_header) = req.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                auth_str.to_owned()
+            } else {
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        };
+
+        // if let Some(auth_header) = req.headers().get("Authorization") {
+        if !auth_str.is_empty() {
+            return ready(Ok(AuthExtractor {
+                auth: auth_str.to_owned(),
+                method: "".to_string(),
+                o2_type: "".to_string(),
+                org_id: "".to_string(),
+                bypass_check: true, // bypass check permissions
+                parent_id: "".to_string(),
+            }));
         }
+
         ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
         )))
