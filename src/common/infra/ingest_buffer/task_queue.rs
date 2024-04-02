@@ -20,88 +20,126 @@ use once_cell::sync::Lazy;
 
 use super::{entry::IngestEntry, workers::Workers};
 
-pub static TASKQUEUE: Lazy<TaskQueue> = Lazy::new(TaskQueue::new);
+// TODO: change those static to env
+static MIN_WORKER_CNT: usize = 3;
+static DEFAULT_CHANNEL_CAP: usize = 10;
+
+pub static TQMANAGER: Lazy<TaskQueueManager> = Lazy::new(TaskQueueManager::new);
 
 pub type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
+
+pub async fn init() -> Result<(), anyhow::Error> {
+    _ = TQMANAGER.task_queues.read().await.len();
+    Ok(())
+}
+
+// pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
+//     TASKQUEUE.send_task(stream_name, task).await
+// }
+
+// pub async fn remove_worker_for(stream_name: &str) {
+//     TASKQUEUE.remove_worker_for(stream_name);
+// }
+
+pub struct TaskQueueManager {
+    pub task_queues: RwMap<Arc<str>, TaskQueue>, // key: stream, val: TaskQueue
+}
+
+impl TaskQueueManager {
+    pub fn new() -> Self {
+        Self {
+            task_queues: RwMap::default(),
+        }
+    }
+
+    pub async fn send_task(&self, stream_name: &str, task: IngestEntry) {
+        if !self.task_queue_avail(stream_name).await {
+            self.add_task_queue_for(stream_name).await;
+        }
+        let r = self.task_queues.read().await;
+        let tq = r.get(stream_name).unwrap();
+        let _ = tq.send_task(task).await;
+    }
+
+    // HELP: how do i invoke this function is a looping thread on the global instance
+    pub async fn remove_stopped_task_queues(&self) {
+        let interval = tokio::time::Duration::from_secs(600);
+        let mut interval = tokio::time::interval(interval);
+        interval.tick().await; // the first tick is immediate
+        loop {
+            let mut keys_to_remove = vec![];
+            {
+                let r = self.task_queues.read().await;
+                for (k, v) in r.iter() {
+                    if v.workers.running_worker_count().await == 0 {
+                        keys_to_remove.push(k.clone());
+                    }
+                }
+            }
+            {
+                let mut w = self.task_queues.write().await;
+                for key in keys_to_remove {
+                    w.remove(&key);
+                }
+            }
+            interval.tick().await;
+        }
+    }
+
+    async fn task_queue_avail(&self, stream_name: &str) -> bool {
+        let r = self.task_queues.read().await;
+        if let Some(tq) = r.get(stream_name) {
+            if tq.workers.running_worker_count().await == 0 {
+                tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+            }
+            return true;
+        }
+        false
+    }
+
+    async fn add_task_queue_for(&self, stream_name: &str) {
+        let tq = TaskQueue::new(DEFAULT_CHANNEL_CAP);
+        let mut w = self.task_queues.write().await;
+        w.insert(Arc::from(stream_name), tq);
+    }
+}
 
 pub struct TaskQueue {
     pub sender: Arc<Sender<IngestEntry>>,
     pub receiver: Arc<Receiver<IngestEntry>>,
-    pub queues: RwMap<Arc<str>, Workers>, // key: stream, val: workers
-}
-
-pub async fn init() -> Result<(), anyhow::Error> {
-    _ = TASKQUEUE.queues.read().await.len();
-    Ok(())
-}
-
-pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
-    TASKQUEUE.send_task(stream_name, task).await
+    pub workers: Arc<Workers>,
 }
 
 impl TaskQueue {
-    pub fn new() -> Self {
-        // TODO: set default channel cap
-        let queue_cap = 10;
-        let (sender, receiver) = bounded::<IngestEntry>(queue_cap);
-        let queues = RwMap::default();
+    // TODO: decide default initial workers count for a queue
+    pub fn new(channel_cap: usize) -> Self {
+        let (sender, receiver) = bounded::<IngestEntry>(channel_cap);
+        // let queues = RwMap::default();
+        let workers = Arc::new(Workers::new(MIN_WORKER_CNT, Arc::new(receiver.clone())));
         Self {
             sender: Arc::new(sender),
             receiver: Arc::new(receiver),
-            queues,
+            workers,
         }
     }
 
     // TODO
-    // 1. add logic to increase # of workers for a queue or increase the channel capacity
-    // 2. send status back. (??: public endpoint needs to respond IngestionResponse)
-    pub async fn send_task(
-        &self,
-        stream_name: &str,
-        task: IngestEntry,
-    ) -> Result<(), anyhow::Error> {
+    // 1. add min worker count to increase the number of workers
+    pub async fn send_task(&self, task: IngestEntry) -> Result<(), anyhow::Error> {
         if self.receiver.is_closed() {
             return Err(anyhow::anyhow!("Channel is closed. BUG"));
         }
-        if !self.queue_exists_for(stream_name).await {
-            let mut r = self.queues.write().await;
-            let workers = Workers::new(Arc::clone(&self.receiver));
-            r.insert(Arc::from(stream_name), workers);
-        }
-
-        let mut delay_secs = 1;
         while let Err(e) = self.sender.try_send(task.clone()) {
-            println!("channel is full {:?}. delay for now, TODO to add", e);
-            tokio::time::sleep(tokio::time::Duration::from_secs(delay_secs)).await;
-            delay_secs *= 2;
-            if delay_secs > 10 {
-                // waiting too long, not enough workers to take tasks out of the channel
-                // increase worker count for this stream
-                self.increase_workers_for(stream_name).await;
+            println!("channel is full {:?}.", e);
+            if self.workers.running_worker_count().await < MIN_WORKER_CNT {
+                self.workers.add_workers_by(MIN_WORKER_CNT).await;
             }
         }
         Ok(())
     }
 
-    // TODO: change the static incremental number
-    pub async fn increase_workers_for(&self, stream_name: &str) {
-        let mut rw = self.queues.write().await;
-        rw.entry(Arc::from(stream_name)).and_modify(|workers| {
-            workers.add_workers_by(5);
-        });
-    }
-
     pub async fn shut_down(&self) {
-        let mut r = self.queues.write().await;
-        let _: Vec<_> = r
-            .values_mut()
-            .map(|w| async { w.shut_down().await })
-            .collect();
         self.sender.close(); // all cloned receivers will shut down in next iteration
-    }
-
-    async fn queue_exists_for(&self, stream_name: &str) -> bool {
-        let r = self.queues.read().await;
-        r.contains_key(stream_name)
+        self.workers.shut_down().await;
     }
 }
