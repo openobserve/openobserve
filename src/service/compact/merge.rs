@@ -235,7 +235,6 @@ pub async fn merge_by_stream(
         files.len(),
     );
 
-
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
         // offset if offset > 0 && offset_time_hour +
