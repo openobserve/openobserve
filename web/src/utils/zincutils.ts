@@ -242,6 +242,10 @@ export const useLocalInterestingFields = (val = "", isDelete = false) => {
   return useLocalStorage("interestingFields", val, isDelete, true);
 };
 
+export const useLocalSavedView = (val = "", isDelete = false) => {
+  return useLocalStorage("savedViews", val, isDelete, true);
+};
+
 export const useLocalUserInfo = (val = "", isDelete = false) => {
   const userInfo: any = useLocalStorage("userInfo", val, isDelete);
   return userInfo.value;
@@ -590,6 +594,7 @@ export const localTimeSelectedTimezoneUTCTime = (
   // Convert the moment object to a Unix timestamp (in seconds)
   const unixTimestamp = convertedDate.unix() * 1000000;
 
+  console.log(unixTimestamp);
   return unixTimestamp;
 };
 
@@ -624,7 +629,7 @@ export function getUUID() {
 }
 
 export const maskText = (text: string) => {
-  // Disabled masking as it was not great usefull
+  // Disabled masking as it was not great usefully
   // const visibleChars = 4; // Number of characters to keep visible at the beginning and end
   // const maskedChars = text.length - visibleChars * 2;
 

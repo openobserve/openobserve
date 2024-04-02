@@ -332,7 +332,7 @@ pub async fn remote_write(
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    val_map,
+                    vec![val_map],
                     timestamp,
                 )
                 .await
