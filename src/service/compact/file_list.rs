@@ -60,7 +60,7 @@ pub async fn run_merge(offset: i64) -> Result<(), anyhow::Error> {
         offset = time_now.timestamp_micros();
         let r = STREAM_SCHEMAS.read().await;
         for (key, val) in r.iter() {
-            if let Some(val) = val.first().unwrap().metadata.get("created_at") {
+            if let Some(val) = val.last().unwrap().metadata.get("created_at") {
                 let time_min = val.parse().unwrap();
                 if time_min == 0 {
                     log::info!(
@@ -197,7 +197,6 @@ async fn merge_file_list(offset: i64) -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::file_list::get_process(offset).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::debug!("[COMPACT] list_list offset [{offset}] is processing by {node}");
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
     }

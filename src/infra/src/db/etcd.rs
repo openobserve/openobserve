@@ -36,6 +36,7 @@ use tokio::{
 
 use crate::{
     db::{Event, EventData},
+    dist_lock,
     errors::*,
 };
 
@@ -63,6 +64,28 @@ impl Etcd {
         Etcd {
             prefix: prefix.to_string(),
         }
+    }
+
+    async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
+        let key = format!("{}{}", self.prefix, key);
+        let mut client = get_etcd_client().await.clone();
+        let opt = GetOptions::new()
+            .with_prefix()
+            .with_sort(SortTarget::Key, SortOrder::Descend)
+            .with_limit(1);
+        let ret = client.get(key.as_str(), Some(opt)).await?;
+        if ret.kvs().is_empty() {
+            return Err(Error::from(DbError::KeyNotExists(key)));
+        }
+        let item_key = ret.kvs()[0]
+            .key_str()
+            .unwrap()
+            .strip_prefix(&self.prefix)
+            .unwrap();
+        Ok((
+            item_key.to_string(),
+            Bytes::from(ret.kvs()[0].value().to_vec()),
+        ))
     }
 }
 
@@ -98,7 +121,11 @@ impl super::Db for Etcd {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let key = format!("{}{}", self.prefix, key);
         let mut client = get_etcd_client().await.clone();
-        let ret = client.get(key.as_str(), None).await?;
+        let opt = GetOptions::new()
+            .with_prefix()
+            .with_sort(SortTarget::Key, SortOrder::Descend)
+            .with_limit(1);
+        let ret = client.get(key.as_str(), Some(opt)).await?;
         if ret.kvs().is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key)));
         }
@@ -110,12 +137,77 @@ impl super::Db for Etcd {
         key: &str,
         value: Bytes,
         _need_watch: bool,
-        _start_dt: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()> {
-        let key = format!("{}{}", self.prefix, key);
+        let key = if start_dt.is_some() {
+            format!("{}{}/{}", self.prefix, key, start_dt.unwrap())
+        } else {
+            format!("{}{}", self.prefix, key)
+        };
         let mut client = get_etcd_client().await.clone();
         let _ = client.put(key, value, None).await?;
         Ok(())
+    }
+
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: Box<super::UpdateFn>,
+    ) -> Result<()> {
+        // acquire lock and update
+        let lock_key = format!("/meta{key}/{}", start_dt.unwrap_or_default());
+        let locker = match dist_lock::lock(&lock_key, 0).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::Message(format!(
+                    "dist_lock key: {}, acquire error: {}",
+                    lock_key, e
+                )));
+            }
+        };
+        log::info!("Acquired lock for cluster key: {}", lock_key);
+
+        // get value and update
+        let value = self.get_key_value(key).await.ok();
+        let old_key = value.as_ref().map(|v| v.0.clone());
+        let old_value = value.map(|v| v.1);
+        let ret = match update_fn(old_value) {
+            Err(e) => Err(e),
+            Ok(None) => Ok(()),
+            Ok(Some((value, new_value))) => {
+                if let Some(value) = value {
+                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
+                        if let Err(e) = dist_lock::unlock(&locker).await {
+                            log::error!("dist_lock unlock err: {}", e);
+                        }
+                        log::info!("Released lock for cluster key: {}", lock_key);
+                        return Err(e);
+                    }
+                }
+                if let Some((new_key, new_value, new_start_dt)) = new_value {
+                    if let Err(e) = self
+                        .put(&new_key, new_value, need_watch, new_start_dt)
+                        .await
+                    {
+                        if let Err(e) = dist_lock::unlock(&locker).await {
+                            log::error!("dist_lock unlock err: {}", e);
+                        }
+                        log::info!("Released lock for cluster key: {}", lock_key);
+                        return Err(e);
+                    }
+                }
+                Ok(())
+            }
+        };
+
+        // release lock
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            log::error!("dist_lock unlock err: {}", e);
+        }
+        log::info!("Released lock for cluster key: {}", lock_key);
+        ret
     }
 
     async fn delete(

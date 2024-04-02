@@ -77,7 +77,9 @@ pub async fn ingest(
     );
     client = client
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
     let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
         Ok(res) => res.into_inner(),
         Err(err) => {

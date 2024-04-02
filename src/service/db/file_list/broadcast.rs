@@ -177,7 +177,9 @@ async fn send_to_node(
         );
         client = client
             .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
+            .accept_compressed(CompressionEncoding::Gzip)
+            .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+            .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
         loop {
             let items = match rx.recv().await {
                 Some(v) => v,

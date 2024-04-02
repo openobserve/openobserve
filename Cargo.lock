@@ -1107,31 +1107,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aws-sdk-dynamodb"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "069e3c6f367a02ee0af86616b6bf9dcc4f1eab19e11b05d4b0f71da0c86fcd9d"
-dependencies = [
- "aws-credential-types",
- "aws-http",
- "aws-runtime",
- "aws-smithy-async",
- "aws-smithy-client",
- "aws-smithy-http",
- "aws-smithy-json",
- "aws-smithy-runtime",
- "aws-smithy-runtime-api",
- "aws-smithy-types",
- "aws-types",
- "bytes",
- "fastrand 2.0.1",
- "http 0.2.11",
- "regex",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "aws-sdk-sso"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1251,8 +1226,6 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "pin-utils",
- "tokio",
- "tokio-util",
  "tracing",
 ]
 
@@ -2199,7 +2172,6 @@ dependencies = [
  "arrow",
  "arrow-json",
  "arrow-schema",
- "aws-sdk-dynamodb",
  "base64 0.21.7",
  "byteorder",
  "bytes",
@@ -3913,7 +3885,6 @@ dependencies = [
  "async-nats",
  "async-trait",
  "aws-config",
- "aws-sdk-dynamodb",
  "bytes",
  "chrono",
  "config",

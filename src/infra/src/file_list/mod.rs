@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
-
 use async_trait::async_trait;
-use aws_sdk_dynamodb::types::AttributeValue;
 use config::{
     meta::{
         meta_store::MetaStore,
@@ -28,7 +25,6 @@ use once_cell::sync::Lazy;
 
 use crate::errors::{Error, Result};
 
-pub mod dynamo;
 pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
@@ -37,11 +33,9 @@ static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn FileList> {
     match CONFIG.common.meta_store.as_str().into() {
-        MetaStore::Sled => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Etcd => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
-        MetaStore::DynamoDB => Box::<dynamo::DynamoFileList>::default(),
         MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
@@ -293,56 +287,6 @@ impl From<&StatsRecord> for StreamStats {
             file_num: record.file_num,
             storage_size: record.original_size as f64,
             compressed_size: record.compressed_size as f64,
-        }
-    }
-}
-
-impl From<&HashMap<String, AttributeValue>> for StatsRecord {
-    fn from(data: &HashMap<String, AttributeValue>) -> Self {
-        StatsRecord {
-            stream: data.get("stream").unwrap().as_s().unwrap().to_string(),
-            file_num: data
-                .get("file_num")
-                .unwrap()
-                .as_n()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap(),
-            min_ts: data
-                .get("min_ts")
-                .unwrap()
-                .as_n()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap(),
-            max_ts: data
-                .get("max_ts")
-                .unwrap()
-                .as_n()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap(),
-            records: data
-                .get("records")
-                .unwrap()
-                .as_n()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap(),
-            original_size: data
-                .get("original_size")
-                .unwrap()
-                .as_n()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap(),
-            compressed_size: data
-                .get("compressed_size")
-                .unwrap()
-                .as_n()
-                .unwrap()
-                .parse::<i64>()
-                .unwrap(),
         }
     }
 }
