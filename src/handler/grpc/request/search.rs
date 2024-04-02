@@ -17,8 +17,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use config::metrics;
 use infra::errors;
+use proto::cluster_rpc::{
+    search_server::Search, CancelJobRequest, CancelJobResponse, JobStatus, JobStatusRequest,
+    JobStatusResponse, SearchRequest, SearchResponse,
+};
 use tokio::sync::{oneshot::Sender, RwLock};
-use proto::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 

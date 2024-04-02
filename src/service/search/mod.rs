@@ -39,7 +39,7 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, CancelJobRequest, JobStatusRequest};
 use tokio::sync::{
     oneshot::{self, Receiver, Sender},
     Mutex,
@@ -58,6 +58,7 @@ use crate::{
             stream::{ScanStats, StreamParams, StreamPartition},
         },
     },
+    handler::grpc::request::search::{Searcher, TaskStatus},
     service::{file_list, format_partition_key, stream},
 };
 

@@ -24,14 +24,13 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
-use tokio::sync::oneshot::{self, Receiver, Sender};
 use proto::cluster_rpc;
+use tokio::sync::oneshot::{self, Receiver, Sender};
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
 use crate::{
     common::meta::stream::ScanStats,
-    handler::grpc::cluster_rpc,
     service::{db, search::SEARCH_SERVER},
 };
 
