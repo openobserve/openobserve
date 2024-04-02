@@ -712,6 +712,10 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
+    #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
+    pub distinct_values_interval: u64,
+    #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
+    pub distinct_values_hourly: bool,
 }
 
 #[derive(EnvConfig)]
@@ -720,6 +724,8 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_LOOKBACK_HOURS", default = 0)] // hours
+    pub lookback_hours: i64,
     #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
@@ -753,6 +759,10 @@ pub struct MemoryCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 10)] // MB
+    pub gc_size: usize,
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
+    pub gc_interval: u64,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
     pub datafusion_max_size: usize,
@@ -777,6 +787,10 @@ pub struct DiskCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
+    #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 10)] // MB
+    pub gc_size: usize,
+    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
+    pub gc_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1235,6 +1249,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
     }
+    if cfg.memory_cache.gc_size == 0 {
+        cfg.memory_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+    } else {
+        cfg.memory_cache.gc_size *= 1024 * 1024;
+    }
     if cfg.memory_cache.datafusion_max_size == 0 {
         cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
@@ -1312,6 +1331,11 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.disk_cache.release_size = cfg.disk_cache.max_size / 100;
     } else {
         cfg.disk_cache.release_size *= 1024 * 1024;
+    }
+    if cfg.disk_cache.gc_size == 0 {
+        cfg.disk_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+    } else {
+        cfg.disk_cache.gc_size *= 1024 * 1024;
     }
     Ok(())
 }
