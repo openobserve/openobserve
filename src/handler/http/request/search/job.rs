@@ -17,6 +17,25 @@ use std::io::Error;
 
 use actix_web::{delete, get, web, HttpResponse};
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Delete a job by session_id",
+    operation_id = "DeleteJob",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("session_id" = String, Path, description = "Job's session id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = CancelJobResponse, example = json!([{
+            "session_id": "2eWbtjKPiHLzmZ7Idt6lLxDwX44",
+            "success": true,
+        }])),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[delete("/job/{session_id}")]
 pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
@@ -26,6 +45,31 @@ pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, E
     }
 }
 
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Get all job status in background",
+    operation_id = "JobStatus",
+    security(
+        ("Authorization"= [])
+    ),
+    responses(
+          (status = 200, description = "Success", content_type = "application/json", body = JobStatusResponse, example = json!([{
+                "status":[
+                    {
+                        "session_id":"2eWbtjKPiHLzmZ7Idt6lLxDwX44",
+                        "running_time":5,
+                        "is_queue":false,
+                        "sql":"select * from 'default'",
+                        "start_time":1706429989000000i64,
+                        "end_time":2706685707000000i64,
+                        "user":"root@example.com"
+                    }
+                ]
+          }])),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
 #[get("/job/status")]
 pub async fn job_status() -> Result<HttpResponse, Error> {
     let res = crate::service::search::job_status().await;
