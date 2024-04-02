@@ -78,13 +78,9 @@ pub fn new_parquet_writer<'a>(
     // Bloom filter stored by row_group, so if the num_rows can limit to row_group_size
     let num_rows = min(metadata.records as u64, row_group_size as u64);
     if CONFIG.common.bloom_filter_enabled {
-        let mut fields = bloom_filter_fields.to_vec();
-        fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
-        fields.sort();
-        fields.dedup();
         // if bloom_filter_on_all_fields is true, then use all string fields
-        if CONFIG.common.bloom_filter_on_all_fields {
-            fields = schema
+        let fields = if CONFIG.common.bloom_filter_on_all_fields {
+            schema
                 .fields()
                 .iter()
                 .filter(|f| {
@@ -93,8 +89,14 @@ pub fn new_parquet_writer<'a>(
                         && !full_text_search_fields.contains(f.name())
                 })
                 .map(|f| f.name().to_string())
-                .collect::<Vec<_>>();
-        }
+                .collect::<Vec<_>>()
+        } else {
+            let mut fields = bloom_filter_fields.to_vec();
+            fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
+            fields.sort();
+            fields.dedup();
+            fields
+        };
         for field in fields {
             if metadata.records > 0 {
                 writer_props =
@@ -102,7 +104,7 @@ pub fn new_parquet_writer<'a>(
             }
             writer_props = writer_props
                 .set_column_dictionary_enabled(field.as_str().into(), false)
-                .set_column_bloom_filter_enabled(field.into(), true);   // take the field ownership
+                .set_column_bloom_filter_enabled(field.into(), true); // take the field ownership
         }
     }
     let writer_props = writer_props.build();
@@ -114,7 +116,6 @@ pub fn new_parquet_writer<'a>(
     )
     .unwrap()
 }
-
 
 // parse file key to get stream_key, date_key, file_name
 pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
