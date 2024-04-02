@@ -86,6 +86,9 @@ impl Partition {
         path.push(stream_name);
         path.push(thread_id.to_string());
         for (hour, data) in r.iter() {
+            if data.data.is_empty() {
+                continue;
+            }
             let mut file_meta = FileMeta::default();
             data.data.iter().for_each(|r| {
                 file_meta.original_size += r.data_json_size as i64;
