@@ -54,7 +54,7 @@ impl MetricsService for MetricsServer {
         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let channel = super::get_ingeter_channel().await?;
+        let channel = super::get_ingester_channel().await?;
         let client = MetricsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)

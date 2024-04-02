@@ -25,7 +25,7 @@ pub mod traces;
 
 static CHANNELS: Lazy<RwAHashMap<String, Channel>> = Lazy::new(Default::default);
 
-pub(crate) async fn get_ingeter_channel() -> Result<Channel, tonic::Status> {
+pub(crate) async fn get_ingester_channel() -> Result<Channel, tonic::Status> {
     let grpc_addr = get_rand_ingester_addr().await?;
     // cache hit
     let r = CHANNELS.read().await;
