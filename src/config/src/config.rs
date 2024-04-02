@@ -636,6 +636,8 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
+    #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
+    pub file_push_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
@@ -950,6 +952,12 @@ pub fn init() -> Config {
     // HACK for move_file_thread_num equal to CPU core * 2
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
+    }
+    if cfg.limit.file_push_interval == 0 {
+        cfg.limit.file_push_interval = 10;
+    }
+    if cfg.limit.file_push_limit == 0 {
+        cfg.limit.file_push_limit = 100_000;
     }
 
     if cfg.limit.sql_min_db_connections == 0 {

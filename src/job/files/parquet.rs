@@ -77,11 +77,15 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let files = scan_files(&pattern, "parquet");
+    let mut files = scan_files(&pattern, "parquet");
     if files.is_empty() {
         return Ok(());
     }
     log::debug!("[INGESTER:JOB] move files get: {}", files.len());
+    if files.len() > CONFIG.limit.file_push_limit {
+        files.sort();
+        files.truncate(CONFIG.limit.file_push_limit);
+    }
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
