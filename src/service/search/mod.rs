@@ -85,7 +85,7 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
-            "service:search:cluster:grpc_search",
+            "service:search:cluster:grpc_job_status",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
@@ -203,7 +203,7 @@ pub async fn cancel_job(session_id: &str) -> Result<search::CancelJobResponse, E
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
-            "service:search:cluster:grpc_search",
+            "service:search:cluster:grpc_cancel_job",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
