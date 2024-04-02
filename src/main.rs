@@ -366,7 +366,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                 .connector(
                     awc::Connector::new()
                         .timeout(Duration::from_secs(CONFIG.route.timeout))
-                        .limit(1024),
+                        .limit(CONFIG.route.max_connections),
                 )
                 .timeout(Duration::from_secs(CONFIG.route.timeout))
                 .disable_redirects()

@@ -411,6 +411,8 @@ pub struct TCP {
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
+    #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
+    pub max_connections: usize,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
