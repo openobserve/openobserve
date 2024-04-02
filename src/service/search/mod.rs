@@ -323,19 +323,21 @@ pub async fn search(
     let start_time = Some(req.query.start_time);
     let end_time = Some(req.query.end_time);
     // set search task
-    SEARCH_SERVER.task_manager.insert(
-        session_id.clone(),
-        TaskStatus::new(
-            vec![],
-            true,
-            user_id,
-            Some(org_id.to_string()),
-            Some(stream_type.to_string()),
-            sql,
-            start_time,
-            end_time,
-        ),
-    );
+    SEARCH_SERVER
+        .insert(
+            session_id.clone(),
+            TaskStatus::new(
+                vec![],
+                true,
+                user_id,
+                Some(org_id.to_string()),
+                Some(stream_type.to_string()),
+                sql,
+                start_time,
+                end_time,
+            ),
+        )
+        .await;
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().session_id = session_id.clone();
@@ -345,7 +347,7 @@ pub async fn search(
     let res = search_in_cluster(req).await;
 
     // remove task because task if finished
-    SEARCH_SERVER.task_manager.remove(&session_id);
+    SEARCH_SERVER.remove(&session_id).await;
     res
 }
 
@@ -839,17 +841,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             node_addr = node_addr.as_str(),
         );
 
-        if !SEARCH_SERVER.task_manager.contains_key(&session_id) {
+        if !SEARCH_SERVER.contain_key(&session_id).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER
-            .task_manager
-            .get_mut(&session_id)
-            .unwrap()
-            .push(abort_sender);
+        SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let task = tokio::task::spawn(
             async move {
@@ -1030,17 +1028,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
         };
 
-        if !SEARCH_SERVER.task_manager.contains_key(&session_id) {
+        if !SEARCH_SERVER.contain_key(&session_id).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER
-            .task_manager
-            .get_mut(&session_id)
-            .unwrap()
-            .push(abort_sender);
+        SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let merge_batch;
         tokio::select! {

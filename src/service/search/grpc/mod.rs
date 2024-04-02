@@ -196,17 +196,13 @@ pub async fn search(
             )
         };
 
-        if !SEARCH_SERVER.task_manager.contains_key(session_id.as_ref()) {
+        if !SEARCH_SERVER.contain_key(session_id.as_ref()).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] task is cancel after get first stage result"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER
-            .task_manager
-            .get_mut(session_id.as_ref())
-            .unwrap()
-            .push(abort_sender);
+        SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let merge_batches;
         tokio::select! {

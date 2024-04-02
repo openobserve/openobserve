@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use config::metrics;
-use dashmap::DashMap;
 use infra::errors;
-use tokio::sync::oneshot::Sender;
+use tokio::sync::{oneshot::Sender, RwLock};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -32,14 +31,121 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct Searcher {
-    pub task_manager: Arc<DashMap<String, TaskStatus>>,
+    pub task_manager: Arc<TaskManager>,
+}
+
+#[derive(Debug)]
+pub struct TaskManager {
+    pub task_manager: Arc<RwLock<HashMap<String, TaskStatus>>>,
+}
+
+impl Default for TaskManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TaskManager {
+    pub fn new() -> Self {
+        Self {
+            task_manager: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+    // check is the session_id in the task_manager
+    pub async fn contain_key(&self, session_id: &str) -> bool {
+        let read_guard = self.task_manager.read().await;
+        read_guard.contains_key(session_id)
+    }
+
+    // insert the session_id and task_status into the task_manager
+    pub async fn insert(&self, session_id: String, task_status: TaskStatus) {
+        let mut write_guard = self.task_manager.write().await;
+        write_guard.insert(session_id, task_status);
+    }
+
+    // remove the session_id from the task_manager
+    pub async fn remove(&self, session_id: &str) -> Option<(String, TaskStatus)> {
+        let mut write_guard = self.task_manager.write().await;
+        write_guard.remove_entry(session_id)
+    }
+
+    // check is the session_id in the task_manager and is_leader
+    pub async fn is_leader(&self, session_id: &str) -> bool {
+        let read_guard = self.task_manager.read().await;
+        if let Some(task_status) = read_guard.get(session_id) {
+            task_status.is_leader()
+        } else {
+            false
+        }
+    }
+
+    // insert the sender into the task_manager by session_id
+    pub async fn insert_sender(&self, session_id: &str, sender: Sender<()>) {
+        let mut write_guard = self.task_manager.write().await;
+        if let Some(task_status) = write_guard.get_mut(session_id) {
+            task_status.push(sender);
+        }
+    }
+
+    // get all task status that is leader
+    pub async fn get_task_status(&self) -> Vec<JobStatus> {
+        let mut status = vec![];
+        let read_guard = self.task_manager.read().await;
+        for (session_id, value) in read_guard.iter() {
+            if !value.is_leader() {
+                continue;
+            }
+            status.push(JobStatus {
+                session_id: session_id.clone(),
+                query_start_time: value.query_start_time,
+                is_queue: value.is_queue,
+                user_id: value.user_id.clone(),
+                org_id: value.org_id.clone(),
+                stream_type: value.stream_type.clone(),
+                sql: value.sql.clone(),
+                start_time: value.start_time,
+                end_time: value.end_time,
+            });
+        }
+        status
+    }
 }
 
 impl Searcher {
     pub fn new() -> Self {
         Self {
-            task_manager: Arc::new(DashMap::new()),
+            task_manager: Arc::new(TaskManager::new()),
         }
+    }
+
+    // check is the session_id in the task_manager
+    pub async fn contain_key(&self, session_id: &str) -> bool {
+        self.task_manager.contain_key(session_id).await
+    }
+
+    // insert the session_id and task_status into the task_manager
+    pub async fn insert(&self, session_id: String, task_status: TaskStatus) {
+        self.task_manager.insert(session_id, task_status).await;
+    }
+
+    // remove the session_id from the task_manager
+    pub async fn remove(&self, session_id: &str) -> Option<(String, TaskStatus)> {
+        self.task_manager.remove(session_id).await
+    }
+
+    // check is the session_id in the task_manager and is_leader
+    pub async fn is_leader(&self, session_id: &str) -> bool {
+        self.task_manager.is_leader(session_id).await
+    }
+
+    // insert the sender into the task_manager by session_id
+    pub async fn insert_sender(&self, session_id: &str, sender: Sender<()>) {
+        self.task_manager.insert_sender(session_id, sender).await;
+    }
+
+    // get all task status that is leader
+    pub async fn get_task_status(&self) -> Vec<JobStatus> {
+        self.task_manager.get_task_status().await
     }
 }
 
@@ -129,20 +235,19 @@ impl Search for Searcher {
         let session_id = req.job.as_ref().unwrap().session_id.to_string();
 
         // set search task
-        if !self.task_manager.contains_key(&session_id) {
-            self.task_manager.insert(
+        if !self.contain_key(&session_id).await {
+            self.insert(
                 session_id.clone(),
                 TaskStatus::new(vec![], false, None, None, None, None, None, None),
-            );
+            )
+            .await;
         }
 
         let result = SearchService::grpc::search(&req).await;
 
         // remove task
-        if self.task_manager.get(&session_id).is_some()
-            && !self.task_manager.get(&session_id).unwrap().is_leader()
-        {
-            self.task_manager.remove(&session_id);
+        if !self.is_leader(&session_id).await {
+            self.remove(&session_id).await;
         }
 
         match result {
@@ -179,25 +284,7 @@ impl Search for Searcher {
         &self,
         _req: Request<JobStatusRequest>,
     ) -> Result<Response<JobStatusResponse>, Status> {
-        let mut status = vec![];
-        for pair in self.task_manager.iter() {
-            if !pair.value().is_leader() {
-                continue;
-            }
-            let session_id = pair.key();
-            let value = pair.value();
-            status.push(JobStatus {
-                session_id: session_id.clone(),
-                query_start_time: value.query_start_time,
-                is_queue: value.is_queue,
-                user_id: value.user_id.clone(),
-                org_id: value.org_id.clone(),
-                stream_type: value.stream_type.clone(),
-                sql: value.sql.clone(),
-                start_time: value.start_time,
-                end_time: value.end_time,
-            });
-        }
+        let status = self.get_task_status().await;
         Ok(Response::new(JobStatusResponse { status }))
     }
 
@@ -206,7 +293,7 @@ impl Search for Searcher {
         req: Request<CancelJobRequest>,
     ) -> Result<Response<CancelJobResponse>, Status> {
         let session_id = req.into_inner().session_id;
-        match self.task_manager.remove(&session_id) {
+        match self.remove(&session_id).await {
             Some((_, senders)) => {
                 for sender in senders.abort_senders.into_iter().rev() {
                     let _ = sender.send(());

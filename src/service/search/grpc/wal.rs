@@ -275,17 +275,13 @@ pub async fn search_parquet(
             stream_type = stream_type.to_string(),
         );
 
-        if !SEARCH_SERVER.task_manager.contains_key(session_id) {
+        if !SEARCH_SERVER.contain_key(session_id).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER
-            .task_manager
-            .get_mut(session_id)
-            .unwrap()
-            .push(abort_sender);
+        SEARCH_SERVER.insert_sender(session_id, abort_sender).await;
 
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
@@ -481,17 +477,13 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
-        if !SEARCH_SERVER.task_manager.contains_key(session_id) {
+        if !SEARCH_SERVER.contain_key(session_id).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
             )));
         }
         let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER
-            .task_manager
-            .get_mut(session_id)
-            .unwrap()
-            .push(abort_sender);
+        SEARCH_SERVER.insert_sender(session_id, abort_sender).await;
 
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
