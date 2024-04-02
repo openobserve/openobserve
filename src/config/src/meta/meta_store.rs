@@ -18,11 +18,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum MetaStore {
-    Sled,
     Sqlite,
     Etcd,
     Nats,
-    DynamoDB,
     MySQL,
     PostgreSQL,
 }
@@ -30,11 +28,9 @@ pub enum MetaStore {
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "sled" => MetaStore::Sled,
             "sqlite" => MetaStore::Sqlite,
             "etcd" => MetaStore::Etcd,
             "nats" => MetaStore::Nats,
-            "dynamo" | "dynamodb" => MetaStore::DynamoDB,
             "mysql" => MetaStore::MySQL,
             "postgres" | "postgresql" => MetaStore::PostgreSQL,
             _ => MetaStore::Sqlite,
@@ -45,11 +41,9 @@ impl From<&str> for MetaStore {
 impl From<String> for MetaStore {
     fn from(s: String) -> Self {
         match s.to_lowercase().as_str() {
-            "sled" => MetaStore::Sled,
             "sqlite" => MetaStore::Sqlite,
             "etcd" => MetaStore::Etcd,
             "nats" => MetaStore::Nats,
-            "dynamo" | "dynamodb" => MetaStore::DynamoDB,
             "mysql" => MetaStore::MySQL,
             "postgres" | "postgresql" => MetaStore::PostgreSQL,
             _ => MetaStore::Sqlite,
@@ -60,11 +54,9 @@ impl From<String> for MetaStore {
 impl std::fmt::Display for MetaStore {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            MetaStore::Sled => write!(f, "sled"),
             MetaStore::Sqlite => write!(f, "sqlite"),
             MetaStore::Etcd => write!(f, "etcd"),
             MetaStore::Nats => write!(f, "nats"),
-            MetaStore::DynamoDB => write!(f, "dynamodb"),
             MetaStore::MySQL => write!(f, "mysql"),
             MetaStore::PostgreSQL => write!(f, "postgresql"),
         }

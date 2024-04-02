@@ -54,9 +54,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         println!("[Schema:Migration]: Start migrating schema: {}", key);
         let schemas: Vec<Schema> = json::from_slice(&val).unwrap();
+        let versions_count = schemas.len();
         let mut prev_end_dt: i64 = 0;
 
         for schema in schemas {
+            if schema.fields().is_empty() && versions_count > 1 {
+                continue; // Skip empty schema when there are multiple versions
+            }
             let meta = schema.metadata();
             let start_dt: i64 = match meta.get("start_dt") {
                 Some(val) => val.clone().parse().unwrap(),

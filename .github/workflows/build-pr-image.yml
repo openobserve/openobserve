@@ -7,6 +7,8 @@ on:
       - "*"
     paths-ignore:
       - "**.md"
+  workflow_dispatch:
+
 env:
     AWS_REGION: us-east-1
 

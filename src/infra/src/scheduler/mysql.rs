@@ -319,7 +319,7 @@ WHERE FIND_IN_SET(id, ?);
                     res.err().unwrap()
                 );
             } else {
-                log::debug!("[JOBS SCHEDULER] clean up complete");
+                log::debug!("[SCHEDULER] clean up complete");
             }
         }
     }
@@ -351,11 +351,11 @@ WHERE status = ? AND end_time <= ?
 
             if res.is_err() {
                 log::error!(
-                    "[SCHEDULER] error during watching for timeout for dead jobs: {}",
+                    "[SCHEDULER] error during watching timeout jobs: {}",
                     res.err().unwrap()
                 );
             } else {
-                log::debug!("[JOBS SCHEDULER] watch timeout run complete");
+                log::debug!("[SCHEDULER] watching timeout jobs run complete");
             }
         }
     }

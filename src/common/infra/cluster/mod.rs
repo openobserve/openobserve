@@ -38,7 +38,7 @@ mod nats;
 
 const CONSISTENT_HASH_VNODES: usize = 3;
 const HEALTH_CHECK_FAILED_TIMES: usize = 3;
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(1);
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
 
 static NODES: Lazy<RwAHashMap<String, Node>> = Lazy::new(Default::default);
 static QUERIER_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(Default::default);
@@ -125,9 +125,10 @@ pub async fn register_and_keepalive() -> Result<()> {
     // check node heatbeat
     tokio::task::spawn(async move {
         let ttl_keep_alive = min(10, (CONFIG.limit.node_heartbeat_ttl / 2) as u64);
+        let client = reqwest::Client::new();
         loop {
             time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
-            if let Err(e) = check_nodes_status().await {
+            if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {}", e);
             }
         }
@@ -296,18 +297,14 @@ async fn watch_node_list() -> Result<()> {
     Ok(())
 }
 
-async fn check_nodes_status() -> Result<()> {
+async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
     let nodes = get_cached_online_nodes().await.unwrap_or_default();
     for node in nodes {
         if node.uuid.eq(LOCAL_NODE_UUID.as_str()) {
             continue;
         }
         let url = format!("{}/healthz", node.http_addr);
-        let resp = reqwest::Client::new()
-            .get(url)
-            .timeout(HEALTH_CHECK_TIMEOUT)
-            .send()
-            .await;
+        let resp = client.get(url).timeout(HEALTH_CHECK_TIMEOUT).send().await;
         if resp.is_err() || !resp.unwrap().status().is_success() {
             log::error!("[CLUSTER] node {} health check failed", node.name);
             let mut w = NODES_HEALTH_CHECK.write().await;

@@ -301,7 +301,6 @@ pub struct Config {
     pub etcd: Etcd,
     pub nats: Nats,
     pub sled: Sled,
-    pub dynamo: Dynamo,
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
@@ -412,6 +411,8 @@ pub struct TCP {
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
+    #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
+    pub max_connections: usize,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
@@ -597,13 +598,6 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
-
-    #[env_config(
-        name = "ZO_RUN_SCHEMA_MIGRATION_ON_START_UP",
-        default = false,
-        help = "Run autimatic schema migration on start up"
-    )]
-    pub run_schema_migration_on_start_up: bool,
     #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
     pub blocked_streams: String,
     #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
@@ -642,6 +636,8 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
+    #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
+    pub file_push_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
@@ -682,7 +678,7 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 10)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,
@@ -869,19 +865,6 @@ pub struct Nats {
     pub lock_wait_timeout: u64,
 }
 
-#[derive(EnvConfig)]
-pub struct Dynamo {
-    #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
-    pub prefix: String,
-    pub file_list_table: String,
-    pub file_list_deleted_table: String,
-    pub stream_stats_table: String,
-    pub org_meta_table: String,
-    pub meta_table: String,
-    pub schema_table: String,
-    pub compact_table: String,
-}
-
 #[derive(Debug, EnvConfig)]
 pub struct S3 {
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
@@ -970,6 +953,12 @@ pub fn init() -> Config {
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
     }
+    if cfg.limit.file_push_interval == 0 {
+        cfg.limit.file_push_interval = 10;
+    }
+    if cfg.limit.file_push_limit == 0 {
+        cfg.limit.file_push_limit = 100_000;
+    }
 
     if cfg.limit.sql_min_db_connections == 0 {
         cfg.limit.sql_min_db_connections = cpu_num as u32
@@ -1012,11 +1001,6 @@ pub fn init() -> Config {
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
-    }
-
-    // check dynamo config
-    if let Err(e) = check_dynamo_config(&mut cfg) {
-        panic!("dynamo config error: {e}");
     }
 
     cfg
@@ -1359,25 +1343,6 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
-
-    Ok(())
-}
-
-fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.common.meta_store.starts_with("dynamo") && cfg.dynamo.prefix.is_empty() {
-        cfg.dynamo.prefix = if cfg.s3.bucket_name.is_empty() {
-            "default".to_string()
-        } else {
-            cfg.s3.bucket_name.clone()
-        };
-    }
-    cfg.dynamo.file_list_table = format!("{}-file-list", cfg.dynamo.prefix);
-    cfg.dynamo.file_list_deleted_table = format!("{}-file-list-deleted", cfg.dynamo.prefix);
-    cfg.dynamo.stream_stats_table = format!("{}-stream-stats", cfg.dynamo.prefix);
-    cfg.dynamo.org_meta_table = format!("{}-org-meta", cfg.dynamo.prefix);
-    cfg.dynamo.meta_table = format!("{}-meta", cfg.dynamo.prefix);
-    cfg.dynamo.schema_table = format!("{}-schema", cfg.dynamo.prefix);
-    cfg.dynamo.compact_table = format!("{}-compact", cfg.dynamo.prefix);
 
     Ok(())
 }

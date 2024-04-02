@@ -19,10 +19,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
 };
-use tonic::{
-    codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request, Response,
-    Status,
-};
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{common::infra::cluster, service::search::MetadataMap};
@@ -47,7 +44,6 @@ impl MetricsService for MetricsServer {
         }
 
         // call ingester
-        let grpc_addr = super::get_rand_ingester_addr().await?;
         let mut request = Request::from_parts(metadata, extensions, message);
         opentelemetry::global::get_text_map_propagator(|propagator| {
             propagator.inject_context(
@@ -55,22 +51,10 @@ impl MetricsService for MetricsServer {
                 &mut MetadataMap(request.metadata_mut()),
             )
         });
-
         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let channel = Channel::from_shared(grpc_addr.clone())
-            .unwrap()
-            .connect()
-            .await
-            .map_err(|err| {
-                log::error!(
-                    "[ROUTER] grpc->ingest->metrics: node: {}, connect err: {:?}",
-                    &grpc_addr,
-                    err
-                );
-                Status::internal("connect querier error".to_string())
-            })?;
+        let channel = super::get_ingester_channel().await?;
         let client = MetricsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)

@@ -46,6 +46,7 @@ async fn run_merge() -> Result<(), anyhow::Error> {
         interval.tick().await;
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
+        log::debug!("[COMPACTOR] Running data merge");
         let ret = service::compact::run_merge().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run data merge error: {}", ret.err().unwrap());
@@ -62,6 +63,7 @@ async fn run_retention() -> Result<(), anyhow::Error> {
         interval.tick().await;
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
+        log::debug!("[COMPACTOR] Running data retention");
         let ret = service::compact::run_retention().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run data delete error: {}", ret.err().unwrap());
@@ -78,6 +80,7 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         interval.tick().await;
         let locker = service::compact::QUEUE_LOCKER.clone();
         let locker = locker.lock().await;
+        log::debug!("[COMPACTOR] Running data delay deletion");
         let ret = service::compact::run_delay_deletion().await;
         if ret.is_err() {
             log::error!("[COMPACTOR] run files delete error: {}", ret.err().unwrap());

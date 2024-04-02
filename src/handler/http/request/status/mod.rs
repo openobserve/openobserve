@@ -119,14 +119,15 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     path = "/schedulez",
     tag = "Meta",
     responses(
-        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"}))
+        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
+        (status = 404, description="Staus Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
     )
 )]
 #[get("/schedulez")]
 pub async fn schedulez() -> Result<HttpResponse, Error> {
     let node_id = LOCAL_NODE_UUID.clone();
     let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
-        return Ok(HttpResponse::InternalServerError().json(HealthzResponse {
+        return Ok(HttpResponse::NotFound().json(HealthzResponse {
             status: "not ok".to_string(),
         }));
     };
@@ -135,7 +136,7 @@ pub async fn schedulez() -> Result<HttpResponse, Error> {
             status: "ok".to_string(),
         })
     } else {
-        HttpResponse::InternalServerError().json(HealthzResponse {
+        HttpResponse::NotFound().json(HealthzResponse {
             status: "not ok".to_string(),
         })
     })
