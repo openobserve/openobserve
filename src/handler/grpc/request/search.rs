@@ -72,6 +72,7 @@ pub struct TaskStatus {
 }
 
 impl TaskStatus {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         abort_senders: Vec<Sender<()>>,
         is_leader: bool,
