@@ -23,6 +23,7 @@ exceptions = [
     { name = "infra", allow = ["AGPL-3.0"] },
     { name = "ingester", allow = ["AGPL-3.0"] },
     { name = "wal", allow = ["AGPL-3.0"] },
+    { name = "proto", allow = ["AGPL-3.0"] },
 ]
 
 allow = [

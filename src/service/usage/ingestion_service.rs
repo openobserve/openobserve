@@ -15,18 +15,16 @@
 
 use anyhow::Error;
 use config::CONFIG;
+use proto::cluster_rpc;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::{
-    common::infra::cluster,
-    handler::grpc::cluster_rpc::{self, UsageResponse},
-};
+use crate::common::infra::cluster;
 
 pub async fn ingest(
     dest_org_id: &str,
     req: cluster_rpc::UsageRequest,
-) -> Result<UsageResponse, Error> {
+) -> Result<cluster_rpc::UsageResponse, Error> {
     let mut nodes = cluster::get_cached_online_ingester_nodes().await.unwrap();
     nodes.sort_by_key(|x| x.id);
 

@@ -30,12 +30,12 @@ use infra::{
     errors::{Error, ErrorCodes},
     file_list, storage,
 };
+use proto::cluster_rpc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{infra::cluster, meta::stream::ScanStats},
-    handler::grpc::cluster_rpc,
     service::{db, search::MetadataMap},
 };
 

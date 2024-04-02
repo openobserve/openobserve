@@ -131,7 +131,7 @@ pub async fn search(
     }
 
     let user_id = in_req.headers().get("user_id").unwrap();
-    let mut rpc_req: crate::handler::grpc::cluster_rpc::SearchRequest = req.to_owned().into();
+    let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
     let stream_name = match crate::common::meta::sql::Sql::new(&req.query.sql) {

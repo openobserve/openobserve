@@ -42,11 +42,6 @@ use openobserve::{
     handler::{
         grpc::{
             auth::check_auth,
-            cluster_rpc::{
-                event_server::EventServer, filelist_server::FilelistServer,
-                metrics_server::MetricsServer, search_server::SearchServer,
-                usage_server::UsageServer,
-            },
             request::{
                 event::Eventer,
                 file_list::Filelister,
@@ -70,6 +65,10 @@ use opentelemetry_proto::tonic::collector::{
     trace::v1::trace_service_server::TraceServiceServer,
 };
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
+use proto::cluster_rpc::{
+    event_server::EventServer, filelist_server::FilelistServer, metrics_server::MetricsServer,
+    search_server::SearchServer, usage_server::UsageServer,
+};
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
 #[cfg(feature = "profiling")]

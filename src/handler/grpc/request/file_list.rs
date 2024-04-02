@@ -19,12 +19,11 @@ use config::{
 };
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
-use tonic::{Request, Response, Status};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
-
-use crate::handler::grpc::cluster_rpc::{
+use proto::cluster_rpc::{
     filelist_server::Filelist, EmptyRequest, FileKey, FileList, FileListQueryRequest, MaxIdResponse,
 };
+use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub struct Filelister;
 
