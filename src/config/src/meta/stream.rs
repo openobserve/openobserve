@@ -17,6 +17,7 @@ use std::cmp::max;
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::Duration;
+use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -304,6 +305,50 @@ impl std::ops::Sub<FileMeta> for StreamStats {
     }
 }
 
+impl From<&FileMeta> for cluster_rpc::FileMeta {
+    fn from(req: &FileMeta) -> Self {
+        cluster_rpc::FileMeta {
+            min_ts: req.min_ts,
+            max_ts: req.max_ts,
+            records: req.records,
+            original_size: req.original_size,
+            compressed_size: req.compressed_size,
+        }
+    }
+}
+
+impl From<&cluster_rpc::FileMeta> for FileMeta {
+    fn from(req: &cluster_rpc::FileMeta) -> Self {
+        FileMeta {
+            min_ts: req.min_ts,
+            max_ts: req.max_ts,
+            records: req.records,
+            original_size: req.original_size,
+            compressed_size: req.compressed_size,
+        }
+    }
+}
+
+impl From<&FileKey> for cluster_rpc::FileKey {
+    fn from(req: &FileKey) -> Self {
+        cluster_rpc::FileKey {
+            key: req.key.clone(),
+            meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
+            deleted: req.deleted,
+        }
+    }
+}
+
+impl From<&cluster_rpc::FileKey> for FileKey {
+    fn from(req: &cluster_rpc::FileKey) -> Self {
+        FileKey {
+            key: req.key.clone(),
+            meta: FileMeta::from(req.meta.as_ref().unwrap()),
+            deleted: req.deleted,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
@@ -341,5 +386,25 @@ impl std::fmt::Display for PartitionTimeLevel {
             PartitionTimeLevel::Hourly => write!(f, "hourly"),
             PartitionTimeLevel::Daily => write!(f, "daily"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_file_meta() {
+        let file_meta = FileMeta {
+            min_ts: 1667978841110,
+            max_ts: 1667978845354,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+
+        let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
+        let resp = FileMeta::from(&rpc_meta);
+        assert_eq!(file_meta, resp);
     }
 }

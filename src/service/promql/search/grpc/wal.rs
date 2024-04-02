@@ -26,6 +26,7 @@ use datafusion::{
 };
 use futures::future::try_join_all;
 use infra::cache::tmpfs;
+use proto::cluster_rpc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -38,7 +39,6 @@ use crate::{
             stream::ScanStats,
         },
     },
-    handler::grpc::cluster_rpc,
     service::{
         db,
         search::{

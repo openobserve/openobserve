@@ -15,11 +15,10 @@
 
 use config::FxIndexMap;
 use hashbrown::HashMap;
+use proto::prometheus_rpc;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
-
-use crate::service::metrics::prom::prometheus as proto;
 
 pub const NAME_LABEL: &str = "__name__";
 pub const TYPE_LABEL: &str = "__type__";
@@ -61,9 +60,9 @@ pub enum MetricType {
     Empty,
 }
 
-impl From<proto::metric_metadata::MetricType> for MetricType {
-    fn from(mt: proto::metric_metadata::MetricType) -> Self {
-        use proto::metric_metadata::MetricType as ProtoMetricType;
+impl From<prometheus_rpc::metric_metadata::MetricType> for MetricType {
+    fn from(mt: prometheus_rpc::metric_metadata::MetricType) -> Self {
+        use prometheus_rpc::metric_metadata::MetricType as ProtoMetricType;
 
         match mt {
             ProtoMetricType::Unknown => Self::Unknown,

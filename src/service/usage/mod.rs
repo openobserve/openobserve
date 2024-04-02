@@ -30,9 +30,8 @@ use config::{
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use tokio::sync::RwLock;
-
-use crate::handler::grpc::cluster_rpc;
 
 pub mod ingestion_service;
 pub mod stats;
