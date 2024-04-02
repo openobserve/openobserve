@@ -35,6 +35,7 @@ use tokio::{
 
 use crate::{
     db::{Event, EventData},
+    dist_lock,
     errors::*,
 };
 
@@ -79,6 +80,43 @@ impl NatsDb {
             prefix: prefix.to_string(),
         }
     }
+
+    async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        let bucket_name = bucket.status().await?.bucket;
+        let en_key = base64::encode_url(new_key);
+        if let Some(v) = bucket.get(&en_key).await? {
+            return Ok((key.to_string(), v));
+        }
+        // try as prefix, with start_dt
+        let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
+        let mut keys = keys
+            .into_iter()
+            .filter_map(|k| {
+                let key = base64::decode_url(&k).unwrap();
+                if key.starts_with(new_key) {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        let keys_len = keys.len();
+        if keys_len == 0 {
+            return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+        }
+        keys.sort();
+        let key = keys.last().unwrap();
+        let en_key = base64::encode_url(key);
+        match bucket.get(&en_key).await? {
+            None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
+            Some(v) => {
+                let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
+                let key = bucket_prefix.to_string() + key;
+                Ok((key, v))
+            }
+        }
+    }
 }
 
 impl Default for NatsDb {
@@ -112,20 +150,120 @@ impl super::Db for NatsDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let key = base64::encode_url(new_key);
-        match bucket.get(&key).await? {
+        if let Some(v) = bucket.get(&key).await? {
+            return Ok(v);
+        }
+        // try as prefix, with start_dt
+        let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
+        let mut keys = keys
+            .into_iter()
+            .filter_map(|k| {
+                let key = base64::decode_url(&k).unwrap();
+                if key.starts_with(new_key) {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+        let keys_len = keys.len();
+        if keys_len == 0 {
+            return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+        }
+        keys.sort();
+        let key = keys.last().unwrap();
+        match bucket.get(key).await? {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => Ok(v),
         }
     }
 
-    async fn put(&self, key: &str, value: Bytes, _need_watch: bool) -> Result<()> {
-        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+    async fn put(
+        &self,
+        key: &str,
+        value: Bytes,
+        _need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
+        let key = if start_dt.is_some() {
+            format!("{}/{}", key, start_dt.unwrap())
+        } else {
+            key.to_string()
+        };
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, &key).await?;
         let key = base64::encode_url(new_key);
         _ = bucket.put(&key, value).await?;
         Ok(())
     }
 
-    async fn delete(&self, key: &str, with_prefix: bool, _need_watch: bool) -> Result<()> {
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: Box<super::UpdateFn>,
+    ) -> Result<()> {
+        // acquire lock and update
+        let lock_key = format!("/meta{key}/{}", start_dt.unwrap_or_default());
+        let locker = match dist_lock::lock(&lock_key, 0).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::Message(format!(
+                    "dist_lock key: {}, acquire error: {}",
+                    lock_key, e
+                )));
+            }
+        };
+        log::info!("Acquired lock for cluster key: {}", lock_key);
+
+        // get value and update
+        let value = self.get_key_value(key).await.ok();
+        let old_key = value.as_ref().map(|v| v.0.clone());
+        let old_value = value.map(|v| v.1);
+        let ret = match update_fn(old_value) {
+            Err(e) => Err(e),
+            Ok(None) => Ok(()),
+            Ok(Some((value, new_value))) => {
+                if let Some(value) = value {
+                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
+                        if let Err(e) = dist_lock::unlock(&locker).await {
+                            log::error!("dist_lock unlock err: {}", e);
+                        }
+                        log::info!("Released lock for cluster key: {}", lock_key);
+                        return Err(e);
+                    }
+                }
+                if let Some((new_key, new_value, new_start_dt)) = new_value {
+                    if let Err(e) = self
+                        .put(&new_key, new_value, need_watch, new_start_dt)
+                        .await
+                    {
+                        if let Err(e) = dist_lock::unlock(&locker).await {
+                            log::error!("dist_lock unlock err: {}", e);
+                        }
+                        log::info!("Released lock for cluster key: {}", lock_key);
+                        return Err(e);
+                    }
+                }
+                Ok(())
+            }
+        };
+
+        // release lock
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            log::error!("dist_lock unlock err: {}", e);
+        }
+        log::info!("Released lock for cluster key: {}", lock_key);
+        ret
+    }
+
+    async fn delete(
+        &self,
+        key: &str,
+        with_prefix: bool,
+        _need_watch: bool,
+        _start_dt: Option<i64>,
+    ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         if !with_prefix {
             let key = base64::encode_url(new_key);
@@ -190,7 +328,7 @@ impl super::Db for NatsDb {
         let bucket_name = bucket.status().await?.bucket;
         let bucket_prefix = "/".to_string() + bucket_name.trim_start_matches(&self.prefix);
         let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
-        let keys = keys
+        let mut keys = keys
             .into_iter()
             .filter_map(|k| {
                 let key = base64::decode_url(&k).unwrap();
@@ -201,6 +339,7 @@ impl super::Db for NatsDb {
                 }
             })
             .collect::<Vec<String>>();
+        keys.sort();
         Ok(keys)
     }
 
@@ -208,7 +347,7 @@ impl super::Db for NatsDb {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, prefix).await?;
         let bucket = &bucket;
         let keys = bucket.keys().await?.try_collect::<Vec<String>>().await?;
-        let keys = keys
+        let mut keys = keys
             .into_iter()
             .filter_map(|k| {
                 let key = base64::decode_url(&k).unwrap();
@@ -223,6 +362,7 @@ impl super::Db for NatsDb {
         if keys_len == 0 {
             return Ok(vec![]);
         }
+        keys.sort();
         let values = futures::stream::iter(keys)
             .map(|key| async move {
                 let encoded_key = base64::encode_url(&key);
@@ -306,6 +446,9 @@ impl super::Db for NatsDb {
     async fn close(&self) -> Result<()> {
         Ok(())
     }
+    async fn add_start_dt_column(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub async fn create_table() -> Result<()> {
@@ -387,11 +530,8 @@ impl Locker {
                     break;
                 }
                 Err(err) => {
+                    // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    log::error!("nats lock for key: {}, error: {}", self.key, err);
-                    // if !err.to_string().contains("Timeout expired") {
-                    //     break;
-                    // }
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             };

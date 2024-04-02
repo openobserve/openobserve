@@ -19,6 +19,10 @@ use tokio::time;
 use crate::common::meta::telemetry::Telemetry;
 
 pub async fn run() -> Result<(), anyhow::Error> {
+    if !CONFIG.common.telemetry_enabled {
+        return Ok(());
+    }
+
     let mut interval = time::interval(time::Duration::from_secs(
         (CONFIG.common.telemetry_heartbeat).try_into().unwrap(),
     ));

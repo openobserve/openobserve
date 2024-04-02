@@ -122,6 +122,10 @@ pub async fn search_partition(
     let nodes = cluster::get_cached_online_querier_nodes()
         .await
         .unwrap_or_default();
+    if nodes.is_empty() {
+        log::error!("no querier node online");
+        return Err(Error::Message("no querier node online".to_string()));
+    }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
     let (records, original_size, compressed_size) =
@@ -248,6 +252,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let querier_num = nodes.iter().filter(|node| is_querier(&node.role)).count();
     if querier_num == 0 {
+        log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
 
@@ -262,8 +267,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let is_inverted_index = !meta.fts_terms.is_empty();
 
-    log::warn!(
-        "searching in is_agg_query {:?} is_inverted_index {:?}",
+    log::info!(
+        "[session_id {session_id}] search: is_agg_query {:?} is_inverted_index {:?}",
         !req.aggs.is_empty(),
         is_inverted_index
     );
@@ -419,7 +424,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         )
     };
 
-    println!("final file_list: {:?}", file_list.len());
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[session_id {session_id}] search: get file_list time_range: {:?}, num: {}, took: {}",
+        meta.meta.time_range,
+        file_list.len(),
+        file_list_took,
+    );
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
@@ -464,7 +475,11 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     }
     #[cfg(feature = "enterprise")]
     dist_lock::unlock(&locker).await?;
-    let took_wait = start.elapsed().as_millis() as usize;
+    let took_wait = start.elapsed().as_millis() as usize - file_list_took;
+    log::info!(
+        "[session_id {session_id}] search: wait in queue took: {}",
+        took_wait,
+    );
 
     // set work_group
     req.work_group = work_group_str;
@@ -497,8 +512,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             1
         }
     };
+
     log::info!(
-        "[session_id {session_id}] search->file_list: time_range: {:?}, num: {file_num}, offset: {offset}",
+        "[session_id {session_id}] search: file_list partition, time_range: {:?}, num: {file_num}, offset: {offset}",
         meta.meta.time_range
     );
 

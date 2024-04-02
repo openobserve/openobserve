@@ -25,5 +25,9 @@ pub use config::*;
 pub async fn init() -> Result<(), anyhow::Error> {
     // init ider
     ider::init();
+
+    // initialize chrome launch options, so that if chrome download is
+    // needed, it will happen now and not during serving report API
+    let _ = get_chrome_launch_options().await;
     Ok(())
 }

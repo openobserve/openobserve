@@ -7,6 +7,8 @@ on:
       - "*"
     paths-ignore:
       - "**.md"
+  workflow_dispatch:
+
 env:
     AWS_REGION: us-east-1
 
@@ -16,7 +18,7 @@ jobs:
       permissions:
         id-token: write
         contents: read
-      runs-on: ubicloud-standard-8
+      runs-on: ${{ github.event.pull_request.head.repo.fork == true && 'ubuntu-2004-8-cores' || 'ubicloud-standard-8' }}
       steps:
         - name: Remove unused tools
           run: |
@@ -28,7 +30,7 @@ jobs:
         - name: Clone the current repo
           uses: actions/checkout@v4
           with:
-            repository: ${{ github.repo }}
+            repository: ${{ github.event.pull_request.head.repo.full_name }}
             ref: ${{ github.event.pull_request.head.ref || github.ref }}
             fetch-depth: 0
             fetch-tags: true

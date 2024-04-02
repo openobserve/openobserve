@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::stream::StreamType, CONFIG};
-use utoipa::{
-    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
-    Modify, OpenApi,
-};
+use utoipa::{openapi::security::SecurityScheme, Modify, OpenApi};
 
 use crate::{common::meta, handler::http::request};
 
@@ -29,7 +26,6 @@ use crate::{common::meta, handler::http::request};
         request::users::save,
         request::users::update,
         request::users::delete,
-        request::users::authentication,
         request::users::add_user_to_org,
         request::organization::org::organizations,
         request::organization::org::org_summary,
@@ -186,7 +182,6 @@ use crate::{common::meta, handler::http::request};
             meta::user::UserList,
             meta::user::UserResponse,
             meta::user::UpdateUser,
-            meta::user::SignInUser,
             meta::user::SignInResponse,
             meta::organization::OrgSummary,
             meta::organization::OrganizationResponse,
@@ -244,7 +239,9 @@ impl Modify for SecurityAddon {
         let components = openapi.components.as_mut().unwrap();
         components.add_security_scheme(
             "Authorization",
-            SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Basic).build()),
+            SecurityScheme::ApiKey(utoipa::openapi::security::ApiKey::Header(
+                utoipa::openapi::security::ApiKeyValue::new("Authorization"),
+            )),
         );
     }
 }

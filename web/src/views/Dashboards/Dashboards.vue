@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div class="q-table__title">{{ t("dashboard.header") }}</div>
+
       <q-input
         v-model="filterQuery"
         filled
@@ -558,7 +559,7 @@ export default defineComponent({
       ].find((dashboard) => dashboard.dashboardId === row.id);
 
       const selectedTabId = selectedDashboard
-        ? selectedDashboard.tabs[0].tabId
+        ? selectedDashboard?.tabs[0]?.tabId
         : null;
       return router.push({
         path: "/dashboards/view",

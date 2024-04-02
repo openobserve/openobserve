@@ -18,6 +18,7 @@ use std::io::Error;
 use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    meta::cluster::NodeStatus,
     utils::json,
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -81,6 +82,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_hide_menus: String,
 }
 
 #[derive(Serialize)]
@@ -110,6 +112,34 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(HealthzResponse {
         status: "ok".to_string(),
     }))
+}
+
+/// Healthz of the node for scheduled status
+#[utoipa::path(
+    path = "/schedulez",
+    tag = "Meta",
+    responses(
+        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
+        (status = 404, description="Staus Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
+    )
+)]
+#[get("/schedulez")]
+pub async fn schedulez() -> Result<HttpResponse, Error> {
+    let node_id = LOCAL_NODE_UUID.clone();
+    let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
+        return Ok(HttpResponse::NotFound().json(HealthzResponse {
+            status: "not ok".to_string(),
+        }));
+    };
+    Ok(if node.scheduled && node.status == NodeStatus::Online {
+        HttpResponse::Ok().json(HealthzResponse {
+            status: "ok".to_string(),
+        })
+    } else {
+        HttpResponse::NotFound().json(HealthzResponse {
+            status: "not ok".to_string(),
+        })
+    })
 }
 
 #[get("")]
@@ -148,6 +178,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let logo = None;
 
+    #[cfg(feature = "enterprise")]
+    let custom_hide_menus = &O2_CONFIG.common.custom_hide_menus;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_hide_menus = "";
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
@@ -176,6 +211,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_hide_menus: custom_hide_menus.to_string(),
         rum: Rum {
             enabled: CONFIG.rum.enabled,
             client_token: CONFIG.rum.client_token.to_string(),

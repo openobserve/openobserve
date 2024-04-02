@@ -77,11 +77,15 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let files = scan_files(&pattern, "parquet");
+    let mut files = scan_files(&pattern, "parquet");
     if files.is_empty() {
         return Ok(());
     }
-    // log::info!("[INGESTER:JOB] move files get: {}", files.len());
+    log::debug!("[INGESTER:JOB] move files get: {}", files.len());
+    if files.len() > CONFIG.limit.file_push_limit {
+        files.sort();
+        files.truncate(CONFIG.limit.file_push_limit);
+    }
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
@@ -369,7 +373,7 @@ async fn merge_files(
     let full_text_search_fields = stream::get_stream_setting_fts_fields(latest_schema).unwrap();
     let mut buf = Vec::new();
     let mut fts_buf = Vec::new();
-    let (mut new_file_meta, _) = merge_parquet_files(
+    let (mut new_file_meta, _) = match merge_parquet_files(
         tmp_dir.name(),
         stream_type,
         &stream_name,
@@ -380,11 +384,29 @@ async fn merge_files(
         new_file_size,
         &mut fts_buf,
     )
-    .await?;
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[INGESTER:JOB]  merge_parquet_files error for stream -> '{}/{}/{}'",
+                org_id,
+                stream_type,
+                stream_name
+            );
+            log::error!("[INGESTER:JOB] {} for files {:?}", e, retain_file_list);
+            return Err(e.into());
+        }
+    };
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
-        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: records is 0 for org {} stream type {} stream {}",
+            org_id,
+            stream_type,
+            stream_name
+        ));
     }
     if new_file_meta.compressed_size == 0 {
         return Err(anyhow::anyhow!(
@@ -491,7 +513,7 @@ pub(crate) async fn generate_index_on_ingester(
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-    log::warn!("[INGESTER:JOB] Written index wal file successfully");
+    log::info!("[INGESTER:JOB] Written index wal file successfully");
     Ok(())
 }
 

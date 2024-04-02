@@ -280,7 +280,7 @@ export default defineComponent({
     const showDashboardSettingsDialog = ref(false);
 
     // selected tab
-    const selectedTabId: any = ref(null);
+    const selectedTabId: any = ref(route.query.tab ?? null);
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
@@ -394,7 +394,7 @@ export default defineComponent({
     // refresh interval v-model
     const refreshInterval = ref(0);
 
-    // intial timezone, which will come from the route query
+    // initial timezone, which will come from the route query
     const initialTimezone = ref(route.query.timezone ?? null);
 
     // when the date changes from the picker, update the current time object for the dashboard
@@ -475,7 +475,7 @@ export default defineComponent({
       }
 
       // check if timezone query params exist
-      // will be used for intial time zone only, so remove it from query
+      // will be used for initial time zone only, so remove it from query
       if (params.timezone) {
         // get the query params
         const query = {

@@ -31,9 +31,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             continue;
         }
         let new_key = key.replace("/dashboard/", "/dashboard/default/");
-        match db.put(&new_key, val, infra_db::NO_NEED_WATCH).await {
+        match db.put(&new_key, val, infra_db::NO_NEED_WATCH, None).await {
             Ok(_) => {
-                let _ = db.delete(&key, false, infra_db::NO_NEED_WATCH).await;
+                let _ = db.delete(&key, false, infra_db::NO_NEED_WATCH, None).await;
                 println!("Migrated dashboard: {} successfully", key);
             }
             Err(_) => {

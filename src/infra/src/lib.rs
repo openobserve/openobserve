@@ -19,6 +19,7 @@ pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
 pub mod queue;
+pub mod scheduler;
 pub mod storage;
 
 pub async fn init() -> Result<(), anyhow::Error> {

@@ -63,9 +63,6 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                 && LOCAL_NODE_UUID.ne(&node)
                 && get_node_by_uuid(&node).await.is_some()
             {
-                log::debug!(
-                    "[COMPACT] run retention: organization {org_id} is processing by {node}"
-                );
                 continue;
             }
 
@@ -79,9 +76,6 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                 && LOCAL_NODE_UUID.ne(&node)
                 && get_node_by_uuid(&node).await.is_some()
             {
-                log::debug!(
-                    "[COMPACT] run retention: organization {org_id} is processing by {node}"
-                );
                 dist_lock::unlock(&locker).await?;
                 continue;
             }
@@ -230,12 +224,6 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                         )
                         .await?;
                     }
-                    // log::warn!(
-                    //     "[COMPACTOR] the stream [{}/{}/{}] is processing by another node",
-                    //     &org_id,
-                    //     stream_type,
-                    //     &stream_name,
-                    // );
                     continue; // not this node
                 }
 
@@ -261,7 +249,7 @@ pub async fn run_merge() -> Result<(), anyhow::Error> {
                     if let Err(e) = merge::merge_by_stream(&org_id, stream_type, &stream_name).await
                     {
                         log::error!(
-                            "[COMPACTOR] merge_by_stream [{}:{}:{}] error: {}",
+                            "[COMPACTOR] merge_by_stream [{}/{}/{}] error: {}",
                             org_id,
                             stream_type,
                             stream_name,
@@ -312,9 +300,6 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         let (_, node) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
-            log::debug!(
-                "[COMPACT] run delay_deletion: organization {org_id} is processing by {node}"
-            );
             continue;
         }
 
@@ -327,9 +312,6 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
             db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
         if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
-            log::debug!(
-                "[COMPACT] run delay_deletion organization {org_id} is processing by {node}"
-            );
             dist_lock::unlock(&locker).await?;
             continue;
         }
@@ -356,9 +338,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
                     if affected == 0 {
                         break;
                     }
-                    if CONFIG.common.print_key_event {
-                        log::info!("[COMPACTOR] deleted from file_list_deleted {affected} files");
-                    }
+                    log::debug!("[COMPACTOR] deleted from file_list_deleted {affected} files");
                 }
                 Err(e) => {
                     log::error!("[COMPACTOR] delete files error: {}", e);

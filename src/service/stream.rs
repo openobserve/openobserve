@@ -242,16 +242,9 @@ pub async fn save_stream_settings(
             chrono::Utc::now().timestamp_micros().to_string(),
         );
     }
-    db::schema::set(
-        org_id,
-        stream_name,
-        stream_type,
-        &schema.clone().with_metadata(metadata),
-        None,
-        false,
-    )
-    .await
-    .unwrap();
+    db::schema::update_metadata(org_id, stream_name, stream_type, metadata)
+        .await
+        .unwrap();
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
         http::StatusCode::OK.into(),
@@ -409,28 +402,11 @@ pub async fn delete_fields(
     if fields.is_empty() {
         return Ok(());
     }
-    let schema =
-        db::schema::get_from_db(org_id, stream_name, stream_type.unwrap_or_default()).await?;
-    let fields = schema
-        .all_fields()
-        .into_iter()
-        .filter_map(|f| {
-            if !fields.contains(f.name()) {
-                Some(f.clone())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    let schema = Schema::new(fields);
-    let min_ts = chrono::Utc::now().timestamp_micros();
-    db::schema::set(
+    db::schema::delete_fields(
         org_id,
         stream_name,
         stream_type.unwrap_or_default(),
-        &schema,
-        Some(min_ts),
-        true,
+        fields.to_vec(),
     )
     .await?;
     Ok(())

@@ -72,7 +72,7 @@ export default defineComponent({
 
     // get filtered options
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
-      useSelectAutoComplete(options, "name");
+      useSelectAutoComplete(options, "value");
 
     // set watcher on variable item changes at that time change the option value
     watch(
