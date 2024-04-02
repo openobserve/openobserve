@@ -35,6 +35,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         loop {
             // worker persist
 
+            // and clean up TaskQueueManager map
+            task_queue::remove_stopped_task_queues().await;
             interval.tick().await;
         }
     });

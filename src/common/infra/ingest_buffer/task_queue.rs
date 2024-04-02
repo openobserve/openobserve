@@ -33,13 +33,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-// pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
-//     TASKQUEUE.send_task(stream_name, task).await
-// }
+pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
+    TQMANAGER.send_task(stream_name, task).await
+}
 
-// pub async fn remove_worker_for(stream_name: &str) {
-//     TASKQUEUE.remove_worker_for(stream_name);
-// }
+pub async fn remove_stopped_task_queues() {
+    TQMANAGER.remove_stopped_task_queues().await;
+}
 
 pub struct TaskQueueManager {
     pub task_queues: RwMap<Arc<str>, TaskQueue>, // key: stream, val: TaskQueue
@@ -52,17 +52,17 @@ impl TaskQueueManager {
         }
     }
 
-    pub async fn send_task(&self, stream_name: &str, task: IngestEntry) {
+    async fn send_task(&self, stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
         if !self.task_queue_avail(stream_name).await {
             self.add_task_queue_for(stream_name).await;
         }
         let r = self.task_queues.read().await;
         let tq = r.get(stream_name).unwrap();
         let _ = tq.send_task(task).await;
+        Ok(())
     }
 
-    // HELP: how do i invoke this function is a looping thread on the global instance
-    pub async fn remove_stopped_task_queues(&self) {
+    async fn remove_stopped_task_queues(&self) {
         let interval = tokio::time::Duration::from_secs(600);
         let mut interval = tokio::time::interval(interval);
         interval.tick().await; // the first tick is immediate
