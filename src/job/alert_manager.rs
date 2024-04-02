@@ -14,12 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster;
-use tokio::time;
 #[cfg(feature = "enterprise")]
-use {
-    config::{CONFIG, INSTANCE_ID},
-    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
-};
+use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use tokio::time;
 
 use crate::service;
 
@@ -29,7 +26,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     // check super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.common.super_cluster_enabled {
+    if O2_CONFIG.super_cluster.enabled {
         let cluster_name =
             o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
         if !cluster_name.is_empty() {
@@ -39,11 +36,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 return Ok(());
             }
         }
-        let cluster_name = format!(
-            "{}_{}",
-            CONFIG.common.cluster_name,
-            *INSTANCE_ID.get("instance_id").unwrap(),
-        );
+        let cluster_name = config::get_cluster_name();
         // regester to super cluster
         o2_enterprise::enterprise::super_cluster::kv::alert_manager::register_job_cluster(
             &cluster_name,

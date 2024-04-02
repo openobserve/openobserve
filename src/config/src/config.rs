@@ -1249,6 +1249,15 @@ pub fn is_local_disk_storage() -> bool {
     CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
 }
 
+#[inline]
+pub fn get_cluster_name() -> String {
+    if !CONFIG.common.cluster_name.is_empty() {
+        CONFIG.common.cluster_name.to_string()
+    } else {
+        INSTANCE_ID.get("instance_id").unwrap().to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

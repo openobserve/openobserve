@@ -46,7 +46,7 @@ pub(crate) async fn get(key: &str) -> Result<Bytes> {
 pub(crate) async fn put(key: &str, value: Bytes, need_watch: bool) -> Result<()> {
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.common.super_cluster_enabled {
+    if O2_CONFIG.super_cluster.enabled {
         o2_enterprise::enterprise::super_cluster::queue::put(key, value.clone(), need_watch)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
@@ -62,7 +62,7 @@ pub(crate) async fn delete(key: &str, with_prefix: bool, need_watch: bool) -> Re
 
     // super cluster
     #[cfg(feature = "enterprise")]
-    if O2_CONFIG.common.super_cluster_enabled {
+    if O2_CONFIG.super_cluster.enabled {
         o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;

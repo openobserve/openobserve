@@ -18,7 +18,7 @@ use std::{sync::Arc, time::Duration};
 use async_nats::jetstream;
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{CONFIG, INSTANCE_ID};
+use config::{get_cluster_name, CONFIG};
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -87,11 +87,7 @@ impl super::Queue for NatsQueue {
             let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await?;
-            let consumer_name = format!(
-                "{}_{}",
-                CONFIG.common.cluster_name,
-                *INSTANCE_ID.get("instance_id").unwrap(),
-            );
+            let consumer_name = get_cluster_name();
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
                 durable_name: Some(consumer_name.to_string()),
