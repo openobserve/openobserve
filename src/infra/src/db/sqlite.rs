@@ -214,12 +214,12 @@ impl super::Db for SqliteDb {
         start_dt: Option<i64>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let local_start_dt = start_dt.unwrap_or(0);
+        let local_start_dt = start_dt.unwrap_or_default();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
-            r#"INSERT OR IGNORE INTO meta (module, key1, key2,  start_dt, value) VALUES ($1, $2, $3,  $4, '');"#,
+            r#"INSERT OR IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '');"#
         )
         .bind(&module)
         .bind(&key1)
@@ -234,13 +234,13 @@ impl super::Db for SqliteDb {
             return Err(e.into());
         }
         if let Err(e) = sqlx::query(
-            r#"UPDATE meta SET value=$5 WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#,
+            r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
         )
+        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .bind(&module)
         .bind(&key1)
         .bind(&key2)
         .bind(local_start_dt)
-        .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
         .execute(&mut *tx)
         .await
         {
@@ -269,6 +269,166 @@ impl super::Db for SqliteDb {
                 .await
             {
                 log::error!("[SQLITE] send event error: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn get_for_update(
+        &self,
+        key: &str,
+        need_watch: bool,
+        start_dt: Option<i64>,
+        update_fn: Box<super::UpdateFn>,
+    ) -> Result<()> {
+        let (module, key1, key2) = super::parse_key(key);
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let mut tx = client.begin().await?;
+        let row = if let Some(start_dt) = start_dt {
+            match sqlx::query_as::<_,super::MetaRecord>(
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#
+            )
+              .bind(&module)
+              .bind(&key1)
+              .bind(&key2)
+            .bind(start_dt)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    if e.to_string().contains("no rows returned") {
+                        None
+                    } else {
+                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {}", e))); 
+                    }
+                }
+            }
+        } else {
+            match sqlx::query_as::<_,super::MetaRecord>(
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    if e.to_string().contains("no rows returned") {
+                        None
+                    } else {
+                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {}", e))); 
+                    }
+                }
+            }
+        };
+        let exist = row.is_some();
+        let row_id = row.as_ref().map(|r| r.id);
+        let value = row.map(|r| Bytes::from(r.value));
+        let (value, new_value) = match update_fn(value) {
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback get_for_update error: {}", e);
+                }
+                return Err(e);
+            }
+            Ok(None) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback get_for_update error: {}", e);
+                }
+                return Ok(());
+            }
+            Ok(Some(v)) => v,
+        };
+
+        // update value
+        if let Some(value) = value.as_ref() {
+            let ret = if exist {
+                sqlx::query(r#"UPDATE meta SET value = $1 WHERE id = $2;"#)
+                    .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+                    .bind(row_id.unwrap())
+                    .execute(&mut *tx)
+                    .await
+            } else {
+                sqlx::query(
+                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(start_dt.unwrap_or_default())
+            .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            };
+            if let Err(e) = ret {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback get_for_update error: {}", e);
+                }
+                return Err(e.into());
+            }
+        }
+
+        // new value
+        if let Some((new_key, new_value, new_start_dt)) = new_value.as_ref() {
+            let (module, key1, key2) = super::parse_key(new_key);
+            if let Err(e) = sqlx::query(
+                r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
+            )
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .bind(new_start_dt.unwrap_or_default())
+            .bind(String::from_utf8(new_value.to_vec()).unwrap_or_default())
+            .execute(&mut *tx)
+            .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                }
+                return Err(e.into());
+            }
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit get_for_update error: {}", e);
+            return Err(e.into());
+        }
+
+        // release lock
+        drop(client);
+
+        // event watch
+        if need_watch {
+            if let Some(value) = value {
+                if let Err(e) = CHANNEL
+                    .watch_tx
+                    .clone()
+                    .send(Event::Put(EventData {
+                        key: key.to_string(),
+                        value: Some(value),
+                    }))
+                    .await
+                {
+                    log::error!("[SQLITE] send event error: {}", e);
+                }
+            }
+            if let Some((_, value, _)) = new_value {
+                if let Err(e) = CHANNEL
+                    .watch_tx
+                    .clone()
+                    .send(Event::Put(EventData {
+                        key: key.to_string(),
+                        value: Some(value.clone()),
+                    }))
+                    .await
+                {
+                    log::error!("[SQLITE] send event error: {}", e);
+                }
             }
         }
 
@@ -343,7 +503,7 @@ impl super::Db for SqliteDb {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, start_dt, value FROM meta".to_string();
+        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -353,7 +513,8 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
-        sql = format!("{} ORDER BY start_dt DESC ", sql);
+        sql = format!("{} ORDER BY start_dt ASC", sql);
+
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -362,7 +523,7 @@ impl super::Db for SqliteDb {
             .into_iter()
             .map(|r| {
                 (
-                    super::build_key(&r.module, &r.key1, &r.key2),
+                    super::build_key(&r.module, &r.key1, &r.key2, r.start_dt),
                     Bytes::from(r.value),
                 )
             })
@@ -371,7 +532,7 @@ impl super::Db for SqliteDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT module, key1, key2, start_dt, '' AS value FROM meta".to_string();
+        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
         if !module.is_empty() {
             sql = format!("{} WHERE module = '{}'", sql, module);
         }
@@ -382,7 +543,7 @@ impl super::Db for SqliteDb {
             sql = format!("{} AND key2 LIKE '{}%'", sql, key2);
         }
 
-        sql = format!("{} ORDER BY start_dt DESC ", sql);
+        sql = format!("{} ORDER BY start_dt ASC", sql);
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -394,8 +555,13 @@ impl super::Db for SqliteDb {
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
-        let items = self.list(prefix).await?;
-        Ok(items.into_values().collect())
+        let mut items = self.list(prefix).await?;
+        let mut keys = items.keys().map(|k| k.to_string()).collect::<Vec<_>>();
+        keys.sort();
+        Ok(keys
+            .into_iter()
+            .map(|k| items.remove(&k).unwrap())
+            .collect())
     }
 
     async fn count(&self, prefix: &str) -> Result<i64> {
@@ -432,21 +598,8 @@ impl super::Db for SqliteDb {
     async fn add_start_dt_column(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        println!("[SQLITE] ENTER: add_start_dt_column");
-
-        add_col(&client).await?;
-
-        // Proceed to drop the index if it exists and create a new one if it does not exist
-        sqlx::query(
-        r#"
-        DROP INDEX IF EXISTS meta_module_key2_idx;
-        CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (start_dt, key2, key1, module);
-        "#
-    )
-    .execute(&*client)
-    .await?;
-
-        println!("[SQLITE] EXIT: add_start_dt_column");
+        create_meta_backup(&client).await?;
+        add_start_dt_column(&client).await?;
         Ok(())
     }
 }
@@ -459,32 +612,34 @@ async fn create_table() -> Result<()> {
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
-    id      INTEGER  not null primary key autoincrement,
-    module  VARCHAR  not null,
-    key1    VARCHAR not null,
-    key2    VARCHAR not null,
-    start_dt    INTEGER not null,
-    value   TEXT not null
+    id       INTEGER not null primary key autoincrement,
+    module   VARCHAR not null,
+    key1     VARCHAR not null,
+    key2     VARCHAR not null,
+    start_dt INTEGER not null,
+    value    TEXT not null
 );
         "#,
     )
     .execute(&*client)
     .await?;
+
+    // create start_dt cloumn for old version <= 0.9.2
+    add_start_dt_column(&client).await?;
+
     // create table index
     sqlx::query(
         r#"
 CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);
-CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (key1, module);
+CREATE INDEX IF NOT EXISTS meta_module_key1_idx on meta (module, key1);
         "#,
     )
     .execute(&*client)
     .await?;
 
-    add_col(&client).await?;
-
     match sqlx::query(
         r#"
-CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, key2, key1, module);
+CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (module, key1, key2, start_dt);
         "#,
     )
     .execute(&*client)
@@ -501,31 +656,54 @@ CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx on meta (start_dt, ke
     Ok(())
 }
 
-async fn add_col(client: &Pool<Sqlite>) -> Result<()> {
+async fn add_start_dt_column(client: &Pool<Sqlite>) -> Result<()> {
     // Attempt to add the column, ignoring the error if the column already exists
-    let add_column_result = sqlx::query(
-        r#"
-        ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;
-        "#,
-    )
-    .execute(client)
-    .await;
-
-    match add_column_result {
-        Ok(_) => {
-            println!("[SQLITE] Column added or already exists.");
-            Ok(())
-        }
-        Err(e) => {
-            // Check if the error is about the duplicate column
-            if e.to_string().contains("duplicate column name") {
-                // Ignore the duplicate column error and proceed
-                println!("[SQLITE] start_dt Column already exists, proceeding.");
-                Ok(())
-            } else {
-                // If the error is not about the duplicate column, return it
-                Err(e.into())
-            }
+    if let Err(e) =
+        sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt INTEGER NOT NULL DEFAULT 0;"#)
+            .execute(client)
+            .await
+    {
+        // Check if the error is about the duplicate column
+        if !e.to_string().contains("duplicate column name") {
+            // If the error is not about the duplicate column, return it
+            return Err(e.into());
         }
     }
+
+    // Proceed to drop the index if it exists and create a new one if it does not exist
+    sqlx::query(
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS meta_module_start_dt_idx ON meta (module, key1, key2, start_dt);"#
+        )
+        .execute(client)
+        .await?;
+    sqlx::query(r#"DROP INDEX IF EXISTS meta_module_key2_idx;"#)
+        .execute(client)
+        .await?;
+
+    Ok(())
+}
+
+async fn create_meta_backup(client: &Pool<Sqlite>) -> Result<()> {
+    let mut tx = client.begin().await?;
+    if let Err(e) =
+        sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
+            .execute(&mut *tx)
+            .await
+    {
+        if let Err(e) = tx.rollback().await {
+            log::error!(
+                "[SQLITE] rollback create table meta_backup_20240330 error: {}",
+                e
+            );
+        }
+        return Err(e.into());
+    }
+    if let Err(e) = tx.commit().await {
+        log::error!(
+            "[SQLITE] commit create table meta_backup_20240330 error: {}",
+            e
+        );
+        return Err(e.into());
+    }
+    Ok(())
 }

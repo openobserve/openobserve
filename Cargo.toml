@@ -58,7 +58,7 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-awc = "3.2"
+awc = "3.4"
 base64.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
@@ -114,7 +114,8 @@ opentelemetry-proto = { version = "0.4", features = [
 parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser = "0.3"
-prost = "0.11"
+prost.workspace = true
+proto.workspace = true
 pyroscope = { version = "0.5.6", optional = true }
 pyroscope_pprofrs = { version = "0.2.5", optional = true }
 rand.workspace = true
@@ -159,8 +160,6 @@ lettre.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-tonic-build = { version = "0.9", features = ["prost"] }
-prost-build = "0.11"
 
 [dev-dependencies]
 expect-test = "1.4"
@@ -169,7 +168,7 @@ float-cmp = "0.9"
 walkdir = "2"
 
 [workspace]
-members = ["src/config", "src/infra", "src/ingester", "src/wal"]
+members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto"]
 resolver = "2"
 
 [workspace.package]
@@ -182,6 +181,7 @@ config = { path = "src/config" }
 infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
+proto = { path = "src/proto" }
 
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.5"
@@ -191,7 +191,6 @@ argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
 async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "0.56.1"
-aws-sdk-dynamodb = "0.30.0"
 base64 = "0.21"
 bytes = "1.4"
 byteorder = "1.4.3"
@@ -217,7 +216,10 @@ getrandom = "0.2.11"
 gxhash = "~3.0.0"
 hashlink = "0.8.4"
 hashbrown = { version = "0.14", features = ["serde"] }
-chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = ["tokio-runtime", "_fetcher-rusttls-tokio"], default-features = false, branch = "main"}
+chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
+  "tokio-runtime",
+  "_fetcher-rusttls-tokio",
+], default-features = false, branch = "main" }
 hex = "0.4"
 indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
@@ -237,6 +239,7 @@ async-nats = "0.34.0"
 once_cell = "1.17"
 parking_lot = "0.12"
 prometheus = "0.13"
+prost = "0.11"
 rand = "0.8"
 rayon = "1.7.0"
 reqwest = { version = "0.11", default-features = false, features = [

@@ -30,12 +30,12 @@ use infra::{
     errors::{Error, ErrorCodes},
     file_list, storage,
 };
+use proto::cluster_rpc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{infra::cluster, meta::stream::ScanStats},
-    handler::grpc::cluster_rpc,
     service::{db, search::MetadataMap},
 };
 
@@ -114,7 +114,9 @@ pub async fn query(
             );
             client = client
                 .send_compressed(CompressionEncoding::Gzip)
-                .accept_compressed(CompressionEncoding::Gzip);
+                .accept_compressed(CompressionEncoding::Gzip)
+                .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+                .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
             let response: cluster_rpc::MaxIdResponse = match client.max_id(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -219,7 +221,9 @@ pub async fn query(
     );
     client = client
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
     let response: cluster_rpc::FileList = match client.query(request).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
@@ -313,7 +317,7 @@ pub async fn delete_parquet_file(key: &str, file_list_only: bool) -> Result<(), 
 }
 
 async fn delete_parquet_file_db_only(key: &str, file_list_only: bool) -> Result<(), anyhow::Error> {
-    // delete from file list in dynamo
+    // delete from file list in metastore
     file_list::batch_remove(&[key.to_string()]).await?;
 
     // delete the parquet whaterever the file is exists or not

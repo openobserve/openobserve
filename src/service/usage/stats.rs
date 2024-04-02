@@ -26,6 +26,7 @@ use config::{
 };
 use infra::{db as infra_db, dist_lock};
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use reqwest::Client;
 
 use super::ingestion_service;
@@ -34,7 +35,6 @@ use crate::{
         infra::cluster::get_node_by_uuid,
         meta::{self, search::Request},
     },
-    handler::grpc::cluster_rpc,
     service::{db, search as SearchService},
 };
 

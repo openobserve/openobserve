@@ -13,29 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
-
 pub mod dashboards;
 pub mod file_list;
 pub mod meta;
 pub mod schema;
 
 pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::Error> {
-    if CONFIG.common.run_schema_migration_on_start_up && new_ver >= "v0.9.1" {
-        schema::run().await?;
+    if old_ver == "v0.0.0" {
+        // new install
+        return Ok(());
     }
-
-    if !CONFIG.common.local_mode || old_ver >= new_ver {
+    if old_ver >= new_ver {
         return Ok(());
     }
 
-    if old_ver >= "v0.5.3" {
-        return Ok(());
-    }
     log::info!("Upgrading from {} to {}", old_ver, new_ver);
-    if new_ver.starts_with("v0.6.") {
+    if old_ver < "v0.5.3" && new_ver.starts_with("v0.6.") {
         upgrade_052_053().await?;
+        return Ok(());
     }
+    if old_ver < "v0.9.3" {
+        upgrade_092_093().await?;
+        return Ok(());
+    }
+
     Ok(())
 }
 
@@ -45,6 +46,13 @@ async fn upgrade_052_053() -> Result<(), anyhow::Error> {
 
     // migration for file_list
     file_list::run("", "sled", "sqlite").await?;
+
+    Ok(())
+}
+
+async fn upgrade_092_093() -> Result<(), anyhow::Error> {
+    // migration schema
+    schema::run().await?;
 
     Ok(())
 }

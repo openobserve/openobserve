@@ -19,10 +19,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
     logs_service_client::LogsServiceClient, logs_service_server::LogsService,
     ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
-use tonic::{
-    codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request, Response,
-    Status,
-};
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{common::infra::cluster, service::search::MetadataMap};
@@ -47,7 +44,6 @@ impl LogsService for LogsServer {
         }
 
         // call ingester
-        let grpc_addr = super::get_rand_ingester_addr().await?;
         let mut request = Request::from_parts(metadata, extensions, message);
         opentelemetry::global::get_text_map_propagator(|propagator| {
             propagator.inject_context(
@@ -59,18 +55,7 @@ impl LogsService for LogsServer {
         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let channel = Channel::from_shared(grpc_addr.clone())
-            .unwrap()
-            .connect()
-            .await
-            .map_err(|err| {
-                log::error!(
-                    "[ROUTER] grpc->ingest->logs: node: {}, connect err: {:?}",
-                    &grpc_addr,
-                    err
-                );
-                Status::internal("connect querier error".to_string())
-            })?;
+        let channel = super::get_ingester_channel().await?;
         let client = LogsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)

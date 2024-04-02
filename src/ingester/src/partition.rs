@@ -77,15 +77,18 @@ impl Partition {
         stream_type: &str,
         stream_name: &str,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
-        let r = self.files.read().await;
-        let mut paths = Vec::with_capacity(r.len());
         let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
         path.push("files");
         path.push(org_id);
         path.push(stream_type);
         path.push(stream_name);
         path.push(thread_id.to_string());
+        let r = self.files.read().await;
+        let mut paths = Vec::with_capacity(r.len());
         for (hour, data) in r.iter() {
+            if data.data.is_empty() {
+                continue;
+            }
             let mut file_meta = FileMeta::default();
             data.data.iter().for_each(|r| {
                 file_meta.original_size += r.data_json_size as i64;

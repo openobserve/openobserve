@@ -18,16 +18,11 @@ use std::{collections::HashMap, sync::Arc};
 use config::metrics;
 use infra::errors;
 use tokio::sync::{oneshot::Sender, RwLock};
+use proto::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    handler::grpc::cluster_rpc::{
-        search_server::Search, CancelJobRequest, CancelJobResponse, JobStatus, JobStatusRequest,
-        JobStatusResponse, SearchRequest, SearchResponse,
-    },
-    service::search as SearchService,
-};
+use crate::service::search as SearchService;
 
 #[derive(Clone, Debug)]
 pub struct Searcher {

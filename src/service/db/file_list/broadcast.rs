@@ -25,10 +25,11 @@ use config::{
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use tokio::sync::{mpsc, RwLock};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::{common::infra::cluster, handler::grpc::cluster_rpc};
+use crate::common::infra::cluster;
 
 static EVENTS: Lazy<RwLock<HashMap<String, EventChannel>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -177,7 +178,9 @@ async fn send_to_node(
         );
         client = client
             .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
+            .accept_compressed(CompressionEncoding::Gzip)
+            .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+            .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
         loop {
             let items = match rx.recv().await {
                 Some(v) => v,
