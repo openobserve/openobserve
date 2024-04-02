@@ -713,44 +713,41 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
 
     let mut fields = Vec::new();
     let mut from_pos = 0;
-    let sql_chars = sql.chars().collect::<Vec<char>>();
-    let sql_chars_len = sql_chars.len();
     let mut start_pos = 0;
     let mut in_word = false;
     let mut brackets = 0;
     let mut quotes = 0;
     let mut quote_now = '\"';
-    for i in 0..sql_chars_len {
-        let c = sql_chars.get(i).unwrap();
-        if *c == '(' {
+    for (i, c) in sql.char_indices() {
+        if c == '(' {
             brackets += 1;
             continue;
         }
-        if *c == ')' {
+        if c == ')' {
             brackets -= 1;
             continue;
         }
-        if *c == '"' || *c == '\'' {
+        if c == '"' || c == '\'' {
             if quotes == 0 {
                 quotes += 1;
-                quote_now = *c;
+                quote_now = c;
                 if !in_word {
                     start_pos = i;
                     in_word = true;
                 }
                 continue;
             }
-            if quotes == 1 && quote_now == *c {
+            if quotes == 1 && quote_now == c {
                 quotes = 0;
                 continue;
             }
         }
-        if *c == ',' || *c == ' ' {
+        if c == ',' || c == ' ' {
             if brackets > 0 || quotes > 0 {
                 continue;
             }
             if in_word {
-                let field = sql_chars[start_pos..i].iter().collect::<String>();
+                let field = sql[start_pos..i].to_string();
                 if field.to_lowercase().eq("from") {
                     from_pos = i;
                     break;
