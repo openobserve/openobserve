@@ -160,8 +160,6 @@ lettre.workspace = true
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-tonic-build = { version = "0.9", features = ["prost"] }
-prost-build = "0.11"
 
 [dev-dependencies]
 expect-test = "1.4"
