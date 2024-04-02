@@ -157,6 +157,9 @@ impl Writer {
     }
 
     pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry) -> Result<()> {
+        if entry.data.is_empty() {
+            return Ok(());
+        }
         let entry_bytes = entry.into_bytes()?;
         let mut wal = self.wal.lock().await;
         let mut mem = self.memtable.write().await;

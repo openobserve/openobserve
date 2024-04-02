@@ -54,6 +54,9 @@ impl Directory {
         let key = format!("/{}/{}", self.location, path);
         get(&key)
     }
+    pub fn list(&self, extension: &str) -> Result<Vec<File>> {
+        list(&self.location, extension)
+    }
 }
 
 impl Default for Directory {
