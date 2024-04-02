@@ -75,12 +75,14 @@ message JobStatusResponse {
 
 message JobStatus {
     string session_id = 1;
-    int64 running_time = 2;
+    int64 query_start_time = 2;
     bool is_queue = 3;
-    optional string sql = 4;
-    optional int64 start_time = 5;
-    optional int64 end_time = 6;
-    optional string user = 7;
+    optional string user_id = 4;
+    optional string org_id = 5;
+    optional string stream_type = 6;
+    optional string sql = 7;
+    optional int64 start_time = 8;
+    optional int64 end_time = 9;
 }
 
 message CancelJobRequest {
@@ -88,5 +90,5 @@ message CancelJobRequest {
 }
 
 message CancelJobResponse {
-    bool success = 2;
+    bool is_success = 1;
 }

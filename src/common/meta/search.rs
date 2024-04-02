@@ -304,18 +304,20 @@ pub struct JobStatusResponse {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct JobStatus {
     pub session_id: String,
-    pub running_time: i64,
+    pub query_start_time: i64,
     pub is_queue: bool,
+    pub user_id: Option<String>,
+    pub org_id: Option<String>,
+    pub stream_type: Option<String>,
     pub sql: Option<String>,
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
-    pub user: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct CancelJobResponse {
     pub session_id: String,
-    pub success: bool,
+    pub is_success: bool,
 }
 #[cfg(test)]
 mod tests {

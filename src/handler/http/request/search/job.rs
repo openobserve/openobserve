@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,13 +30,13 @@ use actix_web::{delete, get, web, HttpResponse};
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = CancelJobResponse, example = json!([{
             "session_id": "2eWbtjKPiHLzmZ7Idt6lLxDwX44",
-            "success": true,
+            "is_success": true,
         }])),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/job/{session_id}")]
+#[delete("/search_job/{session_id}")]
 pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
     match res {
@@ -55,22 +55,24 @@ pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, E
     responses(
           (status = 200, description = "Success", content_type = "application/json", body = JobStatusResponse, example = json!([{
                 "status":[
-                    {
-                        "session_id":"2eWbtjKPiHLzmZ7Idt6lLxDwX44",
-                        "running_time":5,
-                        "is_queue":false,
-                        "sql":"select * from 'default'",
-                        "start_time":1706429989000000i64,
-                        "end_time":2706685707000000i64,
-                        "user":"root@example.com"
-                    }
+                   {
+                      "session_id":"2eXczWNb38frLRhayaGs8luouel",
+                      "query_start_time":1712054625174128i64,
+                      "is_queue":false,
+                      "user_id":"root@example.com",
+                      "org_id":"default",
+                      "stream_type":"logs",
+                      "sql":"select * from 'default'",
+                      "start_time":1706429989000000i64,
+                      "end_time":2706685707000000i64
+                   }
                 ]
           }])),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/job/status")]
+#[get("/search_job/status")]
 pub async fn job_status() -> Result<HttpResponse, Error> {
     let res = crate::service::search::job_status().await;
     match res {

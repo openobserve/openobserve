@@ -179,12 +179,14 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
         }
         status.push(search::JobStatus {
             session_id: result.session_id,
-            running_time: result.running_time,
+            query_start_time: result.query_start_time,
             is_queue: result.is_queue,
+            user_id: result.user_id,
+            org_id: result.org_id,
+            stream_type: result.stream_type,
             sql: result.sql,
             start_time: result.start_time,
             end_time: result.end_time,
-            user: result.user,
         });
     }
 
@@ -289,17 +291,17 @@ pub async fn cancel_job(session_id: &str) -> Result<search::CancelJobResponse, E
         }
     }
 
-    let mut success = false;
+    let mut is_success = false;
     for res in results {
-        if res.success {
-            success = true;
+        if res.is_success {
+            is_success = true;
             break;
         }
     }
 
     Ok(search::CancelJobResponse {
         session_id: session_id.to_string(),
-        success,
+        is_success,
     })
 }
 
@@ -323,7 +325,16 @@ pub async fn search(
     // set search task
     SEARCH_SERVER.task_manager.insert(
         session_id.clone(),
-        TaskStatus::new(true, vec![], sql, start_time, end_time, user_id),
+        TaskStatus::new(
+            vec![],
+            true,
+            user_id,
+            Some(org_id.to_string()),
+            Some(stream_type.to_string()),
+            sql,
+            start_time,
+            end_time,
+        ),
     );
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();

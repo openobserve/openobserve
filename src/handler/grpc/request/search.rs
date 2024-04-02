@@ -53,54 +53,59 @@ pub struct TaskStatus {
     // handle cancel query task
     pub abort_senders: Vec<Sender<()>>,
     // start time of the query task
-    pub time: std::time::Instant,
+    pub query_start_time: i64,
     // is leader
     pub is_leader: bool,
     // is query in queue
     pub is_queue: bool,
+    // the user of the query task
+    pub user_id: Option<String>,
+    // the org id of the query task
+    pub org_id: Option<String>,
+    // the stream type of the query task
+    pub stream_type: Option<String>,
     // the sql the task query
     pub sql: Option<String>,
-    // time range of the task query
+    // time range of the query task in sql
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
-    // the user of the query task
-    pub user: Option<String>,
 }
 
 impl TaskStatus {
     pub fn new(
-        is_leader: bool,
         abort_senders: Vec<Sender<()>>,
+        is_leader: bool,
+        user_id: Option<String>,
+        org_id: Option<String>,
+        stream_type: Option<String>,
         sql: Option<String>,
         start_time: Option<i64>,
         end_time: Option<i64>,
-        user: Option<String>,
     ) -> Self {
         Self {
             abort_senders,
-            time: std::time::Instant::now(),
+            query_start_time: 0,
             is_leader,
             is_queue: true,
+            user_id,
+            org_id,
+            stream_type,
             sql,
             start_time,
             end_time,
-            user,
         }
     }
 
     pub fn push(&mut self, sender: Sender<()>) {
         if self.is_queue {
             self.is_queue = false;
+            self.query_start_time = chrono::Utc::now().timestamp_micros();
         }
         self.abort_senders.push(sender);
     }
 
     pub fn is_leader(&self) -> bool {
         self.is_leader
-    }
-
-    pub fn elapsed_time(&self) -> i64 {
-        self.time.elapsed().as_secs_f64() as i64
     }
 }
 
@@ -126,7 +131,7 @@ impl Search for Searcher {
         if !self.task_manager.contains_key(&session_id) {
             self.task_manager.insert(
                 session_id.clone(),
-                TaskStatus::new(false, vec![], None, None, None, None),
+                TaskStatus::new(vec![], false, None, None, None, None, None, None),
             );
         }
 
@@ -182,12 +187,14 @@ impl Search for Searcher {
             let value = pair.value();
             status.push(JobStatus {
                 session_id: session_id.clone(),
-                running_time: value.elapsed_time(),
+                query_start_time: value.query_start_time,
                 is_queue: value.is_queue,
+                user_id: value.user_id.clone(),
+                org_id: value.org_id.clone(),
+                stream_type: value.stream_type.clone(),
                 sql: value.sql.clone(),
                 start_time: value.start_time,
                 end_time: value.end_time,
-                user: value.user.clone(),
             });
         }
         Ok(Response::new(JobStatusResponse { status }))
@@ -203,9 +210,9 @@ impl Search for Searcher {
                 for sender in senders.abort_senders.into_iter().rev() {
                     let _ = sender.send(());
                 }
-                Ok(Response::new(CancelJobResponse { success: true }))
+                Ok(Response::new(CancelJobResponse { is_success: true }))
             }
-            None => Ok(Response::new(CancelJobResponse { success: false })),
+            None => Ok(Response::new(CancelJobResponse { is_success: false })),
         }
     }
 }
