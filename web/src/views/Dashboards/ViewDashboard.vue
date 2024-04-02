@@ -280,7 +280,7 @@ export default defineComponent({
     const showDashboardSettingsDialog = ref(false);
 
     // selected tab
-    const selectedTabId: any = ref(null);
+    const selectedTabId: any = ref(route.query.tab ?? null);
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
