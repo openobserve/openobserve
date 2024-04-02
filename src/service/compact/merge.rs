@@ -187,7 +187,7 @@ pub async fn merge_by_stream(
                 offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap() - 1,
             )
         };
-    let files = file_list::query(
+    let mut files = file_list::query(
         org_id,
         stream_name,
         stream_type,
@@ -198,6 +198,32 @@ pub async fn merge_by_stream(
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+
+    // check lookback files
+    if CONFIG.compact.lookback_hours > 0 {
+        let lookback_offset = Duration::try_hours(CONFIG.compact.lookback_hours)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let lookback_offset_start = partition_offset_start - lookback_offset;
+        let mut lookback_offset_end = partition_offset_end - lookback_offset;
+        if lookback_offset_end > partition_offset_start {
+            // the lookback period is overlap with current period
+            lookback_offset_end = partition_offset_start;
+        }
+        let lookback_files = file_list::query(
+            org_id,
+            stream_name,
+            stream_type,
+            partition_time_level,
+            lookback_offset_start,
+            lookback_offset_end,
+            true,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("query lookback file list failed: {}", e))?;
+        files.extend(lookback_files);
+    }
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{}/{}/{}] time range: [{},{}], files: {}",
@@ -529,12 +555,13 @@ async fn merge_files(
     let mut fts_buf = Vec::new();
     let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
+        stream_type,
+        stream_name,
         &mut buf,
         schema.clone(),
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
-        stream_type,
         &mut fts_buf,
     )
     .await

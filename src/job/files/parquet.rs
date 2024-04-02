@@ -375,12 +375,13 @@ async fn merge_files(
     let mut fts_buf = Vec::new();
     let (mut new_file_meta, _) = match merge_parquet_files(
         tmp_dir.name(),
+        stream_type,
+        &stream_name,
         &mut buf,
         Arc::new(file_schema.unwrap()),
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
-        stream_type,
         &mut fts_buf,
     )
     .await

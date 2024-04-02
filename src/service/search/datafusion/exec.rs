@@ -1051,12 +1051,13 @@ pub async fn convert_parquet_file(
 #[allow(clippy::too_many_arguments)]
 pub async fn merge_parquet_files(
     session_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
     full_text_search_fields: &[String],
     original_size: i64,
-    stream_type: StreamType,
     fts_buf: &mut Vec<RecordBatch>,
 ) -> Result<(FileMeta, Arc<Schema>)> {
     // query data
@@ -1115,8 +1116,19 @@ pub async fn merge_parquet_files(
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
+        // TODO: NOT IN is not efficient, need to optimize it: NOT EXIST
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted is True) ORDER BY {} DESC",
+            CONFIG.common.column_timestamp
+        )
+    } else if CONFIG.limit.distinct_values_hourly
+        && stream_type == StreamType::Metadata
+        && stream_name == "distinct_values"
+    {
+        format!(
+            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
+            CONFIG.common.column_timestamp,
+            CONFIG.common.column_timestamp,
             CONFIG.common.column_timestamp
         )
     } else {
