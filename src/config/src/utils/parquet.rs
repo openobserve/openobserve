@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, path::PathBuf, sync::Arc};
+use std::{cmp::min, io::Cursor, path::PathBuf, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Schema;
@@ -23,7 +23,6 @@ use parquet::{
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
     format::SortingColumn,
-    schema::types::ColumnPath,
 };
 
 use crate::{config::*, ider, meta::stream::FileMeta};
@@ -51,14 +50,14 @@ pub fn new_parquet_writer<'a>(
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
         .set_sorting_columns(Some(
-            [SortingColumn::new(sort_column_id as i32, true, false)].to_vec(),
+            vec![SortingColumn::new(sort_column_id as i32, true, false)],
         ))
         .set_column_dictionary_enabled(
-            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
+            CONFIG.common.column_timestamp.as_str().into(),
             false,
         )
         .set_column_encoding(
-            ColumnPath::from(vec![CONFIG.common.column_timestamp.to_string()]),
+            CONFIG.common.column_timestamp.as_str().into(),
             Encoding::DELTA_BINARY_PACKED,
         )
         .set_key_value_metadata(Some(vec![
@@ -71,56 +70,39 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
-        writer_props = writer_props
-            .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
+        writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
     }
     for field in full_text_search_fields.iter() {
-        writer_props = writer_props
-            .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
+        writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
     }
     // Bloom filter stored by row_group, so if the num_rows can limit to row_group_size
-    let num_rows = metadata.records as u64;
-    let num_rows = if num_rows > row_group_size as u64 {
-        row_group_size as u64
-    } else {
-        num_rows
-    };
+    let num_rows = min(metadata.records as u64, row_group_size as u64);
     if CONFIG.common.bloom_filter_enabled {
         let mut fields = bloom_filter_fields.to_vec();
         fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
         fields.sort();
         fields.dedup();
-        let mut fields = fields.as_slice();
         // if bloom_filter_on_all_fields is true, then use all string fields
-        let mut all_fields = None;
         if CONFIG.common.bloom_filter_on_all_fields {
-            all_fields = Some(
-                schema
-                    .fields()
-                    .iter()
-                    .filter(|f| {
-                        f.data_type() == &arrow::datatypes::DataType::Utf8
-                            && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(f.name())
-                            && !full_text_search_fields.contains(f.name())
-                    })
-                    .map(|f| f.name().to_string())
-                    .collect::<Vec<_>>(),
-            );
+            fields = schema
+                .fields()
+                .iter()
+                .filter(|f| {
+                    f.data_type() == &arrow::datatypes::DataType::Utf8
+                        && !SQL_FULL_TEXT_SEARCH_FIELDS.contains(f.name())
+                        && !full_text_search_fields.contains(f.name())
+                })
+                .map(|f| f.name().to_string())
+                .collect::<Vec<_>>();
         }
-        if let Some(all_fields) = all_fields.as_ref() {
-            fields = all_fields.as_slice();
-        }
-        for field in fields.iter() {
-            writer_props = writer_props
-                .set_column_dictionary_enabled(ColumnPath::from(vec![field.to_string()]), false);
-            writer_props = writer_props
-                .set_column_bloom_filter_enabled(ColumnPath::from(vec![field.to_string()]), true);
+        for field in fields {
             if metadata.records > 0 {
-                writer_props = writer_props.set_column_bloom_filter_ndv(
-                    ColumnPath::from(vec![field.to_string()]),
-                    num_rows,
-                );
+                writer_props =
+                    writer_props.set_column_bloom_filter_ndv(field.as_str().into(), num_rows);
             }
+            writer_props = writer_props
+                .set_column_dictionary_enabled(field.as_str().into(), false)
+                .set_column_bloom_filter_enabled(field.into(), true);   // take the field ownership
         }
     }
     let writer_props = writer_props.build();
@@ -133,7 +115,8 @@ pub fn new_parquet_writer<'a>(
     .unwrap()
 }
 
-/// parse file key to get stream_key, date_key, file_name
+
+// parse file key to get stream_key, date_key, file_name
 pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), anyhow::Error> {
     // eg: files/default/logs/olympics/2022/10/03/10/6982652937134804993_1.parquet
     let columns = key.splitn(9, '/').collect::<Vec<&str>>();
