@@ -640,30 +640,14 @@ const savePermissionHash = () => {
 const updateRolePermissions = async (permissions: Permission[]) => {
   let resourceMapper: { [key: string]: Resource } = {};
   for (let i = 0; i < permissions.length; i++) {
-    let {
-      resource,
-      entity,
-    }: {
-      resource: string;
-      entity: string;
-    } = decodePermission(permissions[i].object);
-
-    if (!resourceMapper[resource]) {
-      resourceMapper[resource] = getResourceByName(
-        permissionsState.permissions,
-        resource
-      ) as Resource;
-    }
-
-    // Added it intentionally, as to get parent resource for dashboard, before getting dashboard permissions
-    if (!resourceMapper[resource] && resource === "dashboard") {
-      if (!resourceMapper["dfolder"])
-        resourceMapper["dfolder"] = getResourceByName(
-          permissionsState.permissions,
-          "dfolder"
-        ) as Resource;
-
-      await getResourceEntities(resourceMapper["dfolder"]);
+    try {
+      let {
+        resource,
+        entity,
+      }: {
+        resource: string;
+        entity: string;
+      } = decodePermission(permissions[i].object);
 
       if (!resourceMapper[resource]) {
         resourceMapper[resource] = getResourceByName(
@@ -671,51 +655,71 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           resource
         ) as Resource;
       }
-    }
 
-    if (!resourceMapper[resource]) return;
+      // Added it intentionally, as to get parent resource for dashboard, before getting dashboard permissions
+      if (!resourceMapper[resource] && resource === "dashboard") {
+        if (!resourceMapper["dfolder"])
+          resourceMapper["dfolder"] = getResourceByName(
+            permissionsState.permissions,
+            "dfolder"
+          ) as Resource;
 
-    if (
-      resourceMapper[resource].parent &&
-      !resourceMapper[resourceMapper[resource].parent]
-    ) {
-      resourceMapper[resourceMapper[resource].parent] = getResourceByName(
-        permissionsState.permissions,
-        resourceMapper[resource].parent
-      ) as Resource;
-    }
+        await getResourceEntities(resourceMapper["dfolder"]);
 
-    if (entity === getOrgId()) {
-      resourceMapper[resource].permission[permissions[i].permission].value =
-        true;
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource
+          ) as Resource;
+        }
+      }
 
-      continue;
-    }
+      if (!resourceMapper[resource]) continue;
 
-    if (resourceMapper[resource].parent)
-      await getResourceEntities(
-        resourceMapper[resourceMapper[resource].parent]
-      );
+      if (
+        resourceMapper[resource].parent &&
+        !resourceMapper[resourceMapper[resource].parent]
+      ) {
+        resourceMapper[resourceMapper[resource].parent] = getResourceByName(
+          permissionsState.permissions,
+          resourceMapper[resource].parent
+        ) as Resource;
+      }
 
-    // This is just to handle dashboard permissions, need to fix this
-    if (resource === "dashboard") {
-      const [folderId, dashboardId] = entity.split("/");
+      if (entity === "_all_" + getOrgId()) {
+        resourceMapper[resource].permission[permissions[i].permission].value =
+          true;
 
-      const dashResource = resourceMapper["dfolder"].entities.find(
-        (e: Entity) => e.name === folderId
-      );
-      await getResourceEntities(dashResource as Entity);
-    } else if (
-      resource === "logs" ||
-      resource === "metrics" ||
-      resource === "traces"
-    ) {
-      const streamResource = resourceMapper["stream"].entities.find(
-        (e: Entity) => e.name === resource
-      );
-      await getResourceEntities(streamResource as Entity);
-    } else {
-      await getResourceEntities(resourceMapper[resource]);
+        continue;
+      }
+
+      if (resourceMapper[resource].parent)
+        await getResourceEntities(
+          resourceMapper[resourceMapper[resource].parent]
+        );
+
+      // This is just to handle dashboard permissions, need to fix this
+      if (resource === "dashboard") {
+        const [folderId, dashboardId] = entity.split("/");
+
+        const dashResource = resourceMapper["dfolder"].entities.find(
+          (e: Entity) => e.name === folderId
+        );
+        await getResourceEntities(dashResource as Entity);
+      } else if (
+        resource === "logs" ||
+        resource === "metrics" ||
+        resource === "traces"
+      ) {
+        const streamResource = resourceMapper["stream"].entities.find(
+          (e: Entity) => e.name === resource
+        );
+        await getResourceEntities(streamResource as Entity);
+      } else {
+        await getResourceEntities(resourceMapper[resource]);
+      }
+    } catch (err) {
+      console.log(err);
     }
   }
 
@@ -739,12 +743,16 @@ const handlePermissionChange = (row: any, permission: string) => {
   let entity = "";
   let resourceName = row.resourceName;
 
-  if (row.type === "Type") entity = store.state.selectedOrganization.identifier;
+  // As there can be conflict in resource name and org id, as they can be same.
+  // So we are adding _all_ prefix to org id to differentiate between org id and resource name
+
+  if (row.type === "Type")
+    entity = "_all_" + store.state.selectedOrganization.identifier;
   else entity = row.name;
 
   if (row.type === "Resource" && row.top_level) {
     resourceName = row.name;
-    entity = store.state.selectedOrganization.identifier;
+    entity = "_all_" + store.state.selectedOrganization.identifier;
   }
 
   const permissionHash = `${resourceName}:${entity}:${permission}`;
@@ -870,7 +878,7 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId
         ) as Entity;
-      } else if (entity === getOrgId()) {
+      } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
             getPermissionHash(resource, permission.permission, entity)
@@ -915,7 +923,7 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId
         ) as Entity;
-      } else if (entity === getOrgId()) {
+      } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
             getPermissionHash(resource, permission.permission, entity)
@@ -1207,7 +1215,7 @@ const getPermissionHash = (
   permission: string,
   entity?: string
 ) => {
-  if (!entity) entity = store.state.selectedOrganization.identifier;
+  if (!entity) entity = "_all_" + store.state.selectedOrganization.identifier;
 
   return `${resourceName}:${entity}:${permission}`;
 };
@@ -1703,7 +1711,7 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowAll",
-              store.state.selectedOrganization.identifier
+              "_all_" + store.state.selectedOrganization.identifier
             )
           ),
           show: true,
@@ -1713,7 +1721,7 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowGet",
-              store.state.selectedOrganization.identifier
+              "_all_" + store.state.selectedOrganization.identifier
             )
           ),
           show: true,
@@ -1723,7 +1731,7 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowDelete",
-              store.state.selectedOrganization.identifier
+              "_all_" + store.state.selectedOrganization.identifier
             )
           ),
           show: true,
@@ -1733,7 +1741,7 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowPut",
-              store.state.selectedOrganization.identifier
+              "_all_" + store.state.selectedOrganization.identifier
             )
           ),
           show: true,
@@ -1743,7 +1751,7 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowList",
-              store.state.selectedOrganization.identifier
+              "_all_" + store.state.selectedOrganization.identifier
             )
           ),
           show: hasEntities,
@@ -1753,7 +1761,7 @@ const updateResourceResource = (
             getPermissionHash(
               resourceName,
               "AllowPost",
-              store.state.selectedOrganization.identifier
+              "_all_" + store.state.selectedOrganization.identifier
             )
           ),
           show: hasEntities,
