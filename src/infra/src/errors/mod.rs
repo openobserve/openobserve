@@ -99,6 +99,7 @@ pub enum ErrorCodes {
     SearchParquetFileNotFound,
     SearchFieldHasNoCompatibleDataType(String),
     SearchSQLExecuteError(String),
+    SearchCancelQuery(String),
 }
 
 impl std::fmt::Display for ErrorCodes {
@@ -124,6 +125,7 @@ impl ErrorCodes {
             ErrorCodes::SearchParquetFileNotFound => 20006,
             ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => 20007,
             ErrorCodes::SearchSQLExecuteError(_) => 20008,
+            ErrorCodes::SearchCancelQuery(_) => 429,
         }
     }
 
@@ -146,6 +148,7 @@ impl ErrorCodes {
                 format!("Search field has no compatible data type: {field}")
             }
             ErrorCodes::SearchSQLExecuteError(_) => "Search SQL execute error".to_string(),
+            ErrorCodes::SearchCancelQuery(_) => "Search query cancelled".to_string(),
         }
     }
 
@@ -160,6 +163,7 @@ impl ErrorCodes {
             ErrorCodes::SearchParquetFileNotFound => "".to_string(),
             ErrorCodes::SearchFieldHasNoCompatibleDataType(field) => field.to_owned(),
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
+            ErrorCodes::SearchCancelQuery(msg) => msg.to_owned(),
         }
     }
 
@@ -174,6 +178,7 @@ impl ErrorCodes {
             ErrorCodes::SearchParquetFileNotFound => "".to_string(),
             ErrorCodes::SearchFieldHasNoCompatibleDataType(_) => "".to_string(),
             ErrorCodes::SearchSQLExecuteError(msg) => msg.to_owned(),
+            ErrorCodes::SearchCancelQuery(msg) => msg.to_string(),
         }
     }
 

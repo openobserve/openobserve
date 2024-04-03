@@ -616,9 +616,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&session_id).await {
-            return Err(Error::Message(format!(
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
-            )));
+            ))));
         }
         #[cfg(feature = "enterprise")]
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -686,7 +686,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     }
                     _ = abort_receiver => {
                         log::info!("[session_id {session_id}] search->grpc: cancel search in node: {:?}", &node.grpc_addr);
-                        return Err(Error::Message(format!("[session_id {session_id}] search->grpc: search canceled")));
+                        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[session_id {session_id}] search->grpc: search canceled"))));
                     }
                 }
                 #[cfg(not(feature = "enterprise"))]
@@ -821,9 +821,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&session_id).await {
-            return Err(Error::Message(format!(
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
-            )));
+            ))));
         }
         #[cfg(feature = "enterprise")]
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
@@ -857,7 +857,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             }
             _ = abort_receiver => {
                 log::info!("[session_id {session_id}] search->cluster: final merge task is cancel");
-                return Err(Error::Message(format!("[session_id {session_id}] search->cluster: final merge task is cancel")));
+                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[session_id {session_id}] search->cluster: final merge task is cancel"))));
             }
         }
         #[cfg(not(feature = "enterprise"))]
