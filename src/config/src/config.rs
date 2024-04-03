@@ -367,6 +367,8 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+    #[env_config(name = "ZO_COOKIE_SAME_SITE_LAX", default = true)]
+    pub cookie_same_site_lax: bool,
 }
 
 #[derive(EnvConfig)]

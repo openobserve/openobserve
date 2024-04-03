@@ -346,13 +346,21 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             access_token_cookie.set_http_only(true);
             access_token_cookie.set_secure(true);
             access_token_cookie.set_path("/");
-            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            if CONFIG.auth.cookie_same_site_lax {
+                access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                access_token_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
 
             let mut refresh_token_cookie = Cookie::new("refresh_token", login_data.refresh_token);
             refresh_token_cookie.set_http_only(true);
             refresh_token_cookie.set_secure(true);
             refresh_token_cookie.set_path("/");
-            refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
 
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
@@ -398,12 +406,21 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             access_cookie.set_http_only(true);
             access_cookie.set_secure(true);
             access_cookie.set_path("/");
-            access_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            if CONFIG.auth.cookie_same_site_lax {
+                access_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                access_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
             let mut refresh_cookie = Cookie::new("refresh_token", "");
             refresh_cookie.set_http_only(true);
             refresh_cookie.set_secure(true);
             refresh_cookie.set_path("/");
-            refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                refresh_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
             HttpResponse::Unauthorized()
                 .append_header((header::LOCATION, "/"))
                 .cookie(access_cookie)
