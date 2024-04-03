@@ -39,7 +39,7 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use proto::cluster_rpc::{self, JobStatusRequest};
+use proto::cluster_rpc;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -67,240 +67,6 @@ pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
-
-pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
-    // get nodes from cluster
-    let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
-    // sort nodes by node_id this will improve hit cache ratio
-    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    let nodes = nodes;
-
-    // make cluster request
-    let mut tasks = Vec::new();
-    for node in nodes.iter().cloned() {
-        let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!(
-            "service:search:cluster:grpc_job_status",
-            node_id = node.id,
-            node_addr = node_addr.as_str(),
-        );
-
-        let task = tokio::task::spawn(
-            async move {
-                let mut request = tonic::Request::new(JobStatusRequest {});
-
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        //  req.metadata_mut()
-                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
-                let response = match client.job_status(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!(
-                            "search->grpc: node: {}, search err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
-                    }
-                };
-                Ok(response)
-            }
-            .instrument(grpc_span),
-        );
-        tasks.push(task);
-    }
-
-    let mut results = Vec::new();
-    for task in tasks {
-        match task.await {
-            Ok(res) => match res {
-                Ok(res) => results.push(res),
-                Err(err) => {
-                    return Err(err);
-                }
-            },
-            Err(e) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    e.to_string(),
-                )));
-            }
-        }
-    }
-
-    let mut status = vec![];
-    let mut set = HashSet::new();
-    for result in results.into_iter().flat_map(|v| v.status.into_iter()) {
-        if set.contains(&result.session_id) {
-            continue;
-        } else {
-            set.insert(result.session_id.clone());
-        }
-        status.push(search::JobStatus {
-            session_id: result.session_id,
-            query_start_time: result.query_start_time,
-            is_queue: result.is_queue,
-            user_id: result.user_id,
-            org_id: result.org_id,
-            stream_type: result.stream_type,
-            sql: result.sql,
-            start_time: result.start_time,
-            end_time: result.end_time,
-        });
-    }
-
-    Ok(search::JobStatusResponse { status })
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn cancel_job(session_id: &str) -> Result<search::CancelJobResponse, Error> {
-    // get nodes from cluster
-    let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
-    // sort nodes by node_id this will improve hit cache ratio
-    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    let nodes = nodes;
-
-    // make cluster request
-    let mut tasks = Vec::new();
-    for node in nodes.iter().cloned() {
-        let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!(
-            "service:search:cluster:grpc_cancel_job",
-            node_id = node.id,
-            node_addr = node_addr.as_str(),
-        );
-
-        let session_id = session_id.to_string();
-        let task = tokio::task::spawn(
-            async move {
-                let mut request =
-                    tonic::Request::new(proto::cluster_rpc::CancelJobRequest { session_id });
-                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
-
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        //  req.metadata_mut()
-                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
-                let response = match client.cancel_job(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!(
-                            "search->grpc: node: {}, search err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        if err.code() == tonic::Code::Internal {
-                            let err = ErrorCodes::from_json(err.message())?;
-                            return Err(Error::ErrorCode(err));
-                        }
-                        return Err(server_internal_error("search node error"));
-                    }
-                };
-                Ok(response)
-            }
-            .instrument(grpc_span),
-        );
-        tasks.push(task);
-    }
-
-    let mut results = Vec::new();
-    for task in tasks {
-        match task.await {
-            Ok(res) => match res {
-                Ok(res) => results.push(res),
-                Err(err) => {
-                    return Err(err);
-                }
-            },
-            Err(e) => {
-                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                    e.to_string(),
-                )));
-            }
-        }
-    }
-
-    let mut is_success = false;
-    for res in results {
-        if res.is_success {
-            is_success = true;
-            break;
-        }
-    }
-
-    Ok(search::CancelJobResponse {
-        session_id: session_id.to_string(),
-        is_success,
-    })
-}
 
 #[tracing::instrument(name = "service:search:enter", skip(req))]
 pub async fn search(
@@ -1287,6 +1053,241 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     );
 
     Ok(result)
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
+    // get nodes from cluster
+    let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
+    // sort nodes by node_id this will improve hit cache ratio
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    let nodes = nodes;
+
+    // make cluster request
+    let mut tasks = Vec::new();
+    for node in nodes.iter().cloned() {
+        let node_addr = node.grpc_addr.clone();
+        let grpc_span = info_span!(
+            "service:search:cluster:grpc_job_status",
+            node_id = node.id,
+            node_addr = node_addr.as_str(),
+        );
+
+        let task = tokio::task::spawn(
+            async move {
+                let mut request = tonic::Request::new(proto::cluster_rpc::JobStatusRequest {});
+
+                opentelemetry::global::get_text_map_propagator(|propagator| {
+                    propagator.inject_context(
+                        &tracing::Span::current().context(),
+                        &mut MetadataMap(request.metadata_mut()),
+                    )
+                });
+
+                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                    .parse()
+                    .map_err(|_| Error::Message("invalid token".to_string()))?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "search->grpc: node: {}, connect err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        server_internal_error("connect search node error")
+                    })?;
+                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
+                        req.metadata_mut().insert("authorization", token.clone());
+                        //  req.metadata_mut()
+                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                        Ok(req)
+                    },
+                );
+                client = client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                let response = match client.job_status(request).await {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "search->grpc: node: {}, search err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        if err.code() == tonic::Code::Internal {
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                        return Err(server_internal_error("search node error"));
+                    }
+                };
+                Ok(response)
+            }
+            .instrument(grpc_span),
+        );
+        tasks.push(task);
+    }
+
+    let mut results = Vec::new();
+    for task in tasks {
+        match task.await {
+            Ok(res) => match res {
+                Ok(res) => results.push(res),
+                Err(err) => {
+                    return Err(err);
+                }
+            },
+            Err(e) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    e.to_string(),
+                )));
+            }
+        }
+    }
+
+    let mut status = vec![];
+    let mut set = HashSet::new();
+    for result in results.into_iter().flat_map(|v| v.status.into_iter()) {
+        if set.contains(&result.session_id) {
+            continue;
+        } else {
+            set.insert(result.session_id.clone());
+        }
+        status.push(search::JobStatus {
+            session_id: result.session_id,
+            query_start_time: result.query_start_time,
+            is_queue: result.is_queue,
+            user_id: result.user_id,
+            org_id: result.org_id,
+            stream_type: result.stream_type,
+            sql: result.sql,
+            start_time: result.start_time,
+            end_time: result.end_time,
+        });
+    }
+
+    Ok(search::JobStatusResponse { status })
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn cancel_job(session_id: &str) -> Result<search::CancelJobResponse, Error> {
+    // get nodes from cluster
+    let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
+    // sort nodes by node_id this will improve hit cache ratio
+    nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    let nodes = nodes;
+
+    // make cluster request
+    let mut tasks = Vec::new();
+    for node in nodes.iter().cloned() {
+        let node_addr = node.grpc_addr.clone();
+        let grpc_span = info_span!(
+            "service:search:cluster:grpc_cancel_job",
+            node_id = node.id,
+            node_addr = node_addr.as_str(),
+        );
+
+        let session_id = session_id.to_string();
+        let task = tokio::task::spawn(
+            async move {
+                let mut request =
+                    tonic::Request::new(proto::cluster_rpc::CancelJobRequest { session_id });
+                // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
+
+                opentelemetry::global::get_text_map_propagator(|propagator| {
+                    propagator.inject_context(
+                        &tracing::Span::current().context(),
+                        &mut MetadataMap(request.metadata_mut()),
+                    )
+                });
+
+                let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                    .parse()
+                    .map_err(|_| Error::Message("invalid token".to_string()))?;
+                let channel = Channel::from_shared(node_addr)
+                    .unwrap()
+                    .connect()
+                    .await
+                    .map_err(|err| {
+                        log::error!(
+                            "search->grpc: node: {}, connect err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        server_internal_error("connect search node error")
+                    })?;
+                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
+                        req.metadata_mut().insert("authorization", token.clone());
+                        //  req.metadata_mut()
+                        //      .insert(CONFIG.grpc.org_header_key.as_str(), org_id.clone());
+                        Ok(req)
+                    },
+                );
+                client = client
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
+                let response = match client.cancel_job(request).await {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "search->grpc: node: {}, search err: {:?}",
+                            &node.grpc_addr,
+                            err
+                        );
+                        if err.code() == tonic::Code::Internal {
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                        return Err(server_internal_error("search node error"));
+                    }
+                };
+                Ok(response)
+            }
+            .instrument(grpc_span),
+        );
+        tasks.push(task);
+    }
+
+    let mut results = Vec::new();
+    for task in tasks {
+        match task.await {
+            Ok(res) => match res {
+                Ok(res) => results.push(res),
+                Err(err) => {
+                    return Err(err);
+                }
+            },
+            Err(e) => {
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    e.to_string(),
+                )));
+            }
+        }
+    }
+
+    let mut is_success = false;
+    for res in results {
+        if res.is_success {
+            is_success = true;
+            break;
+        }
+    }
+
+    Ok(search::CancelJobResponse {
+        session_id: session_id.to_string(),
+        is_success,
+    })
 }
 
 fn partition_file_by_bytes(file_keys: &[FileKey], num_nodes: usize) -> Vec<Vec<&FileKey>> {
