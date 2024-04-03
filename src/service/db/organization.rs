@@ -17,10 +17,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use config::utils::json;
-use infra::{
-    db as infra_db,
-    errors::{self, Error},
-};
+use infra::errors::{self, Error};
 
 use crate::{
     common::{
@@ -80,7 +77,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = ORG_SETTINGS_KEY_PREFIX;
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching organization settings");
@@ -93,7 +90,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
 
-        if let infra_db::Event::Put(ev) = ev {
+        if let db::Event::Put(ev) = ev {
             let item_key = ev.key;
             let item_value = ev.value.unwrap();
             let json_val: OrganizationSetting = if config::CONFIG.common.meta_store_external {

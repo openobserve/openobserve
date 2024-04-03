@@ -12,15 +12,12 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#[cfg(feature = "enterprise")]
-use std::sync::Arc;
 
 #[cfg(feature = "enterprise")]
-use config::utils::json;
-#[cfg(feature = "enterprise")]
-use infra::db as infra_db;
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel;
+use {
+    crate::service::db, config::utils::json,
+    o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel, std::sync::Arc,
+};
 
 #[cfg(feature = "enterprise")]
 pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, anyhow::Error> {
@@ -100,7 +97,7 @@ pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
 #[cfg(feature = "enterprise")]
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/ofga/model";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching /ofga/model");
@@ -113,7 +110,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_value: OFGAModel = if config::CONFIG.common.meta_store_external {
                     match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
@@ -135,10 +132,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
                     .insert("store_id".to_owned(), item_value.store_id);
             }
-            infra_db::Event::Delete(_) => {
+            db::Event::Delete(_) => {
                 o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID.remove("store_id");
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())
