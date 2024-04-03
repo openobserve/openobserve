@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::db as infra_db;
+use crate::service::db;
 
 pub async fn get_mark(org_id: &str) -> String {
-    let db = infra_db::get_db().await;
     let key = format!("/alert_manager/organization/{org_id}");
-    let val = match db.get(&key).await {
+    let val = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => "".to_string(),
     };
@@ -26,14 +25,11 @@ pub async fn get_mark(org_id: &str) -> String {
 }
 
 pub async fn set_mark(org_id: &str, node: Option<&str>) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/alert_manager/organization/{org_id}");
     let val = if let Some(node) = node {
         node.to_string()
     } else {
         "NOP".to_string()
     };
-    Ok(db
-        .put(&key, val.into(), infra_db::NO_NEED_WATCH, None)
-        .await?)
+    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
