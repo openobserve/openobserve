@@ -80,5 +80,7 @@
   "SearchQuery": "/api/**/_around*",
   "applyQuery": "/api/**/_search*",
   "Stream": "e2e_automate",
-  "StreamType": "logs"
+  "StreamType": "logs",
+  "functionUrl" : "/web/functions/"
+
 }
