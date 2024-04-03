@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input>
 
-      <q-input
+      <!-- <q-input
         v-if="promqlMode"
         v-model="
           dashboardPanelData.data.queries[
@@ -535,7 +535,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </q-input>
+      </q-input> -->
+
+      <PromqlLegendConfig></PromqlLegendConfig>
 
       <div class="space"></div>
 
@@ -735,9 +737,10 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
+import PromqlLegendConfig from "./PromqlLegendConfig.vue";
 
 export default defineComponent({
-  components: { Drilldown },
+  components: { Drilldown, PromqlLegendConfig },
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
