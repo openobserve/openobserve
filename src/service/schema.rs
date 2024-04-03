@@ -34,7 +34,6 @@ use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
 };
-use infra::dist_lock;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 
@@ -499,74 +498,13 @@ async fn handle_diff_schema(
             }
         };
     }
-
-    // after x times retry, still error, switch to dist_lock
-    if err.is_some() {
-        log::error!(
-            "handle_diff_schema [{}/{}/{}], still error after retry {} times, now switch to dist_lock",
-            org_id,
-            stream_type,
-            stream_name,
-            retries
-        );
-        // acquire lock and update
-        let lock_key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
-        let locker = match dist_lock::lock(&lock_key, 0).await {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "dist_lock key: {}, acquire error: {}",
-                    lock_key,
-                    e
-                ));
-            }
-        };
-        log::info!(
-            "Acquired lock for stream: {}/{}/{}",
-            org_id,
-            stream_type,
-            stream_name,
-        );
-
-        // update schema
-        let resp = db::schema::merge(
-            org_id,
-            stream_name,
-            stream_type,
-            inferred_schema,
-            Some(record_ts),
-        )
-        .await;
-
-        // release lock
-        if let Err(e) = dist_lock::unlock(&locker).await {
-            log::error!("dist_lock unlock err: {}", e);
-        }
-        log::info!(
-            "Released lock for stream: {}/{}/{}",
-            org_id,
-            stream_type,
-            stream_name,
-        );
-
-        // handle response
-        match resp {
-            Err(e) => {
-                err = Some(e);
-            }
-            Ok(v) => {
-                ret = v;
-                err = None;
-            }
-        }
-    }
-
     if let Some(e) = err {
         log::error!(
-            "handle_diff_schema [{}/{}/{}], abort: {}",
+            "handle_diff_schema [{}/{}/{}] abort after retry {} times, error: {}",
             org_id,
             stream_type,
             stream_name,
+            retries,
             e
         );
         return Err(e);

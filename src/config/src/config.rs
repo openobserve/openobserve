@@ -717,6 +717,9 @@ pub struct Limit {
     // max time of transaction will retry
     #[env_config(name = "ZO_META_TRANSACTION_RETRIES", default = 10)]
     pub meta_transaction_retries: usize,
+    // timeout of transaction lock
+    #[env_config(name = "ZO_META_TRANSACTION_LOCK_TIMEOUT", default = 600)] // seconds
+    pub meta_transaction_lock_timeout: usize,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
