@@ -341,7 +341,7 @@ const setupSession = async () => {
   });
 
   player.value.addEventListener("error", (error) => {
-    console.error("Playback error:", error);
+    console.error("Playback error:");
   });
 
   // player.value.addEventListener("event-cast", (e) => {
