@@ -468,8 +468,8 @@ async fn handle_diff_schema(
     let mut retries = 0;
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
-    // retry 3 times for update schema
-    while retries < 3 {
+    // retry x times for update schema
+    while retries < CONFIG.limit.meta_transaction_retries {
         match db::schema::merge(
             org_id,
             stream_name,
@@ -493,6 +493,7 @@ async fn handle_diff_schema(
         };
     }
     if let Some(e) = err {
+        log::error!("handle_diff_schema abort: {}, ", e);
         return Err(e);
     }
     let Some((final_schema, field_datatype_delta)) = ret else {
