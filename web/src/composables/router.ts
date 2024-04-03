@@ -16,7 +16,6 @@
 import Login from "@/views/Login.vue";
 import {
   useLocalUserInfo,
-  useLocalToken,
   useLocalCurrentUser,
 } from "@/utils/zincutils";
 import useIngestionRoutes from "./shared/useIngestionRoutes";
@@ -30,7 +29,6 @@ const useOSRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
-        useLocalToken("", true);
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
 

@@ -55,6 +55,10 @@ pub async fn save(
         return Err(anyhow::anyhow!("Chrome not enabled"));
     }
 
+    if CONFIG.common.report_user_name.is_empty() || CONFIG.common.report_user_password.is_empty() {
+        return Err(anyhow::anyhow!("Report username and password ENVs not set"));
+    }
+
     if !name.is_empty() {
         report.name = name.to_string();
     }

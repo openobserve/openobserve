@@ -357,8 +357,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-            println!("index got file_list: {:?}", sorted_data.len());
-
             for (term, filename, count, _timestamp) in sorted_data {
                 let term = term.as_str();
                 for search_term in terms.iter() {
@@ -374,7 +372,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     }
                 }
             }
-            println!("term_map: {:?}", term_map);
             (
                 term_map
                     .into_iter()
