@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::db as infra_db;
+use crate::service::db;
 
 pub async fn get_offset() -> Result<i64, anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/compact/file_list/offset";
-    let value = match db.get(key).await {
+    let value = match db::get(key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
@@ -27,39 +26,28 @@ pub async fn get_offset() -> Result<i64, anyhow::Error> {
 }
 
 pub async fn set_offset(offset: i64) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/compact/file_list/offset";
-    db.put(
-        key,
-        offset.to_string().into(),
-        infra_db::NO_NEED_WATCH,
-        None,
-    )
-    .await?;
+    db::put(key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn set_delete(key: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/delete/{key}");
-    db.put(&key, "OK".into(), infra_db::NO_NEED_WATCH, None)
-        .await?;
+    db::put(&key, "OK".into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn del_delete(key: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/delete/{key}");
-    db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
+    db::delete_if_exists(&key, false, db::NO_NEED_WATCH)
         .await
         .map_err(Into::into)
 }
 
 pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {
     let mut items = Vec::new();
-    let db = infra_db::get_db().await;
     let key = "/compact/file_list/delete/";
-    for (item_key, _item_value) in db.list(key).await? {
+    for (item_key, _item_value) in db::list(key).await? {
         let item_key = item_key.strip_prefix(key).unwrap();
         items.push(item_key.to_string());
     }
@@ -67,26 +55,22 @@ pub async fn list_delete() -> Result<Vec<String>, anyhow::Error> {
 }
 
 pub async fn get_process(offset: i64) -> String {
-    let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/process/{offset}");
-    match db.get(&key).await {
+    match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from(""),
     }
 }
 
 pub async fn set_process(offset: i64, node: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/process/{offset}");
-    db.put(&key, node.to_string().into(), infra_db::NO_NEED_WATCH, None)
-        .await?;
+    db::put(&key, node.to_string().into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn del_process(offset: i64) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/compact/file_list/process/{offset}");
-    db.delete_if_exists(&key, false, infra_db::NO_NEED_WATCH)
+    db::delete_if_exists(&key, false, db::NO_NEED_WATCH)
         .await
         .map_err(Into::into)
 }
