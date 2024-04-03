@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -714,11 +714,17 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
-    // max time of transaction will retry
-    #[env_config(name = "ZO_META_TRANSACTION_RETRIES", default = 10)]
+    #[env_config(
+        name = "ZO_META_TRANSACTION_RETRIES",
+        help = "max time of transaction will retry",
+        default = 10
+    )]
     pub meta_transaction_retries: usize,
-    // timeout of transaction lock
-    #[env_config(name = "ZO_META_TRANSACTION_LOCK_TIMEOUT", default = 600)] // seconds
+    #[env_config(
+        name = "ZO_META_TRANSACTION_LOCK_TIMEOUT",
+        help = "timeout of transaction lock",
+        default = 600
+    )] // seconds
     pub meta_transaction_lock_timeout: usize,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
