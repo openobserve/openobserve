@@ -19,43 +19,23 @@ use std::{
     net::SocketAddr,
     str::FromStr,
     sync::{
-        Arc,
         atomic::{AtomicU16, Ordering},
+        Arc,
     },
     time::Duration,
 };
 
-use actix_web::{App, dev::ServerHandle, http::KeepAlive, HttpServer, middleware, web};
+use actix_web::{dev::ServerHandle, http::KeepAlive, middleware, web, App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
-use log::LevelFilter;
-use opentelemetry::KeyValue;
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_proto::tonic::collector::{
-    logs::v1::logs_service_server::LogsServiceServer,
-    metrics::v1::metrics_service_server::MetricsServiceServer,
-    trace::v1::trace_service_server::TraceServiceServer,
-};
-use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource, trace as sdktrace};
-#[cfg(feature = "profiling")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "profiling")]
-use pyroscope_pprofrs::{pprof_backend, PprofConfig};
-use tokio::sync::oneshot;
-use tonic::codec::CompressionEncoding;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{
-    EnvFilter, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*,
-};
-use tracing_subscriber::Registry;
-
 use config::{
     cluster::{is_router, LOCAL_NODE_ROLE},
     CONFIG,
 };
+use log::LevelFilter;
 use openobserve::{
     cli::basic::cli,
     common::{
-        infra::{cluster, config::VERSION, self as common_infra},
+        infra::{self as common_infra, cluster, config::VERSION},
         meta, migration,
         utils::zo_logger,
     },
@@ -77,10 +57,26 @@ use openobserve::{
     job, router,
     service::{db, metadata},
 };
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
+    trace::v1::trace_service_server::TraceServiceServer,
+};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
 use proto::cluster_rpc::{
     event_server::EventServer, filelist_server::FilelistServer, metrics_server::MetricsServer,
     search_server::SearchServer, usage_server::UsageServer,
 };
+#[cfg(feature = "profiling")]
+use pyroscope::PyroscopeAgent;
+#[cfg(feature = "profiling")]
+use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use tokio::sync::oneshot;
+use tonic::codec::CompressionEncoding;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::Registry;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -89,6 +85,10 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+use tracing_subscriber::{
+    filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -103,16 +103,16 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // setup profiling
     #[cfg(feature = "profiling")]
-        let agent = PyroscopeAgent::builder(
+    let agent = PyroscopeAgent::builder(
         &CONFIG.profiling.pyroscope_server_url,
         &CONFIG.profiling.pyroscope_project_name,
     )
-        .tags([("Host", "Rust")].to_vec())
-        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-        .build()
-        .expect("Failed to setup pyroscope agent");
+    .tags([("Host", "Rust")].to_vec())
+    .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+    .build()
+    .expect("Failed to setup pyroscope agent");
     #[cfg(feature = "profiling")]
-        let agent_running = agent.start().expect("Failed to start pyroscope agent");
+    let agent_running = agent.start().expect("Failed to start pyroscope agent");
 
     // cli mode
     if cli::cli().await? {
@@ -214,13 +214,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
-
+    // flush distinct values
+    _ = metadata::close().await;
     // flush compact offset cache to disk disk
     _ = db::compact::files::sync_cache_to_db().await;
-
-    // flush metadata
-    _ = metadata::close().await;
-
     // flush db
     let db = infra::db::get_db().await;
     _ = db.close().await;
@@ -235,7 +232,7 @@ async fn main() -> Result<(), anyhow::Error> {
     log::info!("server stopped");
 
     #[cfg(feature = "profiling")]
-        let agent_ready = agent_running.stop().unwrap();
+    let agent_ready = agent_running.stop().unwrap();
     #[cfg(feature = "profiling")]
     agent_ready.shutdown();
 
@@ -399,20 +396,20 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         }
         app.app_data(web::JsonConfig::default().limit(CONFIG.limit.req_json_limit))
             .app_data(web::PayloadConfig::new(CONFIG.limit.req_payload_limit)) // size is in bytes
-            .app_data(web::Data::new(local_id % 10))
+            .app_data(web::Data::new(local_id%10))
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::new(
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
             .wrap(RequestTracing::new())
     })
-        .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-            5,
-            CONFIG.limit.keep_alive,
-        ))))
-        .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
-        .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
-        .bind(haddr)?;
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
+        5,
+        CONFIG.limit.keep_alive,
+    ))))
+    .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
+    .shutdown_timeout(max(1, CONFIG.limit.shutdown_timeout))
+    .bind(haddr)?;
 
     let server = server
         .workers(CONFIG.limit.http_worker_num)
