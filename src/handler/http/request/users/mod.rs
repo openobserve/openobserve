@@ -15,7 +15,9 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web::{cookie::Cookie, delete, get, http, post, put, web, HttpResponse};
+use base64::Engine;
+use config::CONFIG;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -237,7 +239,21 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
         }
     };
     if resp.status {
-        Ok(HttpResponse::Ok().json(resp))
+        let token = format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD
+                .encode(format!("{}:{}", auth.name, auth.password))
+        );
+        let mut access_cookie = Cookie::new("access_token", token);
+        access_cookie.set_http_only(true);
+        access_cookie.set_secure(true);
+        access_cookie.set_path("/");
+        if CONFIG.auth.cookie_same_site_lax {
+            access_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+        } else {
+            access_cookie.set_same_site(actix_web::cookie::SameSite::None)
+        };
+        Ok(HttpResponse::Ok().cookie(access_cookie).json(resp))
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
     }

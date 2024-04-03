@@ -41,12 +41,13 @@ use crate::{
         stream::{SchemaRecords, StreamParams},
     },
     service::{
-        db, distinct_values, get_formatted_stream_name,
+        db, get_formatted_stream_name,
         ingestion::{
             evaluate_trigger,
             grpc::{get_val, get_val_with_type_retained},
             write_file, TriggerAlertData,
         },
+        metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
         schema::{get_upto_discard_error, stream_schema_exists, SchemaCache},
         usage::report_request_usage_stats,
     },
@@ -152,14 +153,14 @@ pub async fn usage_ingest(
         for field in DISTINCT_FIELDS.iter() {
             if let Some(val) = local_val.get(field) {
                 if !val.is_null() {
-                    to_add_distinct_values.push(distinct_values::DvItem {
+                    to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
                         stream_type: StreamType::Logs,
                         stream_name: stream_name.to_string(),
                         field_name: field.to_string(),
                         field_value: val.as_str().unwrap().to_string(),
                         filter_name: "".to_string(),
                         filter_value: "".to_string(),
-                    });
+                    }));
                 }
             }
         }
@@ -207,7 +208,7 @@ pub async fn usage_ingest(
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
@@ -434,14 +435,14 @@ pub async fn handle_grpc_request(
                 for field in DISTINCT_FIELDS.iter() {
                     if let Some(val) = local_val.get(field) {
                         if !val.is_null() {
-                            to_add_distinct_values.push(distinct_values::DvItem {
+                            to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
                                 stream_type: StreamType::Logs,
                                 stream_name: stream_name.to_string(),
                                 field_name: field.to_string(),
                                 field_value: val.as_str().unwrap().to_string(),
                                 filter_name: "".to_string(),
                                 filter_value: "".to_string(),
-                            });
+                            }));
                         }
                     }
                 }
@@ -489,7 +490,7 @@ pub async fn handle_grpc_request(
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }
@@ -546,7 +547,6 @@ pub async fn handle_grpc_request(
 
 #[cfg(test)]
 mod tests {
-
     use opentelemetry_proto::tonic::{
         collector::logs::v1::ExportLogsServiceRequest,
         common::v1::{

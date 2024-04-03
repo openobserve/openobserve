@@ -54,7 +54,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, distinct_values, search::SEARCH_SERVER},
+    service::{db, metadata, search::SEARCH_SERVER},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -214,7 +214,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
     // flush distinct values
-    _ = distinct_values::close().await;
+    _ = metadata::close().await;
     // flush compact offset cache to disk disk
     _ = db::compact::files::sync_cache_to_db().await;
     // flush db

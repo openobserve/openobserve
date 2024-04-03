@@ -18,13 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
     <div
       class="flex justify-center text-center"
-      v-if="config.isEnterprise == 'true' && store.state.zoConfig.custom_logo_text != ''"
+      v-if="
+        config.isEnterprise == 'true' &&
+        store.state.zoConfig.custom_logo_text != ''
+      "
     >
       <div class="text-h5 text-bold q-pa-none text-centered full-width">
         {{ store.state.zoConfig.custom_logo_text }}
       </div>
 
-      <div class="text-caption full-width text-centered"><img :src="getImageURL('images/common/spark-logo-connector.png')" class="q-mt-sm" style="width: 30px" /></div>
+      <div class="text-caption full-width text-centered">
+        <img
+          :src="getImageURL('images/common/spark-logo-connector.png')"
+          class="q-mt-sm"
+          style="width: 30px"
+        />
+      </div>
     </div>
     <div class="flex justify-center q-mb-lg">
       <img
@@ -83,8 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform"
-class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -142,7 +150,6 @@ import { useI18n } from "vue-i18n";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
-  useLocalToken,
   getBasicAuth,
   b64EncodeStandard,
   useLocalUserInfo,
@@ -189,7 +196,7 @@ export default defineComponent({
           }
         });
       } catch (error) {
-        console.error("Error during redirection:", error);
+        console.error("Error during redirection:");
       }
     };
 
@@ -216,7 +223,6 @@ export default defineComponent({
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
                 const authToken = getBasicAuth(name.value, password.value);
-                useLocalToken(authToken);
                 const userInfo = {
                   given_name: name.value,
                   auth_time: Math.floor(Date.now() / 1000),
@@ -361,6 +367,7 @@ export default defineComponent({
     color: #595959;
   }
 }
+
 .my-card {
   width: 400px;
 }

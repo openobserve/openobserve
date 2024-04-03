@@ -13,21 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{common::infra::config, service::db};
+use config::utils::json;
+use infra::errors::Result;
 
-pub async fn get() -> Result<String, anyhow::Error> {
-    let ret = db::get("/meta/kv/version").await?;
-    let version = std::str::from_utf8(&ret).unwrap();
-    Ok(version.to_string())
+pub async fn get() -> Result<Option<String>> {
+    let ret = super::get("/instance/").await?;
+    let loc_value = json::from_slice(&ret).unwrap();
+    let value = Some(loc_value);
+    Ok(value)
 }
 
-pub async fn set() -> Result<(), anyhow::Error> {
-    db::put(
-        "/meta/kv/version",
-        bytes::Bytes::from(config::VERSION),
-        db::NO_NEED_WATCH,
+pub async fn set(id: &str) -> Result<()> {
+    super::put(
+        "/instance/",
+        json::to_vec(&id).unwrap().into(),
+        super::NO_NEED_WATCH,
         None,
     )
-    .await?;
-    Ok(())
+    .await
 }

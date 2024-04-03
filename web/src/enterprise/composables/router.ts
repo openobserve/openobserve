@@ -17,7 +17,6 @@ import Login from "@/views/Login.vue";
 import LoginCallback from "@/enterprise/components/login/Login.vue";
 import {
   useLocalUserInfo,
-  useLocalToken,
   useLocalCurrentUser,
   getLoginURL,
   getLogoutURL,
@@ -59,7 +58,6 @@ const useEnvRoutes = () => {
     {
       path: "/logout",
       beforeEnter: async (to: any, from: any, next: any) => {
-        useLocalToken("", true);
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
         if (config.isEnterprise == "true") {
@@ -73,7 +71,12 @@ const useEnvRoutes = () => {
       path: "/cb",
       name: "callback",
       component: LoginCallback,
-    },
+    }, 
+     {
+      path: "/web/cb",
+      name: "callback",
+      component: LoginCallback,
+    },      
   ];
 
   const homeChildRoutes = [

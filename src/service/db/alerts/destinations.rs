@@ -16,10 +16,12 @@
 use std::sync::Arc;
 
 use config::utils::json;
-use infra::db as infra_db;
 use itertools::Itertools;
 
-use crate::common::{infra::config::ALERTS_DESTINATIONS, meta::alerts::destinations::Destination};
+use crate::{
+    common::{infra::config::ALERTS_DESTINATIONS, meta::alerts::destinations::Destination},
+    service::db,
+};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");
@@ -27,30 +29,26 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error>
         return Ok(val.value().clone());
     }
 
-    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
-    let val = db.get(&key).await?;
+    let val = db::get(&key).await?;
     let dest: Destination = json::from_slice(&val)?;
     Ok(dest)
 }
 
 pub async fn set(org_id: &str, destination: &Destination) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{}", destination.name);
-    Ok(db
-        .put(
-            &key,
-            json::to_vec(destination).unwrap().into(),
-            infra_db::NEED_WATCH,
-            None,
-        )
-        .await?)
+    Ok(db::put(
+        &key,
+        json::to_vec(destination).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/{name}");
-    Ok(db.delete(&key, false, infra_db::NEED_WATCH, None).await?)
+    Ok(db::delete(&key, false, db::NEED_WATCH, None).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
@@ -66,10 +64,9 @@ pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
             .collect());
     }
 
-    let db = infra_db::get_db().await;
     let key = format!("/destinations/{org_id}/");
     let mut items: Vec<Destination> = Vec::new();
-    for item_value in db.list_values(&key).await? {
+    for item_value in db::list_values(&key).await? {
         let dest: Destination = json::from_slice(&item_value)?;
         items.push(dest)
     }
@@ -79,7 +76,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/destinations/";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching alert destinations");
@@ -92,11 +89,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Destination = if config::CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -114,20 +110,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 ALERTS_DESTINATIONS.insert(item_key.to_owned(), item_value);
             }
-            infra_db::Event::Delete(ev) => {
+            db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 ALERTS_DESTINATIONS.remove(item_key);
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/destinations/";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: Destination = json::from_slice(&item_value).unwrap();
