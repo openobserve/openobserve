@@ -15,9 +15,7 @@
 
 use std::io::Error;
 
-#[cfg(feature = "enterprise")]
-use actix_web::cookie::Cookie;
-use actix_web::{get, put, web, HttpRequest, HttpResponse};
+use actix_web::{cookie::Cookie, get, http::header, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
@@ -33,7 +31,6 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    actix_web::http::header,
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
@@ -426,8 +423,6 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
                 .cookie(access_cookie)
                 .cookie(refresh_cookie)
                 .finish()
-
-            // HttpResponse::Unauthorized().finish()
         }
     }
 }
@@ -449,8 +444,6 @@ async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
         .cookie(access_cookie)
         .cookie(refresh_cookie)
         .finish()
-
-    // HttpResponse::Unauthorized().finish()
 }
 
 #[put("/enable")]
