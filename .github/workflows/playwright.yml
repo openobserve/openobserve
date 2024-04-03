@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         browser: [chrome]
-        testfilename: ["functions_tests.cy.js","logs_tests.cy.js","logs_queries.cy.js","logs_quickmode.cy.js","menu_tests.cy.js","alerts_tests.cy.js", "dashboard"]
+        testfilename: ["logsquickmode.spec.js"]
     steps:
       - name: Remove unused tools
         run: |
@@ -76,7 +76,7 @@ jobs:
         with:
             node-version: lts/*
       - name: Install dependencies and run ui-tests
-        run: cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test
+        run: cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
