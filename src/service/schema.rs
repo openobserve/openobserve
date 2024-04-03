@@ -34,6 +34,7 @@ use datafusion::arrow::{
     datatypes::{DataType, Field, Schema},
     error::ArrowError,
 };
+use infra::dist_lock;
 use itertools::Itertools;
 use serde_json::{Map, Value};
 
@@ -439,7 +440,6 @@ pub async fn get_merged_schema(
 // 2. get schema from db for update,
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
-
 async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
@@ -480,7 +480,14 @@ async fn handle_diff_schema(
         .await
         {
             Err(e) => {
-                log::error!("handle_diff_schema error: {}, retrying...{}", e, retries);
+                log::error!(
+                    "handle_diff_schema [{}/{}/{}], error: {}, retrying...{}",
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    e,
+                    retries
+                );
                 err = Some(e);
                 retries += 1;
                 continue;
@@ -492,8 +499,76 @@ async fn handle_diff_schema(
             }
         };
     }
+
+    // after x times retry, still error, switch to dist_lock
+    if err.is_some() {
+        log::error!(
+            "handle_diff_schema [{}/{}/{}], still error after retry {} times, now switch to dist_lock",
+            org_id,
+            stream_type,
+            stream_name,
+            retries
+        );
+        // acquire lock and update
+        let lock_key = format!("/schema/{}/{}/{}", org_id, stream_type, stream_name);
+        let locker = match dist_lock::lock(&lock_key, 0).await {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "dist_lock key: {}, acquire error: {}",
+                    lock_key,
+                    e
+                ));
+            }
+        };
+        log::info!(
+            "Acquired lock for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name,
+        );
+
+        // update schema
+        let resp = db::schema::merge(
+            org_id,
+            stream_name,
+            stream_type,
+            inferred_schema,
+            Some(record_ts),
+        )
+        .await;
+
+        // release lock
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            log::error!("dist_lock unlock err: {}", e);
+        }
+        log::info!(
+            "Released lock for stream: {}/{}/{}",
+            org_id,
+            stream_type,
+            stream_name,
+        );
+
+        // handle response
+        match resp {
+            Err(e) => {
+                err = Some(e);
+            }
+            Ok(v) => {
+                ret = v;
+                err = None;
+            }
+        }
+    }
+
     if let Some(e) = err {
-        log::error!("handle_diff_schema abort: {}, ", e);
+        log::error!(
+            "handle_diff_schema [{}/{}/{}], abort: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
         return Err(e);
     }
     let Some((final_schema, field_datatype_delta)) = ret else {
