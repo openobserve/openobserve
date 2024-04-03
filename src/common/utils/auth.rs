@@ -204,6 +204,7 @@ impl FromRequest for AuthExtractor {
             if path_columns[2].starts_with("alerts")
                 || path_columns[2].starts_with("templates")
                 || path_columns[2].starts_with("destinations")
+                || path.ends_with("users/roles")
             {
                 if method.eq("GET") {
                     method = "LIST".to_string();
