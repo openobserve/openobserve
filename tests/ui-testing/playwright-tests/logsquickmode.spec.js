@@ -7,18 +7,18 @@ test.describe.configure({ mode: 'parallel' });
 
 
 async function login(page) {
-      await page.goto(process.env["BASEURL"]);
+      await page.goto(process.env["ZO_BASE_URL"]);
       await page.waitForTimeout(1000);
       await page
         .locator('[data-cy="login-user-id"]')
-        .fill(process.env["EMAIL"]);
+        .fill(process.env["ZO_ROOT_USER_EMAIL"]);
       //Enter Password
       await page
         .locator('[data-cy="login-password"]')
-        .fill(process.env["PASSWORD"]);
+        .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
       await page.locator('[data-cy="login-sign-in"]').click();
       await page.waitForTimeout(4000);
-  await page.goto(process.env["BASEURL"]);
+  await page.goto(process.env["ZO_BASE_URL"]);
 }
 
 
@@ -61,7 +61,7 @@ test.describe("Logs Quickmode testcases", () => {
       const orgId = process.env["ORGNAME"];
       const streamName = "e2e_automate";
       const basicAuthCredentials = Buffer.from(
-        `${process.env["EMAIL"]}:${process.env["PASSWORD"]}`
+        `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
       ).toString('base64');
     
       const headers = {

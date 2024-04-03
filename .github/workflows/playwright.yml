@@ -20,6 +20,8 @@ env:
   # these are cypress related env vars
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
+  ORGNAME: default
+
 
 jobs:
   ui_integration_tests:
