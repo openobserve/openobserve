@@ -15,9 +15,7 @@
 
 use std::io::Error;
 
-#[cfg(feature = "enterprise")]
-use actix_web::cookie::Cookie;
-use actix_web::{get, put, web, HttpRequest, HttpResponse};
+use actix_web::{cookie::Cookie, get, http::header, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
@@ -33,7 +31,6 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    actix_web::http::header,
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
@@ -346,13 +343,21 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             access_token_cookie.set_http_only(true);
             access_token_cookie.set_secure(true);
             access_token_cookie.set_path("/");
-            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            if CONFIG.auth.cookie_same_site_lax {
+                access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                access_token_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
 
             let mut refresh_token_cookie = Cookie::new("refresh_token", login_data.refresh_token);
             refresh_token_cookie.set_http_only(true);
             refresh_token_cookie.set_secure(true);
             refresh_token_cookie.set_path("/");
-            refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
 
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
@@ -398,24 +403,30 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             access_cookie.set_http_only(true);
             access_cookie.set_secure(true);
             access_cookie.set_path("/");
-            access_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            if CONFIG.auth.cookie_same_site_lax {
+                access_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                access_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
             let mut refresh_cookie = Cookie::new("refresh_token", "");
             refresh_cookie.set_http_only(true);
             refresh_cookie.set_secure(true);
             refresh_cookie.set_path("/");
-            refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                refresh_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
             HttpResponse::Unauthorized()
                 .append_header((header::LOCATION, "/"))
                 .cookie(access_cookie)
                 .cookie(refresh_cookie)
                 .finish()
-
-            // HttpResponse::Unauthorized().finish()
         }
     }
 }
 
-#[cfg(feature = "enterprise")]
 #[get("/logout")]
 async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
     let mut access_cookie = Cookie::new("access_token", "");
@@ -433,8 +444,6 @@ async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
         .cookie(access_cookie)
         .cookie(refresh_cookie)
         .finish()
-
-    // HttpResponse::Unauthorized().finish()
 }
 
 #[put("/enable")]
