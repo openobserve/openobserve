@@ -39,6 +39,7 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
@@ -54,7 +55,6 @@ use crate::{
             stream::{ScanStats, StreamParams, StreamPartition},
         },
     },
-    handler::grpc::cluster_rpc,
     service::{file_list, format_partition_key, stream},
 };
 
@@ -122,6 +122,10 @@ pub async fn search_partition(
     let nodes = cluster::get_cached_online_querier_nodes()
         .await
         .unwrap_or_default();
+    if nodes.is_empty() {
+        log::error!("no querier node online");
+        return Err(Error::Message("no querier node online".to_string()));
+    }
     let cpu_cores = nodes.iter().map(|n| n.cpu_num).sum::<u64>() as usize;
 
     let (records, original_size, compressed_size) =
@@ -248,6 +252,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
     let querier_num = nodes.iter().filter(|node| is_querier(&node.role)).count();
     if querier_num == 0 {
+        log::error!("no querier node online");
         return Err(Error::Message("no querier node online".to_string()));
     }
 
@@ -352,8 +357,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-            println!("index got file_list: {:?}", sorted_data.len());
-
             for (term, filename, count, _timestamp) in sorted_data {
                 let term = term.as_str();
                 for search_term in terms.iter() {
@@ -369,7 +372,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     }
                 }
             }
-            println!("term_map: {:?}", term_map);
             (
                 term_map
                     .into_iter()

@@ -308,7 +308,6 @@ import {
   useLocalCurrentUser,
   useLocalOrganization,
   useLocalUserInfo,
-  useLocalToken,
   getImageURL,
   invlidateLoginData,
 } from "../utils/zincutils";
@@ -410,7 +409,6 @@ export default defineComponent({
         invlidateLoginData();
       }
       this.store.dispatch("logout");
-      useLocalToken("", true);
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
       this.$router.push("/logout");
@@ -988,6 +986,7 @@ export default defineComponent({
 
 <style lang="scss">
 @import "../styles/app.scss";
+
 .printMode {
   .q-header {
     display: none;

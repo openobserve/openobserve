@@ -15,13 +15,11 @@
 
 use config::metrics;
 use infra::errors;
+use proto::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    handler::grpc::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse},
-    service::search as SearchService,
-};
+use crate::service::search as SearchService;
 
 pub struct Searcher;
 

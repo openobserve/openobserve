@@ -29,13 +29,13 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
+use proto::cluster_rpc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{infra::cluster, meta::stream::ScanStats},
-    handler::grpc::cluster_rpc,
     service::{
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
         search::{server_internal_error, MetadataMap},
@@ -190,7 +190,9 @@ async fn search_in_cluster(
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip);
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await
                 {
                     Ok(res) => res.into_inner(),

@@ -8,7 +8,6 @@ license.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
-aws-sdk-dynamodb.workspace = true
 aws-config.workspace = true
 bytes.workspace = true
 chrono.workspace = true

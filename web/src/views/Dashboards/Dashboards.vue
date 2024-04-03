@@ -559,7 +559,7 @@ export default defineComponent({
       ].find((dashboard) => dashboard.dashboardId === row.id);
 
       const selectedTabId = selectedDashboard
-        ? selectedDashboard.tabs[0].tabId
+        ? selectedDashboard?.tabs[0]?.tabId
         : null;
       return router.push({
         path: "/dashboards/view",

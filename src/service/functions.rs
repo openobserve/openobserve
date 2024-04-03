@@ -74,6 +74,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             );
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
+
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 FN_SUCCESS.to_string(),

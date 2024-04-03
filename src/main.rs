@@ -61,11 +61,6 @@ use openobserve::{
     handler::{
         grpc::{
             auth::check_auth,
-            cluster_rpc::{
-                event_server::EventServer, filelist_server::FilelistServer,
-                metrics_server::MetricsServer, search_server::SearchServer,
-                usage_server::UsageServer,
-            },
             request::{
                 event::Eventer,
                 file_list::Filelister,
@@ -81,6 +76,26 @@ use openobserve::{
     job, router,
     service::{db, metadata},
 };
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_proto::tonic::collector::{
+    logs::v1::logs_service_server::LogsServiceServer,
+    metrics::v1::metrics_service_server::MetricsServiceServer,
+    trace::v1::trace_service_server::TraceServiceServer,
+};
+use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
+use proto::cluster_rpc::{
+    event_server::EventServer, filelist_server::FilelistServer, metrics_server::MetricsServer,
+    search_server::SearchServer, usage_server::UsageServer,
+};
+#[cfg(feature = "profiling")]
+use pyroscope::PyroscopeAgent;
+#[cfg(feature = "profiling")]
+use pyroscope_pprofrs::{pprof_backend, PprofConfig};
+use tokio::sync::oneshot;
+use tonic::codec::CompressionEncoding;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::Registry;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -92,6 +107,16 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    // let tokio steal the thread
+    let rt_handle = tokio::runtime::Handle::current();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_secs(10));
+            rt_handle.spawn(std::future::ready(()));
+        }
+    });
+
+    // setup profiling
     #[cfg(feature = "profiling")]
         let agent = PyroscopeAgent::builder(
         &CONFIG.profiling.pyroscope_server_url,
@@ -176,12 +201,16 @@ async fn main() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
 
-    tokio::task::spawn(async move { zo_logger::send_logs().await });
-    tokio::task::spawn(async move {
-        meta::telemetry::Telemetry::new()
-            .event("OpenObserve - Starting server", None, false)
-            .await;
-    });
+    if CONFIG.log.events_enabled {
+        tokio::task::spawn(async move { zo_logger::send_logs().await });
+    }
+    if CONFIG.common.telemetry_enabled {
+        tokio::task::spawn(async move {
+            meta::telemetry::Telemetry::new()
+                .event("OpenObserve - Starting server", None, false)
+                .await;
+        });
+    }
 
     // init http server
     if let Err(e) = init_http_server().await {
@@ -212,9 +241,11 @@ async fn main() -> Result<(), anyhow::Error> {
     _ = db.close().await;
 
     // stop telemetry
-    meta::telemetry::Telemetry::new()
-        .event("OpenObserve - Server stopped", None, false)
-        .await;
+    if CONFIG.common.telemetry_enabled {
+        meta::telemetry::Telemetry::new()
+            .event("OpenObserve - Server stopped", None, false)
+            .await;
+    }
 
     log::info!("server stopped");
 
@@ -348,18 +379,29 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
-            app = app.service(
-                // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
-                web::scope(&CONFIG.common.base_uri)
-                    .service(router::http::config)
-                    .service(router::http::config_paths)
-                    .service(router::http::api)
-                    .service(router::http::aws)
-                    .service(router::http::gcp)
-                    .service(router::http::rum)
-                    .configure(get_basic_routes)
-                    .configure(get_proxy_routes),
-            )
+            let client = awc::Client::builder()
+                .connector(
+                    awc::Connector::new()
+                        .timeout(Duration::from_secs(CONFIG.route.timeout))
+                        .limit(CONFIG.route.max_connections),
+                )
+                .timeout(Duration::from_secs(CONFIG.route.timeout))
+                .disable_redirects()
+                .finish();
+            app = app
+                .service(
+                    // if `CONFIG.common.base_uri` is empty, scope("") still works as expected.
+                    web::scope(&CONFIG.common.base_uri)
+                        .service(router::http::config)
+                        .service(router::http::config_paths)
+                        .service(router::http::api)
+                        .service(router::http::aws)
+                        .service(router::http::gcp)
+                        .service(router::http::rum)
+                        .configure(get_basic_routes)
+                        .configure(get_proxy_routes),
+                )
+                .app_data(web::Data::new(client))
         } else {
             app = app.service(
                 web::scope(&CONFIG.common.base_uri)

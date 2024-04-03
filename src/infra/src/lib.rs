@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::CONFIG;
-
 pub mod cache;
 pub mod db;
 pub mod dist_lock;
@@ -30,11 +28,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     cache::init().await?;
     file_list::create_table().await?;
     queue::init().await?;
-    scheduler::init(
-        CONFIG.limit.scheduler_clean_interval,
-        CONFIG.limit.scheduler_watch_interval,
-    )
-    .await?;
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     Ok(())

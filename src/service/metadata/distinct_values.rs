@@ -272,7 +272,9 @@ impl Metadata for DistinctValues {
 }
 
 async fn run_flush() {
-    let mut interval = time::interval(time::Duration::from_secs(10));
+    let mut interval = time::interval(time::Duration::from_secs(
+        CONFIG.limit.distinct_values_interval,
+    ));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

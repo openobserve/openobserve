@@ -13,19 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, collections::HashMap};
+use std::cmp::max;
 
-use aws_sdk_dynamodb::types::AttributeValue;
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::Duration;
+use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::usage::Stats;
-use crate::{
-    utils::{json, parquet::parse_file_key_columns},
-    CONFIG,
-};
+use crate::{utils::json, CONFIG};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -93,84 +90,6 @@ impl FileKey {
             meta: FileMeta::default(),
             deleted: false,
         }
-    }
-}
-
-impl From<&FileKey> for HashMap<String, AttributeValue> {
-    fn from(file_key: &FileKey) -> Self {
-        let mut item = HashMap::new();
-        let (stream_key, date_key, file_name) = parse_file_key_columns(&file_key.key).unwrap();
-        let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
-        let file_name = format!("{date_key}/{file_name}");
-        item.insert("org".to_string(), AttributeValue::S(org_id));
-        item.insert("stream".to_string(), AttributeValue::S(stream_key));
-        item.insert("file".to_string(), AttributeValue::S(file_name));
-        item.insert(
-            "deleted".to_string(),
-            AttributeValue::Bool(file_key.deleted),
-        );
-        item.insert(
-            "min_ts".to_string(),
-            AttributeValue::N(file_key.meta.min_ts.to_string()),
-        );
-        item.insert(
-            "max_ts".to_string(),
-            AttributeValue::N(file_key.meta.max_ts.to_string()),
-        );
-        item.insert(
-            "records".to_string(),
-            AttributeValue::N(file_key.meta.records.to_string()),
-        );
-        item.insert(
-            "original_size".to_string(),
-            AttributeValue::N(file_key.meta.original_size.to_string()),
-        );
-        item.insert(
-            "compressed_size".to_string(),
-            AttributeValue::N(file_key.meta.compressed_size.to_string()),
-        );
-        item.insert(
-            "created_at".to_string(),
-            AttributeValue::N(chrono::Utc::now().timestamp_micros().to_string()),
-        );
-        item
-    }
-}
-
-impl From<&HashMap<String, AttributeValue>> for FileKey {
-    fn from(data: &HashMap<String, AttributeValue>) -> Self {
-        let mut item = FileKey {
-            key: format!(
-                "files/{}/{}",
-                data.get("stream").unwrap().as_s().unwrap(),
-                data.get("file").unwrap().as_s().unwrap()
-            ),
-            ..Default::default()
-        };
-        for (k, v) in data {
-            match k.as_str() {
-                "deleted" => {
-                    item.deleted = v.as_bool().unwrap().to_owned();
-                }
-                "min_ts" => {
-                    item.meta.min_ts = v.as_n().unwrap().parse::<i64>().unwrap();
-                }
-                "max_ts" => {
-                    item.meta.max_ts = v.as_n().unwrap().parse::<i64>().unwrap();
-                }
-                "records" => {
-                    item.meta.records = v.as_n().unwrap().parse::<i64>().unwrap();
-                }
-                "original_size" => {
-                    item.meta.original_size = v.as_n().unwrap().parse::<i64>().unwrap();
-                }
-                "compressed_size" => {
-                    item.meta.compressed_size = v.as_n().unwrap().parse::<i64>().unwrap();
-                }
-                _ => {}
-            }
-        }
-        item
     }
 }
 
@@ -386,6 +305,50 @@ impl std::ops::Sub<FileMeta> for StreamStats {
     }
 }
 
+impl From<&FileMeta> for cluster_rpc::FileMeta {
+    fn from(req: &FileMeta) -> Self {
+        cluster_rpc::FileMeta {
+            min_ts: req.min_ts,
+            max_ts: req.max_ts,
+            records: req.records,
+            original_size: req.original_size,
+            compressed_size: req.compressed_size,
+        }
+    }
+}
+
+impl From<&cluster_rpc::FileMeta> for FileMeta {
+    fn from(req: &cluster_rpc::FileMeta) -> Self {
+        FileMeta {
+            min_ts: req.min_ts,
+            max_ts: req.max_ts,
+            records: req.records,
+            original_size: req.original_size,
+            compressed_size: req.compressed_size,
+        }
+    }
+}
+
+impl From<&FileKey> for cluster_rpc::FileKey {
+    fn from(req: &FileKey) -> Self {
+        cluster_rpc::FileKey {
+            key: req.key.clone(),
+            meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
+            deleted: req.deleted,
+        }
+    }
+}
+
+impl From<&cluster_rpc::FileKey> for FileKey {
+    fn from(req: &cluster_rpc::FileKey) -> Self {
+        FileKey {
+            key: req.key.clone(),
+            meta: FileMeta::from(req.meta.as_ref().unwrap()),
+            deleted: req.deleted,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum PartitionTimeLevel {
@@ -423,5 +386,25 @@ impl std::fmt::Display for PartitionTimeLevel {
             PartitionTimeLevel::Hourly => write!(f, "hourly"),
             PartitionTimeLevel::Daily => write!(f, "daily"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_file_meta() {
+        let file_meta = FileMeta {
+            min_ts: 1667978841110,
+            max_ts: 1667978845354,
+            records: 300,
+            original_size: 10,
+            compressed_size: 1,
+        };
+
+        let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
+        let resp = FileMeta::from(&rpc_meta);
+        assert_eq!(file_meta, resp);
     }
 }

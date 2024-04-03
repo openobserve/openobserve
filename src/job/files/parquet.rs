@@ -77,11 +77,15 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let files = scan_files(&pattern, "parquet");
+    let mut files = scan_files(&pattern, "parquet");
     if files.is_empty() {
         return Ok(());
     }
-    // log::info!("[INGESTER:JOB] move files get: {}", files.len());
+    log::debug!("[INGESTER:JOB] move files get: {}", files.len());
+    if files.len() > CONFIG.limit.file_push_limit {
+        files.sort();
+        files.truncate(CONFIG.limit.file_push_limit);
+    }
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
@@ -89,6 +93,20 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
             continue;
         };
+        if parquet_meta.eq(&FileMeta::default()) {
+            log::warn!(
+                "[INGESTER:JOB] the file is empty, just delete file: {}",
+                file
+            );
+            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file)).await {
+                log::error!(
+                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                    file,
+                    e
+                );
+            }
+            continue;
+        }
         let file = Path::new(&file)
             .canonicalize()
             .unwrap()
@@ -371,12 +389,13 @@ async fn merge_files(
     let mut fts_buf = Vec::new();
     let (mut new_file_meta, _) = match merge_parquet_files(
         tmp_dir.name(),
+        stream_type,
+        &stream_name,
         &mut buf,
         Arc::new(file_schema.unwrap()),
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
-        stream_type,
         &mut fts_buf,
     )
     .await
@@ -508,7 +527,7 @@ pub(crate) async fn generate_index_on_ingester(
     if let Err(e) = writer.sync().await {
         log::error!("ingestion error while syncing writer: {}", e);
     }
-    log::warn!("[INGESTER:JOB] Written index wal file successfully");
+    log::info!("[INGESTER:JOB] Written index wal file successfully");
     Ok(())
 }
 

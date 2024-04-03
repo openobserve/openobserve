@@ -26,6 +26,7 @@ use datafusion::{
 };
 use futures::future::try_join_all;
 use infra::cache::tmpfs;
+use proto::cluster_rpc;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -38,7 +39,6 @@ use crate::{
             stream::ScanStats,
         },
     },
-    handler::grpc::cluster_rpc,
     service::{
         db,
         search::{
@@ -268,7 +268,9 @@ async fn get_file_list(
                 );
                 client = client
                     .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip);
+                    .accept_compressed(CompressionEncoding::Gzip)
+                    .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+                    .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
                 let response: cluster_rpc::MetricsWalFileResponse =
                     match client.wal_file(request).await {
                         Ok(response) => response.into_inner(),

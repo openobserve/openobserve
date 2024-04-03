@@ -15,7 +15,9 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web::{cookie::Cookie, delete, get, http, post, put, web, HttpResponse};
+use base64::Engine;
+use config::CONFIG;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -210,6 +212,17 @@ pub async fn delete(
 )]
 #[post("/login")]
 pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+    #[cfg(feature = "enterprise")]
+    let native_login_enabled = O2_CONFIG.dex.native_login_enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let native_login_enabled = true;
+
+    if !native_login_enabled {
+        return Ok(HttpResponse::Forbidden().json("Not Supported"));
+    }
+
     let mut resp = SignInResponse::default();
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
@@ -226,7 +239,21 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
         }
     };
     if resp.status {
-        Ok(HttpResponse::Ok().json(resp))
+        let token = format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD
+                .encode(format!("{}:{}", auth.name, auth.password))
+        );
+        let mut access_cookie = Cookie::new("access_token", token);
+        access_cookie.set_http_only(true);
+        access_cookie.set_secure(true);
+        access_cookie.set_path("/");
+        if CONFIG.auth.cookie_same_site_lax {
+            access_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+        } else {
+            access_cookie.set_same_site(actix_web::cookie::SameSite::None)
+        };
+        Ok(HttpResponse::Ok().cookie(access_cookie).json(resp))
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
     }

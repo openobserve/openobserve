@@ -24,13 +24,11 @@ use config::{
 use hashbrown::HashSet;
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
+use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::{cluster::get_node_from_consistent_hash, config::STREAM_SCHEMAS_FIELDS},
-    handler::grpc::cluster_rpc::{event_server::Event, EmptyResponse, FileList},
-};
+use crate::common::infra::{cluster::get_node_from_consistent_hash, config::STREAM_SCHEMAS_FIELDS};
 
 pub struct Eventer;
 
