@@ -25,14 +25,10 @@ use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
-use tokio::sync::oneshot::{self, Receiver, Sender};
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::{
-    common::meta::stream::ScanStats,
-    service::{db, search::SEARCH_SERVER},
-};
+use crate::{common::meta::stream::ScanStats, service::db};
 
 mod storage;
 mod wal;
@@ -196,15 +192,24 @@ pub async fn search(
             )
         };
 
-        if !SEARCH_SERVER.contain_key(session_id.as_ref()).await {
+        #[cfg(feature = "enterprise")]
+        if !crate::service::search::SEARCH_SERVER
+            .contain_key(session_id.as_ref())
+            .await
+        {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] task is cancel after get first stage result"
             )));
         }
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        crate::service::search::SEARCH_SERVER
+            .insert_sender(&session_id, abort_sender)
+            .await;
 
         let merge_batches;
+        #[cfg(feature = "enterprise")]
         tokio::select! {
             result = super::datafusion::exec::merge(
                 &sql.org_id,
@@ -228,6 +233,27 @@ pub async fn search(
                 return Err(Error::Message(format!("[session_id {session_id}] in node merge task is cancel")));
             }
         }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            merge_batches = match super::datafusion::exec::merge(
+                &sql.org_id,
+                offset,
+                limit,
+                &merge_sql,
+                &batches,
+                &select_fields,
+                false,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(err) => {
+                    log::error!("[session_id {session_id}] datafusion merge error: {}", err);
+                    return Err(err.into());
+                }
+            }
+        }
+
         merge_results.insert(name.to_string(), merge_batches);
     }
 

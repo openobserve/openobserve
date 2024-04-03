@@ -63,8 +63,6 @@ use crate::{common::meta, handler::http::request};
         request::search::search_partition,
         request::search::around,
         request::search::values,
-        request::search::job::cancel_job,
-        request::search::job::job_status,
         request::search::saved_view::create_view,
         request::search::saved_view::delete_view,
         request::search::saved_view::get_view,

@@ -38,10 +38,7 @@ use infra::{
     errors::{Error, ErrorCodes},
 };
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
-use tokio::{
-    sync::oneshot::{self, Receiver, Sender},
-    time::Duration,
-};
+use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
 use crate::{
@@ -58,7 +55,6 @@ use crate::{
         search::{
             datafusion::{exec, storage::StorageType},
             sql::Sql,
-            SEARCH_SERVER,
         },
         stream::{stream_settings, unwrap_partition_time_level},
     },
@@ -275,14 +271,23 @@ pub async fn search_parquet(
             stream_type = stream_type.to_string(),
         );
 
-        if !SEARCH_SERVER.contain_key(session_id).await {
+        #[cfg(feature = "enterprise")]
+        if !crate::service::search::SEARCH_SERVER
+            .contain_key(session_id)
+            .await
+        {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
             )));
         }
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER.insert_sender(session_id, abort_sender).await;
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        crate::service::search::SEARCH_SERVER
+            .insert_sender(session_id, abort_sender)
+            .await;
 
+        #[cfg(feature = "enterprise")]
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
@@ -306,6 +311,24 @@ pub async fn search_parquet(
             }
             .instrument(datafusion_span),
         );
+        #[cfg(not(feature = "enterprise"))]
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &files,
+                    None,
+                    FileType::PARQUET,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
+
         tasks.push(task);
     }
 
@@ -477,14 +500,23 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
-        if !SEARCH_SERVER.contain_key(session_id).await {
+        #[cfg(feature = "enterprise")]
+        if !crate::service::search::SEARCH_SERVER
+            .contain_key(session_id)
+            .await
+        {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
             )));
         }
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER.insert_sender(session_id, abort_sender).await;
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        crate::service::search::SEARCH_SERVER
+            .insert_sender(session_id, abort_sender)
+            .await;
 
+        #[cfg(feature = "enterprise")]
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
@@ -509,6 +541,24 @@ pub async fn search_memtable(
             }
             .instrument(datafusion_span),
         );
+        #[cfg(not(feature = "enterprise"))]
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &Vec::new(),
+                    Some(record_batches),
+                    FileType::ARROW,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
+
         tasks.push(task);
     }
 

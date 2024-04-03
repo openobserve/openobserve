@@ -17,25 +17,7 @@ use std::io::Error;
 
 use actix_web::{delete, get, web, HttpResponse};
 
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Delete a job by session_id",
-    operation_id = "DeleteJob",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("session_id" = String, Path, description = "Job's session id"),
-    ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = CancelJobResponse, example = json!([{
-            "session_id": "2eWbtjKPiHLzmZ7Idt6lLxDwX44",
-            "is_success": true,
-        }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
-    )
-)]
+#[cfg(feature = "enterprise")]
 #[delete("/search_job/{session_id}")]
 pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
@@ -45,33 +27,13 @@ pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, E
     }
 }
 
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Get all job status in background",
-    operation_id = "JobStatus",
-    security(
-        ("Authorization"= [])
-    ),
-    responses(
-          (status = 200, description = "Success", content_type = "application/json", body = JobStatusResponse, example = json!([{
-                "status":[
-                   {
-                      "session_id":"2eXczWNb38frLRhayaGs8luouel",
-                      "query_start_time":1712054625174128i64,
-                      "is_queue":false,
-                      "user_id":"root@example.com",
-                      "org_id":"default",
-                      "stream_type":"logs",
-                      "sql":"select * from 'default'",
-                      "start_time":1706429989000000i64,
-                      "end_time":2706685707000000i64
-                   }
-                ]
-          }])),
-        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
-        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
-    )
-)]
+#[cfg(not(feature = "enterprise"))]
+#[delete("/search_job/{session_id}")]
+pub async fn cancel_job(_session_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(feature = "enterprise")]
 #[get("/search_job/status")]
 pub async fn job_status() -> Result<HttpResponse, Error> {
     let res = crate::service::search::job_status().await;
@@ -79,4 +41,10 @@ pub async fn job_status() -> Result<HttpResponse, Error> {
         Ok(job_status) => Ok(HttpResponse::Ok().json(job_status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/search_job/status")]
+pub async fn job_status() -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

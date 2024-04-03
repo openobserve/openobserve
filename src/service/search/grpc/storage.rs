@@ -30,13 +30,7 @@ use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
 };
-use tokio::{
-    sync::{
-        oneshot::{self, Receiver, Sender},
-        Semaphore,
-    },
-    time::Duration,
-};
+use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
 use crate::{
@@ -50,7 +44,6 @@ use crate::{
         search::{
             datafusion::{exec, storage::StorageType},
             sql::Sql,
-            SEARCH_SERVER,
         },
         stream,
     },
@@ -252,14 +245,23 @@ pub async fn search(
         );
         let schema = Arc::new(schema);
 
-        if !SEARCH_SERVER.contain_key(session_id).await {
+        #[cfg(feature = "enterprise")]
+        if !crate::service::search::SEARCH_SERVER
+            .contain_key(session_id)
+            .await
+        {
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->storage: search canceled before call search->storage"
             )));
         }
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
-        SEARCH_SERVER.insert_sender(session_id, abort_sender).await;
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        crate::service::search::SEARCH_SERVER
+            .insert_sender(session_id, abort_sender)
+            .await;
 
+        #[cfg(feature = "enterprise")]
         let task = tokio::time::timeout(
             Duration::from_secs(timeout),
             async move {
@@ -283,6 +285,25 @@ pub async fn search(
             }
             .instrument(datafusion_span),
         );
+
+        #[cfg(not(feature = "enterprise"))]
+        let task = tokio::time::timeout(
+            Duration::from_secs(timeout),
+            async move {
+                exec::sql(
+                    &session,
+                    schema,
+                    &diff_fields,
+                    &sql,
+                    &files,
+                    None,
+                    FileType::PARQUET,
+                )
+                .await
+            }
+            .instrument(datafusion_span),
+        );
+
         tasks.push(task);
     }
 

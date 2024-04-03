@@ -39,11 +39,8 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use proto::cluster_rpc::{self, CancelJobRequest, JobStatusRequest};
-use tokio::sync::{
-    oneshot::{self, Receiver, Sender},
-    Mutex,
-};
+use proto::cluster_rpc::{self, JobStatusRequest};
+use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -58,7 +55,7 @@ use crate::{
             stream::{ScanStats, StreamParams, StreamPartition},
         },
     },
-    handler::grpc::request::search::{Searcher, TaskStatus},
+    handler::grpc::request::search::Searcher,
     service::{file_list, format_partition_key, stream},
 };
 
@@ -191,6 +188,7 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
     Ok(search::JobStatusResponse { status })
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn cancel_job(session_id: &str) -> Result<search::CancelJobResponse, Error> {
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
@@ -211,7 +209,8 @@ pub async fn cancel_job(session_id: &str) -> Result<search::CancelJobResponse, E
         let session_id = session_id.to_string();
         let task = tokio::task::spawn(
             async move {
-                let mut request = tonic::Request::new(CancelJobRequest { session_id });
+                let mut request =
+                    tonic::Request::new(proto::cluster_rpc::CancelJobRequest { session_id });
                 // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
@@ -317,36 +316,41 @@ pub async fn search(
         session_id.to_string()
     };
 
-    let sql = Some(req.query.sql.clone());
-    let start_time = Some(req.query.start_time);
-    let end_time = Some(req.query.end_time);
-    // set search task
-    SEARCH_SERVER
-        .insert(
-            session_id.clone(),
-            TaskStatus::new(
-                vec![],
-                true,
-                user_id,
-                Some(org_id.to_string()),
-                Some(stream_type.to_string()),
-                sql,
-                start_time,
-                end_time,
-            ),
-        )
-        .await;
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(req.query.sql.clone());
+        let start_time = Some(req.query.start_time);
+        let end_time = Some(req.query.end_time);
+        // set search task
+        SEARCH_SERVER
+            .insert(
+                session_id.clone(),
+                o2_enterprise::enterprise::search::TaskStatus::new(
+                    vec![],
+                    true,
+                    user_id,
+                    Some(org_id.to_string()),
+                    Some(stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                ),
+            )
+            .await;
+    }
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().session_id = session_id.clone();
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
-    let res = search_in_cluster(req).await;
+    let res = search_in_cluster(req).await?;
 
     // remove task because task if finished
+    #[cfg(feature = "enterprise")]
     SEARCH_SERVER.remove(&session_id).await;
-    res
+
+    Ok(res)
 }
 
 #[tracing::instrument(name = "service:search_partition:enter", skip(req))]
@@ -844,12 +848,15 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             node_addr = node_addr.as_str(),
         );
 
+        #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&session_id).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
             )));
         }
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
         SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let task = tokio::task::spawn(
@@ -896,6 +903,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
                 let response;
+                #[cfg(feature = "enterprise")]
                 tokio::select! {
                     result = client.search(request) => {
                         match result {
@@ -914,6 +922,20 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                         log::info!("[session_id {session_id}] search->grpc: cancel search in node: {:?}", &node.grpc_addr);
                         return Err(Error::Message(format!("[session_id {session_id}] search->grpc: search canceled")));
                     }
+                }
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    response = match client.search(request).await {
+                        Ok(res) => res.into_inner(),
+                        Err(err) => {
+                            log::error!("[session_id {session_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
+                            if err.code() == tonic::Code::Internal {
+                                let err = ErrorCodes::from_json(err.message())?;
+                                return Err(Error::ErrorCode(err));
+                            }
+                            return Err(server_internal_error("search node error"));
+                        }
+                    };
                 }
 
                 log::info!(
@@ -1031,15 +1053,19 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             (sql.aggs.get(agg_name).unwrap().0.clone(), vec![])
         };
 
+        #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&session_id).await {
             return Err(Error::Message(format!(
                 "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
             )));
         }
-        let (abort_sender, abort_receiver): (Sender<()>, Receiver<()>) = oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
         SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let merge_batch;
+        #[cfg(feature = "enterprise")]
         tokio::select! {
             res = datafusion::exec::merge(
                 &sql.org_id,
@@ -1053,10 +1079,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 match res {
                     Ok(res) => merge_batch = res,
                     Err(err) => {
-                        // search done, release lock
-                        #[cfg(not(feature = "enterprise"))]
-                        dist_lock::unlock(&locker).await?;
-                        #[cfg(feature = "enterprise")]
                         work_group
                             .as_ref()
                             .unwrap()
@@ -1071,6 +1093,29 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 log::info!("[session_id {session_id}] search->cluster: final merge task is cancel");
                 return Err(Error::Message(format!("[session_id {session_id}] search->cluster: final merge task is cancel")));
             }
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            merge_batch = match datafusion::exec::merge(
+                &sql.org_id,
+                sql.meta.offset,
+                sql.meta.limit,
+                &merge_sql,
+                &batch,
+                &select_fields,
+                true,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(err) => {
+                    // search done, release lock
+                    dist_lock::unlock(&locker).await?;
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
+                }
+            };
         }
 
         merge_batches.insert(name, merge_batch);
