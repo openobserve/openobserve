@@ -432,7 +432,6 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     }
 }
 
-#[cfg(feature = "enterprise")]
 #[get("/logout")]
 async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
     let mut access_cookie = Cookie::new("access_token", "");
