@@ -2,7 +2,7 @@ import { ref, markRaw } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 
-import { useLocalToken, getUserInfo, getImageURL } from "@/utils/zincutils";
+import { getUserInfo, getImageURL } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
@@ -142,7 +142,6 @@ const MainLayoutCloudMixin = {
       userService
         .getRefreshToken()
         .then((res) => {
-          useLocalToken(res.data.data.id_token);
           const sessionUserInfo: any = getUserInfo(
             "#id_token=" + res.data.data.id_token
           );

@@ -16,31 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="max-width: 400px; margin-top: 100px" class="q-mx-auto q-pa-md">
-    <div
-      class="flex justify-center text-center"
-      v-if="config.isEnterprise == 'true' && store.state.zoConfig.custom_logo_text != ''"
-    >
+    <div class="flex justify-center text-center"
+      v-if="config.isEnterprise == 'true' && store.state.zoConfig.custom_logo_text != ''">
       <div class="text-h5 text-bold q-pa-none text-centered full-width">
         {{ store.state.zoConfig.custom_logo_text }}
       </div>
 
-      <div class="text-caption full-width text-centered"><img :src="getImageURL('images/common/spark-logo-connector.png')" class="q-mt-sm" style="width: 30px" /></div>
+      <div class="text-caption full-width text-centered"><img
+          :src="getImageURL('images/common/spark-logo-connector.png')" class="q-mt-sm" style="width: 30px" /></div>
     </div>
     <div class="flex justify-center q-mb-lg">
-      <img
-        class="appLogo"
-        style="height: auto"
-        :style="
-          store.state.zoConfig.custom_logo_text != ''
-            ? 'width: 150px;'
-            : 'width: 250px;'
-        "
-        :src="
-          store?.state?.theme == 'dark'
-            ? getImageURL('images/common/open_observe_logo_2.svg')
-            : getImageURL('images/common/open_observe_logo.svg')
-        "
-      />
+      <img class="appLogo" style="height: auto" :style="store.state.zoConfig.custom_logo_text != ''
+        ? 'width: 150px;'
+        : 'width: 250px;'
+        " :src="store?.state?.theme == 'dark'
+        ? getImageURL('images/common/open_observe_logo_2.svg')
+        : getImageURL('images/common/open_observe_logo.svg')
+        " />
     </div>
 
     <div style="font-size: 22px" class="full-width text-center q-pb-md">
@@ -48,84 +40,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="showSSO" class="flex justify-center">
-      <q-btn
-        data-test="sso-login-btn"
-        class="text-bold no-border"
-        padding="sm lg"
-        color="primary"
-        no-caps
-        style="width: 400px"
-        @click="loginWithSSo"
-      >
-        <div
-          class="flex items-center justify-center full-width text-center realtive"
-        >
-          <img
-            class="absolute"
-            style="width: 30px; left: 16px"
-            :src="getImageURL('images/common/sso.svg')"
-          />
+      <q-btn data-test="sso-login-btn" class="text-bold no-border" padding="sm lg" color="primary" no-caps
+        style="width: 400px" @click="loginWithSSo">
+        <div class="flex items-center justify-center full-width text-center realtive">
+          <img class="absolute" style="width: 30px; left: 16px" :src="getImageURL('images/common/sso.svg')" />
           <span class="text-center"> Login with SSO</span>
         </div>
       </q-btn>
     </div>
 
     <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
-      <a
-        class="cursor-pointer login-internal-link q-py-md"
-        style="text-decoration: underline"
-        @click="loginAsInternalUser = !loginAsInternalUser"
-        >Login as internal user</a
-      >
+      <a class="cursor-pointer login-internal-link q-py-md" style="text-decoration: underline"
+        @click="loginAsInternalUser = !loginAsInternalUser">Login as internal user</a>
     </div>
 
-    <div
-      v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
-      class="o2-input login-inputs"
-    >
-      <q-form ref="loginform"
-class="q-gutter-md" @submit.prevent="">
-        <q-input
-          v-model="name"
-          data-cy="login-user-id"
-          data-test="login-user-id"
-          outlined
-          :label="`${t('login.userEmail')} *`"
-          placeholder="Email"
-          class="showLabelOnTop no-case"
-          type="email"
-          dense
-          stack-label
-          filled
-        />
+    <div v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)" class="o2-input login-inputs">
+      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
+        <q-input v-model="name" data-cy="login-user-id" data-test="login-user-id" outlined
+          :label="`${t('login.userEmail')} *`" placeholder="Email" class="showLabelOnTop no-case" type="email" dense
+          stack-label filled />
 
-        <q-input
-          v-model="password"
-          data-cy="login-password"
-          data-test="login-password"
-          outlined
-          :label="`${t('login.password')} *`"
-          placeholder="Password"
-          class="showLabelOnTop no-case"
-          type="password"
-          dense
-          stack-label
-          filled
-        />
+        <q-input v-model="password" data-cy="login-password" data-test="login-password" outlined
+          :label="`${t('login.password')} *`" placeholder="Password" class="showLabelOnTop no-case" type="password"
+          dense stack-label filled />
 
         <div class="q-mt-lg q-mb-xl">
-          <q-btn
-            data-cy="login-sign-in"
-            unelevated
-            class="full-width text-bold no-border"
-            color="primary"
-            type="submit"
-            padding="sm lg"
-            :label="t('login.login')"
-            :loading="submitting"
-            no-caps
-            @click="onSignIn()"
-          />
+          <q-btn data-cy="login-sign-in" unelevated class="full-width text-bold no-border" color="primary" type="submit"
+            padding="sm lg" :label="t('login.login')" :loading="submitting" no-caps @click="onSignIn()" />
         </div>
       </q-form>
     </div>
@@ -142,7 +83,6 @@ import { useI18n } from "vue-i18n";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
-  useLocalToken,
   getBasicAuth,
   b64EncodeStandard,
   useLocalUserInfo,
@@ -216,7 +156,6 @@ export default defineComponent({
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
                 const authToken = getBasicAuth(name.value, password.value);
-                useLocalToken(authToken);
                 const userInfo = {
                   given_name: name.value,
                   auth_time: Math.floor(Date.now() / 1000),
@@ -361,6 +300,7 @@ export default defineComponent({
     color: #595959;
   }
 }
+
 .my-card {
   width: 400px;
 }

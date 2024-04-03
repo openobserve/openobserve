@@ -16,7 +16,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import {
   getDecodedUserInfo,
-  useLocalToken,
   getPath,
   mergeRoutes,
 } from "@/utils/zincutils";
@@ -31,7 +30,7 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  if (config.isCloud == "true") {
+  if (config.isCloud == "true" || config.isEnterprise == "true") {
     envRoutes = userCloudRoutes();
   } else {
     envRoutes = useOSRoutes();
@@ -66,16 +65,16 @@ export default function (store: any) {
     const isAuthenticated = store.state.loggedIn;
 
     if (!isAuthenticated) {
-      if (to.path == "/cb") {
+      if (to.path == "/cb" ||to.path == "/web/cb") {
         next();
       }
       const sessionUserInfo = getDecodedUserInfo();
 
-      const localStorageToken: any = useLocalToken();
       if (
         to.path !== "/login" &&
         to.path !== "/cb" &&
-        (localStorageToken.value === "" || sessionUserInfo === null)
+        to.path != "/web/cb" &&
+         sessionUserInfo === null
       ) {
         if (to.path !== "/logout") {
           window.sessionStorage.setItem("redirectURI", to.fullPath);
