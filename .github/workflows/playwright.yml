@@ -17,10 +17,9 @@ env:
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
   ZO_BASE_URL: http://localhost:5080
-  # these are cypress related env vars
+  ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 5
   ZO_QUICK_MODE_STRATEGY : first
-  ORGNAME: default
 
 
 jobs:
@@ -78,7 +77,14 @@ jobs:
         with:
             node-version: lts/*
       - name: Install dependencies and run ui-tests
-        run: cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+        run: |
+          touch .env
+          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
+          echo "ZO_ROOT_USER_PASSWORD"=${ZO_ROOT_USER_PASSWORD} >> .env
+          echo "ZO_BASE_URL"=${ZO_BASE_URL} >> .env
+          echo "ORGNAME"=${ORGNAME} >> .env
+          mv .env tests/ui-testing
+          cd tests/ui-testing && npm ci && npx playwright install --with-deps && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
