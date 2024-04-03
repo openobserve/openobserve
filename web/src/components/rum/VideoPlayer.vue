@@ -16,105 +16,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="player-container full-height q-pa-sm">
-    <div
-      v-if="isLoading"
-      class="q-pb-lg flex items-center justify-center text-center full-width"
-      style="height: calc(100vh - 200px)"
-    >
+    <div v-if="isLoading" class="q-pb-lg flex items-center justify-center text-center full-width"
+      style="height: calc(100vh - 200px)">
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
-        />
+        <q-spinner-hourglass color="primary" size="40px" style="margin: 0 auto; display: block" />
         <div class="text-center full-width">
           Hold on tight, we're fetching session.
         </div>
       </div>
     </div>
-    <div
-      ref="playerContainerRef"
-      class="flex items-center justify-center"
-      style="height: calc(100vh - 198px)"
-    >
-      <div
-        ref="playerRef"
-        id="player"
-        class="player flex items-center cursor-pointer"
-        @click="togglePlay"
-      />
+    <div ref="playerContainerRef" class="flex items-center justify-center" style="height: calc(100vh - 198px)">
+      <div ref="playerRef" id="player" class="player flex items-center cursor-pointer" @click="togglePlay" />
     </div>
     <div class="full-width q-pa-sm q-pt-md controls-container">
-      <div
-        ref="playbackBarRef"
-        class="playback_bar q-mt-sm q-mb-md relative-position cursor-pointer"
-        @click="handlePlaybackBarClick"
-      >
-        <div
-          class="progressTime bg-primary absolute"
-          :style="{
-            width: playerState.progressWidth + 'px',
-            left: 0,
-            top: 0,
-            height: '100%',
-            transition: 'all 0.1s linear',
-          }"
-        />
-        <div
-          class="progressTime bg-primary absolute"
-          :style="{
-            width: '2px',
-            left: playerState.progressWidth - 2 + 'px',
-            bottom: '-5px',
-            height: '15px',
-            transition: 'all 0.1s linear',
-          }"
-        />
+      <div ref="playbackBarRef" class="playback_bar q-mt-sm q-mb-md relative-position cursor-pointer"
+        @click="handlePlaybackBarClick">
+        <div class="progressTime bg-primary absolute" :style="{
+      width: playerState.progressWidth + 'px',
+      left: 0,
+      top: 0,
+      height: '100%',
+      transition: 'all 0.1s linear',
+    }" />
+        <div class="progressTime bg-primary absolute" :style="{
+      width: '2px',
+      left: playerState.progressWidth - 2 + 'px',
+      bottom: '-5px',
+      height: '15px',
+      transition: 'all 0.1s linear',
+    }" />
 
-        <div
-          v-for="event in (events as any[])"
-          :key="event.id"
-          class="progressTime bg-secondary absolute cursor-pointer"
-          :style="{
-            width: '2px',
-            left:
-              (event.relativeTime / playerState.totalTime) * playerState.width +
-              'px',
-            bottom: '-5px',
-            height: '15px',
-          }"
-          :title="
-            event.name.length > 100
-              ? event.name.slice(0, 100) + '...'
-              : event.name
-          "
-        />
+        <div v-for="event in (events as any[])" :key="event.id"
+          class="progressTime bg-secondary absolute cursor-pointer" :style="{
+      width: '2px',
+      left:
+        (event.relativeTime / playerState.totalTime) * playerState.width +
+        'px',
+      bottom: '-5px',
+      height: '15px',
+    }" :title="event.name.length > 100
+      ? event.name.slice(0, 100) + '...'
+      : event.name
+      " />
       </div>
       <div class="controls flex justify-between items-center">
         <div class="flex items-center">
           <div>
-            <q-icon
-              name="replay_10"
-              size="24px"
-              class="q-mr-sm cursor-pointer"
-              @click="skipTo('backward')"
-            />
-            <q-icon
-              :name="
-                playerState.isPlaying
-                  ? 'pause_circle_filled'
-                  : 'play_circle_filled'
-              "
-              size="32px"
-              class="cursor-pointer"
-              @click="togglePlay"
-            />
-            <q-icon
-              name="forward_10"
-              size="24px"
-              class="q-ml-sm cursor-pointer"
-              @click="skipTo('forward')"
-            />
+            <q-icon name="replay_10" size="24px" class="q-mr-sm cursor-pointer" @click="skipTo('backward')" />
+            <q-icon :name="playerState.isPlaying
+      ? 'pause_circle_filled'
+      : 'play_circle_filled'
+      " size="32px" class="cursor-pointer" @click="togglePlay" />
+            <q-icon name="forward_10" size="24px" class="q-ml-sm cursor-pointer" @click="skipTo('forward')" />
           </div>
           <div class="flex q-ml-lg items-center">
             <div>{{ playerState.time }}</div>
@@ -123,26 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex items-center">
-          <q-toggle
-            class="q-mr-md"
-            v-model="playerState.skipInactivity"
-            :label="t('rum.skipInactivity')"
-            size="xs"
-            @update:model-value="toggleSkipInactive"
-          />
-          <q-select
-            class="speed-selector"
-            v-model="playerState.speed"
-            :options="speedOptions"
-            color="input-border"
-            bg-color="input-bg"
-            stack-label
-            outlined
-            filled
-            dense
-            size="xs"
-            @update:model-value="setSpeed"
-          />
+          <q-toggle class="q-mr-md" v-model="playerState.skipInactivity" :label="t('rum.skipInactivity')" size="xs"
+            @update:model-value="toggleSkipInactive" />
+          <q-select class="speed-selector" v-model="playerState.speed" :options="speedOptions" color="input-border"
+            bg-color="input-bg" stack-label outlined filled dense size="xs" @update:model-value="setSpeed" />
         </div>
       </div>
     </div>
@@ -163,7 +100,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
-import { useLocalToken, getPath } from "@/utils/zincutils";
+import { getPath } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 
 const props = defineProps({
@@ -534,12 +471,10 @@ const processCss = (cssString: string, id: string | number) => {
         }
       };
       worker.value.addEventListener("message", handleWorkerMessage);
-      const token = useLocalToken()?.value as string;
       worker.value.postMessage({
         cssString: cssString,
         proxyUrl: `${store.state.API_ENDPOINT}/proxy/${store.state.selectedOrganization.identifier}`,
         id,
-        token: token.replace("Basic ", ""),
       });
     } else {
       reject("Worker not initialized");
@@ -575,6 +510,7 @@ defineExpose({
   .q-field__control {
     padding: 0 8px !important;
   }
+
   .q-field__marginal,
   .q-field__native,
   .q-field__control {
