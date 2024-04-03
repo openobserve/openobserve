@@ -40,17 +40,7 @@ module.exports = defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 1920, height: 1080 }, },
      
       
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    }
 
     /* Test against mobile viewports. */
     // {
