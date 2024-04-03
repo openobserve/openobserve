@@ -24,7 +24,7 @@ use config::{
     utils::json,
     CONFIG,
 };
-use infra::{db as infra_db, dist_lock};
+use infra::dist_lock;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use reqwest::Client;
@@ -252,9 +252,8 @@ async fn report_stats(
 }
 
 async fn get_last_stats_offset(org_id: &str) -> (i64, String) {
-    let db = infra_db::get_db().await;
     let key = format!("/stats/last_updated/org/{org_id}");
-    let value = match db.get(&key).await {
+    let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
@@ -273,28 +272,19 @@ pub async fn set_last_stats_offset(
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let val = if let Some(node) = node {
         format!("{};{}", offset, node)
     } else {
         offset.to_string()
     };
     let key = format!("/stats/last_updated/org/{org_id}");
-    db.put(&key, val.into(), infra_db::NO_NEED_WATCH, None)
-        .await?;
+    db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/stats/cache_expiry".to_string();
-    db.put(
-        &key,
-        offset.to_string().into(),
-        infra_db::NO_NEED_WATCH,
-        None,
-    )
-    .await?;
+    db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 

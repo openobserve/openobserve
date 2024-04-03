@@ -22,9 +22,12 @@ use infra::{
     errors::{self, Error},
 };
 
-use crate::common::{
-    infra::config::ORGANIZATION_SETTING,
-    meta::organization::{Organization, OrganizationSetting},
+use crate::{
+    common::{
+        infra::config::ORGANIZATION_SETTING,
+        meta::organization::{Organization, OrganizationSetting},
+    },
+    service::db,
 };
 
 // DBKey to set settings for an org
@@ -33,12 +36,11 @@ pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 pub const ORG_KEY_PREFIX: &str = "/organization/org";
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
-    let db = infra_db::get_db().await;
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
-    db.put(
+    db::put(
         &key,
         json::to_vec(&setting).unwrap().into(),
-        infra_db::NEED_WATCH,
+        db::NEED_WATCH,
         None,
     )
     .await?;
@@ -53,19 +55,17 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 }
 
 pub async fn get_org_setting(org_id: &str) -> Result<Bytes, Error> {
-    let db = infra_db::get_db().await;
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
     match ORGANIZATION_SETTING.clone().read().await.get(&key) {
         Some(v) => Ok(json::to_vec(v).unwrap().into()),
-        None => Ok(db.get(&key).await?),
+        None => Ok(db::get(&key).await?),
     }
 }
 
 /// Cache the existing org settings in the beginning
 pub async fn cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;
-    let db = infra_db::get_db().await;
-    let ret = db.list(prefix).await?;
+    let ret = db::list(prefix).await?;
     for (key, item_value) in ret {
         let json_val: OrganizationSetting = json::from_slice(&item_value).unwrap();
         ORGANIZATION_SETTING
@@ -97,8 +97,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             let item_key = ev.key;
             let item_value = ev.value.unwrap();
             let json_val: OrganizationSetting = if config::CONFIG.common.meta_store_external {
-                let db = infra_db::get_db().await;
-                match db.get(&item_key).await {
+                match db::get(&item_key).await {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
@@ -124,16 +123,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("{ORG_KEY_PREFIX}/{}", org.identifier);
-    match db
-        .put(
-            &key,
-            json::to_vec(org).unwrap().into(),
-            infra_db::NEED_WATCH,
-            None,
-        )
-        .await
+    match db::put(
+        &key,
+        json::to_vec(org).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
     {
         Ok(_) => {}
         Err(e) => {
@@ -146,15 +143,13 @@ pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
 }
 
 pub async fn get(org_id: &str) -> Result<Organization, anyhow::Error> {
-    let db = infra_db::get_db().await;
-    let val = db.get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await?;
+    let val = db::get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("{ORG_KEY_PREFIX}/{}", org_id);
-    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
+    match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting function: {}", e);

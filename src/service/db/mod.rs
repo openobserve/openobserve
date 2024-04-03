@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
-use infra::db as infra_db;
+use bytes::Bytes;
+use hashbrown::HashMap;
+use infra::{db as infra_db, errors::Result};
+#[cfg(feature = "enterprise")]
+use {infra::errors::Error, o2_enterprise::enterprise::common::infra::config::O2_CONFIG};
 
 pub mod alerts;
 pub mod compact;
@@ -22,6 +25,7 @@ pub mod dashboards;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod functions;
+pub mod instance;
 pub mod kv;
 pub mod metrics;
 pub mod ofga;
@@ -32,28 +36,86 @@ pub mod syslog;
 pub mod user;
 pub mod version;
 
-pub async fn get_instance() -> Result<Option<String>, anyhow::Error> {
+pub(crate) use infra_db::{get_coordinator, Event, NEED_WATCH, NO_NEED_WATCH};
+
+#[inline]
+pub(crate) async fn get(key: &str) -> Result<Bytes> {
     let db = infra_db::get_db().await;
-    let key = "/instance/";
-    let ret = db.get(key).await?;
-    let loc_value = json::from_slice(&ret).unwrap();
-    let value = Some(loc_value);
-    Ok(value)
+    db.get(key).await
 }
 
-pub async fn set_instance(id: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
-    let key = "/instance/";
-    match db
-        .put(
-            key,
-            json::to_vec(&id).unwrap().into(),
-            infra_db::NO_NEED_WATCH,
-            None,
-        )
-        .await
-    {
-        Ok(_) => Ok(()),
-        Err(e) => Err(anyhow::anyhow!(e)),
+#[inline]
+pub(crate) async fn put(
+    key: &str,
+    value: Bytes,
+    need_watch: bool,
+    start_dt: Option<i64>,
+) -> Result<()> {
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.super_cluster.enabled {
+        o2_enterprise::enterprise::super_cluster::queue::put(key, value.clone(), need_watch)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
     }
+
+    let db = infra_db::get_db().await;
+    db.put(key, value, need_watch, start_dt).await
+}
+
+#[inline]
+pub(crate) async fn get_for_update(
+    key: &str,
+    need_watch: bool,
+    start_dt: Option<i64>,
+    update_fn: Box<infra_db::UpdateFn>,
+) -> Result<()> {
+    let db = infra_db::get_db().await;
+    db.get_for_update(key, need_watch, start_dt, update_fn)
+        .await
+}
+
+#[inline]
+pub(crate) async fn delete(
+    key: &str,
+    with_prefix: bool,
+    need_watch: bool,
+    start_dt: Option<i64>,
+) -> Result<()> {
+    let db = infra_db::get_db().await;
+    db.delete(key, with_prefix, need_watch, start_dt).await?;
+
+    // super cluster
+    #[cfg(feature = "enterprise")]
+    if O2_CONFIG.super_cluster.enabled {
+        o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch)
+            .await
+            .map_err(|e| Error::Message(e.to_string()))?;
+    }
+
+    Ok(())
+}
+
+#[inline]
+pub(crate) async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+    let db = infra_db::get_db().await;
+    db.delete_if_exists(key, with_prefix, need_watch).await
+}
+
+#[inline]
+pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
+    let db = infra_db::get_db().await;
+    db.list(prefix).await
+}
+
+#[inline]
+pub(crate) async fn list_keys(prefix: &str) -> Result<Vec<String>> {
+    let db = infra_db::get_db().await;
+    db.list_keys(prefix).await
+}
+
+#[inline]
+pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
+    let db = infra_db::get_db().await;
+    db.list_values(prefix).await
 }

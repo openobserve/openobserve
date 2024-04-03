@@ -17,11 +17,13 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use config::{utils::json, CONFIG};
-use infra::db as infra_db;
 
-use crate::common::{
-    infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
-    meta::user::{DBUser, User, UserOrg, UserRole},
+use crate::{
+    common::{
+        infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
+        meta::user::{DBUser, User, UserOrg, UserRole},
+    },
+    service::db,
 };
 
 pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
@@ -36,9 +38,8 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 
     let org_id = org_id.expect("Missing org_id");
 
-    let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
-    let val = db.get(&key).await?;
+    let val = db::get(&key).await?;
     let db_user: DBUser = json::from_slice(&val).unwrap();
     Ok(db_user.get_user(org_id.to_string()))
 }
@@ -59,9 +60,8 @@ pub async fn get_by_token(
 
     let org_id = org_id.expect("Missing org_id");
 
-    let db = infra_db::get_db().await;
     let key = "/user/";
-    let ret = db.list_values(key).await.unwrap();
+    let ret = db::list_values(key).await.unwrap();
 
     let normal_valid_user = |org: &UserOrg| {
         org.name == org_id && org.rum_token.is_some() && org.rum_token.as_ref().unwrap() == token
@@ -84,19 +84,17 @@ pub async fn get_by_token(
 }
 
 pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
-    let val = db.get(&key).await?;
+    let val = db::get(&key).await?;
     Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/user/{}", user.email);
-    db.put(
+    db::put(
         &key,
         json::to_vec(&user).unwrap().into(),
-        infra_db::NEED_WATCH,
+        db::NEED_WATCH,
         None,
     )
     .await?;
@@ -130,9 +128,8 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
 }
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/user/{name}");
-    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
+    match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting user: {}", e);
@@ -144,7 +141,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/user/";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching user");
@@ -157,12 +154,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
 
                 let item_value: DBUser = if CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -200,7 +196,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // Invalidate the entire RUM-TOKEN-CACHE
                 USERS_RUM_TOKEN.clear();
             }
-            infra_db::Event::Delete(ev) => {
+            db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 for user in USERS.clone() {
                     if user.1.email.eq(item_key) {
@@ -211,16 +207,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // Invalidate the entire RUM-TOKEN-CACHE
                 USERS_RUM_TOKEN.clear();
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/user/";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (_, item_value) in ret {
         // let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
@@ -258,9 +253,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn root_user_exists() -> bool {
-    let db = infra_db::get_db().await;
     let key = "/user/";
-    let mut ret = db.list_values(key).await.unwrap_or_default();
+    let mut ret = db::list_values(key).await.unwrap_or_default();
     ret.retain(|item| {
         let user: DBUser = json::from_slice(item).unwrap();
         if user.organizations.is_empty() {
@@ -277,16 +271,14 @@ pub async fn root_user_exists() -> bool {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/user/";
-    db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?;
+    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
-    let db = infra_db::get_db().await;
     let key = "/user/";
-    let mut ret = db.list_values(key).await.unwrap();
+    let mut ret = db::list_values(key).await.unwrap();
     ret.retain(|item| {
         let user: DBUser = serde_json::from_slice(item).unwrap();
         user.email.eq(email)

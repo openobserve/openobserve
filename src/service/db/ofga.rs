@@ -41,21 +41,19 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
             };
             match write_auth_models(&meta, &store_id).await {
                 Ok(_) => {
-                    let db = infra_db::get_db().await;
                     let key = "/ofga/model";
 
                     let mut loc_meta = meta.clone();
                     loc_meta.store_id = store_id;
                     loc_meta.model = None;
 
-                    match db
-                        .put(
-                            key,
-                            json::to_vec(&loc_meta).unwrap().into(),
-                            infra_db::NEED_WATCH,
-                            None,
-                        )
-                        .await
+                    match db::put(
+                        key,
+                        json::to_vec(&loc_meta).unwrap().into(),
+                        db::NEED_WATCH,
+                        None,
+                    )
+                    .await
                     {
                         Ok(_) => Ok(loc_meta.store_id),
                         Err(e) => Err(anyhow::anyhow!(e)),
@@ -68,21 +66,19 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
         let store_id = create_open_fga_store().await.unwrap();
         match write_auth_models(&meta, &store_id).await {
             Ok(_) => {
-                let db = infra_db::get_db().await;
                 let key = "/ofga/model";
 
                 let mut loc_meta = meta.clone();
                 loc_meta.store_id = store_id;
                 loc_meta.model = None;
 
-                match db
-                    .put(
-                        key,
-                        json::to_vec(&loc_meta).unwrap().into(),
-                        infra_db::NEED_WATCH,
-                        None,
-                    )
-                    .await
+                match db::put(
+                    key,
+                    json::to_vec(&loc_meta).unwrap().into(),
+                    db::NEED_WATCH,
+                    None,
+                )
+                .await
                 {
                     Ok(_) => Ok(loc_meta.store_id),
                     Err(e) => Err(anyhow::anyhow!(e)),
@@ -94,9 +90,8 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
 }
 #[cfg(feature = "enterprise")]
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/ofga/model";
-    let ret = db.get(key).await?;
+    let ret = db::get(key).await?;
     let loc_value = json::from_slice(&ret).unwrap();
     let value = Some(loc_value);
     Ok(value)
@@ -120,8 +115,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_value: OFGAModel = if config::CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -152,9 +146,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/ofga/model";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (_, item_value) in ret {
         let json_val: OFGAModel = json::from_slice(&item_value).unwrap();
         log::info!("Caching store id {}", &json_val.store_id);
