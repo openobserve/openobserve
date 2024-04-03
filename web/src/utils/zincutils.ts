@@ -23,6 +23,7 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import billings from "@/services/billings";
 import useStreams from "@/composables/useStreams";
+import userService from "@/services/users";
 
 const useLocalStorage = (
   key: string,
@@ -98,14 +99,7 @@ export const getUserInfo = (loginString: string) => {
         const encodedSessionData: any = b64EncodeStandard(
           JSON.stringify(decToken)
         );
-
-        useLocalUserInfo(encodedSessionData);
-        useLocalToken("Bearer " + propArr[1]);
-      } else if (propArr[0] == "access_token" && useLocalToken()?.value == "") {
-        useLocalStorage("access_token", "Bearer " + propArr[1], false, false);
-      }
-      if (propArr[0] == "refresh_token") {
-        useLocalStorage("refresh_token", propArr[1], false, false);
+      useLocalUserInfo(encodedSessionData);
       }
     }
 
@@ -116,9 +110,7 @@ export const getUserInfo = (loginString: string) => {
 };
 
 export const invlidateLoginData = () => {
-  useLocalStorage("refresh_token", "", true, false);
-  useLocalStorage("access_token", "", true, false);
-  useLocalStorage("token", "", true, false);
+  userService.logout().then((res: any) => {});
 };
 
 export const getLoginURL = () => {
@@ -214,9 +206,7 @@ export const getSessionStorageVal = (key: string) => {
   }
 };
 
-export const useLocalToken = (val = "", isDelete = false) => {
-  return useLocalStorage("access_token", val, isDelete);
-};
+
 
 export const useLocalOrganization = (val: any = "", isDelete = false) => {
   return useLocalStorage("organization", val, isDelete, true);

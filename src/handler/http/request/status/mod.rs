@@ -15,6 +15,8 @@
 
 use std::io::Error;
 
+#[cfg(feature = "enterprise")]
+use actix_web::cookie::Cookie;
 use actix_web::{get, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
@@ -339,8 +341,23 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
+
+            let mut access_token_cookie = Cookie::new("access_token", token);
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(true);
+            access_token_cookie.set_path("/");
+            access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
+            let mut refresh_token_cookie = Cookie::new("refresh_token", login_data.refresh_token);
+            refresh_token_cookie.set_http_only(true);
+            refresh_token_cookie.set_secure(true);
+            refresh_token_cookie.set_path("/");
+            refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
+                .cookie(access_token_cookie)
+                .cookie(refresh_token_cookie)
                 .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
@@ -376,8 +393,48 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
         Ok(token_response) => HttpResponse::Ok().json(token_response),
-        Err(_) => HttpResponse::Unauthorized().finish(),
+        Err(_) => {
+            let mut access_cookie = Cookie::new("access_token", "");
+            access_cookie.set_http_only(true);
+            access_cookie.set_secure(true);
+            access_cookie.set_path("/");
+            access_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            let mut refresh_cookie = Cookie::new("refresh_token", "");
+            refresh_cookie.set_http_only(true);
+            refresh_cookie.set_secure(true);
+            refresh_cookie.set_path("/");
+            refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+            HttpResponse::Unauthorized()
+                .append_header((header::LOCATION, "/"))
+                .cookie(access_cookie)
+                .cookie(refresh_cookie)
+                .finish()
+
+            // HttpResponse::Unauthorized().finish()
+        }
     }
+}
+
+#[cfg(feature = "enterprise")]
+#[get("/logout")]
+async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
+    let mut access_cookie = Cookie::new("access_token", "");
+    access_cookie.set_http_only(true);
+    access_cookie.set_secure(true);
+    access_cookie.set_path("/");
+    access_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+    let mut refresh_cookie = Cookie::new("refresh_token", "");
+    refresh_cookie.set_http_only(true);
+    refresh_cookie.set_secure(true);
+    refresh_cookie.set_path("/");
+    refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+    HttpResponse::Ok()
+        .append_header((header::LOCATION, "/"))
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .finish()
+
+    // HttpResponse::Unauthorized().finish()
 }
 
 #[put("/enable")]

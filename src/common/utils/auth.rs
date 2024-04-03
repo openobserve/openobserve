@@ -299,81 +299,88 @@ impl FromRequest for AuthExtractor {
             )
         };
 
-        if let Some(auth_header) = req.headers().get("Authorization") {
+        let auth_str = if let Some(cookie) = req.cookie("access_token") {
+            let access_token = cookie.value().to_string();
+            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                access_token
+            } else {
+                format!("Bearer {}", access_token)
+            }
+        } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
-                if (method.eq("POST") && path_columns[1].starts_with("_search"))
-                    || path.contains("/prometheus/api/v1/query")
-                    || path.contains("/resources")
-                    || path.contains("/format_query")
-                    || path.contains("/prometheus/api/v1/series")
-                    || path.contains("/traces/latest")
-                {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method: "".to_string(),
-                        o2_type: "".to_string(),
-                        org_id: "".to_string(),
-                        bypass_check: true, // bypass check permissions
-                        parent_id: folder,
-                    }));
-                }
-                if object_type.starts_with("stream") {
-                    let object_type = match stream_type {
-                        Some(stream_type) => {
-                            if stream_type.eq(&StreamType::EnrichmentTables) {
-                                // since enrichment tables have separate permissions
-                                let stream_type_str = format!("{stream_type}");
+                auth_str.to_owned()
+            } else {
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        };
 
-                                object_type.replace(
-                                    "stream:",
-                                    format!(
-                                        "{}:",
-                                        OFGA_MODELS
-                                            .get(stream_type_str.as_str())
-                                            .map_or(stream_type_str.as_str(), |model| model.key)
-                                    )
-                                    .as_str(),
+        // if let Some(auth_header) = req.headers().get("Authorization") {
+        if !auth_str.is_empty() {
+            if (method.eq("POST") && path_columns[1].starts_with("_search"))
+                || path.contains("/prometheus/api/v1/query")
+                || path.contains("/resources")
+                || path.contains("/format_query")
+                || path.contains("/prometheus/api/v1/series")
+                || path.contains("/traces/latest")
+            {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: folder,
+                }));
+            }
+            if object_type.starts_with("stream") {
+                let object_type = match stream_type {
+                    Some(stream_type) => {
+                        if stream_type.eq(&StreamType::EnrichmentTables) {
+                            // since enrichment tables have separate permissions
+                            let stream_type_str = format!("{stream_type}");
+
+                            object_type.replace(
+                                "stream:",
+                                format!(
+                                    "{}:",
+                                    OFGA_MODELS
+                                        .get(stream_type_str.as_str())
+                                        .map_or(stream_type_str.as_str(), |model| model.key)
                                 )
-                            } else if stream_type.eq(&StreamType::Index) {
-                                object_type
-                                    .replace("stream:", format!("{}:", StreamType::Logs).as_str())
-                            } else {
-                                object_type.replace("stream:", format!("{}:", stream_type).as_str())
-                            }
+                                .as_str(),
+                            )
+                        } else if stream_type.eq(&StreamType::Index) {
+                            object_type
+                                .replace("stream:", format!("{}:", StreamType::Logs).as_str())
+                        } else {
+                            object_type.replace("stream:", format!("{}:", stream_type).as_str())
                         }
-                        None => object_type,
-                    };
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: object_type,
-                        org_id,
-                        bypass_check: false,
-                        parent_id: folder,
-                    }));
-                }
-                if object_type.contains("dashboard") {
-                    let object_type = if method.eq("POST") || method.eq("LIST") {
-                        format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(path_columns[1])
-                                .map_or("dfolder", |model| model.parent),
-                            folder.as_str(),
-                        )
-                    } else {
-                        object_type
-                    };
-
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: object_type,
-                        org_id,
-                        bypass_check: false,
-                        parent_id: folder,
-                    }));
-                }
+                    }
+                    None => object_type,
+                };
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: object_type,
+                    org_id,
+                    bypass_check: false,
+                    parent_id: folder,
+                }));
+            }
+            if object_type.contains("dashboard") {
+                let object_type = if method.eq("POST") || method.eq("LIST") {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(path_columns[1])
+                            .map_or("dfolder", |model| model.parent),
+                        folder.as_str(),
+                    )
+                } else {
+                    object_type
+                };
 
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -384,7 +391,17 @@ impl FromRequest for AuthExtractor {
                     parent_id: folder,
                 }));
             }
+
+            return ready(Ok(AuthExtractor {
+                auth: auth_str.to_owned(),
+                method,
+                o2_type: object_type,
+                org_id,
+                bypass_check: false,
+                parent_id: folder,
+            }));
         }
+        //}
         log::info!("AuthExtractor::from_request took {:?}", start.elapsed());
         ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
@@ -393,18 +410,35 @@ impl FromRequest for AuthExtractor {
 
     #[cfg(not(feature = "enterprise"))]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Ok(auth_str) = auth_header.to_str() {
-                return ready(Ok(AuthExtractor {
-                    auth: auth_str.to_owned(),
-                    method: "".to_string(),
-                    o2_type: "".to_string(),
-                    org_id: "".to_string(),
-                    bypass_check: true, // bypass check permissions
-                    parent_id: "".to_string(),
-                }));
+        let auth_str = if let Some(cookie) = req.cookie("access_token") {
+            let access_token = cookie.value().to_string();
+            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+                access_token
+            } else {
+                format!("Bearer {}", access_token)
             }
+        } else if let Some(auth_header) = req.headers().get("Authorization") {
+            if let Ok(auth_str) = auth_header.to_str() {
+                auth_str.to_owned()
+            } else {
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        };
+
+        // if let Some(auth_header) = req.headers().get("Authorization") {
+        if !auth_str.is_empty() {
+            return ready(Ok(AuthExtractor {
+                auth: auth_str.to_owned(),
+                method: "".to_string(),
+                o2_type: "".to_string(),
+                org_id: "".to_string(),
+                bypass_check: true, // bypass check permissions
+                parent_id: "".to_string(),
+            }));
         }
+
         ready(Err(actix_web::error::ErrorUnauthorized(
             "Unauthorized Access",
         )))
