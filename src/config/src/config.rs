@@ -580,14 +580,12 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
-
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = " ;,",
         help = "Characters which should be used as a delimiter to split the string."
     )]
     pub inverted_index_split_chars: String,
-
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -885,6 +883,8 @@ pub struct Nats {
     pub user: String,
     #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
     pub password: String,
+    #[env_config(name = "ZO_NATS_REPLICAS", default = 3)]
+    pub replicas: usize,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
@@ -1388,6 +1388,15 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 #[inline]
 pub fn is_local_disk_storage() -> bool {
     CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
+}
+
+#[inline]
+pub fn get_cluster_name() -> String {
+    if !CONFIG.common.cluster_name.is_empty() {
+        CONFIG.common.cluster_name.to_string()
+    } else {
+        INSTANCE_ID.get("instance_id").unwrap().to_string()
+    }
 }
 
 #[cfg(test)]

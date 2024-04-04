@@ -55,11 +55,12 @@ async fn get_bucket_by_key<'a>(
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
+        num_replicas: CONFIG.nats.replicas,
         history: 3,
         ..Default::default()
     };
-    if bucket_name == "nodes" {
-        // if changed ttl need recreate the bucket\
+    if bucket_name == "nodes" || bucket_name == "clusters" {
+        // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
         bucket.max_age = Duration::from_secs(CONFIG.limit.node_heartbeat_ttl as u64);
     }
