@@ -47,7 +47,6 @@ fn get_cors() -> Rc<Cors> {
             header::ACCEPT,
             header::CONTENT_TYPE,
         ])
-        .allow_any_origin()
         .supports_credentials()
         .max_age(3600);
     Rc::new(cors)
@@ -63,7 +62,6 @@ fn get_cors() -> Rc<Cors> {
             header::ACCEPT,
             header::CONTENT_TYPE,
         ])
-        .allow_any_origin()
         .supports_credentials()
         .max_age(3600);
     Rc::new(cors)
