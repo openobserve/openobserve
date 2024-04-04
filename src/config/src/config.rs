@@ -542,9 +542,10 @@ pub struct Common {
         help = "possible values - 'local', 'remote', 'both'"
     )] // local, remote , both
     pub usage_reporting_mode: String,
-    #[env_config(name = "ZO_USAGE_REPORTING_REMOTE_STREAM_NAME", default = "")]
-    pub usage_reporting_remote_stream_name: String,
-    #[env_config(name = "ZO_USAGE_REPORTING_URL", default = "http://localhost:5080")]
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_URL",
+        default = "http://localhost:5080/api/_meta/usage/_json"
+    )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
     pub usage_reporting_creds: String,

@@ -61,11 +61,6 @@ pub async fn report_request_usage_stats(
     if !CONFIG.common.usage_enabled {
         return;
     }
-    if CONFIG.common.usage_org.eq(org_id)
-        && (stream_name.eq(STATS_STREAM) || stream_name.eq(USAGE_STREAM))
-    {
-        return;
-    }
 
     let request_body = stats.request_body.unwrap_or(usage_type.to_string());
     let user_email = stats.user_email.unwrap_or("".to_owned());
@@ -248,17 +243,10 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     }
 
     if &CONFIG.common.usage_reporting_mode != "local"
-        && !CONFIG.common.usage_reporting_remote_stream_name.is_empty()
         && !CONFIG.common.usage_reporting_url.is_empty()
         && !CONFIG.common.usage_reporting_creds.is_empty()
     {
-        let url = format!(
-            "{}/api/{}/{}/_json",
-            &CONFIG.common.usage_reporting_url,
-            &CONFIG.common.usage_org,
-            &CONFIG.common.usage_reporting_remote_stream_name
-        );
-        let url = url::Url::parse(&url).unwrap();
+        let url = url::Url::parse(&CONFIG.common.usage_reporting_url).unwrap();
         let creds = CONFIG.common.usage_reporting_creds.to_string();
         if let Err(e) = Client::builder()
             .build()
