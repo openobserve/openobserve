@@ -33,6 +33,7 @@ pub fn new_parquet_writer<'a>(
     bloom_filter_fields: &'a [String],
     full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
+    compress: bool,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
         .index_of(&CONFIG.common.column_timestamp)
@@ -46,7 +47,6 @@ pub fn new_parquet_writer<'a>(
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
-        .set_compression(Compression::ZSTD(Default::default()))
         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
         .set_sorting_columns(Some(
@@ -69,6 +69,9 @@ pub fn new_parquet_writer<'a>(
                 metadata.original_size.to_string(),
             ),
         ]));
+    if compress {
+        writer_props = writer_props.set_compression(Compression::ZSTD(Default::default()));
+    }
     for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
         writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
     }
@@ -164,10 +167,14 @@ pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, a
 pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow::Error> {
     let mut meta = FileMeta::default();
     let mut file = tokio::fs::File::open(path).await?;
+    // read the file size
+    let metadata = file.metadata().await?;
+    let compressed_size = metadata.len();
     let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
     if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
         meta = metadata.as_slice().into();
     }
+    meta.compressed_size = compressed_size as i64;
     Ok(meta)
 }
 

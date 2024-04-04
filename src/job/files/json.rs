@@ -331,6 +331,7 @@ async fn upload_file(
         &bloom_filter_fields,
         &full_text_search_fields,
         &file_meta,
+        true,
     );
     for batch in batches {
         writer.write(&batch).await?;
