@@ -1,0 +1,15 @@
+[package]
+name = "proto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prost.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tonic.workspace = true
+
+[build-dependencies]
+tonic-build = { version = "0.9", features = ["prost"] }
+prost-build = "0.11"

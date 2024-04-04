@@ -1,0 +1,14 @@
+.DS_Store
+node_modules
+public/bundle.*
+public/build
+package-lock.json
+yarn.lock
+
+.vscode
+temp
+
+dist
+lib
+
+*.log

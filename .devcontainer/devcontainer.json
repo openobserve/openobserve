@@ -1,0 +1,33 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/debian
+{
+	"name": "Debian",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	// "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+	"build": {
+		"dockerfile": "Dockerfile"
+		// Update 'VARIANT' to pick a Node version: 16, 14, 12.
+		// Append -bookworm or -buster to pin to an OS version.
+		// Use -bookworm variants on local arm64/Apple Silicon.
+		// "args": {
+		// 	"VARIANT": "bookworm"
+		// }
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/rust:1": {},
+		"devwasm.azurecr.io/dev-wasm/dev-wasm-feature/rust-wasi:0": {}
+	},
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [ 5080, 8081 ]
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

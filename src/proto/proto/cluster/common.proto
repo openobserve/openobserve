@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.openobserve.cluster";
+option java_outer_classname = "commonProto";
+
+package cluster;
+
+message EmptyRequest {}
+message EmptyResponse {}
+
+message FileDescriptor {
+    FileMeta   meta      = 1;
+    StreamType file_type = 2;
+}
+
+message FileMeta {
+    int64  min_ts         = 1; // microseconds
+    int64  max_ts         = 2; // microseconds
+    int64 records         = 3;
+    int64 original_size   = 4;
+    int64 compressed_size = 5;
+}
+
+enum StreamType {
+    LOGS     = 0;
+    METRICS  = 1;
+    TRACES   = 2;
+    METADATA = 3;
+    FILELIST = 4;
+}
+
+// Search request type
+enum SearchType {
+    USER     = 0; // user input search request
+    CLUSTER  = 1; // cluster dispatch search request
+    WAL_ONLY = 2; // ingester node just search local wal
+}
+
+// Job information for a request
+message Job {
+    string session_id = 1;
+    string        job = 2;
+    int32       stage = 3;
+    int32   partition = 4;
+}
+
+message ScanStats {
+    int64 files           = 1;
+    int64 records         = 2;
+    int64 original_size   = 3; // unit: MB
+    int64 compressed_size = 4; // unit: MB
+}
+
+message FileList {
+    repeated FileKey items = 1;
+}
+
+message FileKey {
+    string   key     = 1;
+    FileMeta meta    = 2;
+    bool     deleted = 3;
+}

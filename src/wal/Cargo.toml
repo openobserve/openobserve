@@ -1,0 +1,21 @@
+[package]
+name = "wal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bytes.workspace = true
+byteorder.workspace = true
+crc32fast = "1.2.0"
+parking_lot.workspace = true
+snap.workspace = true
+snafu.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["rayon"] }
+
+[[bench]]
+name = "write"
+harness = false

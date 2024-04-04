@@ -1,0 +1,46 @@
+name: 'Feature Request'
+description: Suggest a feature for OpenObserve
+labels: ["✏️ Feature"]
+
+body:
+  - type: dropdown
+    id: affected-packages
+    attributes:
+      label: Which OpenObserve functionalities are relevant/related to the feature request?
+      options:
+        - login
+        - home
+        - log search
+        - dashboards
+        - users
+        - streams
+        - functions
+        - ingestion
+        - alerts
+        - localization
+        - routing
+        - metrics
+        - traces
+        - other
+      multiple: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives-considered
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true

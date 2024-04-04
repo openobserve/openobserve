@@ -1,0 +1,82 @@
+name: API Integration Test
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**.md"
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080/
+
+jobs:
+  api_integration_tests:
+    name: api_integration_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-03-02
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v2
+        with:
+          enable-cache: true
+          working-directory: 'tests/api-testing/'
+          version: '0.27.0'
+
+      - name: Start OpenObserve
+        run: target/debug/openobserve &
+
+      - name: Wait for start
+        run: sleep 15
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Run tests
+        run: rye run pytest --force-sugar
+        working-directory: tests/api-testing/

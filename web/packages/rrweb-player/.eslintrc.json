@@ -1,0 +1,22 @@
+{
+  "extends": ["../../.eslintrc.js"],
+  "rules": {
+    "require-jsdoc": "off",
+    "arrow-parens": "off",
+    "object-curly-spacing": "off",
+    "indent": "off"
+  },
+  "parserOptions": {
+    "extraFileExtensions": [".svelte"]
+  },
+  "plugins": ["svelte3"],
+  "overrides": [
+    {
+      "files": ["*.svelte"],
+      "processor": "svelte3/svelte3"
+    }
+  ],
+  "settings": {
+    "svelte3/typescript": true
+  }
+}

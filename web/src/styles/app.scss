@@ -1,0 +1,116 @@
+.q-w-sm {
+  width: 260px;
+}
+.q-w-md {
+  width: 400px;
+}
+.q-w-lg {
+  width: 600px;
+}
+.q-w-xl {
+  width: 800px;
+}
+.q-w-p50 {
+  min-width: 500px;
+  width: 50vw;
+}
+.q-w-p80 {
+  min-width: 800px;
+  width: 80vw;
+}
+
+.text-decoration-none {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.text-decoration-none:hover {
+  text-decoration: underline;
+}
+
+.bg-white {
+  background-color: white;
+}
+
+.border-bottom {
+  border-bottom: 1px solid $border-color;
+}
+
+.border-right {
+  border-right: 1px solid $border-color;
+}
+
+// For Dashboard draggable color change
+.displayDiv .vue-grid-item.vue-grid-placeholder {
+  background: #b1b5e5 !important;
+}
+
+.confirmBody {
+  padding: 11px 1.375rem 0;
+  font-size: 0.875rem;
+  text-align: center;
+  font-weight: 700;
+
+  .head {
+    line-height: 2.125rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .para {
+    color: $light-text;
+  }
+}
+
+.confirmActions {
+  justify-content: center;
+  padding: 1.25rem 1.375rem 1.625rem;
+  display: flex;
+
+  .q-btn {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}
+.q-position-engine {
+  z-index: 6001;
+}
+
+.tabContent {
+  background-color: rgba(136, 136, 136, 0.103);
+  // tab content bg color
+  padding: 0px 10px;
+  border-radius: 0.5rem;
+  &__head {
+    justify-content: end;
+    display: flex;
+    .title {
+      line-height: 1rem;
+      font-weight: bold;
+      font-size: 16px;
+      padding-top: 10px;
+    }
+    .copy_action {
+      .q-btn {
+        justify-content: end;
+        font-size: 8px;
+        padding: 10px 0px 0px 0px;
+        min-width: 0px;
+        min-height: 0px;
+        line-height: 0px;
+        float: inline-end;
+        position: absolute;
+        right: 30px;
+      }
+    }
+  }
+  pre {
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    line-height: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    max-width: 96%;
+  }
+}

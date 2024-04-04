@@ -1,0 +1,10 @@
+version: '3'
+services:
+  pyroscope:
+    image: pyroscope/pyroscope:latest
+    environment:
+      - PYROSCOPE_LOG_LEVEL=debug
+    ports:
+      - '4040:4040'
+    command:
+      - 'server'

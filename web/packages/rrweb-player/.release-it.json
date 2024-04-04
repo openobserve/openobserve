@@ -1,0 +1,5 @@
+{
+  "non-interactive": false,
+  "buildCommand": "npm run build",
+  "requireCleanWorkingDir": false
+}

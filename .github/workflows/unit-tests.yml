@@ -1,0 +1,54 @@
+name: Unit tests
+
+on:
+  push:
+    branches:
+      - "main"
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "**.md" 
+
+env:
+  COLUMNS: 150
+
+jobs:
+  build:
+
+    runs-on: 
+      labels: ubicloud-standard-8
+
+    steps:
+
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-03-02
+          targets: x86_64-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
+
+      
+      - name: Simulate building frontend code
+        run: mkdir -p web/dist && touch web/dist/index.html
+      
+      - name: Print rustc cfg
+        run: rustc --print cfg
+
+      - name: Setup cargo config
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -A clippy::question-mark -D warnings
+
+      - name: Run unit tests
+        run: ./coverage.sh
+      
