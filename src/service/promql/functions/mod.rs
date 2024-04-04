@@ -13,8 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub(crate) use absent::absent;
+pub(crate) use absent_over_time::absent_over_time;
+pub(crate) use avg_over_time::avg_over_time;
+pub(crate) use changes::changes;
+pub(crate) use clamp::clamp;
+pub(crate) use count_over_time::count_over_time;
 use datafusion::error::{DataFusionError, Result};
+pub(crate) use delta::delta;
+pub(crate) use deriv::deriv;
+pub(crate) use histogram::histogram_quantile;
+pub(crate) use holt_winters::holt_winters;
+pub(crate) use idelta::idelta;
+pub(crate) use increase::increase;
+pub(crate) use irate::irate;
+pub(crate) use label_join::label_join;
+pub(crate) use label_replace::label_replace;
+pub(crate) use last_over_time::last_over_time;
+pub(crate) use math_operations::*;
+pub(crate) use max_over_time::max_over_time;
+pub(crate) use min_over_time::min_over_time;
+pub(crate) use predict_linear::predict_linear;
+pub(crate) use quantile_over_time::quantile_over_time;
+pub(crate) use rate::rate;
+pub(crate) use resets::resets;
+pub(crate) use stddev_over_time::stddev_over_time;
+pub(crate) use stdvar_over_time::stdvar_over_time;
+use strum::EnumString;
+pub(crate) use sum_over_time::sum_over_time;
+pub(crate) use time_operations::*;
+pub(crate) use vector::vector;
 
+use super::value::LabelsExt;
 use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 mod absent;
@@ -45,38 +75,6 @@ mod stdvar_over_time;
 mod sum_over_time;
 mod time_operations;
 mod vector;
-
-pub(crate) use absent::absent;
-pub(crate) use absent_over_time::absent_over_time;
-pub(crate) use avg_over_time::avg_over_time;
-pub(crate) use changes::changes;
-pub(crate) use clamp::clamp;
-pub(crate) use count_over_time::count_over_time;
-pub(crate) use delta::delta;
-pub(crate) use deriv::deriv;
-pub(crate) use histogram::histogram_quantile;
-pub(crate) use holt_winters::holt_winters;
-pub(crate) use idelta::idelta;
-pub(crate) use increase::increase;
-pub(crate) use irate::irate;
-pub(crate) use label_join::label_join;
-pub(crate) use label_replace::label_replace;
-pub(crate) use last_over_time::last_over_time;
-pub(crate) use math_operations::*;
-pub(crate) use max_over_time::max_over_time;
-pub(crate) use min_over_time::min_over_time;
-pub(crate) use predict_linear::predict_linear;
-pub(crate) use quantile_over_time::quantile_over_time;
-pub(crate) use rate::rate;
-pub(crate) use resets::resets;
-pub(crate) use stddev_over_time::stddev_over_time;
-pub(crate) use stdvar_over_time::stdvar_over_time;
-use strum::EnumString;
-pub(crate) use sum_over_time::sum_over_time;
-pub(crate) use time_operations::*;
-pub(crate) use vector::vector;
-
-use super::value::LabelsExt;
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]

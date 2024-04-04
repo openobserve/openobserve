@@ -211,7 +211,6 @@ export default defineComponent({
             // });
           });
       } catch (e) {
-        console.error(e);
         // throw errorE("Request failed.");
       }
     }
@@ -267,7 +266,6 @@ export default defineComponent({
 
         return req;
       } catch (e) {
-        console.error(e);
         // throw new ErrorException(e.message);
       }
     }

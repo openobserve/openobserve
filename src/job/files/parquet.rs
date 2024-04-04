@@ -93,6 +93,20 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
             continue;
         };
+        if parquet_meta.eq(&FileMeta::default()) {
+            log::warn!(
+                "[INGESTER:JOB] the file is empty, just delete file: {}",
+                file
+            );
+            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file)).await {
+                log::error!(
+                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                    file,
+                    e
+                );
+            }
+            continue;
+        }
         let file = Path::new(&file)
             .canonicalize()
             .unwrap()

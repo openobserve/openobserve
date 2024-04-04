@@ -14,16 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::json;
-use infra::{db as infra_db, errors::Error};
+use infra::errors::Error;
 
-use crate::common::meta::saved_view::{
-    CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
+use crate::{
+    common::meta::saved_view::{
+        CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
+    },
+    service::db,
 };
 
 pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 
 pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Error> {
-    let db = &infra_db::get_db().await;
     let view_id = config::ider::uuid();
     let view = View {
         org_id: org_id.into(),
@@ -32,10 +34,10 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         view_name: view.view_name.clone(),
     };
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
-    db.put(
+    db::put(
         &key,
         json::to_vec(&view).unwrap().into(),
-        infra_db::NO_NEED_WATCH,
+        db::NO_NEED_WATCH,
         None,
     )
     .await?;
@@ -48,8 +50,6 @@ pub async fn update_view(
     view_id: &str,
     view: &UpdateViewRequest,
 ) -> Result<View, Error> {
-    let db = &infra_db::get_db().await;
-
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
     let updated_view = match get_view(org_id, view_id).await {
         Ok(original_view) => View {
@@ -59,10 +59,10 @@ pub async fn update_view(
         },
         Err(e) => return Err(e),
     };
-    db.put(
+    db::put(
         &key,
         json::to_vec(&updated_view).unwrap().into(),
-        infra_db::NO_NEED_WATCH,
+        db::NO_NEED_WATCH,
         None,
     )
     .await?;
@@ -71,9 +71,8 @@ pub async fn update_view(
 
 /// Get the saved view id associated with an org_id
 pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
-    let db = &infra_db::get_db().await;
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
-    let ret = db.get(&key).await?;
+    let ret = db::get(&key).await?;
     let view = json::from_slice(&ret).unwrap();
     Ok(view)
 }
@@ -81,9 +80,8 @@ pub async fn get_view(org_id: &str, view_id: &str) -> Result<View, Error> {
 /// Return all the saved views but query limited data only, associated with a
 /// provided org_id This will not contain the payload.
 pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error> {
-    let db = &infra_db::get_db().await;
     let key = format!("{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id);
-    let ret = db.list_values(&key).await?;
+    let ret = db::list_values(&key).await?;
     let mut views: Vec<ViewWithoutData> = ret
         .iter()
         .map(|view| json::from_slice(view).unwrap())
@@ -97,9 +95,7 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
 // pub async fn delete_view(org_id: &str, view_id: &str) -> Result<View, Error>
 // {
 pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
-    let db = &infra_db::get_db().await;
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
-    db.delete(&key, false, infra_db::NO_NEED_WATCH, None)
-        .await?;
+    db::delete(&key, false, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
