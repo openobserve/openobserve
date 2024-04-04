@@ -16,7 +16,6 @@
 use std::sync::Arc;
 
 use config::{meta::stream::StreamType, RwHashSet};
-use infra::db as infra_db;
 use once_cell::sync::Lazy;
 
 use crate::service::db;
@@ -55,7 +54,7 @@ pub async fn delete_stream(
     let db_key = format!("/compact/delete/{key}");
     CACHE.insert(key);
 
-    Ok(db::put(&db_key, "OK".into(), db::NEED_WATCH).await?)
+    Ok(db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?)
 }
 
 // set the stream is processing by the node
@@ -68,7 +67,7 @@ pub async fn process_stream(
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
-    Ok(db::put(&db_key, node.to_string().into(), db::NEED_WATCH).await?)
+    Ok(db::put(&db_key, node.to_string().into(), db::NEED_WATCH, None).await?)
 }
 
 // get the stream processing information
@@ -126,7 +125,7 @@ pub async fn list() -> Result<Vec<String>, anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/compact/delete/";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching stream deleting");
@@ -139,15 +138,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 CACHE.insert(item_key.to_string());
             }
-            infra_db::Event::Delete(ev) => {
+            db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 CACHE.remove(item_key);
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())

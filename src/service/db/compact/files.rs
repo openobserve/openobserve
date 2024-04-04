@@ -41,6 +41,10 @@ pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str
         return val.clone();
     }
     drop(r);
+<<<<<<< HEAD
+=======
+
+>>>>>>> main
     let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
@@ -72,7 +76,7 @@ pub async fn set_offset(
     let key = mk_key(org_id, stream_type, stream_name);
     let Some(node) = node else {
         // release this key from this node
-        db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH).await?;
+        db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
         let mut w = CACHES.write().await;
         w.remove(&key);
         drop(w);
@@ -127,7 +131,7 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
             } else {
                 offset.to_string()
             };
-            db::put(key, val.into(), db::NO_NEED_WATCH).await?;
+            db::put(key, val.into(), db::NO_NEED_WATCH, None).await?;
         }
     }
     Ok(())

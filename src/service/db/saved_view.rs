@@ -34,7 +34,13 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
         view_name: view.view_name.clone(),
     };
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
-    db::put(&key, json::to_vec(&view).unwrap().into(), db::NO_NEED_WATCH).await?;
+    db::put(
+        &key,
+        json::to_vec(&view).unwrap().into(),
+        db::NO_NEED_WATCH,
+        None,
+    )
+    .await?;
     Ok(view)
 }
 
@@ -57,6 +63,7 @@ pub async fn update_view(
         &key,
         json::to_vec(&updated_view).unwrap().into(),
         db::NO_NEED_WATCH,
+        None,
     )
     .await?;
     Ok(updated_view)
@@ -89,6 +96,6 @@ pub async fn get_views_list_only(org_id: &str) -> Result<ViewsWithoutData, Error
 // {
 pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     let key = format!("{}/{}/{}", SAVED_VIEWS_KEY_PREFIX, org_id, view_id);
-    db::delete(&key, false, db::NO_NEED_WATCH).await?;
+    db::delete(&key, false, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }

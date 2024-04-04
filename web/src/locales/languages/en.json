@@ -104,7 +104,8 @@
     "noRecordFound": "No records found. Please adjust filters and try again.",
     "functionErrorLabel": "Function not applied: (expand for more details)",
     "histogramErrorBtnLabel": "Click for error details",
-    "applySearch": "Adjust filter parameters and click 'Run query'."
+    "applySearch": "Adjust filter parameters and click 'Run query'.",
+    "searchSavedView": "Search Saved View"
   },
   "menu": {
     "home": "Home",
@@ -132,7 +133,8 @@
     "billings": "Billing",
     "rum": "Real User Monitoring",
     "settings": "Settings",
-    "iam": "IAM"
+    "iam": "IAM",
+    "report": "Reports"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -805,5 +807,21 @@
     "deleteLogo": "Delete Logo",
     "logo": "Logo",
     "customLogoText": "Custom Logo Text"
+  },
+  "reports": {
+    "header": "Reports",
+    "add": "Add Report",
+    "search": "Search report",
+    "update": "Update Report",
+    "dashboardFolder": "Folder",
+    "dashboard": "Dashboard",
+    "dashboardTab": "Dashboard Tab",
+    "recipients": "Recipients",
+    "name": "Report name",
+    "replyTo": "Reply-to email address",
+    "title": "Title",
+    "description": "Description",
+    "cron": "Cron Job",
+    "cronExpression": "Cron expression"
   }
 }

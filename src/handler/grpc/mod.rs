@@ -13,20 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{
-    ider,
-    meta::stream::{FileKey, FileMeta},
-    utils::json,
-};
+use config::ider;
+use proto::cluster_rpc;
 
 use crate::{common::meta, service::promql};
 
 pub mod auth;
 pub mod request;
-
-pub mod cluster_rpc {
-    tonic::include_proto!("cluster");
-}
 
 impl From<meta::search::Request> for cluster_rpc::SearchRequest {
     fn from(req: meta::search::Request) -> Self {
@@ -68,50 +61,6 @@ impl From<meta::search::Request> for cluster_rpc::SearchRequest {
             stream_type: "".to_string(),
             timeout: req.timeout,
             work_group: "".to_string(),
-        }
-    }
-}
-
-impl From<&FileMeta> for cluster_rpc::FileMeta {
-    fn from(req: &FileMeta) -> Self {
-        cluster_rpc::FileMeta {
-            min_ts: req.min_ts,
-            max_ts: req.max_ts,
-            records: req.records,
-            original_size: req.original_size,
-            compressed_size: req.compressed_size,
-        }
-    }
-}
-
-impl From<&cluster_rpc::FileMeta> for FileMeta {
-    fn from(req: &cluster_rpc::FileMeta) -> Self {
-        FileMeta {
-            min_ts: req.min_ts,
-            max_ts: req.max_ts,
-            records: req.records,
-            original_size: req.original_size,
-            compressed_size: req.compressed_size,
-        }
-    }
-}
-
-impl From<&FileKey> for cluster_rpc::FileKey {
-    fn from(req: &FileKey) -> Self {
-        cluster_rpc::FileKey {
-            key: req.key.clone(),
-            meta: Some(cluster_rpc::FileMeta::from(&req.meta)),
-            deleted: req.deleted,
-        }
-    }
-}
-
-impl From<&cluster_rpc::FileKey> for FileKey {
-    fn from(req: &cluster_rpc::FileKey) -> Self {
-        FileKey {
-            key: req.key.clone(),
-            meta: FileMeta::from(req.meta.as_ref().unwrap()),
-            deleted: req.deleted,
         }
     }
 }
@@ -198,34 +147,11 @@ impl From<&cluster_rpc::ScanStats> for meta::stream::ScanStats {
     }
 }
 
-impl From<Vec<json::Value>> for cluster_rpc::UsageData {
-    fn from(usages: Vec<json::Value>) -> Self {
-        Self {
-            data: json::to_vec(&usages).unwrap(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
     use super::*;
-
-    #[tokio::test]
-    async fn test_get_file_meta() {
-        let file_meta = FileMeta {
-            min_ts: 1667978841110,
-            max_ts: 1667978845354,
-            records: 300,
-            original_size: 10,
-            compressed_size: 1,
-        };
-
-        let rpc_meta = cluster_rpc::FileMeta::from(&file_meta);
-        let resp = FileMeta::from(&rpc_meta);
-        assert_eq!(file_meta, resp);
-    }
 
     #[tokio::test]
     async fn test_search_convert() {

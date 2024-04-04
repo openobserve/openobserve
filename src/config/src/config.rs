@@ -15,6 +15,12 @@
 
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
+use chromiumoxide::{
+    browser::BrowserConfig,
+    detection::{default_executable, DetectionOptions},
+    fetcher::{BrowserFetcher, BrowserFetcherOptions},
+    handler::viewport::Viewport,
+};
 use dotenv_config::EnvConfig;
 use dotenvy::dotenv;
 use hashbrown::{HashMap, HashSet};
@@ -168,6 +174,87 @@ pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     )
 });
 
+static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =
+    tokio::sync::OnceCell::const_new();
+
+pub async fn get_chrome_launch_options() -> &'static Option<BrowserConfig> {
+    CHROME_LAUNCHER_OPTIONS
+        .get_or_init(init_chrome_launch_options)
+        .await
+}
+
+async fn init_chrome_launch_options() -> Option<BrowserConfig> {
+    if !CONFIG.chrome.chrome_enabled {
+        None
+    } else {
+        let mut browser_config = BrowserConfig::builder()
+            .window_size(
+                CONFIG.chrome.chrome_window_width,
+                CONFIG.chrome.chrome_window_height,
+            )
+            .viewport(Viewport {
+                width: CONFIG.chrome.chrome_window_width,
+                height: CONFIG.chrome.chrome_window_height,
+                device_scale_factor: Some(1.0),
+                ..Viewport::default()
+            });
+
+        if CONFIG.chrome.chrome_no_sandbox {
+            browser_config = browser_config.no_sandbox();
+        }
+
+        if !CONFIG.chrome.chrome_path.is_empty() {
+            browser_config = browser_config.chrome_executable(CONFIG.chrome.chrome_path.as_str());
+        } else {
+            let mut should_download = false;
+
+            if !CONFIG.chrome.chrome_check_default {
+                should_download = true;
+            } else {
+                // Check if chrome is available on default paths
+                // 1. Check the CHROME env
+                // 2. Check usual chrome file names in user path
+                // 3. (Windows) Registry
+                // 4. (Windows & MacOS) Usual installations paths
+                if let Ok(exec_path) = default_executable(DetectionOptions::default()) {
+                    browser_config = browser_config.chrome_executable(exec_path);
+                } else {
+                    should_download = true;
+                }
+            }
+            if should_download {
+                // Download known good chrome version
+                let download_path = &CONFIG.chrome.chrome_download_path;
+                log::info!("fetching chrome at: {download_path}");
+                tokio::fs::create_dir_all(download_path).await.unwrap();
+                let fetcher = BrowserFetcher::new(
+                    BrowserFetcherOptions::builder()
+                        .with_path(download_path)
+                        .build()
+                        .unwrap(),
+                );
+
+                // Fetches the browser revision, either locally if it was previously
+                // installed or remotely. Returns error when the download/installation
+                // fails. Since it doesn't retry on network errors during download,
+                // if the installation fails, it might leave the cache in a bad state
+                // and it is advised to wipe it.
+                // Note: Does not work on LinuxArm platforms.
+                let info = fetcher
+                    .fetch()
+                    .await
+                    .expect("chrome could not be downloaded");
+                log::info!(
+                    "chrome fetched at path {:#?}",
+                    info.executable_path.as_path()
+                );
+                browser_config = browser_config.chrome_executable(info.executable_path);
+            }
+        }
+        Some(browser_config.build().unwrap())
+    }
+}
+
 pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy::new(|| {
     if !CONFIG.smtp.smtp_enabled {
         None
@@ -196,6 +283,9 @@ pub static SMTP_CLIENT: Lazy<Option<AsyncSmtpTransport<Tokio1Executor>>> = Lazy:
     }
 });
 
+pub static BLOCKED_STREAMS: Lazy<Vec<&str>> =
+    Lazy::new(|| CONFIG.common.blocked_streams.split(',').collect());
+
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
@@ -211,13 +301,33 @@ pub struct Config {
     pub etcd: Etcd,
     pub nats: Nats,
     pub sled: Sled,
-    pub dynamo: Dynamo,
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
     pub profiling: Pyroscope,
     pub smtp: Smtp,
     pub rum: RUM,
+    pub chrome: Chrome,
+}
+
+#[derive(EnvConfig)]
+pub struct Chrome {
+    #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
+    pub chrome_enabled: bool,
+    #[env_config(name = "ZO_CHROME_PATH", default = "")]
+    pub chrome_path: String,
+    #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
+    pub chrome_check_default: bool,
+    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
+    pub chrome_download_path: String,
+    #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
+    pub chrome_no_sandbox: bool,
+    #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
+    pub chrome_sleep_secs: u16,
+    #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
+    pub chrome_window_width: u32,
+    #[env_config(name = "ZO_CHROME_WINDOW_HEIGHT", default = 730)]
+    pub chrome_window_height: u32,
 }
 
 #[derive(EnvConfig)]
@@ -257,6 +367,8 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+    #[env_config(name = "ZO_COOKIE_SAME_SITE_LAX", default = true)]
+    pub cookie_same_site_lax: bool,
 }
 
 #[derive(EnvConfig)]
@@ -301,6 +413,8 @@ pub struct TCP {
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
+    #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
+    pub max_connections: usize,
     // zo1-openobserve-ingester.ziox-dev.svc.cluster.local
     #[env_config(name = "ZO_INGESTER_SERVICE_URL", default = "")]
     pub ingester_srv_url: String,
@@ -484,6 +598,14 @@ pub struct Common {
         help = "Show docs count and stream dates"
     )]
     pub show_stream_dates_doc_num: bool,
+    #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
+    pub blocked_streams: String,
+    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
+    pub infer_schema_per_request: bool,
+    #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]
+    pub report_user_name: String,
+    #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
+    pub report_user_password: String,
 }
 
 #[derive(EnvConfig)]
@@ -514,6 +636,8 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
+    #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
+    pub file_push_limit: usize,
     #[env_config(name = "ZO_FILE_MOVE_THREAD_NUM", default = 0)]
     pub file_move_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
@@ -554,12 +678,24 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 5)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 10)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
+    pub alert_schedule_concurrency: i64,
+    #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
+    pub alert_schedule_timeout: i64,
+    #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
+    pub report_schedule_timeout: i64,
+    #[env_config(name = "ZO_SCHEDULER_MAX_RETRIES", default = 3)]
+    pub scheduler_max_retries: i32,
+    #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
+    pub scheduler_clean_interval: u64,
+    #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
+    pub scheduler_watch_interval: u64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
@@ -576,6 +712,10 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
+    #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
+    pub distinct_values_interval: u64,
+    #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
+    pub distinct_values_hourly: bool,
 }
 
 #[derive(EnvConfig)]
@@ -584,6 +724,8 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 60)] // seconds
     pub interval: u64,
+    #[env_config(name = "ZO_COMPACT_LOOKBACK_HOURS", default = 0)] // hours
+    pub lookback_hours: i64,
     #[env_config(name = "ZO_COMPACT_STEP_SECS", default = 3600)] // seconds
     pub step_secs: i64,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 1800)] // seconds
@@ -617,6 +759,10 @@ pub struct MemoryCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 10)] // MB
+    pub gc_size: usize,
+    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 0)] // seconds
+    pub gc_interval: u64,
     // MB, default is 50% of system memory
     #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
     pub datafusion_max_size: usize,
@@ -641,6 +787,10 @@ pub struct DiskCache {
     // MB, when cache is full will release how many data once time, default is 1% of max_size
     #[env_config(name = "ZO_DISK_CACHE_RELEASE_SIZE", default = 0)]
     pub release_size: usize,
+    #[env_config(name = "ZO_DISK_CACHE_GC_SIZE", default = 10)] // MB
+    pub gc_size: usize,
+    #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 0)] // seconds
+    pub gc_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -731,19 +881,6 @@ pub struct Nats {
     pub lock_wait_timeout: u64,
 }
 
-#[derive(EnvConfig)]
-pub struct Dynamo {
-    #[env_config(name = "ZO_META_DYNAMO_PREFIX", default = "")] // default set to s3 bucket name
-    pub prefix: String,
-    pub file_list_table: String,
-    pub file_list_deleted_table: String,
-    pub stream_stats_table: String,
-    pub org_meta_table: String,
-    pub meta_table: String,
-    pub schema_table: String,
-    pub compact_table: String,
-}
-
 #[derive(Debug, EnvConfig)]
 pub struct S3 {
     #[env_config(name = "ZO_S3_PROVIDER", default = "")]
@@ -832,6 +969,12 @@ pub fn init() -> Config {
     if cfg.limit.file_move_thread_num == 0 {
         cfg.limit.file_move_thread_num = cpu_num * 2;
     }
+    if cfg.limit.file_push_interval == 0 {
+        cfg.limit.file_push_interval = 10;
+    }
+    if cfg.limit.file_push_limit == 0 {
+        cfg.limit.file_push_limit = 100_000;
+    }
 
     if cfg.limit.sql_min_db_connections == 0 {
         cfg.limit.sql_min_db_connections = cpu_num as u32
@@ -874,11 +1017,6 @@ pub fn init() -> Config {
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
-    }
-
-    // check dynamo config
-    if let Err(e) = check_dynamo_config(&mut cfg) {
-        panic!("dynamo config error: {e}");
     }
 
     cfg
@@ -1113,6 +1251,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.memory_cache.release_size *= 1024 * 1024;
     }
+    if cfg.memory_cache.gc_size == 0 {
+        cfg.memory_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+    } else {
+        cfg.memory_cache.gc_size *= 1024 * 1024;
+    }
     if cfg.memory_cache.datafusion_max_size == 0 {
         cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size;
     } else {
@@ -1191,6 +1334,11 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.disk_cache.release_size *= 1024 * 1024;
     }
+    if cfg.disk_cache.gc_size == 0 {
+        cfg.disk_cache.gc_size = 10 * 1024 * 1024; // 10 MB
+    } else {
+        cfg.disk_cache.gc_size *= 1024 * 1024;
+    }
     Ok(())
 }
 
@@ -1221,25 +1369,6 @@ fn check_s3_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.s3.provider.eq("swift") {
         std::env::set_var("AWS_EC2_METADATA_DISABLED", "true");
     }
-
-    Ok(())
-}
-
-fn check_dynamo_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.common.meta_store.starts_with("dynamo") && cfg.dynamo.prefix.is_empty() {
-        cfg.dynamo.prefix = if cfg.s3.bucket_name.is_empty() {
-            "default".to_string()
-        } else {
-            cfg.s3.bucket_name.clone()
-        };
-    }
-    cfg.dynamo.file_list_table = format!("{}-file-list", cfg.dynamo.prefix);
-    cfg.dynamo.file_list_deleted_table = format!("{}-file-list-deleted", cfg.dynamo.prefix);
-    cfg.dynamo.stream_stats_table = format!("{}-stream-stats", cfg.dynamo.prefix);
-    cfg.dynamo.org_meta_table = format!("{}-org-meta", cfg.dynamo.prefix);
-    cfg.dynamo.meta_table = format!("{}-meta", cfg.dynamo.prefix);
-    cfg.dynamo.schema_table = format!("{}-schema", cfg.dynamo.prefix);
-    cfg.dynamo.compact_table = format!("{}-compact", cfg.dynamo.prefix);
 
     Ok(())
 }

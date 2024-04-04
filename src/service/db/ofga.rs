@@ -42,8 +42,14 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                     let mut loc_meta = meta.clone();
                     loc_meta.store_id = store_id;
                     loc_meta.model = None;
-                    match db::put(key, json::to_vec(&loc_meta).unwrap().into(), db::NEED_WATCH)
-                        .await
+
+                    match db::put(
+                        key,
+                        json::to_vec(&loc_meta).unwrap().into(),
+                        db::NEED_WATCH,
+                        None,
+                    )
+                    .await
                     {
                         Ok(_) => Ok(loc_meta.store_id),
                         Err(e) => Err(anyhow::anyhow!(e)),
@@ -60,7 +66,15 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
                 let mut loc_meta = meta.clone();
                 loc_meta.store_id = store_id;
                 loc_meta.model = None;
-                match db::put(key, json::to_vec(&loc_meta).unwrap().into(), db::NEED_WATCH).await {
+
+                match db::put(
+                    key,
+                    json::to_vec(&loc_meta).unwrap().into(),
+                    db::NEED_WATCH,
+                    None,
+                )
+                .await
+                {
                     Ok(_) => Ok(loc_meta.store_id),
                     Err(e) => Err(anyhow::anyhow!(e)),
                 }

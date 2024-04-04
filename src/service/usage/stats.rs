@@ -26,6 +26,7 @@ use config::{
 };
 use infra::dist_lock;
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use reqwest::Client;
 
 use super::ingestion_service;
@@ -34,7 +35,6 @@ use crate::{
         infra::cluster::get_node_by_uuid,
         meta::{self, search::Request},
     },
-    handler::grpc::cluster_rpc,
     service::{db, search as SearchService},
 };
 
@@ -278,13 +278,13 @@ pub async fn set_last_stats_offset(
         offset.to_string()
     };
     let key = format!("/stats/last_updated/org/{org_id}");
-    db::put(&key, val.into(), db::NO_NEED_WATCH).await?;
+    db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn _set_cache_expiry(offset: i64) -> Result<(), anyhow::Error> {
     let key = "/stats/cache_expiry".to_string();
-    db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH).await?;
+    db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 

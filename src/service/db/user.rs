@@ -91,7 +91,13 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
 
 pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     let key = format!("/user/{}", user.email);
-    db::put(&key, json::to_vec(&user).unwrap().into(), db::NEED_WATCH).await?;
+    db::put(
+        &key,
+        json::to_vec(&user).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?;
 
     // cache user
     for org in user.organizations {
@@ -123,7 +129,7 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
 
 pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/user/{name}");
-    match db::delete(&key, false, db::NEED_WATCH).await {
+    match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting user: {}", e);
@@ -266,7 +272,7 @@ pub async fn root_user_exists() -> bool {
 
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/user/";
-    db::delete(key, true, db::NO_NEED_WATCH).await?;
+    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 

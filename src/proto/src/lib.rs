@@ -13,26 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::StreamType;
-
-use super::db;
-use crate::common::meta::alerts::triggers::Trigger;
-
-pub async fn save(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    alert_name: &str,
-    trigger: &Trigger,
-) -> Result<(), anyhow::Error> {
-    db::alerts::triggers::set(org_id, stream_type, stream_name, alert_name, trigger).await
+pub mod cluster_rpc {
+    tonic::include_proto!("cluster");
 }
 
-pub async fn delete(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    alert_name: &str,
-) -> Result<(), anyhow::Error> {
-    db::alerts::triggers::delete(org_id, stream_type, stream_name, alert_name).await
+pub mod prometheus_rpc {
+    include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
+}
+
+impl From<Vec<serde_json::Value>> for cluster_rpc::UsageData {
+    fn from(usages: Vec<serde_json::Value>) -> Self {
+        Self {
+            data: serde_json::to_vec(&usages).unwrap(),
+        }
+    }
 }

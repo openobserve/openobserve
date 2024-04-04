@@ -27,7 +27,14 @@ use crate::{
 
 pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
-    match db::put(&key, json::to_vec(js_func).unwrap().into(), db::NEED_WATCH).await {
+    match db::put(
+        &key,
+        json::to_vec(js_func).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
+    {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error saving function: {}", e);
@@ -45,7 +52,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
-    match db::delete(&key, false, db::NEED_WATCH).await {
+    match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting function: {}", e);
@@ -164,8 +171,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/function/";
-    db::delete(key, true, db::NO_NEED_WATCH).await?;
+    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     let key = "/transform/";
-    db::delete(key, true, db::NO_NEED_WATCH).await?;
+    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }

@@ -26,7 +26,7 @@ pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow:
 #[tracing::instrument(skip(folder))]
 pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::Error> {
     let key = format!("/folders/{org_id}/{}", folder.folder_id);
-    match db::put(&key, json::to_vec(&folder)?.into(), db::NO_NEED_WATCH).await {
+    match db::put(&key, json::to_vec(&folder)?.into(), db::NO_NEED_WATCH, None).await {
         Ok(_) => Ok(folder),
         Err(_) => Err(anyhow::anyhow!("Failed to save folder")),
     }
@@ -45,5 +45,5 @@ pub(crate) async fn list(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
 #[tracing::instrument]
 pub(crate) async fn delete(org_id: &str, folder_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("/folders/{org_id}/{folder_id}");
-    Ok(db::delete(&key, false, db::NO_NEED_WATCH).await?)
+    Ok(db::delete(&key, false, db::NO_NEED_WATCH, None).await?)
 }

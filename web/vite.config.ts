@@ -91,9 +91,14 @@ export default defineConfig({
     __VUE_I18N_FULL_INSTALL__: true,
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
+    __INTLIFY_JIT_COMPILATION__: true,
   },
   server: {
     port: 8081,
+    // headers: {
+    //   "Content-Security-Policy":
+    //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
+    // },
   },
   base: "./",
   plugins: [

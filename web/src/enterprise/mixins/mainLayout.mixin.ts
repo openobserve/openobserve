@@ -1,11 +1,12 @@
-import { ref } from "vue";
+import { ref, markRaw } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 
-import { useLocalToken, getUserInfo, getImageURL } from "@/utils/zincutils";
+import { getUserInfo, getImageURL } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
+import FunctionIcon from "@/components/icons/FunctionIcon.vue";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -25,8 +26,9 @@ const MainLayoutCloudMixin = {
       // });
       linksList.value.splice(5, 0, {
         title: t("menu.function"),
-        icon: "img:" + getImageURL("images/common/function.svg"),
+        iconComponent: markRaw(FunctionIcon),
         link: "/functions",
+        name: 'functions',
       });
       linksList.value.splice(10, 0, {
         title: t("menu.billings"),
@@ -140,7 +142,6 @@ const MainLayoutCloudMixin = {
       userService
         .getRefreshToken()
         .then((res) => {
-          useLocalToken(res.data.data.id_token);
           const sessionUserInfo: any = getUserInfo(
             "#id_token=" + res.data.data.id_token
           );

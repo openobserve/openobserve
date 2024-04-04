@@ -15,18 +15,16 @@
 
 use anyhow::Error;
 use config::CONFIG;
+use proto::cluster_rpc;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 
-use crate::{
-    common::infra::cluster,
-    handler::grpc::cluster_rpc::{self, UsageResponse},
-};
+use crate::common::infra::cluster;
 
 pub async fn ingest(
     dest_org_id: &str,
     req: cluster_rpc::UsageRequest,
-) -> Result<UsageResponse, Error> {
+) -> Result<cluster_rpc::UsageResponse, Error> {
     let mut nodes = cluster::get_cached_online_ingester_nodes().await.unwrap();
     nodes.sort_by_key(|x| x.id);
 
@@ -77,7 +75,9 @@ pub async fn ingest(
     );
     client = client
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
     let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
         Ok(res) => res.into_inner(),
         Err(err) => {

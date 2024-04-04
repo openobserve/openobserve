@@ -15,9 +15,10 @@
 
 use std::io::Error;
 
-use actix_web::{get, put, web, HttpRequest, HttpResponse};
+use actix_web::{cookie::Cookie, get, http::header, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
+    meta::cluster::NodeStatus,
     utils::json,
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -30,7 +31,6 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    actix_web::http::header,
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
@@ -81,6 +81,7 @@ struct ConfigResponse<'a> {
     custom_docs_url: String,
     rum: Rum,
     custom_logo_img: Option<String>,
+    custom_hide_menus: String,
 }
 
 #[derive(Serialize)]
@@ -110,6 +111,34 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(HealthzResponse {
         status: "ok".to_string(),
     }))
+}
+
+/// Healthz of the node for scheduled status
+#[utoipa::path(
+    path = "/schedulez",
+    tag = "Meta",
+    responses(
+        (status = 200, description="Staus OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "ok"})),
+        (status = 404, description="Staus Not OK", content_type = "application/json", body = HealthzResponse, example = json!({"status": "not ok"})),
+    )
+)]
+#[get("/schedulez")]
+pub async fn schedulez() -> Result<HttpResponse, Error> {
+    let node_id = LOCAL_NODE_UUID.clone();
+    let Some(node) = cluster::get_node_by_uuid(&node_id).await else {
+        return Ok(HttpResponse::NotFound().json(HealthzResponse {
+            status: "not ok".to_string(),
+        }));
+    };
+    Ok(if node.scheduled && node.status == NodeStatus::Online {
+        HttpResponse::Ok().json(HealthzResponse {
+            status: "ok".to_string(),
+        })
+    } else {
+        HttpResponse::NotFound().json(HealthzResponse {
+            status: "not ok".to_string(),
+        })
+    })
 }
 
 #[get("")]
@@ -148,6 +177,11 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let logo = None;
 
+    #[cfg(feature = "enterprise")]
+    let custom_hide_menus = &O2_CONFIG.common.custom_hide_menus;
+    #[cfg(not(feature = "enterprise"))]
+    let custom_hide_menus = "";
+
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: VERSION.to_string(),
         instance: INSTANCE_ID.get("instance_id").unwrap().to_string(),
@@ -176,6 +210,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,
+        custom_hide_menus: custom_hide_menus.to_string(),
         rum: Rum {
             enabled: CONFIG.rum.enabled,
             client_token: CONFIG.rum.client_token.to_string(),
@@ -303,8 +338,31 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
+
+            let mut access_token_cookie = Cookie::new("access_token", token);
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(true);
+            access_token_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                access_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                access_token_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
+
+            let mut refresh_token_cookie = Cookie::new("refresh_token", login_data.refresh_token);
+            refresh_token_cookie.set_http_only(true);
+            refresh_token_cookie.set_secure(true);
+            refresh_token_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                refresh_token_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
+
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
+                .cookie(access_token_cookie)
+                .cookie(refresh_token_cookie)
                 .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
@@ -340,8 +398,52 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
         Ok(token_response) => HttpResponse::Ok().json(token_response),
-        Err(_) => HttpResponse::Unauthorized().finish(),
+        Err(_) => {
+            let mut access_cookie = Cookie::new("access_token", "");
+            access_cookie.set_http_only(true);
+            access_cookie.set_secure(true);
+            access_cookie.set_path("/");
+
+            if CONFIG.auth.cookie_same_site_lax {
+                access_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                access_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
+            let mut refresh_cookie = Cookie::new("refresh_token", "");
+            refresh_cookie.set_http_only(true);
+            refresh_cookie.set_secure(true);
+            refresh_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax)
+            } else {
+                refresh_cookie.set_same_site(actix_web::cookie::SameSite::None)
+            };
+            HttpResponse::Unauthorized()
+                .append_header((header::LOCATION, "/"))
+                .cookie(access_cookie)
+                .cookie(refresh_cookie)
+                .finish()
+        }
     }
+}
+
+#[get("/logout")]
+async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
+    let mut access_cookie = Cookie::new("access_token", "");
+    access_cookie.set_http_only(true);
+    access_cookie.set_secure(true);
+    access_cookie.set_path("/");
+    access_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+    let mut refresh_cookie = Cookie::new("refresh_token", "");
+    refresh_cookie.set_http_only(true);
+    refresh_cookie.set_secure(true);
+    refresh_cookie.set_path("/");
+    refresh_cookie.set_same_site(actix_web::cookie::SameSite::Lax);
+    HttpResponse::Ok()
+        .append_header((header::LOCATION, "/"))
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .finish()
 }
 
 #[put("/enable")]

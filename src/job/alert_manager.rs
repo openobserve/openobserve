@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster;
-#[cfg(feature = "enterprise")]
+ #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use config::{cluster, config::CONFIG};
+use infra::scheduler;
 use tokio::time;
 
 use crate::service;
@@ -24,7 +25,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::is_alert_manager(&cluster::LOCAL_NODE_ROLE) {
         return Ok(());
     }
-    // check super cluster
+     // check super cluster
     #[cfg(feature = "enterprise")]
     if O2_CONFIG.super_cluster.enabled {
         let cluster_name =
@@ -43,7 +44,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
         )
         .await?;
     }
-
+ 
+    scheduler::init(
+        CONFIG.limit.scheduler_clean_interval,
+        CONFIG.limit.scheduler_watch_interval,
+    )
+    .await?;
+ 
     // should run it every 10 seconds
     let mut interval = time::interval(time::Duration::from_secs(30));
     interval.tick().await; // trigger the first run

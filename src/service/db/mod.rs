@@ -38,12 +38,21 @@ pub mod version;
 
 pub(crate) use infra_db::{get_coordinator, Event, NEED_WATCH, NO_NEED_WATCH};
 
+
+#[inline]
 pub(crate) async fn get(key: &str) -> Result<Bytes> {
     let db = infra_db::get_db().await;
     db.get(key).await
 }
-
-pub(crate) async fn put(key: &str, value: Bytes, need_watch: bool) -> Result<()> {
+ 
+ 
+#[inline]
+pub(crate) async fn put(
+    key: &str,
+    value: Bytes,
+    need_watch: bool,
+    start_dt: Option<i64>,
+) -> Result<()> {
     // super cluster
     #[cfg(feature = "enterprise")]
     if O2_CONFIG.super_cluster.enabled {
@@ -53,39 +62,69 @@ pub(crate) async fn put(key: &str, value: Bytes, need_watch: bool) -> Result<()>
     }
 
     let db = infra_db::get_db().await;
-    db.put(key, value, need_watch).await
+    db.put(key, value, need_watch, start_dt).await
 }
 
-pub(crate) async fn delete(key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
+#[inline]
+pub(crate) async fn get_for_update(
+    key: &str,
+    need_watch: bool,
+    start_dt: Option<i64>,
+    update_fn: Box<infra_db::UpdateFn>,
+) -> Result<()> { 
+       // super cluster
+       #[cfg(feature = "enterprise")]
+       if O2_CONFIG.super_cluster.enabled {
+           o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch)
+               .await
+               .map_err(|e| Error::Message(e.to_string()))?;
+       }
+       
+
     let db = infra_db::get_db().await;
-    db.delete(key, with_prefix, need_watch).await?;
+    db.get_for_update(key, need_watch, start_dt, update_fn)
+        .await
+}
 
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-    }
+#[inline]
+pub(crate) async fn delete(
+    key: &str,
+    with_prefix: bool,
+    need_watch: bool,
+    start_dt: Option<i64>,
+) -> Result<()> {
+       // super cluster
+       #[cfg(feature = "enterprise")]
+       if O2_CONFIG.super_cluster.enabled {
+           o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch)
+               .await
+               .map_err(|e| Error::Message(e.to_string()))?;
+       }
 
+    let db = infra_db::get_db().await;
+    db.delete(key, with_prefix, need_watch, start_dt).await?;
     Ok(())
 }
 
+#[inline]
 pub(crate) async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
     let db = infra_db::get_db().await;
     db.delete_if_exists(key, with_prefix, need_watch).await
 }
 
+#[inline]
 pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
     let db = infra_db::get_db().await;
     db.list(prefix).await
 }
 
+#[inline]
 pub(crate) async fn list_keys(prefix: &str) -> Result<Vec<String>> {
     let db = infra_db::get_db().await;
     db.list_keys(prefix).await
 }
 
+#[inline]
 pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
     let db = infra_db::get_db().await;
     db.list_values(prefix).await

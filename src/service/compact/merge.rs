@@ -52,6 +52,13 @@ pub async fn merge_by_stream(
 ) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
 
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] start",
+        org_id,
+        stream_type,
+        stream_name,
+    );
+
     // get last compacted offset
     let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -96,6 +103,15 @@ pub async fn merge_by_stream(
     if offset == 0 {
         return Ok(()); // no data
     }
+
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] offset: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        offset
+    );
+
     let offset = offset;
     let offset_time: DateTime<Utc> = Utc.timestamp_nanos(offset * 1000);
     let offset_time_hour = Utc
@@ -171,7 +187,7 @@ pub async fn merge_by_stream(
                 offset_time_hour + Duration::try_hours(1).unwrap().num_microseconds().unwrap() - 1,
             )
         };
-    let files = file_list::query(
+    let mut files = file_list::query(
         org_id,
         stream_name,
         stream_type,
@@ -182,6 +198,42 @@ pub async fn merge_by_stream(
     )
     .await
     .map_err(|e| anyhow::anyhow!("query file list failed: {}", e))?;
+
+    // check lookback files
+    if CONFIG.compact.lookback_hours > 0 {
+        let lookback_offset = Duration::try_hours(CONFIG.compact.lookback_hours)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let lookback_offset_start = partition_offset_start - lookback_offset;
+        let mut lookback_offset_end = partition_offset_end - lookback_offset;
+        if lookback_offset_end > partition_offset_start {
+            // the lookback period is overlap with current period
+            lookback_offset_end = partition_offset_start;
+        }
+        let lookback_files = file_list::query(
+            org_id,
+            stream_name,
+            stream_type,
+            partition_time_level,
+            lookback_offset_start,
+            lookback_offset_end,
+            true,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("query lookback file list failed: {}", e))?;
+        files.extend(lookback_files);
+    }
+
+    log::debug!(
+        "[COMPACTOR] merge_by_stream [{}/{}/{}] time range: [{},{}], files: {}",
+        org_id,
+        stream_type,
+        stream_name,
+        partition_offset_start,
+        partition_offset_end,
+        files.len(),
+    );
 
     if files.is_empty() {
         // this hour is no data, and check if pass allowed_upto, then just write new
@@ -253,12 +305,6 @@ pub async fn merge_by_stream(
                     }
                 };
                 if new_file_name.is_empty() {
-                    if CONFIG.common.print_key_event {
-                        log::info!(
-                            "[COMPACTOR] processing merge for {org_id}/{stream_type}/{stream_name}, new merge file is empty, new_file_list is {}",
-                            new_file_list.len()
-                        );
-                    }
                     if new_file_list.is_empty() {
                         // no file need to merge
                         break;
@@ -509,15 +555,27 @@ async fn merge_files(
     let mut fts_buf = Vec::new();
     let (mut new_file_meta, _) = datafusion::exec::merge_parquet_files(
         tmp_dir.name(),
+        stream_type,
+        stream_name,
         &mut buf,
-        schema,
+        schema.clone(),
         &bloom_filter_fields,
         &full_text_search_fields,
         new_file_size,
-        stream_type,
         &mut fts_buf,
     )
-    .await?;
+    .await
+    .map_err(|e| {
+        let files = tmp_dir.list("all").unwrap();
+        let files = files.into_iter().map(|f| f.location).collect::<Vec<_>>();
+        log::error!(
+            "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
+            e,
+            files,
+            schema
+        );
+        DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
+    })?;
     new_file_meta.original_size = new_file_size;
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.records == 0 {
@@ -580,7 +638,7 @@ async fn merge_files(
                         );
                     }
                 } else {
-                    log::error!(
+                    log::warn!(
                         "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
                         retain_file_list
                     );

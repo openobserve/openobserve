@@ -41,13 +41,14 @@ pub async fn set(org_id: &str, destination: &Destination) -> Result<(), anyhow::
         &key,
         json::to_vec(destination).unwrap().into(),
         db::NEED_WATCH,
+        None,
     )
     .await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/destinations/{org_id}/{name}");
-    Ok(db::delete(&key, false, db::NEED_WATCH).await?)
+    Ok(db::delete(&key, false, db::NEED_WATCH, None).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {

@@ -73,6 +73,9 @@ const users = {
   getRoles: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/users/roles`);
   },
+ logout: () => {
+    return http().get(`/config/logout`);
+  },
 };
 
 export default users;

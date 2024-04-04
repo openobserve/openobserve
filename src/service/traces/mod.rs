@@ -45,8 +45,12 @@ use crate::{
         traces::{Event, Span, SpanRefType},
     },
     service::{
-        db, distinct_values, format_stream_name,
+        db, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
+        metadata::{
+            distinct_values::DvItem, trace_list_index::TraceListItem, write, MetadataItem,
+            MetadataType,
+        },
         schema::{check_for_schema, stream_schema_exists, SchemaCache},
         stream::unwrap_partition_time_level,
         usage::report_request_usage_stats,
@@ -160,6 +164,7 @@ pub async fn handle_trace_request(
 
     let mut service_name: String = traces_stream_name.to_string();
     let res_spans = request.resource_spans;
+    let mut trace_index = Vec::with_capacity(res_spans.len());
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let resource = res_span.resource.unwrap();
@@ -288,17 +293,25 @@ pub async fn handle_trace_request(
                             } else {
                                 ("".to_string(), "".to_string())
                             };
-                            distinct_values.push(distinct_values::DvItem {
+                            distinct_values.push(MetadataItem::DistinctValues(DvItem {
                                 stream_type: StreamType::Traces,
                                 stream_name: traces_stream_name.to_string(),
                                 field_name: field.to_string(),
                                 field_value: val.to_string(),
                                 filter_name,
                                 filter_value,
-                            });
+                            }));
                         }
                     }
                 }
+
+                // build trace metadata
+                trace_index.push(MetadataItem::TraceListIndexer(TraceListItem {
+                    stream_name: traces_stream_name.to_string(),
+                    service_name: service_name.clone(),
+                    trace_id,
+                    _timestamp: start_time / 1000,
+                }));
 
                 // check schema
                 let _ = check_for_schema(
@@ -306,7 +319,7 @@ pub async fn handle_trace_request(
                     &traces_stream_name,
                     StreamType::Traces,
                     &mut traces_schema_map,
-                    &record_val,
+                    vec![&record_val],
                     timestamp.try_into().unwrap(),
                 )
                 .await;
@@ -374,7 +387,14 @@ pub async fn handle_trace_request(
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = distinct_values::write(org_id, distinct_values).await {
+        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, distinct_values).await {
+            log::error!("Error while writing distinct values: {}", e);
+        }
+    }
+
+    // send trace metadata
+    if !trace_index.is_empty() {
+        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }

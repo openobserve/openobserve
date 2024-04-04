@@ -28,6 +28,7 @@ pub async fn set(id: &str) -> Result<()> {
         "/instance/",
         json::to_vec(&id).unwrap().into(),
         super::NO_NEED_WATCH,
+        None,
     )
     .await
 }

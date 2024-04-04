@@ -23,10 +23,10 @@ use config::CONFIG;
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use infra::{cache::tmpfs, errors::Result};
 use promql_parser::parser;
+use proto::cluster_rpc;
 
 use crate::{
     common::meta::stream::ScanStats,
-    handler::grpc::cluster_rpc,
     service::{
         promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
         search,

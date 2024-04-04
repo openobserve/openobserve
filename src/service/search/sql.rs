@@ -27,6 +27,7 @@ use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
 use once_cell::sync::Lazy;
+use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +39,6 @@ use crate::{
             stream::{StreamParams, StreamPartition},
         },
     },
-    handler::grpc::cluster_rpc,
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
 };
 

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::time::Duration;
-
 use ::config::{meta::cluster::Role, utils::rand::get_rand_element, CONFIG};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
@@ -57,8 +55,9 @@ fn is_fixed_querier_route(path: &str) -> bool {
 pub async fn config(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
+    dispatch(req, payload, client).await
 }
 
 #[route(
@@ -71,8 +70,9 @@ pub async fn config(
 pub async fn config_paths(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
+    dispatch(req, payload, client).await
 }
 
 #[route(
@@ -85,8 +85,9 @@ pub async fn config_paths(
 pub async fn api(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
+    dispatch(req, payload, client).await
 }
 
 #[route(
@@ -99,8 +100,9 @@ pub async fn api(
 pub async fn aws(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
+    dispatch(req, payload, client).await
 }
 
 #[route(
@@ -113,8 +115,9 @@ pub async fn aws(
 pub async fn gcp(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
+    dispatch(req, payload, client).await
 }
 
 #[route(
@@ -125,26 +128,18 @@ pub async fn gcp(
 pub async fn rum(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    dispatch(req, payload).await
+    dispatch(req, payload, client).await
 }
 
 async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,
+    client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
-
-    let client = awc::Client::builder()
-        .connector(
-            awc::Connector::new()
-                .timeout(Duration::from_secs(CONFIG.route.timeout))
-                .limit(0),
-        )
-        .timeout(Duration::from_secs(CONFIG.route.timeout))
-        .disable_redirects()
-        .finish();
 
     // send query
     let new_url = get_url(path).await;

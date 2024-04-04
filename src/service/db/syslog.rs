@@ -31,6 +31,7 @@ pub async fn toggle_syslog_setting(enabled: bool) -> Result<(), anyhow::Error> {
         "/syslog/enabled",
         json::to_vec(&json::Value::Bool(enabled)).unwrap().into(),
         db::NEED_WATCH,
+        None,
     )
     .await?)
 }
@@ -50,6 +51,7 @@ pub async fn set(route: &SyslogRoute) -> Result<(), anyhow::Error> {
         &format!("/syslog/route/{}", route.id),
         json::to_vec(route).unwrap().into(),
         db::NEED_WATCH,
+        None,
     )
     .await?)
 }
@@ -62,7 +64,7 @@ pub async fn get(id: &str) -> Result<SyslogRoute, anyhow::Error> {
 
 #[tracing::instrument(name = "service:db:syslog:delete")]
 pub async fn delete(id: &str) -> Result<(), anyhow::Error> {
-    Ok(db::delete(&format!("/syslog/route/{id}"), false, db::NEED_WATCH).await?)
+    Ok(db::delete(&format!("/syslog/route/{id}"), false, db::NEED_WATCH, None).await?)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

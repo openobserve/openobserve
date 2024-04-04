@@ -25,7 +25,13 @@ use crate::{
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let key = format!("/metrics_members/{cluster}");
-    Ok(db::put(&key, Bytes::from(members.join(",")), db::NO_NEED_WATCH).await?)
+    Ok(db::put(
+        &key,
+        Bytes::from(members.join(",")),
+        db::NO_NEED_WATCH,
+        None,
+    )
+    .await?)
 }
 
 pub async fn set_prom_cluster_leader(
@@ -33,7 +39,14 @@ pub async fn set_prom_cluster_leader(
     leader: &ClusterLeader,
 ) -> Result<(), anyhow::Error> {
     let key = format!("/metrics_leader/{cluster}");
-    match db::put(&key, json::to_vec(&leader).unwrap().into(), db::NEED_WATCH).await {
+    match db::put(
+        &key,
+        json::to_vec(&leader).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
+    {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error updating cluster_leader: {}", e);

@@ -31,6 +31,7 @@ use infra::{
 };
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
+use proto::prometheus_rpc;
 
 use crate::{
     common::{
@@ -53,10 +54,6 @@ use crate::{
         usage::report_request_usage_stats,
     },
 };
-
-pub(crate) mod prometheus {
-    include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
-}
 
 pub async fn remote_write(
     org_id: &str,
@@ -99,7 +96,7 @@ pub async fn remote_write(
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {}", e.to_string()))?;
-    let request = prometheus::WriteRequest::decode(bytes::Bytes::from(decoded))
+    let request = prometheus_rpc::WriteRequest::decode(bytes::Bytes::from(decoded))
         .map_err(|e| anyhow::anyhow!("Invalid protobuf: {}", e.to_string()))?;
 
     // parse metadata
@@ -332,7 +329,7 @@ pub async fn remote_write(
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
-                    val_map,
+                    vec![val_map],
                     timestamp,
                 )
                 .await

@@ -27,13 +27,13 @@ pub async fn get_offset() -> Result<i64, anyhow::Error> {
 
 pub async fn set_offset(offset: i64) -> Result<(), anyhow::Error> {
     let key = "/compact/file_list/offset";
-    db::put(key, offset.to_string().into(), db::NO_NEED_WATCH).await?;
+    db::put(key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
 pub async fn set_delete(key: &str) -> Result<(), anyhow::Error> {
     let key = format!("/compact/file_list/delete/{key}");
-    db::put(&key, "OK".into(), db::NO_NEED_WATCH).await?;
+    db::put(&key, "OK".into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 
@@ -64,7 +64,7 @@ pub async fn get_process(offset: i64) -> String {
 
 pub async fn set_process(offset: i64, node: &str) -> Result<(), anyhow::Error> {
     let key = format!("/compact/file_list/process/{offset}");
-    db::put(&key, node.to_string().into(), db::NO_NEED_WATCH).await?;
+    db::put(&key, node.to_string().into(), db::NO_NEED_WATCH, None).await?;
     Ok(())
 }
 

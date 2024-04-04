@@ -52,5 +52,5 @@ pub async fn set_offset(
     } else {
         offset.to_string()
     };
-    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH).await?)
+    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }

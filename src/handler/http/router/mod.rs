@@ -57,7 +57,6 @@ fn get_cors() -> Rc<Cors> {
 #[cfg(not(feature = "enterprise"))]
 fn get_cors() -> Rc<Cors> {
     let cors = Cors::default()
-        .send_wildcard()
         .allowed_methods(vec!["HEAD", "GET", "POST", "PUT", "OPTIONS", "DELETE"])
         .allowed_headers(vec![
             header::AUTHORIZATION,
@@ -65,6 +64,7 @@ fn get_cors() -> Rc<Cors> {
             header::CONTENT_TYPE,
         ])
         .allow_any_origin()
+        .supports_credentials()
         .max_age(3600);
     Rc::new(cors)
 }
@@ -110,7 +110,7 @@ async fn proxy(
 
 pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(status::healthz);
+    cfg.service(status::healthz).service(status::schedulez);
     cfg.service(
         web::scope("/auth")
             .wrap(cors.clone())
@@ -195,7 +195,8 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
             .service(status::zo_config)
             .service(status::redirect)
             .service(status::dex_login)
-            .service(status::refresh_token_with_dex),
+            .service(status::refresh_token_with_dex)
+            .service(status::logout),
     );
 }
 
@@ -288,6 +289,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(dashboards::folders::update_folder)
             .service(dashboards::folders::get_folder)
             .service(dashboards::folders::delete_folder)
+            .service(dashboards::reports::create_report)
+            .service(dashboards::reports::update_report)
+            .service(dashboards::reports::get_report)
+            .service(dashboards::reports::list_reports)
+            .service(dashboards::reports::delete_report)
+            .service(dashboards::reports::enable_report)
+            .service(dashboards::reports::trigger_report)
             .service(alerts::save_alert)
             .service(alerts::update_alert)
             .service(alerts::get_alert)

@@ -24,10 +24,11 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
+use proto::cluster_rpc;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::{common::meta::stream::ScanStats, handler::grpc::cluster_rpc, service::db};
+use crate::{common::meta::stream::ScanStats, service::db};
 
 mod storage;
 mod wal;

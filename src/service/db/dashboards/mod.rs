@@ -22,6 +22,7 @@ use crate::{
 };
 
 pub mod folders;
+pub mod reports;
 
 #[tracing::instrument]
 pub(crate) async fn get(
@@ -72,7 +73,8 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH).await {
+
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v1: Some(dash),
                 version: 1,
@@ -87,7 +89,7 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH).await {
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v2: Some(dash),
                 version: 2,
@@ -102,7 +104,7 @@ pub(crate) async fn put(
             return Err(anyhow::anyhow!("Dashboard should have title"));
         };
         dash.dashboard_id = dashboard_id.to_string();
-        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH).await {
+        match db::put(&key, json::to_vec(&dash)?.into(), db::NO_NEED_WATCH, None).await {
             Ok(_) => Ok(Dashboard {
                 v3: Some(dash),
                 version: 3,
@@ -154,11 +156,11 @@ pub(crate) async fn delete(
     folder: &str,
 ) -> Result<(), anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
-    Ok(db::delete(&key, false, db::NO_NEED_WATCH).await?)
+    Ok(db::delete(&key, false, db::NO_NEED_WATCH, None).await?)
 }
 
 #[tracing::instrument]
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH).await?)
+    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }

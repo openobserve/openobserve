@@ -47,12 +47,18 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
 pub async fn set(org_id: &str, template: &mut Template) -> Result<(), anyhow::Error> {
     template.is_default = Some(org_id == DEFAULT_ORG);
     let key = format!("/templates/{org_id}/{}", template.name);
-    Ok(db::put(&key, json::to_vec(template).unwrap().into(), db::NEED_WATCH).await?)
+    Ok(db::put(
+        &key,
+        json::to_vec(template).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/templates/{org_id}/{name}");
-    Ok(db::delete(&key, false, db::NEED_WATCH).await?)
+    Ok(db::delete(&key, false, db::NEED_WATCH, None).await?)
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {

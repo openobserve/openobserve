@@ -34,7 +34,13 @@ pub const ORG_KEY_PREFIX: &str = "/organization/org";
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
-    db::put(&key, json::to_vec(&setting).unwrap().into(), db::NEED_WATCH).await?;
+    db::put(
+        &key,
+        json::to_vec(&setting).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?;
 
     // cache the org setting
     ORGANIZATION_SETTING
@@ -115,7 +121,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
     let key = format!("{ORG_KEY_PREFIX}/{}", org.identifier);
-    match db::put(&key, json::to_vec(org).unwrap().into(), db::NEED_WATCH).await {
+    match db::put(
+        &key,
+        json::to_vec(org).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
+    {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error saving function: {}", e);
@@ -133,7 +146,7 @@ pub async fn get(org_id: &str) -> Result<Organization, anyhow::Error> {
 
 pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
     let key = format!("{ORG_KEY_PREFIX}/{}", org_id);
-    match db::delete(&key, false, db::NEED_WATCH).await {
+    match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting function: {}", e);

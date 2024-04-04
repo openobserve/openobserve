@@ -27,12 +27,9 @@ mod tests {
         handler::http::router::*,
     };
     use prost::Message;
+    use proto::prometheus_rpc;
 
     static START: Once = Once::new();
-
-    pub mod prometheus_prot {
-        include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
-    }
 
     fn setup() -> (&'static str, &'static str) {
         START.call_once(|| {
@@ -911,54 +908,54 @@ mod tests {
     async fn e2e_post_metrics() {
         let auth = setup();
 
-        let loc_lable: Vec<prometheus_prot::Label> = vec![
-            prometheus_prot::Label {
+        let loc_lable: Vec<prometheus_rpc::Label> = vec![
+            prometheus_rpc::Label {
                 name: "__name__".to_string(),
                 value: "grafana_api_dashboard_save_milliseconds_count".to_string(),
             },
-            prometheus_prot::Label {
+            prometheus_rpc::Label {
                 name: "cluster".to_string(),
                 value: "prom-k8s".to_string(),
             },
-            prometheus_prot::Label {
+            prometheus_rpc::Label {
                 name: "__replica__".to_string(),
                 value: "prom-k8s-0".to_string(),
             },
         ];
 
-        let mut loc_samples: Vec<prometheus_prot::Sample> = vec![];
+        let mut loc_samples: Vec<prometheus_rpc::Sample> = vec![];
 
         for i in 1..2 {
-            loc_samples.push(prometheus_prot::Sample {
+            loc_samples.push(prometheus_rpc::Sample {
                 value: i as f64,
                 timestamp: Utc::now().timestamp_micros(),
             });
         }
-        loc_samples.push(prometheus_prot::Sample {
+        loc_samples.push(prometheus_rpc::Sample {
             value: f64::NEG_INFINITY,
             timestamp: Utc::now().timestamp_micros(),
         });
-        loc_samples.push(prometheus_prot::Sample {
+        loc_samples.push(prometheus_rpc::Sample {
             value: f64::INFINITY,
             timestamp: Utc::now().timestamp_micros(),
         });
 
-        loc_samples.push(prometheus_prot::Sample {
+        loc_samples.push(prometheus_rpc::Sample {
             value: f64::NAN,
             timestamp: Utc::now().timestamp_micros(),
         });
-        let loc_exemp: Vec<prometheus_prot::Exemplar> = vec![];
-        let loc_hist: Vec<prometheus_prot::Histogram> = vec![];
+        let loc_exemp: Vec<prometheus_rpc::Exemplar> = vec![];
+        let loc_hist: Vec<prometheus_rpc::Histogram> = vec![];
 
-        let ts = prometheus_prot::TimeSeries {
+        let ts = prometheus_rpc::TimeSeries {
             labels: loc_lable,
             samples: loc_samples,
             exemplars: loc_exemp,
             histograms: loc_hist,
         };
 
-        let metadata: Vec<prometheus_prot::MetricMetadata> = vec![];
-        let wr_req: prometheus_prot::WriteRequest = prometheus_prot::WriteRequest {
+        let metadata: Vec<prometheus_rpc::MetricMetadata> = vec![];
+        let wr_req: prometheus_rpc::WriteRequest = prometheus_rpc::WriteRequest {
             timeseries: vec![ts],
             metadata,
         };

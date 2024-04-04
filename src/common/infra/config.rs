@@ -26,6 +26,7 @@ use vector_enrichment::TableRegistry;
 use crate::{
     common::meta::{
         alerts,
+        dashboards::reports,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
         organization::OrganizationSetting,
@@ -65,19 +66,17 @@ pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<alerts::Alert>>> =
     Lazy::new(Default::default);
-pub static TRIGGERS: Lazy<RwAHashMap<String, alerts::triggers::Trigger>> =
-    Lazy::new(Default::default);
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, alerts::templates::Template>> =
     Lazy::new(Default::default);
 pub static ALERTS_DESTINATIONS: Lazy<RwHashMap<String, alerts::destinations::Destination>> =
+    Lazy::new(Default::default);
+pub static DASHBOARD_REPORTS: Lazy<RwHashMap<String, reports::Report>> =
     Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));
-pub static LOCAL_SCHEMA_LOCKER: Lazy<Arc<RwAHashMap<String, Arc<tokio::sync::RwLock<bool>>>>> =
-    Lazy::new(|| Arc::new(Default::default)());
 
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<tokio::sync::RwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(None)));
