@@ -300,7 +300,6 @@ pub struct Config {
     pub log: Log,
     pub etcd: Etcd,
     pub nats: Nats,
-    pub sled: Sled,
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
@@ -835,14 +834,6 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
-#[derive(EnvConfig)]
-pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
-    pub data_dir: String,
-    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
-    pub prefix: String,
-}
-
 #[derive(Debug, EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
@@ -1021,11 +1012,6 @@ pub fn init() -> Config {
         panic!("etcd config error: {e}");
     }
 
-    // check sled config
-    if let Err(e) = check_sled_config(&mut cfg) {
-        panic!("sled config error: {e}");
-    }
-
     // check s3 config
     if let Err(e) = check_s3_config(&mut cfg) {
         panic!("s3 config error: {e}");
@@ -1179,12 +1165,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
     }
-    if cfg.sled.data_dir.is_empty() {
-        cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
-    }
-    if !cfg.sled.data_dir.ends_with('/') {
-        cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
-    }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
     }
@@ -1222,20 +1202,6 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             name = name.split(':').collect::<Vec<&str>>()[0].to_string();
         }
         cfg.etcd.domain_name = name;
-    }
-
-    Ok(())
-}
-
-fn check_sled_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.sled.data_dir.is_empty() {
-        cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
-    }
-    if !cfg.sled.data_dir.ends_with('/') {
-        cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
-    }
-    if !cfg.sled.prefix.is_empty() && !cfg.sled.prefix.ends_with('/') {
-        cfg.sled.prefix = format!("{}/", cfg.sled.prefix);
     }
 
     Ok(())
@@ -1445,7 +1411,6 @@ mod tests {
         cfg.common.data_dir = "/abc".to_string();
         cfg.common.data_wal_dir = "/abc".to_string();
         cfg.common.data_stream_dir = "/abc".to_string();
-        cfg.sled.data_dir = "/abc/".to_string();
         cfg.common.base_uri = "/abc/".to_string();
         let ret = check_path_config(&mut cfg);
         assert!(ret.is_ok());

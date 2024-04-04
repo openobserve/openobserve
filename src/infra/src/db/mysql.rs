@@ -168,11 +168,27 @@ impl super::Db for MysqlDb {
             lock_key, CONFIG.limit.meta_transaction_lock_timeout
         );
         let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_key);
-        if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] rollback get_for_update error: {}", e);
+        match sqlx::query_scalar::<_, i64>(&lock_sql)
+            .fetch_one(&mut *tx)
+            .await
+        {
+            Ok(v) => {
+                if v != 1 {
+                    if let Err(e) = tx.rollback().await {
+                        log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                    }
+                    return Err(Error::from(DbError::DBOperError(
+                        "LockTimeout".to_string(),
+                        key.to_string(),
+                    )));
+                }
             }
-            return Err(e.into());
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[MYSQL] rollback get_for_update error: {}", e);
+                }
+                return Err(e.into());
+            }
         };
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(

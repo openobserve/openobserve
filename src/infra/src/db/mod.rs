@@ -54,7 +54,7 @@ async fn default() -> Box<dyn Db> {
     if !CONFIG.common.local_mode
         && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
     {
-        panic!("cluster mode is not supported for ZO_META_STORE=sled/sqlite");
+        panic!("cluster mode is not supported for ZO_META_STORE=sqlite");
     }
 
     match CONFIG.common.meta_store.as_str().into() {
