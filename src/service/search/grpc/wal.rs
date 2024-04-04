@@ -74,9 +74,7 @@ pub async fn search_parquet(
             }
         };
     if schema_versions.is_empty() {
-        return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-            sql.stream_name.clone(),
-        )));
+        return Ok((HashMap::new(), ScanStats::new()));
     }
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
