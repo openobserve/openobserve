@@ -2240,38 +2240,46 @@ const useLogs = () => {
     streamName: string
   ) => {
     // Parse the SQL query into an AST
-    const parsedQuery: any = parser.astify(sql);
+    try {
+      const parsedQuery: any = parser.astify(sql);
 
-    // Check for the presence of an ORDER BY clause
-    const hasOrderBy = !!(
-      parsedQuery.orderby && parsedQuery.orderby.length > 0
-    );
+      if (!parsedQuery.columns.length || !parsedQuery.from) {
+        return sql;
+      }
 
-    // Check if _timestamp is in the SELECT clause if not SELECT *
-    const includesTimestamp = !!parsedQuery.columns.find(
-      (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
-    );
+      // Check for the presence of an ORDER BY clause
+      const hasOrderBy = !!(
+        parsedQuery.orderby && parsedQuery.orderby.length > 0
+      );
 
-    // If ORDER BY is present and doesn't include _timestamp, append it
-    if (!hasOrderBy) {
-      // If no ORDER BY clause, add it
-      parsedQuery.orderby = [
-        {
-          expr: {
-            type: "column_ref",
-            table: null,
-            column: column,
+      // Check if _timestamp is in the SELECT clause if not SELECT *
+      const includesTimestamp = !!parsedQuery.columns.find(
+        (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
+      );
+
+      // If ORDER BY is present and doesn't include _timestamp, append it
+      if (!hasOrderBy) {
+        // If no ORDER BY clause, add it
+        parsedQuery.orderby = [
+          {
+            expr: {
+              type: "column_ref",
+              table: null,
+              column: column,
+            },
+            type: type,
           },
-          type: type,
-        },
-      ];
-    }
+        ];
+      }
 
-    // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-    return quoteTableNameDirectly(
-      parser.sqlify(parsedQuery).replace(/`/g, ""),
-      streamName
-    );
+      // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
+      return quoteTableNameDirectly(
+        parser.sqlify(parsedQuery).replace(/`/g, ""),
+        streamName
+      );
+    } catch (err) {
+      return sql;
+    }
   };
 
   function quoteTableNameDirectly(sql: string, streamName: string) {
