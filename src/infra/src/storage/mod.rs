@@ -25,6 +25,7 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
 pub static LOCAL_CACHE: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_cache);
+pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
 
 /// Returns the default object store based on the configuration.
 /// If the local disk storage is enabled, it creates a local object store.
@@ -50,6 +51,11 @@ fn default() -> Box<dyn ObjectStore> {
 fn local_cache() -> Box<dyn ObjectStore> {
     std::fs::create_dir_all(&CONFIG.common.data_cache_dir).expect("create cache dir success");
     Box::new(local::Local::new(&CONFIG.common.data_cache_dir))
+}
+
+fn local_wal() -> Box<dyn ObjectStore> {
+    std::fs::create_dir_all(&CONFIG.common.data_wal_dir).expect("create wal dir success");
+    Box::new(local::Local::new(&CONFIG.common.data_wal_dir))
 }
 
 pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
