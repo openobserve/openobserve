@@ -725,11 +725,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return (
-      searchObj.meta.sqlMode &&
-      parsedSQL.groupby == null &&
-      !hasAggregation(parsedSQL.columns)
-    );
+    return !(parsedSQL.groupby || hasAggregation(parsedSQL.columns));
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1122,6 +1118,21 @@ const useLogs = () => {
             searchObj.data.resultGrid.currentPage == 1)
         ) {
           getHistogramQueryData(searchObj.data.histogramQuery);
+        } else if (!isNonAggregatedQuery(parsedSQL)) {
+          searchObj.data.histogram = {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+              unparsed_x_data: [],
+              timezone: "",
+            },
+            errorCode: 0,
+            errorMsg: "Histogram is not available for aggregation queries.",
+            errorDetail: "",
+          };
+        } else {
+          console.log("Histogram is not available for aggregation queries.");
         }
       } else {
         searchObj.loading = false;
@@ -1135,6 +1146,7 @@ const useLogs = () => {
 
   function hasAggregation(columns: any) {
     for (const column of columns) {
+      console.log(column);
       if (column.expr && column.expr.type === "aggr_func") {
         return true; // Found aggregation function or non-null groupby property
       }
