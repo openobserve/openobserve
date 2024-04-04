@@ -47,7 +47,7 @@ pub fn new_parquet_writer<'a>(
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
         .set_compression(Compression::ZSTD(Default::default()))
-         .set_dictionary_enabled(true)
+        .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
         .set_sorting_columns(Some(
             vec![SortingColumn::new(sort_column_id as i32, true, false)],
