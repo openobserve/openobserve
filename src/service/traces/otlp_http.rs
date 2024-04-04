@@ -282,7 +282,7 @@ pub async fn traces_json(
                         }
                         events.push(Event {
                             name: event.get("name").unwrap().as_str().unwrap().to_string(),
-                            _timestamp: event.get("timeUnixNano").unwrap().as_u64().unwrap(),
+                            _timestamp: get_uint_value(event.get("timeUnixNano").unwrap()),
                             attributes: event_att_map.clone(),
                         })
                     }
