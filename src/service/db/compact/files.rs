@@ -41,10 +41,7 @@ pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str
         return val.clone();
     }
     drop(r);
-<<<<<<< HEAD
-=======
 
->>>>>>> main
     let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
