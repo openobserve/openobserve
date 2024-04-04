@@ -4909,6 +4909,7 @@ dependencies = [
  "once_cell",
  "openfga-sdk",
  "openidconnect",
+ "proto",
  "rand",
  "regex",
  "reqwest",

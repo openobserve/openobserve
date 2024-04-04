@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, time::Duration};
+use std::{cmp::max, sync::Arc, time::Duration};
 
 use async_nats::jetstream;
 use async_trait::async_trait;
@@ -61,7 +61,7 @@ impl super::Queue for NatsQueue {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
             retention: jetstream::stream::RetentionPolicy::Limits,
-            max_age: Duration::from_secs(60 * 60 * 24 * 30), // 30 days
+            max_age: Duration::from_secs(60 * 60 * 24 * max(1, CONFIG.nats.queue_max_age)),
             num_replicas: CONFIG.nats.replicas,
             ..Default::default()
         };
