@@ -33,7 +33,6 @@ pub fn new_parquet_writer<'a>(
     bloom_filter_fields: &'a [String],
     full_text_search_fields: &'a [String],
     metadata: &'a FileMeta,
-    compress: bool,
 ) -> AsyncArrowWriter<&'a mut Vec<u8>> {
     let sort_column_id = schema
         .index_of(&CONFIG.common.column_timestamp)
@@ -47,7 +46,8 @@ pub fn new_parquet_writer<'a>(
         .set_write_batch_size(PARQUET_BATCH_SIZE) // in bytes
         .set_data_page_size_limit(PARQUET_PAGE_SIZE) // maximum size of a data page in bytes
         .set_max_row_group_size(row_group_size) // maximum number of rows in a row group
-        .set_dictionary_enabled(true)
+        .set_compression(Compression::ZSTD(Default::default()))
+         .set_dictionary_enabled(true)
         .set_encoding(Encoding::PLAIN)
         .set_sorting_columns(Some(
             vec![SortingColumn::new(sort_column_id as i32, true, false)],
@@ -69,9 +69,6 @@ pub fn new_parquet_writer<'a>(
                 metadata.original_size.to_string(),
             ),
         ]));
-    if compress {
-        writer_props = writer_props.set_compression(Compression::ZSTD(Default::default()));
-    }
     for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
         writer_props = writer_props.set_column_dictionary_enabled(field.as_str().into(), false);
     }

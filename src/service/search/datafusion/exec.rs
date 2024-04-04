@@ -1032,7 +1032,6 @@ pub async fn convert_parquet_file(
         bloom_filter_fields,
         full_text_search_fields,
         &file_meta,
-        true,
     );
     for batch in batches {
         writer.write(&batch).await?;
@@ -1150,7 +1149,6 @@ pub async fn merge_parquet_files(
         bloom_filter_fields,
         full_text_search_fields,
         &file_meta,
-        true,
     );
     for batch in batches {
         if stream_type == StreamType::Logs {
