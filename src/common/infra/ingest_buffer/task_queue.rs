@@ -24,21 +24,29 @@ use super::{entry::IngestEntry, workers::Workers};
 static MIN_WORKER_CNT: usize = 3;
 static DEFAULT_CHANNEL_CAP: usize = 10;
 
-pub static TQMANAGER: Lazy<TaskQueueManager> = Lazy::new(TaskQueueManager::new);
+static TQMANAGER: Lazy<TaskQueueManager> = Lazy::new(TaskQueueManager::new);
 
 pub type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     _ = TQMANAGER.task_queues.read().await.len();
+
+    // start a background job to clean up TQManager's hash table
+    tokio::spawn(async move {
+        let interval = tokio::time::Duration::from_secs(600);
+        let mut interval = tokio::time::interval(interval);
+        interval.tick().await; // the first tick is immediate
+        loop {
+            TQMANAGER.remove_stopped_task_queues().await;
+            interval.tick().await;
+        }
+    });
+
     Ok(())
 }
 
 pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
     TQMANAGER.send_task(stream_name, task).await
-}
-
-pub async fn remove_stopped_task_queues() {
-    TQMANAGER.remove_stopped_task_queues().await;
 }
 
 pub struct TaskQueueManager {
@@ -63,26 +71,18 @@ impl TaskQueueManager {
     }
 
     async fn remove_stopped_task_queues(&self) {
-        let interval = tokio::time::Duration::from_secs(600);
-        let mut interval = tokio::time::interval(interval);
-        interval.tick().await; // the first tick is immediate
-        loop {
-            let mut keys_to_remove = vec![];
-            {
-                let r = self.task_queues.read().await;
-                for (k, v) in r.iter() {
-                    if v.workers.running_worker_count().await == 0 {
-                        keys_to_remove.push(k.clone());
-                    }
+        let mut keys_to_remove = vec![];
+        {
+            let r = self.task_queues.read().await;
+            for (k, v) in r.iter() {
+                if v.workers.running_worker_count().await == 0 {
+                    keys_to_remove.push(k.clone());
                 }
             }
-            {
-                let mut w = self.task_queues.write().await;
-                for key in keys_to_remove {
-                    w.remove(&key);
-                }
-            }
-            interval.tick().await;
+        }
+        let mut w = self.task_queues.write().await;
+        for key in keys_to_remove {
+            w.remove(&key);
         }
     }
 

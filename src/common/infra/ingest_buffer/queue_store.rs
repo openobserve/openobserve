@@ -13,48 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    fs::{create_dir_all, remove_file, File, OpenOptions},
+    io::{self, Seek, SeekFrom, Write},
+    path::PathBuf,
+};
 
-use super::{entry::IngestEntry, task_queue::RwMap};
+// use byteorder::{BigEndian, WriteBytesExt};
+use config::CONFIG;
+use tokio::io::AsyncWriteExt;
 
-/// Two options for persisting pending ingestion tasks
-/// 1. Each spawned up worker has its own WAL file
-/// 2. All workers asscoaited with each stream_name share one WAL file
-/// - Each WAL file
-///
-/// TBD
-///
-/// After implementing store, needs 2 more functions during init
-/// scane and replay previous uncompleted requests saved in the WAL files
+use super::entry::IngestEntry;
 
-pub struct QueueStore {
-    reqs: RwMap<Arc<str>, IngestEntry>,
+/// File extension for segment files.
+const FILE_EXTENSION: &str = "wal";
+
+pub async fn persist_pending_tasks(stream_name: &str, worker_id: &str, task: IngestEntry) {
+    let path = build_file_path(stream_name, worker_id);
+    create_dir_all(path.parent().unwrap());
+    let mut f = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(false)
+        .open(&path)
+        .unwrap();
+
+    // let mut writer = Vec::new();
+    // let x = writer.write_u64::<BigEndian>(0);
 }
 
-impl QueueStore {
-    pub fn new() -> Self {
-        Self {
-            reqs: RwMap::default(),
-        }
-    }
-
-    pub async fn add_task(
-        &mut self,
-        key: Arc<str>,
-        entry: IngestEntry,
-    ) -> Result<(), anyhow::Error> {
-        let mut rw = self.reqs.write().await;
-        rw.insert(key, entry);
-        Ok(())
-    }
-
-    pub async fn remove_task(&mut self, key: Arc<str>) -> Result<(), anyhow::Error> {
-        let mut rw = self.reqs.write().await;
-        rw.remove(&key);
-        Ok(())
-    }
-
-    pub async fn persist(&self) -> Result<(), anyhow::Error> {
-        Ok(())
-    }
+fn build_file_path(stream_name: &str, worker_id: &str) -> PathBuf {
+    let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
+    path.push("ingest_buffer");
+    path.push(stream_name);
+    path.push(worker_id);
+    path.set_extension(FILE_EXTENSION);
+    path
 }

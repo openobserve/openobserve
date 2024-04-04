@@ -28,18 +28,5 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // init task queue
     task_queue::init().await?;
 
-    // start a job to dump tasks to disk
-    tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(INTERVAL);
-        interval.tick().await; // the first tick is immediate
-        loop {
-            // worker persist
-
-            // and clean up TaskQueueManager map
-            task_queue::remove_stopped_task_queues().await;
-            interval.tick().await;
-        }
-    });
-
     Ok(())
 }

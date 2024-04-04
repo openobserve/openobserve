@@ -16,26 +16,28 @@
 use std::sync::Arc;
 
 use async_channel::Receiver;
+use config::ider;
 use futures::future::join_all;
-use tokio::task::JoinHandle;
+use tokio::{sync::RwLock, task::JoinHandle};
 
 use super::entry::IngestEntry;
 
-type RwVec<T> = tokio::sync::RwLock<Vec<T>>;
+type RwVec<T> = RwLock<Vec<T>>;
+type Worker = JoinHandle<()>;
 
+// HELP: is the RwLock on the workers necessary
+// only 1 global TaskQueueManager which is already RwLock'd
+// 
 pub struct Workers {
     pub receiver: Arc<Receiver<IngestEntry>>,
-    pub handles: RwVec<JoinHandle<()>>,
+    pub handles: RwVec<Worker>,
 }
 
 impl Workers {
     pub fn new(count: usize, receiver: Arc<Receiver<IngestEntry>>) -> Self {
         let mut handles = Vec::with_capacity(count);
-        for i in 0..count {
-            let r = receiver.clone();
-            let worker = tokio::spawn(async move {
-                let _ = process_task(i, r).await;
-            });
+        for _ in 0..count {
+            let worker = init_worker(Arc::clone(&receiver));
             handles.push(worker);
         }
         Self {
@@ -47,11 +49,8 @@ impl Workers {
     pub async fn add_workers_by(&self, count: usize) {
         let mut rw = self.handles.write().await;
         let curr_cnt = rw.len();
-        for i in curr_cnt..curr_cnt + count {
-            let r = Arc::clone(&self.receiver);
-            let handle = tokio::spawn(async move {
-                let _ = process_task(i, r).await;
-            });
+        for _ in curr_cnt..curr_cnt + count {
+            let handle = init_worker(Arc::clone(&self.receiver));
             rw.push(handle);
         }
     }
@@ -59,6 +58,7 @@ impl Workers {
     pub async fn running_worker_count(&self) -> usize {
         let mut rw = self.handles.write().await;
         rw.retain(|handle| !handle.is_finished());
+        rw.shrink_to_fit();
         rw.len()
     }
 
@@ -69,41 +69,105 @@ impl Workers {
     }
 }
 
+struct PendingTasks {
+    closed: bool,
+    tasks: Vec<IngestEntry>,
+}
+
+impl Default for PendingTasks {
+    fn default() -> Self {
+        Self {
+            closed: false,
+            tasks: Vec::new(),
+        }
+    }
+}
+
+fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
+    let handle = tokio::spawn(async move {
+        let id = ider::generate();
+        println!("Worker {id} starting");
+        let shared_pending_tasks: Arc<RwLock<PendingTasks>> = Arc::new(RwLock::default());
+        // start a new tasks to disk every x minuts
+        let persist_job = tokio::spawn(persist(shared_pending_tasks.clone()));
+        // main task - receive/process tasks
+        let _ = process_tasks(id, receiver, shared_pending_tasks.clone()).await;
+        // Worker shut donw. No need to wait for persist job anymore.
+        persist_job.abort();
+        // Maybe clean up file dir;
+    });
+    handle
+}
+
 // TODO: add default delay between each pull
 // TODO: define max idle time before shutting down a worker
 // TODO: handle errors
-async fn process_task(
-    id: usize,
+async fn process_tasks(
+    id: String,
     receiver: Arc<Receiver<IngestEntry>>,
+    pending_tasks: Arc<RwLock<PendingTasks>>,
 ) -> Result<(), anyhow::Error> {
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
     let mut time = std::time::Instant::now();
-    let max_idle_time = 10.0;
-    println!("Worker {id} starting");
+    let max_idle_time = 600.0;
+
     loop {
         if receiver.is_closed() {
             break;
         }
-        let mut received = vec![];
+
+        let mut w = pending_tasks.write().await;
         while let Ok(req) = receiver.try_recv() {
-            received.push(req);
+            w.tasks.push(req)
         }
-        if !received.is_empty() {
+
+        if !w.tasks.is_empty() {
+            time = std::time::Instant::now();
             println!(
                 "receiver {id} received and ingesting {} request.",
                 receiver.len()
             );
-            // reset idle time
-            time = std::time::Instant::now();
-            for req in received {
-                req.ingest().await;
-            }
+            w.tasks = process_tasks_with_retries(&w.tasks).await;
         } else if time.elapsed().as_secs_f64() > max_idle_time {
             println!("worker {id} idle too long, shutting down");
+            w.closed = true;
+            drop(w);
             break;
         }
+        drop(w);
         interval.tick().await;
     }
     drop(receiver);
     Ok(())
+}
+
+async fn process_tasks_with_retries(tasks: &Vec<IngestEntry>) -> Vec<IngestEntry> {
+    let mut failed_tasks = vec![];
+    for task in tasks {
+        match task.ingest().await {
+            Ok(_) => println!("successfully ingested this task"),
+            Err(e) => {
+                println!("failed to ingest. will try again {:?}", e);
+                failed_tasks.push(task.clone());
+            }
+        }
+    }
+    failed_tasks
+}
+
+async fn persist(pending_tasks: Arc<RwLock<PendingTasks>>) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(600));
+    interval.tick().await;
+    loop {
+        let r = pending_tasks.read().await;
+        if r.closed {
+            // maybe clean up files asscoaited with this worker
+            println!("worker is shutting down. no more persisting");
+            break;
+        } else {
+            // invoke a writer and write all the tasks to disk
+        }
+        drop(r);
+        interval.tick().await;
+    }
 }

@@ -100,18 +100,18 @@ pub async fn multi(
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
     // TODO: Temporary testing.
-    {
-        let entry = crate::common::infra::ingest_buffer::entry::IngestRequest::new(
-            org_id.clone(),
-            stream_name.clone(),
-            body.clone(),
-            thread_id.clone(),
-            user_email.to_string(),
-        );
-        let task = crate::common::infra::ingest_buffer::entry::IngestEntry::Multi(entry);
-        let _res =
-            crate::common::infra::ingest_buffer::task_queue::send_task(&stream_name, task).await;
-    }
+    // {
+    //     let entry = crate::common::infra::ingest_buffer::entry::IngestRequest::new(
+    //         org_id.clone(),
+    //         stream_name.clone(),
+    //         body.clone(),
+    //         thread_id.clone(),
+    //         user_email.to_string(),
+    //     );
+    //     let task = crate::common::infra::ingest_buffer::entry::IngestEntry::Multi(entry);
+    //     let _res =
+    //         crate::common::infra::ingest_buffer::task_queue::send_task(&stream_name, task).await;
+    // }
     Ok(
         match logs::ingest::ingest(
             &org_id,

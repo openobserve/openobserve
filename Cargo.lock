@@ -4999,6 +4999,7 @@ dependencies = [
  "awc",
  "base64 0.21.7",
  "blake3",
+ "byteorder",
  "bytes",
  "chromiumoxide",
  "chrono",
