@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::remove_file, path::PathBuf, sync::Arc};
+use std::{fs::remove_file, sync::Arc};
 
-use async_channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
+use async_channel::{bounded, Receiver, RecvError, Sender};
 use config::ider;
 use futures::future::join_all;
 use tokio::{sync::RwLock, task::JoinHandle};
@@ -29,7 +29,6 @@ type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<()>;
 
 // TODO: clean up temp static
-static PERSIST_INTERVAL: u64 = 60;
 static WORKER_MAX_IDLE: f64 = 600.0;
 
 // HELP: is the RwLock on the workers necessary
@@ -73,21 +72,6 @@ impl Workers {
     pub async fn shut_down(&self) {
         let mut rw = self.handles.write().await;
         let _join_res = join_all(rw.drain(..)).await;
-    }
-}
-
-#[derive(Debug, Clone)]
-struct PendingTasks {
-    closed: bool,
-    tasks: Vec<IngestEntry>,
-}
-
-impl Default for PendingTasks {
-    fn default() -> Self {
-        Self {
-            closed: false,
-            tasks: Vec::new(),
-        }
     }
 }
 
