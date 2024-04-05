@@ -28,8 +28,6 @@ pub enum Error {
     DbError(#[from] DbError),
     #[error("EtcdError# {0}")]
     EtcdError(#[from] etcd_client::Error),
-    #[error("SledError# {0}")]
-    SledError(#[from] sled::Error),
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
     #[error("ArrowError# {0}")]

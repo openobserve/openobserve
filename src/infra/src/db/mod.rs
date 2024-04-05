@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -54,7 +54,7 @@ async fn default() -> Box<dyn Db> {
     if !CONFIG.common.local_mode
         && (CONFIG.common.meta_store == "sled" || CONFIG.common.meta_store == "sqlite")
     {
-        panic!("cluster mode is not supported for ZO_META_STORE=sled/sqlite");
+        panic!("cluster mode is not supported for ZO_META_STORE=sqlite");
     }
 
     match CONFIG.common.meta_store.as_str().into() {

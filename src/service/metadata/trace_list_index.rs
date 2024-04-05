@@ -1,3 +1,18 @@
+// Copyright 2024 Zinc Labs Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::{
     collections::HashMap,
     hash::Hash,
@@ -111,8 +126,7 @@ impl Metadata for TraceListIndex {
         Ok(())
     }
     async fn flush(&self) -> infra::errors::Result<()> {
-        // do nothing
-        Ok(())
+        Ok(()) // do nothing
     }
     async fn stop(&self) -> infra::errors::Result<()> {
         if let Err(e) = self.flush().await {
@@ -208,7 +222,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_write_file() {
+    async fn test_trace_list_index_write_file() {
         let t = TraceListIndex::new();
         let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
         let item = metadata::MetadataItem::TraceListIndexer(TraceListItem {
@@ -230,18 +244,17 @@ mod tests {
             &vec![],
             unwrap_partition_time_level(None, StreamType::Metadata),
             data,
-            Some(schema_key.clone()),
+            Some(schema_key),
         );
         let data = json::Value::Object(data.clone());
         let data_size = json::to_vec(&data).unwrap_or_default().len();
         let schema = t.generate_schema();
         let hour_buf = buf.entry(hour_key).or_insert_with(|| SchemaRecords {
             schema_key: schema_key.to_string(),
-            schema: schema.clone(),
+            schema,
             records: vec![],
             records_size: 0,
         });
-        hour_buf.records.push(Arc::new(data.clone()));
         hour_buf.records.push(Arc::new(data));
         hour_buf.records_size += data_size;
 

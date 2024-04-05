@@ -558,6 +558,7 @@ const useLogs = () => {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
 
+        console.log(parsedSQL);
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
           return false;
@@ -718,6 +719,7 @@ const useLogs = () => {
       return req;
     } catch (e: any) {
       // showErrorNotification("Invalid SQL Syntax");
+      console.log(e);
       notificationMsg.value = "Invalid SQL Syntax";
     }
   }
@@ -1136,11 +1138,13 @@ const useLogs = () => {
     for (const column of columns) {
       if (
         column.expr &&
-        (column.expr.column === "_timestamp" ||
+        (column.expr.column === store.state.zoConfig.timestamp_column ||
           column.expr.column === "*" ||
           (column.expr.hasOwnProperty("args") &&
-            column.expr.args.expr.column === "_timestamp") ||
-          (column.hasOwnProperty("as") && column.as === "_timestamp"))
+            column.expr?.args?.expr?.column ===
+              store.state.zoConfig.timestamp_column) ||
+          (column.hasOwnProperty("as") &&
+            column.as === store.state.zoConfig.timestamp_column))
       ) {
         return true; // Found _timestamp column
       }
@@ -2244,18 +2248,20 @@ const useLogs = () => {
     }
 
     // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
-    return quoteTableNameDirectly(parser.sqlify(parsedQuery).replace(/`/g, ""), streamName);
+    return quoteTableNameDirectly(
+      parser.sqlify(parsedQuery).replace(/`/g, ""),
+      streamName
+    );
   };
 
   function quoteTableNameDirectly(sql: string, streamName: string) {
     // This regular expression looks for the FROM keyword followed by
     // an optional schema name, a table name, and handles optional spaces.
     // It captures the table name to be replaced with double quotes.
-    const regex = new RegExp(`FROM\\s+${streamName}`, 'gi')
+    const regex = new RegExp(`FROM\\s+${streamName}`, "gi");
 
     // Replace the captured table name with the same name enclosed in double quotes
     const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
-
 
     return modifiedSql;
   }

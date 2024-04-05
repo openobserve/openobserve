@@ -28,11 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Error while processing member subscription request.<br /><br />
     </div>
-    <div
+
+    <HTMLRenderer
       v-else-if="status == 'error' && error !== ''"
-      v-html="error"
+      :htmlContent="error"
       class="subscription_message"
-    ></div>
+    />
+
     <div v-else>Thank you for your subscription.</div>
 
     <!-- <div
@@ -57,9 +59,13 @@ import {
 } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
+import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
 
 export default defineComponent({
   name: "PageUser",
+  components: {
+    HTMLRenderer,
+  },
   data() {
     return {
       status: "processing",

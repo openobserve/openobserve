@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -300,7 +300,6 @@ pub struct Config {
     pub log: Log,
     pub etcd: Etcd,
     pub nats: Nats,
-    pub sled: Sled,
     pub s3: S3,
     pub tcp: TCP,
     pub prom: Prometheus,
@@ -367,8 +366,12 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+    #[env_config(name = "ZO_COOKIE_MAX_AGE", default = 2592000)] // seconds, 30 days
+    pub cookie_max_age: i64,
     #[env_config(name = "ZO_COOKIE_SAME_SITE_LAX", default = true)]
     pub cookie_same_site_lax: bool,
+    #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = true)]
+    pub cookie_secure_only: bool,
 }
 
 #[derive(EnvConfig)]
@@ -580,14 +583,12 @@ pub struct Common {
         help = "Toggle inverted index generation."
     )]
     pub inverted_index_enabled: bool,
-
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = " ;,",
         help = "Characters which should be used as a delimiter to split the string."
     )]
     pub inverted_index_split_chars: String,
-
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -702,7 +703,7 @@ pub struct Limit {
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 0)]
     pub query_optimization_num_fields: usize,
-    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 100)]
+    #[env_config(name = "ZO_QUICK_MODE_NUM_FIELDS", default = 200)]
     pub quick_mode_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_STRATEGY", default = "")]
     pub quick_mode_strategy: String, // first, last, both
@@ -714,6 +715,18 @@ pub struct Limit {
     pub sql_min_db_connections: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
     pub sql_max_db_connections: u32,
+    #[env_config(
+        name = "ZO_META_TRANSACTION_RETRIES",
+        help = "max time of transaction will retry",
+        default = 10
+    )]
+    pub meta_transaction_retries: usize,
+    #[env_config(
+        name = "ZO_META_TRANSACTION_LOCK_TIMEOUT",
+        help = "timeout of transaction lock",
+        default = 600
+    )] // seconds
+    pub meta_transaction_lock_timeout: usize,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -825,14 +838,6 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
-#[derive(EnvConfig)]
-pub struct Sled {
-    #[env_config(name = "ZO_SLED_DATA_DIR", default = "")] // ./data/openobserve/db/
-    pub data_dir: String,
-    #[env_config(name = "ZO_SLED_PREFIX", default = "/zinc/observe/")]
-    pub prefix: String,
-}
-
 #[derive(Debug, EnvConfig)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
@@ -873,6 +878,8 @@ pub struct Nats {
     pub user: String,
     #[env_config(name = "ZO_NATS_PASSWORD", default = "")]
     pub password: String,
+    #[env_config(name = "ZO_NATS_REPLICAS", default = 3)]
+    pub replicas: usize,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
@@ -1007,11 +1014,6 @@ pub fn init() -> Config {
     // check etcd config
     if let Err(e) = check_etcd_config(&mut cfg) {
         panic!("etcd config error: {e}");
-    }
-
-    // check sled config
-    if let Err(e) = check_sled_config(&mut cfg) {
-        panic!("sled config error: {e}");
     }
 
     // check s3 config
@@ -1167,12 +1169,6 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
     }
-    if cfg.sled.data_dir.is_empty() {
-        cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
-    }
-    if !cfg.sled.data_dir.ends_with('/') {
-        cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
-    }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
     }
@@ -1210,20 +1206,6 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             name = name.split(':').collect::<Vec<&str>>()[0].to_string();
         }
         cfg.etcd.domain_name = name;
-    }
-
-    Ok(())
-}
-
-fn check_sled_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.sled.data_dir.is_empty() {
-        cfg.sled.data_dir = format!("{}db/", cfg.common.data_dir);
-    }
-    if !cfg.sled.data_dir.ends_with('/') {
-        cfg.sled.data_dir = format!("{}/", cfg.sled.data_dir);
-    }
-    if !cfg.sled.prefix.is_empty() && !cfg.sled.prefix.ends_with('/') {
-        cfg.sled.prefix = format!("{}/", cfg.sled.prefix);
     }
 
     Ok(())
@@ -1378,6 +1360,15 @@ pub fn is_local_disk_storage() -> bool {
     CONFIG.common.local_mode && CONFIG.common.local_mode_storage.eq("disk")
 }
 
+#[inline]
+pub fn get_cluster_name() -> String {
+    if !CONFIG.common.cluster_name.is_empty() {
+        CONFIG.common.cluster_name.to_string()
+    } else {
+        INSTANCE_ID.get("instance_id").unwrap().to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1424,7 +1415,6 @@ mod tests {
         cfg.common.data_dir = "/abc".to_string();
         cfg.common.data_wal_dir = "/abc".to_string();
         cfg.common.data_stream_dir = "/abc".to_string();
-        cfg.sled.data_dir = "/abc/".to_string();
         cfg.common.base_uri = "/abc/".to_string();
         let ret = check_path_config(&mut cfg);
         assert!(ret.is_ok());

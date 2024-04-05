@@ -20,8 +20,6 @@ use std::{
 
 use async_trait::async_trait;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
-pub use engine::Engine;
-pub use exec::Query;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -33,10 +31,12 @@ pub mod common;
 mod engine;
 mod exec;
 mod functions;
-
 pub mod name_visitor;
 pub mod search;
 pub mod value;
+
+pub use engine::Engine;
+pub use exec::Query;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s

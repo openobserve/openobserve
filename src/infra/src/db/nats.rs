@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -55,11 +55,12 @@ async fn get_bucket_by_key<'a>(
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
+        num_replicas: CONFIG.nats.replicas,
         history: 3,
         ..Default::default()
     };
-    if bucket_name == "nodes" {
-        // if changed ttl need recreate the bucket\
+    if bucket_name == "nodes" || bucket_name == "clusters" {
+        // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
         bucket.max_age = Duration::from_secs(CONFIG.limit.node_heartbeat_ttl as u64);
     }
@@ -474,9 +475,17 @@ pub async fn connect() -> async_nats::Client {
         .split(',')
         .map(|a| a.parse().unwrap())
         .collect::<Vec<ServerAddr>>();
-    async_nats::connect_with_options(addrs, opts)
-        .await
-        .expect("Nats connect failed")
+    match async_nats::connect_with_options(addrs.clone(), opts).await {
+        Ok(client) => client,
+        Err(e) => {
+            log::error!(
+                "NATS connect failed for address(es): {:?}, err: {}",
+                addrs,
+                e
+            );
+            panic!("NATS connect failed");
+        }
+    }
 }
 
 pub(crate) struct Locker {

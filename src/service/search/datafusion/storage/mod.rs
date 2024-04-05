@@ -22,10 +22,12 @@ use thiserror::Error as ThisError;
 pub mod file_list;
 pub mod memory;
 pub mod tmpfs;
+pub mod wal;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
     Memory,
+    Wal,
     Tmpfs,
 }
 

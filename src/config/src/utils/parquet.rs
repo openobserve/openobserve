@@ -164,10 +164,14 @@ pub async fn read_metadata_from_bytes(data: &bytes::Bytes) -> Result<FileMeta, a
 pub async fn read_metadata_from_file(path: &PathBuf) -> Result<FileMeta, anyhow::Error> {
     let mut meta = FileMeta::default();
     let mut file = tokio::fs::File::open(path).await?;
+    // read the file size
+    let metadata = file.metadata().await?;
+    let compressed_size = metadata.len();
     let arrow_reader = ArrowReaderMetadata::load_async(&mut file, Default::default()).await?;
     if let Some(metadata) = arrow_reader.metadata().file_metadata().key_value_metadata() {
         meta = metadata.as_slice().into();
     }
+    meta.compressed_size = compressed_size as i64;
     Ok(meta)
 }
 
