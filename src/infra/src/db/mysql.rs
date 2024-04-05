@@ -500,9 +500,9 @@ impl super::Db for MysqlDb {
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    let mut tx = pool.begin().await?;
+
     // create table
-    if let Err(e) = sqlx::query(
+    _ = sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
@@ -515,21 +515,16 @@ CREATE TABLE IF NOT EXISTS meta
 );
         "#,
     )
-    .execute(&mut *tx)
-    .await
-    {
-        if let Err(e) = tx.rollback().await {
-            log::error!("[MYSQL] rollback create table meta error: {}", e);
-        }
-        return Err(e.into());
-    }
-    if let Err(e) = tx.commit().await {
-        log::error!("[MYSQL] commit create table meta error: {}", e);
-        return Err(e.into());
-    }
+    .execute(&pool)
+    .await?;
 
     // create start_dt cloumn for old version <= 0.9.2
-    add_start_dt_column().await?;
+    let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='meta' AND column_name='start_dt';")
+            .fetch_one(&pool)
+            .await?;
+    if has_start_dt == 0 {
+        add_start_dt_column().await?;
+    }
 
     // create table index
     create_index_item("CREATE INDEX meta_module_idx on meta (module);").await?;
