@@ -475,9 +475,13 @@ pub async fn connect() -> async_nats::Client {
         .split(',')
         .map(|a| a.parse().unwrap())
         .collect::<Vec<ServerAddr>>();
-    async_nats::connect_with_options(addrs, opts)
-        .await
-        .expect("Nats connect failed")
+    match async_nats::connect_with_options(addrs.clone(), opts).await {
+        Ok(client) => Ok(client),
+        Err(_) => {
+            log::error!("NATS connect failed for address(es): {:?}", addrs);
+            Err("NATS connect failed".into())
+        }
+    }
 }
 
 pub(crate) struct Locker {
