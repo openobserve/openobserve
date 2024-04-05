@@ -352,7 +352,10 @@ pub async fn update_metadata(
             for (k, v) in metadata.iter() {
                 schema_metadata.insert(k.clone(), v.clone());
             }
-            let start_dt = Utc::now().timestamp_micros();
+            let start_dt = match schema_metadata.get("created_at") {
+                Some(v) => v.parse().unwrap(),
+                None => Utc::now().timestamp_micros(),
+            };
             if !schema_metadata.contains_key("created_at") {
                 schema_metadata.insert("created_at".to_string(), start_dt.to_string());
             }
