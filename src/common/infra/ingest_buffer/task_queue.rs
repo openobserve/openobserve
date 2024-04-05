@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,9 +26,9 @@ static DEFAULT_CHANNEL_CAP: usize = 10;
 
 static TQMANAGER: Lazy<TaskQueueManager> = Lazy::new(TaskQueueManager::new);
 
-pub type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
+type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
 
-pub async fn init() -> Result<(), anyhow::Error> {
+pub(super) async fn init() -> Result<(), anyhow::Error> {
     _ = TQMANAGER.task_queues.read().await.len();
 
     // start a background job to clean up TQManager's hash table
@@ -49,12 +49,12 @@ pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyho
     TQMANAGER.send_task(stream_name, task).await
 }
 
-pub struct TaskQueueManager {
-    pub task_queues: RwMap<Arc<str>, TaskQueue>, // key: stream, val: TaskQueue
+struct TaskQueueManager {
+    task_queues: RwMap<Arc<str>, TaskQueue>, // key: stream, val: TaskQueue
 }
 
 impl TaskQueueManager {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             task_queues: RwMap::default(),
         }
@@ -88,13 +88,15 @@ impl TaskQueueManager {
 
     async fn task_queue_avail(&self, stream_name: &str) -> bool {
         let r = self.task_queues.read().await;
-        if let Some(tq) = r.get(stream_name) {
-            if tq.workers.running_worker_count().await == 0 {
-                tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+        match r.get(stream_name) {
+            Some(tq) => {
+                if tq.workers.running_worker_count().await == 0 {
+                    tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                }
+                true
             }
-            return true;
+            None => false,
         }
-        false
     }
 
     async fn add_task_queue_for(&self, stream_name: &str) {
@@ -104,10 +106,10 @@ impl TaskQueueManager {
     }
 }
 
-pub struct TaskQueue {
-    pub sender: Arc<Sender<IngestEntry>>,
-    pub receiver: Arc<Receiver<IngestEntry>>,
-    pub workers: Arc<Workers>,
+struct TaskQueue {
+    sender: Arc<Sender<IngestEntry>>,
+    receiver: Arc<Receiver<IngestEntry>>,
+    workers: Arc<Workers>,
 }
 
 impl TaskQueue {
@@ -125,7 +127,7 @@ impl TaskQueue {
 
     // TODO
     // 1. add min worker count to increase the number of workers
-    pub async fn send_task(&self, task: IngestEntry) -> Result<(), anyhow::Error> {
+    async fn send_task(&self, task: IngestEntry) -> Result<(), anyhow::Error> {
         if self.receiver.is_closed() {
             return Err(anyhow::anyhow!("Channel is closed. BUG"));
         }
@@ -138,7 +140,7 @@ impl TaskQueue {
         Ok(())
     }
 
-    pub async fn shut_down(&self) {
+    async fn shut_down(&self) {
         self.sender.close(); // all cloned receivers will shut down in next iteration
         self.workers.shut_down().await;
     }

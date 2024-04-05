@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -114,7 +114,7 @@ impl IngestEntry {
     }
 
     // HELP: should the buf be limited in certain size (e.g. 4096)
-    pub fn into_bytes(&mut self) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn into_bytes(&self) -> Result<Vec<u8>, anyhow::Error> {
         let mut buf = Vec::with_capacity(4096);
 
         let source = u8::from(&self.source);

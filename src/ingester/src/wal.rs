@@ -208,7 +208,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     Ok(())
 }
 
-fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
+pub fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
     walkdir::WalkDir::new(root_dir.into())
         .into_iter()
         .filter_map(|entry| {

@@ -18,9 +18,9 @@ use ::config::CONFIG;
 
 pub mod cluster;
 pub mod config;
+pub mod ingest_buffer;
 pub mod ofga;
 pub mod wal;
-pub mod ingest_buffer;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     wal::init().await?;

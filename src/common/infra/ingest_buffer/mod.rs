@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,14 @@
 
 pub mod entry;
 mod queue_store;
-pub mod task_queue;
+mod task_queue;
 mod workers;
 
-static INTERVAL: tokio::time::Duration = tokio::time::Duration::from_secs(600);
+pub use task_queue::send_task;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    // check uncompleted ingestion requests persisted in the disk
-
     // replay wal files to create ingestion tasks
+    queue_store::send_persisted_tasks().await?;
 
     // init task queue
     task_queue::init().await?;

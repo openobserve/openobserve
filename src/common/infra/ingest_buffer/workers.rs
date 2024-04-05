@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,15 +20,18 @@ use config::ider;
 use futures::future::join_all;
 use tokio::{sync::RwLock, task::JoinHandle};
 
-use super::entry::IngestEntry;
+use super::{entry::IngestEntry, queue_store::persist_tasks};
 
 type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<()>;
 
+// TODO: clean up temp static
+static PERSIST_INTERVAL: u64 = 600;
+
 // HELP: is the RwLock on the workers necessary
 // only 1 global TaskQueueManager which is already RwLock'd
-// 
-pub struct Workers {
+//
+pub(super) struct Workers {
     pub receiver: Arc<Receiver<IngestEntry>>,
     pub handles: RwVec<Worker>,
 }
@@ -89,7 +92,10 @@ fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
         println!("Worker {id} starting");
         let shared_pending_tasks: Arc<RwLock<PendingTasks>> = Arc::new(RwLock::default());
         // start a new tasks to disk every x minuts
-        let persist_job = tokio::spawn(persist(shared_pending_tasks.clone()));
+        let persist_job = tokio::spawn(persist_with_interval(
+            shared_pending_tasks.clone(),
+            PERSIST_INTERVAL,
+        ));
         // main task - receive/process tasks
         let _ = process_tasks(id, receiver, shared_pending_tasks.clone()).await;
         // Worker shut donw. No need to wait for persist job anymore.
@@ -155,8 +161,8 @@ async fn process_tasks_with_retries(tasks: &Vec<IngestEntry>) -> Vec<IngestEntry
     failed_tasks
 }
 
-async fn persist(pending_tasks: Arc<RwLock<PendingTasks>>) {
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(600));
+async fn persist_with_interval(pending_tasks: Arc<RwLock<PendingTasks>>, interval: u64) {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval));
     interval.tick().await;
     loop {
         let r = pending_tasks.read().await;
@@ -164,8 +170,9 @@ async fn persist(pending_tasks: Arc<RwLock<PendingTasks>>) {
             // maybe clean up files asscoaited with this worker
             println!("worker is shutting down. no more persisting");
             break;
-        } else {
+        } else if !r.tasks.is_empty() {
             // invoke a writer and write all the tasks to disk
+            let _ = persist_tasks("stream_name", "worker_id", &r.tasks);
         }
         drop(r);
         interval.tick().await;
