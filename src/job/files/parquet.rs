@@ -168,7 +168,12 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 .iter()
                 .map(|f| f.meta.original_size)
                 .sum::<i64>();
-            if total_original_size < CONFIG.limit.max_file_size_on_disk as i64 {
+            if total_original_size
+                < std::cmp::min(
+                    CONFIG.limit.max_file_size_on_disk as i64,
+                    CONFIG.compact.max_file_size as i64,
+                )
+            {
                 let mut has_expired_files = false;
                 // not enough files to upload, check if some files are too old
                 let min_ts = Utc::now().timestamp_micros()
