@@ -19,10 +19,10 @@ use actix_web::{cookie, get, http::header, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
-    utils::json,
+    utils::{json, schema_ext::SchemaExt},
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::{Field, Schema};
+use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{cache, file_list};
 use serde::Serialize;
@@ -287,15 +287,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         mem_size += key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
-            for (key, val) in schema.metadata.iter() {
-                mem_size += std::mem::size_of::<HashMap<String, String>>();
-                mem_size += key.len() + val.len();
-            }
-            mem_size += std::mem::size_of::<Vec<Field>>();
-            for field in schema.fields() {
-                mem_size += std::mem::size_of::<Field>();
-                mem_size += field.name().len();
-            }
+            mem_size += schema.size();
         }
     }
     (stream_num, stream_schema_num, mem_size)
