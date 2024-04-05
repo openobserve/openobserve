@@ -92,6 +92,7 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    #[cfg(feature = "tokio-console")]
     console_subscriber::init();
 
     // let tokio steal the thread
@@ -122,22 +123,28 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // setup logs
-    // let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
-    //     let logger = zo_logger::ZoLogger {
-    //         sender: zo_logger::EVENT_SENDER.clone(),
-    //     };
-    //     log::set_boxed_logger(Box::new(logger)).map(|()| {
-    //         log::set_max_level(
-    //             LevelFilter::from_str(&CONFIG.log.level).unwrap_or(LevelFilter::Info),
-    //         )
-    //     })?;
-    //     None
-    // } else if CONFIG.common.tracing_enabled {
-    //     enable_tracing()?;
-    //     None
-    // } else {
-    //     Some(setup_logs())
-    // };
+    #[cfg(feature = "tokio-console")]
+    let enable_tokio_console = true;
+    #[cfg(not(feature = "tokio-console"))]
+    let enable_tokio_console = false;
+    let _guard: Option<WorkerGuard> = if enable_tokio_console {
+        None
+    } else if CONFIG.log.events_enabled {
+        let logger = zo_logger::ZoLogger {
+            sender: zo_logger::EVENT_SENDER.clone(),
+        };
+        log::set_boxed_logger(Box::new(logger)).map(|()| {
+            log::set_max_level(
+                LevelFilter::from_str(&CONFIG.log.level).unwrap_or(LevelFilter::Info),
+            )
+        })?;
+        None
+    } else if CONFIG.common.tracing_enabled {
+        enable_tracing()?;
+        None
+    } else {
+        Some(setup_logs())
+    };
 
     log::info!("Starting OpenObserve {}", VERSION);
     log::info!(
