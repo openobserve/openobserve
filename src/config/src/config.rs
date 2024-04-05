@@ -536,6 +536,19 @@ pub struct Common {
     pub usage_report_compressed_size: bool,
     #[env_config(name = "ZO_USAGE_ORG", default = "_meta")]
     pub usage_org: String,
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_MODE",
+        default = "local",
+        help = "possible values - 'local', 'remote', 'both'"
+    )] // local, remote , both
+    pub usage_reporting_mode: String,
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_URL",
+        default = "http://localhost:5080/api/_meta/usage/_json"
+    )]
+    pub usage_reporting_url: String,
+    #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
+    pub usage_reporting_creds: String,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
