@@ -110,13 +110,17 @@ pub async fn search(
     req.org_id = org_id.to_string();
     req.stype = cluster_rpc::SearchType::User as i32;
     req.stream_type = stream_type.to_string();
-    let res = search_in_cluster(req).await?;
+    let res = search_in_cluster(req).await;
 
     // remove task because task if finished
     #[cfg(feature = "enterprise")]
     SEARCH_SERVER.remove(&session_id).await;
 
-    Ok(res)
+    // do this because of clippy warning
+    match res {
+        Ok(res) => Ok(res),
+        Err(e) => Err(e),
+    }
 }
 
 #[tracing::instrument(name = "service:search_partition:enter", skip(req))]
