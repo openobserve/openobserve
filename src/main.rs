@@ -92,6 +92,9 @@ use tracing_subscriber::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    #[cfg(feature = "tokio-console")]
+    console_subscriber::init();
+
     // let tokio steal the thread
     let rt_handle = tokio::runtime::Handle::current();
     std::thread::spawn(move || {
@@ -120,7 +123,13 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // setup logs
-    let _guard: Option<WorkerGuard> = if CONFIG.log.events_enabled {
+    #[cfg(feature = "tokio-console")]
+    let enable_tokio_console = true;
+    #[cfg(not(feature = "tokio-console"))]
+    let enable_tokio_console = false;
+    let _guard: Option<WorkerGuard> = if enable_tokio_console {
+        None
+    } else if CONFIG.log.events_enabled {
         let logger = zo_logger::ZoLogger {
             sender: zo_logger::EVENT_SENDER.clone(),
         };
