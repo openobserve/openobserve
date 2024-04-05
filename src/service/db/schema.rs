@@ -337,14 +337,14 @@ pub async fn update_metadata(
         db::NEED_WATCH,
         None,
         Box::new(move |value| {
-            let latest_schema = match value {
-                None => Schema::empty(),
+            let (latest_schema, not_exists) = match value {
+                None => (Schema::empty(), true),
                 Some(value) => {
                     let mut schemas: Vec<Schema> = json::from_slice(&value)?;
                     if schemas.is_empty() {
-                        Schema::empty()
+                        (Schema::empty(), false)
                     } else {
-                        schemas.remove(schemas.len() - 1)
+                        (schemas.remove(schemas.len() - 1), false)
                     }
                 }
             };
@@ -352,11 +352,29 @@ pub async fn update_metadata(
             for (k, v) in metadata.iter() {
                 schema_metadata.insert(k.clone(), v.clone());
             }
+            let start_dt = Utc::now().timestamp_micros();
+            if !schema_metadata.contains_key("created_at") {
+                schema_metadata.insert("created_at".to_string(), start_dt.to_string());
+            }
+            if !schema_metadata.contains_key("start_dt") {
+                schema_metadata.insert("start_dt".to_string(), start_dt.to_string());
+            }
             let new_schema = vec![latest_schema.with_metadata(schema_metadata)];
-            Ok(Some((
-                Some(json::to_vec(&new_schema).unwrap().into()),
-                None,
-            )))
+            if not_exists {
+                Ok(Some((
+                    None,
+                    Some((
+                        key,
+                        json::to_vec(&new_schema).unwrap().into(),
+                        Some(start_dt),
+                    )),
+                )))
+            } else {
+                Ok(Some((
+                    Some(json::to_vec(&new_schema).unwrap().into()),
+                    None,
+                )))
+            }
         }),
     )
     .await?;
