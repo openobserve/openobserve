@@ -98,7 +98,7 @@ pub(super) async fn replay_persisted_tasks() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn build_file_path(stream_name: &str, worker_id: &str) -> PathBuf {
+pub(super) fn build_file_path(stream_name: &str, worker_id: &str) -> PathBuf {
     let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
     path.push("ingest_buffer");
     path.push(stream_name);

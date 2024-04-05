@@ -13,20 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{fs::remove_file, path::PathBuf, sync::Arc};
 
-use async_channel::Receiver;
+use async_channel::{bounded, Receiver, RecvError, Sender, TryRecvError};
 use config::ider;
 use futures::future::join_all;
 use tokio::{sync::RwLock, task::JoinHandle};
 
-use super::{entry::IngestEntry, queue_store::persist_tasks};
+use super::{
+    entry::IngestEntry,
+    queue_store::{build_file_path, persist_tasks},
+};
 
 type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<()>;
 
 // TODO: clean up temp static
 static PERSIST_INTERVAL: u64 = 60;
+static WORKER_MAX_IDLE: f64 = 600.0;
 
 // HELP: is the RwLock on the workers necessary
 // only 1 global TaskQueueManager which is already RwLock'd
@@ -72,6 +76,7 @@ impl Workers {
     }
 }
 
+#[derive(Debug, Clone)]
 struct PendingTasks {
     closed: bool,
     tasks: Vec<IngestEntry>,
@@ -94,14 +99,16 @@ fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
     let handle = tokio::spawn(async move {
         let id = ider::generate();
         println!("Worker {id} starting");
-        let shared_pending_tasks: Arc<RwLock<PendingTasks>> = Arc::new(RwLock::default());
+        // let (store_sig_s, store_sig_r) = mpsc::channel::<Vec<IngestEntry>>(1);
+        let (store_sig_s, store_sig_r) = bounded::<Vec<IngestEntry>>(1);
         // start a new task to disk every x minuts
         let persist_job = tokio::spawn(persist_with_interval(
-            shared_pending_tasks.clone(),
-            PERSIST_INTERVAL,
+            "stream_name",
+            "worker_id",
+            store_sig_r,
         ));
         // main task - receive/process tasks
-        let _ = process_tasks(id, receiver, shared_pending_tasks.clone()).await;
+        let _ = process_tasks(id, receiver, store_sig_s).await;
         // Worker shut donw. No need to wait for persist job anymore.
         persist_job.abort();
         // Maybe clean up file dir;
@@ -115,39 +122,38 @@ fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
 async fn process_tasks(
     id: String,
     receiver: Arc<Receiver<IngestEntry>>,
-    pending_tasks: Arc<RwLock<PendingTasks>>,
+    store_sig_s: Sender<Vec<IngestEntry>>,
 ) -> Result<(), anyhow::Error> {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
     let mut time = std::time::Instant::now();
-    let max_idle_time = 600.0;
 
-    loop {
+    let mut pending_tasks = vec![];
+
+    while time.elapsed().as_secs_f64() <= WORKER_MAX_IDLE {
         if receiver.is_closed() {
             break;
         }
 
-        let mut w = pending_tasks.write().await;
         while let Ok(req) = receiver.try_recv() {
-            w.tasks.push(req)
+            pending_tasks.push(req);
         }
 
-        if !w.tasks.is_empty() {
+        if !pending_tasks.is_empty() {
             time = std::time::Instant::now();
+            // Send to background to persist
+            if let Err(e) = store_sig_s.send(pending_tasks.clone()).await {
+                println!("failed to send to persisting job, {}", e);
+            }
             println!(
-                "receiver {id} received and ingesting {} request.",
-                receiver.len()
+                "worker {id} received and ingesting {} request.",
+                pending_tasks.len()
             );
-            w.tasks = process_tasks_with_retries(&w.tasks).await;
-        } else if time.elapsed().as_secs_f64() > max_idle_time {
-            println!("worker {id} idle too long, shutting down");
-            w.closed = true;
-            drop(w);
-            break;
+            pending_tasks = process_tasks_with_retries(&pending_tasks).await;
         }
-        drop(w);
         interval.tick().await;
     }
-    drop(receiver);
+    println!("worker {id} idle too long, shutting down");
+    store_sig_s.close(); // signal persist job to close
     Ok(())
 }
 
@@ -165,20 +171,24 @@ pub(super) async fn process_tasks_with_retries(tasks: &Vec<IngestEntry>) -> Vec<
     failed_tasks
 }
 
-async fn persist_with_interval(pending_tasks: Arc<RwLock<PendingTasks>>, interval: u64) {
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval));
-    interval.tick().await;
+async fn persist_with_interval(
+    stream_name: &str,
+    worker_id: &str,
+    store_sig_r: Receiver<Vec<IngestEntry>>,
+) -> Result<(), anyhow::Error> {
     loop {
-        let r = pending_tasks.read().await;
-        if r.closed {
-            // maybe clean up files asscoaited with this worker
-            println!("worker is shutting down. no more persisting");
-            break;
-        } else if !r.tasks.is_empty() {
-            // invoke a writer and write all the tasks to disk
-            let _ = persist_tasks("stream_name", "worker_id", &r.tasks);
+        match store_sig_r.recv().await {
+            Ok(pending_tasks) => {
+                let _ = persist_tasks(stream_name, worker_id, &pending_tasks);
+            }
+            Err(RecvError) => {
+                // worker shutting down. No more persisting
+                break;
+            }
         }
-        drop(r);
-        interval.tick().await;
     }
+    // clean up
+    let path = build_file_path(stream_name, worker_id);
+    remove_file(path)?;
+    Ok(())
 }
