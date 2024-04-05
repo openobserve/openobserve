@@ -99,10 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       Result not found.
                     </div>
-                    <div
+                    <HTMLRenderer
                       data-test="logs-search-error-message"
-                      v-html="searchObj.data.errorMsg"
-                    ></div>
+                      :htmlContent="searchObj.data.errorMsg"
+                    />
                     <div
                       data-test="logs-search-error-20003"
                       v-if="parseInt(searchObj.data.errorCode) == 20003"
@@ -233,6 +233,7 @@ import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
+import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
 
 export default defineComponent({
   name: "PageSearch",
@@ -240,6 +241,7 @@ export default defineComponent({
     SearchBar,
     IndexList,
     SearchResult,
+    HTMLRenderer,
   },
   mixins: [MainLayoutCloudMixin],
   methods: {
