@@ -345,7 +345,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
             );
             access_token_cookie.set_http_only(true);
-            access_token_cookie.set_secure(true);
+            access_token_cookie.set_secure(CONFIG.auth.cookie_secure_only);
             access_token_cookie.set_path("/");
             if CONFIG.auth.cookie_same_site_lax {
                 access_token_cookie.set_same_site(cookie::SameSite::Lax)
@@ -360,7 +360,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
             );
             refresh_token_cookie.set_http_only(true);
-            refresh_token_cookie.set_secure(true);
+            refresh_token_cookie.set_secure(CONFIG.auth.cookie_secure_only);
             refresh_token_cookie.set_path("/");
             if CONFIG.auth.cookie_same_site_lax {
                 refresh_token_cookie.set_same_site(cookie::SameSite::Lax)
@@ -410,7 +410,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
         Err(_) => {
             let mut access_cookie = cookie::Cookie::new("access_token", "");
             access_cookie.set_http_only(true);
-            access_cookie.set_secure(true);
+            access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
             access_cookie.set_path("/");
 
             if CONFIG.auth.cookie_same_site_lax {
@@ -420,7 +420,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             };
             let mut refresh_cookie = cookie::Cookie::new("refresh_token", "");
             refresh_cookie.set_http_only(true);
-            refresh_cookie.set_secure(true);
+            refresh_cookie.set_secure(CONFIG.auth.cookie_secure_only);
             refresh_cookie.set_path("/");
             if CONFIG.auth.cookie_same_site_lax {
                 refresh_cookie.set_same_site(cookie::SameSite::Lax)
@@ -440,12 +440,12 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
 async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
     let mut access_cookie = cookie::Cookie::new("access_token", "");
     access_cookie.set_http_only(true);
-    access_cookie.set_secure(true);
+    access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
     access_cookie.set_path("/");
     access_cookie.set_same_site(cookie::SameSite::Lax);
     let mut refresh_cookie = cookie::Cookie::new("refresh_token", "");
     refresh_cookie.set_http_only(true);
-    refresh_cookie.set_secure(true);
+    refresh_cookie.set_secure(CONFIG.auth.cookie_secure_only);
     refresh_cookie.set_path("/");
     refresh_cookie.set_same_site(cookie::SameSite::Lax);
     HttpResponse::Ok()

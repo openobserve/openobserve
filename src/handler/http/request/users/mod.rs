@@ -250,7 +250,7 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
                 + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
         );
         access_cookie.set_http_only(true);
-        access_cookie.set_secure(true);
+        access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
         access_cookie.set_path("/");
         if CONFIG.auth.cookie_same_site_lax {
             access_cookie.set_same_site(cookie::SameSite::Lax)
