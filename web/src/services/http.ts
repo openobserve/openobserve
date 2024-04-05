@@ -21,17 +21,17 @@ import { Notify } from "quasar";
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
-  
+
   headers = {
     ...headers,
   };
 
   instance = axios.create({
     // timeout: 10000,
-    withCredentials:true,
+    withCredentials: true,
     baseURL: store.state.API_ENDPOINT,
     headers,
-  });  
+  });
 
   instance.interceptors.response.use(
     function (response) {
@@ -77,21 +77,21 @@ const http = ({ headers } = {} as any) => {
                   return instance(error.config);
                 })
                 .catch((refreshError) => {
-                  instance.get("/config/logout", {
-                }).then((res) => {
-                  store.dispatch("logout");
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  window.location.reload();
-                  return Promise.reject(refreshError);
-                })
+                  instance.get("/config/logout", {}).then((res) => {
+                    store.dispatch("logout");
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.reload();
+                    return Promise.reject(refreshError);
+                  });
                 });
             } else {
-              console.log(
-                JSON.stringify(
-                  error.response.data["error"] || "Invalid credentials"
-                )
-              );
+              if (!error.request.responseURL.includes("/login")) {
+                store.dispatch("logout");
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+              }
             }
             break;
           case 403:
