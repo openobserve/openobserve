@@ -22,7 +22,7 @@ pub use task_queue::send_task;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     // replay wal files to create ingestion tasks
-    queue_store::send_persisted_tasks().await?;
+    queue_store::replay_persisted_tasks().await?;
 
     // init task queue
     task_queue::init().await?;

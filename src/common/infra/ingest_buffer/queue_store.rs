@@ -15,7 +15,7 @@
 
 use std::{
     fs::{create_dir_all, remove_file, File, OpenOptions},
-    io::{BufReader, Read, Write},
+    io::{BufReader, ErrorKind, Read, Write},
     path::PathBuf,
 };
 
@@ -23,7 +23,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use config::CONFIG;
 use ingester::scan_files;
 
-use super::entry::IngestEntry;
+use super::{entry::IngestEntry, workers::process_tasks_with_retries};
 
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";
@@ -41,7 +41,7 @@ pub(super) fn persist_tasks(
         remove_file(&path)?;
     }
 
-    let _ = create_dir_all(path.parent().unwrap());
+    create_dir_all(path.parent().unwrap())?;
     let mut f = OpenOptions::new()
         .write(true)
         .create(true)
@@ -59,29 +59,39 @@ pub(super) fn persist_tasks(
     Ok(())
 }
 
-pub(super) async fn send_persisted_tasks() -> Result<(), anyhow::Error> {
+pub(super) async fn replay_persisted_tasks() -> Result<(), anyhow::Error> {
     let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("ingest_buffer");
     create_dir_all(&wal_dir)?;
     let wal_files = scan_files(wal_dir, FILE_EXTENSION);
     if wal_files.is_empty() {
         return Ok(());
     }
-    let mut entry_size_buf = [0; std::mem::size_of::<u16>()];
 
     for wal_file in wal_files.iter() {
         let f = File::open(wal_file)?;
         let mut f = BufReader::new(f);
-
+        let mut entries = vec![];
         loop {
-            match f.read_exact(&mut entry_size_buf) {
-                Ok(_) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break, // end of file
-                Err(_) => return Err(anyhow::anyhow!("Error reading file when repalying")),
-            }
-            let mut entry = vec![0; entry_size_buf.len() as usize];
+            let entry_size = match f.read_u16::<BigEndian>() {
+                Ok(size) => size,
+                Err(e) => {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        // end of file
+                        break;
+                    } else {
+                        return Err(anyhow::anyhow!("Error reading file when replaying"));
+                    }
+                }
+            };
+            let mut entry = vec![0; entry_size as usize];
             f.read_exact(&mut entry)?;
             let entry = IngestEntry::from_bytes(&entry)?;
-            entry.ingest().await?;
+            entries.push(entry);
+        }
+        // process the loaded tasks and log
+        if !entries.is_empty() {
+            let _ = process_tasks_with_retries(&entries).await;
+            //
         }
     }
 

@@ -26,7 +26,7 @@ type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<()>;
 
 // TODO: clean up temp static
-static PERSIST_INTERVAL: u64 = 600;
+static PERSIST_INTERVAL: u64 = 60;
 
 // HELP: is the RwLock on the workers necessary
 // only 1 global TaskQueueManager which is already RwLock'd
@@ -86,12 +86,16 @@ impl Default for PendingTasks {
     }
 }
 
+// TODO: improvement
+// add an env variable to adjust persisting strategy
+// 1. No data loss -> persist and process linearly
+// 2. lossy -> async tasks and only persist one a while
 fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
     let handle = tokio::spawn(async move {
         let id = ider::generate();
         println!("Worker {id} starting");
         let shared_pending_tasks: Arc<RwLock<PendingTasks>> = Arc::new(RwLock::default());
-        // start a new tasks to disk every x minuts
+        // start a new task to disk every x minuts
         let persist_job = tokio::spawn(persist_with_interval(
             shared_pending_tasks.clone(),
             PERSIST_INTERVAL,
@@ -147,7 +151,7 @@ async fn process_tasks(
     Ok(())
 }
 
-async fn process_tasks_with_retries(tasks: &Vec<IngestEntry>) -> Vec<IngestEntry> {
+pub(super) async fn process_tasks_with_retries(tasks: &Vec<IngestEntry>) -> Vec<IngestEntry> {
     let mut failed_tasks = vec![];
     for task in tasks {
         match task.ingest().await {
