@@ -476,10 +476,14 @@ pub async fn connect() -> async_nats::Client {
         .map(|a| a.parse().unwrap())
         .collect::<Vec<ServerAddr>>();
     match async_nats::connect_with_options(addrs.clone(), opts).await {
-        Ok(client) => Ok(client),
-        Err(_) => {
-            log::error!("NATS connect failed for address(es): {:?}", addrs);
-            Err("NATS connect failed".into())
+        Ok(client) => client,
+        Err(e) => {
+            log::error!(
+                "NATS connect failed for address(es): {:?}, err: {}",
+                addrs,
+                e
+            );
+            panic!("NATS connect failed");
         }
     }
 }
