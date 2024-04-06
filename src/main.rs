@@ -111,7 +111,14 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         let agent =
             PyroscopeAgent::builder(&CONFIG.profiling.server_url, &CONFIG.profiling.project_name)
-                .tags([("Host", "Rust")].to_vec())
+                .tags(
+                    [
+                        ("role", CONFIG.common.node_role.as_str()),
+                        ("instance", CONFIG.common.instance_name.as_str()),
+                        ("version", VERSION),
+                    ]
+                    .to_vec(),
+                )
                 .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
                 .build()
                 .expect("Failed to setup pyroscope agent");
