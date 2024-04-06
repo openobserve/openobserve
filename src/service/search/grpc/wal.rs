@@ -258,7 +258,6 @@ pub async fn search_parquet(
             stream_type = stream_type.to_string(),
         );
         let schema = Arc::new(schema);
-        let session_id = session_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 tokio::select! {
@@ -272,9 +271,9 @@ pub async fn search_parquet(
                         FileType::PARQUET,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::info!("[session_id {session_id}-{ver}] search->parquet: search timeout");
+                        log::error!("[session_id {}] search->parquet: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search_parquet: task timeout"
+                            "[session_id {}] search_parquet: task timeout", session.id
                         )))
                     }
                 }
@@ -460,7 +459,6 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
-        let session_id = session_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 let files = vec![];
@@ -475,9 +473,9 @@ pub async fn search_memtable(
                         FileType::ARROW,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::info!("[session_id {session_id}-{ver}] search->memtable: search timeout");
+                        log::error!("[session_id {}] search->memtable: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search_memtable: task timeout"
+                            "[session_id {}] search_memtable: task timeout", session.id
                         )))
                     }
                 }
