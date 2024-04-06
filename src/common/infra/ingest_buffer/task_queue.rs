@@ -80,9 +80,11 @@ impl TaskQueueManager {
                 }
             }
         }
-        let mut w = self.task_queues.write().await;
-        for key in keys_to_remove {
-            w.remove(&key);
+        if !keys_to_remove.is_empty() {
+            let mut w = self.task_queues.write().await;
+            for key in keys_to_remove {
+                w.remove(&key);
+            }
         }
     }
 
@@ -90,8 +92,11 @@ impl TaskQueueManager {
         let r = self.task_queues.read().await;
         match r.get(stream_name) {
             Some(tq) => {
-                if tq.workers.running_worker_count().await == 0 {
-                    tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+                let curr_running_cnt = tq.workers.running_worker_count().await;
+                if curr_running_cnt < MIN_WORKER_CNT {
+                    tq.workers
+                        .add_workers_by(MIN_WORKER_CNT - curr_running_cnt)
+                        .await;
                 }
                 true
             }
@@ -100,7 +105,7 @@ impl TaskQueueManager {
     }
 
     async fn add_task_queue_for(&self, stream_name: &str) {
-        let tq = TaskQueue::new(DEFAULT_CHANNEL_CAP);
+        let tq = TaskQueue::new(DEFAULT_CHANNEL_CAP, stream_name);
         let mut w = self.task_queues.write().await;
         w.insert(Arc::from(stream_name), tq);
     }
@@ -114,13 +119,17 @@ struct TaskQueue {
 
 impl TaskQueue {
     // TODO: decide default initial workers count for a queue
-    pub fn new(channel_cap: usize) -> Self {
+    pub fn new(channel_cap: usize, stream_name: &str) -> Self {
         let (sender, receiver) = bounded::<IngestEntry>(channel_cap);
-        // let queues = RwMap::default();
-        let workers = Arc::new(Workers::new(MIN_WORKER_CNT, Arc::new(receiver.clone())));
+        let (sender, receiver) = (Arc::new(sender), Arc::new(receiver));
+        let workers = Arc::new(Workers::new(
+            MIN_WORKER_CNT,
+            stream_name,
+            Arc::clone(&receiver),
+        ));
         Self {
-            sender: Arc::new(sender),
-            receiver: Arc::new(receiver),
+            sender,
+            receiver,
             workers,
         }
     }

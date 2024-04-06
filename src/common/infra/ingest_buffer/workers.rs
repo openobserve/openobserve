@@ -35,18 +35,20 @@ static WORKER_MAX_IDLE: f64 = 600.0;
 // only 1 global TaskQueueManager which is already RwLock'd
 //
 pub(super) struct Workers {
+    pub stream_name: Arc<str>,
     pub receiver: Arc<Receiver<IngestEntry>>,
     pub handles: RwVec<Worker>,
 }
 
 impl Workers {
-    pub fn new(count: usize, receiver: Arc<Receiver<IngestEntry>>) -> Self {
+    pub fn new(count: usize, stream_name: &str, receiver: Arc<Receiver<IngestEntry>>) -> Self {
         let mut handles = Vec::with_capacity(count);
         for _ in 0..count {
-            let worker = init_worker(Arc::clone(&receiver));
+            let worker = init_worker(stream_name, Arc::clone(&receiver));
             handles.push(worker);
         }
         Self {
+            stream_name: Arc::from(stream_name),
             receiver,
             handles: RwVec::from(handles),
         }
@@ -56,7 +58,7 @@ impl Workers {
         let mut rw = self.handles.write().await;
         let curr_cnt = rw.len();
         for _ in curr_cnt..curr_cnt + count {
-            let handle = init_worker(Arc::clone(&self.receiver));
+            let handle = init_worker(&self.stream_name, Arc::clone(&self.receiver));
             rw.push(handle);
         }
     }
@@ -79,23 +81,24 @@ impl Workers {
 // add an env variable to adjust persisting strategy
 // 1. No data loss -> persist and process linearly
 // 2. lossy -> async tasks and only persist one a while
-fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
+fn init_worker(stream_name: &str, receiver: Arc<Receiver<IngestEntry>>) -> Worker {
+    let stream_name = stream_name.to_owned();
     let handle = tokio::spawn(async move {
-        let id = ider::generate();
-        println!("Worker {id} starting");
-        // let (store_sig_s, store_sig_r) = mpsc::channel::<Vec<IngestEntry>>(1);
+        let worker_id = ider::generate();
+        println!("Worker {worker_id} starting");
         let (store_sig_s, store_sig_r) = bounded::<Vec<IngestEntry>>(1);
         // start a new task to disk every x minuts
+        let (stream_name_cp, worker_id_cp) = (stream_name.clone(), worker_id.clone());
         let persist_job = tokio::spawn(persist_with_interval(
-            "stream_name",
-            "worker_id",
+            stream_name_cp,
+            worker_id_cp,
             store_sig_r,
         ));
+
         // main task - receive/process tasks
-        let _ = process_tasks(id, receiver, store_sig_s).await;
-        // Worker shut donw. No need to wait for persist job anymore.
-        persist_job.abort();
-        // Maybe clean up file dir;
+        let _ = process_tasks(stream_name, receiver, store_sig_s).await;
+        // Persisting job should be done as well. 
+        let _ = persist_job.await;
     });
     handle
 }
@@ -104,7 +107,7 @@ fn init_worker(receiver: Arc<Receiver<IngestEntry>>) -> Worker {
 // TODO: define max idle time before shutting down a worker
 // TODO: handle errors
 async fn process_tasks(
-    id: String,
+    worker_id: String,
     receiver: Arc<Receiver<IngestEntry>>,
     store_sig_s: Sender<Vec<IngestEntry>>,
 ) -> Result<(), anyhow::Error> {
@@ -129,14 +132,14 @@ async fn process_tasks(
                 println!("failed to send to persisting job, {}", e);
             }
             println!(
-                "worker {id} received and ingesting {} request.",
+                "worker {worker_id} received and ingesting {} request.",
                 pending_tasks.len()
             );
             pending_tasks = process_tasks_with_retries(&pending_tasks).await;
         }
         interval.tick().await;
     }
-    println!("worker {id} idle too long, shutting down");
+    println!("worker {worker_id} idle too long, shutting down");
     store_sig_s.close(); // signal persist job to close
     Ok(())
 }
@@ -156,14 +159,14 @@ pub(super) async fn process_tasks_with_retries(tasks: &Vec<IngestEntry>) -> Vec<
 }
 
 async fn persist_with_interval(
-    stream_name: &str,
-    worker_id: &str,
+    stream_name: String,
+    worker_id: String,
     store_sig_r: Receiver<Vec<IngestEntry>>,
 ) -> Result<(), anyhow::Error> {
     loop {
         match store_sig_r.recv().await {
             Ok(pending_tasks) => {
-                let _ = persist_tasks(stream_name, worker_id, &pending_tasks);
+                let _ = persist_tasks(&stream_name, &worker_id, &pending_tasks);
             }
             Err(RecvError) => {
                 // worker shutting down. No more persisting
@@ -171,8 +174,8 @@ async fn persist_with_interval(
             }
         }
     }
-    // clean up
-    let path = build_file_path(stream_name, worker_id);
+    // worker shutting down --> remove stored files
+    let path = build_file_path(&stream_name, &worker_id);
     remove_file(path)?;
     Ok(())
 }
