@@ -59,9 +59,9 @@ jobs:
           
         - name: Build and run binary
           run: |
-            cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
+            cargo build --profile=release-profiling --features mimalloc --target x86_64-unknown-linux-gnu
             mkdir -p bin
-            mv target/x86_64-unknown-linux-gnu/release/openobserve bin/openobserve
+            mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
      
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
