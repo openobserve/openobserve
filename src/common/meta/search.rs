@@ -304,18 +304,29 @@ pub struct JobStatusResponse {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct JobStatus {
     pub session_id: String,
-    pub query_start_time: i64,
+    pub created_at: i64,
+    pub started_at: i64,
     pub is_queue: bool,
     pub user_id: Option<String>,
     pub org_id: Option<String>,
     pub stream_type: Option<String>,
-    pub sql: Option<String>,
-    pub start_time: Option<i64>,
-    pub end_time: Option<i64>,
-    pub files: Option<i64>,
-    pub records: Option<i64>,
-    pub original_size: Option<i64>,
-    pub compressed_size: Option<i64>,
+    pub query_info: Option<QueryInfo>,
+    pub scan_stats: Option<ScanStats>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct QueryInfo {
+    pub sql: String,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ScanStats {
+    pub files: i64,
+    pub records: i64,
+    pub original_size: i64,
+    pub compressed_size: i64,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

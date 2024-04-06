@@ -193,21 +193,18 @@ pub async fn search(
         };
 
         #[cfg(feature = "enterprise")]
-        if !crate::service::search::SEARCH_SERVER
-            .contain_key(session_id.as_ref())
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if crate::service::search::SEARCH_SERVER
+            .insert_sender(&session_id, abort_sender)
             .await
+            .is_err()
         {
             log::info!("[session_id {session_id}] task is cancel after get first stage result");
             return Err(Error::Message(format!(
                 "[session_id {session_id}] task is cancel after get first stage result"
             )));
         }
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        crate::service::search::SEARCH_SERVER
-            .insert_sender(&session_id, abort_sender)
-            .await;
 
         let merge_batches;
         tokio::select! {

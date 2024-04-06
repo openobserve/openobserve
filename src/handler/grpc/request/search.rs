@@ -66,8 +66,12 @@ impl Searcher {
     }
 
     // insert the sender into the task_manager by session_id
-    pub async fn insert_sender(&self, session_id: &str, sender: tokio::sync::oneshot::Sender<()>) {
-        self.task_manager.insert_sender(session_id, sender).await;
+    pub async fn insert_sender(
+        &self,
+        session_id: &str,
+        sender: tokio::sync::oneshot::Sender<()>,
+    ) -> Result<(), infra::errors::Error> {
+        self.task_manager.insert_sender(session_id, sender).await
     }
 
     // get all task status that is leader

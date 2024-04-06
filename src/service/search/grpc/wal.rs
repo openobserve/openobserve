@@ -259,26 +259,24 @@ pub async fn search_parquet(
         );
 
         #[cfg(feature = "enterprise")]
-        if !crate::service::search::SEARCH_SERVER
-            .contain_key(session_id)
-            .await
-        {
-            log::info!(
-                "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
-            );
-            return Err(Error::Message(format!(
-                "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
-            )));
-        }
-        #[cfg(feature = "enterprise")]
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
-        crate::service::search::SEARCH_SERVER
+        if crate::service::search::SEARCH_SERVER
             .insert_sender(session_id, abort_sender)
-            .await;
+            .await
+            .is_err()
+        {
+            log::info!(
+                "[session_id {}] wal->parquet->search: search canceled before call search->parquet",
+                session.id
+            );
+            return Err(Error::Message(format!(
+                "[session_id {}] wal->parquet->search: search canceled before call search->parquet",
+                session.id
+            )));
+        }
 
         let schema = Arc::new(schema);
-        let session_id = session_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 tokio::select! {
@@ -292,9 +290,9 @@ pub async fn search_parquet(
                         FileType::PARQUET,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout))=> {
-                        log::info!("[session_id {session_id}-{ver}] search->parquet: search timeout");
+                        log::error!("[session_id {}] wal->parquet->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search_parquet: task timeout"
+                            "[session_id {}] wal->parquet->search: task timeout", session.id
                         )))
                     },
                     _ = async {
@@ -303,9 +301,9 @@ pub async fn search_parquet(
                         #[cfg(not(feature = "enterprise"))]
                         futures::future::pending::<()>().await;
                     } => {
-                        log::info!("[session_id {session_id}-{ver}] search->parquet: search canceled");
+                        log::info!("[session_id {}] wal->parquet->search: search canceled", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search_parquet: task is cancel"
+                            "[session_id {}] wal->parquet->search: task is cancel", session.id
                         )))
                     }
                 }
@@ -493,25 +491,23 @@ pub async fn search_memtable(
         );
 
         #[cfg(feature = "enterprise")]
-        if !crate::service::search::SEARCH_SERVER
-            .contain_key(session_id)
-            .await
-        {
-            log::info!(
-                "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
-            );
-            return Err(Error::Message(format!(
-                "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
-            )));
-        }
-        #[cfg(feature = "enterprise")]
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
-        crate::service::search::SEARCH_SERVER
+        if crate::service::search::SEARCH_SERVER
             .insert_sender(session_id, abort_sender)
-            .await;
+            .await
+            .is_err()
+        {
+            log::info!(
+                "[session_id {}] wal->mem->search: search canceled before call search->memtable",
+                session.id
+            );
+            return Err(Error::Message(format!(
+                "[session_id {}] wal->mem->search: search canceled before call search->memtable",
+                session.id
+            )));
+        }
 
-        let session_id = session_id.to_string();
         let task = tokio::task::spawn(
             async move {
                 let files = vec![];
@@ -526,9 +522,9 @@ pub async fn search_memtable(
                         FileType::ARROW,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::info!("[session_id {session_id}-{ver}] search->memtable: search timeout");
+                        log::error!("[session_id {}] wal->mem->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search_memtable: task timeout"
+                            "[session_id {}] wal->mem->search: task timeout", session.id
                         )))
                     },
                     _ = async {
@@ -537,9 +533,9 @@ pub async fn search_memtable(
                         #[cfg(not(feature = "enterprise"))]
                         futures::future::pending::<()>().await;
                     } => {
-                        log::info!("[session_id {session_id}-{ver}] search->memtable: search canceled");
+                        log::info!("[session_id {}] wal->mem->search: search canceled", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search_memtable: task is cancel"
+                            "[session_id {}] wal->mem->search: task is cancel", session.id
                         )))
                     }
                 }

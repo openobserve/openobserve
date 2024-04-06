@@ -241,28 +241,26 @@ pub async fn search(
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
         );
-        let schema = Arc::new(schema);
 
-        #[cfg(feature = "enterprise")]
-        if !crate::service::search::SEARCH_SERVER
-            .contain_key(session_id)
-            .await
-        {
-            log::info!(
-                "[session_id {session_id}-{ver}] search->storage: search canceled before call search->storage"
-            );
-            return Err(Error::Message(format!(
-                "[session_id {session_id}-{ver}] search->storage: search canceled before call search->storage"
-            )));
-        }
         #[cfg(feature = "enterprise")]
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
-        crate::service::search::SEARCH_SERVER
+        if crate::service::search::SEARCH_SERVER
             .insert_sender(session_id, abort_sender)
-            .await;
+            .await
+            .is_err()
+        {
+            log::info!(
+                "[session_id {}] search->storage: search canceled before call search->storage",
+                session.id
+            );
+            return Err(Error::Message(format!(
+                "[session_id {}] search->storage: search canceled before call search->storage",
+                session.id
+            )));
+        }
 
-        let session_id = session_id.to_string();
+        let schema = Arc::new(schema);
         let task = tokio::task::spawn(
             async move {
                 tokio::select! {
@@ -276,9 +274,9 @@ pub async fn search(
                         FileType::PARQUET,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::info!("[session_id {session_id}-{ver}] search->storage: search timeout");
+                        log::error!("[session_id {}] search->storage: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search->storage: task timeout"
+                            "[session_id {}] search->storage: task timeout", session.id
                         )))
                     },
                     _ = async {
@@ -287,9 +285,9 @@ pub async fn search(
                         #[cfg(not(feature = "enterprise"))]
                         futures::future::pending::<()>().await;
                     } => {
-                        log::info!("[session_id {session_id}-{ver}] search->storage: search canceled");
+                        log::info!("[session_id {}] search->storage: search canceled", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {session_id}] search->storage: task is cancel"
+                            "[session_id {}] search->storage: task is cancel", session.id
                         )))
                     }
                 }

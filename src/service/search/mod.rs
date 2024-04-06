@@ -638,7 +638,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         );
 
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&session_id).await {
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if SEARCH_SERVER
+            .insert_sender(&session_id, abort_sender)
+            .await
+            .is_err()
+        {
             log::info!(
                 "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
             );
@@ -646,10 +652,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
             ))));
         }
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let task = tokio::task::spawn(
             async move {
@@ -836,7 +838,13 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         };
 
         #[cfg(feature = "enterprise")]
-        if !SEARCH_SERVER.contain_key(&session_id).await {
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if SEARCH_SERVER
+            .insert_sender(&session_id, abort_sender)
+            .await
+            .is_err()
+        {
             log::info!(
                 "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
             );
@@ -844,10 +852,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
             ))));
         }
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let merge_batch;
         tokio::select! {
@@ -1166,20 +1170,29 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
         } else {
             set.insert(result.session_id.clone());
         }
+        let query_info = result.query.unwrap_or(proto::cluster_rpc::Query::default());
+        let scan_stats = result
+            .scan_stats
+            .unwrap_or(proto::cluster_rpc::ScanStats::default());
         status.push(search::JobStatus {
             session_id: result.session_id,
-            query_start_time: result.query_start_time,
+            created_at: result.created_at,
+            started_at: result.started_at,
             is_queue: result.is_queue,
             user_id: result.user_id,
             org_id: result.org_id,
             stream_type: result.stream_type,
-            sql: result.sql,
-            start_time: result.start_time,
-            end_time: result.end_time,
-            files: result.files,
-            records: result.records,
-            original_size: result.original_size,
-            compressed_size: result.compressed_size,
+            query_info: Some(search::QueryInfo {
+                sql: query_info.sql,
+                start_time: query_info.start_time,
+                end_time: query_info.end_time,
+            }),
+            scan_stats: Some(search::ScanStats {
+                files: scan_stats.files,
+                records: scan_stats.records,
+                original_size: scan_stats.original_size,
+                compressed_size: scan_stats.compressed_size,
+            }),
         });
     }
 
