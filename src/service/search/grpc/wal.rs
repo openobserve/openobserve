@@ -258,19 +258,25 @@ pub async fn search_parquet(
             stream_type = stream_type.to_string(),
         );
         let schema = Arc::new(schema);
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let task = tokio::task::spawn(
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        None,
+                        FileType::PARQUET,
+                    ) => ret,
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        log::error!("[session_id {}] wal->parquet->search: search timeout", session.id);
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {}] wal->parquet->search: task timeout", session.id
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );
@@ -453,19 +459,26 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let task = tokio::task::spawn(
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &Vec::new(),
-                    Some(record_batches),
-                    FileType::ARROW,
-                )
-                .await
+                let files = vec![];
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        Some(record_batches),
+                        FileType::ARROW,
+                    ) => ret,
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        log::error!("[session_id {}] wal->mem->search: search timeout", session.id);
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {}] wal->mem->search: task timeout", session.id
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );
