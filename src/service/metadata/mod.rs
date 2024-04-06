@@ -20,10 +20,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::try_join;
 
-use crate::service::metadata::{
-    distinct_values::{DistinctValues, DvItem},
-    trace_list_index::{TraceListIndex, TraceListItem},
-};
+use crate::service::metadata::{distinct_values::DvItem, trace_list_index::TraceListItem};
 
 pub mod distinct_values;
 pub mod trace_list_index;
@@ -41,10 +38,7 @@ pub enum MetadataType {
     DistinctValues,
 }
 
-pub struct MetadataManager {
-    trace_list_indexer: TraceListIndex,
-    distinct_values: DistinctValues,
-}
+pub struct MetadataManager {}
 
 pub trait Metadata {
     fn generate_schema(&self) -> Arc<Schema>;
@@ -65,14 +59,14 @@ impl Default for MetadataManager {
 
 impl MetadataManager {
     pub fn new() -> Self {
-        Self {
-            trace_list_indexer: TraceListIndex::new(),
-            distinct_values: DistinctValues::new(),
-        }
+        Self {}
     }
 
     pub async fn close(&self) -> infra::errors::Result<()> {
-        match try_join!(self.trace_list_indexer.stop(), self.distinct_values.stop()) {
+        match try_join!(
+            trace_list_index::INSTANCE.stop(),
+            distinct_values::INSTANCE.stop()
+        ) {
             Ok(_) => {}
             Err(e) => {
                 log::error!("[METADATA] error while closing: {}", e);
@@ -89,13 +83,8 @@ pub async fn write(
     data: Vec<MetadataItem>,
 ) -> infra::errors::Result<()> {
     match mt {
-        MetadataType::TraceListIndexer => {
-            METADATA_MANAGER
-                .trace_list_indexer
-                .write(org_id, data)
-                .await
-        }
-        MetadataType::DistinctValues => METADATA_MANAGER.distinct_values.write(org_id, data).await,
+        MetadataType::TraceListIndexer => trace_list_index::INSTANCE.write(org_id, data).await,
+        MetadataType::DistinctValues => distinct_values::INSTANCE.write(org_id, data).await,
     }
 }
 

@@ -271,9 +271,9 @@ pub async fn search_parquet(
                         FileType::PARQUET,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[session_id {}] search->parquet: search timeout", session.id);
+                        log::error!("[session_id {}] wal->parquet->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] search_parquet: task timeout", session.id
+                            "[session_id {}] wal->parquet->search: task timeout", session.id
                         )))
                     }
                 }
@@ -473,9 +473,9 @@ pub async fn search_memtable(
                         FileType::ARROW,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[session_id {}] search->memtable: search timeout", session.id);
+                        log::error!("[session_id {}] wal->mem->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] search_memtable: task timeout", session.id
+                            "[session_id {}] wal->mem->search: task timeout", session.id
                         )))
                     }
                 }
