@@ -262,9 +262,8 @@ pub async fn search(
             .insert_sender(session_id, abort_sender)
             .await;
 
-        #[cfg(feature = "enterprise")]
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let session_id = session_id.to_string();
+        let task = tokio::task::spawn(
             async move {
                 tokio::select! {
                     ret = exec::sql(
@@ -276,31 +275,24 @@ pub async fn search(
                         None,
                         FileType::PARQUET,
                     ) => ret,
-                    _ = abort_receiver => {
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        log::info!("[session_id {session_id}-{ver}] search->storage: search timeout");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search->storage: task timeout"
+                        )))
+                    },
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
                         log::info!("[session_id {session_id}-{ver}] search->storage: search canceled");
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {session_id}] search->storage: task is cancel"
                         )))
                     }
                 }
-            }
-            .instrument(datafusion_span),
-        );
-
-        #[cfg(not(feature = "enterprise"))]
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
-            async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
             }
             .instrument(datafusion_span),
         );

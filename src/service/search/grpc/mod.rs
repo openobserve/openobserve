@@ -210,7 +210,6 @@ pub async fn search(
             .await;
 
         let merge_batches;
-        #[cfg(feature = "enterprise")]
         tokio::select! {
             result = super::datafusion::exec::merge(
                 &sql.org_id,
@@ -229,29 +228,14 @@ pub async fn search(
                     }
                 }
             },
-            _ = abort_receiver => {
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
                 log::info!("[session_id {session_id}] in node merge task is cancel");
                 return Err(Error::Message(format!("[session_id {session_id}] in node merge task is cancel")));
-            }
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            merge_batches = match super::datafusion::exec::merge(
-                &sql.org_id,
-                offset,
-                limit,
-                &merge_sql,
-                &batches,
-                &select_fields,
-                false,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    log::error!("[session_id {session_id}] datafusion merge error: {}", err);
-                    return Err(err.into());
-                }
             }
         }
 

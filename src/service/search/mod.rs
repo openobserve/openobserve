@@ -695,7 +695,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
                 let response;
-                #[cfg(feature = "enterprise")]
                 tokio::select! {
                     result = client.search(request) => {
                         match result {
@@ -710,24 +709,15 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                             }
                         }
                     }
-                    _ = abort_receiver => {
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
                         log::info!("[session_id {session_id}] search->grpc: cancel search in node: {:?}", &node.grpc_addr);
                         return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[session_id {session_id}] search->grpc: search canceled"))));
                     }
-                }
-                #[cfg(not(feature = "enterprise"))]
-                {
-                    response = match client.search(request).await {
-                        Ok(res) => res.into_inner(),
-                        Err(err) => {
-                            log::error!("[session_id {session_id}] search->grpc: node: {}, search err: {:?}", &node.grpc_addr, err);
-                            if err.code() == tonic::Code::Internal {
-                                let err = ErrorCodes::from_json(err.message())?;
-                                return Err(Error::ErrorCode(err));
-                            }
-                            return Err(server_internal_error("search node error"));
-                        }
-                    };
                 }
 
                 log::info!(
@@ -860,7 +850,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         SEARCH_SERVER.insert_sender(&session_id, abort_sender).await;
 
         let merge_batch;
-        #[cfg(feature = "enterprise")]
         tokio::select! {
             res = datafusion::exec::merge(
                 &sql.org_id,
@@ -874,43 +863,31 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 match res {
                     Ok(res) => merge_batch = res,
                     Err(err) => {
+                        // search done, release lock
+                        #[cfg(not(feature = "enterprise"))]
+                        dist_lock::unlock(&locker).await?;
+                        #[cfg(feature = "enterprise")]
                         work_group
                             .as_ref()
                             .unwrap()
                             .done(&session_id)
                             .await
                             .map_err(|e| Error::Message(e.to_string()))?;
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string())));
+                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                            err.to_string(),
+                        )));
                     }
                 }
             }
-            _ = abort_receiver => {
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
                 log::info!("[session_id {session_id}] search->cluster: final merge task is cancel");
                 return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[session_id {session_id}] search->cluster: final merge task is cancel"))));
             }
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            merge_batch = match datafusion::exec::merge(
-                &sql.org_id,
-                sql.meta.offset,
-                sql.meta.limit,
-                &merge_sql,
-                &batch,
-                &select_fields,
-                true,
-            )
-            .await
-            {
-                Ok(res) => res,
-                Err(err) => {
-                    // search done, release lock
-                    dist_lock::unlock(&locker).await?;
-                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                        err.to_string(),
-                    )));
-                }
-            };
         }
 
         merge_batches.insert(name, merge_batch);

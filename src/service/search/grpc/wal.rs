@@ -278,9 +278,8 @@ pub async fn search_parquet(
             .await;
 
         let schema = Arc::new(schema);
-        #[cfg(feature = "enterprise")]
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let session_id = session_id.to_string();
+        let task = tokio::task::spawn(
             async move {
                 tokio::select! {
                     ret = exec::sql(
@@ -292,31 +291,24 @@ pub async fn search_parquet(
                         None,
                         FileType::PARQUET,
                     ) => ret,
-                    _ = abort_receiver => {
+                    _ = tokio::time::sleep(Duration::from_secs(timeout))=> {
+                        log::info!("[session_id {session_id}-{ver}] search->parquet: search timeout");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search_parquet: task timeout"
+                        )))
+                    },
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
                         log::info!("[session_id {session_id}-{ver}] search->parquet: search canceled");
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {session_id}] search_parquet: task is cancel"
                         )))
                     }
                 }
-            }
-            .instrument(datafusion_span),
-        );
-
-        #[cfg(not(feature = "enterprise"))]
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
-            async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
             }
             .instrument(datafusion_span),
         );
@@ -519,9 +511,8 @@ pub async fn search_memtable(
             .insert_sender(session_id, abort_sender)
             .await;
 
-        #[cfg(feature = "enterprise")]
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let session_id = session_id.to_string();
+        let task = tokio::task::spawn(
             async move {
                 let files = vec![];
                 tokio::select! {
@@ -534,30 +525,24 @@ pub async fn search_memtable(
                         Some(record_batches),
                         FileType::ARROW,
                     ) => ret,
-                    _ = abort_receiver => {
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        log::info!("[session_id {session_id}-{ver}] search->memtable: search timeout");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search_memtable: task timeout"
+                        )))
+                    },
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
                         log::info!("[session_id {session_id}-{ver}] search->memtable: search canceled");
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {session_id}] search_memtable: task is cancel"
                         )))
                     }
                 }
-            }
-            .instrument(datafusion_span),
-        );
-        #[cfg(not(feature = "enterprise"))]
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
-            async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &Vec::new(),
-                    Some(record_batches),
-                    FileType::ARROW,
-                )
-                .await
             }
             .instrument(datafusion_span),
         );
