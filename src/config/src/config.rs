@@ -351,13 +351,15 @@ pub struct Smtp {
 
 #[derive(EnvConfig)]
 pub struct Pyroscope {
+    #[env_config(name = "ZO_PROF_PYROSCOPE_ENABLED", default = false)]
+    pub enabled: bool,
     #[env_config(
         name = "ZO_PROF_PYROSCOPE_SERVER_URL",
         default = "http://localhost:4040"
     )]
-    pub pyroscope_server_url: String,
+    pub server_url: String,
     #[env_config(name = "ZO_PROF_PYROSCOPE_PROJECT_NAME", default = "openobserve")]
-    pub pyroscope_project_name: String,
+    pub project_name: String,
 }
 
 #[derive(EnvConfig)]
