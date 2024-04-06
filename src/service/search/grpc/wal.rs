@@ -267,11 +267,11 @@ pub async fn search_parquet(
             .is_err()
         {
             log::info!(
-                "[session_id {}] wal->parquet->search: search canceled before call search->parquet",
+                "[session_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
                 session.id
             );
             return Err(Error::Message(format!(
-                "[session_id {}] wal->parquet->search: search canceled before call search->parquet",
+                "[session_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
                 session.id
             )));
         }
@@ -499,11 +499,11 @@ pub async fn search_memtable(
             .is_err()
         {
             log::info!(
-                "[session_id {}] wal->mem->search: search canceled before call search->memtable",
+                "[session_id {}] wal->mem->search: search canceled before call wal->mem->search",
                 session.id
             );
             return Err(Error::Message(format!(
-                "[session_id {}] wal->mem->search: search canceled before call search->memtable",
+                "[session_id {}] wal->mem->search: search canceled before call wal->mem->search",
                 session.id
             )));
         }
