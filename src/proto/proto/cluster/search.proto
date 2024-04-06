@@ -83,6 +83,10 @@ message JobStatus {
     optional string sql = 7;
     optional int64 start_time = 8;
     optional int64 end_time = 9;
+    optional int64 files = 10;
+    optional int64 records = 11;
+    optional int64 original_size = 12;
+    optional int64 compressed_size = 13;
 }
 
 message CancelJobRequest {

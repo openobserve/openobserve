@@ -74,6 +74,20 @@ impl Searcher {
     pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::JobStatus> {
         self.task_manager.get_task_status().await
     }
+
+    // add file stats
+    pub async fn add_file_stats(
+        &self,
+        session_id: &str,
+        files: i64,
+        records: i64,
+        original_size: i64,
+        compressed_size: i64,
+    ) {
+        self.task_manager
+            .add_file_stats(session_id, files, records, original_size, compressed_size)
+            .await;
+    }
 }
 
 #[derive(Clone, Debug)]

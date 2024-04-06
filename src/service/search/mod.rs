@@ -553,6 +553,28 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
         meta.meta.time_range
     );
 
+    #[cfg(feature = "enterprise")]
+    {
+        let mut records = 0;
+        let mut original_size = 0;
+        let mut compressed_size = 0;
+        for file in file_list.iter() {
+            let file_meta = &file.meta;
+            records += file_meta.records;
+            original_size += file_meta.original_size;
+            compressed_size += file_meta.compressed_size;
+        }
+        SEARCH_SERVER
+            .add_file_stats(
+                &session_id,
+                file_list.len() as i64,
+                records,
+                original_size,
+                compressed_size,
+            )
+            .await;
+    }
+
     // set this value to null & use it later on results ,
     // this being to avoid performance impact of query fn being applied during query
     // execution
@@ -617,6 +639,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&session_id).await {
+            log::info!(
+                "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
+            );
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[session_id {session_id}] search->grpc: search canceled before call search->grpc"
             ))));
@@ -822,6 +847,9 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&session_id).await {
+            log::info!(
+                "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
+            );
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[session_id {session_id}] search->grpc: search canceled after get result from remote node"
             ))));
@@ -1171,6 +1199,10 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
             sql: result.sql,
             start_time: result.start_time,
             end_time: result.end_time,
+            files: result.files,
+            records: result.records,
+            original_size: result.original_size,
+            compressed_size: result.compressed_size,
         });
     }
 

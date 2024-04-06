@@ -197,6 +197,7 @@ pub async fn search(
             .contain_key(session_id.as_ref())
             .await
         {
+            log::info!("[session_id {session_id}] task is cancel after get first stage result");
             return Err(Error::Message(format!(
                 "[session_id {session_id}] task is cancel after get first stage result"
             )));

@@ -248,6 +248,9 @@ pub async fn search(
             .contain_key(session_id)
             .await
         {
+            log::info!(
+                "[session_id {session_id}-{ver}] search->storage: search canceled before call search->storage"
+            );
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->storage: search canceled before call search->storage"
             )));

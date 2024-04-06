@@ -263,6 +263,9 @@ pub async fn search_parquet(
             .contain_key(session_id)
             .await
         {
+            log::info!(
+                "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
+            );
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->parquet: search canceled before call search->parquet"
             )));
@@ -502,6 +505,9 @@ pub async fn search_memtable(
             .contain_key(session_id)
             .await
         {
+            log::info!(
+                "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
+            );
             return Err(Error::Message(format!(
                 "[session_id {session_id}-{ver}] search->memtable: search canceled before call search->memtable"
             )));

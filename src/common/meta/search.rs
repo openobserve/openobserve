@@ -312,6 +312,10 @@ pub struct JobStatus {
     pub sql: Option<String>,
     pub start_time: Option<i64>,
     pub end_time: Option<i64>,
+    pub files: Option<i64>,
+    pub records: Option<i64>,
+    pub original_size: Option<i64>,
+    pub compressed_size: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
