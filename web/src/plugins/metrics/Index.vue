@@ -174,10 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <h5 class="text-center">
-              <div
+              <HTMLRenderer
                 data-test="logs-search-error-message"
-                v-html="searchObj.data.errorMsg"
-              ></div>
+                :htmlContent="searchObj.data.errorMsg"
+              />
+
               <br />
               <q-item-label>{{
                 searchObj.data.additionalErrorMsg
@@ -278,6 +279,7 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import useStreams from "@/composables/useStreams";
+import HTMLRenderer from "@/components/dashboards/panels/HTMLRenderer.vue";
 
 export default defineComponent({
   name: "AppMetrics",
@@ -289,6 +291,7 @@ export default defineComponent({
     AddToDashboard,
     SyntaxGuideMetrics,
     PanelSchemaRenderer,
+    HTMLRenderer,
   },
   methods: {
     searchData() {

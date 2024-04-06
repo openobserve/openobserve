@@ -38,6 +38,7 @@
     "cron-parser": "^4.9.0",
     "d3-hierarchy": "^3.1.2",
     "d3-selection": "^3.0.0",
+    "date-fns": "^2.0.0",
     "date-fns-tz": "^2.0.0",
     "dompurify": "^3.0.8",
     "echarts": "^5.4.3",
