@@ -242,19 +242,26 @@ pub async fn search(
             stream_type = stream_type.to_string(),
         );
         let schema = Arc::new(schema);
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let session_id = session_id.to_string();
+        let task = tokio::task::spawn(
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        None,
+                        FileType::PARQUET,
+                    ) => ret,
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        log::info!("[session_id {session_id}-{ver}] search->storage: search timeout");
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {session_id}] search->storage: task timeout"
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );
