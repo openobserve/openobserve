@@ -31,6 +31,7 @@ use config::{
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
+use reqwest::Client;
 use tokio::sync::RwLock;
 
 pub mod ingestion_service;
@@ -58,11 +59,6 @@ pub async fn report_request_usage_stats(
     let event: UsageEvent = usage_type.into();
 
     if !CONFIG.common.usage_enabled {
-        return;
-    }
-    if CONFIG.common.usage_org.eq(org_id)
-        && (stream_name.eq(STATS_STREAM) || stream_name.eq(USAGE_STREAM))
-    {
         return;
     }
 
@@ -243,21 +239,54 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     for (_, data) in groups {
         let mut usage_data = data.usage_data;
         usage_data.response_time /= data.count as f64;
-        report_data.push(json::to_value(usage_data).unwrap());
+        report_data.push(usage_data);
     }
 
-    // report usage data
-    let req = cluster_rpc::UsageRequest {
-        stream_name: USAGE_STREAM.to_owned(),
-        data: Some(cluster_rpc::UsageData::from(report_data)),
-    };
-    if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
-        log::error!("Error in ingesting usage data {:?}", e);
-        // on error in ingesting usage data, push back the data
-        let mut usages = USAGE_DATA.write().await;
-        let mut curr_usages = curr_usages.clone();
-        usages.append(&mut curr_usages);
-        drop(usages);
+    if &CONFIG.common.usage_reporting_mode != "local"
+        && !CONFIG.common.usage_reporting_url.is_empty()
+        && !CONFIG.common.usage_reporting_creds.is_empty()
+    {
+        let url = url::Url::parse(&CONFIG.common.usage_reporting_url).unwrap();
+        let creds = CONFIG.common.usage_reporting_creds.to_string();
+        if let Err(e) = Client::builder()
+            .build()
+            .unwrap()
+            .post(url)
+            .header("Content-Type", "application/json")
+            .header(reqwest::header::AUTHORIZATION, creds)
+            .json(&report_data)
+            .send()
+            .await
+        {
+            log::error!("Error in ingesting usage data to external URL {:?}", e);
+            if &CONFIG.common.usage_reporting_mode != "both" {
+                // on error in ingesting usage data, push back the data
+                let mut usages = USAGE_DATA.write().await;
+                let mut curr_usages = curr_usages.clone();
+                usages.append(&mut curr_usages);
+                drop(usages);
+            }
+        }
+    }
+
+    if &CONFIG.common.usage_reporting_mode != "remote" {
+        let report_data = report_data
+            .iter_mut()
+            .map(|usage| json::to_value(usage).unwrap())
+            .collect::<Vec<_>>();
+        // report usage data
+        let req = cluster_rpc::UsageRequest {
+            stream_name: USAGE_STREAM.to_owned(),
+            data: Some(cluster_rpc::UsageData::from(report_data)),
+        };
+        if let Err(e) = ingestion_service::ingest(&CONFIG.common.usage_org, req).await {
+            log::error!("Error in ingesting usage data {:?}", e);
+            // on error in ingesting usage data, push back the data
+            let mut usages = USAGE_DATA.write().await;
+            let mut curr_usages = curr_usages.clone();
+            usages.append(&mut curr_usages);
+            drop(usages);
+        }
     }
 }
 

@@ -48,7 +48,7 @@ use crate::{
 const CHANNEL_SIZE: usize = 10240;
 const STREAM_NAME: &str = "distinct_values";
 
-static CHANNEL: Lazy<DistinctValues> = Lazy::new(DistinctValues::new);
+pub(crate) static INSTANCE: Lazy<DistinctValues> = Lazy::new(DistinctValues::new);
 
 type MemTable = FxIndexMap<String, FxIndexMap<DvItem, u32>>;
 
@@ -130,13 +130,13 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
                 }
             };
             if let DvEventType::Shutudown = event.ev_type {
-                if let Err(e) = CHANNEL.flush().await {
+                if let Err(e) = INSTANCE.flush().await {
                     log::error!("[DISTINCT_VALUES] flush error: {}", e);
                 }
-                CHANNEL.shutdown.store(true, Ordering::Release);
+                INSTANCE.shutdown.store(true, Ordering::SeqCst);
                 break;
             }
-            let mut mem_table = CHANNEL.mem_table.write().await;
+            let mut mem_table = INSTANCE.mem_table.write().await;
             let entry = mem_table.entry(event.org_id).or_default();
             let field_entry = entry.entry(event.item).or_default();
             *field_entry += event.count;
@@ -260,7 +260,7 @@ impl Metadata for DistinctValues {
             .map_err(|e| Error::Message(e.to_string()))?;
         let mut i = 0;
         while i < 10 {
-            if self.shutdown.load(Ordering::Relaxed) {
+            if self.shutdown.load(Ordering::SeqCst) {
                 break;
             }
             time::sleep(time::Duration::from_secs(1)).await;
@@ -278,7 +278,7 @@ async fn run_flush() {
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
-        if let Err(e) = CHANNEL.flush().await {
+        if let Err(e) = INSTANCE.flush().await {
             log::error!("[DISTINCT_VALUES] errot flush data to wal: {}", e);
         }
     }

@@ -289,7 +289,7 @@ pub async fn search_parquet(
                         None,
                         FileType::PARQUET,
                     ) => ret,
-                    _ = tokio::time::sleep(Duration::from_secs(timeout))=> {
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                         log::error!("[session_id {}] wal->parquet->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {}] wal->parquet->search: task timeout", session.id
