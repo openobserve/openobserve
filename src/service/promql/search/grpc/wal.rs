@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,13 @@
 use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use arrow::{ipc::reader::StreamReader, record_batch::RecordBatch};
-use config::{meta::stream::StreamType, CONFIG, FILE_EXT_PARQUET};
+use config::{
+    meta::{
+        search::{ScanStats, SearchType, Session as SearchSession, StorageType},
+        stream::StreamType,
+    },
+    CONFIG, FILE_EXT_PARQUET,
+};
 use datafusion::{
     arrow::datatypes::Schema,
     common::FileType,
@@ -32,20 +38,11 @@ use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{
-        infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
-        meta::{
-            search::{SearchType, Session as SearchSession},
-            stream::ScanStats,
-        },
-    },
+    common::infra::cluster::{get_cached_online_ingester_nodes, get_internal_grpc_token},
     service::{
         db,
         search::{
-            datafusion::{
-                exec::{prepare_datafusion_context, register_table},
-                storage::StorageType,
-            },
+            datafusion::exec::{prepare_datafusion_context, register_table},
             MetadataMap,
         },
     },

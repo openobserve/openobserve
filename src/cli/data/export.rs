@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,18 +16,20 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use actix_web::web::Query;
-use config::meta::stream::StreamType;
+use async_trait::async_trait;
+use config::meta::{search, stream::StreamType};
 
 use crate::{
     cli::data::{cli::Cli, Context},
-    common::{meta::search::Request, utils::http::get_stream_type_from_request},
+    common::utils::http::get_stream_type_from_request,
     service::search as SearchService,
 };
 
 pub struct Export {}
 
+#[async_trait]
 impl Context for Export {
-    fn operator(c: Cli) -> Result<bool, anyhow::Error> {
+    async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
         let map = HashMap::from([("type".to_string(), c.stream_type)]);
 
         let stream_type = match get_stream_type_from_request(&Query(map.clone())) {
@@ -36,7 +38,7 @@ impl Context for Export {
         };
 
         let table = c.stream_name;
-        let query = crate::common::meta::search::Query {
+        let query = search::Query {
             sql: format!("select * from {}", table),
             from: 0,
             size: 100,
@@ -52,35 +54,33 @@ impl Context for Export {
             query_fn: None,
         };
 
-        let req: Request = Request {
+        let req = search::Request {
             query,
             aggs: HashMap::new(),
-            encoding: crate::common::meta::search::RequestEncoding::Empty,
+            encoding: search::RequestEncoding::Empty,
             timeout: 0,
         };
 
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
-            match SearchService::search("", &c.org, stream_type, &req).await {
-                Ok(res) => {
-                    if c.file_type != "json" {
-                        eprintln!("No other file types are implemented");
-                        return Ok(false);
-                    }
-                    let path = Path::new(c.data.as_str());
-                    fs::create_dir_all(path)?;
-                    let file = fs::File::create(path.join(format!(
-                        "{}.{}",
-                        chrono::Local::now().timestamp_micros(),
-                        c.file_type
-                    )))?;
-                    serde_json::to_writer_pretty(file, &res.hits)?;
-                    Ok(true)
+        match SearchService::search("", &c.org, stream_type, &req).await {
+            Ok(res) => {
+                if c.file_type != "json" {
+                    eprintln!("No other file types are implemented");
+                    return Ok(false);
                 }
-                Err(err) => {
-                    eprintln!("search error: {:?}", err);
-                    Ok(false)
-                }
+                let path = Path::new(c.data.as_str());
+                fs::create_dir_all(path)?;
+                let file = fs::File::create(path.join(format!(
+                    "{}.{}",
+                    chrono::Local::now().timestamp_micros(),
+                    c.file_type
+                )))?;
+                serde_json::to_writer_pretty(file, &res.hits)?;
+                Ok(true)
             }
-        })
+            Err(err) => {
+                eprintln!("search error: {:?}", err);
+                Ok(false)
+            }
+        }
     }
 }

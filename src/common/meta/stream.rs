@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -253,32 +253,6 @@ pub struct SchemaRecords {
     pub schema: Arc<Schema>,
     pub records: Vec<Arc<json::Value>>,
     pub records_size: usize,
-}
-
-#[derive(Clone, Copy, Default)]
-pub struct ScanStats {
-    pub files: i64,
-    pub records: i64,
-    pub original_size: i64,
-    pub compressed_size: i64,
-}
-
-impl ScanStats {
-    pub fn new() -> Self {
-        ScanStats::default()
-    }
-
-    pub fn add(&mut self, other: &ScanStats) {
-        self.files += other.files;
-        self.records += other.records;
-        self.original_size += other.original_size;
-        self.compressed_size += other.compressed_size;
-    }
-
-    pub fn format_to_mb(&mut self) {
-        self.original_size = self.original_size / 1024 / 1024;
-        self.compressed_size = self.compressed_size / 1024 / 1024;
-    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]

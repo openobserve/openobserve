@@ -32,7 +32,6 @@ use crate::{
     common::{
         infra::config::{STREAM_SCHEMAS, STREAM_SETTINGS},
         meta::{
-            self,
             authz::Authz,
             http::HttpResponse as MetaHttpResponse,
             prom,
@@ -442,17 +441,17 @@ async fn _get_stream_stats(
 
     // group by stream_name , org_id , stream_type
 
-    let query = meta::search::Query {
+    let query = config::meta::search::Query {
         sql: format!("{sql} group by stream_name , org_id , stream_type"),
         sql_mode: "full".to_owned(),
         size: 100000000,
         ..Default::default()
     };
 
-    let req: meta::search::Request = meta::search::Request {
+    let req = config::meta::search::Request {
         query,
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
     match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, &req).await {

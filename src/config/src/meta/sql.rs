@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::DateTime;
-use config::CONFIG;
 use regex::Regex;
 use serde::Serialize;
 use sqlparser::{
@@ -26,23 +25,25 @@ use sqlparser::{
     parser::Parser,
 };
 
+use crate::CONFIG;
+
 const MAX_LIMIT: usize = 100000;
 const MAX_OFFSET: usize = 100000;
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
-    pub(crate) fields: Vec<String>,           // projection, select, fields
-    pub(crate) selection: Option<SqlExpr>,    // where
-    pub(crate) source: String,                // table
-    pub(crate) order_by: Vec<(String, bool)>, // desc: true / false
-    pub(crate) group_by: Vec<String>,         // field
-    pub(crate) having: bool,
-    pub(crate) offset: usize,
-    pub(crate) limit: usize,
-    pub(crate) time_range: Option<(i64, i64)>,
-    pub(crate) quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
-    pub(crate) field_alias: Vec<(String, String)>,             // alias for select field
+    pub fields: Vec<String>,           // projection, select, fields
+    pub selection: Option<SqlExpr>,    // where
+    pub source: String,                // table
+    pub order_by: Vec<(String, bool)>, // desc: true / false
+    pub group_by: Vec<String>,         // field
+    pub having: bool,
+    pub offset: usize,
+    pub limit: usize,
+    pub time_range: Option<(i64, i64)>,
+    pub quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
+    pub field_alias: Vec<(String, String)>,             // alias for select field
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -65,14 +66,14 @@ pub enum SqlValue {
     Number(i64),
 }
 
-pub struct Projection<'a>(pub(crate) &'a Vec<SelectItem>);
-pub struct Quicktext<'a>(pub(crate) &'a Option<SqlExpr>);
-pub struct Timerange<'a>(pub(crate) &'a Option<SqlExpr>);
-pub struct Source<'a>(pub(crate) &'a [TableWithJoins]);
-pub struct Order<'a>(pub(crate) &'a OrderByExpr);
-pub struct Group<'a>(pub(crate) &'a SqlExpr);
-pub struct Offset<'a>(pub(crate) &'a SqlOffset);
-pub struct Limit<'a>(pub(crate) &'a SqlExpr);
+pub struct Projection<'a>(pub &'a Vec<SelectItem>);
+pub struct Quicktext<'a>(pub &'a Option<SqlExpr>);
+pub struct Timerange<'a>(pub &'a Option<SqlExpr>);
+pub struct Source<'a>(pub &'a [TableWithJoins]);
+pub struct Order<'a>(pub &'a OrderByExpr);
+pub struct Group<'a>(pub &'a SqlExpr);
+pub struct Offset<'a>(pub &'a SqlOffset);
+pub struct Limit<'a>(pub &'a SqlExpr);
 
 impl Sql {
     pub fn new(sql: &str) -> Result<Sql, anyhow::Error> {

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,13 +23,6 @@ pub mod file_list;
 pub mod memory;
 pub mod tmpfs;
 pub mod wal;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum StorageType {
-    Memory,
-    Wal,
-    Tmpfs,
-}
 
 /// A specialized `Error` for in-memory object store-related errors
 #[derive(ThisError, Debug)]
