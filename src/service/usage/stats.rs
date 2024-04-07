@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,10 +31,7 @@ use reqwest::Client;
 
 use super::ingestion_service;
 use crate::{
-    common::{
-        infra::cluster::get_node_by_uuid,
-        meta::{self, search::Request},
-    },
+    common::infra::cluster::get_node_by_uuid,
     service::{db, search as SearchService},
 };
 
@@ -89,17 +86,17 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             )
         };
 
-        let query = meta::search::Query {
+        let query = config::meta::search::Query {
             sql,
             sql_mode: "full".to_owned(),
             size: 100000000,
             ..Default::default()
         };
 
-        let req: meta::search::Request = Request {
+        let req = config::meta::search::Request {
             query,
             aggs: HashMap::new(),
-            encoding: meta::search::RequestEncoding::Empty,
+            encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
         };
         // do search
@@ -153,17 +150,17 @@ async fn get_last_stats(
         )
     };
 
-    let query = meta::search::Query {
+    let query = config::meta::search::Query {
         sql,
         sql_mode: "full".to_owned(),
         size: 100000000,
         ..Default::default()
     };
 
-    let req: meta::search::Request = Request {
+    let req = config::meta::search::Request {
         query,
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
     match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {

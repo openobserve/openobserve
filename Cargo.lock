@@ -2189,10 +2189,12 @@ dependencies = [
  "prometheus",
  "proto",
  "rand",
+ "regex",
  "reqwest",
  "segment",
  "serde",
  "serde_json",
+ "sqlparser",
  "svix-ksuid",
  "sysinfo",
  "tokio",
@@ -4940,7 +4942,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "openobserve"
-version = "0.9.1"
+version = "0.9.3"
 dependencies = [
  "actix-cors",
  "actix-multipart",
@@ -7968,7 +7970,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 

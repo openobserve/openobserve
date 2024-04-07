@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,10 +23,7 @@ use config::{
 use infra::cache::stats;
 use vrl::prelude::NotNan;
 
-use crate::{
-    common::meta::{self, search::Request},
-    service::search as SearchService,
-};
+use crate::service::search as SearchService;
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
@@ -37,7 +34,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         stats.doc_num
     };
 
-    let query = meta::search::Query {
+    let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\" limit {rec_num}"),
         start_time: BASE_TIME.timestamp_micros(),
         end_time: Utc::now().timestamp_micros(),
@@ -45,10 +42,10 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         ..Default::default()
     };
 
-    let req: meta::search::Request = Request {
+    let req = config::meta::search::Request {
         query,
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
     // do search

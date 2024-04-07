@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,10 @@ use std::sync::Arc;
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
 use config::{
     cluster,
-    meta::stream::{FileKey, StreamType},
+    meta::{
+        search::ScanStats,
+        stream::{FileKey, StreamType},
+    },
     CONFIG,
 };
 use futures::future::try_join_all;
@@ -28,8 +31,7 @@ use proto::cluster_rpc;
 use tracing::{info_span, Instrument};
 
 use super::datafusion;
-use crate::{common::meta::stream::ScanStats, service::db};
-
+use crate::service::db;
 mod storage;
 mod wal;
 

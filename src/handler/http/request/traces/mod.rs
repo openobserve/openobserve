@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -211,8 +211,8 @@ pub async fn get_latest_traces(
     } else {
         format!("{query_sql} WHERE {filter} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
     };
-    let mut req = meta::search::Request {
-        query: meta::search::Query {
+    let mut req = config::meta::search::Request {
+        query: config::meta::search::Query {
             sql: query_sql.to_string(),
             from,
             size,
@@ -228,7 +228,7 @@ pub async fn get_latest_traces(
             query_fn: None,
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
     let stream_type = StreamType::Traces;

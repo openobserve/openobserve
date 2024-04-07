@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -43,7 +43,6 @@ use crate::{
                 QueryType,
             },
             authz::Authz,
-            search,
         },
         utils::auth::{remove_ownership, set_ownership},
     },
@@ -439,8 +438,8 @@ impl QueryCondition {
         };
 
         // fire the query
-        let req = search::Request {
-            query: search::Query {
+        let req = config::meta::search::Request {
+            query: config::meta::search::Query {
                 sql: sql.clone(),
                 from: 0,
                 size: 100,
@@ -460,7 +459,7 @@ impl QueryCondition {
                 query_fn: None,
             },
             aggs: HashMap::new(),
-            encoding: search::RequestEncoding::Empty,
+            encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
         };
         let session_id = ider::uuid();
