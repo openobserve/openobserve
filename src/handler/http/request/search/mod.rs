@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -122,7 +122,7 @@ pub async fn search(
     };
 
     // handle encoding for query and aggs
-    let mut req: meta::search::Request = match json::from_slice(&body) {
+    let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
@@ -134,7 +134,7 @@ pub async fn search(
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
-    let stream_name = match crate::common::meta::sql::Sql::new(&req.query.sql) {
+    let stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
         Ok(v) => v.source.to_string(),
         Err(e) => {
             return Ok(
@@ -404,8 +404,8 @@ pub async fn around(
             .unwrap();
 
     // search forward
-    let req = meta::search::Request {
-        query: meta::search::Query {
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
@@ -421,7 +421,7 @@ pub async fn around(
             query_fn: query_fn.clone(),
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
     let resp_forward = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
@@ -460,8 +460,8 @@ pub async fn around(
     };
 
     // search backward
-    let req = meta::search::Request {
-        query: meta::search::Query {
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
             sql: around_sql.clone(),
             from: 0,
             size: around_size / 2,
@@ -477,7 +477,7 @@ pub async fn around(
             query_fn: query_fn.clone(),
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
     let resp_backward = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
@@ -516,7 +516,7 @@ pub async fn around(
     };
 
     // merge
-    let mut resp = meta::search::Response::default();
+    let mut resp = config::meta::search::Response::default();
     let hits_num = resp_backward.hits.len();
     for i in 0..hits_num {
         resp.hits
@@ -768,8 +768,8 @@ async fn values_v1(
     let _locker = locker.lock().await;
 
     // search
-    let mut req = meta::search::Request {
-        query: meta::search::Query {
+    let mut req = config::meta::search::Request {
+        query: config::meta::search::Query {
             sql: query_sql,
             from: 0,
             size: 0,
@@ -785,7 +785,7 @@ async fn values_v1(
             query_fn: query_fn.clone(),
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
 
@@ -846,7 +846,7 @@ async fn values_v1(
         }
     };
 
-    let mut resp = meta::search::Response::default();
+    let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
     for (key, val) in resp_search.aggs {
         let mut field_value: json::Map<String, json::Value> = json::Map::new();
@@ -956,8 +956,8 @@ async fn values_v2(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // search
-    let req = meta::search::Request {
-        query: meta::search::Query {
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
             sql: format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}"),
             from: 0,
             size: 0,
@@ -973,7 +973,7 @@ async fn values_v2(
             query_fn: None,
         },
         aggs: HashMap::new(),
-        encoding: meta::search::RequestEncoding::Empty,
+        encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
     let resp_search = match SearchService::search(&session_id, org_id, StreamType::Metadata, &req)
@@ -1013,7 +1013,7 @@ async fn values_v2(
         }
     };
 
-    let mut resp = meta::search::Response::default();
+    let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut field_value: json::Map<String, json::Value> = json::Map::new();
     field_value.insert("field".to_string(), json::Value::String(field.to_string()));
@@ -1117,7 +1117,7 @@ pub async fn search_partition(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let req: meta::search::SearchPartitionRequest = match json::from_slice(&body) {
+    let req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };

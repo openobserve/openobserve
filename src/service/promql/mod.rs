@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,11 +19,10 @@ use std::{
 };
 
 use async_trait::async_trait;
+use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::common::meta::stream::ScanStats;
 
 mod aggregations;
 mod binaries;

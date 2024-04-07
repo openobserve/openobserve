@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,20 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use async_trait::async_trait;
+
 pub mod cli;
 pub mod export;
 pub mod import;
 
+#[async_trait]
 pub trait Context {
-    fn operator(c: cli::Cli) -> Result<bool, anyhow::Error>;
+    async fn operator(c: cli::Cli) -> Result<bool, anyhow::Error>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_export_operator() {
+    #[tokio::test]
+    async fn test_export_operator() {
         let args = vec![
             "openobserve",
             "--c",
@@ -47,13 +50,13 @@ mod tests {
 
         let cli = cli::Cli::args(args);
 
-        if let Err(err) = export::Export::operator(cli.clone()) {
+        if let Err(err) = export::Export::operator(cli.clone()).await {
             println!("Error: {}", err);
         }
     }
 
-    #[test]
-    fn test_import_operator() {
+    #[tokio::test]
+    async fn test_import_operator() {
         let args = vec![
             "openobserve",
             "--c",
@@ -74,7 +77,7 @@ mod tests {
 
         let cli = cli::Cli::args(args);
 
-        if let Err(err) = import::Import::operator(cli.clone()) {
+        if let Err(err) = import::Import::operator(cli.clone()).await {
             println!("Error: {}", err);
         }
     }

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,8 @@
 
 use std::fs;
 
+use async_recursion::async_recursion;
+use async_trait::async_trait;
 use bytes::Bytes;
 
 use crate::{
@@ -25,37 +27,38 @@ use crate::{
 
 pub struct Import {}
 
+#[async_trait]
 impl Context for Import {
-    fn operator(c: Cli) -> Result<bool, anyhow::Error> {
-        read_files_in_directory(c.clone(), c.data.as_str())
+    async fn operator(c: Cli) -> Result<bool, anyhow::Error> {
+        read_files_in_directory(c.clone(), c.data.as_str()).await
     }
 }
 
-fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow::Error> {
-    tokio::runtime::Runtime::new().unwrap().block_on(async {
-        let entries = fs::read_dir(dir_path)?;
-        for entry in entries {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() {
-                let content = fs::read(&path)?;
-                if let Err(e) = logs::ingest::ingest(
-                    &c.org,
-                    &c.stream_name,
-                    IngestionRequest::JSON(&Bytes::from(content)),
-                    0,
-                    "root",
-                )
-                .await
-                {
-                    eprintln!("insert data fail {:?}: {:?}", path, e);
-                    return Ok(false);
-                }
-            } else if path.is_dir() && !read_files_in_directory(c.clone(), &path.to_string_lossy())?
+#[async_recursion]
+async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow::Error> {
+    let entries = fs::read_dir(dir_path)?;
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            let content = fs::read(&path)?;
+            if let Err(e) = logs::ingest::ingest(
+                &c.org,
+                &c.stream_name,
+                IngestionRequest::JSON(&Bytes::from(content)),
+                0,
+                "root",
+            )
+            .await
             {
+                eprintln!("insert data fail {:?}: {:?}", path, e);
                 return Ok(false);
             }
+        } else if path.is_dir()
+            && !read_files_in_directory(c.clone(), &path.to_string_lossy()).await?
+        {
+            return Ok(false);
         }
-        Ok(true)
-    })
+    }
+    Ok(true)
 }
