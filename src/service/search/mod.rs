@@ -1182,10 +1182,20 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
         } else {
             set.insert(result.session_id.clone());
         }
-        let query_info = result.query.unwrap_or(proto::cluster_rpc::Query::default());
+        let query = result.query.as_ref().map(|query| search::QueryInfo {
+            sql: query.sql.clone(),
+            start_time: query.start_time,
+            end_time: query.end_time,
+        });
         let scan_stats = result
             .scan_stats
-            .unwrap_or(proto::cluster_rpc::ScanStats::default());
+            .as_ref()
+            .map(|scan_stats| search::ScanStats {
+                files: scan_stats.files,
+                records: scan_stats.records,
+                original_size: scan_stats.original_size / 1024 / 1024, // change to MB
+                compressed_size: scan_stats.compressed_size / 1024 / 1024, // change to MB
+            });
         let job_status = if result.is_queue {
             "waiting"
         } else {
@@ -1199,17 +1209,8 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
             user_id: result.user_id,
             org_id: result.org_id,
             stream_type: result.stream_type,
-            query: Some(search::QueryInfo {
-                sql: query_info.sql,
-                start_time: query_info.start_time,
-                end_time: query_info.end_time,
-            }),
-            scan_stats: Some(search::ScanStats {
-                files: scan_stats.files,
-                records: scan_stats.records,
-                original_size: scan_stats.original_size / 1024 / 1024, // change to MB
-                compressed_size: scan_stats.compressed_size / 1024 / 1024, // change to MB
-            }),
+            query,
+            scan_stats,
         });
     }
 
