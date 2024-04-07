@@ -889,6 +889,16 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                 #[cfg(not(feature = "enterprise"))]
                 futures::future::pending::<()>().await;
             } => {
+                // search done, release lock
+                #[cfg(not(feature = "enterprise"))]
+                dist_lock::unlock(&locker).await?;
+                #[cfg(feature = "enterprise")]
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(&session_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
                 log::info!("[session_id {session_id}] search->cluster: final merge task is cancel");
                 return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[session_id {session_id}] search->cluster: final merge task is cancel"))));
             }
@@ -896,6 +906,8 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 
         merge_batches.insert(name, merge_batch);
     }
+
+    log::info!("[session_id {session_id}] final merge task finish");
 
     // search done, release lock
     #[cfg(not(feature = "enterprise"))]
@@ -1174,11 +1186,16 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
         let scan_stats = result
             .scan_stats
             .unwrap_or(proto::cluster_rpc::ScanStats::default());
+        let job_status = if result.is_queue {
+            "waiting"
+        } else {
+            "processing"
+        };
         status.push(search::JobStatus {
             session_id: result.session_id,
             created_at: result.created_at,
             started_at: result.started_at,
-            is_queue: result.is_queue,
+            status: job_status.to_string(),
             user_id: result.user_id,
             org_id: result.org_id,
             stream_type: result.stream_type,
@@ -1190,8 +1207,8 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
             scan_stats: Some(search::ScanStats {
                 files: scan_stats.files,
                 records: scan_stats.records,
-                original_size: scan_stats.original_size,
-                compressed_size: scan_stats.compressed_size,
+                original_size: scan_stats.original_size / 1024 / 1024, // change to MB
+                compressed_size: scan_stats.compressed_size / 1024 / 1024, // change to MB
             }),
         });
     }

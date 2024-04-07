@@ -304,9 +304,9 @@ pub struct JobStatusResponse {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct JobStatus {
     pub session_id: String,
+    pub status: String,
     pub created_at: i64,
     pub started_at: i64,
-    pub is_queue: bool,
     pub user_id: Option<String>,
     pub org_id: Option<String>,
     pub stream_type: Option<String>,

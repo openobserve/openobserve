@@ -242,6 +242,8 @@ pub async fn search(
     // clear session data
     datafusion::storage::file_list::clear(&session_id);
 
+    log::info!("[session_id {session_id}] in node merge task finish");
+
     // final result
     let mut hits_buf = Vec::new();
     let mut hits_total = 0;
