@@ -90,8 +90,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
             "[Schema:Migration]: Done creating row per version of schema: {}",
             key
         );
-        // TODO debug
-        // db.delete(&key, false, infra_db::NEED_WATCH, Some(0)).await?;
+        db.delete(&key, false, infra_db::NEED_WATCH, Some(0))
+            .await?;
         println!("[Schema:Migration]: Done migrating schema: {}", key);
     }
     infra::dist_lock::unlock(&locker).await?;

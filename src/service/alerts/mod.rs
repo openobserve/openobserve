@@ -1114,7 +1114,7 @@ async fn process_dest_template(
             alert.stream_name,
             alert_start_time,
             alert_end_time,
-            base64::encode(&alert_query).replace('+', "%2B"),
+            base64::encode_url(&alert_query).replace('+', "%2B"),
             alert.org_id,
         )
     } else {
@@ -1142,7 +1142,7 @@ async fn process_dest_template(
             alert.stream_name,
             alert_start_time,
             alert_end_time,
-            base64::encode(&alert_query),
+            base64::encode_url(&alert_query),
             alert.org_id,
         )
     };

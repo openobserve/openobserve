@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,7 @@
 use std::io::Error;
 
 use actix_web::{cookie, delete, get, http, post, put, web, HttpResponse};
-use base64::Engine;
-use config::CONFIG;
+use config::{utils::base64, CONFIG};
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -241,8 +240,7 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
     if resp.status {
         let token = format!(
             "Basic {}",
-            base64::engine::general_purpose::STANDARD
-                .encode(format!("{}:{}", auth.name, auth.password))
+            base64::encode(&format!("{}:{}", auth.name, auth.password))
         );
         let mut access_cookie = cookie::Cookie::new("access_token", token);
         access_cookie.set_expires(
