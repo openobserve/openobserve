@@ -50,7 +50,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashMap;
-use infra::cache::tmpfs;
+use infra::cache::tmpfs::Directory;
 use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
@@ -621,7 +621,7 @@ pub async fn merge(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
-    let list_url = format!("tmpfs://{work_dir}");
+    let list_url = format!("tmpfs://{}", work_dir.name());
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
         Err(e) => {
@@ -665,15 +665,12 @@ pub async fn merge(
     }
     ctx.deregister_table("tbl")?;
 
-    // clear temp file
-    tmpfs::delete(&work_dir, true).unwrap();
-
     Ok(batches)
 }
 
-fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, String)> {
+fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Directory)> {
     let mut i = 0;
-    let work_dir = format!("/tmp/merge/{}/", ider::uuid());
+    let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
     let mut schema = Schema::empty();
     for row in batches.iter() {
         if row.num_rows() == 0 {
@@ -682,12 +679,14 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Stri
         i += 1;
         let row_schema = row.schema();
         schema = Schema::try_merge(vec![schema, row_schema.as_ref().clone()])?;
-        let file_name = format!("{work_dir}{i}.parquet");
+        let file_name = format!("{}{i}.parquet", work_dir.name());
         let mut buf_parquet = Vec::new();
         let mut writer = ArrowWriter::try_new(&mut buf_parquet, row_schema, None)?;
         writer.write(row)?;
         writer.close()?;
-        tmpfs::set(&file_name, buf_parquet.into()).expect("tmpfs set success");
+        work_dir
+            .set(&file_name, buf_parquet.into())
+            .expect("tmpfs set success");
     }
     filter_schema_null_fields(&mut schema); // fix schema
     Ok((Arc::new(schema), work_dir))
@@ -1505,7 +1504,7 @@ mod tests {
 
         let res = merge_write_recordbatch(&[batch1, batch2]).unwrap();
         assert!(!res.0.fields().is_empty());
-        assert!(!res.1.is_empty())
+        assert!(!res.1.name().is_empty())
     }
 
     #[tokio::test]
