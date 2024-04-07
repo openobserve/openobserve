@@ -107,13 +107,19 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let wal_files = scan_files(wal_dir, "wal");
+    let wal_files = scan_files(&wal_dir, "wal");
     if wal_files.is_empty() {
         return Ok(());
     }
     for wal_file in wal_files.iter() {
         log::warn!("starting replay wal file: {:?}", wal_file);
-        let file_str = wal_file.to_string_lossy().to_string();
+        let file_str = wal_file
+            .strip_prefix(&wal_dir)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace('\\', "/")
+            .to_string();
         let file_columns = file_str.split('/').collect::<Vec<_>>();
         let stream_type = file_columns[file_columns.len() - 2];
         let org_id = file_columns[file_columns.len() - 3];
