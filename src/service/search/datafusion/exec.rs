@@ -17,7 +17,6 @@ use std::{str::FromStr, sync::Arc};
 
 use arrow_schema::Field;
 use config::{
-    ider,
     meta::{
         search::{SearchType, Session as SearchSession, StorageType},
         sql,
@@ -559,7 +558,7 @@ pub async fn merge(
         return Ok(vec![]);
     }
 
-    let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
+    let work_dir = Directory::default();
     // write temp file
     let mut schema = merge_write_recordbatch(batches, &work_dir)?;
     if schema.fields().is_empty() {
@@ -622,7 +621,7 @@ pub async fn merge(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
-    let list_url = format!("tmpfs://{}", work_dir.name());
+    let list_url = format!("tmpfs:///{}/", work_dir.name());
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
         Err(e) => {
@@ -674,7 +673,6 @@ pub async fn merge(
 
 fn merge_write_recordbatch(batches: &[RecordBatch], work_dir: &Directory) -> Result<Arc<Schema>> {
     let mut i = 0;
-    // let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
     let mut schema = Schema::empty();
     for row in batches.iter() {
         if row.num_rows() == 0 {
@@ -1506,7 +1504,7 @@ mod tests {
         )
         .unwrap();
 
-        let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
+        let work_dir = Directory::default();
         let schema = merge_write_recordbatch(&[batch1, batch2], &work_dir).unwrap();
         assert!(!schema.fields().is_empty());
         assert!(!work_dir.name().is_empty())
