@@ -559,8 +559,9 @@ pub async fn merge(
         return Ok(vec![]);
     }
 
+    let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
     // write temp file
-    let (mut schema, work_dir) = merge_write_recordbatch(batches)?;
+    let mut schema = merge_write_recordbatch(batches, &work_dir)?;
     if schema.fields().is_empty() {
         return Ok(vec![]);
     }
@@ -665,12 +666,15 @@ pub async fn merge(
     }
     ctx.deregister_table("tbl")?;
 
+    // drop temp dir
+    drop(work_dir);
+
     Ok(batches)
 }
 
-fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Directory)> {
+fn merge_write_recordbatch(batches: &[RecordBatch], work_dir: &Directory) -> Result<Arc<Schema>> {
     let mut i = 0;
-    let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
+    // let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
     let mut schema = Schema::empty();
     for row in batches.iter() {
         if row.num_rows() == 0 {
@@ -689,7 +693,7 @@ fn merge_write_recordbatch(batches: &[RecordBatch]) -> Result<(Arc<Schema>, Dire
             .expect("tmpfs set success");
     }
     filter_schema_null_fields(&mut schema); // fix schema
-    Ok((Arc::new(schema), work_dir))
+    Ok(Arc::new(schema))
 }
 
 fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Result<String> {
@@ -1502,9 +1506,10 @@ mod tests {
         )
         .unwrap();
 
-        let res = merge_write_recordbatch(&[batch1, batch2]).unwrap();
-        assert!(!res.0.fields().is_empty());
-        assert!(!res.1.name().is_empty())
+        let work_dir = Directory::new(format!("/tmp/merge/{}/", ider::uuid()));
+        let schema = merge_write_recordbatch(&[batch1, batch2], &work_dir).unwrap();
+        assert!(!schema.fields().is_empty());
+        assert!(!work_dir.name().is_empty())
     }
 
     #[tokio::test]
