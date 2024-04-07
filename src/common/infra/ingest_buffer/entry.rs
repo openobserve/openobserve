@@ -16,10 +16,10 @@
 use std::io::{Cursor, Read};
 
 use actix_web::web::Bytes;
+use anyhow::{anyhow, Context, Result};
 use arrow::datatypes::ToByteSlice;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-// TODO: clean up imports
 use crate::{common::meta::ingestion::IngestionRequest, service::logs};
 
 // TODO: support other two endpoints
@@ -66,35 +66,29 @@ impl IngestEntry {
         }
     }
 
-    pub async fn ingest(&self) -> Result<(), anyhow::Error> {
+    pub async fn ingest(&self) -> Result<bool> {
         let in_req = match self.source {
             IngestSource::Bulk => {
-                return match logs::bulk::ingest(
+                return logs::bulk::ingest(
                     &self.org_id,
                     self.body.clone(),
                     self.thread_id,
                     &self.user_email,
                 )
                 .await
-                {
-                    Ok(v) => {
-                        println!("ingested: {:?}", v);
-                        Ok(())
-                    }
-                    Err(e) => {
-                        println!("error: {:?}", e);
-                        Ok(())
-                    }
-                };
+                .map(|_| false);
             }
             IngestSource::Multi => IngestionRequest::Multi(&self.body),
             IngestSource::JSON => IngestionRequest::JSON(&self.body),
-            _ => unimplemented!("To be supported"),
+            _ => unimplemented!("Ingest type {} to be implemented", self.source),
         };
         let Some(stream_name) = self.stream_name.as_ref() else {
-            return Err(anyhow::anyhow!("missing stream name"));
+            return Err(anyhow!(
+                "Ingest type {} requires stream_name but received none",
+                self.source
+            ));
         };
-        match logs::ingest::ingest(
+        logs::ingest::ingest(
             &self.org_id,
             &stream_name,
             in_req,
@@ -102,87 +96,116 @@ impl IngestEntry {
             &self.user_email,
         )
         .await
-        {
-            Ok(v) => {
-                println!("ingested: {:?}", v);
-            }
-            Err(e) => {
-                println!("error: {:?}", e);
-            }
-        };
-        Ok(())
+        // Mark 503 as retries
+        .map(|resp| resp.code == 503)
     }
 
-    // HELP: should the buf be limited in certain size (e.g. 4096)
-    pub fn into_bytes(&self) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn into_bytes(&self) -> Result<Vec<u8>> {
         let mut buf = Vec::with_capacity(4096);
 
         let source = u8::from(&self.source);
-        buf.write_u8(source)?;
+        buf.write_u8(source)
+            .context("IngestEntry::into_bytes() failed at <source>")?;
 
         let thread_id = self.thread_id.to_be_bytes();
         buf.extend_from_slice(&thread_id);
 
         let org_id = self.org_id.as_bytes();
-        buf.write_u16::<BigEndian>(org_id.len() as u16)?;
+        buf.write_u16::<BigEndian>(org_id.len() as u16)
+            .context("IngestEntry::into_bytes() failed at <org_id>")?;
         buf.extend_from_slice(org_id);
 
         let user_email = self.user_email.as_bytes();
-        buf.write_u16::<BigEndian>(user_email.len() as u16)?;
+        buf.write_u16::<BigEndian>(user_email.len() as u16)
+            .context("IngestEntry::into_bytes() failed at <user_email>")?;
         buf.extend_from_slice(user_email);
 
         match &self.stream_name {
-            None => buf.write_u8(0)?,
+            None => buf
+                .write_u8(0)
+                .context("IngestEntry::into_bytes() failed at <stream_name_indicator>")?,
             Some(stream_name) => {
-                buf.write_u8(1)?;
+                buf.write_u8(1)
+                    .context("IngestEntry::into_bytes() failed at <stream_name_indicator>")?;
                 let stream_name = stream_name.as_bytes();
-                buf.write_u16::<BigEndian>(stream_name.len() as u16)?;
+                buf.write_u16::<BigEndian>(stream_name.len() as u16)
+                    .context("IngestEntry::into_bytes() failed at <stream_name>")?;
                 buf.extend_from_slice(stream_name);
             }
         };
 
         let body = self.body.to_byte_slice();
-        buf.write_u16::<BigEndian>(body.len() as u16)?;
+        buf.write_u16::<BigEndian>(body.len() as u16)
+            .context("IngestEntry::into_bytes() failed at <body>")?;
         buf.extend_from_slice(body);
 
         Ok(buf)
     }
 
-    pub fn from_bytes(value: &[u8]) -> Result<Self, anyhow::Error> {
+    pub fn from_bytes(value: &[u8]) -> Result<Self> {
         let mut cursor = Cursor::new(value);
         let mut source = [0u8; 1];
         let mut thread_id = [0u8; 1];
-        cursor.read_exact(&mut source)?;
-        cursor.read_exact(&mut thread_id)?;
-        let source = IngestSource::try_from(source[0])?;
+        cursor
+            .read_exact(&mut source)
+            .context("IngestEntry::from_bytes() failed at reading <source>")?;
+        cursor
+            .read_exact(&mut thread_id)
+            .context("IngestEntry::from_bytes() failed at <thread_id>")?;
+        let source = IngestSource::try_from(source[0])
+            .context("IngestEntry::from_bytes() failed at converting <source>")?;
         let thread_id = thread_id[0] as usize;
 
-        let org_id_len = cursor.read_u16::<BigEndian>()?;
+        let org_id_len = cursor
+            .read_u16::<BigEndian>()
+            .context("IngestEntry::from_bytes() failed at reading <org_id_len>")?;
         let mut org_id = vec![0; org_id_len as usize];
-        cursor.read_exact(&mut org_id)?;
-        let org_id = String::from_utf8(org_id)?;
+        cursor
+            .read_exact(&mut org_id)
+            .context("IngestEntry::from_bytes() failed at reading <org_id>")?;
+        let org_id = String::from_utf8(org_id)
+            .context("IngestEntry::from_bytes() failed at converting <org_id>")?;
 
-        let user_email_len = cursor.read_u16::<BigEndian>()?;
+        let user_email_len = cursor
+            .read_u16::<BigEndian>()
+            .context("IngestEntry::from_bytes() failed at reading <user_email_len>")?;
         let mut user_email = vec![0; user_email_len as usize];
-        cursor.read_exact(&mut user_email)?;
-        let user_email = String::from_utf8(user_email)?;
+        cursor
+            .read_exact(&mut user_email)
+            .context("IngestEntry::from_bytes() failed at reading <user_email>")?;
+        let user_email = String::from_utf8(user_email)
+            .context("IngestEntry::from_bytes() failed at converting <user_email>")?;
 
         let mut stream_name_op = [0u8; 1];
-        cursor.read_exact(&mut stream_name_op)?;
+        cursor
+            .read_exact(&mut stream_name_op)
+            .context("IngestEntry::from_bytes() failed at reading <stream_name_indicator>")?;
 
         let stream_name = if stream_name_op[0] == 0 {
             None
         } else {
-            let stream_name_len = cursor.read_u16::<BigEndian>()?;
+            let stream_name_len = cursor
+                .read_u16::<BigEndian>()
+                .context("IngestEntry::from_bytes() failed at reading <stream_name_len>")?;
             let mut stream_name = vec![0; stream_name_len as usize];
-            cursor.read_exact(&mut stream_name)?;
-            Some(String::from_utf8(stream_name)?)
+            cursor
+                .read_exact(&mut stream_name)
+                .context("IngestEntry::from_bytes() failed at reading <stream_name>")?;
+            Some(
+                String::from_utf8(stream_name)
+                    .context("IngestEntry::from_bytes() failed at converting <stream_name>")?,
+            )
         };
 
-        let body_len = cursor.read_u16::<BigEndian>()?;
+        let body_len = cursor
+            .read_u16::<BigEndian>()
+            .context("IngestEntry::from_bytes() failed at reading <body_len>")?;
         let mut body = vec![0; body_len as usize];
-        cursor.read_exact(&mut body)?;
-        let body = Bytes::try_from(body)?;
+        cursor
+            .read_exact(&mut body)
+            .context("IngestEntry::from_bytes() failed at reading <body>")?;
+        let body = Bytes::try_from(body)
+            .context("IngestEntry::from_bytes() failed at converting <body>")?;
 
         Ok(Self {
             source,
@@ -217,6 +240,18 @@ impl std::convert::TryFrom<u8> for IngestSource {
             4 => Ok(IngestSource::KinesisFH),
             5 => Ok(IngestSource::GCP),
             _ => Err(anyhow::anyhow!("not supported")),
+        }
+    }
+}
+
+impl std::fmt::Display for IngestSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IngestSource::Bulk => write!(f, "Bulk"),
+            IngestSource::Multi => write!(f, "Multi"),
+            IngestSource::JSON => write!(f, "JSON"),
+            IngestSource::KinesisFH => write!(f, "KinesisFH"),
+            IngestSource::GCP => write!(f, "GCP"),
         }
     }
 }

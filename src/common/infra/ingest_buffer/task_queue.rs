@@ -113,7 +113,6 @@ impl TaskQueueManager {
 
 struct TaskQueue {
     sender: Arc<Sender<IngestEntry>>,
-    receiver: Arc<Receiver<IngestEntry>>,
     workers: Arc<Workers>,
 }
 
@@ -121,15 +120,13 @@ impl TaskQueue {
     // TODO: decide default initial workers count for a queue
     pub fn new(channel_cap: usize, stream_name: &str) -> Self {
         let (sender, receiver) = bounded::<IngestEntry>(channel_cap);
-        let (sender, receiver) = (Arc::new(sender), Arc::new(receiver));
         let workers = Arc::new(Workers::new(
             MIN_WORKER_CNT,
             stream_name,
-            Arc::clone(&receiver),
+            Arc::new(receiver),
         ));
         Self {
-            sender,
-            receiver,
+            sender: Arc::new(sender),
             workers,
         }
     }
@@ -137,7 +134,7 @@ impl TaskQueue {
     // TODO
     // 1. add min worker count to increase the number of workers
     async fn send_task(&self, task: IngestEntry) -> Result<(), anyhow::Error> {
-        if self.receiver.is_closed() {
+        if self.sender.is_closed() {
             return Err(anyhow::anyhow!("Channel is closed. BUG"));
         }
         while let Err(e) = self.sender.try_send(task.clone()) {

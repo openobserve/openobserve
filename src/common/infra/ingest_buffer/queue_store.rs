@@ -14,11 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, remove_file, File, OpenOptions},
-    io::{BufReader, ErrorKind, Read, Write},
+    fs::{create_dir_all, remove_dir_all, remove_file, File, OpenOptions},
+    io::{BufReader, Read, Write},
     path::PathBuf,
 };
 
+use anyhow::{Context, Result};
+use async_channel::Receiver;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use config::CONFIG;
 use ingester::scan_files;
@@ -28,76 +30,109 @@ use super::{entry::IngestEntry, workers::process_tasks_with_retries};
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";
 
-pub(super) fn persist_tasks(
-    stream_name: &str,
-    worker_id: &str,
-    tasks: &Vec<IngestEntry>,
-) -> Result<(), anyhow::Error> {
-    let arr: Vec<Vec<u8>> = tasks.iter().map(|t| t.into_bytes().unwrap()).collect();
+/// Writes the given array of IngestEntries to disk at direcotry formatted by
+/// pattern {data_wal_dir}/ingest_buffer/{stream_name}/{worker_id}.wal.
+///
+/// Overwrites if previously persisted.
+///
+/// Bytes of IngestEntries are written to wal file one by one following pattern
+/// {entry_len, entry, entry_len, entry}.
+///
+/// <entry_len> written in u16 ordered by BigEndian.
+pub(super) async fn persist_job(
+    stream_name: String,
+    worker_id: String,
+    store_sig_r: Receiver<Option<Vec<IngestEntry>>>,
+) -> Result<()> {
+    let path = build_file_path(&stream_name, &worker_id);
+    create_dir_all(path.parent().unwrap()).context("Failed to open directory")?;
 
-    let path = build_file_path(stream_name, worker_id);
-    // remove if already exists
-    if path.exists() {
-        remove_file(&path)?;
+    loop {
+        match store_sig_r.recv().await {
+            Ok(tasks) => {
+                let mut f = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true) // always overwrite
+                    .open(&path)
+                    .context("Failed to open file when persisting tasks")?;
+
+                log::info!(
+                    "stream({})-worker({}) persists its pending tasks to disk",
+                    stream_name,
+                    worker_id
+                );
+                if let Some(tasks) = tasks {
+                    for task in tasks {
+                        let bytes = task.into_bytes()?;
+                        let len = bytes.len();
+                        f.write_u16::<BigEndian>(len as u16)?;
+                        f.write_all(&bytes)?;
+                    }
+                }
+
+                f.sync_all()
+                    .context("Failed to sync file when persisting tasks")?;
+            }
+            Err(_) => {
+                // worker shutting down. No more persisting
+                break;
+            }
+        }
     }
-
-    create_dir_all(path.parent().unwrap())?;
-    let mut f = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .append(true)
-        .open(&path)
-        .unwrap();
-
-    for data in arr {
-        let data_len = data.len();
-        f.write_u16::<BigEndian>(data_len as u16)?;
-        f.write_all(&data)?;
-    }
-    f.sync_all()?;
-
+    // Closing down. Remove saved file.
+    remove_dir_all(path)?;
     Ok(())
 }
 
-pub(super) async fn replay_persisted_tasks() -> Result<(), anyhow::Error> {
+/// Finds all existing .wal files from {data_wal_dir}/ingest_buffer/* directory.
+/// Reads and decodes each wal file into Vec<IngestEntry> and ingests them.
+///
+/// Only called in application init process.
+pub(super) async fn replay_persisted_tasks() -> Result<()> {
     let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("ingest_buffer");
-    create_dir_all(&wal_dir)?;
+    create_dir_all(&wal_dir).context("Failed to open wal/ingest_buffer directory")?;
     let wal_files = scan_files(wal_dir, FILE_EXTENSION);
     if wal_files.is_empty() {
         return Ok(());
     }
 
     for wal_file in wal_files.iter() {
-        let f = File::open(wal_file)?;
+        log::warn!("Start replaying wal file: {:?}", wal_file);
+        let f = match File::open(wal_file) {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!(
+                    "Unable to open the wal file err: {}. Remove and skip file",
+                    e
+                );
+                remove_file(wal_file)?;
+                continue;
+            }
+        };
         let mut f = BufReader::new(f);
         let mut entries = vec![];
-        loop {
-            let entry_size = match f.read_u16::<BigEndian>() {
-                Ok(size) => size,
-                Err(e) => {
-                    if e.kind() == ErrorKind::UnexpectedEof {
-                        // end of file
-                        break;
-                    } else {
-                        return Err(anyhow::anyhow!("Error reading file when replaying"));
-                    }
-                }
-            };
+        while let Ok(entry_size) = f.read_u16::<BigEndian>() {
             let mut entry = vec![0; entry_size as usize];
             f.read_exact(&mut entry)?;
             let entry = IngestEntry::from_bytes(&entry)?;
             entries.push(entry);
         }
-        // process the loaded tasks and log
         if !entries.is_empty() {
-            let _ = process_tasks_with_retries(&entries).await;
-            //
+            log::info!(
+                "Decoded {} IngestEntries from wal file: {:?}. Ingesting",
+                entries.len(),
+                wal_file
+            );
+            // Hack (stream_name = replay, worker_id=0)
+            process_tasks_with_retries("replay", "0", &entries, 1).await;
         }
+        remove_file(wal_file)?;
     }
-
     Ok(())
 }
 
+/// Builds file path for TaskQueue workers to persist their pending tasks to disk.
 pub(super) fn build_file_path(stream_name: &str, worker_id: &str) -> PathBuf {
     let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
     path.push("ingest_buffer");
