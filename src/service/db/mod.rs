@@ -71,13 +71,7 @@ pub(crate) async fn get_for_update(
     update_fn: Box<infra_db::UpdateFn>,
 ) -> Result<()> {
     // super cluster
-    #[cfg(feature = "enterprise")]
-    if O2_CONFIG.super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-    }
-
+    // TODO: super cluster
     let db = infra_db::get_db().await;
     db.get_for_update(key, need_watch, start_dt, update_fn)
         .await
