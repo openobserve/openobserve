@@ -331,19 +331,18 @@ pub struct QueryInfo {
     pub end_time: i64,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct CancelJobResponse {
+    pub session_id: String,
+    pub is_success: bool,
+}
+
 #[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, ToSchema)]
-// #[derive(Clone, Copy, Default)]
 pub struct ScanStats {
     pub files: i64,
     pub records: i64,
     pub original_size: i64,
     pub compressed_size: i64,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct CancelJobResponse {
-    pub session_id: String,
-    pub is_success: bool,
 }
 
 impl ScanStats {
