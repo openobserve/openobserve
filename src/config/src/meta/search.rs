@@ -144,14 +144,14 @@ impl Request {
     pub fn decode(&mut self) -> Result<(), std::io::Error> {
         match self.encoding {
             RequestEncoding::Base64 => {
-                self.query.sql = match base64::decode(&self.query.sql) {
+                self.query.sql = match base64::decode_url(&self.query.sql) {
                     Ok(v) => v,
                     Err(e) => {
                         return Err(e);
                     }
                 };
                 for (_, v) in self.aggs.iter_mut() {
-                    *v = match base64::decode(v) {
+                    *v = match base64::decode_url(v) {
                         Ok(v) => v,
                         Err(e) => {
                             return Err(e);
