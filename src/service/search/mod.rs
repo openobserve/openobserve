@@ -1199,7 +1199,7 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
             user_id: result.user_id,
             org_id: result.org_id,
             stream_type: result.stream_type,
-            query_info: Some(search::QueryInfo {
+            query: Some(search::QueryInfo {
                 sql: query_info.sql,
                 start_time: query_info.start_time,
                 end_time: query_info.end_time,

@@ -320,7 +320,7 @@ pub struct JobStatus {
     pub user_id: Option<String>,
     pub org_id: Option<String>,
     pub stream_type: Option<String>,
-    pub query_info: Option<QueryInfo>,
+    pub query: Option<QueryInfo>,
     pub scan_stats: Option<ScanStats>,
 }
 
