@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,10 @@ use std::{path::Path, sync::Arc};
 
 use arrow::array::{new_null_array, ArrayRef};
 use config::{
-    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    meta::{
+        search::{ScanStats, SearchType, StorageType},
+        stream::{FileKey, PartitionTimeLevel, StreamType},
+    },
     utils::{
         file::scan_files,
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
@@ -35,20 +38,10 @@ use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::{
-        infra::wal,
-        meta::{
-            self,
-            search::SearchType,
-            stream::{ScanStats, StreamPartition},
-        },
-    },
+    common::{infra::wal, meta::stream::StreamPartition},
     service::{
         db, file_list,
-        search::{
-            datafusion::{exec, storage::StorageType},
-            sql::Sql,
-        },
+        search::{datafusion::exec, sql::Sql},
         stream,
     },
 };
@@ -212,7 +205,7 @@ pub async fn search_parquet(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
-        let session = meta::search::Session {
+        let session = config::meta::search::Session {
             id: format!("{session_id}-wal-{ver}"),
             storage_type: StorageType::Wal,
             search_type: if !sql.meta.group_by.is_empty() {
@@ -441,7 +434,7 @@ pub async fn search_memtable(
         }
 
         let sql = sql.clone();
-        let session = meta::search::Session {
+        let session = config::meta::search::Session {
             id: format!("{session_id}-mem-{ver}"),
             storage_type: StorageType::Tmpfs,
             search_type: if !sql.meta.group_by.is_empty() {

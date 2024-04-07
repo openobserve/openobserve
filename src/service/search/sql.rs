@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,10 @@ use std::{
 
 use chrono::Duration;
 use config::{
-    meta::stream::{FileKey, StreamType},
+    meta::{
+        sql::{Sql as MetaSql, SqlOperator},
+        stream::{FileKey, StreamType},
+    },
     CONFIG, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -34,10 +37,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common::{
         infra::config::STREAM_SCHEMAS_FIELDS,
-        meta::{
-            sql::{Sql as MetaSql, SqlOperator},
-            stream::{StreamParams, StreamPartition},
-        },
+        meta::stream::{StreamParams, StreamPartition},
     },
     service::{db, search::match_source, stream::get_stream_setting_fts_fields},
 };
@@ -981,7 +981,7 @@ mod tests {
         let org_id = "test_org";
         let col = "_timestamp";
         let table = "default";
-        let query = crate::common::meta::search::Query {
+        let query = config::meta::search::Query {
             sql: format!("select {} from {} ", col, table),
             from: 0,
             size: 100,
@@ -997,10 +997,10 @@ mod tests {
             query_fn: None,
         };
 
-        let req: crate::common::meta::search::Request = crate::common::meta::search::Request {
+        let req: config::meta::search::Request = config::meta::search::Request {
             query,
             aggs: HashMap::new(),
-            encoding: crate::common::meta::search::RequestEncoding::Empty,
+            encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
         };
 
@@ -1089,7 +1089,7 @@ mod tests {
 
         let org_id = "test_org";
         for (sql, ok, time_range) in sqls {
-            let query = crate::common::meta::search::Query {
+            let query = config::meta::search::Query {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
@@ -1104,10 +1104,10 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
             };
-            let req: crate::common::meta::search::Request = crate::common::meta::search::Request {
+            let req = config::meta::search::Request {
                 query: query.clone(),
                 aggs: HashMap::new(),
-                encoding: crate::common::meta::search::RequestEncoding::Empty,
+                encoding: config::meta::search::RequestEncoding::Empty,
                 timeout: 0,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -1209,7 +1209,7 @@ mod tests {
 
         let org_id = "test_org";
         for (sql, ok, limit, time_range) in sqls {
-            let query = crate::common::meta::search::Query {
+            let query = config::meta::search::Query {
                 sql: sql.to_string(),
                 from: 0,
                 size: 100,
@@ -1224,10 +1224,10 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
             };
-            let req: crate::common::meta::search::Request = crate::common::meta::search::Request {
+            let req = config::meta::search::Request {
                 query: query.clone(),
                 aggs: HashMap::new(),
-                encoding: crate::common::meta::search::RequestEncoding::Empty,
+                encoding: config::meta::search::RequestEncoding::Empty,
                 timeout: 0,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();

@@ -122,8 +122,8 @@ pyroscope_pprofrs = { version = "0.2.5", optional = true }
 rand.workspace = true
 getrandom.workspace = true
 rayon.workspace = true
-regex = "1.7"
-regex-syntax = "0.8"
+regex.workspace = true
+regex-syntax.workspace = true
 reqwest.workspace = true
 rust-embed-for-web = "11.1"
 segment.workspace = true
@@ -244,6 +244,8 @@ prometheus = "0.13"
 prost = "0.11"
 rand = "0.8"
 rayon = "1.7.0"
+regex = "1.7"
+regex-syntax = "0.8"
 reqwest = { version = "0.11", default-features = false, features = [
   "rustls-tls",
   "stream",

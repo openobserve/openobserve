@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use config::{
     is_local_disk_storage,
-    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    meta::{
+        search::{ScanStats, SearchType, StorageType},
+        stream::{FileKey, PartitionTimeLevel, StreamType},
+    },
     CONFIG,
 };
 use datafusion::{
@@ -34,17 +37,10 @@ use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::meta::{
-        self,
-        search::SearchType,
-        stream::{ScanStats, StreamPartition},
-    },
+    common::meta::stream::StreamPartition,
     service::{
         db, file_list,
-        search::{
-            datafusion::{exec, storage::StorageType},
-            sql::Sql,
-        },
+        search::{datafusion::exec, sql::Sql},
         stream,
     },
 };
@@ -196,7 +192,7 @@ pub async fn search(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
-        let session = meta::search::Session {
+        let session = config::meta::search::Session {
             id: format!("{session_id}-{ver}"),
             storage_type: StorageType::Memory,
             search_type: if !sql.meta.group_by.is_empty() {
