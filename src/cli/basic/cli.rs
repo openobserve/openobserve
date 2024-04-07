@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -254,10 +254,10 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
-            return import::Import::operator(dataCli::arg_matches(command.clone()));
+            import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
-            return export::Export::operator(dataCli::arg_matches(command.clone()));
+            export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "migrate-schemas" => {
             println!("Running schema migration to row per schema version");

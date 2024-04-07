@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,11 @@ use std::{str::FromStr, sync::Arc};
 use arrow_schema::Field;
 use config::{
     ider,
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::{
+        search::{SearchType, Session as SearchSession, StorageType},
+        sql,
+        stream::{FileKey, FileMeta, StreamType},
+    },
     utils::{flatten, json, parquet::new_parquet_writer, schema::infer_json_schema_from_values},
     CONFIG, PARQUET_BATCH_SIZE,
 };
@@ -51,16 +55,9 @@ use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
-use super::{
-    storage::{file_list, StorageType},
-    transform_udf::get_all_transform,
-};
+use super::{storage::file_list, transform_udf::get_all_transform};
 use crate::{
-    common::meta::{
-        functions::VRLResultResolver,
-        search::{SearchType, Session as SearchSession},
-        sql,
-    },
+    common::meta::functions::VRLResultResolver,
     service::search::{datafusion::rewrite, sql::Sql},
 };
 

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -144,13 +144,13 @@ use crate::{common::meta, handler::http::request};
             meta::dashboards::Folder,
             meta::dashboards::MoveDashboard,
             meta::dashboards::FolderList,
-            meta::search::Query,
-            meta::search::Request,
-            meta::search::RequestEncoding,
-            meta::search::Response,
-            meta::search::ResponseTook,
-            meta::search::SearchPartitionRequest,
-            meta::search::SearchPartitionResponse,
+            config::meta::search::Query,
+            config::meta::search::Request,
+            config::meta::search::RequestEncoding,
+            config::meta::search::Response,
+            config::meta::search::ResponseTook,
+            config::meta::search::SearchPartitionRequest,
+            config::meta::search::SearchPartitionResponse,
             meta::saved_view::View,
             meta::saved_view::ViewWithoutData,
             meta::saved_view::ViewsWithoutData,

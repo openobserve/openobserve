@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,12 +25,9 @@ use infra::{cache::tmpfs, errors::Result};
 use promql_parser::parser;
 use proto::cluster_rpc;
 
-use crate::{
-    common::meta::stream::ScanStats,
-    service::{
-        promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
-        search,
-    },
+use crate::service::{
+    promql::{value, Query, TableProvider, DEFAULT_LOOKBACK},
+    search,
 };
 
 mod storage;
@@ -49,7 +46,9 @@ impl TableProvider for StorageProvider {
         stream_name: &str,
         time_range: (i64, i64),
         filters: &mut [(&str, Vec<String>)],
-    ) -> datafusion::error::Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
+    ) -> datafusion::error::Result<
+        Vec<(SessionContext, Arc<Schema>, config::meta::search::ScanStats)>,
+    > {
         let mut resp = Vec::new();
         // register storage table
         let session_id = self.session_id.to_owned() + "-storage-" + stream_name;
