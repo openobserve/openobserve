@@ -287,11 +287,11 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     let mut w = FILES.write().await;
                     w.cur_size += data_size;
                     w.data.insert(file_key.clone(), data_size);
-                    let files_num = w.data.len();
+                    let total = w.len();
                     drop(w);
                     // print progress
-                    if files_num % 1000 == 0 {
-                        log::info!("Loading disk cache {}", files_num,);
+                    if total % 1000 == 0 {
+                        log::info!("Loading disk cache {}", total);
                     }
                     // metrics
                     let columns = file_key.split('/').collect::<Vec<&str>>();
