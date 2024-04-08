@@ -232,39 +232,48 @@ pub async fn get_latest_traces(
         timeout,
     };
     let stream_type = StreamType::Traces;
-    let resp_search = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
-        Ok(res) => res,
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/traces/latest",
-                    "500",
-                    &org_id,
-                    "default",
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/traces/latest",
-                    "500",
-                    &org_id,
-                    "default",
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            log::error!("get traces latest data error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                    .json(meta::http::HttpResponse::error_code(code)),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .unwrap()
+        .to_str()
+        .ok()
+        .map(|v| v.to_string());
+    let resp_search =
+        match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req).await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        "default",
+                        stream_type.to_string().as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        "default",
+                        stream_type.to_string().as_str(),
+                    ])
+                    .inc();
+                log::error!("get traces latest data error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                        .json(meta::http::HttpResponse::error_code(code)),
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
     if resp_search.hits.is_empty() {
         return Ok(HttpResponse::Ok().json(resp_search));
     }
@@ -313,40 +322,44 @@ pub async fn get_latest_traces(
     let mut traces_service_name: HashMap<String, HashMap<String, u16>> = HashMap::new();
 
     loop {
-        let resp_search = match SearchService::search(&session_id, &org_id, stream_type, &req).await
-        {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/traces/latest",
-                        "500",
-                        &org_id,
-                        &stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/traces/latest",
-                        "500",
-                        &org_id,
-                        &stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .inc();
-                log::error!("get traces latest data error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
+        let resp_search =
+            match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req)
+                .await
+            {
+                Ok(res) => res,
+                Err(err) => {
+                    let time = start.elapsed().as_secs_f64();
+                    metrics::HTTP_RESPONSE_TIME
+                        .with_label_values(&[
+                            "/api/org/traces/latest",
+                            "500",
+                            &org_id,
+                            &stream_name,
+                            stream_type.to_string().as_str(),
+                        ])
+                        .observe(time);
+                    metrics::HTTP_INCOMING_REQUESTS
+                        .with_label_values(&[
+                            "/api/org/traces/latest",
+                            "500",
+                            &org_id,
+                            &stream_name,
+                            stream_type.to_string().as_str(),
+                        ])
+                        .inc();
+                    log::error!("get traces latest data error: {:?}", err);
+                    return Ok(match err {
+                        errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error(
+                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                err.to_string(),
+                            ),
+                        ),
+                    });
+                }
+            };
 
         let resp_size = resp_search.hits.len();
         for item in resp_search.hits {

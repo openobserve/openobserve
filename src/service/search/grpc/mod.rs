@@ -193,28 +193,58 @@ pub async fn search(
                 vec![],
             )
         };
-        let batches = match super::datafusion::exec::merge(
-            &sql.org_id,
-            offset,
-            limit,
-            &merge_sql,
-            &batches,
-            &select_fields,
-            false,
-        )
-        .await
+
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if crate::service::search::SEARCH_SERVER
+            .insert_sender(&session_id, abort_sender)
+            .await
+            .is_err()
         {
-            Ok(res) => res,
-            Err(err) => {
-                log::error!("[session_id {session_id}] datafusion merge error: {}", err);
-                return Err(err.into());
+            log::info!("[session_id {session_id}] task is cancel after get first stage result");
+            return Err(Error::Message(format!(
+                "[session_id {session_id}] task is cancel after get first stage result"
+            )));
+        }
+
+        let merge_batches;
+        tokio::select! {
+            result = super::datafusion::exec::merge(
+                &sql.org_id,
+                offset,
+                limit,
+                &merge_sql,
+                &batches,
+                &select_fields,
+                false,
+            ) => {
+                match result {
+                    Ok(res) => merge_batches = res,
+                    Err(err) => {
+                        log::error!("[session_id {session_id}] datafusion merge error: {}", err);
+                        return Err(err.into());
+                    }
+                }
+            },
+            _ = async {
+                #[cfg(feature = "enterprise")]
+                let _ = abort_receiver.await;
+                #[cfg(not(feature = "enterprise"))]
+                futures::future::pending::<()>().await;
+            } => {
+                log::info!("[session_id {session_id}] in node merge task is cancel");
+                return Err(Error::Message(format!("[session_id {session_id}] in node merge task is cancel")));
             }
-        };
-        merge_results.insert(name.to_string(), batches);
+        }
+
+        merge_results.insert(name.to_string(), merge_batches);
     }
 
     // clear session data
     datafusion::storage::file_list::clear(&session_id);
+
+    log::info!("[session_id {session_id}] in node merge task finish");
 
     // final result
     let mut hits_buf = Vec::new();

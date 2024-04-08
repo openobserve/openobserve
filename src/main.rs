@@ -47,7 +47,6 @@ use openobserve::{
                 file_list::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
-                search::Searcher,
                 traces::TraceServer,
                 usage::UsageServerImpl,
             },
@@ -55,7 +54,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata},
+    service::{db, metadata, search::SEARCH_SERVER},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -272,7 +271,7 @@ fn init_common_grpc_server(
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let search_svc = SearchServer::new(Searcher)
+    let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let filelist_svc = FilelistServer::new(Filelister)

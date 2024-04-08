@@ -151,6 +151,8 @@ use crate::{common::meta, handler::http::request};
             config::meta::search::ResponseTook,
             config::meta::search::SearchPartitionRequest,
             config::meta::search::SearchPartitionResponse,
+            config::meta::search::CancelJobResponse,
+            config::meta::search::JobStatusResponse,
             meta::saved_view::View,
             meta::saved_view::ViewWithoutData,
             meta::saved_view::ViewsWithoutData,

@@ -15,13 +15,101 @@
 
 use config::metrics;
 use infra::errors;
-use proto::cluster_rpc::{search_server::Search, SearchRequest, SearchResponse};
+use proto::cluster_rpc::{
+    search_server::Search, CancelJobRequest, CancelJobResponse, JobStatusRequest,
+    JobStatusResponse, SearchRequest, SearchResponse,
+};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search as SearchService;
 
+#[derive(Clone, Debug)]
+#[cfg(feature = "enterprise")]
+pub struct Searcher {
+    pub task_manager: std::sync::Arc<o2_enterprise::enterprise::search::TaskManager>,
+}
+
+#[cfg(feature = "enterprise")]
+impl Searcher {
+    pub fn new() -> Self {
+        Self {
+            task_manager: std::sync::Arc::new(o2_enterprise::enterprise::search::TaskManager::new()),
+        }
+    }
+
+    // check is the session_id in the task_manager
+    pub async fn contain_key(&self, session_id: &str) -> bool {
+        self.task_manager.contain_key(session_id).await
+    }
+
+    // insert the session_id and task_status into the task_manager
+    pub async fn insert(
+        &self,
+        session_id: String,
+        task_status: o2_enterprise::enterprise::search::TaskStatus,
+    ) {
+        self.task_manager.insert(session_id, task_status).await;
+    }
+
+    // remove the session_id from the task_manager
+    pub async fn remove(
+        &self,
+        session_id: &str,
+    ) -> Option<(String, o2_enterprise::enterprise::search::TaskStatus)> {
+        self.task_manager.remove(session_id).await
+    }
+
+    // check is the session_id in the task_manager and is_leader
+    pub async fn is_leader(&self, session_id: &str) -> bool {
+        self.task_manager.is_leader(session_id).await
+    }
+
+    // insert the sender into the task_manager by session_id
+    pub async fn insert_sender(
+        &self,
+        session_id: &str,
+        sender: tokio::sync::oneshot::Sender<()>,
+    ) -> Result<(), infra::errors::Error> {
+        self.task_manager.insert_sender(session_id, sender).await
+    }
+
+    // get all task status that is leader
+    pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::JobStatus> {
+        self.task_manager.get_task_status().await
+    }
+
+    // add file stats
+    pub async fn add_file_stats(
+        &self,
+        session_id: &str,
+        files: i64,
+        records: i64,
+        original_size: i64,
+        compressed_size: i64,
+    ) {
+        self.task_manager
+            .add_file_stats(session_id, files, records, original_size, compressed_size)
+            .await;
+    }
+}
+
+#[derive(Clone, Debug)]
+#[cfg(not(feature = "enterprise"))]
 pub struct Searcher;
+
+#[cfg(not(feature = "enterprise"))]
+impl Searcher {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for Searcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[tonic::async_trait]
 impl Search for Searcher {
@@ -39,7 +127,37 @@ impl Search for Searcher {
         let req = req.get_ref().to_owned();
         let org_id = req.org_id.clone();
         let stream_type = req.stream_type.clone();
-        match SearchService::grpc::search(&req).await {
+
+        // set search task
+        #[cfg(feature = "enterprise")]
+        let session_id = req.job.as_ref().unwrap().session_id.to_string();
+        #[cfg(feature = "enterprise")]
+        if !self.contain_key(&session_id).await {
+            self.insert(
+                session_id.clone(),
+                o2_enterprise::enterprise::search::TaskStatus::new(
+                    vec![],
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            )
+            .await;
+        }
+
+        let result = SearchService::grpc::search(&req).await;
+
+        // remove task
+        #[cfg(feature = "enterprise")]
+        if !self.is_leader(&session_id).await {
+            self.remove(&session_id).await;
+        }
+
+        match result {
             Ok(res) => {
                 let time = start.elapsed().as_secs_f64();
                 metrics::GRPC_RESPONSE_TIME
@@ -67,5 +185,47 @@ impl Search for Searcher {
                 Err(Status::internal(message))
             }
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn job_status(
+        &self,
+        _req: Request<JobStatusRequest>,
+    ) -> Result<Response<JobStatusResponse>, Status> {
+        let status = self.get_task_status().await;
+        Ok(Response::new(JobStatusResponse { status }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn job_status(
+        &self,
+        _req: Request<JobStatusRequest>,
+    ) -> Result<Response<JobStatusResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn cancel_job(
+        &self,
+        req: Request<CancelJobRequest>,
+    ) -> Result<Response<CancelJobResponse>, Status> {
+        let session_id = req.into_inner().session_id;
+        match self.remove(&session_id).await {
+            Some((_, senders)) => {
+                for sender in senders.abort_senders.into_iter().rev() {
+                    let _ = sender.send(());
+                }
+                Ok(Response::new(CancelJobResponse { is_success: true }))
+            }
+            None => Ok(Response::new(CancelJobResponse { is_success: false })),
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn cancel_job(
+        &self,
+        _req: Request<CancelJobRequest>,
+    ) -> Result<Response<CancelJobResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
     }
 }

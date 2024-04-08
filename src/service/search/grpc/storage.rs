@@ -237,6 +237,25 @@ pub async fn search(
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
         );
+
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if crate::service::search::SEARCH_SERVER
+            .insert_sender(session_id, abort_sender)
+            .await
+            .is_err()
+        {
+            log::info!(
+                "[session_id {}] search->storage: search canceled before call search->storage",
+                session.id
+            );
+            return Err(Error::Message(format!(
+                "[session_id {}] search->storage: search canceled before call search->storage",
+                session.id
+            )));
+        }
+
         let schema = Arc::new(schema);
         let task = tokio::task::spawn(
             async move {
@@ -255,11 +274,23 @@ pub async fn search(
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {}] search->storage: task timeout", session.id
                         )))
+                    },
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
+                        log::info!("[session_id {}] search->storage: search canceled", session.id);
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {}] search->storage: task is cancel", session.id
+                        )))
                     }
                 }
             }
             .instrument(datafusion_span),
         );
+
         tasks.push(task);
     }
 
