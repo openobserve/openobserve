@@ -38,6 +38,7 @@ use crate::{
     service::{search as SearchService, usage::report_request_usage_stats},
 };
 
+pub mod job;
 pub mod saved_view;
 
 /// SearchStreamData
@@ -212,7 +213,15 @@ pub async fn search(
     let took_wait = 0;
 
     // do search
-    match SearchService::search(&session_id, &org_id, stream_type, &req).await {
+    match SearchService::search(
+        &session_id,
+        &org_id,
+        stream_type,
+        Some(user_id.to_str().unwrap().to_string()),
+        &req,
+    )
+    .await
+    {
         Ok(mut res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
@@ -426,40 +435,52 @@ pub async fn around(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_forward = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
-        Ok(res) => res,
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            log::error!("search around error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .unwrap()
+        .to_str()
+        .ok()
+        .map(|v| v.to_string());
+    let resp_forward =
+        match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req).await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/_around",
+                        "500",
+                        &org_id,
+                        &stream_name,
+                        stream_type.to_string().as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/_around",
+                        "500",
+                        &org_id,
+                        &stream_name,
+                        stream_type.to_string().as_str(),
+                    ])
+                    .inc();
+                log::error!("search around error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        ),
+                    ),
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
 
     // search backward
     let req = config::meta::search::Request {
@@ -482,40 +503,44 @@ pub async fn around(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_backward = match SearchService::search(&session_id, &org_id, stream_type, &req).await {
-        Ok(res) => res,
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_around",
-                    "500",
-                    &org_id,
-                    &stream_name,
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            log::error!("search around error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
-                ),
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
+    let resp_backward =
+        match SearchService::search(&session_id, &org_id, stream_type, user_id, &req).await {
+            Ok(res) => res,
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/_around",
+                        "500",
+                        &org_id,
+                        &stream_name,
+                        stream_type.to_string().as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/_around",
+                        "500",
+                        &org_id,
+                        &stream_name,
+                        stream_type.to_string().as_str(),
+                    ])
+                    .inc();
+                log::error!("search around error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        ),
+                    ),
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
 
     // merge
     let mut resp = config::meta::search::Response::default();
@@ -815,7 +840,15 @@ async fn values_v1(
                 ),
             );
     }
-    let resp_search = match SearchService::search(&session_id, org_id, stream_type, &req).await {
+    let resp_search = match SearchService::search(
+        &session_id,
+        org_id,
+        stream_type,
+        Some(user_id.to_string()),
+        &req,
+    )
+    .await
+    {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -980,8 +1013,14 @@ async fn values_v2(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_search = match SearchService::search(&session_id, org_id, StreamType::Metadata, &req)
-        .await
+    let resp_search = match SearchService::search(
+        &session_id,
+        org_id,
+        StreamType::Metadata,
+        Some(user_id.to_string()),
+        &req,
+    )
+    .await
     {
         Ok(res) => res,
         Err(err) => {

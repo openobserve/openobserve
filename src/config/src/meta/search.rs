@@ -306,7 +306,38 @@ pub struct SearchPartitionResponse {
     pub partitions: Vec<[i64; 2]>,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct JobStatusResponse {
+    pub status: Vec<JobStatus>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct JobStatus {
+    pub session_id: String,
+    pub status: String,
+    pub created_at: i64,
+    pub started_at: i64,
+    pub user_id: Option<String>,
+    pub org_id: Option<String>,
+    pub stream_type: Option<String>,
+    pub query: Option<QueryInfo>,
+    pub scan_stats: Option<ScanStats>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct QueryInfo {
+    pub sql: String,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct CancelJobResponse {
+    pub session_id: String,
+    pub is_success: bool,
+}
+
+#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, ToSchema)]
 pub struct ScanStats {
     pub files: i64,
     pub records: i64,
