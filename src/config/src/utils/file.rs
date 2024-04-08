@@ -19,6 +19,9 @@ use std::{
     path::Path,
 };
 
+use async_walkdir::WalkDir;
+use futures::StreamExt;
+
 #[inline(always)]
 pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
     let file = File::open(file)?;
@@ -40,37 +43,51 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[inline(always)]
-pub fn scan_files<P: AsRef<Path>>(root: P, ext: &str) -> Vec<String> {
-    walkdir::WalkDir::new(root)
-        .into_iter()
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.is_file() {
-                let path_ext = path.extension()?.to_str()?;
-                if path_ext == ext {
-                    Some(path.to_str().unwrap().to_string())
+pub async fn scan_files<P: AsRef<Path>>(root: P, ext: &str) -> Vec<String> {
+    let mut wd = WalkDir::new(root);
+    let mut resp = Vec::new();
+    loop {
+        match wd.next().await {
+            Some(Ok(entry)) => {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(e) = path.extension() {
+                        if e == ext {
+                            resp.push(path.to_str().unwrap().to_string())
+                        }
+                    }
                 } else {
-                    None
+                    continue;
                 }
-            } else {
-                None
             }
-        })
-        .collect()
-}
-
-pub fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
-    let mut dirs = Vec::new();
-    for entry in walkdir::WalkDir::new(dir) {
-        let entry = entry?;
-        if entry.path().display().to_string() == dir {
-            continue;
-        }
-        if entry.file_type().is_dir() {
-            dirs.push(entry.path().to_str().unwrap().to_string());
+            Some(Err(_)) => {}
+            None => break,
         }
     }
+    resp
+}
+
+pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
+    let mut dirs = Vec::new();
+    let mut wd = async_walkdir::WalkDir::new(dir);
+
+    loop {
+        match wd.next().await {
+            Some(Ok(entry)) => {
+                if entry.path().display().to_string() == dir {
+                    continue;
+                }
+                if let Ok(ft) = entry.file_type().await {
+                    if ft.is_dir() {
+                        dirs.push(entry.path().to_str().unwrap().to_string())
+                    };
+                }
+            }
+            Some(Err(_)) => {}
+            None => break,
+        }
+    }
+
     dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
     for dir in dirs {
         if let Ok(entries) = std::fs::read_dir(&dir) {
