@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    fs::{create_dir_all, remove_dir_all, remove_file, File, OpenOptions},
+    fs::{create_dir_all, remove_file, File, OpenOptions},
     io::{BufReader, Read, Write},
     path::PathBuf,
 };
