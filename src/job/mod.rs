@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -188,7 +188,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("Failed to create wal dir: {}", e);
         }
         // clean empty sub dirs
-        _ = clean_empty_dirs(&CONFIG.common.data_wal_dir);
+        _ = clean_empty_dirs(&CONFIG.common.data_wal_dir).await;
     }
 
     tokio::task::spawn(async move { files::run().await });

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -62,7 +62,7 @@ pub async fn move_file_list_to_storage(check_in_use: bool) -> Result<(), anyhow:
         .unwrap();
 
     let pattern = format!("{}file_list/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern, "json");
+    let files = scan_files(&pattern, "json").await;
 
     for file in files {
         let local_file = file.to_owned();
