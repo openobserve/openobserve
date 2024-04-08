@@ -600,6 +600,7 @@ export default defineComponent({
           filter: filter || "",
           size: 1,
           from: 0,
+          stream_name: selectedStreamName.value,
         })
         .then(async (res) => {
           const trace = getTracesMetaData(res.data.hits)[0];
@@ -641,7 +642,7 @@ export default defineComponent({
       req.query.end_time = trace.trace_end_time + 30000000;
 
       req.query.sql = b64EncodeUnicode(
-        `SELECT * FROM ${searchObj.data.stream.selectedStream.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
+        `SELECT * FROM ${selectedStreamName.value} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
       );
 
       return req;

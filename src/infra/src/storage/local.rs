@@ -29,19 +29,21 @@ use crate::storage::{format_key, CONCURRENT_REQUESTS};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
+    with_prefix: bool,
 }
 
 impl Local {
-    pub fn new(root_dir: &str) -> Self {
+    pub fn new(root_dir: &str, with_prefix: bool) -> Self {
         Self {
             client: LimitStore::new(init_client(root_dir), CONCURRENT_REQUESTS),
+            with_prefix,
         }
     }
 }
 
 impl Default for Local {
     fn default() -> Self {
-        Local::new(&CONFIG.common.data_stream_dir)
+        Local::new(&CONFIG.common.data_stream_dir, true)
     }
 }
 
@@ -68,7 +70,11 @@ impl ObjectStore for Local {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
-        match self.client.put(&(format_key(&file).into()), bytes).await {
+        match self
+            .client
+            .put(&(format_key(&file, self.with_prefix).into()), bytes)
+            .await
+        {
             Ok(_output) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
@@ -110,7 +116,10 @@ impl ObjectStore for Local {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let result = self.client.get(&(format_key(&file).into())).await?;
+        let result = self
+            .client
+            .get(&(format_key(&file, self.with_prefix).into()))
+            .await?;
 
         // metrics
         let data_len = result.meta.size;
@@ -136,7 +145,7 @@ impl ObjectStore for Local {
         let file = location.to_string();
         let result = self
             .client
-            .get_opts(&(format_key(&file).into()), options)
+            .get_opts(&(format_key(&file, self.with_prefix).into()), options)
             .await?;
 
         // metrics
@@ -163,7 +172,7 @@ impl ObjectStore for Local {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file).into()), range)
+            .get_range(&(format_key(&file, self.with_prefix).into()), range)
             .await?;
 
         // metrics
@@ -194,7 +203,7 @@ impl ObjectStore for Local {
         for _ in 0..3 {
             result = self
                 .client
-                .delete(&(format_key(location.as_ref()).into()))
+                .delete(&(format_key(location.as_ref(), self.with_prefix).into()))
                 .await;
             if result.is_ok() {
                 let file = location.to_string();
@@ -210,7 +219,7 @@ impl ObjectStore for Local {
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        let prefix = format_key(prefix.unwrap().as_ref());
+        let prefix = format_key(prefix.unwrap().as_ref(), self.with_prefix);
         self.client.list(Some(&prefix.into()))
     }
 

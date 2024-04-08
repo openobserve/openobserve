@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -58,9 +58,6 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
     db::schema::cache().await?;
 
     // move files from wal for disk
-    if let Err(e) = files::json::move_files_to_storage().await {
-        log::error!("Error moving disk json files to remote: {}", e);
-    }
     if let Err(e) = files::parquet::move_files_to_storage().await {
         log::error!("Error moving disk parquet files to remote: {}", e);
     }
