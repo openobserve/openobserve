@@ -50,12 +50,12 @@ fn default() -> Box<dyn ObjectStore> {
 
 fn local_cache() -> Box<dyn ObjectStore> {
     std::fs::create_dir_all(&CONFIG.common.data_cache_dir).expect("create cache dir success");
-    Box::new(local::Local::new(&CONFIG.common.data_cache_dir))
+    Box::new(local::Local::new(&CONFIG.common.data_cache_dir, true))
 }
 
 fn local_wal() -> Box<dyn ObjectStore> {
     std::fs::create_dir_all(&CONFIG.common.data_wal_dir).expect("create wal dir success");
-    Box::new(local::Local::new(&CONFIG.common.data_wal_dir))
+    Box::new(local::Local::new(&CONFIG.common.data_wal_dir, false))
 }
 
 pub async fn list(prefix: &str) -> Result<Vec<String>, anyhow::Error> {
@@ -114,8 +114,9 @@ pub async fn del(files: &[&str]) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn format_key(key: &str) -> String {
+pub fn format_key(key: &str, with_prefix: bool) -> String {
     if !is_local_disk_storage()
+        && with_prefix
         && !CONFIG.s3.bucket_prefix.is_empty()
         && !key.starts_with(&CONFIG.s3.bucket_prefix)
     {

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,6 @@ use std::str::FromStr;
 
 use chrono::{Duration, FixedOffset, Utc};
 use config::{
-    cluster::LOCAL_NODE_UUID,
     meta::{
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
@@ -25,47 +24,14 @@ use config::{
     CONFIG,
 };
 use cron::Schedule;
-use infra::{dist_lock, scheduler};
+use infra::scheduler;
 
 use crate::{
-    common::{
-        infra::cluster::get_node_by_uuid,
-        meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
-    },
+    common::meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
     service::{db, usage::publish_triggers_usage},
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    // maybe in the future we can support multiple organizations
-    let org_id = "default";
-    // get the working node for the organization
-    let node = db::alerts::alert_manager::get_mark(org_id).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::debug!("[ALERT_MANAGER] is processing by {node}");
-        return Ok(());
-    }
-
-    // before start merging, set current node to lock the organization
-    let lock_key = format!("/alert_manager/organization/{org_id}");
-    let locker = dist_lock::lock(&lock_key, 0).await?;
-    // check the working node for the organization again, maybe other node locked it
-    // first
-    let node = db::alerts::alert_manager::get_mark(org_id).await;
-    if !node.is_empty() && LOCAL_NODE_UUID.ne(&node) && get_node_by_uuid(&node).await.is_some() {
-        log::debug!("[ALERT_MANAGER] is processing by {node}");
-        dist_lock::unlock(&locker).await?;
-        return Ok(());
-    }
-    let ret = if node.is_empty() || LOCAL_NODE_UUID.ne(&node) {
-        db::alerts::alert_manager::set_mark(org_id, Some(&LOCAL_NODE_UUID.clone())).await
-    } else {
-        Ok(())
-    };
-    // already bind to this node, we can unlock now
-    dist_lock::unlock(&locker).await?;
-    drop(locker);
-    ret?;
-
     // Scheduler pulls only those triggers that match the conditions-
     // - trigger.next_run_at <= now
     // - !(trigger.is_realtime && !trigger.is_silenced)

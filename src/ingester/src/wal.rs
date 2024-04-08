@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,10 +20,12 @@ use std::{
     sync::Arc,
 };
 
+use async_walkdir::WalkDir;
 use config::{
     utils::{schema::infer_json_schema_from_values, schema_ext::SchemaExt},
     CONFIG,
 };
+use futures::StreamExt;
 use snafu::ResultExt;
 
 use crate::{errors::*, immutable, memtable, writer::WriterKey};
@@ -52,7 +54,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let lock_files = scan_files(wal_dir, "lock");
+    let lock_files = scan_files(wal_dir, "lock").await;
 
     // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
     for lock_file in lock_files.iter() {
@@ -93,7 +95,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     create_dir_all(&parquet_dir).context(OpenDirSnafu {
         path: parquet_dir.clone(),
     })?;
-    let par_files = scan_files(parquet_dir, "par");
+    let par_files = scan_files(parquet_dir, "par").await;
     for par_file in par_files.iter() {
         log::warn!("delete uncompleted par file: {:?}", par_file);
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
@@ -107,7 +109,7 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let wal_files = scan_files(&wal_dir, "wal");
+    let wal_files = scan_files(&wal_dir, "wal").await;
     if wal_files.is_empty() {
         return Ok(());
     }
@@ -214,22 +216,18 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     Ok(())
 }
 
-fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
-    walkdir::WalkDir::new(root_dir.into())
-        .into_iter()
-        .filter_map(|entry| {
+async fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
+    WalkDir::new(root_dir.into())
+        .filter_map(|entry| async move {
             let entry = entry.ok()?;
             let path = entry.path();
             if path.is_file() {
                 let path_ext = path.extension()?.to_str()?;
-                if path_ext == ext {
-                    Some(PathBuf::from(path))
-                } else {
-                    None
-                }
+                if path_ext == ext { Some(path) } else { None }
             } else {
                 None
             }
         })
         .collect()
+        .await
 }

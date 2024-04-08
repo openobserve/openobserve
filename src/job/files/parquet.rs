@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -77,7 +77,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let mut files = scan_files(&pattern, "parquet");
+    let mut files = scan_files(&pattern, "parquet").await;
     if files.is_empty() {
         return Ok(());
     }
