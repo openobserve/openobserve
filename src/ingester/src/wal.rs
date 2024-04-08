@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{
     fs::{create_dir_all, File},
     io::{BufRead, BufReader},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -49,11 +49,11 @@ use crate::{errors::*, immutable, memtable, writer::WriterKey};
 //    files actually wrote to disk completely, need to continue step 5
 pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     // 1. get all .lock files
-    let wal_dir_path_buf = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
-
-    let wal_dir = wal_dir_path_buf.as_path();
+    let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("logs");
     // create wal dir if not exists
-    create_dir_all(wal_dir).context(OpenDirSnafu { path: wal_dir })?;
+    create_dir_all(&wal_dir).context(OpenDirSnafu {
+        path: wal_dir.clone(),
+    })?;
     let lock_files = scan_files(wal_dir, "lock").await;
 
     // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
@@ -90,11 +90,11 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     }
 
     // 4. delete all the .par files
-    let parquet_dir_path_buf = PathBuf::from(&CONFIG.common.data_wal_dir).join("files");
-
-    let parquet_dir = parquet_dir_path_buf.as_path();
+    let parquet_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("files");
     // create wal dir if not exists
-    create_dir_all(parquet_dir).context(OpenDirSnafu { path: parquet_dir })?;
+    create_dir_all(&parquet_dir).context(OpenDirSnafu {
+        path: parquet_dir.clone(),
+    })?;
     let par_files = scan_files(parquet_dir, "par").await;
     for par_file in par_files.iter() {
         log::warn!("delete uncompleted par file: {:?}", par_file);
@@ -216,26 +216,18 @@ pub(crate) async fn replay_wal_files() -> Result<()> {
     Ok(())
 }
 
-async fn scan_files(root_dir: &Path, ext: &str) -> Vec<PathBuf> {
-    let mut wd = WalkDir::new(root_dir);
-    let mut resp = Vec::new();
-    loop {
-        match wd.next().await {
-            Some(Ok(entry)) => {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(e) = path.extension() {
-                        if e == ext {
-                            resp.push(PathBuf::from(path.to_str().unwrap()))
-                        }
-                    }
-                } else {
-                    continue;
-                }
+async fn scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Vec<PathBuf> {
+    WalkDir::new(root_dir.into())
+        .filter_map(|entry| async move {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_file() {
+                let path_ext = path.extension()?.to_str()?;
+                if path_ext == ext { Some(path) } else { None }
+            } else {
+                None
             }
-            Some(Err(_)) => {}
-            None => break,
-        }
-    }
-    resp
+        })
+        .collect()
+        .await
 }

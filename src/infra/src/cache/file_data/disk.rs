@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -61,7 +61,7 @@ impl FileData {
             root_dir: format!(
                 "{}{}",
                 CONFIG.common.data_cache_dir,
-                storage::format_key("")
+                storage::format_key("", true)
             ),
             data: CacheStrategy::new(strategy),
         }

@@ -480,11 +480,12 @@ async fn handle_diff_schema(
         {
             Err(e) => {
                 log::error!(
-                    "handle_diff_schema [{}/{}/{}] with hash {}, error: {}, retrying...{}",
+                    "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, error: {}, retrying...{}",
                     org_id,
                     stream_type,
                     stream_name,
                     inferred_schema.hash_key(),
+                    record_ts,
                     e,
                     retries
                 );
@@ -501,11 +502,12 @@ async fn handle_diff_schema(
     }
     if let Some(e) = err {
         log::error!(
-            "handle_diff_schema [{}/{}/{}] with hash {} abort after retry {} times, error: {}",
+            "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, abort after retry {} times, error: {}",
             org_id,
             stream_type,
             stream_name,
             inferred_schema.hash_key(),
+            record_ts,
             retries,
             e
         );
