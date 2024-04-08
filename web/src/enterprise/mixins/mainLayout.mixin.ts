@@ -1,6 +1,7 @@
 import { ref, markRaw } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
+import { useStore } from "vuex";
 
 import { getUserInfo, getImageURL } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
@@ -11,6 +12,7 @@ import FunctionIcon from "@/components/icons/FunctionIcon.vue";
 const MainLayoutCloudMixin = {
   setup() {
     const router = useRouter();
+    const store = useStore();
     const orgOptions = ref([{ label: Number, value: String }]);
 
     /**
@@ -138,7 +140,7 @@ const MainLayoutCloudMixin = {
     /**
      * Get refresh token
      */
-    const getRefreshToken = (store: any) => {
+    const getRefreshToken = () => {
       userService
         .getRefreshToken()
         .then((res) => {
@@ -152,14 +154,9 @@ const MainLayoutCloudMixin = {
               loginState: true,
               userInfo: userInfo,
             });
+
+            store.dispatch("setUserInfo", userInfo);
           }
-          const d = new Date();
-          const timeoutinterval = Math.floor(d.getTime() / 1000);
-          const timeout =
-            (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-          setTimeout(() => {
-            getRefreshToken(store);
-          }, timeout);
         })
         .catch((e) => {
           console.log("Error while fetching refresh token:", e);
@@ -167,6 +164,7 @@ const MainLayoutCloudMixin = {
     };
 
     return {
+      store,
       orgOptions,
       getImageURL,
       leftNavigationLinks,

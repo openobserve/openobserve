@@ -92,7 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning" size="xs" class="warning" />{{
+            <q-icon name="warning"
+size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -179,10 +180,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
+          <q-btn-dropdown flat
+unelevated no-caps
+padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
-                <q-avatar size="md" color="grey" text-color="white">
+                <q-avatar size="md"
+color="grey" text-color="white">
                   <img
                     :src="
                       user.picture
@@ -648,16 +652,31 @@ export default defineComponent({
       }
     }
 
+    const triggerRefreshToken = () => {
+      const expirationTimeUnix = store.state.userInfo.exp;
+
+      // Convert the expiration time to milliseconds
+      const expirationTimeMilliseconds = expirationTimeUnix * 1000;
+
+      // Get the current time in milliseconds
+      const currentTimeMilliseconds = Date.now();
+
+      // Calculate the time difference
+      const timeUntilNextAPICall =
+        expirationTimeMilliseconds - currentTimeMilliseconds - 100;
+
+      // Convert the time difference from milliseconds to seconds
+      const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
+
+      setTimeout(() => {
+        mainLayoutMixin.setup().getRefreshToken();
+      }, timeUntilNextAPICallInSeconds);
+    };
+
     //get refresh token for cloud environment
     if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
-      const d = new Date();
-      const timeoutinterval = Math.floor(d.getTime() / 1000);
-      const timeout = (store.state.userInfo.exp - timeoutinterval - 30) * 1000;
-
       if (config.isCloud == "true") {
-        setTimeout(() => {
-          mainLayoutMixin.setup().getRefreshToken(store);
-        }, timeout);
+        triggerRefreshToken();
       }
     }
 
@@ -944,6 +963,7 @@ export default defineComponent({
       redirectToParentRoute,
       getOrganizationSettings,
       resetStreams,
+      triggerRefreshToken,
     };
   },
   computed: {
@@ -955,6 +975,9 @@ export default defineComponent({
     },
     forceFetchOrganization() {
       return this.router?.currentRoute?.value?.query?.update_org;
+    },
+    changeUserInfo() {
+      return this.store?.state?.userInfo;
     },
   },
   watch: {
@@ -979,6 +1002,9 @@ export default defineComponent({
         this.redirectToParentRoute(this.$route.matched);
         // this.setSelectedOrganization();
       }, 500);
+    },
+    changeUserInfo() {
+      this.triggerRefreshToken();
     },
   },
 });
