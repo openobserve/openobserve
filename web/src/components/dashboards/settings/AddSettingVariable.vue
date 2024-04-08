@@ -380,7 +380,6 @@ import {
   type Ref,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import IndexService from "../../../services/index";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import {
