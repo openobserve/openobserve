@@ -188,7 +188,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("Failed to create wal dir: {}", e);
         }
         // clean empty sub dirs
-        _ = clean_empty_dirs(&CONFIG.common.data_wal_dir);
+        let _ = clean_empty_dirs(&CONFIG.common.data_wal_dir).await;
     }
 
     tokio::task::spawn(async move { files::run().await });
