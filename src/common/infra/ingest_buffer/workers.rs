@@ -30,8 +30,10 @@ type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<Result<()>>;
 
 // TODO: clean up temp static
-static WORKER_DEFAULT_WAIT_TIME: u64 = 1; // seconds between each pull
-static WORKER_MAX_IDLE: f64 = 600.0; // max idle time in seconds before shut down
+// seconds between each pull for a worker
+static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
+// max idle time in seconds before shut down
+static WORKER_MAX_IDLE: f64 = 600.0;
 
 /// Multi-consumer side of the TaskQueue. Created and maaged by TaskQueue asscoaited with a stream.
 /// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold

@@ -25,8 +25,12 @@ use super::{entry::IngestEntry, workers::Workers};
 type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
 
 // TODO: change those static to env
+// initial # of workers
 static MIN_WORKER_CNT: usize = 3;
+// max # of requests could be held in channel.
+// if channel if full -> init more workers
 static DEFAULT_CHANNEL_CAP: usize = 10;
+// worker shuts itself down after idle too long. if all workers finished, remove TQ from Manager
 static MANAGER_CLEANUP_INTERVAL: u64 = 600;
 
 /// A global hash map that maps stream of a TaskQueue instsance.
