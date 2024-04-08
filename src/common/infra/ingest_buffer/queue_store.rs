@@ -40,31 +40,25 @@ const FILE_EXTENSION: &str = "wal";
 ///
 /// <entry_len> written in u16 ordered by BigEndian.
 pub(super) async fn persist_job(
-    stream_name: String,
+    tq_index: usize,
     worker_id: String,
     store_sig_r: Receiver<Option<Vec<IngestEntry>>>,
 ) -> Result<()> {
-    let path = build_file_path(&stream_name, &worker_id);
+    let path = build_file_path(tq_index, &worker_id);
     create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
 
     while let Ok(tasks) = store_sig_r.recv().await {
-        log::info!(
-            "stream({})-worker({}) persists its pending tasks to disk",
-            stream_name,
-            worker_id
-        );
+        log::info!("TaskQueue({tq_index})-worker({worker_id}) persists its pending tasks to disk");
 
         match persist_job_inner(&path, tasks) {
             Err(e) => {
                 log::error!(
-                    "stream({})-worker({}) failed to persist tasks: {:?} ",
-                    stream_name,
-                    worker_id,
+                    "TaskQueue({tq_index})-worker({worker_id}) failed to persist tasks: {:?} ",
                     e
                 );
             }
             Ok(_) => {
-                log::info!("stream({stream_name})-worker({worker_id}) persisted to disk");
+                log::info!("TaskQueue({tq_index})-worker({worker_id}) persisted to disk");
             }
         }
     }
@@ -132,8 +126,8 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
                 entries.len(),
                 wal_file
             );
-            // Hack (stream_name = replay, worker_id=0)
-            process_tasks_with_retries("replay", "0", &entries, 1).await;
+            // Hack (stream_name = 0, worker_id=0)
+            process_tasks_with_retries(0, "0", &entries, 1).await;
         }
         remove_file(wal_file)?;
     }
@@ -141,10 +135,11 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
 }
 
 /// Builds file path for TaskQueue workers to persist their pending tasks to disk.
-pub(super) fn build_file_path(stream_name: &str, worker_id: &str) -> PathBuf {
+pub(super) fn build_file_path(tq_index: usize, worker_id: &str) -> PathBuf {
+    let tq_folder = format!("task_queue-{tq_index}");
     let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
     path.push("ingest_buffer");
-    path.push(stream_name);
+    path.push(tq_folder);
     path.push(worker_id);
     path.set_extension(FILE_EXTENSION);
     path

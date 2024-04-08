@@ -40,20 +40,20 @@ static WORKER_MAX_IDLE: f64 = 600.0;
 /// the receiver. Each initialized worker has two tasks to perform. Worker will shut down
 /// when corresponding producer closes their channel.
 pub(super) struct Workers {
-    pub stream_name: Arc<str>,
+    pub tq_index: usize,
     pub receiver: Arc<Receiver<IngestEntry>>,
     pub handles: RwVec<Worker>,
 }
 
 impl Workers {
-    pub fn new(count: usize, stream_name: &str, receiver: Arc<Receiver<IngestEntry>>) -> Self {
+    pub fn new(count: usize, tq_index: usize, receiver: Arc<Receiver<IngestEntry>>) -> Self {
         let mut handles = Vec::with_capacity(count);
         for _ in 0..count {
-            let worker = init_worker(stream_name.to_owned(), Arc::clone(&receiver));
+            let worker = init_worker(tq_index, Arc::clone(&receiver));
             handles.push(worker);
         }
         Self {
-            stream_name: Arc::from(stream_name),
+            tq_index,
             receiver,
             handles: RwVec::from(handles),
         }
@@ -63,17 +63,9 @@ impl Workers {
     pub async fn add_workers_by(&self, count: usize) {
         let mut rw = self.handles.write().await;
         for _ in 0..count {
-            let handle = init_worker(self.stream_name.to_string(), Arc::clone(&self.receiver));
+            let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
             rw.push(handle);
         }
-    }
-
-    /// Removes finished workers and returns remaining active worker count.
-    pub async fn running_worker_count(&self) -> usize {
-        let mut rw = self.handles.write().await;
-        rw.retain(|handle| !handle.is_finished());
-        rw.shrink_to_fit();
-        rw.len()
     }
 
     /// Terminates all active workers
@@ -83,8 +75,8 @@ impl Workers {
         join_res.iter().for_each(|res| {
             if let Err(e) = res {
                 log::error!(
-                    "Stream({})-Worker error when closing: {:?}",
-                    self.stream_name,
+                    "TaskQueue({})-Worker error when closing: {:?}",
+                    self.tq_index,
                     e
                 )
             }
@@ -96,23 +88,20 @@ impl Workers {
 /// The main task is receiving and processing IngestEntry sent by TaskQueue producers.
 /// The side task is persisting pending tasks to disk.
 /// The worker is asscoaited with a stream by stream_name.
-fn init_worker(stream_name: String, receiver: Arc<Receiver<IngestEntry>>) -> Worker {
+fn init_worker(tq_index: usize, receiver: Arc<Receiver<IngestEntry>>) -> Worker {
     tokio::spawn(async move {
         let worker_id = ider::generate();
-        log::info!("Stream({stream_name})-Worker({worker_id}) starting");
+        log::info!("TaskQueue({tq_index})-Worker({worker_id}) starting");
 
         // Used to communicated between the worker's two tasks
         let (store_sig_s, store_sig_r) = bounded::<Option<Vec<IngestEntry>>>(1);
 
         // side job - persisting
-        let persist_job_handle = tokio::spawn(persist_job(
-            stream_name.clone(),
-            worker_id.clone(),
-            store_sig_r,
-        ));
+        let persist_job_handle =
+            tokio::spawn(persist_job(tq_index, worker_id.clone(), store_sig_r));
 
         // main task - receiving/processing IngestEntries (awaited)
-        process_job(stream_name, worker_id, receiver, store_sig_s).await?;
+        process_job(tq_index, worker_id, receiver, store_sig_s).await?;
         // Join the side task
         _ = persist_job_handle.await?;
         Ok(())
@@ -131,7 +120,7 @@ fn init_worker(stream_name: String, receiver: Arc<Receiver<IngestEntry>>) -> Wor
 /// Otherwise:
 ///     Records elapsed time, which if exceeds WORKER_MAX_IDLE time, exists this task.
 async fn process_job(
-    stream_name: String,
+    tq_index: usize,
     worker_id: String,
     receiver: Arc<Receiver<IngestEntry>>,
     store_sig_s: Sender<Option<Vec<IngestEntry>>>,
@@ -155,19 +144,19 @@ async fn process_job(
             // Send to background to persist
             if let Err(e) = store_sig_s.send(Some(pending_tasks.clone())).await {
                 log::error!(
-                    "Stream({stream_name})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
+                    "TaskQueue({tq_index})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
                     e
                 );
             }
             log::info!(
-                "Stream({stream_name})-Worker({worker_id}) received and processing {} requests",
+                "TaskQueue({tq_index})-Worker({worker_id}) received and processing {} requests",
                 pending_tasks.len()
             );
-            process_tasks_with_retries(&stream_name, &worker_id, &pending_tasks, 0).await;
+            process_tasks_with_retries(tq_index, &worker_id, &pending_tasks, 0).await;
             pending_tasks.clear();
             if let Err(e) = store_sig_s.send(None).await {
                 log::error!(
-                    "Stream({stream_name})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
+                    "TaskQueue({tq_index})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
                     e
                 );
             }
@@ -176,11 +165,11 @@ async fn process_job(
         interval.tick().await;
     }
     log::info!(
-        "Stream({stream_name})-Worker({worker_id}) idle time exceeded maximum idle time allowed. Shutting down."
+        "TaskQueue({tq_index})-Worker({worker_id}) idle time exceeded maximum idle time allowed. Shutting down."
     );
     store_sig_s.close(); // signal persist job to close
     // Flush to disk or remove saved file
-    let path = build_file_path(&stream_name, &worker_id);
+    let path = build_file_path(tq_index, &worker_id);
     create_dir_all(path.parent().unwrap())
         .context("Failed to flush to disk when worker shutting down")?;
     let to_persist = if pending_tasks.is_empty() {
@@ -196,7 +185,7 @@ async fn process_job(
 /// Retry only applies to IngestEntries that failed due to ServiceUnavailable (503)
 /// from Ingester
 pub(super) async fn process_tasks_with_retries(
-    stream_name: &str,
+    tq_index: usize,
     worker_id: &str,
     tasks: &Vec<IngestEntry>,
     retry_count: i32,
@@ -205,7 +194,7 @@ pub(super) async fn process_tasks_with_retries(
         match task.ingest().await {
             Ok(mut retry) => {
                 if retry {
-                    log::error!("Ingester not available for {stream_name}. Trying again",);
+                    log::error!("Ingester not available. Trying again",);
                     let mut retires = 0;
                     while retires < retry_count && retry {
                         if let Ok(r) = task.ingest().await {
@@ -217,7 +206,7 @@ pub(super) async fn process_tasks_with_retries(
                     }
                     if retry {
                         log::warn!(
-                            "Stream({stream_name})-Worker({worker_id}): max retries reached. Skip request",
+                            "TaskQueue({tq_index})-Worker({worker_id}): max retries reached. Skip request",
                         );
                         continue;
                     }
@@ -225,7 +214,7 @@ pub(super) async fn process_tasks_with_retries(
             }
             Err(e) => {
                 log::error!(
-                    "Stream({stream_name})-Worker({worker_id}) failed to ingest {:?}. Error: {:?}. Request dropped",
+                    "TaskQueue({tq_index})-Worker({worker_id}) failed to ingest {:?}. Error: {:?}. Request dropped",
                     task,
                     e,
                 );
@@ -233,7 +222,7 @@ pub(super) async fn process_tasks_with_retries(
         }
     }
     log::info!(
-        "Stream({stream_name})-Worker({worker_id}) succesfully ingested {} request(s).",
+        "TaskQueue({tq_index})-Worker({worker_id}) succesfully ingested {} request(s).",
         tasks.len()
     );
 }

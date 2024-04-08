@@ -112,7 +112,7 @@ pub async fn multi(
             Some(stream_name.clone()),
             body,
         );
-        match send_task(&stream_name, ingest_entry).await {
+        match send_task(ingest_entry).await {
             Ok(_) => HttpResponse::Ok().json("Request acepted"),
             Err(e) => {
                 log::error!("Error sending request to ingest buffer: {:?}", e);
@@ -183,7 +183,7 @@ pub async fn json(
             Some(stream_name.clone()),
             body,
         );
-        match send_task(&stream_name, ingest_entry).await {
+        match send_task(ingest_entry).await {
             Ok(_) => HttpResponse::Ok().json("Request acepted"),
             Err(e) => {
                 log::error!("Error sending request to ingest buffer: {:?}", e);
