@@ -100,7 +100,7 @@ pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>)
 pub(super) async fn replay_persisted_tasks() -> Result<()> {
     let wal_dir = PathBuf::from(&CONFIG.common.data_wal_dir).join("ingest_buffer");
     create_dir_all(&wal_dir).context("Failed to open wal/ingest_buffer directory")?;
-    let wal_files = scan_files(wal_dir, FILE_EXTENSION);
+    let wal_files = scan_files(wal_dir, FILE_EXTENSION).await;
     if wal_files.is_empty() {
         return Ok(());
     }
