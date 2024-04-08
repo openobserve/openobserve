@@ -61,7 +61,7 @@ impl FileData {
             root_dir: format!(
                 "{}{}",
                 CONFIG.common.data_cache_dir,
-                storage::format_key("")
+                storage::format_key("", true)
             ),
             data: CacheStrategy::new(strategy),
         }
