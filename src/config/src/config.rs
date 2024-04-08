@@ -480,6 +480,8 @@ pub struct Common {
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_FILELIST_DEDUP_ENABLED", default = false)]
     pub feature_filelist_dedup_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_INGEST_BUFFER_ENABLED", default = false)]
+    pub feature_ingest_buffer_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]

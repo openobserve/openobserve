@@ -19,10 +19,13 @@ use actix_web::{http, post, web, HttpRequest, HttpResponse};
 use config::CONFIG;
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        ingestion::{
-            GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
+    common::{
+        infra::ingest_buffer::{send_task, IngestEntry, IngestSource},
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            ingestion::{
+                GCPIngestionRequest, IngestionRequest, KinesisFHIngestionResponse, KinesisFHRequest,
+            },
         },
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
@@ -99,20 +102,27 @@ pub async fn multi(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    // TODO: Temporary testing.
-    // {
-    //     let entry = crate::common::infra::ingest_buffer::entry::IngestRequest::new(
-    //         org_id.clone(),
-    //         stream_name.clone(),
-    //         body.clone(),
-    //         thread_id.clone(),
-    //         user_email.to_string(),
-    //     );
-    //     let task = crate::common::infra::ingest_buffer::entry::IngestEntry::Multi(entry);
-    //     let _res =
-    //         crate::common::infra::ingest_buffer::task_queue::send_task(&stream_name, task).await;
-    // }
-    Ok(
+
+    Ok(if CONFIG.common.feature_ingest_buffer_enabled {
+        let ingest_entry = IngestEntry::new(
+            IngestSource::Multi,
+            **thread_id,
+            org_id,
+            user_email.to_string(),
+            Some(stream_name.clone()),
+            body,
+        );
+        match send_task(&stream_name, ingest_entry).await {
+            Ok(_) => HttpResponse::Ok().json("Request acepted"),
+            Err(e) => {
+                log::error!("Error sending request to ingest buffer: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        }
+    } else {
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
@@ -133,8 +143,8 @@ pub async fn multi(
                     e.to_string(),
                 ))
             }
-        },
-    )
+        }
+    })
 }
 
 /// _json ingestion API
