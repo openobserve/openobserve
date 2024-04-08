@@ -118,7 +118,7 @@ pub trait Db: Sync + Send + 'static {
         key: &str,
         with_prefix: bool,
         need_watch: bool,
-        updated_at: Option<i64>,
+        start_dt: Option<i64>,
     ) -> Result<()>;
 
     /// Contrary to `delete`, this call won't fail if `key` is missing.

@@ -182,7 +182,7 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
-    let mut query_fn = req.query.query_fn.and_then(|v| base64::decode(&v).ok());
+    let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
 
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
@@ -365,12 +365,14 @@ pub async fn around(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
     };
-    let query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
+    let query_fn = query
+        .get("query_fn")
+        .and_then(|v| base64::decode_url(v).ok());
 
     let default_sql = format!("SELECT * FROM \"{}\" ", stream_name);
     let around_sql = match query.get("sql") {
         None => default_sql,
-        Some(v) => match base64::decode(v) {
+        Some(v) => match base64::decode_url(v) {
             Err(_) => default_sql,
             Ok(v) => {
                 uses_fn = functions::get_all_transform_keys(&org_id)
@@ -656,7 +658,7 @@ pub async fn values(
 
     let query_context = match query.get("sql") {
         None => "".to_string(),
-        Some(v) => base64::decode(v).unwrap_or("".to_string()),
+        Some(v) => base64::decode_url(v).unwrap_or("".to_string()),
     };
     let user_id = match in_req.headers().get("user_id") {
         Some(v) => v.to_str().unwrap(),
@@ -729,7 +731,9 @@ async fn values_v1(
         Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
         None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
     };
-    let mut query_fn = query.get("query_fn").and_then(|v| base64::decode(v).ok());
+    let mut query_fn = query
+        .get("query_fn")
+        .and_then(|v| base64::decode_url(v).ok());
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
             query_fn = Some(format!("{} \n .", vrl_function));
@@ -750,7 +754,7 @@ async fn values_v1(
 
     let mut query_context = match query.get("sql") {
         None => None,
-        Some(v) => match base64::decode(v) {
+        Some(v) => match base64::decode_url(v) {
             Err(_) => None,
             Ok(v) => {
                 uses_fn = functions::get_all_transform_keys(org_id)
