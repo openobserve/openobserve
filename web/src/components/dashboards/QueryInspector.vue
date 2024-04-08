@@ -21,6 +21,8 @@
 
 <script lang="ts">
 import { computed, defineComponent, ref } from "vue";
+import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "QueryInspector",
@@ -39,14 +41,23 @@ export default defineComponent({
   },
   setup(props: any) {
     const queryData = props.metaData?.queries || [] ;
+    const store = useStore();
     
     const getRows = (query: any) => {
       const timestampOfStartTime = query?.startTime;
-      const formattedStartTime = new Date(timestampOfStartTime / 1000);
+      const formattedStartTime = timestampToTimezoneDate(
+        timestampOfStartTime / 1000,
+        store.state.timezone,
+        "yyyy-MM-dd HH:mm:ss.SSS"
+      );
       const startTimeEntry = `${timestampOfStartTime} (${formattedStartTime})`;
 
       const timestampOfEndTime = query?.endTime;
-      const formattedEndTime = new Date(timestampOfEndTime / 1000);
+      const formattedEndTime = timestampToTimezoneDate(
+        timestampOfEndTime / 1000,
+        store.state.timezone,
+        "yyyy-MM-dd HH:mm:ss.SSS"
+      );
       const endTimeEntry = `${timestampOfEndTime} (${formattedEndTime})`;
 
       const rows: any[] = [
