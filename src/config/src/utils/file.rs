@@ -51,13 +51,10 @@ pub async fn scan_files<P: AsRef<Path>>(root: P, ext: &str) -> Vec<String> {
             Some(Ok(entry)) => {
                 let path = entry.path();
                 if path.is_file() {
-                    match path.extension() {
-                        Some(e) => {
-                            if e == ext {
-                                resp.push(path.to_str().unwrap().to_string())
-                            }
+                    if let Some(e) = path.extension() {
+                        if e == ext {
+                            resp.push(path.to_str().unwrap().to_string())
                         }
-                        None => {}
                     }
                 } else {
                     continue;
@@ -80,13 +77,10 @@ pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
                 if entry.path().display().to_string() == dir {
                     continue;
                 }
-                match entry.file_type().await {
-                    Ok(ft) => {
-                        if ft.is_dir() {
-                            dirs.push(entry.path().to_str().unwrap().to_string())
-                        };
-                    }
-                    Err(_) => {}
+                if let Ok(ft) = entry.file_type().await {
+                    if ft.is_dir() {
+                        dirs.push(entry.path().to_str().unwrap().to_string())
+                    };
                 }
             }
             Some(Err(_)) => {}

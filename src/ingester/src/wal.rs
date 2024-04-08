@@ -53,7 +53,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 
     let wal_dir = wal_dir_path_buf.as_path();
     // create wal dir if not exists
-    create_dir_all(&wal_dir).context(OpenDirSnafu { path: wal_dir })?;
+    create_dir_all(wal_dir).context(OpenDirSnafu { path: wal_dir })?;
     let lock_files = scan_files(wal_dir, "lock").await;
 
     // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
@@ -94,7 +94,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 
     let parquet_dir = parquet_dir_path_buf.as_path();
     // create wal dir if not exists
-    create_dir_all(&parquet_dir).context(OpenDirSnafu { path: parquet_dir })?;
+    create_dir_all(parquet_dir).context(OpenDirSnafu { path: parquet_dir })?;
     let par_files = scan_files(parquet_dir, "par").await;
     for par_file in par_files.iter() {
         log::warn!("delete uncompleted par file: {:?}", par_file);
@@ -224,13 +224,10 @@ async fn scan_files(root_dir: &Path, ext: &str) -> Vec<PathBuf> {
             Some(Ok(entry)) => {
                 let path = entry.path();
                 if path.is_file() {
-                    match path.extension() {
-                        Some(e) => {
-                            if e == ext {
-                                resp.push(PathBuf::from(path.to_str().unwrap()))
-                            }
+                    if let Some(e) = path.extension() {
+                        if e == ext {
+                            resp.push(PathBuf::from(path.to_str().unwrap()))
                         }
-                        None => {}
                     }
                 } else {
                     continue;
