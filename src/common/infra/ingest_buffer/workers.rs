@@ -162,6 +162,7 @@ async fn process_job(
                 pending_tasks.len()
             );
             process_tasks_with_retries(&stream_name, &worker_id, &pending_tasks, 0).await;
+            pending_tasks.clear();
             if let Err(e) = store_sig_s.send(None).await {
                 log::error!(
                     "Stream({stream_name})-Worker({worker_id}) failed to send pending tasks to persist job. Error: {:?}",
@@ -212,6 +213,12 @@ pub(super) async fn process_tasks_with_retries(
                             break;
                         }
                     }
+                    if retry {
+                        log::warn!(
+                            "Stream({stream_name})-Worker({worker_id}): max retries reached. Skip request",
+                        );
+                        continue;
+                    }
                 }
             }
             Err(e) => {
@@ -223,4 +230,8 @@ pub(super) async fn process_tasks_with_retries(
             }
         }
     }
+    log::info!(
+        "Stream({stream_name})-Worker({worker_id}) succesfully ingested {} request(s).",
+        tasks.len()
+    );
 }

@@ -29,7 +29,7 @@ pub(super) async fn init() -> anyhow::Result<()> {
 
     if CONFIG.common.feature_ingest_buffer_enabled {
         // init task queue
-        log::info!("Initializing TaskQueueManager for Ingest Buffer feature");
+        log::info!("Start TaskQueueManager as ingest buffer");
         task_queue::init().await?;
     }
 

@@ -54,13 +54,18 @@ pub(super) async fn persist_job(
             worker_id
         );
 
-        if let Err(e) = persist_job_inner(&path, tasks) {
-            log::error!(
-                "stream({})-worker({}) failed to persist tasks: {:?} ",
-                stream_name,
-                worker_id,
-                e
-            );
+        match persist_job_inner(&path, tasks) {
+            Err(e) => {
+                log::error!(
+                    "stream({})-worker({}) failed to persist tasks: {:?} ",
+                    stream_name,
+                    worker_id,
+                    e
+                );
+            }
+            Ok(_) => {
+                log::info!("stream({stream_name})-worker({worker_id}) persisted to disk");
+            }
         }
     }
     Ok(())

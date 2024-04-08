@@ -174,7 +174,26 @@ pub async fn json(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(
+    Ok(if CONFIG.common.feature_ingest_buffer_enabled {
+        let ingest_entry = IngestEntry::new(
+            IngestSource::JSON,
+            **thread_id,
+            org_id,
+            user_email.to_string(),
+            Some(stream_name.clone()),
+            body,
+        );
+        match send_task(&stream_name, ingest_entry).await {
+            Ok(_) => HttpResponse::Ok().json("Request acepted"),
+            Err(e) => {
+                log::error!("Error sending request to ingest buffer: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        }
+    } else {
         match logs::ingest::ingest(
             &org_id,
             &stream_name,
@@ -195,8 +214,8 @@ pub async fn json(
                     e.to_string(),
                 ))
             }
-        },
-    )
+        }
+    })
 }
 
 /// _kinesis_firehose ingestion API

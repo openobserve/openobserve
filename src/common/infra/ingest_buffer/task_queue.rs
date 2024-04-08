@@ -57,6 +57,7 @@ pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<()> {
 /// Gracefully terminates all running TaskQueues
 pub async fn shut_down() {
     if CONFIG.common.feature_ingest_buffer_enabled {
+        log::info!("Shutting down TaskQueueManager");
         TQMANAGER.terminal_all().await;
     }
 }
