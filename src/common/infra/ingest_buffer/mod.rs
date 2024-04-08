@@ -13,19 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod entry;
+use config::CONFIG;
+
+mod entry;
 mod queue_store;
 mod task_queue;
 mod workers;
 
+pub use entry::{IngestEntry, IngestSource};
 pub use task_queue::{send_task, shut_down};
 
 pub(super) async fn init() -> anyhow::Result<()> {
     // replay wal files to create ingestion tasks
     queue_store::replay_persisted_tasks().await?;
 
-    // init task queue
-    task_queue::init().await?;
+    if CONFIG.common.feature_ingest_buffer_enabled {
+        // init task queue
+        log::info!("Initializing TaskQueueManager for Ingest Buffer feature");
+        task_queue::init().await?;
+    }
 
     Ok(())
 }

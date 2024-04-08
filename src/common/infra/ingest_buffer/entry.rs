@@ -90,7 +90,7 @@ impl IngestEntry {
         };
         logs::ingest::ingest(
             &self.org_id,
-            &stream_name,
+            stream_name,
             in_req,
             self.thread_id,
             &self.user_email,
@@ -204,8 +204,7 @@ impl IngestEntry {
         cursor
             .read_exact(&mut body)
             .context("IngestEntry::from_bytes() failed at reading <body>")?;
-        let body = Bytes::try_from(body)
-            .context("IngestEntry::from_bytes() failed at converting <body>")?;
+        let body = Bytes::from(body);
 
         Ok(Self {
             source,

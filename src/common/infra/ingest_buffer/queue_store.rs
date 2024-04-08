@@ -47,28 +47,20 @@ pub(super) async fn persist_job(
     let path = build_file_path(&stream_name, &worker_id);
     create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
 
-    loop {
-        match store_sig_r.recv().await {
-            Ok(tasks) => {
-                log::info!(
-                    "stream({})-worker({}) persists its pending tasks to disk",
-                    stream_name,
-                    worker_id
-                );
+    while let Ok(tasks) = store_sig_r.recv().await {
+        log::info!(
+            "stream({})-worker({}) persists its pending tasks to disk",
+            stream_name,
+            worker_id
+        );
 
-                if let Err(e) = persist_job_inner(&path, tasks) {
-                    log::error!(
-                        "stream({})-worker({}) failed to persist tasks: {:?} ",
-                        stream_name,
-                        worker_id,
-                        e
-                    );
-                }
-            }
-            Err(_) => {
-                // worker shutting down. No more persisting
-                break;
-            }
+        if let Err(e) = persist_job_inner(&path, tasks) {
+            log::error!(
+                "stream({})-worker({}) failed to persist tasks: {:?} ",
+                stream_name,
+                worker_id,
+                e
+            );
         }
     }
     Ok(())
@@ -79,7 +71,7 @@ pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>)
                     .write(true)
                     .create(true)
                     .truncate(true) // always overwrite
-                    .open(&path)
+                    .open(path)
                     .context("Failed to open file")?;
 
     if let Some(tasks) = tasks {

@@ -95,7 +95,7 @@ impl Workers {
 /// The side task is persisting pending tasks to disk.
 /// The worker is asscoaited with a stream by stream_name.
 fn init_worker(stream_name: String, receiver: Arc<Receiver<IngestEntry>>) -> Worker {
-    let handle = tokio::spawn(async move {
+    tokio::spawn(async move {
         let worker_id = ider::generate();
         log::info!("Stream({stream_name})-Worker({worker_id}) starting");
 
@@ -110,12 +110,11 @@ fn init_worker(stream_name: String, receiver: Arc<Receiver<IngestEntry>>) -> Wor
         ));
 
         // main task - receiving/processing IngestEntries (awaited)
-        _ = process_job(stream_name, worker_id, receiver, store_sig_s).await?;
+        process_job(stream_name, worker_id, receiver, store_sig_s).await?;
         // Join the side task
         _ = persist_job_handle.await?;
         Ok(())
-    });
-    handle
+    })
 }
 
 /// TaskQueue worker's main task.

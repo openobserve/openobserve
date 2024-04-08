@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_channel::{bounded, Sender};
+use config::CONFIG;
 use once_cell::sync::Lazy;
 
 use super::{entry::IngestEntry, workers::Workers};
@@ -31,7 +32,7 @@ static MANAGER_CLEANUP_INTERVAL: u64 = 600;
 /// A global hash map that maps stream of a TaskQueue instsance.
 static TQMANAGER: Lazy<TaskQueueManager> = Lazy::new(TaskQueueManager::new);
 
-pub(super) async fn init() -> Result<(), anyhow::Error> {
+pub(super) async fn init() -> Result<()> {
     _ = TQMANAGER.task_queues.read().await.len();
 
     // start a background job to clean up TQManager's hash map
@@ -55,7 +56,9 @@ pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<()> {
 
 /// Gracefully terminates all running TaskQueues
 pub async fn shut_down() {
-    TQMANAGER.terminal_all().await;
+    if CONFIG.common.feature_ingest_buffer_enabled {
+        TQMANAGER.terminal_all().await;
+    }
 }
 
 struct TaskQueueManager {
