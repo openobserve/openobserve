@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -69,8 +69,8 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Err(_) => return Ok(()),
     };
     let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
-    let mut files = scan_files(&pattern, "parquet").await;
-    files.extend(scan_files(&pattern, "json").await);
+    let files = scan_files(&pattern, "parquet").await;
+    // files.extend(scan_files(&pattern, "json").await);
     let mut sizes = HashMap::new();
     for file in files {
         let local_file = file.to_owned();
