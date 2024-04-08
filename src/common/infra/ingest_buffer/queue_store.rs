@@ -45,34 +45,25 @@ pub(super) async fn persist_job(
     store_sig_r: Receiver<Option<Vec<IngestEntry>>>,
 ) -> Result<()> {
     let path = build_file_path(&stream_name, &worker_id);
-    create_dir_all(path.parent().unwrap()).context("Failed to open directory")?;
+    create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
 
     loop {
         match store_sig_r.recv().await {
             Ok(tasks) => {
-                let mut f = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true) // always overwrite
-                    .open(&path)
-                    .context("Failed to open file when persisting tasks")?;
-
                 log::info!(
                     "stream({})-worker({}) persists its pending tasks to disk",
                     stream_name,
                     worker_id
                 );
-                if let Some(tasks) = tasks {
-                    for task in tasks {
-                        let bytes = task.into_bytes()?;
-                        let len = bytes.len();
-                        f.write_u16::<BigEndian>(len as u16)?;
-                        f.write_all(&bytes)?;
-                    }
-                }
 
-                f.sync_all()
-                    .context("Failed to sync file when persisting tasks")?;
+                if let Err(e) = persist_job_inner(&path, tasks) {
+                    log::error!(
+                        "stream({})-worker({}) failed to persist tasks: {:?} ",
+                        stream_name,
+                        worker_id,
+                        e
+                    );
+                }
             }
             Err(_) => {
                 // worker shutting down. No more persisting
@@ -80,8 +71,28 @@ pub(super) async fn persist_job(
             }
         }
     }
-    // Closing down. Remove saved file.
-    remove_dir_all(path)?;
+    Ok(())
+}
+
+pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>) -> Result<()> {
+    let mut f = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true) // always overwrite
+                    .open(&path)
+                    .context("Failed to open file")?;
+
+    if let Some(tasks) = tasks {
+        for task in tasks {
+            let bytes = task.into_bytes()?;
+            let len = bytes.len();
+            f.write_u16::<BigEndian>(len as u16)?;
+            f.write_all(&bytes)?;
+        }
+    }
+
+    f.sync_all().context("Failed to sync file")?;
+
     Ok(())
 }
 

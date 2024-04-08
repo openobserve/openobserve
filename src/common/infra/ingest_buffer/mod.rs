@@ -18,9 +18,9 @@ mod queue_store;
 mod task_queue;
 mod workers;
 
-pub use task_queue::send_task;
+pub use task_queue::{send_task, shut_down};
 
-pub async fn init() -> anyhow::Result<()> {
+pub(super) async fn init() -> anyhow::Result<()> {
     // replay wal files to create ingestion tasks
     queue_store::replay_persisted_tasks().await?;
 

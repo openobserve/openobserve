@@ -13,15 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    fs::{create_dir_all, remove_file},
+    sync::Arc,
+};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_channel::{bounded, Receiver, Sender};
 use config::ider;
 use futures::future::join_all;
 use tokio::{sync::RwLock, task::JoinHandle};
 
-use super::{entry::IngestEntry, queue_store::persist_job};
+use super::{
+    entry::IngestEntry,
+    queue_store::{build_file_path, persist_job, persist_job_inner},
+};
 
 type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<Result<()>>;
@@ -30,9 +36,10 @@ type Worker = JoinHandle<Result<()>>;
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1; // seconds between each pull
 static WORKER_MAX_IDLE: f64 = 600.0; // max idle time in seconds before shut down
 
-// HELP: is the RwLock on the workers necessary
-// only 1 global TaskQueueManager which is already RwLock'd
-//
+/// Multi-consumer side of the TaskQueue. Created and maaged by TaskQueue asscoaited with a stream.
+/// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold
+/// the receiver. Each initialized worker has two tasks to perform. Worker will shut down
+/// when corresponding producer closes their channel.
 pub(super) struct Workers {
     pub stream_name: Arc<str>,
     pub receiver: Arc<Receiver<IngestEntry>>,
@@ -53,6 +60,7 @@ impl Workers {
         }
     }
 
+    /// Initializes additional {count} number of workers.
     pub async fn add_workers_by(&self, count: usize) {
         let mut rw = self.handles.write().await;
         for _ in 0..count {
@@ -61,6 +69,7 @@ impl Workers {
         }
     }
 
+    /// Removes finished workers and returns remaining active worker count.
     pub async fn running_worker_count(&self) -> usize {
         let mut rw = self.handles.write().await;
         rw.retain(|handle| !handle.is_finished());
@@ -68,10 +77,19 @@ impl Workers {
         rw.len()
     }
 
-    // TODO: handle join errors
+    /// Terminates all active workers
     pub async fn shut_down(&self) {
         let mut rw = self.handles.write().await;
-        let _join_res = join_all(rw.drain(..)).await;
+        let join_res = join_all(rw.drain(..)).await;
+        join_res.iter().for_each(|res| {
+            if let Err(e) = res {
+                log::error!(
+                    "Stream({})-Worker error when closing: {:?}",
+                    self.stream_name,
+                    e
+                )
+            }
+        });
     }
 }
 
@@ -162,6 +180,16 @@ async fn process_job(
         "Stream({stream_name})-Worker({worker_id}) idle time exceeded maximum idle time allowed. Shutting down."
     );
     store_sig_s.close(); // signal persist job to close
+    // Flush to disk or remove saved file
+    let path = build_file_path(&stream_name, &worker_id);
+    create_dir_all(path.parent().unwrap())
+        .context("Failed to flush to disk when worker shutting down")?;
+    let to_persist = if pending_tasks.is_empty() {
+        None
+    } else {
+        Some(pending_tasks)
+    };
+    persist_job_inner(&path, to_persist)?;
     Ok(())
 }
 
@@ -178,12 +206,14 @@ pub(super) async fn process_tasks_with_retries(
         match task.ingest().await {
             Ok(mut retry) => {
                 if retry {
-                    log::error!("Ingester not available for {stream_name}. Retry ",);
-                    let mut retires = 1;
+                    log::error!("Ingester not available for {stream_name}. Trying again",);
+                    let mut retires = 0;
                     while retires < retry_count && retry {
                         if let Ok(r) = task.ingest().await {
                             retires += 1;
                             retry = r;
+                        } else {
+                            break;
                         }
                     }
                 }

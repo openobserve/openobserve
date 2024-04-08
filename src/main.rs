@@ -214,6 +214,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // flush WAL cache to disk
     common_infra::wal::flush_all_to_disk().await;
+    // terminate ingest buffer
+    common_infra::ingest_buffer::shut_down().await;
     // flush distinct values
     _ = distinct_values::close().await;
     // flush compact offset cache to disk disk

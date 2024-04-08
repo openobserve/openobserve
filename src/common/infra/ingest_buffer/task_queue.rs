@@ -15,25 +15,28 @@
 
 use std::sync::Arc;
 
-use async_channel::{bounded, Receiver, Sender};
+use anyhow::{Context, Result};
+use async_channel::{bounded, Sender};
 use once_cell::sync::Lazy;
 
 use super::{entry::IngestEntry, workers::Workers};
 
+type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
+
 // TODO: change those static to env
 static MIN_WORKER_CNT: usize = 3;
 static DEFAULT_CHANNEL_CAP: usize = 10;
+static MANAGER_CLEANUP_INTERVAL: u64 = 600;
 
+/// A global hash map that maps stream of a TaskQueue instsance.
 static TQMANAGER: Lazy<TaskQueueManager> = Lazy::new(TaskQueueManager::new);
-
-type RwMap<K, V> = tokio::sync::RwLock<hashbrown::HashMap<K, V>>;
 
 pub(super) async fn init() -> Result<(), anyhow::Error> {
     _ = TQMANAGER.task_queues.read().await.len();
 
-    // start a background job to clean up TQManager's hash table
+    // start a background job to clean up TQManager's hash map
     tokio::spawn(async move {
-        let interval = tokio::time::Duration::from_secs(600);
+        let interval = tokio::time::Duration::from_secs(MANAGER_CLEANUP_INTERVAL);
         let mut interval = tokio::time::interval(interval);
         interval.tick().await; // the first tick is immediate
         loop {
@@ -45,8 +48,14 @@ pub(super) async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
+/// Sends a task to a TaskQueue based on stream name. To be called by server api endpoitns.
+pub async fn send_task(stream_name: &str, task: IngestEntry) -> Result<()> {
     TQMANAGER.send_task(stream_name, task).await
+}
+
+/// Gracefully terminates all running TaskQueues
+pub async fn shut_down() {
+    TQMANAGER.terminal_all().await;
 }
 
 struct TaskQueueManager {
@@ -60,16 +69,20 @@ impl TaskQueueManager {
         }
     }
 
-    async fn send_task(&self, stream_name: &str, task: IngestEntry) -> Result<(), anyhow::Error> {
+    /// Finds or creates a new TaskQueue to send an IngestEntry.
+    async fn send_task(&self, stream_name: &str, task: IngestEntry) -> Result<()> {
         if !self.task_queue_avail(stream_name).await {
             self.add_task_queue_for(stream_name).await;
         }
         let r = self.task_queues.read().await;
-        let tq = r.get(stream_name).unwrap();
-        let _ = tq.send_task(task).await;
-        Ok(())
+        let tq = r
+            .get(stream_name)
+            .context("Failed to find TaskQueue. BUG")?;
+        tq.send_task(task).await
     }
 
+    /// Called by TaskManager's background task periodically to remove the entires
+    /// where a TaskQueue's consumer side is already terminated.
     async fn remove_stopped_task_queues(&self) {
         let mut keys_to_remove = vec![];
         {
@@ -88,6 +101,8 @@ impl TaskQueueManager {
         }
     }
 
+    /// First checks if a TaskQueue instance exists for given stream_name;
+    /// Second, if exists, ensures TaskQueue has at least MIN_WORKER_CNT running workers.
     async fn task_queue_avail(&self, stream_name: &str) -> bool {
         let r = self.task_queues.read().await;
         match r.get(stream_name) {
@@ -104,10 +119,19 @@ impl TaskQueueManager {
         }
     }
 
+    /// Inits a new TaskQueue for stream_name.
     async fn add_task_queue_for(&self, stream_name: &str) {
         let tq = TaskQueue::new(DEFAULT_CHANNEL_CAP, stream_name);
         let mut w = self.task_queues.write().await;
         w.insert(Arc::from(stream_name), tq);
+    }
+
+    async fn terminal_all(&self) {
+        let mut r = self.task_queues.write().await;
+        for tq in r.values() {
+            tq.shut_down().await;
+        }
+        _ = r.drain();
     }
 }
 
@@ -117,7 +141,6 @@ struct TaskQueue {
 }
 
 impl TaskQueue {
-    // TODO: decide default initial workers count for a queue
     pub fn new(channel_cap: usize, stream_name: &str) -> Self {
         let (sender, receiver) = bounded::<IngestEntry>(channel_cap);
         let workers = Arc::new(Workers::new(
@@ -131,17 +154,23 @@ impl TaskQueue {
         }
     }
 
-    // TODO
-    // 1. add min worker count to increase the number of workers
-    async fn send_task(&self, task: IngestEntry) -> Result<(), anyhow::Error> {
+    /// Sends an IngestEntry into the TaskQueue.
+    /// Error if the channel was wrongly closed.
+    /// Increase the worker count if channel is full.
+    async fn send_task(&self, task: IngestEntry) -> Result<()> {
         if self.sender.is_closed() {
-            return Err(anyhow::anyhow!("Channel is closed. BUG"));
+            return Err(anyhow::anyhow!(
+                "Stream({}) channel is closed. BUG",
+                self.workers.stream_name
+            ));
         }
         while let Err(e) = self.sender.try_send(task.clone()) {
-            println!("channel is full {:?}.", e);
-            if self.workers.running_worker_count().await < MIN_WORKER_CNT {
-                self.workers.add_workers_by(MIN_WORKER_CNT).await;
-            }
+            log::info!(
+                "Stream({}) channel currently full {:?}. Increase worker count",
+                self.workers.stream_name,
+                e
+            );
+            self.workers.add_workers_by(MIN_WORKER_CNT).await;
         }
         Ok(())
     }

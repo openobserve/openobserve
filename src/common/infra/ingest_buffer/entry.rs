@@ -34,9 +34,6 @@ pub enum IngestSource {
     GCP,
 }
 
-// HELP:
-// 1. use value or reference to define this struct? which would require static lifetime
-// 2. For persisting entries to disk, into_bytes() or serde::Serialize/Deserialize
 #[derive(Debug, Clone)]
 pub struct IngestEntry {
     pub source: IngestSource,
@@ -66,6 +63,9 @@ impl IngestEntry {
         }
     }
 
+    /// Calls Ingester to ingest data stored in self based on sources.
+    /// Error returned by Ingester will be passed along. If Ingester returns
+    /// SERVICE_UNAVAILABLE (code = 503), this function will return true to indicate retry.
     pub async fn ingest(&self) -> Result<bool> {
         let in_req = match self.source {
             IngestSource::Bulk => {
