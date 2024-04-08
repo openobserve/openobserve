@@ -289,6 +289,10 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     w.data.insert(file_key.clone(), data_size);
                     let files_num = w.data.len();
                     drop(w);
+                    // print progress
+                    if files_num % 1000 == 0 {
+                        log::info!("Loading disk cache {}", files_num,);
+                    }
                     // metrics
                     let columns = file_key.split('/').collect::<Vec<&str>>();
                     metrics::QUERY_DISK_CACHE_FILES
@@ -297,10 +301,6 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     metrics::QUERY_DISK_CACHE_USED_BYTES
                         .with_label_values(&[columns[1], columns[2]])
                         .sub(data_size as i64);
-                    // print progress
-                    if files_num % 1000 == 0 {
-                        log::info!("Loading disk cache {}", files_num,);
-                    }
                 }
             }
         }
