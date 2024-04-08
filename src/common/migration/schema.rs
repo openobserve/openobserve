@@ -40,6 +40,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
     };
 
     let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0).await?;
+
+    // check again
+
+    match upgrade_schema_row_per_version().await {
+        std::result::Result::Ok(true) => {
+            log::info!("[Schema:Migration]: Starting schema migration");
+        }
+        std::result::Result::Ok(false) => {
+            log::info!("[Schema:Migration]: Schema migration already done");
+            return Ok(());
+        }
+        Err(err) => {
+            log::error!(
+                "[Schema:Migration]: Error checking schema migration status: {}",
+                err
+            );
+            return Err(err);
+        }
+    };
+
     let default_end_dt = "0".to_string();
     let cc = infra_db::get_coordinator().await;
     cc.add_start_dt_column().await?;

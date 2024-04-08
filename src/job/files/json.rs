@@ -70,7 +70,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         .unwrap();
 
     let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern, "json");
+    let files = scan_files(&pattern, "json").await;
 
     // use multiple threads to upload files
     let mut tasks = Vec::new();

@@ -71,7 +71,7 @@ impl FileData {
         log::info!("Loading disk cache start");
         std::fs::create_dir_all(&self.root_dir).expect("create cache dir success");
         let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
-        let files = scan_files(&self.root_dir, "parquet");
+        let files = scan_files(&self.root_dir, "parquet").await;
         for file in files {
             let local_path = Path::new(&file).canonicalize().unwrap();
             let file_key = local_path
