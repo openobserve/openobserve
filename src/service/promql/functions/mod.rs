@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use datafusion::error::{DataFusionError, Result};
+use strum::EnumString;
 
+use super::value::LabelsExt;
 use crate::service::promql::value::{InstantValue, RangeValue, Sample, Value};
 
 mod absent;
@@ -71,12 +73,9 @@ pub(crate) use rate::rate;
 pub(crate) use resets::resets;
 pub(crate) use stddev_over_time::stddev_over_time;
 pub(crate) use stdvar_over_time::stdvar_over_time;
-use strum::EnumString;
 pub(crate) use sum_over_time::sum_over_time;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
-
-use super::value::LabelsExt;
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]

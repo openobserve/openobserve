@@ -13,23 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::db as infra_db;
-
-use crate::common::infra::config;
+use crate::{common::infra::config, service::db};
 
 pub async fn get() -> Result<String, anyhow::Error> {
-    let db = infra_db::get_db().await;
-    let ret = db.get("/meta/kv/version").await?;
+    let ret = db::get("/meta/kv/version").await?;
     let version = std::str::from_utf8(&ret).unwrap();
     Ok(version.to_string())
 }
 
 pub async fn set() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
-    db.put(
+    db::put(
         "/meta/kv/version",
         bytes::Bytes::from(config::VERSION),
-        infra_db::NO_NEED_WATCH,
+        db::NO_NEED_WATCH,
         None,
     )
     .await?;

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use config::{
     is_local_disk_storage,
-    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    meta::{
+        search::{ScanStats, SearchType, StorageType},
+        stream::{FileKey, PartitionTimeLevel, StreamType},
+    },
     CONFIG,
 };
 use datafusion::{
@@ -34,17 +37,10 @@ use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::meta::{
-        self,
-        search::SearchType,
-        stream::{ScanStats, StreamPartition},
-    },
+    common::meta::stream::StreamPartition,
     service::{
         db, file_list,
-        search::{
-            datafusion::{exec, storage::StorageType},
-            sql::Sql,
-        },
+        search::{datafusion::exec, sql::Sql},
         stream,
     },
 };
@@ -71,9 +67,7 @@ pub async fn search(
             }
         };
     if schema_versions.is_empty() {
-        return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
-            sql.stream_name.clone(),
-        )));
+        return Ok((HashMap::new(), ScanStats::new()));
     }
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
@@ -198,7 +192,7 @@ pub async fn search(
             .clone()
             .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
-        let session = meta::search::Session {
+        let session = config::meta::search::Session {
             id: format!("{session_id}-{ver}"),
             storage_type: StorageType::Memory,
             search_type: if !sql.meta.group_by.is_empty() {
@@ -244,19 +238,25 @@ pub async fn search(
             stream_type = stream_type.to_string(),
         );
         let schema = Arc::new(schema);
-        let task = tokio::time::timeout(
-            Duration::from_secs(timeout),
+        let task = tokio::task::spawn(
             async move {
-                exec::sql(
-                    &session,
-                    schema,
-                    &diff_fields,
-                    &sql,
-                    &files,
-                    None,
-                    FileType::PARQUET,
-                )
-                .await
+                tokio::select! {
+                    ret = exec::sql(
+                        &session,
+                        schema,
+                        &diff_fields,
+                        &sql,
+                        &files,
+                        None,
+                        FileType::PARQUET,
+                    ) => ret,
+                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                        log::error!("[session_id {}] search->storage: search timeout", session.id);
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {}] search->storage: task timeout", session.id
+                        )))
+                    }
+                }
             }
             .instrument(datafusion_span),
         );

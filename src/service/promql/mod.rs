@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -29,15 +30,12 @@ pub mod common;
 mod engine;
 mod exec;
 mod functions;
-
 pub mod name_visitor;
 pub mod search;
 pub mod value;
 
 pub use engine::Engine;
 pub use exec::Query;
-
-use crate::common::meta::stream::ScanStats;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(10); // 10s

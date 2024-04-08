@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -74,6 +74,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             );
         } else {
             set_ownership(&org_id, "functions", Authz::new(&func.name)).await;
+
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
                 http::StatusCode::OK.into(),
                 FN_SUCCESS.to_string(),

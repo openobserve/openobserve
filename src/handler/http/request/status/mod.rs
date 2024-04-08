@@ -15,14 +15,14 @@
 
 use std::io::Error;
 
-use actix_web::{get, put, web, HttpRequest, HttpResponse};
+use actix_web::{cookie, get, http::header, put, web, HttpRequest, HttpResponse};
 use config::{
     cluster::{is_ingester, LOCAL_NODE_ROLE, LOCAL_NODE_UUID},
     meta::cluster::NodeStatus,
-    utils::json,
+    utils::{json, schema_ext::SchemaExt},
     CONFIG, HAS_FUNCTIONS, INSTANCE_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
-use datafusion::arrow::datatypes::{Field, Schema};
+use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
 use infra::{cache, file_list};
 use serde::Serialize;
@@ -31,7 +31,6 @@ use utoipa::ToSchema;
 use {
     crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{jwt::process_token, validator::PKCE_STATE_ORG},
-    actix_web::http::header,
     o2_enterprise::enterprise::{
         common::{
             infra::config::O2_CONFIG,
@@ -288,17 +287,18 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
         mem_size += key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
-            for (key, val) in schema.metadata.iter() {
-                mem_size += std::mem::size_of::<HashMap<String, String>>();
-                mem_size += key.len() + val.len();
-            }
-            mem_size += std::mem::size_of::<Vec<Field>>();
-            for field in schema.fields() {
-                mem_size += std::mem::size_of::<Field>();
-                mem_size += field.name().len();
-            }
+            mem_size += schema.size();
         }
     }
+    drop(r);
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    for (key, schema) in r.iter() {
+        stream_num += 1;
+        stream_schema_num += 1;
+        mem_size += key.len();
+        mem_size += schema.size();
+    }
+    drop(r);
     (stream_num, stream_schema_num, mem_size)
 }
 
@@ -339,8 +339,40 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 Ok(res) => process_token(res).await,
                 Err(e) => return Ok(HttpResponse::Unauthorized().json(e.to_string())),
             }
+
+            let mut access_token_cookie = cookie::Cookie::new("access_token", token);
+            access_token_cookie.set_expires(
+                cookie::time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+            );
+            access_token_cookie.set_http_only(true);
+            access_token_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            access_token_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                access_token_cookie.set_same_site(cookie::SameSite::Lax)
+            } else {
+                access_token_cookie.set_same_site(cookie::SameSite::None)
+            };
+
+            let mut refresh_token_cookie =
+                cookie::Cookie::new("refresh_token", login_data.refresh_token);
+            refresh_token_cookie.set_expires(
+                cookie::time::OffsetDateTime::now_utc()
+                    + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+            );
+            refresh_token_cookie.set_http_only(true);
+            refresh_token_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            refresh_token_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_token_cookie.set_same_site(cookie::SameSite::Lax)
+            } else {
+                refresh_token_cookie.set_same_site(cookie::SameSite::None)
+            };
+
             Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, login_data.url))
+                .cookie(access_token_cookie)
+                .cookie(refresh_token_cookie)
                 .finish())
         }
         Err(e) => Ok(HttpResponse::Unauthorized().json(e.to_string())),
@@ -376,8 +408,52 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
     // Exchange the refresh token for a new access token
     match refresh_token(&token).await {
         Ok(token_response) => HttpResponse::Ok().json(token_response),
-        Err(_) => HttpResponse::Unauthorized().finish(),
+        Err(_) => {
+            let mut access_cookie = cookie::Cookie::new("access_token", "");
+            access_cookie.set_http_only(true);
+            access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            access_cookie.set_path("/");
+
+            if CONFIG.auth.cookie_same_site_lax {
+                access_cookie.set_same_site(cookie::SameSite::Lax)
+            } else {
+                access_cookie.set_same_site(cookie::SameSite::None)
+            };
+            let mut refresh_cookie = cookie::Cookie::new("refresh_token", "");
+            refresh_cookie.set_http_only(true);
+            refresh_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+            refresh_cookie.set_path("/");
+            if CONFIG.auth.cookie_same_site_lax {
+                refresh_cookie.set_same_site(cookie::SameSite::Lax)
+            } else {
+                refresh_cookie.set_same_site(cookie::SameSite::None)
+            };
+            HttpResponse::Unauthorized()
+                .append_header((header::LOCATION, "/"))
+                .cookie(access_cookie)
+                .cookie(refresh_cookie)
+                .finish()
+        }
     }
+}
+
+#[get("/logout")]
+async fn logout(_req: actix_web::HttpRequest) -> HttpResponse {
+    let mut access_cookie = cookie::Cookie::new("access_token", "");
+    access_cookie.set_http_only(true);
+    access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+    access_cookie.set_path("/");
+    access_cookie.set_same_site(cookie::SameSite::Lax);
+    let mut refresh_cookie = cookie::Cookie::new("refresh_token", "");
+    refresh_cookie.set_http_only(true);
+    refresh_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+    refresh_cookie.set_path("/");
+    refresh_cookie.set_same_site(cookie::SameSite::Lax);
+    HttpResponse::Ok()
+        .append_header((header::LOCATION, "/"))
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .finish()
 }
 
 #[put("/enable")]

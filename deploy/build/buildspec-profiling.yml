@@ -1,0 +1,35 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/zinclabs
+
+  build:
+    commands:
+      # Increase swap file size
+      - fallocate -l 32G /swapfile
+      - chmod 600 /swapfile
+      - mkswap /swapfile || true
+      - swapon /swapfile || true
+      - pwd
+      - GIT_TAG="$(git describe --tags --abbrev=0)"
+      - GIT_HASH="$(git rev-parse --short=7 HEAD)"
+      - echo "Building for commit - $GIT_HASH"
+
+      # install buildx
+      - wget -nv https://github.com/docker/buildx/releases/download/v0.12.0/buildx-v0.12.0.linux-amd64
+      - chmod +x buildx-v0.12.0.linux-amd64
+      - mkdir -p ~/.docker/cli-plugins
+      - mv buildx-v0.12.0.linux-amd64 ~/.docker/cli-plugins/docker-buildx
+      - docker buildx install
+
+      # build openobserve
+      - docker pull public.ecr.aws/zinclabs/rust:bookworm-sccache
+      - docker build --build-arg AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --build-arg AWS_CONTAINER_CREDENTIALS_RELATIVE_URI=$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI -t openobserve:profiling-amd64 -f deploy/build/Dockerfile.profiling.amd64 .
+      - docker tag openobserve:profiling-amd64 public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-profiling-amd64
+      - docker push public.ecr.aws/zinclabs/openobserve-dev:$GIT_TAG-$GIT_HASH-profiling-amd64
+
+cache:
+  paths:
+    - /root/.cache/

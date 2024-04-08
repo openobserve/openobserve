@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ use config::{
     ider,
     meta::{
         cluster::Node,
+        search::ScanStats,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamType},
     },
     utils::{file::get_file_meta as util_get_file_meta, json},
@@ -35,7 +36,7 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{infra::cluster, meta::stream::ScanStats},
+    common::infra::cluster,
     service::{db, search::MetadataMap},
 };
 

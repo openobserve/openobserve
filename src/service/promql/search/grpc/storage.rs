@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use config::{
     is_local_disk_storage,
-    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
+    meta::{
+        search::{ScanStats, SearchType, Session as SearchSession, StorageType},
+        stream::{FileKey, PartitionTimeLevel, StreamType},
+    },
     CONFIG,
 };
 use datafusion::{
@@ -31,16 +34,10 @@ use infra::cache::file_data;
 use tokio::sync::Semaphore;
 
 use crate::{
-    common::meta::{
-        search::{SearchType, Session as SearchSession},
-        stream::{ScanStats, StreamParams, StreamPartition},
-    },
+    common::meta::stream::{StreamParams, StreamPartition},
     service::{
         db, file_list,
-        search::{
-            datafusion::{exec::register_table, storage::StorageType},
-            match_source,
-        },
+        search::{datafusion::exec::register_table, match_source},
         stream,
     },
 };

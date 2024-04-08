@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,7 @@ use config::{
     ider,
     meta::{
         cluster::{Node, Role},
+        search,
         stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
     },
     utils::{flatten, json, str::find},
@@ -51,8 +52,7 @@ use crate::{
         infra::cluster::{self, get_node_from_consistent_hash},
         meta::{
             functions::VRLResultResolver,
-            search,
-            stream::{ScanStats, StreamParams, StreamPartition},
+            stream::{StreamParams, StreamPartition},
         },
     },
     service::{file_list, format_partition_key, stream},
@@ -357,8 +357,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
             let mut term_map: HashMap<String, Vec<String>> = HashMap::new();
             let mut term_counts: HashMap<String, u64> = HashMap::new();
 
-            println!("index got file_list: {:?}", sorted_data.len());
-
             for (term, filename, count, _timestamp) in sorted_data {
                 let term = term.as_str();
                 for search_term in terms.iter() {
@@ -374,7 +372,6 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
                     }
                 }
             }
-            println!("term_map: {:?}", term_map);
             (
                 term_map
                     .into_iter()
@@ -688,7 +685,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
     }
 
     // merge multiple instances data
-    let mut scan_stats = ScanStats::new();
+    let mut scan_stats = search::ScanStats::new();
     let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let sql = Arc::new(meta);
     for (node, resp) in results {
@@ -1248,7 +1245,7 @@ mod tests {
 
     #[test]
     fn test_matches_by_partition_key_with_sql() {
-        use crate::common::meta::sql;
+        use config::meta::sql;
 
         let path = "files/default/logs/gke-fluentbit/2023/04/14/08/kuberneteshost=gke-dev1/kubernetesnamespacename=ziox-dev/7052558621820981249.parquet";
         let sqls = vec![

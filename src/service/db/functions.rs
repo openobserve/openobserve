@@ -16,24 +16,24 @@
 use std::sync::Arc;
 
 use config::{utils::json, CONFIG};
-use infra::db as infra_db;
 
-use crate::common::{
-    infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS},
-    meta::functions::{StreamFunctionsList, Transform},
+use crate::{
+    common::{
+        infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS},
+        meta::functions::{StreamFunctionsList, Transform},
+    },
+    service::db,
 };
 
 pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/function/{org_id}/{name}");
-    match db
-        .put(
-            &key,
-            json::to_vec(js_func).unwrap().into(),
-            infra_db::NEED_WATCH,
-            None,
-        )
-        .await
+    match db::put(
+        &key,
+        json::to_vec(js_func).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
     {
         Ok(_) => {}
         Err(e) => {
@@ -46,15 +46,13 @@ pub async fn set(org_id: &str, name: &str, js_func: &Transform) -> Result<(), an
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Transform, anyhow::Error> {
-    let db = infra_db::get_db().await;
-    let val = db.get(&format!("/function/{org_id}/{name}")).await?;
+    let val = db::get(&format!("/function/{org_id}/{name}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = format!("/function/{org_id}/{name}");
-    match db.delete(&key, false, infra_db::NEED_WATCH, None).await {
+    match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error deleting function: {}", e);
@@ -65,10 +63,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
-    let db = infra_db::get_db().await;
-
-    Ok(db
-        .list(&format!("/function/{org_id}/"))
+    Ok(db::list(&format!("/function/{org_id}/"))
         .await?
         .values()
         .map(|val| json::from_slice(val).unwrap())
@@ -77,7 +72,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Transform>, anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/function/";
-    let cluster_coordinator = infra_db::get_coordinator().await;
+    let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching function");
@@ -90,12 +85,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            infra_db::Event::Put(ev) => {
+            db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let org_id = &item_key[0..item_key.find('/').unwrap()];
                 let item_value: Transform = if CONFIG.common.meta_store_external {
-                    let db = infra_db::get_db().await;
-                    match db.get(&ev.key).await {
+                    match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
                             Err(e) => {
@@ -135,20 +129,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     QUERY_FUNCTIONS.insert(item_key.to_owned(), item_value);
                 }
             }
-            infra_db::Event::Delete(ev) => {
+            db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 QUERY_FUNCTIONS.remove(item_key);
             }
-            infra_db::Event::Empty => {}
+            db::Event::Empty => {}
         }
     }
     Ok(())
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/function/";
-    let ret = db.list(key).await?;
+    let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: Transform = json::from_slice(&item_value).unwrap();
@@ -177,10 +170,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    let db = infra_db::get_db().await;
     let key = "/function/";
-    db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?;
+    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     let key = "/transform/";
-    db.delete(key, true, infra_db::NO_NEED_WATCH, None).await?;
+    db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
 }

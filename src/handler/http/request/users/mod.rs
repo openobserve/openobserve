@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,8 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, http, post, put, web, HttpResponse};
+use actix_web::{cookie, delete, get, http, post, put, web, HttpResponse};
+use config::{utils::base64, CONFIG};
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -237,7 +238,24 @@ pub async fn authentication(auth: web::Json<SignInUser>) -> Result<HttpResponse,
         }
     };
     if resp.status {
-        Ok(HttpResponse::Ok().json(resp))
+        let token = format!(
+            "Basic {}",
+            base64::encode(&format!("{}:{}", auth.name, auth.password))
+        );
+        let mut access_cookie = cookie::Cookie::new("access_token", token);
+        access_cookie.set_expires(
+            cookie::time::OffsetDateTime::now_utc()
+                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+        );
+        access_cookie.set_http_only(true);
+        access_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+        access_cookie.set_path("/");
+        if CONFIG.auth.cookie_same_site_lax {
+            access_cookie.set_same_site(cookie::SameSite::Lax)
+        } else {
+            access_cookie.set_same_site(cookie::SameSite::None)
+        };
+        Ok(HttpResponse::Ok().cookie(access_cookie).json(resp))
     } else {
         Ok(HttpResponse::Unauthorized().json(resp))
     }

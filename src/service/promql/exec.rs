@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,14 +18,14 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use config::meta::search::ScanStats;
 use datafusion::error::Result;
 use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
 use tokio::sync::RwLock;
 
-use crate::{
-    common::meta::stream::ScanStats,
-    service::promql::{micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK},
+use crate::service::promql::{
+    micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
 };
 
 #[derive(Clone)]

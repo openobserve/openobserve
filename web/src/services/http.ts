@@ -21,28 +21,17 @@ import { Notify } from "quasar";
 
 const http = ({ headers } = {} as any) => {
   let instance: AxiosInstance;
-  if (config.isEnterprise == "false") {
-    headers = {
-      Authorization: localStorage.getItem("access_token") || "",
-      ...headers,
-    };
-    instance = axios.create({
-      // timeout: 10000,
-      baseURL: store.state.API_ENDPOINT,
-      headers,
-    });
-  } else {
-    headers = {
-      Authorization: localStorage.getItem("access_token"),
-      ...headers,
-    };
 
-    instance = axios.create({
-      // timeout: 10000,
-      baseURL: store.state.API_ENDPOINT,
-      headers,
-    });
-  }
+  headers = {
+    ...headers,
+  };
+
+  instance = axios.create({
+    // timeout: 10000,
+    withCredentials: true,
+    baseURL: store.state.API_ENDPOINT,
+    headers,
+  });
 
   instance.interceptors.response.use(
     function (response) {
@@ -79,32 +68,30 @@ const http = ({ headers } = {} as any) => {
               !error.config.url.includes("/config/dex_refresh") &&
               !error.config.url.includes("/auth/login")
             ) {
-              // Call refresh token API
-              const refreshToken = localStorage.getItem("refresh_token");
-
               // Modify the request to include the refresh token
               return instance
                 .get("/config/dex_refresh", {
-                  headers: { Authorization: `${refreshToken}` },
+                  //headers: { Authorization: `${refreshToken}` },
                 })
                 .then((res) => {
-                  localStorage.setItem("access_token", "Bearer " + res.data);
-                  error.config.headers["Authorization"] = "Bearer " + res.data;
                   return instance(error.config);
                 })
                 .catch((refreshError) => {
-                  store.dispatch("logout");
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  window.location.reload();
-                  return Promise.reject(refreshError);
+                  instance.get("/config/logout", {}).then((res) => {
+                    store.dispatch("logout");
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.reload();
+                    return Promise.reject(refreshError);
+                  });
                 });
             } else {
-              console.log(
-                JSON.stringify(
-                  error.response.data["error"] || "Invalid credentials"
-                )
-              );
+              if (!error.request.responseURL.includes("/login")) {
+                store.dispatch("logout");
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+              }
             }
             break;
           case 403:

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -77,7 +77,7 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let mut files = scan_files(&pattern, "parquet");
+    let mut files = scan_files(&pattern, "parquet").await;
     if files.is_empty() {
         return Ok(());
     }
@@ -93,6 +93,20 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
             continue;
         };
+        if parquet_meta.eq(&FileMeta::default()) {
+            log::warn!(
+                "[INGESTER:JOB] the file is empty, just delete file: {}",
+                file
+            );
+            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file)).await {
+                log::error!(
+                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                    file,
+                    e
+                );
+            }
+            continue;
+        }
         let file = Path::new(&file)
             .canonicalize()
             .unwrap()
@@ -154,7 +168,12 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 .iter()
                 .map(|f| f.meta.original_size)
                 .sum::<i64>();
-            if total_original_size < CONFIG.limit.max_file_size_on_disk as i64 {
+            if total_original_size
+                < std::cmp::min(
+                    CONFIG.limit.max_file_size_on_disk as i64,
+                    CONFIG.compact.max_file_size as i64,
+                )
+            {
                 let mut has_expired_files = false;
                 // not enough files to upload, check if some files are too old
                 let min_ts = Utc::now().timestamp_micros()

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -439,7 +439,6 @@ pub async fn get_merged_schema(
 // 2. get schema from db for update,
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
-
 async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
@@ -468,8 +467,8 @@ async fn handle_diff_schema(
     let mut retries = 0;
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
-    // retry 3 times for update schema
-    while retries < 3 {
+    // retry x times for update schema
+    while retries < CONFIG.limit.meta_transaction_retries {
         match db::schema::merge(
             org_id,
             stream_name,
@@ -480,7 +479,16 @@ async fn handle_diff_schema(
         .await
         {
             Err(e) => {
-                log::error!("handle_diff_schema error: {}, retrying...{}", e, retries);
+                log::error!(
+                    "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, error: {}, retrying...{}",
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    inferred_schema.hash_key(),
+                    record_ts,
+                    e,
+                    retries
+                );
                 err = Some(e);
                 retries += 1;
                 continue;
@@ -493,6 +501,16 @@ async fn handle_diff_schema(
         };
     }
     if let Some(e) = err {
+        log::error!(
+            "handle_diff_schema [{}/{}/{}] with hash {}, start_dt {}, abort after retry {} times, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            inferred_schema.hash_key(),
+            record_ts,
+            retries,
+            e
+        );
         return Err(e);
     }
     let Some((final_schema, field_datatype_delta)) = ret else {

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,6 @@ use config::{cluster, ider, meta::stream::StreamType, FILE_EXT_PARQUET};
 
 pub mod broadcast;
 pub mod idx;
-pub mod json;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -25,10 +24,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    tokio::task::spawn(async move { json::run().await });
     tokio::task::spawn(async move { parquet::run().await });
     tokio::task::spawn(async move { broadcast::run().await });
-    // tokio::task::spawn(async move { idx::run().await });
 
     Ok(())
 }

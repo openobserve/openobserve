@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -172,7 +172,7 @@ impl super::Db for PostgresDb {
         };
         let row = if let Some(start_dt) = start_dt {
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4 FOR UPDATE;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#
             )
             .bind(&module)
             .bind(&key1)
@@ -195,7 +195,7 @@ impl super::Db for PostgresDb {
             }
         } else {
             match sqlx::query_as::<_,super::MetaRecord>(
-                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC FOR UPDATE;"#
+                r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;"#
             )
             .bind(&module)
             .bind(&key1)
@@ -458,9 +458,9 @@ impl super::Db for PostgresDb {
 
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT.clone();
-    let mut tx = pool.begin().await?;
+
     // create table
-    if let Err(e) = sqlx::query(
+    _ = sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS meta
 (
@@ -471,23 +471,18 @@ CREATE TABLE IF NOT EXISTS meta
     start_dt BIGINT not null,
     value    TEXT not null
 );
-        "#,
+    "#,
     )
-    .execute(&mut *tx)
-    .await
-    {
-        if let Err(e) = tx.rollback().await {
-            log::error!("[POSTGRES] rollback create table meta error: {}", e);
-        }
-        return Err(e.into());
-    }
-    if let Err(e) = tx.commit().await {
-        log::error!("[POSTGRES] commit create table meta error: {}", e);
-        return Err(e.into());
-    }
+    .execute(&pool)
+    .await?;
 
     // create start_dt cloumn for old version <= 0.9.2
-    add_start_dt_column().await?;
+    let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='meta' AND column_name='start_dt';")
+            .fetch_one(&pool)
+            .await?;
+    if has_start_dt == 0 {
+        add_start_dt_column().await?;
+    }
 
     // create table index
     create_index_item("CREATE INDEX IF NOT EXISTS meta_module_idx on meta (module);").await?;

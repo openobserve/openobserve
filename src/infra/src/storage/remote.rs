@@ -62,7 +62,11 @@ impl ObjectStore for Remote {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data_size = bytes.len();
-        match self.client.put(&(format_key(&file).into()), bytes).await {
+        match self
+            .client
+            .put(&(format_key(&file, true).into()), bytes)
+            .await
+        {
             Ok(_) => {
                 // metrics
                 let columns = file.split('/').collect::<Vec<&str>>();
@@ -104,7 +108,7 @@ impl ObjectStore for Remote {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let result = self.client.get(&(format_key(&file).into())).await?;
+        let result = self.client.get(&(format_key(&file, true).into())).await?;
 
         // metrics
         let data_len = result.meta.size;
@@ -131,7 +135,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let result = self
             .client
-            .get_opts(&(format_key(&file).into()), options)
+            .get_opts(&(format_key(&file, true).into()), options)
             .await?;
 
         // metrics
@@ -158,7 +162,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         let data = self
             .client
-            .get_range(&(format_key(&file).into()), range)
+            .get_range(&(format_key(&file, true).into()), range)
             .await?;
 
         // metrics
@@ -189,7 +193,7 @@ impl ObjectStore for Remote {
         for _ in 0..3 {
             result = self
                 .client
-                .delete(&(format_key(location.as_ref()).into()))
+                .delete(&(format_key(location.as_ref(), true).into()))
                 .await;
             if result.is_ok() {
                 let file = location.to_string();
@@ -206,7 +210,7 @@ impl ObjectStore for Remote {
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         self.client
-            .list(Some(&format_key(prefix.unwrap().as_ref()).into()))
+            .list(Some(&format_key(prefix.unwrap().as_ref(), true).into()))
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,6 @@ pub mod alerts;
 pub mod compact;
 pub mod dashboards;
 pub mod db;
-pub mod distinct_values;
 pub mod enrichment;
 pub mod enrichment_table;
 pub mod file_list;
@@ -32,6 +31,7 @@ pub mod functions;
 pub mod ingestion;
 pub mod kv;
 pub mod logs;
+pub mod metadata;
 pub mod metrics;
 pub mod organization;
 pub mod promql;
