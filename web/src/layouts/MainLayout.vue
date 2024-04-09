@@ -337,7 +337,6 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
-import Tracker from "@openreplay/tracker";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import {
   outlinedHome,
@@ -894,12 +893,6 @@ export default defineComponent({
 
     if (config.isCloud == "true") {
       mainLayoutMixin.setup().getDefaultOrganization(store);
-
-      const tracker = new Tracker({
-        projectKey: config.openReplayKey,
-      });
-      tracker.start();
-      tracker.setUserID(store.state.userInfo.email);
     }
 
     const redirectToParentRoute = (machedRoutes: any) => {
