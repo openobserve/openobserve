@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -152,9 +152,8 @@ async fn dispatch(
         .request_from(new_url.value.clone(), req.head())
         .send_stream(payload)
         .await;
-    if resp.is_err() {
-        let e = resp.unwrap_err();
-        log::error!("{}: {}", new_url.value, e);
+    if let Err(e) = resp {
+        log::error!("dispatch: {}, error: {}", new_url.value, e);
         return Ok(HttpResponse::ServiceUnavailable().body(e.to_string()));
     }
 

@@ -383,11 +383,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
             let client = awc::Client::builder()
-                .connector(
-                    awc::Connector::new()
-                        .timeout(Duration::from_secs(CONFIG.route.timeout))
-                        .limit(CONFIG.route.max_connections),
-                )
+                .connector(awc::Connector::new().limit(CONFIG.route.max_connections))
                 .timeout(Duration::from_secs(CONFIG.route.timeout))
                 .disable_redirects()
                 .finish();
@@ -425,7 +421,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             .wrap(RequestTracing::new())
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        5,
+        15,
         CONFIG.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))

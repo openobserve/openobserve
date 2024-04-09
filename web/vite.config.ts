@@ -142,11 +142,10 @@ export default defineConfig({
         }),
       ],
       manualChunks: {
-        analytics: ["@sentry/vue", "@sentry/tracing", "rudder-sdk-js"],
+        analytics: ["rudder-sdk-js"],
         "monaco-editor": ["monaco-editor"],
         echarts: ["echarts"],
         "node-sql-parser": ["node-sql-parser/build/mysql"],
-        d3: ["d3-hierarchy", "d3-selection"],
         lodash: ["lodash-es", "lodash/lodash.js", "moment"],
       },
     },
