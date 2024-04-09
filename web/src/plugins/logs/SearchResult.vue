@@ -94,7 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div v-else-if="searchObj.data.histogram.errorMsg != ''">
+      <div
+        v-else-if="
+          searchObj.data.histogram.errorMsg != '' &&
+          searchObj.meta.showHistogram
+        "
+      >
         <h6 class="text-center">
           <q-icon name="warning" color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
