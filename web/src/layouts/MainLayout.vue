@@ -180,9 +180,7 @@ size="xs" class="warning" />{{
         </div>
 
         <div class="q-mr-xs">
-          <q-btn-dropdown flat
-unelevated no-caps
-padding="xs sm">
+          <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
               <div class="row items-center no-wrap">
                 <q-avatar size="md"
@@ -503,12 +501,6 @@ export default defineComponent({
         name: "dashboards",
       },
       {
-        title: t("menu.report"),
-        icon: outlinedDescription,
-        link: "/reports",
-        name: "reports",
-      },
-      {
         title: t("menu.index"),
         icon: outlinedWindow,
         link: "/streams",
@@ -638,6 +630,13 @@ export default defineComponent({
         .setup()
         .leftNavigationLinks(linksList, t);
       filterMenus();
+    } else {
+      linksList.value.splice(7, 0, {
+        title: t("menu.report"),
+        icon: outlinedDescription,
+        link: "/reports",
+        name: "reports",
+      });
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
