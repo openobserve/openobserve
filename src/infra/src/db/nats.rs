@@ -89,7 +89,7 @@ impl NatsDb {
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let bucket_name = bucket.status().await?.bucket;
-        let en_key = base64::encode_url(new_key);
+        let en_key = base64::encode(new_key);
         if let Some(v) = bucket.get(&en_key).await? {
             return Ok((key.to_string(), v));
         }
@@ -98,7 +98,7 @@ impl NatsDb {
         let mut keys = keys
             .into_iter()
             .filter_map(|k| {
-                let key = base64::decode_url(&k).unwrap();
+                let key = base64::decode(&k).unwrap();
                 if key.starts_with(new_key) {
                     Some(key)
                 } else {
@@ -112,7 +112,7 @@ impl NatsDb {
         }
         keys.sort();
         let key = keys.last().unwrap();
-        let en_key = base64::encode_url(key);
+        let en_key = base64::encode(key);
         match bucket.get(&en_key).await? {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => {
@@ -154,7 +154,7 @@ impl super::Db for NatsDb {
 
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
-        let key = base64::encode_url(new_key);
+        let key = base64::encode(new_key);
         if let Some(v) = bucket.get(&key).await? {
             return Ok(v);
         }
@@ -163,7 +163,7 @@ impl super::Db for NatsDb {
         let mut keys = keys
             .into_iter()
             .filter_map(|k| {
-                let key = base64::decode_url(&k).unwrap();
+                let key = base64::decode(&k).unwrap();
                 if key.starts_with(new_key) {
                     Some(key)
                 } else {
@@ -196,7 +196,7 @@ impl super::Db for NatsDb {
             key.to_string()
         };
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, &key).await?;
-        let key = base64::encode_url(new_key);
+        let key = base64::encode(new_key);
         _ = bucket.put(&key, value).await?;
         Ok(())
     }
@@ -271,14 +271,14 @@ impl super::Db for NatsDb {
     ) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         if !with_prefix {
-            let key = base64::encode_url(new_key);
+            let key = base64::encode(new_key);
             bucket.purge(key).await?;
             return Ok(());
         }
         let mut del_keys = Vec::new();
         let mut keys = bucket.keys().await?.boxed();
         while let Some(key) = keys.try_next().await? {
-            let decoded_key = base64::decode_url(&key).unwrap();
+            let decoded_key = base64::decode(&key).unwrap();
             if decoded_key.starts_with(new_key) {
                 del_keys.push(key);
             }
@@ -298,7 +298,7 @@ impl super::Db for NatsDb {
         let keys = keys
             .into_iter()
             .filter_map(|k| {
-                let key = base64::decode_url(&k).unwrap();
+                let key = base64::decode(&k).unwrap();
                 if key.starts_with(new_key) {
                     Some(key)
                 } else {
@@ -312,7 +312,7 @@ impl super::Db for NatsDb {
         }
         let values = futures::stream::iter(keys)
             .map(|key| async move {
-                let encoded_key = base64::encode_url(&key);
+                let encoded_key = base64::encode(&key);
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<(String, Option<Bytes>), Error>((key, value))
             })
@@ -336,7 +336,7 @@ impl super::Db for NatsDb {
         let mut keys = keys
             .into_iter()
             .filter_map(|k| {
-                let key = base64::decode_url(&k).unwrap();
+                let key = base64::decode(&k).unwrap();
                 if key.starts_with(new_key) {
                     Some(bucket_prefix.to_string() + &key)
                 } else {
@@ -355,7 +355,7 @@ impl super::Db for NatsDb {
         let mut keys = keys
             .into_iter()
             .filter_map(|k| {
-                let key = base64::decode_url(&k).unwrap();
+                let key = base64::decode(&k).unwrap();
                 if key.starts_with(new_key) {
                     Some(key)
                 } else {
@@ -370,7 +370,7 @@ impl super::Db for NatsDb {
         keys.sort();
         let values = futures::stream::iter(keys)
             .map(|key| async move {
-                let encoded_key = base64::encode_url(&key);
+                let encoded_key = base64::encode(&key);
                 let value = bucket.get(&encoded_key).await?;
                 Ok::<Option<Bytes>, Error>(value)
             })
@@ -418,7 +418,7 @@ impl super::Db for NatsDb {
                                     break;
                                 }
                             };
-                            let item_key = base64::decode_url(&entry.key).unwrap();
+                            let item_key = base64::decode(&entry.key).unwrap();
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
@@ -523,20 +523,21 @@ impl Locker {
         let expiration =
             chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
         let value = Bytes::from(format!("{}:{}", self.lock_id, expiration));
+        let key = base64::encode(new_key);
         // check if the locker already expired, clean it
-        if let Ok(Some(ret)) = bucket.get(new_key).await {
+        if let Ok(Some(ret)) = bucket.get(&key).await {
             let ret = String::from_utf8_lossy(&ret).to_string();
             let expiration = ret.split(':').last().unwrap();
             let expiration = expiration.parse::<i64>().unwrap();
             if expiration < chrono::Utc::now().timestamp_micros() {
-                if let Err(err) = bucket.purge(&new_key).await {
+                if let Err(err) = bucket.purge(&key).await {
                     log::error!("nats purge lock for key: {}, error: {}", self.key, err);
                     return Err(Error::Message("nats lock error".to_string()));
                 };
             }
         }
         for _ in 0..n {
-            match bucket.create(new_key, value.clone()).await {
+            match bucket.create(&key, value.clone()).await {
                 Ok(_) => {
                     self.state.store(1, Ordering::SeqCst);
                     last_err = None;
@@ -551,7 +552,7 @@ impl Locker {
         }
         if let Some(err) = last_err {
             return Err(Error::Message(format!(
-                "nats lock or key: {}, error: {}",
+                "nats lock for key: {}, error: {}",
                 self.key, err
             )));
         }
@@ -563,7 +564,8 @@ impl Locker {
             return Ok(());
         }
         let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
-        let ret = bucket.get(new_key).await?;
+        let key = base64::encode(new_key);
+        let ret = bucket.get(&key).await?;
         let Some(ret) = ret else {
             return Ok(());
         };
@@ -571,7 +573,7 @@ impl Locker {
         if !ret.starts_with(&self.lock_id) {
             return Ok(());
         }
-        if let Err(err) = bucket.purge(&new_key).await {
+        if let Err(err) = bucket.purge(&key).await {
             log::error!("nats unlock for key: {}, error: {}", self.key, err);
             return Err(Error::Message("nats unlock error".to_string()));
         };

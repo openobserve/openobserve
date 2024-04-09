@@ -170,7 +170,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 expect-test = "1.4"
 base64 = "0.21"
 float-cmp = "0.9"
-walkdir = "2"
+async-walkdir = "1.0.0"
 
 [workspace]
 members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto"]
@@ -283,5 +283,5 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 url = "2.2"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
-walkdir = "2"
+async-walkdir = "1.0.0"
 zstd = "0.13"

@@ -100,7 +100,9 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             timeout: 0,
         };
         // do search
-        match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, &req).await {
+        match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req)
+            .await
+        {
             Ok(res) => {
                 if !res.hits.is_empty() {
                     match report_stats(res.hits, &org_id, last_query_ts, current_ts).await {
@@ -161,7 +163,7 @@ async fn get_last_stats(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout: 0,
     };
-    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, &req).await {
+    match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {
         Ok(res) => Ok(res.hits),
         Err(err) => match &err {
             infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)) => {

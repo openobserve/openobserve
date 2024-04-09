@@ -463,14 +463,15 @@ impl QueryCondition {
             timeout: 0,
         };
         let session_id = ider::uuid();
-        let resp = match SearchService::search(&session_id, &alert.org_id, alert.stream_type, &req)
-            .await
-        {
-            Ok(v) => v,
-            Err(_) => {
-                return Ok(None);
-            }
-        };
+        let resp =
+            match SearchService::search(&session_id, &alert.org_id, alert.stream_type, None, &req)
+                .await
+            {
+                Ok(v) => v,
+                Err(_) => {
+                    return Ok(None);
+                }
+            };
         if resp.total < alert.trigger_condition.threshold as usize {
             Ok(None)
         } else {
@@ -1114,7 +1115,7 @@ async fn process_dest_template(
             alert.stream_name,
             alert_start_time,
             alert_end_time,
-            base64::encode(&alert_query).replace('+', "%2B"),
+            base64::encode_url(&alert_query).replace('+', "%2B"),
             alert.org_id,
         )
     } else {
@@ -1142,7 +1143,7 @@ async fn process_dest_template(
             alert.stream_name,
             alert_start_time,
             alert_end_time,
-            base64::encode(&alert_query),
+            base64::encode_url(&alert_query),
             alert.org_id,
         )
     };

@@ -372,7 +372,7 @@ pub struct Auth {
     pub cookie_max_age: i64,
     #[env_config(name = "ZO_COOKIE_SAME_SITE_LAX", default = true)]
     pub cookie_same_site_lax: bool,
-    #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = true)]
+    #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
 }
 
@@ -696,7 +696,7 @@ pub struct Limit {
     pub enrichment_table_limit: usize,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 30)] // seconds
     pub request_timeout: u64,
-    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 10)] // seconds
+    #[env_config(name = "ZO_ACTIX_KEEP_ALIVE", default = 30)] // seconds
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,

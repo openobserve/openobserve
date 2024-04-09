@@ -250,6 +250,25 @@ pub async fn search_parquet(
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
         );
+
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if crate::service::search::SEARCH_SERVER
+            .insert_sender(session_id, abort_sender)
+            .await
+            .is_err()
+        {
+            log::info!(
+                "[session_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
+                session.id
+            );
+            return Err(Error::Message(format!(
+                "[session_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
+                session.id
+            )));
+        }
+
         let schema = Arc::new(schema);
         let task = tokio::task::spawn(
             async move {
@@ -268,11 +287,23 @@ pub async fn search_parquet(
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {}] wal->parquet->search: task timeout", session.id
                         )))
+                    },
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
+                        log::info!("[session_id {}] wal->parquet->search: search canceled", session.id);
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {}] wal->parquet->search: task is cancel", session.id
+                        )))
                     }
                 }
             }
             .instrument(datafusion_span),
         );
+
         tasks.push(task);
     }
 
@@ -452,6 +483,24 @@ pub async fn search_memtable(
             stream_type = stream_type.to_string(),
         );
 
+        #[cfg(feature = "enterprise")]
+        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+        #[cfg(feature = "enterprise")]
+        if crate::service::search::SEARCH_SERVER
+            .insert_sender(session_id, abort_sender)
+            .await
+            .is_err()
+        {
+            log::info!(
+                "[session_id {}] wal->mem->search: search canceled before call wal->mem->search",
+                session.id
+            );
+            return Err(Error::Message(format!(
+                "[session_id {}] wal->mem->search: search canceled before call wal->mem->search",
+                session.id
+            )));
+        }
+
         let task = tokio::task::spawn(
             async move {
                 let files = vec![];
@@ -470,11 +519,23 @@ pub async fn search_memtable(
                         Err(datafusion::error::DataFusionError::Execution(format!(
                             "[session_id {}] wal->mem->search: task timeout", session.id
                         )))
+                    },
+                    _ = async {
+                        #[cfg(feature = "enterprise")]
+                        let _ = abort_receiver.await;
+                        #[cfg(not(feature = "enterprise"))]
+                        futures::future::pending::<()>().await;
+                    } => {
+                        log::info!("[session_id {}] wal->mem->search: search canceled", session.id);
+                        Err(datafusion::error::DataFusionError::Execution(format!(
+                            "[session_id {}] wal->mem->search: task is cancel", session.id
+                        )))
                     }
                 }
             }
             .instrument(datafusion_span),
         );
+
         tasks.push(task);
     }
 
@@ -536,7 +597,7 @@ async fn get_file_list_inner(
         "{}/files/{}/{stream_type}/{}/",
         wal_dir, &sql.org_id, &sql.stream_name
     );
-    let files = scan_files(&pattern, file_ext);
+    let files = scan_files(&pattern, file_ext, None).await;
     if files.is_empty() {
         return Ok(vec![]);
     }

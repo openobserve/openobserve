@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -166,7 +166,7 @@ impl Metrics for Querier {
         };
 
         let pattern = format!("{wal_dir}/files/{org_id}/metrics/{stream_name}/");
-        let files = scan_files(&pattern, "parquet");
+        let files = scan_files(&pattern, "parquet", None).await;
 
         if arrow_files.is_empty() && files.is_empty() {
             return Ok(Response::new(resp));

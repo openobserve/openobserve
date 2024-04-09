@@ -387,7 +387,7 @@ pub async fn handle_trace_request(
 
     // send distinct_values
     if !distinct_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, distinct_values).await {
+        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
     }

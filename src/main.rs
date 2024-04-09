@@ -47,7 +47,6 @@ use openobserve::{
                 file_list::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
-                search::Searcher,
                 traces::TraceServer,
                 usage::UsageServerImpl,
             },
@@ -55,7 +54,7 @@ use openobserve::{
         http::router::*,
     },
     job, router,
-    service::{db, metadata},
+    service::{db, metadata, search::SEARCH_SERVER},
 };
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -278,7 +277,7 @@ fn init_common_grpc_server(
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
-    let search_svc = SearchServer::new(Searcher)
+    let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
     let filelist_svc = FilelistServer::new(Filelister)
@@ -388,11 +387,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         let mut app = App::new().wrap(prometheus.clone());
         if is_router(&LOCAL_NODE_ROLE) {
             let client = awc::Client::builder()
-                .connector(
-                    awc::Connector::new()
-                        .timeout(Duration::from_secs(CONFIG.route.timeout))
-                        .limit(CONFIG.route.max_connections),
-                )
+                .connector(awc::Connector::new().limit(CONFIG.route.max_connections))
                 .timeout(Duration::from_secs(CONFIG.route.timeout))
                 .disable_redirects()
                 .finish();
@@ -430,7 +425,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             .wrap(RequestTracing::new())
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(max(
-        5,
+        15,
         CONFIG.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, CONFIG.limit.request_timeout)))
