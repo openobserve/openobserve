@@ -47,7 +47,6 @@ pub(super) async fn persist_job(
     store_sig_r: Receiver<Option<Vec<IngestEntry>>>,
 ) -> Result<()> {
     let path = build_file_path(tq_index, &worker_id);
-    create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
 
     while let Ok(tasks) = store_sig_r.recv().await {
         log::info!("TaskQueue({tq_index})-worker({worker_id}) persist job starts");
@@ -68,6 +67,7 @@ pub(super) async fn persist_job(
 }
 
 pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>) -> Result<()> {
+    create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
     if let Some(tasks) = tasks {
         let mut f = OpenOptions::new()
                     .write(true)

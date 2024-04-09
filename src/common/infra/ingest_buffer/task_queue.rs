@@ -23,14 +23,11 @@ use tokio::sync::RwLock;
 
 use super::{entry::IngestEntry, workers::Workers};
 
-// TODO: change those static to env
-// initial # of workers
+// REVIEW: static ok or env variables?
+/// initial # of workers
 static MIN_WORKER_CNT: usize = 3;
-// max # of requests could be held in channel.
-// if channel if full -> init more workers
-static DEFAULT_CHANNEL_CAP: usize = 10;
-// number of task queues -> env variables
-static TASK_QUEUE_COUNT: usize = 2;
+/// max # of requests could be held in channel.
+static DEFAULT_CHANNEL_CAP: usize = 10; // if channel if full -> init more workers
 
 /// A global hash map that maps stream of a TaskQueue instsance.
 static TQMANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);
@@ -68,8 +65,8 @@ impl Default for TaskQueueManager {
 
 impl TaskQueueManager {
     fn new() -> Self {
-        let mut task_queues = Vec::with_capacity(TASK_QUEUE_COUNT);
-        for idx in 1..=TASK_QUEUE_COUNT {
+        let mut task_queues = Vec::with_capacity(CONFIG.limit.ingest_buffer_queue_num);
+        for idx in 1..=CONFIG.limit.ingest_buffer_queue_num {
             task_queues.push(TaskQueue::new(DEFAULT_CHANNEL_CAP, idx));
         }
         Self {

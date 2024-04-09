@@ -702,6 +702,8 @@ pub struct Limit {
     pub keep_alive: u64,
     #[env_config(name = "ZO_ACTIX_SHUTDOWN_TIMEOUT", default = 10)] // seconds
     pub shutdown_timeout: u64,
+    #[env_config(name = "ZO_INGEST_BUFFER_QUEUE_NUM", default = 5)]
+    pub ingest_buffer_queue_num: usize,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 60)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1047,6 +1049,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.req_cols_per_record_limit == 0 {
         cfg.limit.req_cols_per_record_limit = 1000;
+    }
+
+    // check ingest_buffer_queue_num > 0 if feature enabled
+    if cfg.common.feature_ingest_buffer_enabled {
+        if cfg.limit.ingest_buffer_queue_num <= 0 {
+            cfg.limit.ingest_buffer_queue_num = 5;
+        }
     }
 
     // check max_file_size_on_disk to MB

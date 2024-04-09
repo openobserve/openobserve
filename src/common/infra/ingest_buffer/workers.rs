@@ -29,11 +29,11 @@ use super::{
 type RwVec<T> = RwLock<Vec<T>>;
 type Worker = JoinHandle<Result<()>>;
 
-// TODO: clean up temp static
-// seconds between each pull for a worker
+// REVIEW: static ok or env variables?
+/// seconds between each pull for a worker
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
-// max idle time in seconds before shut down
-static WORKER_MAX_IDLE: f64 = 20.0;
+/// max idle time in seconds before shut down
+static WORKER_MAX_IDLE: f64 = 60.0;
 
 /// Multi-consumer side of the TaskQueue. Created and maaged by TaskQueue asscoaited with a stream.
 /// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold
@@ -176,14 +176,13 @@ async fn process_job(
     store_sig_s.close(); // signal persist job to close
     // Flush to disk or remove saved file
     let path = build_file_path(tq_index, &worker_id);
-    create_dir_all(path.parent().unwrap())
-        .context("Failed to flush to disk when worker shutting down")?;
     let to_persist = if pending_tasks.is_empty() {
         None
     } else {
         Some(pending_tasks)
     };
-    persist_job_inner(&path, to_persist)?;
+    persist_job_inner(&path, to_persist)
+        .context("Failed to flush to disk when worker shutting down")?;
     Ok(())
 }
 
