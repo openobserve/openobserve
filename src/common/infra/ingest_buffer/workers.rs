@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::create_dir_all, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_channel::{bounded, Receiver, Sender};

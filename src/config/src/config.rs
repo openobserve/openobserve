@@ -1052,10 +1052,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check ingest_buffer_queue_num > 0 if feature enabled
-    if cfg.common.feature_ingest_buffer_enabled {
-        if cfg.limit.ingest_buffer_queue_num <= 0 {
-            cfg.limit.ingest_buffer_queue_num = 5;
-        }
+    if cfg.common.feature_ingest_buffer_enabled && cfg.limit.ingest_buffer_queue_num == 0 {
+        cfg.limit.ingest_buffer_queue_num = 5;
     }
 
     // check max_file_size_on_disk to MB
