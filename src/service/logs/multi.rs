@@ -201,6 +201,7 @@ async fn ingest_inner(
                 partition_keys: &partition_keys,
                 partition_time_level: &partition_time_level,
                 stream_alerts_map: &stream_alerts_map,
+                routing: &vec![],
             },
             &mut stream_schema_map,
             &mut stream_status.status,

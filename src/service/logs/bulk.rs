@@ -43,7 +43,7 @@ use crate::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
             StreamSchemaChk,
         },
-        stream::StreamParams,
+        stream::{PartitioningDetails, Routing, StreamParams},
     },
     service::{
         db,
@@ -99,6 +99,7 @@ pub async fn ingest(
     let mut stream_partition_keys_map: HashMap<String, (StreamSchemaChk, PartitioningDetails)> =
         HashMap::new();
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
+    let mut stream_routing_map: HashMap<String, Vec<Routing>> = HashMap::new();
     let mut distinct_values = Vec::with_capacity(16);
 
     let mut action = String::from("");
@@ -138,6 +139,16 @@ pub async fn ingest(
             }
 
             next_line_is_data = true;
+
+            // Start get routing keys
+            crate::service::ingestion::get_stream_routing_keys(
+                org_id,
+                &StreamType::Logs,
+                &stream_name,
+                &mut stream_routing_map,
+            )
+            .await;
+            // End get stream keys
 
             // Start Register Transfoms for stream
 
@@ -186,6 +197,32 @@ pub async fn ingest(
                 });
         } else {
             next_line_is_data = false;
+
+            // JSON Flattening
+            let mut value = flatten::flatten(value)?;
+            let temp = vec![];
+            let routing = stream_routing_map.get(&stream_name).unwrap_or(&temp);
+
+            for route in routing {
+                let mut is_routed = true;
+                let val = &route.routing;
+                for q_condition in val.iter() {
+                    is_routed = is_routed && q_condition.evaluate(value.as_object().unwrap()).await;
+                }
+                if is_routed && !val.is_empty() {
+                    stream_name = route.destination.clone();
+                    if stream_data_map.get(&stream_name).is_none() {
+                        log::debug!("log records are being routed to stream: {}", stream_name);
+                        stream_data_map.insert(
+                            stream_name.clone(),
+                            BulkStreamData {
+                                data: HashMap::new(),
+                            },
+                        );
+                    }
+                    break;
+                }
+            }
 
             let stream_data = stream_data_map.get_mut(&stream_name).unwrap();
             let buf = &mut stream_data.data;
@@ -315,6 +352,7 @@ pub async fn ingest(
                         partition_keys: &partition_keys,
                         partition_time_level: &partition_time_level,
                         stream_alerts_map: &stream_alerts_map,
+                        routing: stream_routing_map.get(&stream_name).unwrap_or(&vec![]),
                     },
                     buf,
                     local_val,
@@ -328,6 +366,7 @@ pub async fn ingest(
                         partition_keys: &partition_keys,
                         partition_time_level: &partition_time_level,
                         stream_alerts_map: &stream_alerts_map,
+                        routing: stream_routing_map.get(&stream_name).unwrap_or(&vec![]),
                     },
                     &mut stream_schema_map,
                     &mut status,

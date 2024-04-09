@@ -44,7 +44,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::SchemaRecords,
+            stream::{PartitioningDetails, Routing, SchemaRecords, StreamPartition},
         },
         utils::functions::get_vrl_compiler_config,
     },
@@ -144,6 +144,27 @@ pub async fn get_stream_partition_keys(
         partition_keys: stream_settings.partition_keys,
         partition_time_level: stream_settings.partition_time_level,
     }
+}
+
+pub async fn get_stream_routing_keys(
+    org_id: &str,
+    stream_type: &StreamType,
+    stream_name: &str,
+    stream_settings_map: &mut HashMap<String, Vec<Routing>>,
+) {
+    let stream_settings = db::schema::get_settings(org_id, stream_name, *stream_type)
+        .await
+        .unwrap_or_default();
+    let res: Vec<Routing> = stream_settings
+        .routing
+        .iter()
+        .map(|(k, v)| Routing {
+            destination: k.to_string(),
+            routing: v.clone(),
+        })
+        .collect();
+
+    stream_settings_map.insert(stream_name.to_owned(), res);
 }
 
 pub async fn get_stream_alerts(

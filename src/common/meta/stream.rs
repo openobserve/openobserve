@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::prom::Metadata;
+use crate::common::meta::alerts::Condition;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {
@@ -57,6 +58,181 @@ pub struct StreamSchema {
     pub stream_name: String,
     pub stream_type: StreamType,
     pub schema: Schema,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct StreamSettings {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub partition_keys: Vec<StreamPartition>,
+    #[serde(skip_serializing_if = "Option::None")]
+    pub partition_time_level: Option<PartitionTimeLevel>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub full_text_search_keys: Vec<String>,
+    #[serde(default)]
+    pub bloom_filter_fields: Vec<String>,
+    #[serde(default)]
+    pub data_retention: i64,
+    #[serde(skip_serializing_if = "Hashmap::is_empty")]
+    #[serde(default)]
+    pub routing: HashMap<String, Vec<Condition>>,
+}
+
+impl Serialize for StreamSettings {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("stream_settings", 4)?;
+        let mut part_keys = HashMap::new();
+        for (index, key) in self.partition_keys.iter().enumerate() {
+            part_keys.insert(format!("L{index}"), key);
+        }
+        state.serialize_field("partition_keys", &part_keys)?;
+        state.serialize_field(
+            "partition_time_level",
+            &self.partition_time_level.unwrap_or_default(),
+        )?;
+        state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
+        state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
+        state.serialize_field("data_retention", &self.data_retention)?;
+        state.serialize_field("log_routing", &self.routing)?;
+        state.end()
+    }
+}
+
+impl From<&str> for StreamSettings {
+    fn from(data: &str) -> Self {
+        let settings: json::Value = json::from_slice(data.as_bytes()).unwrap();
+
+        let mut partition_keys = Vec::new();
+        if let Some(value) = settings.get("partition_keys") {
+            let mut v: Vec<_> = value.as_object().unwrap().into_iter().collect();
+            v.sort_by(|a, b| a.0.cmp(b.0));
+            for (_, value) in v.iter() {
+                match value {
+                    json::Value::String(v) => {
+                        partition_keys.push(StreamPartition::new(v));
+                    }
+                    json::Value::Object(v) => {
+                        let val: StreamPartition =
+                            json::from_value(json::Value::Object(v.to_owned())).unwrap();
+                        partition_keys.push(val);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let mut partition_time_level = None;
+        if let Some(value) = settings.get("partition_time_level") {
+            partition_time_level = Some(PartitionTimeLevel::from(value.as_str().unwrap()));
+        }
+
+        let mut full_text_search_keys = Vec::new();
+        let fts = settings.get("full_text_search_keys");
+        if let Some(value) = fts {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                full_text_search_keys.push(item.as_str().unwrap().to_string())
+            }
+        }
+
+        let mut bloom_filter_fields = Vec::new();
+        let fts = settings.get("bloom_filter_fields");
+        if let Some(value) = fts {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                bloom_filter_fields.push(item.as_str().unwrap().to_string())
+            }
+        }
+
+        let mut log_routing: HashMap<String, Vec<Condition>> = HashMap::new();
+        let routing = settings.get("log_routing");
+        if let Some(value) = routing {
+            let v: Vec<_> = value.as_object().unwrap().iter().collect();
+            for item in v {
+                log_routing.insert(
+                    item.0.to_string(),
+                    json::from_value(item.1.clone()).unwrap(),
+                );
+            }
+        }
+
+        let mut data_retention = 0;
+        if let Some(v) = settings.get("data_retention") {
+            data_retention = v.as_i64().unwrap();
+        };
+
+        Self {
+            partition_keys,
+            partition_time_level,
+            full_text_search_keys,
+            bloom_filter_fields,
+            data_retention,
+            routing: log_routing,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct StreamPartition {
+    pub field: String,
+    #[serde(default)]
+    pub types: StreamPartitionType,
+    #[serde(default)]
+    pub disabled: bool,
+}
+
+impl StreamPartition {
+    pub fn new(field: &str) -> Self {
+        Self {
+            field: field.to_string(),
+            types: StreamPartitionType::Value,
+            disabled: false,
+        }
+    }
+
+    pub fn new_hash(field: &str, buckets: u64) -> Self {
+        Self {
+            field: field.to_string(),
+            types: StreamPartitionType::Hash(std::cmp::max(16, buckets)),
+            disabled: false,
+        }
+    }
+
+    pub fn get_partition_key(&self, value: &str) -> String {
+        format!("{}={}", self.field, self.get_partition_value(value))
+    }
+
+    pub fn get_partition_value(&self, value: &str) -> String {
+        match &self.types {
+            StreamPartitionType::Value => value.to_string(),
+            StreamPartitionType::Hash(n) => {
+                let h = gxhash::new().sum64(value);
+                let bucket = h % n;
+                bucket.to_string()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum StreamPartitionType {
+    #[default]
+    Value, // each value is a partition
+    Hash(u64), // partition with fixed bucket size by hash
+}
+
+impl Display for StreamPartitionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StreamPartitionType::Value => write!(f, "value"),
+            StreamPartitionType::Hash(_) => write!(f, "hash"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -97,6 +273,11 @@ pub struct SchemaRecords {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct StreamDeleteFields {
     pub fields: Vec<String>,
+}
+
+pub struct Routing {
+    pub destination: String,
+    pub routing: Vec<Condition>,
 }
 
 #[cfg(test)]

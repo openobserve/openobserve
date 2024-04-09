@@ -29,7 +29,11 @@ use infra::schema::unwrap_partition_time_level;
 
 use super::ingestion::{get_string_value, TriggerAlertData};
 use crate::{
-    common::meta::{alerts::Alert, ingestion::RecordStatus, stream::SchemaRecords},
+    common::meta::{
+        alerts::Alert,
+        ingestion::RecordStatus,
+        stream::{Routing, SchemaRecords, StreamPartition},
+    },
     service::{
         ingestion::get_wal_time_key,
         schema::{check_for_schema, SchemaCache},
@@ -427,6 +431,7 @@ struct StreamMeta<'a> {
     partition_keys: &'a Vec<StreamPartition>,
     partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
+    routing: &'a Vec<Routing>,
 }
 
 #[cfg(test)]

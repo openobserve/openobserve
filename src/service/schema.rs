@@ -614,6 +614,7 @@ pub async fn add_stream_schema(
             full_text_search_keys: vec![],
             bloom_filter_fields: vec![],
             data_retention: 0,
+            routing: HashMap::new(),
         };
         metadata.insert(
             "settings".to_string(),
