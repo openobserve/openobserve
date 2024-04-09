@@ -19,8 +19,6 @@ import "quasar/src/css/index.sass";
 import "@quasar/extras/roboto-font/roboto-font.css";
 import "@quasar/extras/material-icons/material-icons.css";
 
-import * as Sentry from "@sentry/vue";
-
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
@@ -53,28 +51,6 @@ const getConfig = async () => {
   await configService.get_config().then((res: any) => {
     store.dispatch("setConfig", res.data);
     config.enableAnalytics = res.data.telemetry_enabled.toString();
-    if (res.data.telemetry_enabled == true && config.isCloud == "true") {
-      Sentry.init({
-        app,
-        dsn: config.sentryDSN,
-        integrations: [
-          new Sentry.BrowserTracing({
-            routingInstrumentation: Sentry.vueRouterInstrumentation(router),
-            tracingOrigins: [
-              "localhost",
-              "alpha1.cloud.zinclabs.dev",
-              "cloud.openobserve.ai",
-              /^\//,
-            ],
-          }),
-        ],
-        // Set tracesSampleRate to 1.0 to capture 100%
-        // of transactions for performance monitoring.
-        // We recommend adjusting this value in production
-        tracesSampleRate: 1.0,
-      });
-    }
-
     if (res.data.rum.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
