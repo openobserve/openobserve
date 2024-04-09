@@ -30,7 +30,7 @@ static MIN_WORKER_CNT: usize = 3;
 // if channel if full -> init more workers
 static DEFAULT_CHANNEL_CAP: usize = 10;
 // number of task queues -> env variables
-static TASK_QUEUE_COUNT: usize = 10;
+static TASK_QUEUE_COUNT: usize = 2;
 
 /// A global hash map that maps stream of a TaskQueue instsance.
 static TQMANAGER: Lazy<RwLock<TaskQueueManager>> = Lazy::new(RwLock::default);

@@ -21,7 +21,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use async_channel::Receiver;
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::WriteBytesExt;
 use config::CONFIG;
 use ingester::scan_files;
 
@@ -29,6 +29,8 @@ use super::{entry::IngestEntry, workers::process_tasks_with_retries};
 
 /// File extension for segment files.
 const FILE_EXTENSION: &str = "wal";
+/// Delimiter for writing and reading IngestEntries to/from wal files
+const DELIMITER: u8 = b'|';
 
 /// Writes the given array of IngestEntries to disk at direcotry formatted by
 /// pattern {data_wal_dir}/ingest_buffer/{stream_name}/{worker_id}.wal.
@@ -76,9 +78,8 @@ pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>)
 
         for task in tasks {
             let bytes = task.into_bytes()?;
-            let len = bytes.len();
-            f.write_u16::<BigEndian>(len as u16)?;
             f.write_all(&bytes)?;
+            f.write_u8(DELIMITER)?;
         }
 
         f.sync_all().context("Failed to sync file")?;
@@ -103,33 +104,19 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
 
     for wal_file in wal_files.iter() {
         log::warn!("Start replaying wal file: {:?}", wal_file);
-        let f = match File::open(wal_file) {
-            Ok(f) => f,
-            Err(e) => {
-                log::error!(
-                    "Unable to open the wal file err: {}. Remove and skip file",
-                    e
+        match decode_from_wal_file(wal_file) {
+            Ok(Some(entries)) => {
+                log::info!(
+                    "Ingesting {} entries decoded from wal file: {:?}.",
+                    entries.len(),
+                    wal_file
                 );
-                remove_file(wal_file)?;
-                continue;
+                // Hack (stream_name = 0, worker_id=0)
+                process_tasks_with_retries(0, "0", &entries, 1).await;
             }
-        };
-        let mut f = BufReader::new(f);
-        let mut entries = vec![];
-        while let Ok(entry_size) = f.read_u16::<BigEndian>() {
-            let mut entry = vec![0; entry_size as usize];
-            f.read_exact(&mut entry)?;
-            let entry = IngestEntry::from_bytes(&entry)?;
-            entries.push(entry);
-        }
-        if !entries.is_empty() {
-            log::info!(
-                "Decoded {} IngestEntries from wal file: {:?}. Ingesting",
-                entries.len(),
-                wal_file
-            );
-            // Hack (stream_name = 0, worker_id=0)
-            process_tasks_with_retries(0, "0", &entries, 1).await;
+            _ => {
+                log::error!("Failed to decode from wal file. Skip");
+            }
         }
         remove_file(wal_file)?;
     }
@@ -145,4 +132,25 @@ pub(super) fn build_file_path(tq_index: usize, worker_id: &str) -> PathBuf {
     path.push(worker_id);
     path.set_extension(FILE_EXTENSION);
     path
+}
+
+fn decode_from_wal_file(wal_file: &PathBuf) -> Result<Option<Vec<IngestEntry>>> {
+    let f = File::open(wal_file)?;
+    let mut f = BufReader::new(f);
+    let mut entries = vec![];
+    let mut buffer = Vec::new();
+
+    f.read_to_end(&mut buffer)?;
+    let entries_bytes = buffer.split(|&b| b == DELIMITER);
+    for entry_bytes in entries_bytes {
+        if !entry_bytes.is_empty() {
+            let entry = IngestEntry::from_bytes(entry_bytes)?;
+            entries.push(entry);
+        }
+    }
+    Ok(if entries.is_empty() {
+        None
+    } else {
+        Some(entries)
+    })
 }
