@@ -141,10 +141,12 @@ pub async fn ingest(
             next_line_is_data = true;
 
             // Start get routing keys
-            crate::service::ingestion::get_stream_routing_keys(
-                org_id,
-                &StreamType::Logs,
-                &stream_name,
+            crate::service::ingestion::get_stream_routing(
+                StreamParams {
+                    org_id: org_id.to_owned().into(),
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_owned().into(),
+                },
                 &mut stream_routing_map,
             )
             .await;
@@ -211,8 +213,7 @@ pub async fn ingest(
                 }
                 if is_routed && !val.is_empty() {
                     stream_name = route.destination.clone();
-                    if stream_data_map.get(&stream_name).is_none() {
-                        log::debug!("log records are being routed to stream: {}", stream_name);
+                    if !stream_data_map.contains_key(&stream_name) {
                         stream_data_map.insert(
                             stream_name.clone(),
                             BulkStreamData {

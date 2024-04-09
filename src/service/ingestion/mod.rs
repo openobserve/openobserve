@@ -44,7 +44,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::{PartitioningDetails, Routing, SchemaRecords, StreamPartition},
+            stream::{PartitioningDetails, Routing, SchemaRecords, StreamParams, StreamPartition},
         },
         utils::functions::get_vrl_compiler_config,
     },
@@ -146,15 +146,17 @@ pub async fn get_stream_partition_keys(
     }
 }
 
-pub async fn get_stream_routing_keys(
-    org_id: &str,
-    stream_type: &StreamType,
-    stream_name: &str,
-    stream_settings_map: &mut HashMap<String, Vec<Routing>>,
+pub async fn get_stream_routing(
+    stream_params: StreamParams,
+    stream_routing_map: &mut HashMap<String, Vec<Routing>>,
 ) {
-    let stream_settings = db::schema::get_settings(org_id, stream_name, *stream_type)
-        .await
-        .unwrap_or_default();
+    let stream_settings = db::schema::get_settings(
+        &stream_params.org_id,
+        &stream_params.stream_name,
+        stream_params.stream_type,
+    )
+    .await
+    .unwrap_or_default();
     let res: Vec<Routing> = stream_settings
         .routing
         .iter()
@@ -164,7 +166,7 @@ pub async fn get_stream_routing_keys(
         })
         .collect();
 
-    stream_settings_map.insert(stream_name.to_owned(), res);
+    stream_routing_map.insert(stream_params.stream_name.to_string(), res);
 }
 
 pub async fn get_stream_alerts(
