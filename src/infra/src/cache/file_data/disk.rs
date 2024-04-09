@@ -16,15 +16,12 @@
 use std::{
     cmp::{max, min},
     ops::Range,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
+use async_recursion::async_recursion;
 use bytes::Bytes;
-use config::{
-    is_local_disk_storage, metrics,
-    utils::{asynchronism::file::*, file::scan_files},
-    CONFIG,
-};
+use config::{is_local_disk_storage, metrics, utils::asynchronism::file::*, CONFIG};
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
@@ -65,38 +62,6 @@ impl FileData {
             ),
             data: CacheStrategy::new(strategy),
         }
-    }
-
-    async fn load(&mut self) -> Result<(), anyhow::Error> {
-        log::info!("Loading disk cache start");
-        std::fs::create_dir_all(&self.root_dir).expect("create cache dir success");
-        let wal_dir = Path::new(&self.root_dir).canonicalize().unwrap();
-        let files = scan_files(&self.root_dir, "parquet").await;
-        for file in files {
-            let local_path = Path::new(&file).canonicalize().unwrap();
-            let file_key = local_path
-                .strip_prefix(&wal_dir)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .replace('\\', "/");
-            let meta = get_file_meta(&file).await?;
-            let data_size = meta.len() as usize;
-            self.cur_size += data_size;
-            self.data.insert(file_key.clone(), data_size);
-            // metrics
-            let columns = file_key.split('/').collect::<Vec<&str>>();
-            if columns[0] == "files" {
-                metrics::QUERY_DISK_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .dec();
-                metrics::QUERY_DISK_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .sub(data_size as i64);
-            }
-        }
-        log::info!("Loading disk cache done");
-        Ok(())
     }
 
     async fn exist(&mut self, file: &str) -> bool {
@@ -218,9 +183,16 @@ impl FileData {
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    std::fs::create_dir_all(&CONFIG.common.data_cache_dir).expect("create cache dir success");
-    let mut files = FILES.write().await;
-    files.load().await?;
+    let root_dir = FILES.read().await.root_dir.clone();
+    let root_dir = Path::new(&root_dir).canonicalize().unwrap();
+    std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    tokio::task::spawn(async move {
+        log::info!("Loading disk cache start");
+        if let Err(e) = load(&root_dir, &root_dir).await {
+            log::error!("load disk cache error: {}", e);
+        }
+        log::info!("Loading disk cache done, total files: {} ", len().await);
+    });
 
     tokio::task::spawn(async move {
         if CONFIG.disk_cache.gc_interval == 0 {
@@ -268,6 +240,72 @@ pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow
         return Ok(());
     }
     files.set(session_id, file, data).await
+}
+
+#[async_recursion]
+async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
+    let mut entries = tokio::fs::read_dir(&scan_dir).await?;
+    loop {
+        match entries.next_entry().await {
+            Err(e) => return Err(e.into()),
+            Ok(None) => break,
+            Ok(Some(f)) => {
+                let fp = match f.path().canonicalize() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        log::error!("canonicalize file path error: {}", e);
+                        continue;
+                    }
+                };
+                let ft = match f.file_type().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::error!("get file type error: {}", e);
+                        continue;
+                    }
+                };
+                if ft.is_dir() {
+                    if let Err(e) = load(root_dir, &fp).await {
+                        log::error!("load disk cache error: {}", e);
+                    }
+                } else {
+                    let meta = match get_file_meta(&fp).await {
+                        Ok(m) => m,
+                        Err(e) => {
+                            log::error!("get file meta error: {}", e);
+                            continue;
+                        }
+                    };
+                    let data_size = meta.len() as usize;
+                    let file_key = fp
+                        .strip_prefix(root_dir)
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .replace('\\', "/");
+                    // write into cache
+                    let mut w = FILES.write().await;
+                    w.cur_size += data_size;
+                    w.data.insert(file_key.clone(), data_size);
+                    let total = w.len();
+                    drop(w);
+                    // print progress
+                    if total % 1000 == 0 {
+                        log::info!("Loading disk cache {}", total);
+                    }
+                    // metrics
+                    let columns = file_key.split('/').collect::<Vec<&str>>();
+                    metrics::QUERY_DISK_CACHE_FILES
+                        .with_label_values(&[columns[1], columns[2]])
+                        .dec();
+                    metrics::QUERY_DISK_CACHE_USED_BYTES
+                        .with_label_values(&[columns[1], columns[2]])
+                        .sub(data_size as i64);
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn gc() -> Result<(), anyhow::Error> {
