@@ -21,7 +21,7 @@ use config::{
 use infra::file_list as infra_file_list;
 
 use crate::{
-    job::{file_list, files},
+    job::file_list,
     service::{compact::stats::update_stats_from_file_list, db},
 };
 
@@ -56,11 +56,6 @@ pub async fn run(prefix: &str, from: &str, to: &str) -> Result<(), anyhow::Error
     };
     dest.create_table().await?;
     db::schema::cache().await?;
-
-    // move files from wal for disk
-    if let Err(e) = files::parquet::move_files_to_storage().await {
-        log::error!("Error moving disk parquet files to remote: {}", e);
-    }
 
     // move file_list from wal for disk
     if let Err(e) = file_list::move_file_list_to_storage(false).await {
