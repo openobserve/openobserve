@@ -507,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 <div class="row items-center justify-end">
                                   <q-btn
-                                    :v-close-popup="true"
+                                    v-close-popup
                                     label="Close"
                                     color="primary"
                                     flat
@@ -547,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <q-time v-model="scheduling.time">
                                 <div class="row items-center justify-end">
                                   <q-btn
-                                    :v-close-popup="true"
+                                    v-close-popup
                                     label="Close"
                                     color="primary"
                                     flat
