@@ -34,6 +34,7 @@ import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import moment from "moment";
 import { openobserveRum } from "@openobserve/browser-rum";
+import router from "@/test/unit/helpers/router";
 
 export default defineComponent({
   name: "PageLoginCallback",
@@ -127,6 +128,7 @@ export default defineComponent({
     };
 
     return {
+      router,
       store,
       redirectUser,
       getDefaultOrganization,
@@ -177,7 +179,29 @@ export default defineComponent({
       });
       this.getDefaultOrganization();
     } else {
-      this.VerifyAndCreateUser();
+      this.store.dispatch("login", {
+        loginState: true,
+        userInfo: this.userInfo,
+      });
+
+      //analytics
+      const userId = this.userInfo.email;
+      segment.identify(
+        "Log In",
+        {
+          email: userId,
+          name: this.userInfo.given_name + " " + this.userInfo.family_name,
+          firstName: this.userInfo.given_name,
+          lastName: this.userInfo.family_name,
+        },
+        { originalTimestamp: moment.utc().format() }
+      );
+
+      openobserveRum.setUser({
+        name: this.userInfo.given_name + " " + this.userInfo.family_name,
+        email: this.userInfo.email,
+      });
+      this.getDefaultOrganization();
     }
   },
   methods: {

@@ -61,6 +61,7 @@ const ApiDashboard = () =>
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
 import useIamRoutes from "./useIamRoutes";
+import config from "@/aws-exports";
 
 const useRoutes = () => {
   const parentRoutes: never[] = [];
@@ -186,24 +187,6 @@ const useRoutes = () => {
       meta: {
         // keepAlive: true,
       },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "/reports",
-      name: "reports",
-      component: ReportList,
-      props: true,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "/reports/create",
-      name: "createReport",
-      component: CreateReport,
-      props: true,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -420,6 +403,31 @@ const useRoutes = () => {
       },
     },
   ];
+
+  if (config.isCloud === "false") {
+    homeChildRoutes.splice(
+      13,
+      0,
+      {
+        path: "/reports",
+        name: "reports",
+        component: ReportList,
+        props: true,
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
+        path: "/reports/create",
+        name: "createReport",
+        component: CreateReport,
+        props: true,
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      }
+    );
+  }
 
   return { parentRoutes, homeChildRoutes };
 };
