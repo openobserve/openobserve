@@ -725,7 +725,11 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !(parsedSQL.groupby || hasAggregation(parsedSQL.columns));
+    return !(
+      parsedSQL.groupby ||
+      hasAggregation(parsedSQL.columns) ||
+      parsedSQL.limit
+    );
   };
 
   const getQueryPartitions = async (queryReq: any) => {
