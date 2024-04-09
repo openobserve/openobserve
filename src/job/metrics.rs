@@ -69,8 +69,8 @@ async fn load_ingest_wal_used_bytes() -> Result<(), anyhow::Error> {
         Err(_) => return Ok(()),
     };
     let pattern = format!("{}files/", &CONFIG.common.data_wal_dir);
-    let files = scan_files(&pattern, "parquet").await;
-    // files.extend(scan_files(&pattern, "json").await);
+    let files = scan_files(&pattern, "parquet", None).await;
+    // files.extend(scan_files(&pattern, "json", None).await);
     let mut sizes = HashMap::new();
     for file in files {
         let local_file = file.to_owned();
