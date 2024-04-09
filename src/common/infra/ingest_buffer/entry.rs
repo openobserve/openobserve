@@ -25,7 +25,7 @@ use crate::{common::meta::ingestion::IngestionRequest, service::logs};
 // TODO: support other two endpoints
 // KinesisFH,
 // GCP,
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IngestSource {
     Bulk,
     Multi,
@@ -34,7 +34,7 @@ pub enum IngestSource {
     GCP,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngestEntry {
     pub source: IngestSource,
     pub thread_id: usize,
@@ -101,7 +101,7 @@ impl IngestEntry {
     }
 
     pub fn into_bytes(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::with_capacity(4096);
+        let mut buf = Vec::new();
 
         let source = u8::from(&self.source);
         buf.write_u8(source)
@@ -145,7 +145,7 @@ impl IngestEntry {
     pub fn from_bytes(value: &[u8]) -> Result<Self> {
         let mut cursor = Cursor::new(value);
         let mut source = [0u8; 1];
-        let mut thread_id = [0u8; 1];
+        let mut thread_id = [0u8; 8];
         cursor
             .read_exact(&mut source)
             .context("IngestEntry::from_bytes() failed at reading <source>")?;
@@ -252,5 +252,40 @@ impl std::fmt::Display for IngestSource {
             IngestSource::KinesisFH => write!(f, "KinesisFH"),
             IngestSource::GCP => write!(f, "GCP"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_entry_w_stream_bane_serialization() {
+        let entry = IngestEntry::new(
+            IngestSource::JSON, 
+            0, 
+            "default".to_string(), 
+            "root@example.com".to_string(), 
+            Some("default".to_string()), 
+        Bytes::from_static(b"\"kubernetes.annotations.kubectl.kubernetes.io/default-container\": \"prometheus\""));
+
+        let entry_bytes = entry.into_bytes().unwrap();
+        let entry_decoded = IngestEntry::from_bytes(&entry_bytes).unwrap();
+        assert_eq!(entry, entry_decoded);
+    }
+
+    #[test]
+    fn test_entry_wo_stream_bane_serialization() {
+        let entry = IngestEntry::new(
+            IngestSource::JSON, 
+            0, 
+            "default".to_string(), 
+            "root@example.com".to_string(), 
+            None, 
+        Bytes::from_static(b"\"kubernetes.annotations.kubectl.kubernetes.io/default-container\": \"prometheus\""));
+
+        let entry_bytes = entry.into_bytes().unwrap();
+        let entry_decoded = IngestEntry::from_bytes(&entry_bytes).unwrap();
+        assert_eq!(entry, entry_decoded);
     }
 }
