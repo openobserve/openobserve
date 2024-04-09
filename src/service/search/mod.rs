@@ -40,6 +40,7 @@ use infra::{
 };
 use itertools::Itertools;
 use once_cell::sync::Lazy;
+use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
 use tokio::sync::Mutex;
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
@@ -81,6 +82,15 @@ pub async fn search(
     } else {
         session_id.to_string()
     };
+
+    let ctx = tracing::Span::current().context();
+    // Get the current Span from the Context
+    let span = ctx.span();
+    // Get the SpanContext from the Span
+    let span_context = span.span_context();
+    // Get the trace_id from the SpanContext
+    let trace_id = span_context.trace_id();
+    println!("trace_id: {:?}", trace_id);
 
     #[cfg(feature = "enterprise")]
     {
