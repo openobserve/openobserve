@@ -197,7 +197,6 @@ import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
 import TraceTree from "./TraceTree.vue";
 import TraceHeader from "./TraceHeader.vue";
 import { useStore } from "vuex";
-import D3Chart from "@/components/D3Chart.vue";
 import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -223,7 +222,6 @@ export default defineComponent({
     TraceDetailsSidebar,
     TraceTree,
     TraceHeader,
-    D3Chart,
     TraceTimelineIcon,
     ServiceMapIcon,
     ChartRenderer,
