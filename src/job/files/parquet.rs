@@ -161,7 +161,7 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(&file_key, parquet_meta, false));
         // mark the file as processing
-        log::debug!("Processing files created: {:?}", file_key);
+        // log::debug!("Processing files created: {:?}", file_key);
         PROCESSING_FILES.write().await.insert(file_key);
     }
     log::debug!(
@@ -332,7 +332,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
             }
 
             // remove the file from processing set
-            log::debug!("Processing files deleted: {:?}", file.key);
+            // log::debug!("Processing files deleted: {:?}", file.key);
             PROCESSING_FILES.write().await.remove(&file.key);
 
             // metrics
