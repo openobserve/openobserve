@@ -65,39 +65,6 @@ pub async fn scan_files<P: AsRef<Path>>(root: P, ext: &str, limit: Option<usize>
     }
 }
 
-pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
-    let mut dirs = Vec::new();
-    let mut entries = WalkDir::new(dir);
-    loop {
-        match entries.next().await {
-            Some(Ok(entry)) => {
-                if entry.path().display().to_string() == dir {
-                    continue;
-                }
-                if let Ok(f) = entry.file_type().await {
-                    if f.is_dir() {
-                        dirs.push(entry.path().to_str().unwrap().to_string());
-                    }
-                }
-            }
-            Some(Err(e)) => {
-                log::error!("clean_empty_dirs, err: {}", e);
-                break;
-            }
-            None => break,
-        }
-    }
-    dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
-    for dir in dirs {
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            if entries.count() == 0 {
-                std::fs::remove_dir(&dir)?;
-            }
-        }
-    }
-    Ok(())
-}
-
 #[cfg(unix)]
 pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
     use std::os::unix::fs::PermissionsExt;

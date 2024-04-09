@@ -115,6 +115,10 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(FileKey::new(&file, parquet_meta, false));
     }
+    log::debug!(
+        "[INGESTER:JOB] move files get partitions: {}",
+        partition_files_with_size.len()
+    );
 
     // use multiple threads to upload files
     let mut tasks = Vec::new();
@@ -127,6 +131,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
         let org_id = columns[1].to_string();
         let stream_type = StreamType::from(columns[2]);
         let stream_name = columns[3].to_string();
+
+        log::debug!("[INGESTER:JOB] check deletion for partition: {}", prefix);
 
         // check if we are allowed to ingest or just delete the file
         if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
@@ -148,6 +154,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
             continue;
         }
+
+        log::debug!("[INGESTER:JOB] start processing for partition: {}", prefix);
 
         let wal_dir = wal_dir.clone();
         let permit = semaphore
@@ -198,6 +206,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                 }
             }
 
+            log::debug!("[INGESTER:JOB] get schema for partition: {}", prefix);
+
             // get latest schema
             let latest_schema = db::schema::get(&org_id, &stream_name, stream_type)
                 .await
@@ -211,6 +221,8 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
                     );
                     e
                 })?;
+
+            log::debug!("[INGESTER:JOB] start merging for partition: {}", prefix);
 
             // start merge files and upload to s3
             loop {

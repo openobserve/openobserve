@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fs::Metadata, path::Path};
+use std::{fs::Metadata, path::Path };
 
+use async_walkdir::WalkDir;
+use futures::StreamExt;
 use tokio::{
-    fs::File,
+    fs::{read_dir, remove_dir, File},
     io::{AsyncReadExt, AsyncWriteExt},
 };
 
@@ -41,4 +43,39 @@ pub async fn put_file_contents(
 ) -> Result<(), std::io::Error> {
     let mut file = File::create(path).await?;
     file.write_all(contents).await
+}
+
+pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
+    let mut dirs = Vec::new();
+    let mut entries = WalkDir::new(dir);
+    loop {
+        match entries.next().await {
+            Some(Ok(entry)) => {
+                if entry.path().display().to_string() == dir {
+                    continue;
+                }
+                if let Ok(f) = entry.file_type().await {
+                    if f.is_dir() {
+                        dirs.push(entry.path().to_str().unwrap().to_string());
+                    }
+                }
+            }
+            Some(Err(e)) => {
+                log::error!("clean_empty_dirs, err: {}", e);
+                break;
+            }
+            None => break,
+        }
+    }
+    dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
+    for dir in dirs {
+        if let Ok(mut entries) = read_dir(&dir).await {
+            if let Ok(None) = entries.next_entry().await {
+                if let Err(e) = remove_dir(&dir).await {
+                    log::error!("Failed to remove empty dir: {}, err: {}", dir, e);
+                }
+            }
+        }
+    }
+    Ok(())
 }
