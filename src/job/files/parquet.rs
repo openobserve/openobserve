@@ -204,6 +204,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
                     e
                 );
             }
+            PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
     }
@@ -248,6 +249,10 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
             }
         }
         if !has_expired_files {
+            // need release all the files
+            for file in files_with_size.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
             return Ok(());
         }
     }
@@ -303,6 +308,10 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
                 new_file_name,
                 e.to_string()
             );
+            // need release all the files
+            for file in files_with_size.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
             return Ok(());
         }
 
@@ -327,7 +336,10 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
                     file.key,
                     e.to_string()
                 );
-                PROCESSING_FILES.write().await.remove(&file.key);
+                // need release all the files
+                for file in files_with_size.iter() {
+                    PROCESSING_FILES.write().await.remove(&file.key);
+                }
                 return Ok(());
             }
 
