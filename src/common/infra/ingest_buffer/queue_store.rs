@@ -48,7 +48,7 @@ pub(super) async fn persist_job(
     create_dir_all(path.parent().unwrap()).context("Failed to create directory")?;
 
     while let Ok(tasks) = store_sig_r.recv().await {
-        log::info!("TaskQueue({tq_index})-worker({worker_id}) persists its pending tasks to disk");
+        log::info!("TaskQueue({tq_index})-worker({worker_id}) persist job starts");
 
         match persist_job_inner(&path, tasks) {
             Err(e) => {
@@ -58,7 +58,7 @@ pub(super) async fn persist_job(
                 );
             }
             Ok(_) => {
-                log::info!("TaskQueue({tq_index})-worker({worker_id}) persisted to disk");
+                log::info!("TaskQueue({tq_index})-worker({worker_id}) persist job done");
             }
         }
     }
@@ -66,23 +66,25 @@ pub(super) async fn persist_job(
 }
 
 pub(super) fn persist_job_inner(path: &PathBuf, tasks: Option<Vec<IngestEntry>>) -> Result<()> {
-    let mut f = OpenOptions::new()
+    if let Some(tasks) = tasks {
+        let mut f = OpenOptions::new()
                     .write(true)
                     .create(true)
                     .truncate(true) // always overwrite
                     .open(path)
                     .context("Failed to open file")?;
 
-    if let Some(tasks) = tasks {
         for task in tasks {
             let bytes = task.into_bytes()?;
             let len = bytes.len();
             f.write_u16::<BigEndian>(len as u16)?;
             f.write_all(&bytes)?;
         }
-    }
 
-    f.sync_all().context("Failed to sync file")?;
+        f.sync_all().context("Failed to sync file")?;
+    } else {
+        remove_file(path)?;
+    }
 
     Ok(())
 }
@@ -136,7 +138,7 @@ pub(super) async fn replay_persisted_tasks() -> Result<()> {
 
 /// Builds file path for TaskQueue workers to persist their pending tasks to disk.
 pub(super) fn build_file_path(tq_index: usize, worker_id: &str) -> PathBuf {
-    let tq_folder = format!("task_queue-{tq_index}");
+    let tq_folder = format!("task_queue_{tq_index}");
     let mut path = PathBuf::from(&CONFIG.common.data_wal_dir);
     path.push("ingest_buffer");
     path.push(tq_folder);

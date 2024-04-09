@@ -85,6 +85,9 @@ impl TaskQueueManager {
                 "TaskQueueManager not able to find TaskQeueue."
             ));
         };
+        if tq.workers.running_worker_count().await == 0 {
+            tq.workers.add_workers_by(MIN_WORKER_CNT).await;
+        }
         self.round_robin_idx = (self.round_robin_idx + 1) % self.task_queues.len();
         tq.send_task(task).await
     }
@@ -128,6 +131,8 @@ impl TaskQueue {
                 e
             );
             self.workers.add_workers_by(MIN_WORKER_CNT).await;
+            // HACK: sleep half a sec to allow worker to pick up to avoid init more workers
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         }
         Ok(())
     }

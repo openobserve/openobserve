@@ -33,7 +33,7 @@ type Worker = JoinHandle<Result<()>>;
 // seconds between each pull for a worker
 static WORKER_DEFAULT_WAIT_TIME: u64 = 1;
 // max idle time in seconds before shut down
-static WORKER_MAX_IDLE: f64 = 600.0;
+static WORKER_MAX_IDLE: f64 = 20.0;
 
 /// Multi-consumer side of the TaskQueue. Created and maaged by TaskQueue asscoaited with a stream.
 /// TaskQueue creates a mpmc channel where producer holds the sender and consumers hold
@@ -66,6 +66,14 @@ impl Workers {
             let handle = init_worker(self.tq_index, Arc::clone(&self.receiver));
             rw.push(handle);
         }
+    }
+
+    /// Removes finished workers and returns remaining active worker count.
+    pub async fn running_worker_count(&self) -> usize {
+        let mut rw = self.handles.write().await;
+        rw.retain(|handle| !handle.is_finished());
+        rw.shrink_to_fit();
+        rw.len()
     }
 
     /// Terminates all active workers
@@ -164,9 +172,7 @@ async fn process_job(
         }
         interval.tick().await;
     }
-    log::info!(
-        "TaskQueue({tq_index})-Worker({worker_id}) idle time exceeded maximum idle time allowed. Shutting down."
-    );
+    log::info!("TaskQueue({tq_index})-Worker({worker_id}) shutting down.");
     store_sig_s.close(); // signal persist job to close
     // Flush to disk or remove saved file
     let path = build_file_path(tq_index, &worker_id);
