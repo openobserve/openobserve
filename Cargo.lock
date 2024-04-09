@@ -4044,6 +4044,7 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "async-nats",
+ "async-recursion",
  "async-trait",
  "aws-config",
  "bytes",
