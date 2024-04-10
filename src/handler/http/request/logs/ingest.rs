@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -61,7 +61,26 @@ pub async fn bulk(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
     let user_email = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    Ok(
+    Ok(if CONFIG.common.feature_ingest_buffer_enabled {
+        let ingest_entry = IngestEntry::new(
+            IngestSource::Bulk,
+            **thread_id,
+            org_id,
+            user_email.to_string(),
+            None,
+            body,
+        );
+        match send_task(ingest_entry).await {
+            Ok(_) => HttpResponse::Ok().json("Acepted. Waiting to be processed"),
+            Err(e) => {
+                log::error!("Error sending request to ingest buffer: {:?}", e);
+                HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                ))
+            }
+        }
+    } else {
         match logs::bulk::ingest(&org_id, body, **thread_id, user_email).await {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
@@ -71,8 +90,8 @@ pub async fn bulk(
                     e.to_string(),
                 ))
             }
-        },
-    )
+        }
+    })
 }
 
 /// _multi ingestion API
@@ -109,11 +128,11 @@ pub async fn multi(
             **thread_id,
             org_id,
             user_email.to_string(),
-            Some(stream_name.clone()),
+            Some(stream_name),
             body,
         );
         match send_task(ingest_entry).await {
-            Ok(_) => HttpResponse::Ok().json("Request acepted"),
+            Ok(_) => HttpResponse::Ok().json("Acepted. Waiting to be processed"),
             Err(e) => {
                 log::error!("Error sending request to ingest buffer: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -180,11 +199,11 @@ pub async fn json(
             **thread_id,
             org_id,
             user_email.to_string(),
-            Some(stream_name.clone()),
+            Some(stream_name),
             body,
         );
         match send_task(ingest_entry).await {
-            Ok(_) => HttpResponse::Ok().json("Request acepted"),
+            Ok(_) => HttpResponse::Ok().json("Acepted. Waiting to be processed"),
             Err(e) => {
                 log::error!("Error sending request to ingest buffer: {:?}", e);
                 HttpResponse::BadRequest().json(MetaHttpResponse::error(
