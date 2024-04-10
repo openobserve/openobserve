@@ -78,6 +78,15 @@ export function histogramToggleDisabled() {
   );
 }
 
+export function histogramToggleEnabled() {
+  cy.get(showSQLModeHistogramToggle, { timeout: 2000 }).should(
+    "not.have.attr",
+    "aria-disabled",
+    "true"
+  );
+}
+
+
 //** Type the value of a variable into an input field*/
 export function enterVrlFunctionvalue() {
   cy.get('[data-test="logs-vrl-function-editor"]:first', { timeout: 2000 })

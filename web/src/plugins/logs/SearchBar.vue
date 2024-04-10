@@ -19,16 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row">
       <div class="float-right col q-mb-xs">
         <q-toggle
-          v-if="searchObj.meta.sqlMode"
-          data-test="logs-search-bar-show-histogram-toggle-sqlmode-btn"
-          v-bind:disable="searchObj.meta.sqlMode"
-          :model-value="false"
-          :label="t('search.showHistogramLabel')"
-        />
-        <q-toggle
-          v-else
           data-test="logs-search-bar-show-histogram-toggle-btn"
-          v-bind:disable="searchObj.meta.sqlMode"
           v-model="searchObj.meta.showHistogram"
           :label="t('search.showHistogramLabel')"
         />
