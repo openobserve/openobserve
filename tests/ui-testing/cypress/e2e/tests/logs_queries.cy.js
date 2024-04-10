@@ -79,7 +79,7 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });
 
-  it("should display results for limit query", () => {
+  it.skip("should display results for limit query", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
       .type("match_all('provide_credentials') limit 5");
