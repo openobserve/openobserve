@@ -438,10 +438,12 @@ export default defineComponent({
 
       // first, refresh the dashboard
       refreshDashboard();
+
+      // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
-      await variablesValueSelectorRef.value.changeInitialVariableValues(
-        ...args
-      );
+      // await variablesValueSelectorRef.value.changeInitialVariableValues(
+      //   ...args
+      // );
     };
 
     return {

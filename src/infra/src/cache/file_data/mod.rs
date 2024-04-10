@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -101,11 +101,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     if config::CONFIG.memory_cache.enabled {
-        memory::download(session_id, file).await
+        memory::download(trace_id, file).await
     } else if config::CONFIG.disk_cache.enabled {
-        disk::download(session_id, file).await
+        disk::download(trace_id, file).await
     } else {
         Ok(())
     }

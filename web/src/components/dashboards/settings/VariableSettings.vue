@@ -26,15 +26,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="column full-height">
       <DashboardHeader title="Variables">
         <template #right>
-          <q-btn
-            class="text-bold no-border q-ml-md"
-            no-caps
-            no-outline
-            rounded
-            color="secondary"
-            :label="t(`dashboard.newVariable`)"
-            @click="addVariables"
-          />
+          <div>
+            <!-- show variables dependencies if variables exist -->
+            <q-btn
+              v-if="dashboardVariablesList.length > 0"
+              class="text-bold no-border q-ml-md"
+              no-caps
+              no-outline
+              rounded
+              color="primary"
+              label="Show Dependencies"
+              @click="showVariablesDependenciesGraphPopUp = true"
+            />
+            <q-btn
+              class="text-bold no-border q-ml-md"
+              no-caps
+              no-outline
+              rounded
+              color="secondary"
+              :label="t(`dashboard.newVariable`)"
+              @click="addVariables"
+            />
+          </div>
         </template>
       </DashboardHeader>
       <div>
@@ -83,6 +96,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
+        <q-dialog v-model="showVariablesDependenciesGraphPopUp">
+          <q-card
+            style="width: 60vw; min-width: 60vw; height: 70vh; min-height: 70vh"
+          >
+            <q-toolbar>
+              <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
+              <q-btn flat round dense icon="close" v-close-popup="true" />
+            </q-toolbar>
+            <q-card-section style="width: 100%; height: calc(100% - 50px)">
+              <VariablesDependenciesGraph
+                :variablesList="dashboardVariablesList"
+                :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+                @closePopUp="
+                  () => (showVariablesDependenciesGraphPopUp = false)
+                "
+              />
+            </q-card-section>
+          </q-card>
+        </q-dialog>
       </div>
     </div>
   </div>
@@ -108,6 +140,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useQuasar, type QTableProps } from "quasar";
+import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -116,6 +149,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     DashboardHeader,
+    VariablesDependenciesGraph,
   },
   emits: ["save"],
   setup(props, { emit }) {
@@ -131,6 +165,10 @@ export default defineComponent({
     const dashboardVariableData = reactive({
       data: [],
     });
+
+    // list of all variables, which will be same as the dashboard variables list
+    const dashboardVariablesList: any = ref([]);
+
     const pagination: any = ref({
       rowsPerPage: 20,
     });
@@ -188,6 +226,9 @@ export default defineComponent({
       },
     ]);
 
+    // show variables dependencies graph pop up
+    const showVariablesDependenciesGraphPopUp = ref(false);
+
     onMounted(async () => {
       await getDashboardData();
     });
@@ -197,17 +238,18 @@ export default defineComponent({
     });
 
     const getDashboardData = async () => {
-      const data = JSON.parse(
-        JSON.stringify(
-          await getDashboard(
-            store,
-            route.query.dashboard,
-            route.query.folder ?? "default"
+      dashboardVariablesList.value =
+        JSON.parse(
+          JSON.stringify(
+            await getDashboard(
+              store,
+              route.query.dashboard,
+              route.query.folder ?? "default"
+            )
           )
-        )
-      )?.variables?.list;
+        )?.variables?.list ?? [];
 
-      dashboardVariableData.data = (data || []).map(
+      dashboardVariableData.data = (dashboardVariablesList.value || []).map(
         (it: any, index: number) => {
           return {
             "#": index < 9 ? `0${index + 1}` : index + 1,
@@ -297,6 +339,8 @@ export default defineComponent({
       selectedVariable,
       handleSaveVariable,
       variableTypes,
+      showVariablesDependenciesGraphPopUp,
+      dashboardVariablesList,
     };
   },
 });
