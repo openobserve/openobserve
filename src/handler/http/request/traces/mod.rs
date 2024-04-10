@@ -265,8 +265,12 @@ pub async fn get_latest_traces(
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
                 return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                        _ => HttpResponse::InternalServerError()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                    },
                     _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                         err.to_string(),
@@ -349,8 +353,14 @@ pub async fn get_latest_traces(
                         .inc();
                     log::error!("get traces latest data error: {:?}", err);
                     return Ok(match err {
-                        errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                            .json(meta::http::HttpResponse::error_code(code)),
+                        errors::Error::ErrorCode(code) => match code {
+                            errors::ErrorCodes::SearchCancelQuery(_) => {
+                                HttpResponse::TooManyRequests()
+                                    .json(meta::http::HttpResponse::error_code(code))
+                            }
+                            _ => HttpResponse::InternalServerError()
+                                .json(meta::http::HttpResponse::error_code(code)),
+                        },
                         _ => HttpResponse::InternalServerError().json(
                             meta::http::HttpResponse::error(
                                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),

@@ -23,16 +23,7 @@ pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, E
     let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
     match res {
         Ok(status) => Ok(HttpResponse::Ok().json(status)),
-        Err(err) => Ok(match err {
-            infra::errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                .json(crate::common::meta::http::HttpResponse::error_code(code)),
-            _ => HttpResponse::InternalServerError().json(
-                crate::common::meta::http::HttpResponse::error(
-                    actix_web::http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                ),
-            ),
-        }),
+        Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
     }
 }
 
