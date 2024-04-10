@@ -558,7 +558,6 @@ const useLogs = () => {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
 
-        console.log(parsedSQL);
         if (!parsedSQL?.columns?.length) {
           notificationMsg.value = "Invalid SQL Syntax";
           return false;
@@ -726,9 +725,9 @@ const useLogs = () => {
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
     return !(
-      parsedSQL.groupby ||
-      hasAggregation(parsedSQL.columns) ||
-      parsedSQL.limit
+      parsedSQL?.groupby ||
+      hasAggregation(parsedSQL?.columns) ||
+      parsedSQL?.limit
     );
   };
 
@@ -749,7 +748,11 @@ const useLogs = () => {
     };
 
     const parsedSQL: any = fnParsedSQL();
-    if (!searchObj.meta.sqlMode || isNonAggregatedQuery(parsedSQL)) {
+
+    if (
+      !searchObj.meta.sqlMode ||
+      (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
+    ) {
       const partitionQueryReq: any = {
         sql: queryReq.query.sql,
         start_time: queryReq.query.start_time,
@@ -1110,19 +1113,21 @@ const useLogs = () => {
         // based on pagination request, get the data
         await getPaginatedData(queryReq);
         const parsedSQL: any = fnParsedSQL();
+
         if (
           (searchObj.data.queryResults.aggs == undefined &&
             searchObj.data.resultGrid.currentPage == 1 &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
-            (!searchObj.meta.sqlMode || isNonAggregatedQuery(parsedSQL))) ||
+            (!searchObj.meta.sqlMode ||
+              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
           getHistogramQueryData(searchObj.data.histogramQuery);
-        } else if (!isNonAggregatedQuery(parsedSQL)) {
+        } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
             xData: [],
             yData: [],
@@ -1150,7 +1155,6 @@ const useLogs = () => {
 
   function hasAggregation(columns: any) {
     for (const column of columns) {
-      console.log(column);
       if (column.expr && column.expr.type === "aggr_func") {
         return true; // Found aggregation function or non-null groupby property
       }
