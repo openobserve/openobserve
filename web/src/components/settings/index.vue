@@ -36,6 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-route-tab
             exact
             default
+            name="queryManagement"
+            :to="'/settings/query_management'"
+            icon="query_stats"
+            :label="t('settings.queryManagement')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            exact
+            default
             name="general"
             :to="'/settings/general'"
             :icon="outlinedSettings"
@@ -80,14 +89,14 @@ export default defineComponent({
     onBeforeMount(() => {
       if (router.currentRoute.value.name == "settings") {
         settingsTab.value = "general";
-        router.push({ path: "/settings/general" });
+        router.push({ path: "/settings/query_management" });
       }
     });
 
     // render general settings component
     onActivated(() => {
       settingsTab.value = "general";
-      router.push({ path: "/settings/general" });
+      router.push({ path: "/settings/query_management" });
     });
 
     onUpdated(() => {

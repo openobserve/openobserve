@@ -57,6 +57,8 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
+const RunningQueriesList = () =>
+  import("@/components/queries/RunningQueriesList.vue");
 
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
@@ -217,6 +219,17 @@ const useRoutes = () => {
           path: "general",
           name: "general",
           component: () => import("@/components/settings/General.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "query_management",
+          name: "query_management",
+          component: () => import("@/components/queries/RunningQueriesList.vue"),
+          meta: {
+            keepAlive: true,
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
