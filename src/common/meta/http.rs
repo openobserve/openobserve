@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,7 +33,7 @@ pub struct HttpResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>,
+    pub trace_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ impl HttpResponse {
             code,
             message,
             error_detail: None,
-            session_id: None,
+            trace_id: None,
         }
     }
 
@@ -58,7 +58,7 @@ impl HttpResponse {
             code,
             message: error,
             error_detail: None,
-            session_id: None,
+            trace_id: None,
         }
     }
 
@@ -67,16 +67,16 @@ impl HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
             error_detail: Some(err.get_error_detail()),
-            session_id: None,
+            trace_id: None,
         }
     }
 
-    pub fn error_code_with_session_id(err: errors::ErrorCodes, session_id: Option<String>) -> Self {
+    pub fn error_code_with_trace_id(err: errors::ErrorCodes, trace_id: Option<String>) -> Self {
         HttpResponse {
             code: err.get_code(),
             message: err.get_message(),
             error_detail: Some(err.get_error_detail()),
-            session_id,
+            trace_id,
         }
     }
 

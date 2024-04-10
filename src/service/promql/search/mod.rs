@@ -104,10 +104,10 @@ async fn search_in_cluster(
 
     // partition request, here plus 1 second, because division is integer, maybe
     // lose some precision XXX-REFACTORME: move this into a function
-    let session_id = ider::uuid();
-    let job_id = session_id[0..6].to_string(); // take the last 6 characters as job id
+    let trace_id = ider::uuid();
+    let job_id = trace_id[0..6].to_string(); // take the last 6 characters as job id
     let job = cluster_rpc::Job {
-        session_id,
+        trace_id,
         job: job_id,
         stage: 0,
         partition: 0,

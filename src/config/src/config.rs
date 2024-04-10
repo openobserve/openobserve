@@ -515,7 +515,7 @@ pub struct Common {
     pub tracing_header_key: String,
     #[env_config(
         name = "ZO_TRACING_HEADER_VALUE",
-        default = "Basic YWRtaW46Q29tcGxleHBhc3MjMTIz"
+        default = "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM="
     )]
     pub tracing_header_value: String,
     #[env_config(name = "ZO_TELEMETRY", default = true)]

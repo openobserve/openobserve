@@ -71,7 +71,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             loop {
                 match rx.lock().await.recv().await {
                     None => {
-                        log::warn!("[INGESTER:JOB] Receiving files channel is closed");
+                        log::debug!("[INGESTER:JOB] Receiving files channel is closed");
                         break;
                     }
                     Some((prefix, files)) => {
