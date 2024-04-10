@@ -61,7 +61,7 @@
 import { ref, defineComponent, toRef } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { useI18n } from "vue-i18n";
-import { useSelectAutoComplete2 } from "@/composables/useSelectAutocomplete2";
+import { useSelectAutoComplete2 } from "@/composables/useSelectAutoComplete2";
 
 export default defineComponent({
   setup() {
