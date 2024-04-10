@@ -183,7 +183,12 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 #[cfg(not(feature = "enterprise"))]
 pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
+    cfg.service(
+        web::scope("/config")
+            .wrap(cors)
+            .service(status::zo_config)
+            .service(status::logout),
+    );
 }
 
 #[cfg(feature = "enterprise")]
