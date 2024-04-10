@@ -26,7 +26,6 @@ use crate::{
     common::{
         meta::{
             ingestion::INGESTION_EP,
-            proxy::QueryParamProxyURL,
             user::{DBUser, TokenValidationResponse, UserRole},
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
@@ -308,18 +307,11 @@ pub async fn validator_gcp(
 
 pub async fn validator_proxy_url(
     req: ServiceRequest,
-    query: web::Query<QueryParamProxyURL>,
+    auth_info: AuthExtractor,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let creds = match base64::decode(&query.proxy_token) {
-        Ok(val) => val,
-        Err(_) => {
-            log::error!(
-                "Failed to decode base64 proxy_token: {}",
-                &query.proxy_token
-            );
-            return Err((ErrorUnauthorized("Unauthorized Access"), req));
-        }
-    };
+    let access_token = auth_info.auth;
+
+    let creds = base64::decode(&access_token).expect("Invalid base-encoded token");
     let creds = creds
         .split(':')
         .map(|s| s.to_string())
