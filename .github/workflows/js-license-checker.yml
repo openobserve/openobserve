@@ -1,0 +1,26 @@
+name: "JS Licenses checker"
+on:
+  push:
+    paths:
+      - "**/package-lock.json"
+      - "**/package.json"
+
+jobs:
+  js-license-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout latest code
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Build frontend code
+        run: cd web && npm install && npm run build
+      - name: Check licenses
+        uses: tangro/actions-license-check@v1.0.14
+        with:
+          allowed-licenses: 'MIT; ISC; Apache-2.0; BSD; MPL-2.0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_CONTEXT: ${{ toJson(github) }}
