@@ -109,6 +109,7 @@ describe("Logs testcases", () => {
     cy.get(".q-virtual-scroll__content:last").click();
 
     // Select "25" from the dropdown using contains
+    cy.wait(2000);
     cy.contains(".q-item__label", "25").should("be.visible").click();
     cy.get(".search-list > :nth-child(1) > .text-left")
       .contains("Showing 1 to 5 out of 5")
