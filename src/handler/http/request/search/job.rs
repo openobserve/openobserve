@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{delete, get, web, HttpResponse};
 
 #[cfg(feature = "enterprise")]
-#[delete("/search_job/{trace_id}")]
+#[delete("/query_manager/{trace_id}")]
 pub async fn cancel_job(trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let res = crate::service::search::cancel_job(&trace_id.into_inner()).await;
     match res {
@@ -28,13 +28,13 @@ pub async fn cancel_job(trace_id: web::Path<String>) -> Result<HttpResponse, Err
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[delete("/search_job/{trace_id}")]
+#[delete("/query_manager/{trace_id}")]
 pub async fn cancel_job(_trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
-#[get("/search_job/status")]
+#[get("/query_manager/status")]
 pub async fn job_status() -> Result<HttpResponse, Error> {
     let res = crate::service::search::job_status().await;
     match res {
@@ -44,7 +44,7 @@ pub async fn job_status() -> Result<HttpResponse, Error> {
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[get("/search_job/status")]
+#[get("/query_manager/status")]
 pub async fn job_status() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
