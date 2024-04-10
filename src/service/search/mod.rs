@@ -78,19 +78,15 @@ pub async fn search(
     req: &search::Request,
 ) -> Result<search::Response, Error> {
     let session_id = if session_id.is_empty() {
-        ider::uuid()
+        if CONFIG.common.tracing_enabled {
+            let ctx = tracing::Span::current().context();
+            ctx.span().span_context().trace_id().to_string()
+        } else {
+            ider::uuid()
+        }
     } else {
         session_id.to_string()
     };
-
-    let ctx = tracing::Span::current().context();
-    // Get the current Span from the Context
-    let span = ctx.span();
-    // Get the SpanContext from the Span
-    let span_context = span.span_context();
-    // Get the trace_id from the SpanContext
-    let trace_id = span_context.trace_id();
-    println!("trace_id: {:?}", trace_id);
 
     #[cfg(feature = "enterprise")]
     {

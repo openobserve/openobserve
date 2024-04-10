@@ -28,12 +28,16 @@ use config::{
     CONFIG, DISTINCT_FIELDS,
 };
 use infra::errors;
+use opentelemetry::{global, trace::TraceContextExt};
 
 use crate::{
     common::{
         infra::config::STREAM_SCHEMAS,
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::{functions, http::get_stream_type_from_request},
+        utils::{
+            functions,
+            http::{get_stream_type_from_request, RequestHeaderExtractor},
+        },
     },
     service::{search as SearchService, usage::report_request_usage_stats},
 };
@@ -113,7 +117,15 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -351,7 +363,15 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let mut uses_fn = false;
     let (org_id, stream_name) = path.into_inner();
@@ -681,6 +701,7 @@ pub async fn values(
                         Some((column[0], column[1])),
                         &query,
                         user_id,
+                        &in_req,
                     )
                     .await;
                 }
@@ -694,6 +715,7 @@ pub async fn values(
                     None,
                     &query,
                     user_id,
+                    &in_req,
                 )
                 .await;
             }
@@ -707,12 +729,13 @@ pub async fn values(
                 None,
                 &query,
                 user_id,
+                &in_req,
             )
             .await;
         }
     }
 
-    values_v1(&org_id, stream_type, &stream_name, &query, user_id).await
+    values_v1(&org_id, stream_type, &stream_name, &query, user_id, &in_req).await
 }
 
 /// search in original data
@@ -722,9 +745,18 @@ async fn values_v1(
     stream_name: &str,
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
+    in_req: &HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -942,6 +974,7 @@ async fn values_v1(
 }
 
 /// search in distinct data
+#[allow(clippy::too_many_arguments)]
 async fn values_v2(
     org_id: &str,
     stream_type: StreamType,
@@ -950,9 +983,18 @@ async fn values_v2(
     filter: Option<(&str, &str)>,
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
+    in_req: &HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let mut query_sql = format!(
         "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
@@ -1151,7 +1193,15 @@ pub async fn search_partition(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();

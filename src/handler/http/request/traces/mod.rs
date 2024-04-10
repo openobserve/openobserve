@@ -18,10 +18,14 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use config::{ider, meta::stream::StreamType, metrics, utils::json, CONFIG};
 use infra::errors;
+use opentelemetry::{global, trace::TraceContextExt};
 use serde::Serialize;
 
 use crate::{
-    common::meta::{self, http::HttpResponse as MetaHttpResponse},
+    common::{
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::http::RequestHeaderExtractor,
+    },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces::otlp_http},
 };
@@ -129,7 +133,15 @@ pub async fn get_latest_traces(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();

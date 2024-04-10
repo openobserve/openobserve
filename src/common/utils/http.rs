@@ -19,7 +19,9 @@ use std::{
 };
 
 use actix_web::web::Query;
+use awc::http::header::HeaderMap;
 use config::meta::stream::StreamType;
+use opentelemetry::propagation::Extractor;
 
 #[inline(always)]
 pub(crate) fn get_stream_type_from_request(
@@ -51,6 +53,27 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
         None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
+    }
+}
+
+// Extractor for request headers
+pub struct RequestHeaderExtractor<'a> {
+    headers: &'a HeaderMap,
+}
+
+impl<'a> RequestHeaderExtractor<'a> {
+    pub fn new(headers: &'a HeaderMap) -> Self {
+        RequestHeaderExtractor { headers }
+    }
+}
+
+impl<'a> Extractor for RequestHeaderExtractor<'a> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.headers.get(key).and_then(|v| v.to_str().ok())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.headers.keys().map(|header| header.as_str()).collect()
     }
 }
 
