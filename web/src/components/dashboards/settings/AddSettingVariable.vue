@@ -52,7 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   outlined
                   stack-label
-                  :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                  :rules="[
+                    (val: any) => !!(val.trim()) || 'Field is required!',
+                    (val: any) => /^[a-zA-Z0-9_-]*$/.test(val) || 'Only letters, numbers, hyphens (-), and underscores (_) are allowed.'
+                ]"
                 ></q-input>
               </div>
               <div class="textbox col">
@@ -153,6 +156,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
                   </q-btn>
                 </q-input>
+              </div>
+              <div>
+                <div class="flex flex-row">
+                  <div
+                    data-test="dashboard-query-values-filter"
+                    class="text-body1 text-bold q-mt-lg"
+                  >
+                    Filters
+                  </div>
+                  <q-icon
+                    class=""
+                    style="margin-top: 25px; margin-left: 5px"
+                    size="20px"
+                    name="info_outline"
+                    data-test="dashboard-variables-setting-filter-info"
+                  >
+                    <q-tooltip style="width: 250px">
+                      In filters, you can use the value of another variable to
+                      filter the current variable's value. This can be done by
+                      using the other variable's name. For example:
+                      <span class="bg-highlight">$variableName</span>.
+                    </q-tooltip>
+                  </q-icon>
+                </div>
+                <div class="row items-center">
+                  <div
+                    class="row no-wrap items-center q-mb-xs"
+                    v-for="(filter, index) in variableData.query_data.filter"
+                    :key="index"
+                  >
+                    <q-select
+                      filled
+                      outlined
+                      dense
+                      v-model="filter.name"
+                      :display-value="filter.name ? filter.name : ''"
+                      :options="fieldsFilteredOptions"
+                      input-debounce="0"
+                      behavior="menu"
+                      @update:model-value="filterUpdated(index, $event)"
+                      use-input
+                      stack-label
+                      option-label="name"
+                      data-test="dashboard-query-values-filter-name-selector"
+                      @filter="fieldsFilterFn"
+                      :placeholder="filter.name ? '' : 'Select Field'"
+                      class="textbox col no-case q-ml-sm"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                    >
+                      <template v-slot:no-option>
+                        <q-item>
+                          <q-item-section class="text-italic text-grey"
+                            >No Data Found</q-item-section
+                          >
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <q-select
+                      dense
+                      filled
+                      v-model="filter.operator"
+                      :display-value="filter.operator ? filter.operator : ''"
+                      style="width: auto"
+                      class="operator"
+                      data-test="dashboard-query-values-filter-operator-selector"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                      :options="['=', '!=']"
+                    />
+                    <q-input
+                      v-model="filter.value"
+                      placeholder="Enter Value"
+                      dense
+                      filled
+                      debounce="1000"
+                      style="width: 125px"
+                      class=""
+                      data-test="dashboard-query-values-filter-value"
+                      :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
+                    />
+                    <q-btn
+                      size="sm"
+                      padding="12px 5px"
+                      style="margin-bottom: 20px"
+                      flat
+                      dense
+                      @click="removeFilter(index)"
+                      icon="close"
+                      :data-test="`dashboard-variable-adhoc-close-${index}`"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <q-btn
+                    no-caps
+                    icon="add"
+                    no-outline
+                    class="q-mt-md"
+                    @click="addFilter"
+                    data-test="dashboard-add-filter-btn"
+                  >
+                    Add Filter
+                  </q-btn>
+                </div>
+
+                <!-- show error if filter has cycle -->
+                <div v-show="filterCycleError" style="color: red">
+                  {{ filterCycleError }}
+                </div>
               </div>
             </div>
           </div>
@@ -269,7 +380,6 @@ import {
   type Ref,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import IndexService from "../../../services/index";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import {
@@ -282,6 +392,10 @@ import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
+import {
+  buildVariablesDependencyGraph,
+  isGraphHasCycle,
+} from "@/utils/dashboard/variables/variablesDependencyUtils";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -336,10 +450,32 @@ export default defineComponent({
         stream: "",
         field: "",
         max_record_size: null,
+        filter: [],
       },
       value: "",
       options: [],
     });
+
+    const filterCycleError: any = ref("");
+
+    const addFilter = () => {
+      if (!variableData.query_data.filter) {
+        variableData.query_data.filter = [];
+      }
+      variableData.query_data.filter.push({
+        name: "",
+        operator: "=",
+        value: "",
+      });
+    };
+
+    const filterUpdated = (index: number, filter: any) => {
+      variableData.query_data.filter[index].name = filter.name;
+    };
+
+    const removeFilter = (index: any) => {
+      variableData.query_data.filter.splice(index, 1);
+    };
 
     const editMode = ref(false);
 
@@ -353,6 +489,7 @@ export default defineComponent({
             await getDashboard(store, route.query.dashboard, route.query.folder)
           )
         )?.variables?.list;
+
         // Find the variable to edit
         const edit = (data || []).find(
           (it: any) => it.name === props.variableName
@@ -478,12 +615,85 @@ export default defineComponent({
         }
       }
     };
+
+    // check if filter has cycle
+    const isFilterHasCycle = async () => {
+      try {
+        // need all variables to check for cycle
+        // get all variables data.
+        let variablesData: any = JSON.parse(
+          JSON.stringify(
+            await getDashboard(store, route.query.dashboard, route.query.folder)
+          )
+        )?.variables?.list;
+
+        // current updated variable data need to merge/update in above variablesData.
+        // temporary update variable list
+        // if edit mode, then update the variable data
+        if (editMode.value) {
+          //if name already exists
+          const variableIndex = variablesData.findIndex(
+            (variable: any) => variable.name == props.variableName
+          );
+
+          // Update the variable data in the list
+          variablesData[variableIndex] = variableData;
+        }
+        // else, it's a new variable.
+        else {
+          variablesData.push(variableData);
+        }
+
+        // now, need to check whether filter has cycle or not
+        // key: variable name
+        // value: { parentVariables: list of parent variable names, childVariables: list of child variable names }
+        let variablesDependencyGraph: any =
+          buildVariablesDependencyGraph(variablesData);
+
+        // if graph has cycle, it will return the cycle path
+        // else it will return null
+        const hasCycle = isGraphHasCycle(variablesDependencyGraph);
+        if (hasCycle) {
+          // filter has cycle, so show error and return
+          filterCycleError.value = `Variables has cycle: ${hasCycle.join(
+            "->"
+          )} -> ${hasCycle[0]}`;
+          return true;
+        }
+
+        // above conditions passed, so remove filter cycle error and return false
+        filterCycleError.value = "";
+        return false;
+      } catch (err: any) {
+        $q.notify({
+          type: "negative",
+          message:
+            err?.message ??
+            (editMode.value
+              ? "Variable update failed"
+              : "Variable creation failed"),
+        });
+        return true;
+      }
+    };
+
     const onSubmit = () => {
-      addVariableForm.value.validate().then((valid: any) => {
+      // first, validate form values
+      addVariableForm.value.validate().then(async (valid: any) => {
         if (!valid) {
           return false;
         }
 
+        // check if filter has cycle
+        if (await isFilterHasCycle()) {
+          // filter has cycle, so show error and return
+          return false;
+        }
+
+        // above conditions passed, so remove filter cycle error
+        filterCycleError.value = "";
+
+        // save the variable
         saveVariableApiCall.execute().catch((err: any) => {
           $q.notify({
             type: "negative",
@@ -564,6 +774,7 @@ export default defineComponent({
 
     return {
       variableData,
+      store,
       t,
       data,
       streamsFilterFn,
@@ -582,6 +793,10 @@ export default defineComponent({
       title,
       onSubmit,
       addVariableForm,
+      addFilter,
+      removeFilter,
+      filterUpdated,
+      filterCycleError,
     };
   },
 });
@@ -595,5 +810,13 @@ export default defineComponent({
 .textbox {
   margin-top: 5px;
   margin-bottom: 5px;
+}
+
+.theme-dark .bg-highlight {
+  background-color: #747474;
+}
+
+.theme-light .bg-highlight {
+  background-color: #e7e6e6;
 }
 </style>
