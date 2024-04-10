@@ -591,7 +591,9 @@ async fn get_file_list_inner(
         "{}/files/{}/{stream_type}/{}/",
         wal_dir, &sql.org_id, &sql.stream_name
     );
-    let files = scan_files(&pattern, file_ext, None).await;
+    let files = scan_files(&pattern, file_ext, None)
+        .await
+        .unwrap_or_default();
     if files.is_empty() {
         return Ok(vec![]);
     }
