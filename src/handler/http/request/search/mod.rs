@@ -684,6 +684,14 @@ pub async fn values(
         Some(v) => v.to_str().unwrap(),
         None => "",
     };
+    let session_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
     if fields.len() == 1
         && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
@@ -701,7 +709,7 @@ pub async fn values(
                         Some((column[0], column[1])),
                         &query,
                         user_id,
-                        &in_req,
+                        session_id,
                     )
                     .await;
                 }
@@ -715,7 +723,7 @@ pub async fn values(
                     None,
                     &query,
                     user_id,
-                    &in_req,
+                    session_id,
                 )
                 .await;
             }
@@ -729,13 +737,21 @@ pub async fn values(
                 None,
                 &query,
                 user_id,
-                &in_req,
+                session_id,
             )
             .await;
         }
     }
 
-    values_v1(&org_id, stream_type, &stream_name, &query, user_id, &in_req).await
+    values_v1(
+        &org_id,
+        stream_type,
+        &stream_name,
+        &query,
+        user_id,
+        session_id,
+    )
+    .await
 }
 
 /// search in original data
@@ -745,18 +761,9 @@ async fn values_v1(
     stream_name: &str,
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
-    in_req: &HttpRequest,
+    session_id: String,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-
-    let session_id = if CONFIG.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else {
-        ider::uuid()
-    };
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -983,18 +990,9 @@ async fn values_v2(
     filter: Option<(&str, &str)>,
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
-    in_req: &HttpRequest,
+    session_id: String,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-
-    let session_id = if CONFIG.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else {
-        ider::uuid()
-    };
 
     let mut query_sql = format!(
         "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
