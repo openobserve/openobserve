@@ -46,9 +46,9 @@ use crate::{
 };
 
 /// search in remote object storage
-#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search(
-    session_id: &str,
+    trace_id: &str,
     sql: Arc<Sql>,
     file_list: &[FileKey],
     stream_type: StreamType,
@@ -60,7 +60,7 @@ pub async fn search(
         match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
-                log::error!("[session_id {session_id}] get schema error: {}", err);
+                log::error!("[trace_id {trace_id}] get schema error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
                     sql.stream_name.clone(),
                 )));
@@ -80,7 +80,7 @@ pub async fn search(
     let files = match file_list.is_empty() {
         true => {
             get_file_list(
-                session_id,
+                trace_id,
                 &sql,
                 stream_type,
                 partition_time_level,
@@ -94,7 +94,7 @@ pub async fn search(
         return Ok((HashMap::new(), ScanStats::default()));
     }
     log::info!(
-        "[session_id {session_id}] search->storage: stream {}/{}/{}, load file_list num {}",
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
@@ -109,10 +109,7 @@ pub async fn search(
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
             Err(err) => {
-                log::error!(
-                    "[session_id {session_id}] calculate files size error: {}",
-                    err
-                );
+                log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
                 )));
@@ -135,7 +132,7 @@ pub async fn search(
                 Some(id) => id,
                 None => {
                     log::error!(
-                        "[session_id {session_id}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        "[trace_id {trace_id}] search->storage: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
                         &file.key,
                         file.meta.min_ts,
                         file.meta.max_ts
@@ -150,7 +147,7 @@ pub async fn search(
     }
 
     log::info!(
-        "[session_id {session_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, scan_size {}, compressed_size {}",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
@@ -160,11 +157,11 @@ pub async fn search(
     );
 
     if CONFIG.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(session_id, &scan_stats)?;
+        super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
     }
 
     // load files to local cache
-    let (cache_type, deleted_files) = cache_parquet_files(session_id, &files, &scan_stats).await?;
+    let (cache_type, deleted_files) = cache_parquet_files(trace_id, &files, &scan_stats).await?;
     if !deleted_files.is_empty() {
         // remove deleted files from files_group
         for (_, g_files) in files_group.iter_mut() {
@@ -172,7 +169,7 @@ pub async fn search(
         }
     }
     log::info!(
-        "[session_id {session_id}] search->storage: stream {}/{}/{}, load files {}, into {:?} cache done",
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, into {:?} cache done",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
@@ -193,7 +190,7 @@ pub async fn search(
             .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
         let session = config::meta::search::Session {
-            id: format!("{session_id}-{ver}"),
+            id: format!("{trace_id}-{ver}"),
             storage_type: StorageType::Memory,
             search_type: if !sql.meta.group_by.is_empty() {
                 SearchType::Aggregation
@@ -232,7 +229,7 @@ pub async fn search(
         }
         let datafusion_span = info_span!(
             "service:search:grpc:storage:datafusion",
-            session_id,
+            trace_id,
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
@@ -242,16 +239,16 @@ pub async fn search(
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
         if crate::service::search::SEARCH_SERVER
-            .insert_sender(session_id, abort_sender)
+            .insert_sender(trace_id, abort_sender)
             .await
             .is_err()
         {
             log::info!(
-                "[session_id {}] search->storage: search canceled before call search->storage",
+                "[trace_id {}] search->storage: search canceled before call search->storage",
                 session.id
             );
             return Err(Error::Message(format!(
-                "[session_id {}] search->storage: search canceled before call search->storage",
+                "[trace_id {}] search->storage: search canceled before call search->storage",
                 session.id
             )));
         }
@@ -270,9 +267,9 @@ pub async fn search(
                         FileType::PARQUET,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[session_id {}] search->storage: search timeout", session.id);
+                        log::error!("[trace_id {}] search->storage: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] search->storage: task timeout", session.id
+                            "[trace_id {}] search->storage: task timeout", session.id
                         )))
                     },
                     _ = async {
@@ -281,9 +278,9 @@ pub async fn search(
                         #[cfg(not(feature = "enterprise"))]
                         futures::future::pending::<()>().await;
                     } => {
-                        log::info!("[session_id {}] search->storage: search canceled", session.id);
+                        log::info!("[trace_id {}] search->storage: search canceled", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] search->storage: task is cancel", session.id
+                            "[trace_id {}] search->storage: task is cancel", session.id
                         )))
                     }
                 }
@@ -313,10 +310,7 @@ pub async fn search(
                 }
             }
             Err(err) => {
-                log::error!(
-                    "[session_id {session_id}] datafusion execute error: {}",
-                    err
-                );
+                log::error!("[trace_id {trace_id}] datafusion execute error: {}", err);
                 return Err(err.into());
             }
         };
@@ -325,16 +319,16 @@ pub async fn search(
     Ok((results, scan_stats))
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
-    session_id: &str,
+    trace_id: &str,
     sql: &Sql,
     stream_type: StreamType,
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
     log::debug!(
-        "[session_id {session_id}] search->storage: get file_list in grpc, stream {}/{}/{}, time_range {:?}",
+        "[trace_id {trace_id}] search->storage: get file_list in grpc, stream {}/{}/{}, time_range {:?}",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
@@ -354,7 +348,7 @@ async fn get_file_list(
     {
         Ok(file_list) => file_list,
         Err(err) => {
-            log::error!("[session_id {session_id}] get file list error: {}", err);
+            log::error!("[trace_id {trace_id}] get file list error: {}", err);
             return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                 "get file list error".to_string(),
             )));
@@ -377,10 +371,10 @@ async fn get_file_list(
 #[tracing::instrument(
     name = "service:search:grpc:storage:cache_parquet_files",
     skip_all,
-    fields(session_id)
+    fields(trace_id)
 )]
 async fn cache_parquet_files(
-    session_id: &str,
+    trace_id: &str,
     files: &[FileKey],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>), Error> {
@@ -403,7 +397,7 @@ async fn cache_parquet_files(
     let mut tasks = Vec::new();
     let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.query_thread_num));
     for file in files.iter() {
-        let session_id = session_id.to_string();
+        let trace_id = trace_id.to_string();
         let file_name = file.key.clone();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
@@ -412,7 +406,7 @@ async fn cache_parquet_files(
                     if !file_data::memory::exist(&file_name).await
                         && !file_data::disk::exist(&file_name).await
                     {
-                        file_data::memory::download(&session_id, &file_name)
+                        file_data::memory::download(&trace_id, &file_name)
                             .await
                             .err()
                     } else {
@@ -421,9 +415,7 @@ async fn cache_parquet_files(
                 }
                 file_data::CacheType::Disk => {
                     if !file_data::disk::exist(&file_name).await {
-                        file_data::disk::download(&session_id, &file_name)
-                            .await
-                            .err()
+                        file_data::disk::download(&trace_id, &file_name).await.err()
                     } else {
                         None
                     }
@@ -438,14 +430,14 @@ async fn cache_parquet_files(
                     log::warn!("found invalid file: {}", file_name);
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                         log::error!(
-                            "[session_id {session_id}] search->storage: delete from file_list err: {}",
+                            "[trace_id {trace_id}] search->storage: delete from file_list err: {}",
                             e
                         );
                     }
                     Some(file_name)
                 } else {
                     log::error!(
-                        "[session_id {session_id}] search->storage: download file to cache err: {}",
+                        "[trace_id {trace_id}] search->storage: download file to cache err: {}",
                         e
                     );
                     None
@@ -469,7 +461,7 @@ async fn cache_parquet_files(
             }
             Err(e) => {
                 log::error!(
-                    "[session_id {session_id}] search->storage: load file task err: {}",
+                    "[trace_id {trace_id}] search->storage: load file task err: {}",
                     e
                 );
             }

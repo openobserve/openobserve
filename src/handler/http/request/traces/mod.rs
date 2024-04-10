@@ -18,10 +18,14 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
 use config::{ider, meta::stream::StreamType, metrics, utils::json, CONFIG};
 use infra::errors;
+use opentelemetry::{global, trace::TraceContextExt};
 use serde::Serialize;
 
 use crate::{
-    common::meta::{self, http::HttpResponse as MetaHttpResponse},
+    common::{
+        meta::{self, http::HttpResponse as MetaHttpResponse},
+        utils::http::RequestHeaderExtractor,
+    },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces::otlp_http},
 };
@@ -129,7 +133,15 @@ pub async fn get_latest_traces(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let session_id = ider::uuid();
+
+    let trace_id = if CONFIG.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
+        });
+        ctx.span().span_context().trace_id().to_string()
+    } else {
+        ider::uuid()
+    };
 
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -240,8 +252,7 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
     let resp_search =
-        match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req).await
-        {
+        match SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req).await {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -265,8 +276,12 @@ pub async fn get_latest_traces(
                     .inc();
                 log::error!("get traces latest data error: {:?}", err);
                 return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                        .json(meta::http::HttpResponse::error_code(code)),
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                        _ => HttpResponse::InternalServerError()
+                            .json(meta::http::HttpResponse::error_code(code)),
+                    },
                     _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                         err.to_string(),
@@ -323,7 +338,7 @@ pub async fn get_latest_traces(
 
     loop {
         let resp_search =
-            match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req)
+            match SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
                 .await
             {
                 Ok(res) => res,
@@ -349,8 +364,14 @@ pub async fn get_latest_traces(
                         .inc();
                     log::error!("get traces latest data error: {:?}", err);
                     return Ok(match err {
-                        errors::Error::ErrorCode(code) => HttpResponse::InternalServerError()
-                            .json(meta::http::HttpResponse::error_code(code)),
+                        errors::Error::ErrorCode(code) => match code {
+                            errors::ErrorCodes::SearchCancelQuery(_) => {
+                                HttpResponse::TooManyRequests()
+                                    .json(meta::http::HttpResponse::error_code(code))
+                            }
+                            _ => HttpResponse::InternalServerError()
+                                .json(meta::http::HttpResponse::error_code(code)),
+                        },
                         _ => HttpResponse::InternalServerError().json(
                             meta::http::HttpResponse::error(
                                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -445,7 +466,7 @@ pub async fn get_latest_traces(
     resp.insert("from", json::Value::from(from));
     resp.insert("size", json::Value::from(size));
     resp.insert("hits", json::to_value(traces_data).unwrap());
-    resp.insert("session_id", json::Value::from(session_id));
+    resp.insert("trace_id", json::Value::from(trace_id));
     Ok(HttpResponse::Ok().json(resp))
 }
 

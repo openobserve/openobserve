@@ -83,16 +83,11 @@ impl FileData {
         })
     }
 
-    async fn set(
-        &mut self,
-        session_id: &str,
-        file: &str,
-        data: Bytes,
-    ) -> Result<(), anyhow::Error> {
+    async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = data.len();
         if self.cur_size + data_size >= self.max_size {
             log::info!(
-                "[session_id {session_id}] File disk cache is full, can't cache extra {} bytes",
+                "[trace_id {trace_id}] File disk cache is full, can't cache extra {} bytes",
                 data_size
             );
             // cache is full, need release some space
@@ -100,7 +95,7 @@ impl FileData {
                 CONFIG.disk_cache.max_size,
                 max(CONFIG.disk_cache.release_size, data_size * 100),
             );
-            self.gc(session_id, need_release_size).await?;
+            self.gc(trace_id, need_release_size).await?;
         }
 
         self.cur_size += data_size;
@@ -122,13 +117,9 @@ impl FileData {
         Ok(())
     }
 
-    async fn gc(
-        &mut self,
-        session_id: &str,
-        need_release_size: usize,
-    ) -> Result<(), anyhow::Error> {
+    async fn gc(&mut self, trace_id: &str, need_release_size: usize) -> Result<(), anyhow::Error> {
         log::info!(
-            "[session_id {session_id}] File disk cache start gc {}/{}, need to release {} bytes",
+            "[trace_id {trace_id}] File disk cache start gc {}/{}, need to release {} bytes",
             self.cur_size,
             self.max_size,
             need_release_size
@@ -138,7 +129,7 @@ impl FileData {
             let item = self.data.remove();
             if item.is_none() {
                 log::error!(
-                    "[session_id {session_id}] File disk cache is corrupt, it shouldn't be none"
+                    "[trace_id {trace_id}] File disk cache is corrupt, it shouldn't be none"
                 );
                 break;
             }
@@ -163,7 +154,7 @@ impl FileData {
         }
         self.cur_size -= release_size;
         log::info!(
-            "[session_id {session_id}] File disk cache gc done, released {} bytes",
+            "[trace_id {trace_id}] File disk cache gc done, released {} bytes",
             release_size
         );
         Ok(())
@@ -231,7 +222,7 @@ pub async fn exist(file: &str) -> bool {
 }
 
 #[inline]
-pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
     if !CONFIG.disk_cache.enabled || is_local_disk_storage() {
         return Ok(());
     }
@@ -239,7 +230,7 @@ pub async fn set(session_id: &str, file: &str, data: Bytes) -> Result<(), anyhow
     if files.exist(file).await {
         return Ok(());
     }
-    files.set(session_id, file, data).await
+    files.set(trace_id, file, data).await
 }
 
 #[async_recursion]
@@ -342,12 +333,12 @@ pub async fn is_empty() -> bool {
     files.is_empty()
 }
 
-pub async fn download(session_id: &str, file: &str) -> Result<(), anyhow::Error> {
+pub async fn download(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
     let data = storage::get(file).await?;
     if data.is_empty() {
         return Err(anyhow::anyhow!("file {} data size is zero", file));
     }
-    if let Err(e) = set(session_id, file, data).await {
+    if let Err(e) = set(trace_id, file, data).await {
         return Err(anyhow::anyhow!(
             "set file {} to disk cache failed: {}",
             file,
@@ -363,7 +354,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_set_file() {
-        let session_id = "session_123";
+        let trace_id = "session_123";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
@@ -371,27 +362,27 @@ mod tests {
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(session_id, &file_key, content.clone()).await;
+            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_lru_cache_get_file() {
-        let session_id = "session_123";
+        let trace_id = "session_123";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(CONFIG.disk_cache.max_size, "lru");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
-            .set(session_id, file_key, content.clone())
+            .set(trace_id, file_key, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key).await);
 
         file_data
-            .set(session_id, file_key, content.clone())
+            .set(trace_id, file_key, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key).await);
@@ -400,20 +391,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_lru_cache_miss() {
-        let session_id = "session_456";
+        let trace_id = "session_456";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "lru");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
-            .set(session_id, file_key1, content.clone())
+            .set(trace_id, file_key1, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
         file_data
-            .set(session_id, file_key2, content.clone())
+            .set(trace_id, file_key2, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key2).await);
@@ -423,7 +414,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_set_file() {
-        let session_id = "session_123";
+        let trace_id = "session_123";
         let mut file_data = FileData::with_capacity_and_cache_strategy(1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
         for i in 0..100 {
@@ -431,27 +422,27 @@ mod tests {
                 "files/default/logs/olympics/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(session_id, &file_key, content.clone()).await;
+            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
     async fn test_fifo_cache_get_file() {
-        let session_id = "session_123";
+        let trace_id = "session_123";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(CONFIG.disk_cache.max_size, "fifo");
         let file_key = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
 
         file_data
-            .set(session_id, file_key, content.clone())
+            .set(trace_id, file_key, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key).await);
 
         file_data
-            .set(session_id, file_key, content.clone())
+            .set(trace_id, file_key, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key).await);
@@ -460,20 +451,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_fifo_cache_miss() {
-        let session_id = "session_456";
+        let trace_id = "session_456";
         let mut file_data = FileData::with_capacity_and_cache_strategy(10, "fifo");
         let file_key1 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/olympics/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
         // set one key
         file_data
-            .set(session_id, file_key1, content.clone())
+            .set(trace_id, file_key1, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key1).await);
         // set another key, will release first key
         file_data
-            .set(session_id, file_key2, content.clone())
+            .set(trace_id, file_key2, content.clone())
             .await
             .unwrap();
         assert!(file_data.exist(file_key2).await);

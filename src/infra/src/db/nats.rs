@@ -498,7 +498,7 @@ impl Locker {
     pub(crate) fn new(key: &str) -> Self {
         Self {
             key: format!("/locker{}", key),
-            lock_id: format!("{}:{}", cluster::LOCAL_NODE_UUID.as_str(), ider::generate()),
+            lock_id: ider::uuid(),
             state: Arc::new(AtomicU8::new(0)),
         }
     }
@@ -506,16 +506,11 @@ impl Locker {
     /// lock with timeout, 0 means use default timeout, unit: second
     pub(crate) async fn lock(&mut self, timeout: u64) -> Result<()> {
         let (bucket, new_key) = get_bucket_by_key(&CONFIG.nats.prefix, &self.key).await?;
-        let mut last_err = None;
         let timeout = if timeout == 0 {
             CONFIG.nats.lock_wait_timeout
         } else {
             timeout
         };
-        let mut n = timeout / CONFIG.nats.command_timeout;
-        if n < 1 {
-            n = 1;
-        }
         let expiration =
             chrono::Utc::now().timestamp_micros() + Duration::from_secs(timeout).as_micros() as i64;
         let value = Bytes::from(format!("{}:{}", self.lock_id, expiration));
@@ -532,7 +527,8 @@ impl Locker {
                 };
             }
         }
-        for _ in 0..n {
+        let mut last_err = None;
+        while expiration > chrono::Utc::now().timestamp_micros() {
             match bucket.create(&key, value.clone()).await {
                 Ok(_) => {
                     self.state.store(1, Ordering::SeqCst);

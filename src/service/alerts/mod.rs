@@ -462,9 +462,9 @@ impl QueryCondition {
             encoding: config::meta::search::RequestEncoding::Empty,
             timeout: 0,
         };
-        let session_id = ider::uuid();
+        let trace_id = ider::uuid();
         let resp =
-            match SearchService::search(&session_id, &alert.org_id, alert.stream_type, None, &req)
+            match SearchService::search(&trace_id, &alert.org_id, alert.stream_type, None, &req)
                 .await
             {
                 Ok(v) => v,

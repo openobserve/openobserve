@@ -50,7 +50,7 @@ use crate::{
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip_all)]
 pub(crate) async fn create_context(
-    session_id: &str,
+    trace_id: &str,
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
@@ -58,7 +58,7 @@ pub(crate) async fn create_context(
 ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>> {
     let mut resp = vec![];
     // get file list
-    let files = get_file_list(session_id, org_id, stream_name, time_range, filters).await?;
+    let files = get_file_list(trace_id, org_id, stream_name, time_range, filters).await?;
     if files.is_empty() {
         return Ok(vec![(
             SessionContext::new(),
@@ -75,7 +75,7 @@ pub(crate) async fn create_context(
     let metadata = HashMap::new();
     let mut record_batches_meta: HashMap<String, (Schema, Vec<RecordBatch>)> = HashMap::new();
 
-    let work_dir = session_id.to_string();
+    let work_dir = trace_id.to_string();
 
     for file in files {
         let file_name = format!("/{work_dir}/{}", file.name);
@@ -171,7 +171,7 @@ pub(crate) async fn create_context(
             .with_metadata(std::collections::HashMap::new()),
     );
     let session = SearchSession {
-        id: session_id.to_string(),
+        id: trace_id.to_string(),
         storage_type: StorageType::Tmpfs,
         search_type: SearchType::Normal,
         work_group: None,
@@ -194,7 +194,7 @@ pub(crate) async fn create_context(
 /// searched
 #[tracing::instrument(name = "promql:search:grpc:wal:get_file_list")]
 async fn get_file_list(
-    session_id: &str,
+    trace_id: &str,
     org_id: &str,
     stream_name: &str,
     time_range: (i64, i64),
@@ -216,7 +216,7 @@ async fn get_file_list(
 
     let mut tasks = Vec::new();
     for node in nodes {
-        let session_id = session_id.to_string();
+        let trace_id = trace_id.to_string();
         let node_addr = node.grpc_addr.clone();
         let org_id = org_id.to_string();
         let req = cluster_rpc::MetricsWalFileRequest {
@@ -226,7 +226,7 @@ async fn get_file_list(
             end_time: time_range.1,
             filters: req_filters.clone(),
         };
-        let grpc_span = info_span!("promql:search:grpc:wal:grpc_wal_file", session_id);
+        let grpc_span = info_span!("promql:search:grpc:wal:grpc_wal_file", trace_id);
         let task: tokio::task::JoinHandle<
             std::result::Result<cluster_rpc::MetricsWalFileResponse, DataFusionError>,
         > = tokio::task::spawn(
@@ -268,16 +268,21 @@ async fn get_file_list(
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
-                let response: cluster_rpc::MetricsWalFileResponse =
-                    match client.wal_file(request).await {
-                        Ok(response) => response.into_inner(),
-                        Err(err) => {
-                            log::error!("[session_id {session_id}] get wal file list from search node error: {}", err);
-                            return Err(DataFusionError::Execution(
-                                "get wal file list from search node error".to_string(),
-                            ));
-                        }
-                    };
+                let response: cluster_rpc::MetricsWalFileResponse = match client
+                    .wal_file(request)
+                    .await
+                {
+                    Ok(response) => response.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id {trace_id}] get wal file list from search node error: {}",
+                            err
+                        );
+                        return Err(DataFusionError::Execution(
+                            "get wal file list from search node error".to_string(),
+                        ));
+                    }
+                };
                 Ok(response)
             }
             .instrument(grpc_span),

@@ -43,14 +43,18 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[inline(always)]
-pub async fn scan_files<P: AsRef<Path>>(root: P, ext: &str, limit: Option<usize>) -> Vec<String> {
+pub async fn scan_files<P: AsRef<Path>>(
+    root: P,
+    ext: &str,
+    limit: Option<usize>,
+) -> Result<Vec<String>, std::io::Error> {
     let iter = WalkDir::new(root).filter_map(|entry| async move {
         let entry = entry.ok()?;
         let path = entry.path();
         if path.is_file() {
             let path_ext = path.extension()?.to_str()?;
             if path_ext == ext {
-                Some(path.to_str().unwrap().to_string())
+                Some(path.to_str()?.to_string())
             } else {
                 None
             }
@@ -58,44 +62,11 @@ pub async fn scan_files<P: AsRef<Path>>(root: P, ext: &str, limit: Option<usize>
             None
         }
     });
-    if let Some(limit) = limit {
+    Ok(if let Some(limit) = limit {
         iter.take(limit).collect().await
     } else {
         iter.collect().await
-    }
-}
-
-pub async fn clean_empty_dirs(dir: &str) -> Result<(), std::io::Error> {
-    let mut dirs = Vec::new();
-    let mut entries = WalkDir::new(dir);
-    loop {
-        match entries.next().await {
-            Some(Ok(entry)) => {
-                if entry.path().display().to_string() == dir {
-                    continue;
-                }
-                if let Ok(f) = entry.file_type().await {
-                    if f.is_dir() {
-                        dirs.push(entry.path().to_str().unwrap().to_string());
-                    }
-                }
-            }
-            Some(Err(e)) => {
-                log::error!("clean_empty_dirs, err: {}", e);
-                break;
-            }
-            None => break,
-        }
-    }
-    dirs.sort_by_key(|b| std::cmp::Reverse(b.len()));
-    for dir in dirs {
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            if entries.count() == 0 {
-                std::fs::remove_dir(&dir)?;
-            }
-        }
-    }
-    Ok(())
+    })
 }
 
 #[cfg(unix)]
@@ -125,7 +96,7 @@ mod tests {
         put_file_contents(file_name, content).unwrap();
         assert_eq!(get_file_contents(file_name).unwrap(), content);
         assert!(get_file_meta(file_name).unwrap().is_file());
-        assert!(!scan_files(".", "parquet", None).await.is_empty());
+        assert!(!scan_files(".", "parquet", None).await.unwrap().is_empty());
         std::fs::remove_file(file_name).unwrap();
     }
 }

@@ -93,7 +93,6 @@ async fn register() -> Result<()> {
     };
 
     // 4. calculate node_id
-    let mut node_id = 1;
     let mut node_ids = Vec::new();
     let mut w = super::NODES.write().await;
     for node in node_list {
@@ -109,23 +108,27 @@ async fn register() -> Result<()> {
     drop(w);
 
     node_ids.sort();
+    node_ids.dedup();
     log::debug!("node_ids: {:?}", node_ids);
+
+    let mut new_node_id = 1;
     for id in node_ids {
-        if id == node_id {
-            node_id += 1;
+        if id == new_node_id {
+            new_node_id += 1;
         } else {
             break;
         }
     }
+    log::debug!("new_node_id: {:?}", new_node_id);
     // update local id
     unsafe {
-        LOCAL_NODE_ID = node_id;
+        LOCAL_NODE_ID = new_node_id;
     }
 
     // 4. join the cluster
     let key = format!("{}nodes/{}", &CONFIG.etcd.prefix, *LOCAL_NODE_UUID);
     let node = Node {
-        id: node_id,
+        id: new_node_id,
         uuid: LOCAL_NODE_UUID.clone(),
         name: CONFIG.common.instance_name.clone(),
         http_addr: format!("http://{}:{}", get_local_http_ip(), CONFIG.http.port),
