@@ -93,7 +93,6 @@ async fn register() -> Result<()> {
     };
 
     // 4. calculate node_id
-    let mut new_node_id = 1;
     let mut node_ids = Vec::new();
     let mut w = super::NODES.write().await;
     for node in node_list {
@@ -109,7 +108,10 @@ async fn register() -> Result<()> {
     drop(w);
 
     node_ids.sort();
+    node_ids.dedup();
     log::debug!("node_ids: {:?}", node_ids);
+
+    let mut new_node_id = 1;
     for id in node_ids {
         if id == new_node_id {
             new_node_id += 1;
