@@ -1127,7 +1127,7 @@ const useLogs = () => {
             xData: [],
             yData: [],
             chartParams: {
-              title: "",
+              title: getHistogramTitle(),
               unparsed_x_data: [],
               timezone: "",
             },
