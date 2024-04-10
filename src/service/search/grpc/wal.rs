@@ -47,9 +47,9 @@ use crate::{
 };
 
 /// search in local WAL, which haven't been sync to object storage
-#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(session_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(name = "service:search:wal:parquet::enter", skip_all, fields(trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_parquet(
-    session_id: &str,
+    trace_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
     work_group: &str,
@@ -60,7 +60,7 @@ pub async fn search_parquet(
         match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
-                log::error!("[session_id {session_id}] get schema error: {}", err);
+                log::error!("[trace_id {trace_id}] get schema error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
                     sql.stream_name.clone(),
                 )));
@@ -78,7 +78,7 @@ pub async fn search_parquet(
 
     // get file list
     let files = get_file_list(
-        session_id,
+        trace_id,
         &sql,
         stream_type,
         &partition_time_level,
@@ -103,7 +103,7 @@ pub async fn search_parquet(
         if let Some((min_ts, max_ts)) = sql.meta.time_range {
             if parquet_meta.min_ts > max_ts || parquet_meta.max_ts < min_ts {
                 log::debug!(
-                    "[session_id {session_id}] skip wal parquet file: {} time_range: [{},{}]",
+                    "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{}]",
                     &file.key,
                     parquet_meta.min_ts,
                     parquet_meta.max_ts
@@ -135,10 +135,7 @@ pub async fn search_parquet(
             Err(err) => {
                 // release all files
                 wal::release_files(&lock_files).await;
-                log::error!(
-                    "[session_id {session_id}] calculate files size error: {}",
-                    err
-                );
+                log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
                 )));
@@ -163,7 +160,7 @@ pub async fn search_parquet(
                     // release all files
                     wal::release_files(&lock_files).await;
                     log::error!(
-                        "[session_id {session_id}] wal->parquet->search: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
+                        "[trace_id {trace_id}] wal->parquet->search: file {} schema version not found, will use the latest schema, min_ts: {}, max_ts: {}",
                         &file.key,
                         file.meta.min_ts,
                         file.meta.max_ts
@@ -178,7 +175,7 @@ pub async fn search_parquet(
     }
 
     log::info!(
-        "[session_id {session_id}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
+        "[trace_id {trace_id}] wal->parquet->search: load groups {}, files {}, scan_size {}, compressed_size {}",
         files_group.len(),
         scan_stats.files,
         scan_stats.original_size,
@@ -186,7 +183,7 @@ pub async fn search_parquet(
     );
 
     if CONFIG.common.memory_circuit_breaker_enable {
-        if let Err(e) = super::check_memory_circuit_breaker(session_id, &scan_stats) {
+        if let Err(e) = super::check_memory_circuit_breaker(trace_id, &scan_stats) {
             // release all files
             wal::release_files(&lock_files).await;
             return Err(e);
@@ -206,7 +203,7 @@ pub async fn search_parquet(
             .with_metadata(std::collections::HashMap::new());
         let sql = sql.clone();
         let session = config::meta::search::Session {
-            id: format!("{session_id}-wal-{ver}"),
+            id: format!("{trace_id}-wal-{ver}"),
             storage_type: StorageType::Wal,
             search_type: if !sql.meta.group_by.is_empty() {
                 SearchType::Aggregation
@@ -245,7 +242,7 @@ pub async fn search_parquet(
         }
         let datafusion_span = info_span!(
             "service:search:grpc:wal:parquet:datafusion",
-            session_id,
+            trace_id,
             org_id = sql.org_id,
             stream_name = sql.stream_name,
             stream_type = stream_type.to_string(),
@@ -255,16 +252,16 @@ pub async fn search_parquet(
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
         if crate::service::search::SEARCH_SERVER
-            .insert_sender(session_id, abort_sender)
+            .insert_sender(trace_id, abort_sender)
             .await
             .is_err()
         {
             log::info!(
-                "[session_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
+                "[trace_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
                 session.id
             );
             return Err(Error::Message(format!(
-                "[session_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
+                "[trace_id {}] wal->parquet->search: search canceled before call wal->parquet->search",
                 session.id
             )));
         }
@@ -283,9 +280,9 @@ pub async fn search_parquet(
                         FileType::PARQUET,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[session_id {}] wal->parquet->search: search timeout", session.id);
+                        log::error!("[trace_id {}] wal->parquet->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] wal->parquet->search: task timeout", session.id
+                            "[trace_id {}] wal->parquet->search: task timeout", session.id
                         )))
                     },
                     _ = async {
@@ -294,9 +291,9 @@ pub async fn search_parquet(
                         #[cfg(not(feature = "enterprise"))]
                         futures::future::pending::<()>().await;
                     } => {
-                        log::info!("[session_id {}] wal->parquet->search: search canceled", session.id);
+                        log::info!("[trace_id {}] wal->parquet->search: search canceled", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] wal->parquet->search: task is cancel", session.id
+                            "[trace_id {}] wal->parquet->search: task is cancel", session.id
                         )))
                     }
                 }
@@ -335,10 +332,7 @@ pub async fn search_parquet(
             Err(err) => {
                 // release all files
                 wal::release_files(&lock_files).await;
-                log::error!(
-                    "[session_id {session_id}] datafusion execute error: {}",
-                    err
-                );
+                log::error!("[trace_id {trace_id}] datafusion execute error: {}", err);
                 return Err(err.into());
             }
         };
@@ -353,7 +347,7 @@ pub async fn search_parquet(
 /// search in local WAL, which haven't been sync to object storage
 #[tracing::instrument(name = "service:search:wal:mem:enter", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub async fn search_memtable(
-    session_id: &str,
+    trace_id: &str,
     sql: Arc<Sql>,
     stream_type: StreamType,
     work_group: &str,
@@ -403,14 +397,14 @@ pub async fn search_memtable(
     }
 
     log::info!(
-        "[session_id {session_id}] wal->mem->search: load groups {}, files {}, scan_size {}",
+        "[trace_id {trace_id}] wal->mem->search: load groups {}, files {}, scan_size {}",
         batch_groups.len(),
         scan_stats.files,
         scan_stats.original_size
     );
 
     if CONFIG.common.memory_circuit_breaker_enable {
-        super::check_memory_circuit_breaker(session_id, &scan_stats)?;
+        super::check_memory_circuit_breaker(trace_id, &scan_stats)?;
     }
 
     // fetch all schema versions, get latest schema
@@ -466,7 +460,7 @@ pub async fn search_memtable(
 
         let sql = sql.clone();
         let session = config::meta::search::Session {
-            id: format!("{session_id}-mem-{ver}"),
+            id: format!("{trace_id}-mem-{ver}"),
             storage_type: StorageType::Tmpfs,
             search_type: if !sql.meta.group_by.is_empty() {
                 SearchType::Aggregation
@@ -487,16 +481,16 @@ pub async fn search_memtable(
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
         if crate::service::search::SEARCH_SERVER
-            .insert_sender(session_id, abort_sender)
+            .insert_sender(trace_id, abort_sender)
             .await
             .is_err()
         {
             log::info!(
-                "[session_id {}] wal->mem->search: search canceled before call wal->mem->search",
+                "[trace_id {}] wal->mem->search: search canceled before call wal->mem->search",
                 session.id
             );
             return Err(Error::Message(format!(
-                "[session_id {}] wal->mem->search: search canceled before call wal->mem->search",
+                "[trace_id {}] wal->mem->search: search canceled before call wal->mem->search",
                 session.id
             )));
         }
@@ -515,9 +509,9 @@ pub async fn search_memtable(
                         FileType::ARROW,
                     ) => ret,
                     _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[session_id {}] wal->mem->search: search timeout", session.id);
+                        log::error!("[trace_id {}] wal->mem->search: search timeout", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] wal->mem->search: task timeout", session.id
+                            "[trace_id {}] wal->mem->search: task timeout", session.id
                         )))
                     },
                     _ = async {
@@ -526,9 +520,9 @@ pub async fn search_memtable(
                         #[cfg(not(feature = "enterprise"))]
                         futures::future::pending::<()>().await;
                     } => {
-                        log::info!("[session_id {}] wal->mem->search: search canceled", session.id);
+                        log::info!("[trace_id {}] wal->mem->search: search canceled", session.id);
                         Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[session_id {}] wal->mem->search: task is cancel", session.id
+                            "[trace_id {}] wal->mem->search: task is cancel", session.id
                         )))
                     }
                 }
@@ -569,7 +563,7 @@ pub async fn search_memtable(
 
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list_inner(
-    session_id: &str,
+    trace_id: &str,
     sql: &Sql,
     stream_type: StreamType,
     _partition_time_level: &PartitionTimeLevel,
@@ -626,7 +620,7 @@ async fn get_file_list_inner(
                 && ((max_ts > 0 && file_min_ts > max_ts) || (min_ts > 0 && file_max_ts < min_ts))
             {
                 log::debug!(
-                    "[session_id {session_id}] skip wal parquet file: {} time_range: [{},{}]",
+                    "[trace_id {trace_id}] skip wal parquet file: {} time_range: [{},{}]",
                     &file,
                     file_min_ts,
                     file_max_ts
@@ -651,14 +645,14 @@ async fn get_file_list_inner(
 /// searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list(
-    session_id: &str,
+    trace_id: &str,
     sql: &Sql,
     stream_type: StreamType,
     _partition_time_level: &PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
     get_file_list_inner(
-        session_id,
+        trace_id,
         sql,
         stream_type,
         _partition_time_level,
@@ -672,14 +666,14 @@ async fn get_file_list(
 /// get file list from local mutable arrow idx file, each file will be searched
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_arrow", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 async fn get_file_list_arrow(
-    session_id: &str,
+    trace_id: &str,
     sql: &Sql,
     stream_type: StreamType,
     _partition_time_level: &PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Result<Vec<FileKey>, Error> {
     get_file_list_inner(
-        session_id,
+        trace_id,
         sql,
         stream_type,
         _partition_time_level,

@@ -39,10 +39,10 @@ enum SearchType {
 
 // Job information for a request
 message Job {
-    string session_id = 1;
-    string        job = 2;
-    int32       stage = 3;
-    int32   partition = 4;
+    string trace_id = 1;
+    string      job = 2;
+    int32     stage = 3;
+    int32 partition = 4;
 }
 
 message ScanStats {

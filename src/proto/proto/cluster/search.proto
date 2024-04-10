@@ -74,25 +74,25 @@ message JobStatusResponse {
 }
 
 message JobStatus {
-    string session_id = 1;
+    string  trace_id = 1;
     int64 created_at = 2;
     int64 started_at = 3;
-    bool is_queue = 4;
-    optional string user_id = 5;
-    optional string org_id = 6;
-    optional string stream_type = 7;
-    optional Query query = 8;
+    bool    is_queue = 4;
+    optional string       user_id = 5;
+    optional string        org_id = 6;
+    optional string   stream_type = 7;
+    optional Query          query = 8;
     optional ScanStats scan_stats = 9;
 }
 
 message Query {
-    string sql = 1;
+    string       sql = 1;
     int64 start_time = 2;
-    int64 end_time = 3;
+    int64   end_time = 3;
 }
 
 message CancelJobRequest {
-    string session_id = 1;
+    string trace_id = 1;
 }
 
 message CancelJobResponse {

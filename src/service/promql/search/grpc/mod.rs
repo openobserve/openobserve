@@ -34,7 +34,7 @@ mod storage;
 mod wal;
 
 struct StorageProvider {
-    session_id: String,
+    trace_id: String,
     need_wal: bool,
 }
 
@@ -51,15 +51,15 @@ impl TableProvider for StorageProvider {
     > {
         let mut resp = Vec::new();
         // register storage table
-        let session_id = self.session_id.to_owned() + "-storage-" + stream_name;
+        let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
         let ctx =
-            storage::create_context(&session_id, org_id, stream_name, time_range, filters).await?;
+            storage::create_context(&trace_id, org_id, stream_name, time_range, filters).await?;
         resp.push(ctx);
         // register Wal table
         if self.need_wal {
-            let session_id = self.session_id.to_owned() + "-wal-" + stream_name;
+            let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
             let wal_ctx_list =
-                wal::create_context(&session_id, org_id, stream_name, time_range, filters).await?;
+                wal::create_context(&trace_id, org_id, stream_name, time_range, filters).await?;
             for ctx in wal_ctx_list {
                 resp.push(ctx);
             }
@@ -73,7 +73,7 @@ pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
     let start = std::time::Instant::now();
-    let session_id = req.job.as_ref().unwrap().session_id.to_string();
+    let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
 
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
@@ -103,7 +103,7 @@ pub async fn search(
     let mut engine = Query::new(
         org_id,
         StorageProvider {
-            session_id: session_id.to_string(),
+            trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
         },
         timeout,
@@ -116,9 +116,9 @@ pub async fn search(
     };
 
     // clear session
-    search::datafusion::storage::file_list::clear(&session_id);
+    search::datafusion::storage::file_list::clear(&trace_id);
     // clear tmpfs
-    tmpfs::delete(&session_id, true).unwrap();
+    tmpfs::delete(&trace_id, true).unwrap();
 
     scan_stats.format_to_mb();
     let mut resp = cluster_rpc::MetricsQueryResponse {

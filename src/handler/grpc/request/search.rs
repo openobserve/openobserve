@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,40 +38,40 @@ impl Searcher {
         }
     }
 
-    // check is the session_id in the task_manager
-    pub async fn contain_key(&self, session_id: &str) -> bool {
-        self.task_manager.contain_key(session_id).await
+    // check is the trace_id in the task_manager
+    pub async fn contain_key(&self, trace_id: &str) -> bool {
+        self.task_manager.contain_key(trace_id).await
     }
 
-    // insert the session_id and task_status into the task_manager
+    // insert the trace_id and task_status into the task_manager
     pub async fn insert(
         &self,
-        session_id: String,
+        trace_id: String,
         task_status: o2_enterprise::enterprise::search::TaskStatus,
     ) {
-        self.task_manager.insert(session_id, task_status).await;
+        self.task_manager.insert(trace_id, task_status).await;
     }
 
-    // remove the session_id from the task_manager
+    // remove the trace_id from the task_manager
     pub async fn remove(
         &self,
-        session_id: &str,
+        trace_id: &str,
     ) -> Option<(String, o2_enterprise::enterprise::search::TaskStatus)> {
-        self.task_manager.remove(session_id).await
+        self.task_manager.remove(trace_id).await
     }
 
-    // check is the session_id in the task_manager and is_leader
-    pub async fn is_leader(&self, session_id: &str) -> bool {
-        self.task_manager.is_leader(session_id).await
+    // check is the trace_id in the task_manager and is_leader
+    pub async fn is_leader(&self, trace_id: &str) -> bool {
+        self.task_manager.is_leader(trace_id).await
     }
 
-    // insert the sender into the task_manager by session_id
+    // insert the sender into the task_manager by trace_id
     pub async fn insert_sender(
         &self,
-        session_id: &str,
+        trace_id: &str,
         sender: tokio::sync::oneshot::Sender<()>,
     ) -> Result<(), infra::errors::Error> {
-        self.task_manager.insert_sender(session_id, sender).await
+        self.task_manager.insert_sender(trace_id, sender).await
     }
 
     // get all task status that is leader
@@ -82,14 +82,14 @@ impl Searcher {
     // add file stats
     pub async fn add_file_stats(
         &self,
-        session_id: &str,
+        trace_id: &str,
         files: i64,
         records: i64,
         original_size: i64,
         compressed_size: i64,
     ) {
         self.task_manager
-            .add_file_stats(session_id, files, records, original_size, compressed_size)
+            .add_file_stats(trace_id, files, records, original_size, compressed_size)
             .await;
     }
 }
@@ -113,7 +113,7 @@ impl Default for Searcher {
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:enter", skip_all, fields(session_id=req.get_ref().job.as_ref().unwrap().session_id, org_id = req.get_ref().org_id))]
+    #[tracing::instrument(name = "grpc:search:enter", skip_all, fields(trace_id=req.get_ref().job.as_ref().unwrap().trace_id, org_id = req.get_ref().org_id))]
     async fn search(
         &self,
         req: Request<SearchRequest>,
@@ -130,11 +130,11 @@ impl Search for Searcher {
 
         // set search task
         #[cfg(feature = "enterprise")]
-        let session_id = req.job.as_ref().unwrap().session_id.to_string();
+        let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
         #[cfg(feature = "enterprise")]
-        if !self.contain_key(&session_id).await {
+        if !self.contain_key(&trace_id).await {
             self.insert(
-                session_id.clone(),
+                trace_id.clone(),
                 o2_enterprise::enterprise::search::TaskStatus::new(
                     vec![],
                     false,
@@ -153,8 +153,8 @@ impl Search for Searcher {
 
         // remove task
         #[cfg(feature = "enterprise")]
-        if !self.is_leader(&session_id).await {
-            self.remove(&session_id).await;
+        if !self.is_leader(&trace_id).await {
+            self.remove(&trace_id).await;
         }
 
         match result {
@@ -209,8 +209,8 @@ impl Search for Searcher {
         &self,
         req: Request<CancelJobRequest>,
     ) -> Result<Response<CancelJobResponse>, Status> {
-        let session_id = req.into_inner().session_id;
-        match self.remove(&session_id).await {
+        let trace_id = req.into_inner().trace_id;
+        match self.remove(&trace_id).await {
             Some((_, senders)) => {
                 for sender in senders.abort_senders.into_iter().rev() {
                     let _ = sender.send(());
