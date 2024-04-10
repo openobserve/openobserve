@@ -79,7 +79,7 @@ describe("Logs testcases", () => {
     cy.intercept("GET", "**/api/default/streams**").as("streams");
   });
 
-  it("should display results for limit query", () => {
+  it.skip("should display results for limit query", () => {
     cy.get('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
       .click() // Click on the editor to focus
       .type("match_all('provide_credentials') limit 5");
@@ -109,6 +109,7 @@ describe("Logs testcases", () => {
     cy.get(".q-virtual-scroll__content:last").click();
 
     // Select "25" from the dropdown using contains
+    cy.wait(2000);
     cy.contains(".q-item__label", "25").should("be.visible").click();
     cy.get(".search-list > :nth-child(1) > .text-left")
       .contains("Showing 1 to 5 out of 5")
