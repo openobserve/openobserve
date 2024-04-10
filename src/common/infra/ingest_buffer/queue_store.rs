@@ -37,10 +37,9 @@ const DELIMITER: u8 = b'|';
 ///
 /// Overwrites if previously persisted.
 ///
-/// Bytes of IngestEntries are written to wal file one by one following pattern
-/// {entry_len, entry, entry_len, entry}.
+/// Bytes of IngestEntries are written to wal file one by one seperated by delimiter (|)
 ///
-/// <entry_len> written in u16 ordered by BigEndian.
+/// `entry|entry|entry|...`
 pub(super) async fn persist_job(
     tq_index: usize,
     worker_id: String,

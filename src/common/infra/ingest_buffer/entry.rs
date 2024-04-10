@@ -260,7 +260,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_entry_w_stream_bane_serialization() {
+    fn test_entry_w_stream_name_serialization() {
         let entry = IngestEntry::new(
             IngestSource::JSON, 
             0, 
@@ -275,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn test_entry_wo_stream_bane_serialization() {
+    fn test_entry_wo_stream_name_serialization() {
         let entry = IngestEntry::new(
             IngestSource::JSON, 
             0, 
