@@ -187,6 +187,80 @@ impl Search for Searcher {
         }
     }
 
+    #[tracing::instrument(name = "grpc:cluster_search:enter", skip_all, fields(trace_id=req.get_ref().job.as_ref().unwrap().trace_id, org_id = req.get_ref().org_id))]
+    async fn cluster_search(
+        &self,
+        req: Request<SearchRequest>,
+    ) -> Result<Response<SearchResponse>, Status> {
+        let start = std::time::Instant::now();
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&super::MetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx);
+
+        let req = req.get_ref().to_owned();
+        let org_id = req.org_id.clone();
+        let stream_type = req.stream_type.clone();
+
+        // set search task
+        #[cfg(feature = "enterprise")]
+        let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
+        #[cfg(feature = "enterprise")]
+        if !self.contain_key(&trace_id).await {
+            self.insert(
+                trace_id.clone(),
+                o2_enterprise::enterprise::search::TaskStatus::new(
+                    vec![],
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            )
+            .await;
+        }
+
+        let result = SearchService::cluster::grpc::search(req).await;
+
+        // remove task
+        #[cfg(feature = "enterprise")]
+        if !self.is_leader(&trace_id).await {
+            self.remove(&trace_id).await;
+        }
+
+        match result {
+            Ok(res) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/_search", "200", &org_id, "", &stream_type])
+                    .inc();
+
+                Ok(Response::new(res))
+            }
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::GRPC_RESPONSE_TIME
+                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
+                    .observe(time);
+                metrics::GRPC_INCOMING_REQUESTS
+                    .with_label_values(&["/_search", "500", &org_id, "", &stream_type])
+                    .inc();
+                let message = if let errors::Error::ErrorCode(code) = err {
+                    code.to_json()
+                } else {
+                    err.to_string()
+                };
+                Err(Status::internal(message))
+            }
+        }
+    }
+
     #[cfg(feature = "enterprise")]
     async fn job_status(
         &self,
