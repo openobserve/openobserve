@@ -263,6 +263,16 @@ pub struct QueryData {
     pub stream: String,
     pub field: String,
     pub max_record_size: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<Vec<Filters>>
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Filters {
+    pub name: Option<String>,
+    pub operator: Option<String>,
+    pub value: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

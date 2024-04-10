@@ -1,4 +1,12 @@
-import { ref, onUnmounted, onDeactivated } from "vue";
+import {
+  ref,
+  onUnmounted,
+  onDeactivated,
+  onActivated,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
+import { onBeforeRouteUpdate } from "vue-router";
 
 /**
  * Custom hook to debounce a value
@@ -8,6 +16,8 @@ import { ref, onUnmounted, onDeactivated } from "vue";
  */
 export const useCustomDebouncer = (initialValue: any, delay: any) => {
   const valueRef = ref(initialValue);
+  const isComponentActive = ref(true);
+
   let timeout: any = null;
 
   /**
@@ -18,8 +28,10 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
     // Reset the timeout before setting the value
     resetTimeout();
 
-    // Immediately set the value
-    valueRef.value = newValue;
+    if (isComponentActive.value) {
+      // Immediately set the value
+      valueRef.value = newValue;
+    }
   };
 
   const resetTimeout = () => {
@@ -40,18 +52,41 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
 
     // assign a new timeout
     timeout = setTimeout(() => {
-      valueRef.value = newValue;
+      if (isComponentActive.value) {
+        // set the value
+        valueRef.value = newValue;
+      }
     }, delay);
   };
 
   // clear existing timeout on deactivation
   onDeactivated(() => {
     resetTimeout();
+    isComponentActive.value = false;
+  });
+
+  onActivated(() => {
+    isComponentActive.value = true;
+  });
+
+  onMounted(() => {
+    isComponentActive.value = true;
+  });
+
+  onBeforeUnmount(() => {
+    resetTimeout();
+    isComponentActive.value = false;
+  });
+
+  onBeforeRouteUpdate(() => {
+    resetTimeout();
+    isComponentActive.value = false;
   });
 
   // clear existing timeout on unmount
   onUnmounted(() => {
     resetTimeout();
+    isComponentActive.value = false;
   });
 
   return { valueRef, setImmediateValue, setDebounceValue };
