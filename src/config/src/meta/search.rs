@@ -194,7 +194,7 @@ pub struct Response {
     pub response_type: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub session_id: String,
+    pub trace_id: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub function_error: String,
 }
@@ -231,7 +231,7 @@ impl Response {
             hits: Vec::new(),
             aggs: HashMap::new(),
             response_type: "".to_string(),
-            session_id: "".to_string(),
+            trace_id: "".to_string(),
             function_error: "".to_string(),
         }
     }
@@ -282,8 +282,8 @@ impl Response {
         self.scan_records = val;
     }
 
-    pub fn set_session_id(&mut self, session_id: String) {
-        self.session_id = session_id;
+    pub fn set_trace_id(&mut self, trace_id: String) {
+        self.trace_id = trace_id;
     }
 }
 
@@ -298,7 +298,7 @@ pub struct SearchPartitionRequest {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SearchPartitionResponse {
-    pub session_id: String,
+    pub trace_id: String,
     pub file_num: usize,
     pub records: usize,
     pub original_size: usize,
@@ -313,7 +313,7 @@ pub struct JobStatusResponse {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct JobStatus {
-    pub session_id: String,
+    pub trace_id: String,
     pub status: String,
     pub created_at: i64,
     pub started_at: i64,
@@ -333,7 +333,7 @@ pub struct QueryInfo {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct CancelJobResponse {
-    pub session_id: String,
+    pub trace_id: String,
     pub is_success: bool,
 }
 
@@ -382,7 +382,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
         };
 
         let job = cluster_rpc::Job {
-            session_id: ider::uuid(),
+            trace_id: ider::uuid(),
             job: "".to_string(),
             stage: 0,
             partition: 0,

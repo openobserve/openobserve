@@ -118,7 +118,7 @@ pub async fn search(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let session_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
@@ -226,7 +226,7 @@ pub async fn search(
 
     // do search
     match SearchService::search(
-        &session_id,
+        &trace_id,
         &org_id,
         stream_type,
         Some(user_id.to_str().unwrap().to_string()),
@@ -254,7 +254,7 @@ pub async fn search(
                     stream_type.to_string().as_str(),
                 ])
                 .inc();
-            res.set_session_id(session_id);
+            res.set_trace_id(trace_id);
             res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
             let req_stats = RequestStats {
@@ -302,7 +302,7 @@ pub async fn search(
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                 ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -364,7 +364,7 @@ pub async fn around(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let session_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
@@ -463,8 +463,7 @@ pub async fn around(
         .ok()
         .map(|v| v.to_string());
     let resp_forward =
-        match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req).await
-        {
+        match SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req).await {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -489,10 +488,7 @@ pub async fn around(
                 log::error!("search around error: {:?}", err);
                 return Ok(match err {
                     errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_session_id(
-                            code,
-                            Some(session_id),
-                        ),
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                     ),
                     _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                         StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -524,7 +520,7 @@ pub async fn around(
         timeout,
     };
     let resp_backward =
-        match SearchService::search(&session_id, &org_id, stream_type, user_id, &req).await {
+        match SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -549,10 +545,7 @@ pub async fn around(
                 log::error!("search around error: {:?}", err);
                 return Ok(match err {
                     errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_session_id(
-                            code,
-                            Some(session_id),
-                        ),
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                     ),
                     _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                         StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -684,7 +677,7 @@ pub async fn values(
         Some(v) => v.to_str().unwrap(),
         None => "",
     };
-    let session_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
@@ -709,7 +702,7 @@ pub async fn values(
                         Some((column[0], column[1])),
                         &query,
                         user_id,
-                        session_id,
+                        trace_id,
                     )
                     .await;
                 }
@@ -723,7 +716,7 @@ pub async fn values(
                     None,
                     &query,
                     user_id,
-                    session_id,
+                    trace_id,
                 )
                 .await;
             }
@@ -737,7 +730,7 @@ pub async fn values(
                 None,
                 &query,
                 user_id,
-                session_id,
+                trace_id,
             )
             .await;
         }
@@ -749,7 +742,7 @@ pub async fn values(
         &stream_name,
         &query,
         user_id,
-        session_id,
+        trace_id,
     )
     .await
 }
@@ -761,7 +754,7 @@ async fn values_v1(
     stream_name: &str,
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
-    session_id: String,
+    trace_id: String,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
@@ -880,7 +873,7 @@ async fn values_v1(
             );
     }
     let resp_search = match SearchService::search(
-        &session_id,
+        &trace_id,
         org_id,
         stream_type,
         Some(user_id.to_string()),
@@ -912,7 +905,7 @@ async fn values_v1(
             log::error!("search values error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                 ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -990,7 +983,7 @@ async fn values_v2(
     filter: Option<(&str, &str)>,
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
-    session_id: String,
+    trace_id: String,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
@@ -1054,7 +1047,7 @@ async fn values_v2(
         timeout,
     };
     let resp_search = match SearchService::search(
-        &session_id,
+        &trace_id,
         org_id,
         StreamType::Metadata,
         Some(user_id.to_string()),
@@ -1086,7 +1079,7 @@ async fn values_v2(
             log::error!("search values error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                 ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -1192,7 +1185,7 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let session_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
@@ -1214,7 +1207,7 @@ pub async fn search_partition(
     };
 
     // do search
-    match SearchService::search_partition(&session_id, &org_id, stream_type, &req).await {
+    match SearchService::search_partition(&trace_id, &org_id, stream_type, &req).await {
         Ok(res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
@@ -1260,7 +1253,7 @@ pub async fn search_partition(
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                 ),
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),

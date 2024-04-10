@@ -91,7 +91,7 @@ pub async fn sql(
     }
 
     let start = std::time::Instant::now();
-    let session_id = session.id.clone();
+    let trace_id = session.id.clone();
     let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
@@ -182,10 +182,7 @@ pub async fn sql(
     for (name, orig_agg_sql) in sql.aggs.iter() {
         // Debug SQL
         if CONFIG.common.print_key_sql {
-            log::info!(
-                "[session_id {session_id}] Query agg sql: {}",
-                orig_agg_sql.0
-            );
+            log::info!("[trace_id {trace_id}] Query agg sql: {}", orig_agg_sql.0);
         }
 
         let mut agg_sql = orig_agg_sql.0.to_owned();
@@ -234,7 +231,7 @@ pub async fn sql(
 
         let q_time = start.elapsed().as_secs_f64();
         log::info!(
-            "[session_id {session_id}] Query agg:{name} took {:.3} seconds.",
+            "[trace_id {trace_id}] Query agg:{name} took {:.3} seconds.",
             q_time - spend_time
         );
         spend_time = q_time;
@@ -244,7 +241,7 @@ pub async fn sql(
     ctx.deregister_table("tbl")?;
     ctx_aggs.deregister_table("tbl")?;
     log::info!(
-        "[session_id {session_id}] Query all took {:.3} seconds.",
+        "[trace_id {trace_id}] Query all took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
 
@@ -261,7 +258,7 @@ async fn exec_query(
     file_type: FileType,
 ) -> Result<Vec<RecordBatch>> {
     let start = std::time::Instant::now();
-    let session_id = session.id.clone();
+    let trace_id = session.id.clone();
 
     let select_wildcard = sql.origin_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
@@ -330,14 +327,14 @@ async fn exec_query(
 
     // Debug SQL
     if CONFIG.common.print_key_sql {
-        log::info!("[session_id {session_id}] Query sql: {}", query);
+        log::info!("[trace_id {trace_id}] Query sql: {}", query);
     }
 
     let mut df = match q_ctx.sql(&query).await {
         Ok(df) => df,
         Err(e) => {
             log::error!(
-                "[session_id {session_id}] query sql execute failed, session: {:?}, sql: {}, err: {:?}",
+                "[trace_id {trace_id}] query sql execute failed, session: {:?}, sql: {}, err: {:?}",
                 session,
                 sql.origin_sql,
                 e
@@ -371,7 +368,7 @@ async fn exec_query(
     if field_fns.is_empty() && sql.query_fn.is_none() {
         let batches = df.clone().collect().await?;
         log::info!(
-            "[session_id {session_id}] Query took {:.3} seconds.",
+            "[trace_id {trace_id}] Query took {:.3} seconds.",
             start.elapsed().as_secs_f64()
         );
         return Ok(batches);
@@ -473,7 +470,7 @@ async fn exec_query(
     };
     let batches = df.clone().collect().await?;
     log::info!(
-        "[session_id {session_id}] Query took {:.3} seconds.",
+        "[trace_id {trace_id}] Query took {:.3} seconds.",
         start.elapsed().as_secs_f64()
     );
     Ok(batches)
@@ -927,7 +924,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
 }
 
 pub async fn convert_parquet_file(
-    session_id: &str,
+    trace_id: &str,
     buf: &mut Vec<u8>,
     schema: Arc<Schema>,
     bloom_filter_fields: &[String],
@@ -971,7 +968,7 @@ pub async fn convert_parquet_file(
         }
     };
 
-    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{session_id}/")) {
+    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{trace_id}/")) {
         Ok(url) => url,
         Err(e) => {
             return Err(datafusion::error::DataFusionError::Execution(format!(
@@ -1048,7 +1045,7 @@ pub async fn convert_parquet_file(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn merge_parquet_files(
-    session_id: &str,
+    trace_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     buf: &mut Vec<u8>,
@@ -1068,7 +1065,7 @@ pub async fn merge_parquet_files(
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(CONFIG.limit.cpu_num);
-    let prefix = ListingTableUrl::parse(format!("tmpfs:///{session_id}/"))?;
+    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
         .with_schema(schema);

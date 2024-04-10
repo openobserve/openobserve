@@ -18,9 +18,9 @@ use std::io::Error;
 use actix_web::{delete, get, web, HttpResponse};
 
 #[cfg(feature = "enterprise")]
-#[delete("/search_job/{session_id}")]
-pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let res = crate::service::search::cancel_job(&session_id.into_inner()).await;
+#[delete("/search_job/{trace_id}")]
+pub async fn cancel_job(trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let res = crate::service::search::cancel_job(&trace_id.into_inner()).await;
     match res {
         Ok(status) => Ok(HttpResponse::Ok().json(status)),
         Err(err) => Ok(match err {
@@ -37,8 +37,8 @@ pub async fn cancel_job(session_id: web::Path<String>) -> Result<HttpResponse, E
 }
 
 #[cfg(not(feature = "enterprise"))]
-#[delete("/search_job/{session_id}")]
-pub async fn cancel_job(_session_id: web::Path<String>) -> Result<HttpResponse, Error> {
+#[delete("/search_job/{trace_id}")]
+pub async fn cancel_job(_trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 

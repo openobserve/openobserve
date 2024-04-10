@@ -134,7 +134,7 @@ pub async fn get_latest_traces(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let session_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
@@ -252,8 +252,7 @@ pub async fn get_latest_traces(
         .ok()
         .map(|v| v.to_string());
     let resp_search =
-        match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req).await
-        {
+        match SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req).await {
             Ok(res) => res,
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -335,7 +334,7 @@ pub async fn get_latest_traces(
 
     loop {
         let resp_search =
-            match SearchService::search(&session_id, &org_id, stream_type, user_id.clone(), &req)
+            match SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
                 .await
             {
                 Ok(res) => res,
@@ -457,7 +456,7 @@ pub async fn get_latest_traces(
     resp.insert("from", json::Value::from(from));
     resp.insert("size", json::Value::from(size));
     resp.insert("hits", json::to_value(traces_data).unwrap());
-    resp.insert("session_id", json::Value::from(session_id));
+    resp.insert("trace_id", json::Value::from(trace_id));
     Ok(HttpResponse::Ok().json(resp))
 }
 

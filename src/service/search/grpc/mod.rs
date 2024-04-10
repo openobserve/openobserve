@@ -37,7 +37,7 @@ mod wal;
 
 pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, ScanStats), Error>;
 
-#[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(session_id = req.job.as_ref().unwrap().session_id, org_id = req.org_id))]
+#[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(trace_id = req.job.as_ref().unwrap().trace_id, org_id = req.org_id))]
 pub async fn search(
     req: &cluster_rpc::SearchRequest,
 ) -> Result<cluster_rpc::SearchResponse, Error> {
@@ -46,7 +46,7 @@ pub async fn search(
     let stream_type = StreamType::from(req.stream_type.as_str());
     let work_group = req.work_group.clone();
 
-    let session_id = Arc::new(req.job.as_ref().unwrap().session_id.to_string());
+    let trace_id = Arc::new(req.job.as_ref().unwrap().trace_id.to_string());
     let timeout = if req.timeout > 0 {
         req.timeout as u64
     } else {
@@ -63,7 +63,7 @@ pub async fn search(
     }
 
     log::info!(
-        "[session_id {session_id}] grpc->search in: part_id: {}, stream: {}/{}/{}, time range: {:?}",
+        "[trace_id {trace_id}] grpc->search in: part_id: {}, stream: {}/{}/{}, time range: {:?}",
         req.job.as_ref().unwrap().partition,
         sql.org_id,
         stream_type,
@@ -73,11 +73,11 @@ pub async fn search(
 
     // search in WAL parquet
     let work_group1 = work_group.clone();
-    let session_id1 = session_id.clone();
+    let trace_id1 = trace_id.clone();
     let sql1 = sql.clone();
     let wal_parquet_span = info_span!(
         "service:search:grpc:in_wal_parquet",
-        session_id = session_id1.as_ref().clone(),
+        trace_id = trace_id1.as_ref().clone(),
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -85,7 +85,7 @@ pub async fn search(
     let task1 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_parquet(&session_id1, sql1, stream_type, &work_group1, timeout).await
+                wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -95,11 +95,11 @@ pub async fn search(
 
     // search in WAL memory
     let work_group2 = work_group.clone();
-    let session_id2 = session_id.clone();
+    let trace_id2 = trace_id.clone();
     let sql2 = sql.clone();
     let wal_mem_span = info_span!(
         "service:search:grpc:in_wal_memory",
-        session_id = session_id2.as_ref().clone(),
+        trace_id = trace_id2.as_ref().clone(),
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -107,7 +107,7 @@ pub async fn search(
     let task2 = tokio::task::spawn(
         async move {
             if cluster::is_ingester(&cluster::LOCAL_NODE_ROLE) {
-                wal::search_memtable(&session_id2, sql2, stream_type, &work_group2, timeout).await
+                wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout).await
             } else {
                 Ok((HashMap::new(), ScanStats::default()))
             }
@@ -118,12 +118,12 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     let work_group3 = work_group.clone();
-    let session_id3 = session_id.clone();
+    let trace_id3 = trace_id.clone();
     let sql3 = sql.clone();
     let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     let storage_span = info_span!(
         "service:search:grpc:in_storage",
-        session_id = session_id3.as_ref().clone(),
+        trace_id = trace_id3.as_ref().clone(),
         org_id = sql.org_id,
         stream_name = sql.stream_name,
         stream_type = stream_type.to_string(),
@@ -134,7 +134,7 @@ pub async fn search(
                 Ok((HashMap::new(), ScanStats::default()))
             } else {
                 storage::search(
-                    &session_id3,
+                    &trace_id3,
                     sql3,
                     &file_list,
                     stream_type,
@@ -198,13 +198,13 @@ pub async fn search(
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
         #[cfg(feature = "enterprise")]
         if crate::service::search::SEARCH_SERVER
-            .insert_sender(&session_id, abort_sender)
+            .insert_sender(&trace_id, abort_sender)
             .await
             .is_err()
         {
-            log::info!("[session_id {session_id}] task is cancel after get first stage result");
+            log::info!("[trace_id {trace_id}] task is cancel after get first stage result");
             return Err(Error::Message(format!(
-                "[session_id {session_id}] task is cancel after get first stage result"
+                "[trace_id {trace_id}] task is cancel after get first stage result"
             )));
         }
 
@@ -222,7 +222,7 @@ pub async fn search(
                 match result {
                     Ok(res) => merge_batches = res,
                     Err(err) => {
-                        log::error!("[session_id {session_id}] datafusion merge error: {}", err);
+                        log::error!("[trace_id {trace_id}] datafusion merge error: {}", err);
                         return Err(err.into());
                     }
                 }
@@ -233,8 +233,8 @@ pub async fn search(
                 #[cfg(not(feature = "enterprise"))]
                 futures::future::pending::<()>().await;
             } => {
-                log::info!("[session_id {session_id}] in node merge task is cancel");
-                return Err(Error::Message(format!("[session_id {session_id}] in node merge task is cancel")));
+                log::info!("[trace_id {trace_id}] in node merge task is cancel");
+                return Err(Error::Message(format!("[trace_id {trace_id}] in node merge task is cancel")));
             }
         }
 
@@ -242,9 +242,9 @@ pub async fn search(
     }
 
     // clear session data
-    datafusion::storage::file_list::clear(&session_id);
+    datafusion::storage::file_list::clear(&trace_id);
 
-    log::info!("[session_id {session_id}] in node merge task finish");
+    log::info!("[trace_id {trace_id}] in node merge task finish");
 
     // final result
     let mut hits_buf = Vec::new();
@@ -308,7 +308,7 @@ pub async fn search(
     Ok(result)
 }
 
-fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Result<(), Error> {
+fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Result<(), Error> {
     let scan_size = if scan_stats.compressed_size > 0 {
         scan_stats.compressed_size
     } else {
@@ -332,7 +332,7 @@ fn check_memory_circuit_breaker(session_id: &str, scan_stats: &ScanStats) -> Res
                     * CONFIG.common.memory_circuit_breaker_ratio
                     / 100
             );
-            log::warn!("[{session_id}] {}", err);
+            log::warn!("[{trace_id}] {}", err);
             return Err(Error::Message(err.to_string()));
         }
     }
