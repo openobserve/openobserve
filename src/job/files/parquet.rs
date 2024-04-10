@@ -15,7 +15,6 @@
 
 use std::{collections::HashMap, io::Cursor, path::Path, sync::Arc, time::UNIX_EPOCH};
 
-use anyhow::Context;
 use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
     record_batch::RecordBatch,
@@ -37,9 +36,14 @@ use config::{
     FxIndexMap, CONFIG, DEFAULT_INDEX_TRIM_CHARS, INDEX_MIN_CHAR_LEN,
 };
 use datafusion::{arrow::json as arrow_json, datasource::MemTable, prelude::*};
+use hashbrown::HashSet;
 use infra::{cache, storage};
+use once_cell::sync::Lazy;
 use parquet::arrow::ParquetRecordBatchStreamBuilder;
-use tokio::{sync::Semaphore, task::JoinHandle, time};
+use tokio::{
+    sync::{Mutex, RwLock},
+    time,
+};
 
 use crate::{
     common::{infra::wal, meta::stream::SchemaRecords},
@@ -50,11 +54,40 @@ use crate::{
         search::datafusion::{
             exec::merge_parquet_files, string_to_array_v2_udf::STRING_TO_ARRAY_V2_UDF,
         },
-        stream::{self},
+        stream,
     },
 };
 
+static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+
 pub async fn run() -> Result<(), anyhow::Error> {
+    let (tx, rx) =
+        tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(CONFIG.limit.file_move_thread_num);
+    let rx = Arc::new(Mutex::new(rx));
+    // move files
+    for _ in 0..CONFIG.limit.file_move_thread_num {
+        let rx = rx.clone();
+        tokio::spawn(async move {
+            loop {
+                match rx.lock().await.recv().await {
+                    None => {
+                        log::warn!("[INGESTER:JOB] Receiving files channel is closed");
+                        break;
+                    }
+                    Some((prefix, files)) => {
+                        if let Err(e) = move_files(&prefix, files).await {
+                            log::error!(
+                                "[INGESTER:JOB] Error moving parquet files to remote: {}",
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // prepare files
     let mut interval = time::interval(time::Duration::from_secs(CONFIG.limit.file_push_interval));
     interval.tick().await; // trigger the first run
     loop {
@@ -62,16 +95,24 @@ pub async fn run() -> Result<(), anyhow::Error> {
             break;
         }
         interval.tick().await;
-        if let Err(e) = move_files_to_storage().await {
-            log::error!("Error moving parquet files to remote: {}", e);
+        match prepare_files().await {
+            Err(e) => {
+                log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
+            }
+            Ok(files) => {
+                for (prefix, files) in files.into_iter() {
+                    if let Err(e) = tx.send((prefix, files)).await {
+                        log::error!("[INGESTER:JOB] Error sending parquet files to move: {}", e);
+                    }
+                }
+            }
         }
     }
     log::info!("job::files::parquet is stopped");
     Ok(())
 }
 
-// upload compressed files to storage & delete moved files from local
-pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
+async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
@@ -79,13 +120,26 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
     let pattern = wal_dir.join("files/");
     let files = scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit)).await;
     if files.is_empty() {
-        return Ok(());
+        return Ok(FxIndexMap::default());
     }
     log::debug!("[INGESTER:JOB] move files get: {}", files.len());
 
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
     for file in files {
+        let file_key = Path::new(&file)
+            .canonicalize()
+            .unwrap()
+            .strip_prefix(&wal_dir)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace('\\', "/");
+        // check if the file is processing
+        if PROCESSING_FILES.read().await.contains(&file_key) {
+            continue;
+        }
+
         let Ok(parquet_meta) = read_metadata_from_file(&(&file).into()).await else {
             continue;
         };
@@ -103,206 +157,210 @@ pub async fn move_files_to_storage() -> Result<(), anyhow::Error> {
             }
             continue;
         }
-        let file = Path::new(&file)
-            .canonicalize()
-            .unwrap()
-            .strip_prefix(&wal_dir)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .replace('\\', "/");
-        let prefix = file[..file.rfind('/').unwrap()].to_string();
+        let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
-        partition.push(FileKey::new(&file, parquet_meta, false));
+        partition.push(FileKey::new(&file_key, parquet_meta, false));
+        // mark the file as processing
+        // log::debug!("Processing files created: {:?}", file_key);
+        PROCESSING_FILES.write().await.insert(file_key);
     }
+    log::debug!(
+        "[INGESTER:JOB] move files get partitions: {}",
+        partition_files_with_size.len()
+    );
 
-    // use multiple threads to upload files
-    let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(CONFIG.limit.file_move_thread_num));
-    for (prefix, files_with_size) in partition_files_with_size.into_iter() {
-        let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
-        // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
-        // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
-        // let _ = columns[0].to_string(); // files/
-        let org_id = columns[1].to_string();
-        let stream_type = StreamType::from(columns[2]);
-        let stream_name = columns[3].to_string();
+    Ok(partition_files_with_size)
+}
 
-        // check if we are allowed to ingest or just delete the file
-        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
-            for file in files_with_size {
-                log::warn!(
-                    "[INGESTER:JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
-                    &org_id,
-                    stream_type,
-                    &stream_name,
+async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Error> {
+    let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
+    // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
+    // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
+    // let _ = columns[0].to_string(); // files/
+    let org_id = columns[1].to_string();
+    let stream_type = StreamType::from(columns[2]);
+    let stream_name = columns[3].to_string();
+
+    log::debug!("[INGESTER:JOB] check deletion for partition: {}", prefix);
+
+    let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
+        .canonicalize()
+        .unwrap();
+
+    // check if we are allowed to ingest or just delete the file
+    if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+        for file in files {
+            log::warn!(
+                "[INGESTER:JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
+                file.key,
+            );
+            if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
+                log::error!(
+                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
                     file.key,
-                );
-                if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
-                    log::error!(
-                        "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
-                        file.key,
-                        e
-                    );
-                }
-            }
-            continue;
-        }
-
-        let wal_dir = wal_dir.clone();
-        let permit = semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .context("[INGESTER:JOB] Failed to acquire semaphore for file uploading")?;
-        let task: JoinHandle<Result<(), anyhow::Error>> = tokio::task::spawn(async move {
-            // sort by created time
-            let mut files_with_size = files_with_size.to_owned();
-            files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-            // check the total size
-            let total_original_size: i64 = files_with_size
-                .iter()
-                .map(|f| f.meta.original_size)
-                .sum::<i64>();
-            if total_original_size
-                < std::cmp::min(
-                    CONFIG.limit.max_file_size_on_disk as i64,
-                    CONFIG.compact.max_file_size as i64,
-                )
-            {
-                let mut has_expired_files = false;
-                // not enough files to upload, check if some files are too old
-                let min_ts = Utc::now().timestamp_micros()
-                    - Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap();
-                for file in files_with_size.iter() {
-                    let Ok(file_meta) = get_file_meta(&wal_dir.join(&file.key)).await else {
-                        continue;
-                    };
-                    let file_created = file_meta
-                        .created()
-                        .unwrap_or(UNIX_EPOCH)
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_micros() as i64;
-                    if file_created <= min_ts {
-                        has_expired_files = true;
-                        break;
-                    }
-                }
-                if !has_expired_files {
-                    drop(permit);
-                    return Ok(());
-                }
-            }
-
-            // get latest schema
-            let latest_schema = db::schema::get(&org_id, &stream_name, stream_type)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "[INGESTER:JOB] Failed to get latest schema for stream [{}/{}/{}]: {}",
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                        e
-                    );
                     e
-                })?;
-
-            // start merge files and upload to s3
-            loop {
-                // yield to other tasks
-                tokio::task::yield_now().await;
-                // merge file and get the big file key
-                let (new_file_name, new_file_meta, new_file_list) =
-                    match merge_files(&latest_schema, &wal_dir, &files_with_size).await {
-                        Ok(v) => v,
-                        Err(e) => {
-                            log::error!("[INGESTER:JOB] merge files failed: {}", e);
-                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                            continue;
-                        }
-                    };
-                if new_file_name.is_empty() {
-                    if new_file_list.is_empty() {
-                        // no file need to merge
-                        break;
-                    } else {
-                        // delete files from file_list and continue
-                        files_with_size.retain(|f| !&new_file_list.contains(f));
-                        continue;
-                    }
-                }
-
-                // write file list to storage
-                let ret =
-                    db::file_list::local::set(&new_file_name, Some(new_file_meta), false).await;
-                if let Err(e) = ret {
-                    log::error!(
-                        "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
-                        new_file_name,
-                        e.to_string()
-                    );
-                    drop(permit);
-                    return Ok(());
-                }
-
-                // check if allowed to delete the file
-                for file in new_file_list.iter() {
-                    loop {
-                        if wal::lock_files_exists(&file.key).await {
-                            log::warn!(
-                                "[INGESTER:JOB] the file is still in use, waiting for a few ms: {}",
-                                file.key
-                            );
-                            time::sleep(time::Duration::from_millis(100)).await;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;
-                    if let Err(e) = ret {
-                        log::error!(
-                            "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
-                            file.key,
-                            e.to_string()
-                        );
-                        drop(permit);
-                        return Ok(());
-                    }
-
-                    // metrics
-                    metrics::INGEST_WAL_READ_BYTES
-                        .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                        .inc_by(file.meta.compressed_size as u64);
-                    metrics::INGEST_WAL_USED_BYTES
-                        .with_label_values(&[&org_id, stream_type.to_string().as_str()])
-                        .sub(file.meta.compressed_size);
-                }
-
-                // delete files from file list
-                let new_file_list = new_file_list.iter().map(|f| &f.key).collect::<Vec<_>>();
-                files_with_size.retain(|f| !new_file_list.contains(&&f.key));
+                );
             }
-
-            drop(permit);
-            Ok(())
-        });
-        tasks.push(task);
+            PROCESSING_FILES.write().await.remove(&file.key);
+        }
+        return Ok(());
     }
 
-    for task in tasks {
-        if let Err(e) = task.await {
+    log::debug!("[INGESTER:JOB] start processing for partition: {}", prefix);
+
+    let wal_dir = wal_dir.clone();
+    // sort by created time
+    let mut files_with_size = files.to_owned();
+    files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    // check the total size
+    let total_original_size: i64 = files_with_size
+        .iter()
+        .map(|f| f.meta.original_size)
+        .sum::<i64>();
+    if total_original_size
+        < std::cmp::min(
+            CONFIG.limit.max_file_size_on_disk as i64,
+            CONFIG.compact.max_file_size as i64,
+        )
+    {
+        let mut has_expired_files = false;
+        // not enough files to upload, check if some files are too old
+        let min_ts = Utc::now().timestamp_micros()
+            - Duration::try_seconds(CONFIG.limit.max_file_retention_time as i64)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        for file in files_with_size.iter() {
+            let Ok(file_meta) = get_file_meta(&wal_dir.join(&file.key)).await else {
+                continue;
+            };
+            let file_created = file_meta
+                .created()
+                .unwrap_or(UNIX_EPOCH)
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as i64;
+            if file_created <= min_ts {
+                has_expired_files = true;
+                break;
+            }
+        }
+        if !has_expired_files {
+            // need release all the files
+            for file in files_with_size.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Ok(());
+        }
+    }
+
+    log::debug!("[INGESTER:JOB] get schema for partition: {}", prefix);
+
+    // get latest schema
+    let latest_schema = db::schema::get(&org_id, &stream_name, stream_type)
+        .await
+        .map_err(|e| {
             log::error!(
-                "[INGESTER:JOB] Error while uploading parquet file to storage {}",
+                "[INGESTER:JOB] Failed to get latest schema for stream [{}/{}/{}]: {}",
+                &org_id,
+                stream_type,
+                &stream_name,
                 e
             );
-        };
+            e
+        })?;
+
+    log::debug!("[INGESTER:JOB] start merging for partition: {}", prefix);
+
+    // start merge files and upload to s3
+    loop {
+        // yield to other tasks
+        tokio::task::yield_now().await;
+        // merge file and get the big file key
+        let (new_file_name, new_file_meta, new_file_list) =
+            match merge_files(&latest_schema, &wal_dir, &files_with_size).await {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!("[INGESTER:JOB] merge files failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    continue;
+                }
+            };
+        if new_file_name.is_empty() {
+            if new_file_list.is_empty() {
+                // no file need to merge
+                break;
+            } else {
+                // delete files from file_list and continue
+                files_with_size.retain(|f| !&new_file_list.contains(f));
+                continue;
+            }
+        }
+
+        // write file list to storage
+        let ret = db::file_list::local::set(&new_file_name, Some(new_file_meta), false).await;
+        if let Err(e) = ret {
+            log::error!(
+                "[INGESTER:JOB] Failed write parquet file meta: {}, error: {}",
+                new_file_name,
+                e.to_string()
+            );
+            // need release all the files
+            for file in files_with_size.iter() {
+                PROCESSING_FILES.write().await.remove(&file.key);
+            }
+            return Ok(());
+        }
+
+        // check if allowed to delete the file
+        for file in new_file_list.iter() {
+            loop {
+                if wal::lock_files_exists(&file.key).await {
+                    log::warn!(
+                        "[INGESTER:JOB] the file is still in use, waiting for a few ms: {}",
+                        file.key
+                    );
+                    time::sleep(time::Duration::from_millis(100)).await;
+                } else {
+                    break;
+                }
+            }
+
+            let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;
+            if let Err(e) = ret {
+                log::error!(
+                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                    file.key,
+                    e.to_string()
+                );
+                // need release all the files
+                for file in files_with_size.iter() {
+                    PROCESSING_FILES.write().await.remove(&file.key);
+                }
+                return Ok(());
+            }
+
+            // remove the file from processing set
+            // log::debug!("Processing files deleted: {:?}", file.key);
+            PROCESSING_FILES.write().await.remove(&file.key);
+
+            // metrics
+            metrics::INGEST_WAL_READ_BYTES
+                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .inc_by(file.meta.compressed_size as u64);
+            metrics::INGEST_WAL_USED_BYTES
+                .with_label_values(&[&org_id, stream_type.to_string().as_str()])
+                .sub(file.meta.compressed_size);
+        }
+
+        // delete files from file list
+        let new_file_list = new_file_list.iter().map(|f| &f.key).collect::<Vec<_>>();
+        files_with_size.retain(|f| !new_file_list.contains(&&f.key));
     }
+
     Ok(())
 }
 

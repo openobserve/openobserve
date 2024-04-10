@@ -995,7 +995,7 @@ pub fn init() -> Config {
         cfg.limit.file_push_interval = 10;
     }
     if cfg.limit.file_push_limit == 0 {
-        cfg.limit.file_push_limit = 100_000;
+        cfg.limit.file_push_limit = 10000;
     }
 
     if cfg.limit.sql_min_db_connections == 0 {
