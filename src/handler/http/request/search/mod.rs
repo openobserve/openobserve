@@ -308,10 +308,7 @@ pub async fn search(
                             Some(trace_id),
                         )),
                     _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        ),
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                     ),
                 },
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
@@ -539,51 +536,49 @@ pub async fn around(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_backward =
-        match SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_around",
-                        "500",
-                        &org_id,
-                        &stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_around",
-                        "500",
-                        &org_id,
-                        &stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .inc();
-                log::error!("search around error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
+    let resp_backward = match SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
+        .await
+    {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_around",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_around",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search around error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_trace_id(
+                            code,
+                            Some(trace_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    ),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
 
     // merge
     let mut resp = config::meta::search::Response::default();
@@ -941,10 +936,7 @@ async fn values_v1(
                             Some(trace_id),
                         )),
                     _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        ),
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                     ),
                 },
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
@@ -1125,10 +1117,7 @@ async fn values_v2(
                             Some(trace_id),
                         )),
                     _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        ),
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
                     ),
                 },
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
