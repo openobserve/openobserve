@@ -19,8 +19,8 @@ use actix_web::{delete, get, web, HttpResponse};
 
 #[cfg(feature = "enterprise")]
 #[delete("/query_manager/{trace_id}")]
-pub async fn cancel_job(trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
-    let res = crate::service::search::cancel_job(&trace_id.into_inner()).await;
+pub async fn cancel_query(trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
+    let res = crate::service::search::cancel_query(&trace_id.into_inner()).await;
     match res {
         Ok(status) => Ok(HttpResponse::Ok().json(status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
@@ -29,22 +29,22 @@ pub async fn cancel_job(trace_id: web::Path<String>) -> Result<HttpResponse, Err
 
 #[cfg(not(feature = "enterprise"))]
 #[delete("/query_manager/{trace_id}")]
-pub async fn cancel_job(_trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
+pub async fn cancel_query(_trace_id: web::Path<String>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
 
 #[cfg(feature = "enterprise")]
 #[get("/query_manager/status")]
-pub async fn job_status() -> Result<HttpResponse, Error> {
-    let res = crate::service::search::job_status().await;
+pub async fn query_status() -> Result<HttpResponse, Error> {
+    let res = crate::service::search::query_status().await;
     match res {
-        Ok(job_status) => Ok(HttpResponse::Ok().json(job_status)),
+        Ok(query_status) => Ok(HttpResponse::Ok().json(query_status)),
         Err(e) => Ok(HttpResponse::InternalServerError().body(format!("{:?}", e))),
     }
 }
 
 #[cfg(not(feature = "enterprise"))]
 #[get("/query_manager/status")]
-pub async fn job_status() -> Result<HttpResponse, Error> {
+pub async fn query_status() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }

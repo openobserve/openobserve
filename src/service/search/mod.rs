@@ -1081,7 +1081,7 @@ async fn search_in_cluster(mut req: cluster_rpc::SearchRequest) -> Result<search
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
+pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
     // sort nodes by node_id this will improve hit cache ratio
@@ -1093,14 +1093,14 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
-            "service:search:cluster:grpc_job_status",
+            "service:search:cluster:grpc_query_status",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
 
         let task = tokio::task::spawn(
             async move {
-                let mut request = tonic::Request::new(proto::cluster_rpc::JobStatusRequest {});
+                let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
                     propagator.inject_context(
@@ -1138,7 +1138,7 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
-                let response = match client.job_status(request).await {
+                let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
@@ -1199,16 +1199,16 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
                 original_size: scan_stats.original_size / 1024 / 1024, // change to MB
                 compressed_size: scan_stats.compressed_size / 1024 / 1024, // change to MB
             });
-        let job_status = if result.is_queue {
+        let query_status = if result.is_queue {
             "waiting"
         } else {
             "processing"
         };
-        status.push(search::JobStatus {
+        status.push(search::QueryStatus {
             trace_id: result.trace_id,
             created_at: result.created_at,
             started_at: result.started_at,
-            status: job_status.to_string(),
+            status: query_status.to_string(),
             user_id: result.user_id,
             org_id: result.org_id,
             stream_type: result.stream_type,
@@ -1217,11 +1217,11 @@ pub async fn job_status() -> Result<search::JobStatusResponse, Error> {
         });
     }
 
-    Ok(search::JobStatusResponse { status })
+    Ok(search::QueryStatusResponse { status })
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn cancel_job(trace_id: &str) -> Result<search::CancelJobResponse, Error> {
+pub async fn cancel_query(trace_id: &str) -> Result<search::CancelQueryResponse, Error> {
     // get nodes from cluster
     let mut nodes = cluster::get_cached_online_query_nodes().await.unwrap();
     // sort nodes by node_id this will improve hit cache ratio
@@ -1233,7 +1233,7 @@ pub async fn cancel_job(trace_id: &str) -> Result<search::CancelJobResponse, Err
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
-            "service:search:cluster:grpc_cancel_job",
+            "service:search:cluster:grpc_cancel_query",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
@@ -1242,7 +1242,7 @@ pub async fn cancel_job(trace_id: &str) -> Result<search::CancelJobResponse, Err
         let task = tokio::task::spawn(
             async move {
                 let mut request =
-                    tonic::Request::new(proto::cluster_rpc::CancelJobRequest { trace_id });
+                    tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
                 // request.set_timeout(Duration::from_secs(CONFIG.grpc.timeout));
 
                 opentelemetry::global::get_text_map_propagator(|propagator| {
@@ -1281,7 +1281,7 @@ pub async fn cancel_job(trace_id: &str) -> Result<search::CancelJobResponse, Err
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(CONFIG.grpc.max_message_size * 1024 * 1024);
-                let response = match client.cancel_job(request).await {
+                let response = match client.cancel_query(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
@@ -1328,7 +1328,7 @@ pub async fn cancel_job(trace_id: &str) -> Result<search::CancelJobResponse, Err
         }
     }
 
-    Ok(search::CancelJobResponse {
+    Ok(search::CancelQueryResponse {
         trace_id: trace_id.to_string(),
         is_success,
     })
