@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,7 @@ pub async fn save_template(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner();
-    // let name = name.trim();
+    let _name = tmpl.name.to_string();
     match templates::save(&org_id, "", tmpl, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),

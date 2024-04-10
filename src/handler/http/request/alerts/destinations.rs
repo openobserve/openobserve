@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,6 +46,7 @@ pub async fn save_destination(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let dest = dest.into_inner();
+    let _dest_name = dest.name.to_string();
     match destinations::save(&org_id, "", dest, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => match e {

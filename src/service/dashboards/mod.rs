@@ -51,7 +51,7 @@ pub async fn create_dashboard(
                         org_id,
                         "dashboards",
                         Authz {
-                            obj_id: dashboard_id,
+                            obj_id: dashboard_id.to_string(),
                             parent_type: "folders".to_owned(),
                             parent: folder_id.to_owned(),
                         },
@@ -77,7 +77,7 @@ pub async fn create_dashboard(
                             org_id,
                             "dashboards",
                             Authz {
-                                obj_id: dashboard_id,
+                                obj_id: dashboard_id.to_string(),
                                 parent_type: "folders".to_owned(),
                                 parent: folder_id.to_owned(),
                             },

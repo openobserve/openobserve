@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -52,7 +52,9 @@ pub async fn create_report(
     report: web::Json<Report>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    match reports::save(&org_id, "", report.into_inner(), true).await {
+    let report = report.into_inner();
+    let _name = report.name.to_string();
+    match reports::save(&org_id, "", report, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

@@ -29,6 +29,8 @@ use config::{
     CONFIG, SIZE_IN_MB,
 };
 use hashbrown::HashMap;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::auditor;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use reqwest::Client;
@@ -319,4 +321,16 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
         usages.append(&mut curr_usages);
         drop(usages);
     }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn audit(msg: auditor::AuditMessage) {
+    auditor::audit(msg, publish_audit).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn publish_audit(
+    req: cluster_rpc::UsageRequest,
+) -> Result<cluster_rpc::UsageResponse, anyhow::Error> {
+    ingestion_service::ingest(&CONFIG.common.usage_org, req).await
 }
