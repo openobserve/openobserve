@@ -69,7 +69,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let rx = rx.clone();
         tokio::spawn(async move {
             loop {
-                match rx.lock().await.recv().await {
+                let ret = rx.lock().await.recv().await;
+                match ret {
                     None => {
                         log::debug!("[INGESTER:JOB] Receiving files channel is closed");
                         break;
@@ -118,7 +119,9 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
         .unwrap();
 
     let pattern = wal_dir.join("files/");
-    let files = scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit)).await;
+    let files = scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit))
+        .await
+        .unwrap_or_default();
     if files.is_empty() {
         return Ok(FxIndexMap::default());
     }
