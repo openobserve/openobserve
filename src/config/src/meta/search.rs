@@ -307,12 +307,12 @@ pub struct SearchPartitionResponse {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct JobStatusResponse {
-    pub status: Vec<JobStatus>,
+pub struct QueryStatusResponse {
+    pub status: Vec<QueryStatus>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct JobStatus {
+pub struct QueryStatus {
     pub trace_id: String,
     pub status: String,
     pub created_at: i64,
@@ -332,7 +332,7 @@ pub struct QueryInfo {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
-pub struct CancelJobResponse {
+pub struct CancelQueryResponse {
     pub trace_id: String,
     pub is_success: bool,
 }
