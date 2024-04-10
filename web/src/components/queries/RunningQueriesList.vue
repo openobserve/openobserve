@@ -1,5 +1,5 @@
 <template>
-  <div class="running-queries-page">
+  <div class="running-queries-page" v-if="isMetaOrg">
     <q-table
       data-test="running-queries-table"
       ref="qTable"
@@ -161,6 +161,7 @@
 
 <script lang="ts">
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import useIsMetaOrg from "@/composables/useIsMetaOrg.ts";
 // import SearchService from "@/services/search";
 import {
   onBeforeMount,
@@ -185,6 +186,8 @@ export default defineComponent({
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
+    // console.log("meta org", isMetaOrg());
+    const { isMetaOrg } = useIsMetaOrg();
 
     const refreshData = () => {
       console.log("refreshing data");
@@ -522,6 +525,7 @@ export default defineComponent({
       loadingState,
       refreshData,
       lastRefreshed,
+      isMetaOrg,
     };
   },
 });

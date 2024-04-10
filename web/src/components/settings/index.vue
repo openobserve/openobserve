@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="query_stats"
             :label="t('settings.queryManagement')"
             content-class="tab_content"
+            v-if="isMetaOrg"
           />
           <q-route-tab
             exact
@@ -76,6 +77,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+import useIsMetaOrg from "@/composables/useIsMetaOrg.ts";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -85,18 +87,33 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
     const settingsTab = ref("general");
+    const { isMetaOrg } = useIsMetaOrg();
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name == "settings") {
+      if (router.currentRoute.value.name == "settings" && isMetaOrg.value) {
+        console.log("isMetaOrg onBeforeMount", isMetaOrg.value);
+
         settingsTab.value = "general";
         router.push({ path: "/settings/query_management" });
+      } else {
+        console.log("inside else onBeforeMount", isMetaOrg.value);
+
+        settingsTab.value = "general";
+        router.push({ path: "/settings/general" });
       }
     });
 
     // render general settings component
     onActivated(() => {
-      settingsTab.value = "general";
-      router.push({ path: "/settings/query_management" });
+      if (isMetaOrg.value) {
+        console.log("isMetaOrg onActivated", isMetaOrg.value);
+        settingsTab.value = "general";
+        router.push({ path: "/settings/query_management" });
+      } else {
+        console.log("inside else onActivated", isMetaOrg.value);
+        settingsTab.value = "general";
+        router.push({ path: "/settings/general" });
+      }
     });
 
     onUpdated(() => {
@@ -120,6 +137,7 @@ export default defineComponent({
       settingsTab,
       splitterModel: ref(200),
       outlinedSettings,
+      isMetaOrg,
     };
   },
 });
