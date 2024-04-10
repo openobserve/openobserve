@@ -289,9 +289,19 @@ pub async fn search(
                 .inc();
             log::error!("search error: {:?}", err);
             Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
-                ),
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        ),
+                    ),
+                },
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -468,12 +478,19 @@ pub async fn around(
                     .inc();
                 log::error!("search around error: {:?}", err);
                 return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_session_id(
-                            code,
-                            Some(session_id),
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code_with_session_id(
+                                code,
+                                Some(session_id),
+                            )),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code_with_session_id(
+                                code,
+                                Some(session_id),
+                            ),
                         ),
-                    ),
+                    },
                     _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                         StatusCode::INTERNAL_SERVER_ERROR.into(),
                         err.to_string(),
@@ -528,12 +545,19 @@ pub async fn around(
                     .inc();
                 log::error!("search around error: {:?}", err);
                 return Ok(match err {
-                    errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_session_id(
-                            code,
-                            Some(session_id),
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code_with_session_id(
+                                code,
+                                Some(session_id),
+                            )),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code_with_session_id(
+                                code,
+                                Some(session_id),
+                            ),
                         ),
-                    ),
+                    },
                     _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                         StatusCode::INTERNAL_SERVER_ERROR.into(),
                         err.to_string(),
@@ -872,9 +896,19 @@ async fn values_v1(
                 .inc();
             log::error!("search values error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
-                ),
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        ),
+                    ),
+                },
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
@@ -1045,9 +1079,19 @@ async fn values_v2(
                 .inc();
             log::error!("search values error: {:?}", err);
             return Ok(match err {
-                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error_code_with_session_id(code, Some(session_id)),
-                ),
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_session_id(
+                            code,
+                            Some(session_id),
+                        ),
+                    ),
+                },
                 _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
                     StatusCode::INTERNAL_SERVER_ERROR.into(),
                     err.to_string(),
