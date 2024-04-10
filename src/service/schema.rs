@@ -54,9 +54,12 @@ pub(crate) fn get_upto_discard_error() -> anyhow::Error {
     )
 }
 
-pub(crate) fn get_request_columns_limit_error() -> anyhow::Error {
+pub(crate) fn get_request_columns_limit_error(
+    stream_name: &str,
+    num_fields: usize,
+) -> anyhow::Error {
     anyhow::anyhow!(
-        "Too many cloumns, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_cloumns>",
+        "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_cloumns>",
         CONFIG.limit.req_cols_per_record_limit
     )
 }
@@ -359,7 +362,10 @@ pub async fn check_for_schema(
     }
 
     if inferred_schema.fields.len() > CONFIG.limit.req_cols_per_record_limit {
-        return Err(get_request_columns_limit_error());
+        return Err(get_request_columns_limit_error(
+            &format!("{}/{}/{}", org_id, stream_type, stream_name),
+            inferred_schema.fields.len(),
+        ));
     }
 
     let is_new = schema.schema().fields().is_empty();
