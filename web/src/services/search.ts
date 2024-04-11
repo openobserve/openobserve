@@ -25,7 +25,16 @@ const search = {
     query: any;
     page_type: string;
   }) => {
-    const url = `/api/${org_identifier}/_search?type=${page_type}`;
+    // const url = `/api/${org_identifier}/_search?type=${page_type}`;
+    let url = `/api/${org_identifier}/_search?type=${page_type}`;
+    if (typeof query.query.sql != "string") {
+      url = `/api/${org_identifier}/_search_multi?type=${page_type}`;
+      if (query.hasOwnProperty("aggs")) {
+        return http().post(url, { ...query.query, aggs: query.aggs });
+      } else {
+        return http().post(url, query.query);
+      }
+    }
     return http().post(url, query);
   },
   search_around: ({
@@ -125,7 +134,11 @@ const search = {
     query: any;
     page_type: string;
   }) => {
-    const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    let url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    if (typeof query.sql != "string") {
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}`;
+    }
     return http().post(url, query);
   },
 };

@@ -32,6 +32,7 @@ import {
   useLocalTimezone,
   useLocalInterestingFields,
   useLocalSavedView,
+  convertToCamelCase,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -49,6 +50,8 @@ import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
+import { isMapIterator } from "util/types";
+import stream from "@/services/stream";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -124,20 +127,25 @@ const defaultObject = {
     histogramQuery: <any>"",
     parsedQuery: {},
     errorMsg: "",
+    filterErrMsg: "",
+    missingStreamMessage: "",
     errorCode: 0,
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     stream: {
       loading: false,
       streamLists: <object[]>[],
-      selectedStream: { label: "", value: "" },
-      selectedStreamFields: <any>[],
+      selectedStream: <any>[],
+      selectedStreamFields: <object[]>[],
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
       functions: <any>[],
       streamType: "logs",
       interestingFieldList: <string[]>[],
+      expandGroupRows: <any>{},
+      filteredField: <any>[],
+      missingStreamMultiStreamFilter: <any>[],
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -191,7 +199,7 @@ const useLogs = () => {
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream } = useStreams();
+  const { getStreams, getStream, streams, getMultiStreams } = useStreams();
   const router = useRouter();
   const parser = new Parser();
   const fieldValues = ref();
@@ -204,7 +212,7 @@ const useLogs = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
     searchObj.data.errorMsg = "No stream found in selected organization!";
     searchObj.data.stream.streamLists = [];
-    searchObj.data.stream.selectedStream = { label: "", value: "" };
+    searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
@@ -234,9 +242,9 @@ const useLogs = () => {
       useLocalLogFilterField()?.value != null
         ? useLocalLogFilterField()?.value
         : {};
-    selectedFields[
-      `${identifier}_${searchObj.data.stream.selectedStream.value}`
-    ] = searchObj.data.stream.selectedFields;
+    const stream = searchObj.data.stream.selectedStream.sort().join("_");
+    selectedFields[`${identifier}_${stream}`] =
+      searchObj.data.stream.selectedFields;
     useLocalLogFilterField(selectedFields);
   };
 
@@ -282,7 +290,7 @@ const useLogs = () => {
 
   function resetStreamData() {
     store.dispatch("resetStreams", {});
-    searchObj.data.stream.selectedStream = { label: "", value: "" };
+    searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
     searchObj.data.stream.filterField = "";
@@ -319,7 +327,7 @@ const useLogs = () => {
       if (searchObj.data.streamResults.list.length > 0) {
         let lastUpdatedStreamTime = 0;
 
-        let selectedStream = { label: "", value: "" };
+        let selectedStream: any[] = [];
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
@@ -337,14 +345,15 @@ const useLogs = () => {
 
           // If isFirstLoad is true, then select the stream from query params
           if (router.currentRoute.value?.query?.stream == item.name) {
-            selectedStream = itemObj;
+            selectedStream.push(itemObj.value);
           }
           if (
             !router.currentRoute.value?.query?.stream &&
             item.stats.doc_time_max >= lastUpdatedStreamTime
           ) {
+            selectedStream = [];
             lastUpdatedStreamTime = item.stats.doc_time_max;
-            selectedStream = itemObj;
+            selectedStream.push(itemObj.value);
           }
         }
         if (
@@ -408,9 +417,16 @@ const useLogs = () => {
       query["stream_type"] = searchObj.data.stream.streamType;
     }
 
-    if (searchObj.data.stream.selectedStream.label) {
-      query["stream"] = searchObj.data.stream.selectedStream.label;
-      query["stream_value"] = searchObj.data.stream.selectedStream.value;
+    if (
+      searchObj.data.stream.selectedStream.length > 0 &&
+      typeof searchObj.data.stream.selectedStream != "object"
+    ) {
+      query["stream"] = searchObj.data.stream.selectedStream.join(",");
+    } else if (
+      typeof searchObj.data.stream.selectedStream == "object" &&
+      searchObj.data.stream.selectedStream.hasOwnProperty("value")
+    ) {
+      query["stream"] = searchObj.data.stream.selectedStream.value;
     }
 
     if (date.type == "relative") {
@@ -459,9 +475,88 @@ const useLogs = () => {
     router.push({ query });
   };
 
+  function extractFilterColumns(expression: any) {
+    const columns: any[] = [];
+
+    function traverse(node: {
+      type: string;
+      column: any;
+      left: any;
+      right: any;
+      args: { type: string; value: any[] };
+    }) {
+      if (node.type === "column_ref") {
+        columns.push(node.column);
+      } else if (node.type === "binary_expr") {
+        traverse(node.left);
+        traverse(node.right);
+      } else if (node.type === "function") {
+        // Function expressions might contain columns as arguments
+        if (node.args && node.args.type === "expr_list") {
+          node.args.value.forEach((arg: any) => traverse(arg));
+        }
+      }
+    }
+
+    traverse(expression);
+    return columns;
+  }
+
+  const validateFilterForMultiStream = () => {
+    const filterCondition = searchObj.data.editorValue;
+    const parsedSQL: any = parser.astify(
+      "select * from stream where " + filterCondition
+    );
+    searchObj.data.stream.filteredField = extractFilterColumns(
+      parsedSQL?.where
+    );
+
+    searchObj.data.filterErrMsg = "";
+    searchObj.data.missingStreamMessage = "";
+    searchObj.data.stream.missingStreamMultiStreamFilter = [];
+    for (const fieldName of searchObj.data.stream.filteredField) {
+      const filteredFields: any =
+        searchObj.data.stream.selectedStreamFields.filter(
+          (field: any) => field.name === fieldName
+        );
+      if (filteredFields.length > 0) {
+        const streamsCount = filteredFields[0].streams.length;
+        const allStreamsEqual = filteredFields.every(
+          (field: any) => field.streams.length === streamsCount
+        );
+        if (!allStreamsEqual) {
+          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
+        }
+      } else {
+        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
+      }
+
+      const fieldStreams: any = searchObj.data.stream.selectedStreamFields
+        .filter((field: any) => field.name === fieldName)
+        .map((field: any) => field.streams)
+        .flat();
+
+      searchObj.data.stream.missingStreamMultiStreamFilter =
+        searchObj.data.stream.selectedStream.filter(
+          (stream: any) => !fieldStreams.includes(stream)
+        );
+
+      if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
+        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
+          ", "
+        )}", hence no search is performed in the mentioned stream.\n`;
+      }
+    }
+
+    return searchObj.data.filterErrMsg === "" ? true : false;
+  };
+
   function buildSearch() {
     try {
       let query = searchObj.data.editorValue;
+      searchObj.data.filterErrMsg = "";
+      searchObj.data.missingStreamMessage = "";
+      searchObj.data.stream.missingStreamMultiStreamFilter = [];
       const req: any = {
         query: {
           sql: searchObj.meta.sqlMode
@@ -658,10 +753,51 @@ const useLogs = () => {
           queryFunctions
         );
 
-        req.query.sql = req.query.sql.replace(
-          "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream.value
-        );
+        // in the case of multi stream, we need to pass query for each selected stream in the form of array
+        // additional checks added for filter condition,
+        // 1. all fields in filter condition should be present in same streams.
+        // if one or more fields belongs to different stream then error will be shown
+        // 2. if multiple streams are selected but filter condition contains fields from only one stream
+        // then we need to send the search request for only matched stream
+        if (searchObj.data.stream.selectedStream.length > 1) {
+          let streams: any = searchObj.data.stream.selectedStream;
+          if (whereClause.trim() != "") {
+            const validationFlag = validateFilterForMultiStream();
+            if (!validationFlag) {
+              return false;
+            }
+
+            if (
+              searchObj.data.stream.missingStreamMultiStreamFilter.length > 0
+            ) {
+              streams = searchObj.data.stream.selectedStream.filter(
+                (streams: any) =>
+                  !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
+                    streams
+                  )
+              );
+            }
+          }
+
+          const preSQLQuery = req.query.sql;
+          req.query.sql = [];
+
+          streams
+            .join(",")
+            .split(",")
+            .forEach((item: any) => {
+              req.query.sql.push(preSQLQuery.replace("[INDEX_NAME]", item));
+            });
+        } else {
+          req.query.sql = req.query.sql.replace(
+            "[INDEX_NAME]",
+            searchObj.data.stream.selectedStream[0]
+          );
+        }
+        // req.query.sql = req.query.sql.replace(
+        //   "[INDEX_NAME]",
+        //   searchObj.data.stream.selectedStream.value
+        // );
         // const parsedSQL = parser.astify(req.query.sql);
         // const unparsedSQL = parser.sqlify(parsedSQL);
         // console.log(unparsedSQL);
@@ -773,13 +909,27 @@ const useLogs = () => {
             paginations: [],
           };
 
-          searchObj.data.queryResults.total = res.data.records;
-          const partitions = res.data.partitions;
+          // searchObj.data.queryResults.total = res.data.records;
+          // const partitions = res.data.partitions;
 
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
+          // searchObj.data.queryResults.partitionDetail.partitions = partitions;
 
-          let pageObject: any = [];
-          // partitions.forEach((item: any, index: number) => {
+          // let pageObject: any = [];
+          // // partitions.forEach((item: any, index: number) => {
+          // //   pageObject = [
+          // //     {
+          // //       startTime: item[0],
+          // //       endTime: item[1],
+          // //       from: 0,
+          // //       size: searchObj.meta.resultGrid.rowsPerPage,
+          // //     },
+          // //   ];
+          // //   searchObj.data.queryResults.partitionDetail.paginations.push(
+          // //     pageObject
+          // //   );
+          // //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+          // // });
+          // for (const [index, item] of partitions.entries()) {
           //   pageObject = [
           //     {
           //       startTime: item[0],
@@ -792,20 +942,60 @@ const useLogs = () => {
           //     pageObject
           //   );
           //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          // });
-          for (const [index, item] of partitions.entries()) {
-            pageObject = [
-              {
-                startTime: item[0],
-                endTime: item[1],
-                from: 0,
-                size: searchObj.meta.resultGrid.rowsPerPage,
-              },
-            ];
-            searchObj.data.queryResults.partitionDetail.paginations.push(
-              pageObject
-            );
-            searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+          if (typeof partitionQueryReq.sql != "string") {
+            const partitionSize = 0;
+            let partitions = [];
+            let pageObject = [];
+            // Object.values(res).forEach((partItem: any) => {
+            const partItem = res.data;
+            searchObj.data.queryResults.total += partItem.records;
+
+            if (partItem.partitions.length > partitionSize) {
+              partitions = partItem.partitions;
+
+              searchObj.data.queryResults.partitionDetail.partitions =
+                partitions;
+
+              for (const [index, item] of partitions.entries()) {
+                pageObject = [
+                  {
+                    startTime: item[0],
+                    endTime: item[1],
+                    from: 0,
+                    size: searchObj.meta.resultGrid.rowsPerPage,
+                  },
+                ];
+                searchObj.data.queryResults.partitionDetail.paginations.push(
+                  pageObject
+                );
+                searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                  -1
+                );
+              }
+            }
+            // });
+          } else {
+            searchObj.data.queryResults.total = res.data.records;
+            const partitions = res.data.partitions;
+            let pageObject = [];
+            searchObj.data.queryResults.partitionDetail.partitions = partitions;
+
+            for (const [index, item] of partitions.entries()) {
+              pageObject = [
+                {
+                  startTime: item[0],
+                  endTime: item[1],
+                  from: 0,
+                  size: searchObj.meta.resultGrid.rowsPerPage,
+                },
+              ];
+              searchObj.data.queryResults.partitionDetail.paginations.push(
+                pageObject
+              );
+              searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                -1
+              );
+            }
           }
         });
     } else {
@@ -1678,18 +1868,27 @@ const useLogs = () => {
         useLocalLogFilterField()?.value != null
           ? useLocalLogFilterField()?.value
           : {};
-      const logFieldSelectedValue =
+      const logFieldSelectedValue: any = [];
+      const stream = searchObj.data.stream.selectedStream.sort().join("_");
+      if (
+        logFilterField.length > 0 &&
         logFilterField[
-          `${store.state.selectedOrganization.identifier}_${searchObj.data.stream.selectedStream.value}`
-        ];
+          `${store.state.selectedOrganization.identifier}_${stream}`
+        ] != undefined
+      ) {
+        logFieldSelectedValue.push(
+          ...logFilterField[
+            `${store.state.selectedOrganization.identifier}_${stream}`
+          ]
+        );
+      }
       const selectedFields = (logFilterField && logFieldSelectedValue) || [];
       if (
-        !searchObj.data.stream.selectedFields.length &&
-        selectedFields.length
+        searchObj.data.stream.selectedFields.length == 0 &&
+        selectedFields.length > 0
       ) {
         return (searchObj.data.stream.selectedFields = selectedFields);
       }
-      searchObj.data.stream.selectedFields = selectedFields;
 
       searchObj.data.resultGrid.columns.push({
         name: "@timestamp",
@@ -1860,7 +2059,7 @@ const useLogs = () => {
         }
         query_context =
           `SELECT [FIELD_LIST]${queryFunctions} FROM "` +
-          searchObj.data.stream.selectedStream.value +
+          searchObj.data.stream.selectedStream.join(",") +
           `" `;
 
         if (
@@ -1888,7 +2087,7 @@ const useLogs = () => {
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
-          index: searchObj.data.stream.selectedStream.value,
+          index: searchObj.data.stream.selectedStream.join(","),
           key: obj.key,
           size: obj.size,
           query_context: query_context,
@@ -2193,7 +2392,9 @@ const useLogs = () => {
     let query = searchObj.meta.sqlMode
       ? queryStr != ""
         ? queryStr
-        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.value}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
+        : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
+            ","
+          )}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`
       : "";
 
     await extractFields();
@@ -2334,6 +2535,7 @@ const useLogs = () => {
     getHistogramQueryData,
     fnParsedSQL,
     addOrderByToQuery,
+    validateFilterForMultiStream,
   };
 };
 
