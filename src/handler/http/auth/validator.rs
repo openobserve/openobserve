@@ -310,7 +310,16 @@ pub async fn validator_proxy_url(
     req: ServiceRequest,
     query: web::Query<QueryParamProxyURL>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let creds = base64::decode(&query.proxy_token).expect("Invalid base-encoded token");
+    let creds = match base64::decode(&query.proxy_token) {
+        Ok(val) => val,
+        Err(_) => {
+            log::error!(
+                "Failed to decode base64 proxy_token: {}",
+                &query.proxy_token
+            );
+            return Err((ErrorUnauthorized("Unauthorized Access"), req));
+        }
+    };
     let creds = creds
         .split(':')
         .map(|s| s.to_string())

@@ -82,6 +82,10 @@ impl NatsDb {
         }
     }
 
+    pub fn super_cluster() -> Self {
+        Self::new("super_cluster_kv_")
+    }
+
     async fn get_key_value(&self, key: &str) -> Result<(String, Bytes)> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         let bucket_name = bucket.status().await?.bucket;
