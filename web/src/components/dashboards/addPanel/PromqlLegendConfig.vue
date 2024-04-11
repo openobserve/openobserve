@@ -17,6 +17,7 @@
       dense
       label-slot
       data-test="dashboard-config-promql-legend"
+      @change="fieldsFilterFn"
       @focus="showOptions = true"
       @blur="hideOptionsWithDelay"
     >

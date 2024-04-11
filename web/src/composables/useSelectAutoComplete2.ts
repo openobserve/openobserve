@@ -5,57 +5,72 @@ export const useSelectAutoComplete2 = (
   searchKey: string
 ) => {
   const filteredOptions = ref(options.value);
-  console.log(filteredOptions.value, "filteredOptions");
+  console.log(
+    "[useSelectAutoComplete2] Initial filteredOptions:",
+    filteredOptions.value
+  );
 
-  watch(options, () => {
-    console.log(options.value, "options.value");
-    filteredOptions.value = options.value;
+  watch(options, (newValue, oldValue) => {
+    console.log("[useSelectAutoComplete2] options.value changed:", newValue);
+    filteredOptions.value = newValue;
+    console.log(
+      "[useSelectAutoComplete2] Updated filteredOptions:",
+      filteredOptions.value
+    );
   });
 
-  const filterFn = (val: string, update: (callback: () => void) => void) => {
+  const filterFn = (val: any, update: any) => {
     if (val === "") {
       update(() => {
+        console.log("[useSelectAutoComplete2] Empty value:", val);
         filteredOptions.value = options.value;
       });
       return;
     }
 
-    update(() => {
-      const regex = /\$\{(\w+)/g;
+    const regex = /\$\{(\w+)/g;
+    console.log("[useSelectAutoComplete2] Regex:", regex);
 
-      const match = regex.exec(val);
-      if (match) {
-        console.log(match, "match");
+    const match = regex.exec(val);
+    console.log("[useSelectAutoComplete2] Match:", match);
 
-        const placeholder = match[1];
-        const needle = val.replace(regex, "").toLowerCase();
-        console.log(needle, "needle");
+    if (match) {
+      console.log("[useSelectAutoComplete2] Match found:", match);
 
-        filteredOptions.value = options.value?.filter((option: any) => {
-          const value =
-            typeof option === "object" ? option[searchKey] : option.toString();
-          const lowerCaseValue = value.toLowerCase();
-          const lowerCaseNeedle = needle.toLowerCase();
-          console.log(
-            lowerCaseValue.indexOf(lowerCaseNeedle) > -1 &&
-              (lowerCaseValue.startsWith(placeholder) || !placeholder),
-            "value"
-          );
-          return (
-            lowerCaseValue.indexOf(lowerCaseNeedle) > -1 &&
+      const placeholder = match[1];
+      const needle = val.replace(regex, "").toLowerCase();
+      console.log("[useSelectAutoComplete2] Extracted needle:", needle);
+
+      filteredOptions.value = options.value?.filter((option: any) => {
+        const value =
+          typeof option === "object" ? option[searchKey] : option.toString();
+        const lowerCaseValue = value.toLowerCase();
+        const lowerCaseNeedle = needle.toLowerCase();
+        console.log("[useSelectAutoComplete2] Check value:", lowerCaseValue);
+        console.log("[useSelectAutoComplete2] Check needle:", lowerCaseNeedle);
+        console.log(
+          "[useSelectAutoComplete2] Condition:",
+          lowerCaseValue.indexOf(lowerCaseNeedle) > -1 &&
             (lowerCaseValue.startsWith(placeholder) || !placeholder)
-          );
-        });
-      } else {
-        const needle = val.toLowerCase();
-        filteredOptions.value = options.value?.filter((option: any) => {
-          const value =
-            typeof option === "object" ? option[searchKey] : option.toString();
-          const lowerCaseValue = value.toLowerCase();
-          return lowerCaseValue.indexOf(needle) > -1;
-        });
-      }
-    });
+        );
+        return (
+          lowerCaseValue.indexOf(lowerCaseNeedle) > -1 &&
+          (lowerCaseValue.startsWith(placeholder) || !placeholder)
+        );
+      });
+    } else {
+      console.log("[useSelectAutoComplete2] No match found:", val);
+
+      const needle = val.toLowerCase();
+      filteredOptions.value = options.value?.filter((option: any) => {
+        const value =
+          typeof option === "object" ? option[searchKey] : option.toString();
+        const lowerCaseValue = value.toLowerCase();
+        console.log("[useSelectAutoComplete2] Check value:", lowerCaseValue);
+        console.log("[useSelectAutoComplete2] Check needle:", needle);
+        return lowerCaseValue.indexOf(needle) > -1;
+      });
+    }
   };
 
   return { filteredOptions, filterFn };
