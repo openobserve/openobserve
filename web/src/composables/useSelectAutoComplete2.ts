@@ -19,7 +19,7 @@ export const useSelectAutoComplete2 = (
     );
   });
 
-  const filterFn = (val: any, update: any) => {
+  const filterFn = (val: any) => {
     if (val === "") {
         console.log("[useSelectAutoComplete2] Empty value:", val);
         filteredOptions.value = options.value;
