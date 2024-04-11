@@ -135,7 +135,7 @@ pub async fn get_latest_traces(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let trace_id = if CONFIG.common.tracing_enabled {
+    let trace_id = if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
