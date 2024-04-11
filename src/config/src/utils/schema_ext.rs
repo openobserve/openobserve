@@ -16,7 +16,6 @@
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
-    sync::Arc,
 };
 
 use arrow_schema::{Field, Schema};
@@ -42,7 +41,6 @@ impl SchemaExt for Schema {
         for field in schema.fields() {
             schema_latest_map.insert(field.name(), field.clone());
         }
-
         let mut fields = Vec::with_capacity(self.fields().len());
         for field in self.fields() {
             match schema_latest_map.get(field.name()) {
