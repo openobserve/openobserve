@@ -15,7 +15,7 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::db, config::utils::json,
+    crate::service::db, config::utils::json, o2_enterprise::enterprise::common::infra::config::*,
     o2_enterprise::enterprise::openfga::meta::mapping::OFGAModel, std::sync::Arc,
 };
 
@@ -39,7 +39,6 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
             match write_auth_models(&meta, &store_id).await {
                 Ok(_) => {
                     let key = "/ofga/model";
-
                     let mut loc_meta = meta.clone();
                     loc_meta.store_id = store_id;
                     loc_meta.model = None;
@@ -64,7 +63,6 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
         match write_auth_models(&meta, &store_id).await {
             Ok(_) => {
                 let key = "/ofga/model";
-
                 let mut loc_meta = meta.clone();
                 loc_meta.store_id = store_id;
                 loc_meta.model = None;
@@ -85,6 +83,7 @@ pub async fn set_ofga_model(existing_meta: Option<OFGAModel>) -> Result<String, 
         }
     }
 }
+
 #[cfg(feature = "enterprise")]
 pub async fn get_ofga_model() -> Result<Option<OFGAModel>, anyhow::Error> {
     let key = "/ofga/model";
@@ -129,11 +128,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
                 log::info!("[WATCH] Got store id {}", &item_value.store_id);
-                o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
-                    .insert("store_id".to_owned(), item_value.store_id);
+                OFGA_STORE_ID.insert("store_id".to_owned(), item_value.store_id);
             }
             db::Event::Delete(_) => {
-                o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID.remove("store_id");
+                OFGA_STORE_ID.remove("store_id");
             }
             db::Event::Empty => {}
         }
@@ -148,8 +146,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (_, item_value) in ret {
         let json_val: OFGAModel = json::from_slice(&item_value).unwrap();
         log::info!("Caching store id {}", &json_val.store_id);
-        o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
-            .insert("store_id".to_owned(), json_val.store_id);
+        OFGA_STORE_ID.insert("store_id".to_owned(), json_val.store_id);
     }
     log::info!("/ofga/model Cached ");
     Ok(())

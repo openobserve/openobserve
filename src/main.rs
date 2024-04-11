@@ -186,6 +186,12 @@ async fn main() -> Result<(), anyhow::Error> {
     // init job
     job::init().await.expect("job init failed");
 
+    // init enterprise
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::init()
+        .await
+        .expect("enerprise init failed");
+
     // gRPC server
     let (grpc_shutudown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();

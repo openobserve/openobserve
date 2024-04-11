@@ -687,7 +687,6 @@ async fn prepare_index_record_batches_v1(
 
         let column_name = column.name();
         let split_chars = &CONFIG.common.inverted_index_split_chars;
-
         let remove_chars_btrim = DEFAULT_INDEX_TRIM_CHARS;
         let lower_case_expr = lower(concat(&[col(column_name), lit("")]));
         let split_arr = STRING_TO_ARRAY_V2_UDF.call(vec![lower_case_expr, lit(split_chars)]);

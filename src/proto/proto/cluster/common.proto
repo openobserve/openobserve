@@ -28,13 +28,15 @@ enum StreamType {
     TRACES   = 2;
     METADATA = 3;
     FILELIST = 4;
+    INDEX    = 5;
 }
 
 // Search request type
 enum SearchType {
-    USER     = 0; // user input search request
-    CLUSTER  = 1; // cluster dispatch search request
-    WAL_ONLY = 2; // ingester node just search local wal
+    USER          = 0; // user input search request
+    CLUSTER       = 1; // cluster dispatch search request
+    WAL_ONLY      = 2; // ingester node just search local wal
+    SUPER_CLUSTER = 3; // super cluster
 }
 
 // Job information for a request

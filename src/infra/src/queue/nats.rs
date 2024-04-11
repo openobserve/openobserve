@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{sync::Arc, time::Duration};
+use std::{cmp::max, sync::Arc, time::Duration};
 
 use async_nats::jetstream;
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::{CONFIG, INSTANCE_ID};
+use config::{get_cluster_name, CONFIG};
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -41,7 +41,7 @@ impl NatsQueue {
     }
 
     pub fn super_cluster() -> Self {
-        Self::new("super_cluster_")
+        Self::new("super_cluster_queue_")
     }
 }
 
@@ -61,7 +61,8 @@ impl super::Queue for NatsQueue {
             name: topic_name.to_string(),
             subjects: vec![topic_name.to_string(), format!("{}.*", topic_name)],
             retention: jetstream::stream::RetentionPolicy::Limits,
-            max_age: Duration::from_secs(60 * 60 * 24 * 30), // 30 days
+            max_age: Duration::from_secs(60 * 60 * 24 * max(1, CONFIG.nats.queue_max_age)),
+            num_replicas: CONFIG.nats.replicas,
             ..Default::default()
         };
         _ = jetstream.get_or_create_stream(config).await?;
@@ -86,11 +87,7 @@ impl super::Queue for NatsQueue {
             let client = get_nats_client().await.clone();
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await?;
-            let consumer_name = if !CONFIG.common.cluster_name.is_empty() {
-                CONFIG.common.cluster_name.to_string()
-            } else {
-                INSTANCE_ID.get("instance_id").unwrap().to_string()
-            };
+            let consumer_name = get_cluster_name();
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
                 durable_name: Some(consumer_name.to_string()),

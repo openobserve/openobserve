@@ -18,6 +18,7 @@ use std::sync::atomic;
 use config::CONFIG;
 
 use crate::service::db;
+
 static LOCAL_OFFSET: atomic::AtomicI64 = atomic::AtomicI64::new(0);
 
 pub async fn get_offset() -> (i64, String) {

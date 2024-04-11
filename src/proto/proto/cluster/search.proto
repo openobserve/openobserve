@@ -9,9 +9,10 @@ package cluster;
 import "cluster/common.proto";
 
 service Search {
-  rpc Search (SearchRequest) returns (SearchResponse) {}
-  rpc QueryStatus(QueryStatusRequest) returns (QueryStatusResponse) {}
-  rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
+    rpc Search (SearchRequest) returns (SearchResponse) {}
+    rpc ClusterSearch (SearchRequest) returns (SearchResponse) {}
+    rpc QueryStatus(QueryStatusRequest) returns (QueryStatusResponse) {}
+    rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
 }
 
 // Search request query
@@ -44,7 +45,6 @@ message SearchRequest {
     string              work_group = 9;
 }
 
-// The response message containing the greetings
 message SearchResponse {
     Job                         job = 1;
     int32                      took = 2;
