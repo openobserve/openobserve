@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{BufRead, BufReader},
     sync::Arc,
 };
@@ -108,6 +108,18 @@ pub async fn ingest(
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
+
+    let mut fields = HashSet::new();
+
+    fields.insert(CONFIG.common.column_timestamp.clone());
+
+    let mut interesting = HashSet::new();
+    for i in 1..100 {
+        interesting.insert(format!("random_attr_{}", i));
+    }
+    for i in 1..10 {
+        interesting.insert(format!("attr{i}"));
+    }
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -268,6 +280,8 @@ pub async fn ingest(
                 json::Value::Object(v) => v,
                 _ => unreachable!(),
             };
+
+            crate::service::logs::refactor_map(&mut local_val, &interesting);
 
             // set _id
             if !doc_id.is_empty() {

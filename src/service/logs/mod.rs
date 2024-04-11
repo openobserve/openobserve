@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use arrow_schema::{DataType, Field, Schema};
@@ -432,6 +435,31 @@ struct StreamMeta<'a> {
     partition_time_level: &'a Option<PartitionTimeLevel>,
     stream_alerts_map: &'a HashMap<String, Vec<Alert>>,
     routing: &'a Vec<Routing>,
+}
+
+pub fn refactor_map(original_map: &mut Map<String, Value>, interesting_keys: &HashSet<String>) {
+    let mut non_interesting_concat = String::new();
+
+    for (key, value) in original_map.iter() {
+        if !interesting_keys.contains(key) {
+            // Assuming value is a simple string for concatenation purposes
+            non_interesting_concat.push_str(&format!("{}:{}, ", key, get_string_value(value)));
+        }
+    }
+
+    if !non_interesting_concat.is_empty() {
+        non_interesting_concat.pop();
+        non_interesting_concat.pop();
+    }
+
+    original_map.retain(|key, _| interesting_keys.contains(key));
+
+    if !non_interesting_concat.is_empty() {
+        original_map.insert(
+            "_non_schema".to_string(),
+            Value::String(non_interesting_concat),
+        );
+    }
 }
 
 #[cfg(test)]
