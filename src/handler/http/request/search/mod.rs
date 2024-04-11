@@ -225,16 +225,22 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let took_wait = 0;
 
-    // do search
-    match SearchService::search(
+    let search_fut = SearchService::search(
         &trace_id,
         &org_id,
         stream_type,
         Some(user_id.to_str().unwrap().to_string()),
         &req,
-    ).instrument(tracing::info_span!("search", trace_id = trace_id.clone()))
-    .await
-    {
+    );
+    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        let http_span = tracing::info_span!("/api/{org_id}/_search",);
+        search_fut.instrument(http_span).await
+    } else {
+        search_fut.await
+    };
+
+    // do search
+    match search_res {
         Ok(mut res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
@@ -470,51 +476,54 @@ pub async fn around(
         .to_str()
         .ok()
         .map(|v| v.to_string());
-    let resp_forward =
-        match SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req).await {
-            Ok(res) => res,
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_around",
-                        "500",
-                        &org_id,
-                        &stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_around",
-                        "500",
-                        &org_id,
-                        &stream_name,
-                        stream_type.to_string().as_str(),
-                    ])
-                    .inc();
-                log::error!("search around error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
+    let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
+    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_around");
+        search_fut.instrument(http_span.clone()).await
+    } else {
+        search_fut.await
+    };
+    let resp_forward = match search_res {
+        Ok(res) => res,
+        Err(err) => {
+            let time = start.elapsed().as_secs_f64();
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/_around",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .observe(time);
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/_around",
+                    "500",
+                    &org_id,
+                    &stream_name,
+                    stream_type.to_string().as_str(),
+                ])
+                .inc();
+            log::error!("search around error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_trace_id(
+                            code,
+                            Some(trace_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    ),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
 
     // search backward
     let req = config::meta::search::Request {
@@ -537,9 +546,14 @@ pub async fn around(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_backward = match SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
-        .await
-    {
+    let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
+    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_around");
+        search_fut.instrument(http_span).await
+    } else {
+        search_fut.await
+    };
+    let resp_backward = match search_res {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -898,15 +912,20 @@ async fn values_v1(
                 ),
             );
     }
-    let resp_search = match SearchService::search(
+    let search_fut = SearchService::search(
         &trace_id,
         org_id,
         stream_type,
         Some(user_id.to_string()),
         &req,
-    )
-    .await
-    {
+    );
+    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_values");
+        search_fut.instrument(http_span).await
+    } else {
+        search_fut.await
+    };
+    let resp_search = match search_res {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
@@ -1079,15 +1098,20 @@ async fn values_v2(
         encoding: config::meta::search::RequestEncoding::Empty,
         timeout,
     };
-    let resp_search = match SearchService::search(
+    let search_fut = SearchService::search(
         &trace_id,
         org_id,
         StreamType::Metadata,
         Some(user_id.to_string()),
         &req,
-    )
-    .await
-    {
+    );
+    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_values");
+        search_fut.instrument(http_span).await
+    } else {
+        search_fut.await
+    };
+    let resp_search = match search_res {
         Ok(res) => res,
         Err(err) => {
             let time = start.elapsed().as_secs_f64();
