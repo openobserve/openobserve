@@ -29,6 +29,7 @@ use config::{
 };
 use infra::errors;
 use opentelemetry::{global, trace::TraceContextExt};
+use tracing::Instrument;
 
 use crate::{
     common::{
@@ -231,7 +232,7 @@ pub async fn search(
         stream_type,
         Some(user_id.to_str().unwrap().to_string()),
         &req,
-    )
+    ).instrument(tracing::info_span!("search", trace_id = trace_id.clone()))
     .await
     {
         Ok(mut res) => {
