@@ -18,15 +18,15 @@ use std::{
     io::{Error, ErrorKind},
 };
 
-use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{StreamSettings, StreamType};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use config::meta::stream::StreamType;
 
 use crate::{
     common::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamDeleteFields},
+            stream::{ListStream, Stream, StreamDeleteFields, StreamSettings},
         },
         utils::http::get_stream_type_from_request,
     },
@@ -101,11 +101,11 @@ async fn settings(
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => {
             if let Some(s_type) = v {
-                if s_type == StreamType::EnrichmentTables {
+                if s_type == StreamType::EnrichmentTables || s_type == StreamType::Index {
                     return Ok(
                         HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                             http::StatusCode::BAD_REQUEST.into(),
-                            "Stream type 'EnrichmentTable' not allowed".to_string(),
+                            format!("Stream type '{}' not allowed", s_type),
                         )),
                     );
                 }
@@ -243,10 +243,8 @@ async fn delete(
 async fn create_stream(
     org_id: web::Path<String>,
     stream: web::Json<Stream>,
-    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    stream::save_stream(&org_id, stream).await
+    stream::save_stream(&org_id, stream.into_inner()).await
 }
 
 /// ListStreams

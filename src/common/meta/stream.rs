@@ -17,8 +17,12 @@ use std::sync::Arc;
 
 use arrow_schema::Field;
 use config::{
-    meta::stream::{StreamSettings, StreamStats, StreamType},
-    utils::json,
+    meta::stream::{PartitionTimeLevel, StreamStats, StreamType},
+    utils::{
+        hash::{gxhash, Sum64},
+        json,
+    },
+    CONFIG,
 };
 use datafusion::arrow::datatypes::Schema;
 use serde::{Deserialize, Serialize};
@@ -79,6 +83,12 @@ pub struct StreamSettings {
     pub routing: HashMap<String, Vec<Condition>>,
     #[serde(default)]
     pub disable_schema_evolution: bool,
+    #[serde(default = "default_flatten_level")]
+    pub flatten_level: i32,
+}
+
+fn default_flatten_level() -> i32 {
+    CONFIG.limit.ingest_flatten_level
 }
 
 impl Serialize for StreamSettings {
@@ -175,6 +185,7 @@ impl From<&str> for StreamSettings {
             data_retention,
             routing: log_routing,
             disable_schema_evolution: true,
+            flatten_level: CONFIG.limit.ingest_flatten_level,
         }
     }
 }

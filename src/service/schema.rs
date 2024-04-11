@@ -615,6 +615,7 @@ pub async fn add_stream_schema(
             bloom_filter_fields: vec![],
             data_retention: 0,
             routing: HashMap::new(),
+            disable_schema_evolution: false,
         };
         metadata.insert(
             "settings".to_string(),
