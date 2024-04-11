@@ -411,7 +411,7 @@ export default defineComponent({
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
       invlidateLoginData();
-      window.location.href = getLogoutURL();
+      window.open(getLogoutURL(), "_blank");
       this.$router.push("/logout");
     },
     goToHome() {
