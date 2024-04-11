@@ -408,10 +408,10 @@ export default defineComponent({
     },
     signout() {
       this.store.dispatch("logout");
+      const logoutURL = getLogoutURL();
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
-      // invlidateLoginData();
-      window.location.href = getLogoutURL();
+      window.location.href = logoutURL;
       this.$router.push("/logout");
     },
     goToHome() {
@@ -995,8 +995,10 @@ export default defineComponent({
         // this.setSelectedOrganization();
       }, 500);
     },
-    changeUserInfo() {
-      this.triggerRefreshToken();
+    changeUserInfo(newVal) {
+      if(JSON.stringify(newVal) != "{}") {
+        this.triggerRefreshToken();
+      }
     },
   },
 });

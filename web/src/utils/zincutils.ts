@@ -99,7 +99,7 @@ export const getUserInfo = (loginString: string) => {
         const encodedSessionData: any = b64EncodeStandard(
           JSON.stringify(decToken)
         );
-      useLocalUserInfo(encodedSessionData);
+        useLocalUserInfo(encodedSessionData);
       }
     }
 
@@ -118,10 +118,7 @@ export const getLoginURL = () => {
 };
 
 export const getLogoutURL = () => {
-  return `https://${config.oauth.domain}/oidc/v1/end_session
-  ?id_token_hint=${useLocalUserInfo()}
-  &post_logout_redirect_uri=${config.oauth.redirectSignOut}
-  &state=random_string`;
+  return `https://${config.oauth.domain}/oidc/v1/end_session?client_id=${config.aws_user_pools_web_client_id}&id_token_hint=${useLocalUserInfo()}&post_logout_redirect_uri=${config.oauth.redirectSignOut}&state=random_string`;
 };
 
 export const getDecodedAccessToken = (token: string) => {
@@ -208,8 +205,6 @@ export const getSessionStorageVal = (key: string) => {
     console.log(`Error: Error while pull sessionstorage value ${key}`);
   }
 };
-
-
 
 export const useLocalOrganization = (val: any = "", isDelete = false) => {
   return useLocalStorage("organization", val, isDelete, true);
