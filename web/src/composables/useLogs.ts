@@ -781,7 +781,6 @@ const useLogs = () => {
             }
           }
 
-          console.log(req.query.sql);
           const preSQLQuery = req.query.sql;
           req.query.sql = [];
 
