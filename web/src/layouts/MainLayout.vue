@@ -407,11 +407,19 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      this.store.dispatch("logout");
+      if (config.isEnterprise == "true") {
+        invlidateLoginData();
+      }
+
       const logoutURL = getLogoutURL();
+      this.store.dispatch("logout");
+
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
-      window.location.href = logoutURL;
+
+      if(config.isCloud == "true") {
+        window.location.href = logoutURL;
+      }
       this.$router.push("/logout");
     },
     goToHome() {
