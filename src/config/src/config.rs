@@ -509,6 +509,8 @@ pub struct Common {
     pub bloom_filter_default_fields: String,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
+    #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
+    pub tracing_search_enabled: bool,
     #[env_config(name = "OTEL_OTLP_HTTP_ENDPOINT", default = "")]
     pub otel_otlp_url: String,
     #[env_config(name = "ZO_TRACING_HEADER_KEY", default = "Authorization")]
