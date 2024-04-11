@@ -312,6 +312,7 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
+  getLogoutURL,
 } from "../utils/zincutils";
 
 import {
