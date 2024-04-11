@@ -77,6 +77,8 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Hashmap::is_empty")]
     #[serde(default)]
     pub routing: HashMap<String, Vec<Condition>>,
+    #[serde(default)]
+    pub disable_schema_evolution: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -172,6 +174,7 @@ impl From<&str> for StreamSettings {
             bloom_filter_fields,
             data_retention,
             routing: log_routing,
+            disable_schema_evolution: true,
         }
     }
 }

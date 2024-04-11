@@ -330,6 +330,71 @@ pub async fn delete_stream(
     )))
 }
 
+#[tracing::instrument(skip(stream))]
+pub async fn save_stream(org_id: &str, mut stream: Stream) -> Result<HttpResponse, Error> {
+    // check if we are allowed to recreate
+    if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!("stream [{stream_name}] is being deleted"),
+            )),
+        );
+    }
+
+    for key in settings.partition_keys.iter() {
+        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("field [{}] can't be used for partition key", key.field),
+            )));
+        }
+    }
+
+    // we need to keep the old partition information, because the hash bucket num can't be changed
+    // get old settings and then update partition_keys
+    let schema = db::schema::get(org_id, stream_name, stream_type)
+        .await
+        .unwrap();
+    let mut old_partition_keys = stream_settings(&schema).unwrap_or_default().partition_keys;
+    // first disable all old partition keys
+    for v in old_partition_keys.iter_mut() {
+        v.disabled = true;
+    }
+    // then update new partition keys
+    for v in settings.partition_keys.iter() {
+        if let Some(old_field) = old_partition_keys.iter_mut().find(|k| k.field == v.field) {
+            if old_field.types != v.types {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!("field [{}] partition types can't be changed", v.field),
+                )));
+            }
+            old_field.disabled = v.disabled;
+        } else {
+            old_partition_keys.push(v.clone());
+        }
+    }
+    settings.partition_keys = old_partition_keys;
+
+    let mut metadata = schema.metadata.clone();
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    if !metadata.contains_key("created_at") {
+        metadata.insert(
+            "created_at".to_string(),
+            chrono::Utc::now().timestamp_micros().to_string(),
+        );
+    }
+    db::schema::update_metadata(org_id, stream_name, stream_type, metadata)
+        .await
+        .unwrap();
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        http::StatusCode::OK.into(),
+        "".to_string(),
+    )))
+}
+
 pub fn get_stream_setting_fts_fields(schema: &Schema) -> Result<Vec<String>, anyhow::Error> {
     match unwrap_stream_settings(schema) {
         Some(setting) => Ok(setting.full_text_search_keys),

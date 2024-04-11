@@ -222,6 +222,33 @@ async fn delete(
     stream::delete_stream(&org_id, &stream_name, stream_type).await
 }
 
+/// DeleteStream
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDelete",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/streams")]
+async fn create_stream(
+    org_id: web::Path<String>,
+    stream: web::Json<Stream>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let stream_type = stream_type.unwrap_or(StreamType::Logs);
+    stream::save_stream(&org_id, stream).await
+}
+
 /// ListStreams
 #[utoipa::path(
     context_path = "/api",
