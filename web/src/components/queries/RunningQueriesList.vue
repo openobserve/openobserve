@@ -5,7 +5,7 @@
       ref="qTable"
       :rows="queries"
       :columns="columns"
-      row-key="session_id"
+      row-key="trace_id"
       style="width: 100%"
     >
       <template #no-data>
@@ -119,7 +119,7 @@
             >Last Data Refresh Time: {{ lastRefreshed }}</label
           >
         </div>
-        <q-table-pagination
+        <!-- <q-table-pagination
           data-test="log-stream-table-pagination"
           :scope="scope"
           :pageTitle="t('logStream.header')"
@@ -127,7 +127,7 @@
           :perPageOptions="perPageOptions"
           position="top"
           @update:changeRecordPerPage="changePagination"
-        />
+        /> -->
       </template>
 
       <template #bottom="scope">
@@ -145,7 +145,8 @@
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
       :message="deleteDialog.message"
-      @confirm="deleteQuery"
+      @update:ok="deleteQuery"
+      @update:cancel="deleteDialog.show = false"
     />
     <q-dialog
       v-model="showListSchemaDialog"
@@ -161,8 +162,8 @@
 
 <script lang="ts">
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import useIsMetaOrg from "@/composables/useIsMetaOrg.ts";
-// import SearchService from "@/services/search";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import SearchService from "@/services/search";
 import {
   onBeforeMount,
   ref,
@@ -170,8 +171,8 @@ import {
   defineComponent,
   defineAsyncComponent,
 } from "vue";
-// import { useQuasar, type QTableProps } from "quasar";
-// import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { useQuasar, type QTableProps, QTable } from "quasar";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -181,17 +182,18 @@ import QueryList from "@/components/queries/QueryList.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, ConfirmDialog },
+  components: { QueryList, ConfirmDialog, QTablePagination, NoData },
   setup() {
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
     // console.log("meta org", isMetaOrg());
     const { isMetaOrg } = useIsMetaOrg();
+    const resultTotal = ref<number>(0);
 
     const refreshData = () => {
       console.log("refreshing data");
-      // getRunningQueries();
+      getRunningQueries();
       lastRefreshed.value = getCurrentTime();
     };
 
@@ -211,48 +213,48 @@ export default defineComponent({
 
     const loadingState = ref(false);
     const queries = ref([
-      {
-        "#": 1,
-        session_id: "2el7tMu7v6eH6pZX9hCBe3VG1Jb",
-        status: "processing",
-        created_at: 1712467524505545,
-        started_at: 1712467524517149,
-        user_id: "root@example.com",
-        org_id: "default",
-        stream_type: "logs",
-        query: {
-          sql: "select * from 'default'",
-          start_time: 1706429989000000,
-          end_time: 2706685707000000,
-        },
-        scan_stats: {
-          files: 2,
-          records: 23376,
-          original_size: 50,
-          compressed_size: 0,
-        },
-      },
-      {
-        "#": 2,
-        session_id: "2el7tMu7v6eH6pZX9hCBe3VG2NK",
-        status: "processing",
-        created_at: 1712467524505545,
-        started_at: 1712467524517149,
-        user_id: "root@example.com",
-        org_id: "default",
-        stream_type: "logs",
-        query: {
-          sql: "select * from 'default'",
-          start_time: 1712672758000000,
-          end_time: 1712676358000000,
-        },
-        scan_stats: {
-          files: 2,
-          records: 23376,
-          original_size: 50,
-          compressed_size: 0,
-        },
-      },
+      // {
+      //   "#": 1,
+      //   session_id: "2el7tMu7v6eH6pZX9hCBe3VG1Jb",
+      //   status: "processing",
+      //   created_at: 1712467524505545,
+      //   started_at: 1712467524517149,
+      //   user_id: "root@example.com",
+      //   org_id: "default",
+      //   stream_type: "logs",
+      //   query: {
+      //     sql: "select * from 'default'",
+      //     start_time: 1706429989000000,
+      //     end_time: 2706685707000000,
+      //   },
+      //   scan_stats: {
+      //     files: 2,
+      //     records: 23376,
+      //     original_size: 50,
+      //     compressed_size: 0,
+      //   },
+      // },
+      // {
+      //   "#": 2,
+      //   session_id: "2el7tMu7v6eH6pZX9hCBe3VG2NK",
+      //   status: "processing",
+      //   created_at: 1712467524505545,
+      //   started_at: 1712467524517149,
+      //   user_id: "root@example.com",
+      //   org_id: "default",
+      //   stream_type: "logs",
+      //   query: {
+      //     sql: "select * from 'default'",
+      //     start_time: 1712672758000000,
+      //     end_time: 1712676358000000,
+      //   },
+      //   scan_stats: {
+      //     files: 2,
+      //     records: 23376,
+      //     original_size: 50,
+      //     compressed_size: 0,
+      //   },
+      // },
     ]);
     console.log(queries.value, "queries.value");
 
@@ -260,9 +262,9 @@ export default defineComponent({
       show: false,
       title: "Delete Running Query",
       message: "Are you sure you want to delete this running query?",
-      data: null,
+      data: null as any,
     });
-    // const qTable: any = ref(null);
+    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
@@ -299,11 +301,11 @@ export default defineComponent({
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
+      qTable.value?.setPagination(pagination.value);
     };
     const filterQuery = ref("");
 
-    // const q = useQuasar();
+    const q = useQuasar();
 
     const localTimeToMicroseconds = () => {
       // Create a Date object representing the current local time
@@ -389,7 +391,6 @@ export default defineComponent({
         align: "left",
         sortable: true,
         field: (row: any) => getDuration(row.created_at),
-        prop: (row: any) => getDuration(row.created_at),
       },
       {
         name: "queryRange",
@@ -397,8 +398,6 @@ export default defineComponent({
         align: "left",
         sortable: true,
         field: (row: any) =>
-          queryRange(row.query.start_time, row.query.end_time),
-        prop: (row: any) =>
           queryRange(row.query.start_time, row.query.end_time),
       },
       {
@@ -424,7 +423,7 @@ export default defineComponent({
     ]);
 
     onBeforeMount(() => {
-      // getRunningQueries();
+      getRunningQueries();
       lastRefreshed.value = getCurrentTime();
     });
 
@@ -437,9 +436,10 @@ export default defineComponent({
       });
       SearchService.get_running_queries()
         .then((response: any) => {
+          resultTotal.value = response?.data?.status?.length;
           console.log("response", response);
-
-          queries.value = response.data;
+          console.log("queries", queries.value);
+          queries.value = response?.data?.status;
         })
         .catch((error: any) => {
           q.notify({
@@ -457,7 +457,11 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_query(deleteDialog.value.data.id)
+      console.log("deleteQuery");
+      
+      console.log("deleteQuery", deleteDialog.value.data);
+      
+      SearchService.delete_running_query(deleteDialog.value.data)
         .then(() => {
           getRunningQueries();
           deleteDialog.value.show = false;
@@ -502,7 +506,7 @@ export default defineComponent({
 
     const confirmDeleteAction = (props: any) => {
       console.log(props);
-      deleteDialog.value.data = props.row.session_id;
+      deleteDialog.value.data = props.row.trace_id;
       deleteDialog.value.show = true;
     };
     return {
@@ -526,6 +530,9 @@ export default defineComponent({
       refreshData,
       lastRefreshed,
       isMetaOrg,
+      resultTotal,
+      selectedPerPage,
+      qTable,
     };
   },
 });

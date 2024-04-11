@@ -139,7 +139,7 @@ export default defineComponent({
       };
 
       const rows: any[] = [
-        ["Session ID", query?.session_id],
+        ["Session ID", query?.trace_id],
         ["Status", query?.status],
         ["User ID", query?.user_id],
         ["Org ID", query?.org_id],
