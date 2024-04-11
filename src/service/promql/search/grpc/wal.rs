@@ -131,7 +131,7 @@ pub(crate) async fn create_context(
     for (_, (mut arrow_schema, record_batches)) in record_batches_meta {
         if !record_batches.is_empty() {
             let ctx = prepare_datafusion_context(None, &SearchType::Normal, false)?;
-            // calulate schema diff
+            // calculate schema diff
             let mut diff_fields = HashMap::new();
             let group_fields = arrow_schema.fields();
             for field in group_fields {
@@ -141,7 +141,7 @@ pub(crate) async fn create_context(
                     }
                 }
             }
-            // add not exists field for wal infered schema
+            // add not exists field for wal inferred schema
             let mut new_fields = Vec::new();
             for field in schema.fields() {
                 if arrow_schema.field_with_name(field.name()).is_err() {

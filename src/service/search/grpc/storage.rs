@@ -214,7 +214,7 @@ pub async fn search(
                 diff_fields.insert(alias.to_string(), v.clone());
             }
         }
-        // add not exists field for wal infered schema
+        // add not exists field for wal inferred schema
         let mut new_fields = Vec::new();
         for field in sql.meta.fields.iter() {
             if schema.field_with_name(field).is_err() {

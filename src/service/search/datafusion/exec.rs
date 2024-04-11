@@ -562,7 +562,7 @@ pub async fn merge(
         return Ok(vec![]);
     }
 
-    // add not exists field for wal infered schema
+    // add not exists field for wal inferred schema
     let mut new_fields = Vec::new();
     for field in select_fields.iter() {
         if schema.field_with_name(field.name()).is_err() {
