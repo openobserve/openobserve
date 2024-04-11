@@ -128,7 +128,7 @@ async fn ingest_inner(
         }
 
         // JSON Flattening
-        value = flatten::flatten(value)?;
+        value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
         // Start row based transform
 
         if !local_trans.is_empty() {
