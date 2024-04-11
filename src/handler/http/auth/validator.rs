@@ -372,6 +372,19 @@ async fn oo_validator_internal(
     }
 }
 
+/// Validates the authentication information in the incoming request and returns the request if
+/// valid, or an error if invalid.
+///
+/// This function is responsible for validating the authentication information in the incoming
+/// request. It supports both Basic and Bearer authentication (in enterprise).
+/// Works exclusively on `/api` prefix
+///
+/// For Basic authentication, it decodes the base64-encoded credentials, splits them into username
+/// and password, and calls the `validator` function to validate the credentials.
+///
+/// For Bearer authentication, it calls the `token_validator` function to validate the token.
+///
+/// If the authentication is invalid, it returns an `ErrorUnauthorized` error.
 pub async fn oo_validator(
     req: ServiceRequest,
     auth_info: AuthExtractor,
