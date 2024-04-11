@@ -721,7 +721,7 @@ async fn merge_grpc_result(
     Ok((merge_batches, scan_stats))
 }
 
-#[tracing::instrument(skip(sql), fields(trace_id = ?_trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub(crate) async fn get_file_list(
     _trace_id: &str,
     sql: &super::sql::Sql,
