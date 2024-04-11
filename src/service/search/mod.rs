@@ -25,7 +25,10 @@ use config::{
     utils::str::find,
     CONFIG,
 };
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+};
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc;
@@ -41,7 +44,7 @@ use {
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
-    service::{format_partition_key, stream},
+    service::format_partition_key,
 };
 
 pub(crate) mod cluster;
@@ -151,9 +154,9 @@ pub async fn search_partition(
     };
     let meta = sql::Sql::new(&search_req).await?;
 
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let files = cluster::get_file_list(
         trace_id,
         &meta,

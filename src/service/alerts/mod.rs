@@ -123,7 +123,7 @@ pub async fn save(
     }
 
     // before saving alert check column type to decide numeric condition
-    let schema = db::schema::get(org_id, stream_name, stream_type).await?;
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     if stream_name.is_empty() || schema.fields().is_empty() {
         return Err(anyhow::anyhow!("Stream {stream_name} not found"));
     }
@@ -552,7 +552,7 @@ impl Condition {
 }
 
 async fn build_sql(alert: &Alert, conditions: &[Condition]) -> Result<String, anyhow::Error> {
-    let schema = db::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
+    let schema = infra::schema::get(&alert.org_id, &alert.stream_name, alert.stream_type).await?;
     let mut wheres = Vec::with_capacity(conditions.len());
     for cond in conditions.iter() {
         let data_type = match schema.field_with_name(&cond.column) {

@@ -270,7 +270,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
     log::debug!("[INGESTER:JOB] get schema for partition: {}", prefix);
 
     // get latest schema
-    let latest_schema = db::schema::get(&org_id, &stream_name, stream_type)
+    let latest_schema = infra::schema::get(&org_id, &stream_name, stream_type)
         .await
         .map_err(|e| {
             log::error!(

@@ -27,12 +27,11 @@ use config::{
     utils::{base64, json},
     CONFIG, DISTINCT_FIELDS,
 };
-use infra::errors;
+use infra::{errors, schema::STREAM_SCHEMAS};
 use opentelemetry::{global, trace::TraceContextExt};
 
 use crate::{
     common::{
-        infra::config::STREAM_SCHEMAS,
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,

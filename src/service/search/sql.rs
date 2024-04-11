@@ -22,24 +22,24 @@ use chrono::Duration;
 use config::{
     meta::{
         sql::{Sql as MetaSql, SqlOperator},
-        stream::{FileKey, StreamType},
+        stream::{FileKey, StreamPartition, StreamType},
     },
     CONFIG, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
 use hashbrown::HashSet;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::STREAM_SCHEMAS_FIELDS,
+};
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        infra::config::STREAM_SCHEMAS_FIELDS,
-        meta::stream::{StreamParams, StreamPartition},
-    },
-    service::{db, search::match_source, stream::get_stream_setting_fts_fields},
+    common::meta::stream::StreamParams,
+    service::{search::match_source, stream::get_stream_setting_fts_fields},
 };
 
 const SQL_DELIMITERS: [u8; 12] = [
@@ -369,7 +369,7 @@ impl Sql {
         }
 
         // fetch schema
-        let schema = match db::schema::get(&org_id, &meta.source, stream_type).await {
+        let schema = match infra::schema::get(&org_id, &meta.source, stream_type).await {
             Ok(schema) => schema,
             Err(_) => Schema::empty(),
         };

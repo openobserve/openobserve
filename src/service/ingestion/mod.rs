@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use chrono::{TimeZone, Utc};
 use config::{
     cluster,
     meta::{
-        stream::{PartitionTimeLevel, StreamType},
+        stream::{PartitionTimeLevel, PartitioningDetails, StreamPartition, StreamType},
         usage::RequestStats,
     },
     utils::{
@@ -44,7 +44,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::{PartitioningDetails, SchemaRecords, StreamPartition},
+            stream::SchemaRecords,
         },
         utils::functions::get_vrl_compiler_config,
     },
@@ -137,7 +137,7 @@ pub async fn get_stream_partition_keys(
     stream_type: &StreamType,
     stream_name: &str,
 ) -> PartitioningDetails {
-    let stream_settings = db::schema::get_settings(org_id, stream_name, *stream_type)
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, *stream_type)
         .await
         .unwrap_or_default();
     PartitioningDetails {
@@ -453,8 +453,9 @@ pub fn get_val_with_type_retained(val: &Value) -> Value {
 
 #[cfg(test)]
 mod tests {
+    use infra::schema::{unwrap_stream_settings, STREAM_SETTINGS};
+
     use super::*;
-    use crate::{common::infra::config::STREAM_SETTINGS, service::stream::stream_settings};
 
     #[test]
     fn test_format_partition_key() {
@@ -517,7 +518,7 @@ mod tests {
             r#"{"partition_keys": {"country": "country", "sport": "sport"}}"#.to_string(),
         );
         let schema = arrow_schema::Schema::empty().with_metadata(meta);
-        let settings = stream_settings(&schema).unwrap();
+        let settings = unwrap_stream_settings(&schema).unwrap();
         let mut w = STREAM_SETTINGS.write().await;
         w.insert("default/logs/olympics".to_string(), settings);
         drop(w);

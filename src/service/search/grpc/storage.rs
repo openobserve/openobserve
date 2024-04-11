@@ -19,7 +19,7 @@ use config::{
     is_local_disk_storage,
     meta::{
         search::{ScanStats, SearchType, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
     CONFIG,
 };
@@ -32,17 +32,14 @@ use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
-use crate::{
-    common::meta::stream::StreamPartition,
-    service::{
-        db, file_list,
-        search::{datafusion::exec, sql::Sql},
-        stream,
-    },
+use crate::service::{
+    db, file_list,
+    search::{datafusion::exec, sql::Sql},
 };
 
 /// search in remote object storage
@@ -57,7 +54,7 @@ pub async fn search(
 ) -> super::SearchResult {
     // fetch all schema versions, group files by version
     let schema_versions =
-        match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
+        match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
                 log::error!("[trace_id {trace_id}] get schema error: {}", err);
@@ -72,9 +69,9 @@ pub async fn search(
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = stream::stream_settings(schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(schema_latest).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // get file list
     let files = match file_list.is_empty() {

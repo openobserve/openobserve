@@ -21,9 +21,10 @@ use config::{
     cluster::{is_ingester, is_querier},
     meta::{
         cluster::{Node, Role},
-        search,
-        search::ScanStats,
-        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+        search::{self, ScanStats},
+        stream::{
+            FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
+        },
     },
     utils::json,
     CONFIG, INDEX_MIN_CHAR_LEN,
@@ -32,6 +33,7 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, ErrorCodes, Result},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use itertools::Itertools;
 use proto::cluster_rpc;
@@ -39,10 +41,7 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamPartition},
-    service::{file_list, stream},
-};
+use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
 pub mod grpc;
 pub mod http;
@@ -104,9 +103,9 @@ pub async fn search(
     );
 
     // stream settings
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // If the query is of type inverted index and this is not an aggregations request
     let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {

@@ -27,7 +27,10 @@ use config::{
     utils::{json, schema_ext::SchemaExt},
     FxIndexMap, CONFIG,
 };
-use infra::errors::{Error, Result};
+use infra::{
+    errors::{Error, Result},
+    schema::unwrap_partition_time_level,
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -41,7 +44,6 @@ use crate::{
     service::{
         ingestion,
         metadata::{Metadata, MetadataItem},
-        stream::unwrap_partition_time_level,
     },
 };
 
@@ -196,7 +198,7 @@ impl Metadata for DistinctValues {
             }
 
             // check for schema
-            let db_schema = service::db::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
+            let db_schema = infra::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
                 .await
                 .unwrap();
             if db_schema.fields().is_empty() {
