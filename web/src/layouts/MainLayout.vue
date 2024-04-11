@@ -406,12 +406,11 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      // if (config.isEnterprise == "true") {
-      invlidateLoginData();
-      // }
       this.store.dispatch("logout");
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
+      invlidateLoginData();
+      window.location.href = getLogoutURL();
       this.$router.push("/logout");
     },
     goToHome() {
