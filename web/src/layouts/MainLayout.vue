@@ -406,9 +406,7 @@ export default defineComponent({
       window.open(zoBackendUrl + "/swagger/index.html", "_blank");
     },
     signout() {
-      if (config.isEnterprise == "true") {
-        invlidateLoginData();
-      }
+      invlidateLoginData();
       this.store.dispatch("logout");
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
