@@ -17,7 +17,7 @@
       dense
       label-slot
       data-test="dashboard-config-promql-legend"
-      @change="fieldsFilterFn"
+      @update:model-value="fieldsFilterFn"
       @focus="showOptions = true"
       @blur="hideOptionsWithDelay"
     >
@@ -92,7 +92,8 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.promql_legend;
-
+      console.log("inputValue", inputValue);
+      
       const newValue = inputValue + option;
       console.log("newValue", newValue);
 

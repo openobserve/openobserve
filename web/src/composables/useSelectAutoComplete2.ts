@@ -26,7 +26,7 @@ export const useSelectAutoComplete2 = (
       return;
     }
 
-    const regex = /\$\{(\w+)/g;
+    const regex = /\{(\w+)/g;
     console.log("[useSelectAutoComplete2] Regex:", regex);
 
     const match = regex.exec(val);
@@ -44,8 +44,8 @@ export const useSelectAutoComplete2 = (
           typeof option === "object" ? option[searchKey] : option.toString();
         const lowerCaseValue = value.toLowerCase();
         const lowerCaseNeedle = needle.toLowerCase();
-        console.log("[useSelectAutoComplete2] Check value:", lowerCaseValue);
-        console.log("[useSelectAutoComplete2] Check needle:", lowerCaseNeedle);
+        // console.log("[useSelectAutoComplete2] Check value:", lowerCaseValue);
+        // console.log("[useSelectAutoComplete2] Check needle:", lowerCaseNeedle);
         console.log(
           "[useSelectAutoComplete2] Condition:",
           lowerCaseValue.indexOf(lowerCaseNeedle) > -1 &&
@@ -64,8 +64,8 @@ export const useSelectAutoComplete2 = (
         const value =
           typeof option === "object" ? option[searchKey] : option.toString();
         const lowerCaseValue = value.toLowerCase();
-        console.log("[useSelectAutoComplete2] Check value:", lowerCaseValue);
-        console.log("[useSelectAutoComplete2] Check needle:", needle);
+        // console.log("[useSelectAutoComplete2] Check value:", lowerCaseValue);
+        // console.log("[useSelectAutoComplete2] Check needle:", needle);
         return lowerCaseValue.indexOf(needle) > -1;
       });
     }
