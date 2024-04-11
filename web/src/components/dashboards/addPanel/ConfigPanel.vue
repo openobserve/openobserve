@@ -537,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-input> -->
 
-      <PromqlLegendConfig></PromqlLegendConfig>
+      <PromqlLegendConfig v-if="promqlMode"></PromqlLegendConfig>
 
       <div class="space"></div>
 
