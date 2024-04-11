@@ -44,6 +44,7 @@ use crate::{
 };
 
 pub mod job;
+pub mod multi_streams;
 pub mod saved_view;
 
 /// SearchStreamData
