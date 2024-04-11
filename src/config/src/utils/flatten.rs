@@ -17,6 +17,11 @@ use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
 
+#[inline]
+pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
+    flatten_with_level(to_flatten, 0)
+}
+
 /// Flattens the provided JSON object (`current`).
 ///
 /// It will return an error if flattening the object would make two keys to be
@@ -26,7 +31,7 @@ const KEY_SEPARATOR: &str = "_";
 /// # Errors
 /// Will return `Err` if `to_flatten` it's not an object, or if flattening the
 /// object would result in two or more keys colliding.
-pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
+pub fn flatten_with_level(to_flatten: Value, max_level: u32) -> Result<Value, anyhow::Error> {
     // quick check to see if we have an object`
     let to_flatten = match to_flatten {
         Value::Object(v) => {
@@ -49,7 +54,7 @@ pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
     };
 
     let mut flat = Map::<String, Value>::new();
-    flatten_value(to_flatten, "".to_owned(), 0, &mut flat).map(|_x| Value::Object(flat))
+    flatten_value(to_flatten, "".to_owned(), max_level, 0, &mut flat).map(|_x| Value::Object(flat))
 }
 
 /// Flattens the passed JSON value (`current`), whose path is `parent_key` and
@@ -58,15 +63,16 @@ pub fn flatten(to_flatten: Value) -> Result<Value, anyhow::Error> {
 fn flatten_value(
     current: Value,
     parent_key: String,
+    max_level: u32,
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
     match current {
         Value::Object(map) => {
-            flatten_object(map, &parent_key, depth, flattened)?;
+            flatten_object(map, &parent_key, max_level, depth, flattened)?;
         }
         Value::Array(arr) => {
-            flatten_array(arr, &parent_key, depth, flattened)?;
+            flatten_array(arr, &parent_key, max_level, depth, flattened)?;
         }
         _ => {
             flattened.insert(parent_key, current);
@@ -81,9 +87,18 @@ fn flatten_value(
 fn flatten_object(
     current: Map<String, Value>,
     parent_key: &str,
+    max_level: u32,
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
+    if current.is_empty() {
+        return Ok(());
+    }
+    if max_level > 0 && depth >= max_level {
+        let v = Value::String(Value::Object(current).to_string());
+        flatten_value(v, parent_key.to_string(), max_level, depth, flattened)?;
+        return Ok(());
+    }
     for (mut k, v) in current.into_iter() {
         format_key(&mut k);
         let parent_key = if depth > 0 {
@@ -91,7 +106,7 @@ fn flatten_object(
         } else {
             k
         };
-        flatten_value(v, parent_key, depth + 1, flattened)?;
+        flatten_value(v, parent_key, max_level, depth + 1, flattened)?;
     }
     Ok(())
 }
@@ -102,6 +117,7 @@ fn flatten_object(
 fn flatten_array(
     current: Vec<Value>,
     parent_key: &str,
+    max_level: u32,
     depth: u32,
     flattened: &mut Map<String, Value>,
 ) -> Result<(), anyhow::Error> {
@@ -113,7 +129,7 @@ fn flatten_array(
     //     flatten_value(obj, parent_key, depth + 1, flattened)?;
     // }
     let v = Value::String(Value::Array(current.to_vec()).to_string());
-    flatten_value(v, parent_key.to_string(), depth, flattened)?;
+    flatten_value(v, parent_key.to_string(), max_level, depth, flattened)?;
     Ok(())
 }
 
@@ -385,5 +401,98 @@ mod tests {
 
         let output = flatten(input).unwrap();
         assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_flatten_with_level() {
+        let input = json!({
+            "firstName": "John",
+            "lastName": "Doe",
+            "age": 25,
+            "info": {
+                "address": {
+                    "streetAddress": "123 Main St",
+                    "city": "Anytown",
+                    "state": "CA",
+                    "postalCode": "12345",
+                    "phoneNumbers": {
+                        "type": "home",
+                        "number": "555-555-1234"
+                    }
+                },
+                "phoneNumbers": [
+                    {
+                        "type": "home",
+                        "number": "555-555-1234"
+                    },
+                    {
+                        "type": "work",
+                        "number": "555-555-5678"
+                    }
+                ]
+            }
+        });
+
+        let expected_output_level0 = json!({
+            "firstname": "John",
+            "lastname": "Doe",
+            "age": 25,
+            "info_address_streetaddress": "123 Main St",
+            "info_address_city": "Anytown",
+            "info_address_state": "CA",
+            "info_address_postalcode": "12345",
+            "info_address_phonenumbers_number": "555-555-1234",
+            "info_address_phonenumbers_type": "home",
+            "info_phonenumbers": "[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
+        });
+        let expected_output_level1 = json!({
+            "firstname": "John",
+            "lastname": "Doe",
+            "age": 25,
+            "info": "{\"address\":{\"city\":\"Anytown\",\"phoneNumbers\":{\"number\":\"555-555-1234\",\"type\":\"home\"},\"postalCode\":\"12345\",\"state\":\"CA\",\"streetAddress\":\"123 Main St\"},\"phoneNumbers\":[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]}"
+        });
+        let expected_output_level2 = json!({
+            "firstname": "John",
+            "lastname": "Doe",
+            "age": 25,
+            "info_address": "{\"city\":\"Anytown\",\"phoneNumbers\":{\"number\":\"555-555-1234\",\"type\":\"home\"},\"postalCode\":\"12345\",\"state\":\"CA\",\"streetAddress\":\"123 Main St\"}",
+            "info_phonenumbers": "[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
+        });
+        let expected_output_level3 = json!({
+            "firstname": "John",
+            "lastname": "Doe",
+            "age": 25,
+            "info_address_streetaddress": "123 Main St",
+            "info_address_city": "Anytown",
+            "info_address_state": "CA",
+            "info_address_postalcode": "12345",
+            "info_address_phonenumbers": "{\"number\":\"555-555-1234\",\"type\":\"home\"}",
+            "info_phonenumbers": "[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
+        });
+        let expected_output_level4 = json!({
+            "firstname": "John",
+            "lastname": "Doe",
+            "age": 25,
+            "info_address_streetaddress": "123 Main St",
+            "info_address_city": "Anytown",
+            "info_address_state": "CA",
+            "info_address_postalcode": "12345",
+            "info_address_phonenumbers_number": "555-555-1234",
+            "info_address_phonenumbers_type": "home",
+            "info_phonenumbers": "[{\"number\":\"555-555-1234\",\"type\":\"home\"},{\"number\":\"555-555-5678\",\"type\":\"work\"}]"
+        });
+
+        let output = flatten_with_level(input.clone(), 0).unwrap();
+        assert_eq!(output, expected_output_level0);
+        let output = flatten_with_level(input.clone(), 1).unwrap();
+        assert_eq!(output, expected_output_level1);
+        let output = flatten_with_level(input.clone(), 2).unwrap();
+        assert_eq!(output, expected_output_level2);
+        let output = flatten_with_level(input.clone(), 3).unwrap();
+        assert_eq!(output, expected_output_level3);
+        let output = flatten_with_level(input.clone(), 4).unwrap();
+        assert_eq!(output, expected_output_level4);
+        let output = flatten_with_level(input, 5).unwrap();
+        assert_eq!(output, expected_output_level4);
     }
 }
