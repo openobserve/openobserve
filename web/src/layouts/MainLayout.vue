@@ -410,8 +410,8 @@ export default defineComponent({
       this.store.dispatch("logout");
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
-      invlidateLoginData();
-      window.open(getLogoutURL(), "_blank");
+      // invlidateLoginData();
+      window.location.href = getLogoutURL();
       this.$router.push("/logout");
     },
     goToHome() {

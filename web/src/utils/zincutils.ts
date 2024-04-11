@@ -118,7 +118,10 @@ export const getLoginURL = () => {
 };
 
 export const getLogoutURL = () => {
-  return `https://${config.oauth.domain}/logout?client_id=${config.aws_user_pools_web_client_id}&response_type=${config.oauth.responseType}&redirect_uri=${config.oauth.redirectSignIn}`;
+  return `https://${config.oauth.domain}/oidc/v1/end_session
+  ?id_token_hint=${useLocalUserInfo()}
+  &post_logout_redirect_uri=${config.oauth.redirectSignOut}
+  &state=random_string`;
 };
 
 export const getDecodedAccessToken = (token: string) => {

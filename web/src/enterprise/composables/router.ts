@@ -62,9 +62,10 @@ const useEnvRoutes = () => {
         useLocalUserInfo("", true);
         if (config.isEnterprise == "true") {
           invlidateLoginData();
-        } else {
-          window.location.href = getLogoutURL();
         }
+        //  else {
+        //   window.location.href = getLogoutURL();
+        // }
       },
     },
     {
