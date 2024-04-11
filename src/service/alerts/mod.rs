@@ -972,6 +972,12 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             .replace("{alert_start_time}", &alert_start_time_str)
             .replace("{alert_end_time}", &alert_end_time_str);
 
+        if let Some(contidion) = &alert.query_condition.promql_condition {
+            resp = resp
+                .replace("{alert_promql_operator}", &contidion.operator.to_string())
+                .replace("{alert_promql_value}", &contidion.value.to_string());
+        }
+
         if let Some(attrs) = &alert.context_attributes {
             for (key, value) in attrs.iter() {
                 process_variable_replace(&mut resp, key, &VarValue::Str(value));
@@ -1170,6 +1176,13 @@ async fn process_dest_template(
         .replace("{alert_start_time}", &alert_start_time_str)
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url);
+
+    if let Some(contidion) = &alert.query_condition.promql_condition {
+        resp = resp
+            .replace("{alert_promql_operator}", &contidion.operator.to_string())
+            .replace("{alert_promql_value}", &contidion.value.to_string());
+    }
+
     process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val));
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
