@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     v-if="frequency.type === 'custom'"
-                    class="flex items-center justify-start q-mt-md"
+                    class="flex items-start justify-start q-mt-md"
                   >
                     <div
                       data-test="add-report-schedule-custom-interval-input"
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         filled
                         v-model="frequency.custom.interval"
-                        label="Repeat every"
+                        label="Repeat every *"
                         color="input-border"
                         bg-color="input-bg"
                         class="showLabelOnTop"
@@ -438,6 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         type="number"
                         outlined
                         dense
+                        :rules="[(val) => !!val || 'Field is required!']"
                         style="width: 100%"
                       />
                     </div>
@@ -450,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-select
                         v-model="frequency.custom.period"
                         :options="customFrequencyOptions"
-                        :label="' '"
+                        :label="'Frequency *'"
                         :popup-content-style="{ textTransform: 'capitalize' }"
                         color="input-border"
                         bg-color="input-bg"
@@ -478,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         filled
                         v-model="scheduling.date"
-                        label="Start Date"
+                        label="Start Date *"
                         color="input-border"
                         bg-color="input-bg"
                         class="showLabelOnTop"
@@ -506,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 <div class="row items-center justify-end">
                                   <q-btn
-                                    :v-close-popup="true"
+                                    v-close-popup="true"
                                     label="Close"
                                     color="primary"
                                     flat
@@ -525,7 +526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-input
                         filled
                         v-model="scheduling.time"
-                        label="Start Time"
+                        label="Start Time *"
                         color="input-border"
                         bg-color="input-bg"
                         class="showLabelOnTop"
@@ -546,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <q-time v-model="scheduling.time">
                                 <div class="row items-center justify-end">
                                   <q-btn
-                                    :v-close-popup="true"
+                                    v-close-popup="true"
                                     label="Close"
                                     color="primary"
                                     flat
@@ -577,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         emit-value
                         fill-input
                         hide-selected
-                        :label="t('logStream.timezone')"
+                        :label="t('logStream.timezone') + ' *'"
                         :display-value="`Timezone: ${timezone}`"
                         :rules="[(val: any) => !!val || 'Field is required!']"
                         class="timezone-select showLabelOnTop"

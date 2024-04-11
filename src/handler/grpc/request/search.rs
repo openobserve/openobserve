@@ -16,8 +16,8 @@
 use config::metrics;
 use infra::errors;
 use proto::cluster_rpc::{
-    search_server::Search, CancelJobRequest, CancelJobResponse, JobStatusRequest,
-    JobStatusResponse, SearchRequest, SearchResponse,
+    search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
+    QueryStatusResponse, SearchRequest, SearchResponse,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -27,56 +27,58 @@ use crate::service::search as SearchService;
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
 pub struct Searcher {
-    pub task_manager: std::sync::Arc<o2_enterprise::enterprise::search::TaskManager>,
+    pub query_manager: std::sync::Arc<o2_enterprise::enterprise::search::QueryManager>,
 }
 
 #[cfg(feature = "enterprise")]
 impl Searcher {
     pub fn new() -> Self {
         Self {
-            task_manager: std::sync::Arc::new(o2_enterprise::enterprise::search::TaskManager::new()),
+            query_manager: std::sync::Arc::new(
+                o2_enterprise::enterprise::search::QueryManager::new(),
+            ),
         }
     }
 
-    // check is the trace_id in the task_manager
+    // check is the trace_id in the query_manager
     pub async fn contain_key(&self, trace_id: &str) -> bool {
-        self.task_manager.contain_key(trace_id).await
+        self.query_manager.contain_key(trace_id).await
     }
 
-    // insert the trace_id and task_status into the task_manager
+    // insert the trace_id and task_status into the query_manager
     pub async fn insert(
         &self,
         trace_id: String,
         task_status: o2_enterprise::enterprise::search::TaskStatus,
     ) {
-        self.task_manager.insert(trace_id, task_status).await;
+        self.query_manager.insert(trace_id, task_status).await;
     }
 
-    // remove the trace_id from the task_manager
+    // remove the trace_id from the query_manager
     pub async fn remove(
         &self,
         trace_id: &str,
     ) -> Option<(String, o2_enterprise::enterprise::search::TaskStatus)> {
-        self.task_manager.remove(trace_id).await
+        self.query_manager.remove(trace_id).await
     }
 
-    // check is the trace_id in the task_manager and is_leader
+    // check is the trace_id in the query_manager and is_leader
     pub async fn is_leader(&self, trace_id: &str) -> bool {
-        self.task_manager.is_leader(trace_id).await
+        self.query_manager.is_leader(trace_id).await
     }
 
-    // insert the sender into the task_manager by trace_id
+    // insert the sender into the query_manager by trace_id
     pub async fn insert_sender(
         &self,
         trace_id: &str,
         sender: tokio::sync::oneshot::Sender<()>,
     ) -> Result<(), infra::errors::Error> {
-        self.task_manager.insert_sender(trace_id, sender).await
+        self.query_manager.insert_sender(trace_id, sender).await
     }
 
     // get all task status that is leader
-    pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::JobStatus> {
-        self.task_manager.get_task_status().await
+    pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
+        self.query_manager.get_task_status().await
     }
 
     // add file stats
@@ -88,7 +90,7 @@ impl Searcher {
         original_size: i64,
         compressed_size: i64,
     ) {
-        self.task_manager
+        self.query_manager
             .add_file_stats(trace_id, files, records, original_size, compressed_size)
             .await;
     }
@@ -262,44 +264,44 @@ impl Search for Searcher {
     }
 
     #[cfg(feature = "enterprise")]
-    async fn job_status(
+    async fn query_status(
         &self,
-        _req: Request<JobStatusRequest>,
-    ) -> Result<Response<JobStatusResponse>, Status> {
+        _req: Request<QueryStatusRequest>,
+    ) -> Result<Response<QueryStatusResponse>, Status> {
         let status = self.get_task_status().await;
-        Ok(Response::new(JobStatusResponse { status }))
+        Ok(Response::new(QueryStatusResponse { status }))
     }
 
     #[cfg(not(feature = "enterprise"))]
-    async fn job_status(
+    async fn query_status(
         &self,
-        _req: Request<JobStatusRequest>,
-    ) -> Result<Response<JobStatusResponse>, Status> {
+        _req: Request<QueryStatusRequest>,
+    ) -> Result<Response<QueryStatusResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 
     #[cfg(feature = "enterprise")]
-    async fn cancel_job(
+    async fn cancel_query(
         &self,
-        req: Request<CancelJobRequest>,
-    ) -> Result<Response<CancelJobResponse>, Status> {
+        req: Request<CancelQueryRequest>,
+    ) -> Result<Response<CancelQueryResponse>, Status> {
         let trace_id = req.into_inner().trace_id;
         match self.remove(&trace_id).await {
             Some((_, senders)) => {
                 for sender in senders.abort_senders.into_iter().rev() {
                     let _ = sender.send(());
                 }
-                Ok(Response::new(CancelJobResponse { is_success: true }))
+                Ok(Response::new(CancelQueryResponse { is_success: true }))
             }
-            None => Ok(Response::new(CancelJobResponse { is_success: false })),
+            None => Ok(Response::new(CancelQueryResponse { is_success: false })),
         }
     }
 
     #[cfg(not(feature = "enterprise"))]
-    async fn cancel_job(
+    async fn cancel_query(
         &self,
-        _req: Request<CancelJobRequest>,
-    ) -> Result<Response<CancelJobResponse>, Status> {
+        _req: Request<CancelQueryRequest>,
+    ) -> Result<Response<CancelQueryResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 }

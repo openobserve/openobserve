@@ -500,7 +500,6 @@ export default defineComponent({
       nextTick(() => {
         if (
           searchObj.meta.showHistogram &&
-          !searchObj.meta.sqlMode &&
           searchResultRef.value?.reDrawChart
         ) {
           searchResultRef.value.reDrawChart();
@@ -521,39 +520,46 @@ export default defineComponent({
           let currentQuery = searchObj.data.query;
 
           //check if user try to applied saved views in which sql mode is enabled.
-          if (currentQuery.indexOf("SELECT") >= 0) {
-            return;
-          }
-          currentQuery = currentQuery.split("|");
-          if (currentQuery.length > 1) {
-            selectFields = "," + currentQuery[0].trim();
-            if (currentQuery[1].trim() != "") {
-              whereClause = "WHERE " + currentQuery[1].trim();
-            }
-          } else if (currentQuery[0].trim() != "") {
-            if (currentQuery[0].trim() != "") {
-              whereClause = "WHERE " + currentQuery[0].trim();
-            }
-          }
-          searchObj.data.query =
-            `SELECT [FIELD_LIST]${selectFields} FROM "` +
-            searchObj.data.stream.selectedStream.value +
-            `" ` +
-            whereClause;
 
-          if (
-            searchObj.data.stream.interestingFieldList.length > 0 &&
-            searchObj.meta.quickMode
-          ) {
-            searchObj.data.query = searchObj.data.query.replace(
-              "[FIELD_LIST]",
-              searchObj.data.stream.interestingFieldList.join(",")
-            );
-          } else {
-            searchObj.data.query = searchObj.data.query.replace(
-              "[FIELD_LIST]",
-              "*"
-            );
+          // Parse the query and check if it is valid
+          // It should have one column and one table
+
+          const hasSelect =
+            currentQuery.toLowerCase() === "select" ||
+            currentQuery.toLowerCase().indexOf("select ") == 0;
+
+          if (!hasSelect) {
+            currentQuery = currentQuery.split("|");
+            if (currentQuery.length > 1) {
+              selectFields = "," + currentQuery[0].trim();
+              if (currentQuery[1].trim() != "") {
+                whereClause = "WHERE " + currentQuery[1].trim();
+              }
+            } else if (currentQuery[0].trim() != "") {
+              if (currentQuery[0].trim() != "") {
+                whereClause = "WHERE " + currentQuery[0].trim();
+              }
+            }
+            searchObj.data.query =
+              `SELECT [FIELD_LIST]${selectFields} FROM "` +
+              searchObj.data.stream.selectedStream.value +
+              `" ` +
+              whereClause;
+
+            if (
+              searchObj.data.stream.interestingFieldList.length > 0 &&
+              searchObj.meta.quickMode
+            ) {
+              searchObj.data.query = searchObj.data.query.replace(
+                "[FIELD_LIST]",
+                searchObj.data.stream.interestingFieldList.join(",")
+              );
+            } else {
+              searchObj.data.query = searchObj.data.query.replace(
+                "[FIELD_LIST]",
+                "*"
+              );
+            }
           }
 
           searchObj.data.query = addOrderByToQuery(
@@ -573,7 +579,6 @@ export default defineComponent({
           searchBarRef.value.udpateQuery();
         }
       } catch (e) {
-        console.log(e);
         console.log("Logs : Error in setQuery");
       }
     };
@@ -782,14 +787,12 @@ export default defineComponent({
     },
     showHistogram() {
       if (
-        this.searchObj.meta.showHistogram == true &&
-        this.searchObj.shouldIgnoreWatcher == false
+        this.searchObj.meta.showHistogram &&
+        !this.searchObj.shouldIgnoreWatcher
       ) {
-        if (this.searchObj.meta.sqlMode == false) {
-          setTimeout(() => {
-            if (this.searchResultRef) this.searchResultRef.reDrawChart();
-          }, 100);
-        }
+        setTimeout(() => {
+          if (this.searchResultRef) this.searchResultRef.reDrawChart();
+        }, 100);
 
         if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;

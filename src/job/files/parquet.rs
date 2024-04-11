@@ -130,14 +130,21 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
     // do partition by partition key
     let mut partition_files_with_size: FxIndexMap<String, Vec<FileKey>> = FxIndexMap::default();
     for file in files {
-        let file_key = Path::new(&file)
-            .canonicalize()
-            .unwrap()
-            .strip_prefix(&wal_dir)
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .replace('\\', "/");
+        let file_key = {
+            let file = match Path::new(&file).canonicalize() {
+                Ok(v) => v,
+                Err(_) => {
+                    continue;
+                }
+            };
+            let file = match file.strip_prefix(&wal_dir) {
+                Ok(v) => v,
+                Err(_) => {
+                    continue;
+                }
+            };
+            file.to_str().unwrap().replace('\\', "/")
+        };
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
             continue;

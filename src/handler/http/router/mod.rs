@@ -183,7 +183,12 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 #[cfg(not(feature = "enterprise"))]
 pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(web::scope("/config").wrap(cors).service(status::zo_config));
+    cfg.service(
+        web::scope("/config")
+            .wrap(cors)
+            .service(status::zo_config)
+            .service(status::logout),
+    );
 }
 
 #[cfg(feature = "enterprise")]
@@ -263,8 +268,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(prom::format_query_post)
             .service(enrichment_table::save_enrichment_table)
             .service(search::search)
-            .service(search::job::cancel_job)
-            .service(search::job::job_status)
+            .service(search::job::cancel_query)
+            .service(search::job::query_status)
             .service(search::search_partition)
             .service(search::around)
             .service(search::values)
