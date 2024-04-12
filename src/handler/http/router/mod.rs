@@ -90,7 +90,7 @@ async fn audit_middleware(
     if O2_CONFIG.common.audit_enabled
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
-        let query = req.query_string().to_string();
+        let query_params = req.query_string().to_string();
         let org_id = {
             let org = path_columns[0];
             if org.eq("organizations") {
@@ -129,8 +129,8 @@ async fn audit_middleware(
                 method,
                 path,
                 body,
-                query,
-                resp_status: res.response().status().as_u16(),
+                query_params,
+                response_code: res.response().status().as_u16(),
                 _timestamp: chrono::Utc::now().timestamp_micros(),
             })
             .await;
