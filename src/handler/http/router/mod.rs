@@ -130,6 +130,7 @@ async fn audit_middleware(
                 path,
                 body,
                 query,
+                resp_status: res.response().status().as_u16(),
                 _timestamp: chrono::Utc::now().timestamp_micros(),
             })
             .await;
