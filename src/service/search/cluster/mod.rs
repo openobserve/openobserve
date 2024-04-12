@@ -156,8 +156,7 @@ pub async fn search(
         let idx_resp: search::Response = http::search(idx_req).await?;
         let (unique_files, inverted_index_count) = if is_first_page {
             // should be query size * 2
-            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 2);
-            let limit_count = 2000;
+            let limit_count = std::cmp::max(10, req.query.as_ref().unwrap().size as u64 * 4);
             let mut total_count = 0;
             // get deleted file
             let deleted_files = idx_resp
