@@ -1058,7 +1058,10 @@ pub async fn merge_parquet_files(
     // query data
     let runtime_env = create_runtime_env(None)?;
     let session_config = create_session_config(&SearchType::Normal)?;
-    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
+    let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
+        .with_optimizer_rules(vec![])
+        .with_analyzer_rules(vec![]);
+    let ctx = SessionContext::new_with_state(state);
 
     // Configure listing options
     let file_format = ParquetFormat::default();
