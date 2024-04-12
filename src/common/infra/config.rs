@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, RwAHashSet, RwHashMap};
+use config::{RwAHashMap, RwHashMap};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -79,7 +79,3 @@ pub static GEOIP_CITY_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 
 pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
     Lazy::new(|| Arc::new(RwLock::new(None)));
-
-// SEARCHING_FILES for searching files, in use, should not move to s3
-pub static SEARCHING_FILES: Lazy<RwAHashSet<String>> =
-    Lazy::new(|| tokio::sync::RwLock::new(Default::default()));
