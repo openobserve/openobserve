@@ -1142,6 +1142,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "Default scrape interval can not be set to lesser than 5s ."
         ));
     }
+
+    if cfg.common.inverted_index_split_chars.is_empty() {
+        cfg.common.inverted_index_split_chars = " ;,".to_string();
+    }
     Ok(())
 }
 
