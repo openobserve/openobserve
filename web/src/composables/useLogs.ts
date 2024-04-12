@@ -1809,28 +1809,6 @@ const useLogs = () => {
                 schema: true,
               });
             }
-
-            if (
-              selectedStreamValues.includes(stream.name) &&
-              !stream.hasOwnProperty("schema")
-            ) {
-              multiStreamObj.push({
-                streamName: stream.name,
-                streamType: searchObj.data.stream.streamType,
-                schema: true,
-              });
-            }
-
-            if (
-              selectedStreamValues.includes(stream.name) &&
-              !stream.hasOwnProperty("schema")
-            ) {
-              multiStreamObj.push({
-                streamName: stream.name,
-                streamType: searchObj.data.stream.streamType,
-                schema: true,
-              });
-            }
           }
         }
 
