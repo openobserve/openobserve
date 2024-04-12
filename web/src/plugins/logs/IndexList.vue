@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         dense
         use-input
-        hide-selected
         fill-input
         multiple
         emit-value
@@ -77,7 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="fieldList"
         :rows-per-page-options="[]"
         :hide-bottom="
-          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage || searchObj.data.stream.selectedStreamFields.length == 0
+          searchObj.data.stream.selectedStreamFields.length <= rowsPerPage ||
+          searchObj.data.stream.selectedStreamFields.length == 0
         "
       >
         <template #body-cell-name="props">
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="q-pl-md q-py-xs text-subtitle2"
                       >
-                      {{
+                        {{
                           fieldValues[props.row.name]?.errMsg ||
                           "No values found"
                         }}
@@ -874,6 +874,7 @@ export default defineComponent({
       field: any,
       isInterestingField: boolean
     ) => {
+      console.log(field);
       // if (
       //   field.name == "_timestamp" &&
       //   isInterestingField &&
@@ -931,14 +932,13 @@ export default defineComponent({
 
       const localInterestingFields: any = useLocalInterestingFields();
       let localFields: any = {};
-      if (localInterestingFields.value != null) {
-        localFields = localInterestingFields.value;
+      for (const stream of field.streams) {
+        if (localInterestingFields.value != null) {
+          localFields = localInterestingFields.value;
+        }
+        localFields[searchObj.organizationIdetifier + "_" + stream] =
+          searchObj.data.stream.interestingFieldList;
       }
-      localFields[
-        searchObj.organizationIdetifier +
-          "_" +
-          searchObj.data.stream.selectedStream.value
-      ] = searchObj.data.stream.interestingFieldList;
       useLocalInterestingFields(localFields);
 
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
@@ -948,7 +948,7 @@ export default defineComponent({
       return searchObj.data.stream.selectedStreamFields.sort(
         (a: any, b: any) => a.group - b.group
       );
-    }
+    };
 
     return {
       t,
