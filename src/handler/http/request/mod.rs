@@ -15,6 +15,7 @@
 
 pub mod alerts;
 pub mod authz;
+pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;
 pub mod functions;

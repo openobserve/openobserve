@@ -101,7 +101,9 @@ pub async fn search(
             .await;
     }
 
-    let local_cluster_search = !req.clusters.is_empty() && req.clusters == vec!["local"];
+    let req_clusters = req.clusters.clone();
+    let local_cluster_search = !req_clusters.is_empty()
+        && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().trace_id = trace_id.clone();
@@ -112,7 +114,7 @@ pub async fn search(
     let res = {
         #[cfg(feature = "enterprise")]
         if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
-            cluster::super_cluster::search(req).await
+            cluster::super_cluster::search(req, req_clusters).await
         } else {
             cluster::http::search(req).await
         }
