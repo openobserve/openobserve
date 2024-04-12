@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,10 +16,11 @@
 use std::{collections::HashSet, io::Error};
 
 use actix_web::{get, http, post, put, web, HttpResponse, Result};
+use infra::schema::STREAM_SCHEMAS;
 
 use crate::{
     common::{
-        infra::config::{STREAM_SCHEMAS, USERS},
+        infra::config::USERS,
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::{

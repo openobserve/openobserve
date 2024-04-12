@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,13 +22,10 @@ use bytes::Buf;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{cluster::LOCAL_NODE_UUID, ider, meta::stream::FileKey, utils::json, CONFIG};
 use hashbrown::HashMap;
-use infra::{dist_lock, storage};
+use infra::{dist_lock, schema::STREAM_SCHEMAS, storage};
 use tokio::sync::{RwLock, Semaphore};
 
-use crate::{
-    common::infra::{cluster::get_node_by_uuid, config::STREAM_SCHEMAS},
-    service::db,
-};
+use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub async fn run(offset: i64) -> Result<(), anyhow::Error> {
     run_merge(offset).await?;

@@ -24,20 +24,20 @@ use std::{
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    meta::stream::StreamType,
+    meta::stream::{StreamPartition, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
     CONFIG,
 };
+use infra::schema::unwrap_partition_time_level;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::meta::stream::{SchemaRecords, StreamPartition, StreamSettings},
+    common::meta::stream::SchemaRecords,
     service::{
         db, ingestion,
         metadata::{Metadata, MetadataItem},
         stream,
-        stream::unwrap_partition_time_level,
     },
 };
 
@@ -160,7 +160,7 @@ impl TraceListIndex {
 
     async fn set_db_schema(&self, org_id: &str) -> infra::errors::Result<()> {
         // check for schema
-        let db_schema = db::schema::get(org_id, STREAM_NAME, StreamType::Metadata)
+        let db_schema = infra::schema::get(org_id, STREAM_NAME, StreamType::Metadata)
             .await
             .unwrap();
         if db_schema.fields().is_empty() {
@@ -201,6 +201,7 @@ mod tests {
     use std::{collections::HashMap, sync::Arc};
 
     use config::{meta::stream::StreamType, utils::json, CONFIG};
+    use infra::schema::unwrap_partition_time_level;
 
     use crate::{
         common::meta::stream::SchemaRecords,
@@ -210,7 +211,6 @@ mod tests {
                 trace_list_index::{TraceListIndex, TraceListItem, STREAM_NAME},
                 Metadata, MetadataItem,
             },
-            stream::unwrap_partition_time_level,
         },
     };
 

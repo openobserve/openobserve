@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,11 @@ use config::{
     utils::{json, parquet::parse_file_key_columns},
     CONFIG, FILE_EXT_PARQUET,
 };
-use infra::{cache, dist_lock, file_list as infra_file_list, storage};
+use infra::{
+    cache, dist_lock, file_list as infra_file_list,
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    storage,
+};
 use tokio::{sync::Semaphore, task::JoinHandle};
 
 use crate::{
@@ -90,10 +94,10 @@ pub async fn merge_by_stream(
     }
 
     // get schema
-    let mut schema = db::schema::get(org_id, stream_name, stream_type).await?;
-    let stream_settings = stream::stream_settings(&schema).unwrap_or_default();
+    let mut schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
     let stream_created = stream::stream_created(&schema).unwrap_or_default();
     std::mem::take(&mut schema.metadata);
     let schema = Arc::new(schema);
@@ -469,7 +473,7 @@ async fn merge_files(
     }
 
     // convert the file to the latest version of schema
-    let schema_versions = db::schema::get_versions(org_id, stream_name, stream_type).await?;
+    let schema_versions = infra::schema::get_versions(org_id, stream_name, stream_type).await?;
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
     let bloom_filter_fields =

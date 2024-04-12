@@ -97,6 +97,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             query,
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            clusters: vec![],
             timeout: 0,
         };
         // do search
@@ -161,6 +162,7 @@ async fn get_last_stats(
         query,
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout: 0,
     };
     match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {

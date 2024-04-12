@@ -26,7 +26,10 @@ use vector_enrichment::TableRegistry;
 
 use crate::common::meta::functions::VRLResultResolver;
 
-pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Response> {
+pub async fn search(
+    mut req: cluster_rpc::SearchRequest,
+    req_clusters: Vec<String>,
+) -> Result<search::Response> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.clone();
     let query_type = req.query.as_ref().unwrap().query_type.to_lowercase();
@@ -45,7 +48,8 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (_took, grpc_results) = o2_enterprise::enterprise::super_cluster::search(req).await?;
+    let (_took, grpc_results) =
+        o2_enterprise::enterprise::super_cluster::search(req, req_clusters).await?;
 
     // handle query function
     let grpc_results = grpc_results
@@ -53,7 +57,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         .map(|v| (Node::default(), v))
         .collect();
     let (merge_batches, scan_stats) =
-        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results).await?;
+        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

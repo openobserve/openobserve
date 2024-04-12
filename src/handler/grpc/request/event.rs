@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,13 +22,13 @@ use config::{
     CONFIG,
 };
 use hashbrown::HashSet;
-use infra::file_list as infra_file_list;
+use infra::{file_list as infra_file_list, schema::STREAM_SCHEMAS_FIELDS};
 use opentelemetry::global;
 use proto::cluster_rpc::{event_server::Event, EmptyResponse, FileList};
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::common::infra::{cluster::get_node_from_consistent_hash, config::STREAM_SCHEMAS_FIELDS};
+use crate::common::infra::cluster::get_node_from_consistent_hash;
 
 pub struct Eventer;
 

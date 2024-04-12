@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -98,7 +98,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
             for stream_type in stream_types {
                 let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
                 for stream_name in streams {
-                    let schema = db::schema::get(&org_id, &stream_name, stream_type).await?;
+                    let schema = infra::schema::get(&org_id, &stream_name, stream_type).await?;
                     let stream = super::stream::stream_res(&stream_name, stream_type, schema, None);
                     let stream_data_retention_end = if stream.settings.data_retention > 0 {
                         let date =
