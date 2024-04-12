@@ -77,7 +77,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
-import useIsMetaOrg from "@/composables/useIsMetaOrg.ts";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 export default defineComponent({
   name: "PageIngestion",
