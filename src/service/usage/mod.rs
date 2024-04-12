@@ -329,6 +329,11 @@ pub async fn audit(msg: auditor::AuditMessage) {
 }
 
 #[cfg(feature = "enterprise")]
+pub async fn flush_audit() {
+    auditor::flush_audit(publish_audit).await;
+}
+
+#[cfg(feature = "enterprise")]
 async fn publish_audit(
     req: cluster_rpc::UsageRequest,
 ) -> Result<cluster_rpc::UsageResponse, anyhow::Error> {

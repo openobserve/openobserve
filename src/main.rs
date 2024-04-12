@@ -85,6 +85,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+#[cfg(feature = "enterprise")]
+use openobserve::service::usage::flush_audit;
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -226,6 +228,10 @@ async fn main() -> Result<(), anyhow::Error> {
         log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
+
+    // flush audit data
+    #[cfg(feature = "enterprise")]
+    flush_audit().await;
 
     // leave the cluster
     _ = cluster::leave().await;
