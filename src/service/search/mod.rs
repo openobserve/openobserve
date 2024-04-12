@@ -101,7 +101,9 @@ pub async fn search(
             .await;
     }
 
+    #[cfg(feature = "enterprise")]
     let req_clusters = req.clusters.clone();
+    #[cfg(feature = "enterprise")]
     let local_cluster_search = !req_clusters.is_empty()
         && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 

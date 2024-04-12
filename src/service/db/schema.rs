@@ -21,13 +21,13 @@ use config::{is_local_disk_storage, meta::stream::StreamType, utils::json, CONFI
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
-    errors::Error,
-    schema::{
-        mk_key, unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-    },
+    schema::{unwrap_stream_settings, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use {
+    infra::{errors::Error, schema::mk_key},
+    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+};
 
 use crate::{
     common::{

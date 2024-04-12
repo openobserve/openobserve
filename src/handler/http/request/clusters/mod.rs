@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use actix_web::{get, HttpResponse};
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
+use {o2_enterprise::enterprise::common::infra::config::O2_CONFIG, std::io::ErrorKind};
 
 /// ListClusters
 #[utoipa::path(
@@ -43,6 +43,6 @@ pub async fn list_clusters() -> Result<HttpResponse, Error> {
         vec![]
     };
     #[cfg(not(feature = "enterprise"))]
-    let clusters = vec![];
+    let clusters: Vec<String> = vec![];
     Ok(HttpResponse::Ok().json(clusters))
 }
