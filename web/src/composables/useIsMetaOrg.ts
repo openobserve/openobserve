@@ -7,9 +7,7 @@ export default function useIsMetaOrg() {
   const store = useStore();
 
   const isMetaOrg = computed(() => {
-    console.log("isMetaOrg", store.state.selectedOrganization.label);
-
-    return store.state.selectedOrganization.label === "default";
+     return store.state.selectedOrganization.label === store.state.zoConfig.meta_org;
   });
 
   return {
