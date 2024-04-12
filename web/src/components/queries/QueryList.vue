@@ -65,7 +65,7 @@ export default defineComponent({
       //   const formattedQueryStartTime = new Date(querystartTime / 1000);
       //   const queryStartTimeEntry = `${querystartTime} (${formattedQueryStartTime})`;
 
-      const timestampOfStartTime = query?.query?.start_time;
+      const timestampOfStartTime = query?.start_time;
       const formattedStartTime = timestampToTimezoneDate(
         timestampOfStartTime / 1000,
         store.state.timezone,
@@ -73,7 +73,7 @@ export default defineComponent({
       );
       const startTimeEntry = `${formattedStartTime} ${store.state.timezone} (${timestampOfStartTime})`;
 
-      const timestampOfEndTime = query?.query?.end_time;
+      const timestampOfEndTime = query?.end_time;
       const formattedEndTime = timestampToTimezoneDate(
         timestampOfEndTime / 1000,
         store.state.timezone,
@@ -139,25 +139,27 @@ export default defineComponent({
       };
 
       const rows: any[] = [
-        ["Session ID", query?.trace_id],
+        ["Trace ID", query?.trace_id],
         ["Status", query?.status],
         ["User ID", query?.user_id],
         ["Org ID", query?.org_id],
         ["Stream Type", query?.stream_type],
-        ["SQL", query?.query?.sql],
+        ["SQL", query?.sql],
         ["Start Time", startTimeEntry],
         ["End Time", endTimeEntry],
         ["Exec. Duration", getDuration(query?.created_at)],
         [
           "Query Range",
-          queryRange(query?.query?.start_time, query?.query?.end_time),
+          queryRange(query?.start_time, query?.end_time),
         ],
-        ["Scan Records", query?.scan_stats?.records],
-        ["Files", query?.scan_stats?.files],
-        ["Original Size", query?.scan_stats?.original_size],
-        ["Compressed Size", query?.scan_stats?.compressed_size],
+        ["Scan Records", query?.records],
+        ["Files", query?.files],
+        ["Original Size", query?.original_size],
+        ["Compressed Size", query?.compressed_size],
       ];
 
+      console.log(rows, "rows+++");
+      
       return rows;
     };
     // const totalQueries = computed(() => queryData.length);

@@ -3,7 +3,7 @@
     <q-table
       data-test="running-queries-table"
       ref="qTable"
-      :rows="queries"
+      :rows="rowsQuery"
       :columns="columns"
       row-key="trace_id"
       style="width: 100%"
@@ -170,6 +170,8 @@ import {
   type Ref,
   defineComponent,
   defineAsyncComponent,
+computed,
+toRaw,
 } from "vue";
 import { useQuasar, type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
@@ -390,15 +392,14 @@ export default defineComponent({
         label: t("queries.duration"),
         align: "left",
         sortable: true,
-        field: (row: any) => getDuration(row.created_at),
+        field: "duration",
       },
       {
         name: "queryRange",
         label: t("queries.queryRange"),
         align: "left",
         sortable: true,
-        field: (row: any) =>
-          queryRange(row.query.start_time, row.query.end_time),
+        field: "queryRange",
       },
       {
         name: "status",
@@ -509,6 +510,54 @@ export default defineComponent({
       deleteDialog.value.data = props.row.trace_id;
       deleteDialog.value.show = true;
     };
+
+    // const dashboards = computed(function () {
+    //   const dashboardList = toRaw(
+    //     store.state.organizationData?.allDashboardList[activeFolderId.value] ??
+    //       []
+    //   );
+    //   return dashboardList.map((board: any, index) => {
+    //     return {
+    //       "#": index < 9 ? `0${index + 1}` : index + 1,
+    //       id: board.dashboardId,
+    //       name: board.title,
+    //       identifier: board.dashboardId,
+    //       description: board.description,
+    //       owner: board.owner,
+    //       created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
+    //       actions: "true",
+    //     };
+    //   });
+    // });
+    const rowsQuery = computed(function () {
+      const rows = toRaw(queries.value) ?? [];
+      console.log("rows-----", rows);
+      
+      return rows.map((row: any, index) => {
+        console.log("row inside map", row);
+        console.log("index", index);
+        return {
+          "#": index < 9 ? `0${index + 1}` : index + 1,
+          "user_id": row?.user_id,
+          "org_id": row?.org_id,
+          "duration": getDuration(row?.created_at),
+          "queryRange": queryRange(row?.query?.start_time, row?.query?.end_time),
+          "status": row?.status,
+          "stream_type": row?.stream_type,
+          "actions": "true",
+          "trace_id": row?.trace_id,
+          "created_at": row?.created_at,
+          "started_at": row?.started_at,
+          "sql": row?.query?.sql,
+          "start_time": row?.query?.start_time,
+          "end_time": row?.query?.end_time,
+          "files": row?.scan_stats?.files,
+          "records": row?.scan_stats?.records,
+          "original_size": row?.scan_stats?.original_size,
+          "compressed_size": row?.scan_stats?.compressed_size
+        }
+      })
+    })
     return {
       t,
       store,
@@ -533,6 +582,7 @@ export default defineComponent({
       resultTotal,
       selectedPerPage,
       qTable,
+      rowsQuery
     };
   },
 });
