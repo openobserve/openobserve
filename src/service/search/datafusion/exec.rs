@@ -1136,7 +1136,8 @@ pub async fn merge_parquet_files(
     let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
     let without_optimizer = select_wildcard
         && CONFIG.limit.query_optimization_num_fields > 0
-        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
+        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields
+        && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
 
     let df = ctx.sql(&query_sql).await?;
