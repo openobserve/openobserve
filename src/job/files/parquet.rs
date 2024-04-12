@@ -65,7 +65,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         tokio::sync::mpsc::channel::<(String, Vec<FileKey>)>(CONFIG.limit.file_move_thread_num);
     let rx = Arc::new(Mutex::new(rx));
     // move files
-    for _ in 0..CONFIG.limit.file_move_thread_num {
+    for thread_id in 0..CONFIG.limit.file_move_thread_num {
         let rx = rx.clone();
         tokio::spawn(async move {
             loop {
@@ -76,7 +76,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((prefix, files)) => {
-                        if let Err(e) = move_files(&prefix, files).await {
+                        if let Err(e) = move_files(thread_id, &prefix, files).await {
                             log::error!(
                                 "[INGESTER:JOB] Error moving parquet files to remote: {}",
                                 e
@@ -182,7 +182,11 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
     Ok(partition_files_with_size)
 }
 
-async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Error> {
+async fn move_files(
+    thread_id: usize,
+    prefix: &str,
+    files: Vec<FileKey>,
+) -> Result<(), anyhow::Error> {
     let columns = prefix.splitn(5, '/').collect::<Vec<&str>>();
     // eg: files/default/logs/olympics/0/2023/08/21/08/8b8a5451bbe1c44b/
     // eg: files/default/traces/default/0/2023/09/04/05/default/service_name=ingester/
@@ -191,7 +195,10 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
     let stream_type = StreamType::from(columns[2]);
     let stream_name = columns[3].to_string();
 
-    log::debug!("[INGESTER:JOB] check deletion for partition: {}", prefix);
+    log::debug!(
+        "[INGESTER:JOB:{thread_id}] check deletion for partition: {}",
+        prefix
+    );
 
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
@@ -201,7 +208,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
     if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
         for file in files {
             log::warn!(
-                "[INGESTER:JOB] the stream [{}/{}/{}] is deleting, just delete file: {}",
+                "[INGESTER:JOB:{thread_id}] the stream [{}/{}/{}] is deleting, just delete file: {}",
                 &org_id,
                 stream_type,
                 &stream_name,
@@ -209,7 +216,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
             );
             if let Err(e) = tokio::fs::remove_file(wal_dir.join(&file.key)).await {
                 log::error!(
-                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                    "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
                     e
                 );
@@ -219,7 +226,10 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
         return Ok(());
     }
 
-    log::debug!("[INGESTER:JOB] start processing for partition: {}", prefix);
+    log::debug!(
+        "[INGESTER:JOB:{thread_id}] start processing for partition: {}",
+        prefix
+    );
 
     let wal_dir = wal_dir.clone();
     // sort by created time
@@ -267,14 +277,17 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
         }
     }
 
-    log::debug!("[INGESTER:JOB] get schema for partition: {}", prefix);
+    log::debug!(
+        "[INGESTER:JOB:{thread_id}] get schema for partition: {}",
+        prefix
+    );
 
     // get latest schema
     let latest_schema = infra::schema::get(&org_id, &stream_name, stream_type)
         .await
         .map_err(|e| {
             log::error!(
-                "[INGESTER:JOB] Failed to get latest schema for stream [{}/{}/{}]: {}",
+                "[INGESTER:JOB:{thread_id}] Failed to get latest schema for stream [{}/{}/{}]: {}",
                 &org_id,
                 stream_type,
                 &stream_name,
@@ -283,7 +296,10 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
             e
         })?;
 
-    log::debug!("[INGESTER:JOB] start merging for partition: {}", prefix);
+    log::debug!(
+        "[INGESTER:JOB:{thread_id}] start merging for partition: {}",
+        prefix
+    );
 
     // start merge files and upload to s3
     loop {
@@ -291,7 +307,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
         tokio::task::yield_now().await;
         // merge file and get the big file key
         let (new_file_name, new_file_meta, new_file_list) =
-            match merge_files(&latest_schema, &wal_dir, &files_with_size).await {
+            match merge_files(thread_id, &latest_schema, &wal_dir, &files_with_size).await {
                 Ok(v) => v,
                 Err(e) => {
                     log::error!("[INGESTER:JOB] merge files failed: {}", e);
@@ -330,7 +346,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
             loop {
                 if wal::lock_files_exists(&file.key).await {
                     log::warn!(
-                        "[INGESTER:JOB] the file is still in use, waiting for a few ms: {}",
+                        "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
                         file.key
                     );
                     time::sleep(time::Duration::from_millis(100)).await;
@@ -342,7 +358,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
             let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;
             if let Err(e) = ret {
                 log::error!(
-                    "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
+                    "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
                     file.key,
                     e.to_string()
                 );
@@ -377,6 +393,7 @@ async fn move_files(prefix: &str, files: Vec<FileKey>) -> Result<(), anyhow::Err
 /// merge some small files into one big file, upload to storage, returns the big
 /// file key and merged files
 async fn merge_files(
+    thread_id: usize,
     latest_schema: &Schema,
     wal_dir: &Path,
     files_with_size: &[FileKey],
@@ -403,12 +420,12 @@ async fn merge_files(
     let mut file_schema = None;
     let tmp_dir = cache::tmpfs::Directory::default();
     for file in retain_file_list.iter_mut() {
-        log::info!("[INGESTER:JOB] merge small file: {}", &file.key);
+        log::info!("[INGESTER:JOB:{thread_id}] merge small file: {}", &file.key);
         let data = match get_file_contents(&wal_dir.join(&file.key)).await {
             Ok(body) => body,
             Err(err) => {
                 log::error!(
-                    "[INGESTER:JOB] merge small file: {}, err: {}",
+                    "[INGESTER:JOB:{thread_id}] merge small file: {}, err: {}",
                     &file.key,
                     err
                 );
@@ -472,12 +489,16 @@ async fn merge_files(
         Ok(v) => v,
         Err(e) => {
             log::error!(
-                "[INGESTER:JOB]  merge_parquet_files error for stream -> '{}/{}/{}'",
+                "[INGESTER:JOB:{thread_id}]  merge_parquet_files error for stream -> '{}/{}/{}'",
                 org_id,
                 stream_type,
                 stream_name
             );
-            log::error!("[INGESTER:JOB] {} for files {:?}", e, retain_file_list);
+            log::error!(
+                "[INGESTER:JOB:{thread_id}] {} for files {:?}",
+                e,
+                retain_file_list
+            );
             return Err(e.into());
         }
     };
@@ -499,7 +520,7 @@ async fn merge_files(
     let new_file_key =
         super::generate_storage_file_name(&org_id, stream_type, &stream_name, &file_name);
     log::info!(
-        "[INGESTER:JOB] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
+        "[INGESTER:JOB:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}",
         retain_file_list.len(),
         new_file_key,
         new_file_meta.original_size,

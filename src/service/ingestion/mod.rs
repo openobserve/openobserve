@@ -30,7 +30,7 @@ use config::{
         flatten,
         json::{self, Map, Value},
     },
-    SIZE_IN_MB,
+    CONFIG, SIZE_IN_MB,
 };
 use vector_enrichment::TableRegistry;
 use vrl::{
@@ -272,7 +272,7 @@ pub fn apply_stream_transform(
             value = apply_vrl_fn(runtime, vrl_runtime, &value);
         }
     }
-    flatten::flatten(value)
+    flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)
 }
 
 pub fn init_functions_runtime() -> Runtime {

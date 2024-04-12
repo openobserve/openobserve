@@ -195,7 +195,7 @@ pub async fn ingest(
             let key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
             // JSON Flattening
-            let mut value = flatten::flatten(value)?;
+            let mut value = flatten::flatten_with_level(value, CONFIG.limit.ingest_flatten_level)?;
 
             if let Some(transforms) = stream_transform_map.get(&key) {
                 let mut ret_value = value.clone();
