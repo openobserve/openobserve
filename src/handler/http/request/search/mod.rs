@@ -118,6 +118,7 @@ pub async fn search(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let org_id = org_id.into_inner();
 
     let mut http_span = None;
     let trace_id = if CONFIG.common.tracing_enabled {
@@ -126,7 +127,7 @@ pub async fn search(
         });
         ctx.span().span_context().trace_id().to_string()
     } else if CONFIG.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/org/_search");
+        let span = tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone());
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
         trace_id
@@ -134,7 +135,6 @@ pub async fn search(
         ider::uuid()
     };
 
-    let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
@@ -382,6 +382,7 @@ pub async fn around(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let (org_id, stream_name) = path.into_inner();
 
     let mut http_span = None;
     let trace_id = if CONFIG.common.tracing_enabled {
@@ -390,7 +391,11 @@ pub async fn around(
         });
         ctx.span().span_context().trace_id().to_string()
     } else if CONFIG.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/org/_search");
+        let span = tracing::info_span!(
+            "/api/{org_id}/{stream_name}/_around",
+            org_id = org_id.clone(),
+            stream_name = stream_name.clone()
+        );
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
         trace_id
@@ -399,7 +404,6 @@ pub async fn around(
     };
 
     let mut uses_fn = false;
-    let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
@@ -735,7 +739,11 @@ pub async fn values(
         });
         ctx.span().span_context().trace_id().to_string()
     } else if CONFIG.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/org/_search");
+        let span = tracing::info_span!(
+            "/api/{org_id}/{stream_name}/_values",
+            org_id = org_id.clone(),
+            stream_name = stream_name.clone()
+        );
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
         trace_id
@@ -1279,7 +1287,7 @@ pub async fn search_partition(
         });
         ctx.span().span_context().trace_id().to_string()
     } else if CONFIG.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/org/_search");
+        let span = tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone());
         let trace_id = span.context().span().span_context().trace_id().to_string();
         http_span = Some(span);
         trace_id
