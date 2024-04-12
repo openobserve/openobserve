@@ -28,7 +28,7 @@ use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
         ("Authorization"= [])
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = Vec<String>),
     )
 )]
 #[get("/clusters")]
