@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2024 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ pub mod errors;
 pub mod file_list;
 pub mod queue;
 pub mod scheduler;
+pub mod schema;
 pub mod storage;
 
 pub async fn init() -> Result<(), anyhow::Error> {

@@ -27,14 +27,13 @@ use config::{
     utils::{base64, json},
     CONFIG, DISTINCT_FIELDS,
 };
-use infra::errors;
+use infra::{errors, schema::STREAM_SCHEMAS};
 use opentelemetry::{global, trace::TraceContextExt};
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        infra::config::STREAM_SCHEMAS,
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,
@@ -473,6 +472,7 @@ pub async fn around(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout,
     };
     let user_id = in_req
@@ -550,6 +550,7 @@ pub async fn around(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout,
     };
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
@@ -893,6 +894,7 @@ async fn values_v1(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout,
     };
 
@@ -1102,6 +1104,7 @@ async fn values_v2(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout,
     };
     let search_fut = SearchService::search(

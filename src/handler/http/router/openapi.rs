@@ -112,6 +112,7 @@ use crate::{common::meta, handler::http::request};
         request::syslog::update_route,
         request::syslog::list_routes,
         request::syslog::delete_route,
+        request::clusters::list_clusters,
     ),
     components(
         schemas(
@@ -119,9 +120,9 @@ use crate::{common::meta, handler::http::request};
             StreamType,
             meta::stream::Stream,
             meta::stream::StreamProperty,
-            meta::stream::StreamSettings,
             meta::stream::StreamDeleteFields,
             meta::stream::ListStream,
+            config::meta::stream::StreamSettings,
             config::meta::stream::StreamStats,
             config::meta::stream::PartitionTimeLevel,
             meta::ingestion::RecordStatus,
@@ -223,6 +224,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
         (name = "Syslog Routes", description = "Syslog Routes retrieval & management operations"),
+        (name = "Clusters", description = "Super cluster operations"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",

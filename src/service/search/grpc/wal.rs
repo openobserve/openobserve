@@ -19,7 +19,7 @@ use arrow::array::{new_null_array, ArrayRef};
 use config::{
     meta::{
         search::{ScanStats, SearchType, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamType},
+        stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
     utils::{
         file::scan_files,
@@ -33,16 +33,18 @@ use datafusion::{
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+};
 use tokio::time::Duration;
 use tracing::{info_span, Instrument};
 
 use crate::{
-    common::{infra::wal, meta::stream::StreamPartition},
+    common::infra::wal,
     service::{
         db, file_list,
         search::{datafusion::exec, sql::Sql},
-        stream,
     },
 };
 
@@ -57,7 +59,7 @@ pub async fn search_parquet(
 ) -> super::SearchResult {
     // fetch all schema versions, group files by version
     let schema_versions =
-        match db::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
+        match infra::schema::get_versions(&sql.org_id, &sql.stream_name, stream_type).await {
             Ok(versions) => versions,
             Err(err) => {
                 log::error!("[trace_id {trace_id}] get schema error: {}", err);
@@ -72,9 +74,9 @@ pub async fn search_parquet(
     let schema_latest = schema_versions.last().unwrap();
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = stream::stream_settings(schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(schema_latest).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // get file list
     let files = get_file_list(
@@ -353,7 +355,7 @@ pub async fn search_memtable(
     work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
-    let schema_latest = db::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
         .await
         .unwrap_or(Schema::empty());
     // let schema_settings = stream_settings(&schema_latest).unwrap_or_default();

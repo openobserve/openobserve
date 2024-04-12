@@ -282,7 +282,7 @@ pub fn apply_functions<'a>(
     stream_name: &'a str,
     runtime: &mut Runtime,
 ) -> Result<json::Value> {
-    let mut value = flatten::flatten(item)?;
+    let mut value = flatten::flatten_with_level(item, CONFIG.limit.ingest_flatten_level)?;
 
     if !local_trans.is_empty() {
         value = crate::service::ingestion::apply_stream_transform(

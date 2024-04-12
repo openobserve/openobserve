@@ -26,7 +26,6 @@ use crate::{
     common::{
         meta::{
             ingestion::INGESTION_EP,
-            proxy::QueryParamProxyURL,
             user::{DBUser, TokenValidationResponse, UserRole},
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
@@ -43,11 +42,12 @@ pub async fn validator(
     user_id: &str,
     password: &str,
     auth_info: AuthExtractor,
+    path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = match req
         .request()
         .path()
-        .strip_prefix(format!("{}/api/", CONFIG.common.base_uri).as_str())
+        .strip_prefix(format!("{}{}", CONFIG.common.base_uri, path_prefix).as_str())
     {
         Some(path) => path,
         None => req.request().path(),
@@ -306,42 +306,6 @@ pub async fn validator_gcp(
     }
 }
 
-pub async fn validator_proxy_url(
-    req: ServiceRequest,
-    query: web::Query<QueryParamProxyURL>,
-) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    let creds = match base64::decode(&query.proxy_token) {
-        Ok(val) => val,
-        Err(_) => {
-            log::error!(
-                "Failed to decode base64 proxy_token: {}",
-                &query.proxy_token
-            );
-            return Err((ErrorUnauthorized("Unauthorized Access"), req));
-        }
-    };
-    let creds = creds
-        .split(':')
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
-    let path = req
-        .request()
-        .path()
-        .strip_prefix(format!("{}/proxy/", CONFIG.common.base_uri).as_str())
-        .unwrap_or(req.request().path());
-
-    match validate_credentials(&creds[0], &creds[1], path).await {
-        Ok(res) => {
-            if res.is_valid {
-                Ok(req)
-            } else {
-                Err((ErrorUnauthorized("Unauthorized Access"), req))
-            }
-        }
-        Err(err) => Err((err, req)),
-    }
-}
-
 pub async fn validator_rum(
     req: ServiceRequest,
     _credentials: Option<BasicAuth>,
@@ -382,9 +346,10 @@ pub async fn validator_rum(
     }
 }
 
-pub async fn oo_validator(
+async fn oo_validator_internal(
     req: ServiceRequest,
     auth_info: AuthExtractor,
+    path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     if auth_info.auth.starts_with("Basic") {
         let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
@@ -399,13 +364,56 @@ pub async fn oo_validator(
         let (username, password) = (parts[0], parts[1]);
         let username = username.to_owned();
         let password = password.to_owned();
-        validator(req, &username, &password, auth_info).await
+        validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
     } else {
         Err((ErrorUnauthorized("Unauthorized Access"), req))
     }
 }
+
+/// Validates the authentication information in the incoming request and returns the request if
+/// valid, or an error if invalid.
+///
+/// This function is responsible for validating the authentication information in the incoming
+/// request. It supports both Basic and Bearer authentication (in enterprise).
+/// Works exclusively on `/api` prefix
+///
+/// For Basic authentication, it decodes the base64-encoded credentials, splits them into username
+/// and password, and calls the `validator` function to validate the credentials.
+///
+/// For Bearer authentication, it calls the `token_validator` function to validate the token.
+///
+/// If the authentication is invalid, it returns an `ErrorUnauthorized` error.
+pub async fn oo_validator(
+    req: ServiceRequest,
+    auth_info: AuthExtractor,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let path_prefix = "/api/";
+    oo_validator_internal(req, auth_info, path_prefix).await
+}
+
+/// Validates the authentication information in the request and returns the request if valid, or an
+/// error if invalid.
+///
+/// This function is a proxy for the `oo_validator_internal` function, setting the `path_prefix` to
+/// "/proxy/".
+///
+/// # Arguments
+/// * `req` - The `ServiceRequest` to validate.
+/// * `auth_info` - The authentication information extracted from the request.
+///
+/// # Returns
+/// * `Result<ServiceRequest, (Error, ServiceRequest)>` - The validated request, or an error if the
+///   authentication is invalid.
+pub async fn validator_proxy_url(
+    req: ServiceRequest,
+    auth_info: AuthExtractor,
+) -> Result<ServiceRequest, (Error, ServiceRequest)> {
+    let path_prefix = "/proxy/";
+    oo_validator_internal(req, auth_info, path_prefix).await
+}
+
 #[cfg(feature = "enterprise")]
 pub(crate) async fn check_permissions(
     user_id: &str,

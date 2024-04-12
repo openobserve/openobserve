@@ -242,6 +242,7 @@ pub async fn get_latest_traces(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout,
     };
     let stream_type = StreamType::Traces;

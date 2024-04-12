@@ -21,9 +21,10 @@ use config::{
     cluster::{is_ingester, is_querier},
     meta::{
         cluster::{Node, Role},
-        search,
-        search::ScanStats,
-        stream::{FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamType},
+        search::{self, ScanStats},
+        stream::{
+            FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
+        },
     },
     utils::json,
     CONFIG, INDEX_MIN_CHAR_LEN,
@@ -32,6 +33,7 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
     errors::{Error, ErrorCodes, Result},
+    schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
 use itertools::Itertools;
 use proto::cluster_rpc;
@@ -39,10 +41,7 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Chan
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamPartition},
-    service::{file_list, stream},
-};
+use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
 pub mod grpc;
 pub mod http;
@@ -66,6 +65,9 @@ pub async fn search(
     usize,
 )> {
     let start = std::time::Instant::now();
+
+    // if the request is a super cluster request, then forward it to the super cluster service
+    let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
 
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
@@ -104,9 +106,9 @@ pub async fn search(
     );
 
     // stream settings
-    let stream_settings = stream::stream_settings(&meta.schema).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&meta.schema).unwrap_or_default();
     let partition_time_level =
-        stream::unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
+        unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // If the query is of type inverted index and this is not an aggregations request
     let (file_list, inverted_index_count) = if is_inverted_index && req.aggs.is_empty() {
@@ -376,11 +378,11 @@ pub async fn search(
         let mut job = job.clone();
         job.partition = partition_no as i32;
         req.job = Some(job);
-        req.stype = cluster_rpc::SearchType::WalOnly as i32;
+        req.stype = cluster_rpc::SearchType::WalOnly as _;
         let is_querier = is_querier(&node.role);
         if is_querier {
             if offset_start < file_num {
-                req.stype = cluster_rpc::SearchType::Cluster as i32;
+                req.stype = cluster_rpc::SearchType::Cluster as _;
                 match partition_strategy {
                     QueryPartitionStrategy::FileNum => {
                         req.file_list = file_list
@@ -401,7 +403,7 @@ pub async fn search(
                         offset_start += offset;
                         if req.file_list.is_empty() {
                             if is_ingester(&node.role) {
-                                req.stype = cluster_rpc::SearchType::WalOnly as i32;
+                                req.stype = cluster_rpc::SearchType::WalOnly as _;
                             } else {
                                 continue; // no need more querier
                             }
@@ -561,23 +563,23 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, scan_stats) = match merge_grpc_result(trace_id, meta.clone(), results).await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
-            #[cfg(feature = "enterprise")]
-            work_group
-                .as_ref()
-                .unwrap()
-                .done(trace_id)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-            return Err(e);
-        }
-    };
+    let (merge_batches, scan_stats) =
+        match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
+            Ok(v) => v,
+            Err(e) => {
+                // search done, release lock
+                #[cfg(not(feature = "enterprise"))]
+                dist_lock::unlock(&locker).await?;
+                #[cfg(feature = "enterprise")]
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+                return Err(e);
+            }
+        };
     log::info!("[trace_id {trace_id}] final merge task finish");
 
     // search done, release lock
@@ -598,6 +600,7 @@ async fn merge_grpc_result(
     trace_id: &str,
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
+    is_final_phase: bool,
 ) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
@@ -694,7 +697,7 @@ async fn merge_grpc_result(
                 &merge_sql,
                 &batch,
                 &select_fields,
-                true,
+                is_final_phase,
             ) => {
                 match res {
                     Ok(res) => merge_batch = res,
@@ -721,7 +724,7 @@ async fn merge_grpc_result(
     Ok((merge_batches, scan_stats))
 }
 
-#[tracing::instrument(skip(sql), fields(trace_id = ?_trace_id, org_id = sql.org_id, stream_name = sql.stream_name))]
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
 pub(crate) async fn get_file_list(
     _trace_id: &str,
     sql: &super::sql::Sql,
