@@ -41,8 +41,7 @@
 </template>
 
 <script lang="ts">
-import type { QTableProps } from "quasar";
-import { computed, defineComponent, ref } from "vue";
+import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -59,12 +58,6 @@ export default defineComponent({
     const queryData = props.metaData?.queries || [];
     const store = useStore();
     const getRows = (query: any) => {
-      console.log(query, "query");
-
-      //   const querystartTime = query?.query_start_time;
-      //   const formattedQueryStartTime = new Date(querystartTime / 1000);
-      //   const queryStartTimeEntry = `${querystartTime} (${formattedQueryStartTime})`;
-
       const timestampOfStartTime = query?.start_time;
       const formattedStartTime = timestampToTimezoneDate(
         timestampOfStartTime / 1000,
@@ -91,13 +84,11 @@ export default defineComponent({
         // Convert milliseconds to microseconds
         var timestampMicroseconds = timestampMilliseconds * 1000;
 
-        console.log(timestampMicroseconds, "------------");
         return timestampMicroseconds;
       };
 
       const getDuration = (createdAt: number) => {
         const currentTime = localTimeToMicroseconds();
-        console.log(currentTime, "currentTime", createdAt, "createdAt");
 
         const durationInSeconds = Math.floor(
           (currentTime - createdAt) / 1000000
@@ -148,29 +139,20 @@ export default defineComponent({
         ["Start Time", startTimeEntry],
         ["End Time", endTimeEntry],
         ["Exec. Duration", getDuration(query?.created_at)],
-        [
-          "Query Range",
-          queryRange(query?.start_time, query?.end_time),
-        ],
+        ["Query Range", queryRange(query?.start_time, query?.end_time)],
         ["Scan Records", query?.records],
         ["Files", query?.files],
         ["Original Size", query?.original_size],
         ["Compressed Size", query?.compressed_size],
       ];
-
-      console.log(rows, "rows+++");
       
       return rows;
     };
-    // const totalQueries = computed(() => queryData.length);
-    // const dataTitle = computed(() => props.data.title);
-
+    
     return {
       queryData,
       t,
       getRows,
-      //   totalQueries,
-      //   dataTitle,
       pagination: ref({
         rowsPerPage: 0,
       }),

@@ -2,7 +2,6 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 
 export default function useIsMetaOrg() {
-  console.log("useIsMetaOrg");
 
   const store = useStore();
 

@@ -91,7 +91,6 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name == "settings" && isMetaOrg.value) {
-        console.log("isMetaOrg onBeforeMount", isMetaOrg.value);
         settingsTab.value = "queryManagement";
         router.push({ path: "/settings/query_management" });
       } else {
@@ -103,11 +102,9 @@ export default defineComponent({
     // render general settings component
     onActivated(() => {
       if (isMetaOrg.value) {
-        console.log("isMetaOrg onActivated", isMetaOrg.value);
         settingsTab.value = "queryManagement";
         router.push({ path: "/settings/query_management" });
       } else {
-        console.log("inside else onActivated", isMetaOrg.value);
         settingsTab.value = "general";
         router.push({ path: "/settings/general" });
       }

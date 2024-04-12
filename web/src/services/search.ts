@@ -129,11 +129,7 @@ const search = {
     return http().post(url, query);
   },
   get_running_queries: () => {
-    console.log("get_running_queries");
-    
     const url = `/api/query_manager/status`;
-    console.log("url", url);
-    
     return http().get(url);
   },
   delete_running_query: (traceID: string) => {

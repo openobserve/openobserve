@@ -56,35 +56,6 @@
             {{ t("queries.runningQueries") }}
           </div>
           <div class="flex items-start">
-            <!-- <div class="flex justify-between items-end q-px-md">
-              <div
-                style="
-                  border: 1px solid #cacaca;
-                  padding: 4px;
-                  border-radius: 2px;
-                "
-              >
-                <template
-                  v-for="visual in streamFilterValues"
-                  :key="visual.value"
-                >
-                  <q-btn
-                    :color="
-                      visual.value === selectedStreamType ? 'primary' : ''
-                    "
-                    :flat="visual.value === selectedStreamType ? false : true"
-                    dense
-                    emit-value
-                    no-caps
-                    class="visual-selection-btn"
-                    style="height: 30px; padding: 4px 12px"
-                    @click="onChangeStreamFilter(visual.value)"
-                  >
-                    {{ visual.label }}</q-btn
-                  >
-                </template>
-              </div>
-            </div> -->
             <div
               data-test="streams-search-stream-input"
               class="flex items-center"
@@ -119,15 +90,6 @@
             >Last Data Refresh Time: {{ lastRefreshed }}</label
           >
         </div>
-        <!-- <q-table-pagination
-          data-test="log-stream-table-pagination"
-          :scope="scope"
-          :pageTitle="t('logStream.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        /> -->
       </template>
 
       <template #bottom="scope">
@@ -169,16 +131,14 @@ import {
   ref,
   type Ref,
   defineComponent,
-  defineAsyncComponent,
-computed,
-toRaw,
+  computed,
+  toRaw,
 } from "vue";
 import { useQuasar, type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 
@@ -189,12 +149,10 @@ export default defineComponent({
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
-    // console.log("meta org", isMetaOrg());
     const { isMetaOrg } = useIsMetaOrg();
     const resultTotal = ref<number>(0);
 
     const refreshData = () => {
-      console.log("refreshing data");
       getRunningQueries();
       lastRefreshed.value = getCurrentTime();
     };
@@ -214,51 +172,7 @@ export default defineComponent({
     };
 
     const loadingState = ref(false);
-    const queries = ref([
-      // {
-      //   "#": 1,
-      //   session_id: "2el7tMu7v6eH6pZX9hCBe3VG1Jb",
-      //   status: "processing",
-      //   created_at: 1712467524505545,
-      //   started_at: 1712467524517149,
-      //   user_id: "root@example.com",
-      //   org_id: "default",
-      //   stream_type: "logs",
-      //   query: {
-      //     sql: "select * from 'default'",
-      //     start_time: 1706429989000000,
-      //     end_time: 2706685707000000,
-      //   },
-      //   scan_stats: {
-      //     files: 2,
-      //     records: 23376,
-      //     original_size: 50,
-      //     compressed_size: 0,
-      //   },
-      // },
-      // {
-      //   "#": 2,
-      //   session_id: "2el7tMu7v6eH6pZX9hCBe3VG2NK",
-      //   status: "processing",
-      //   created_at: 1712467524505545,
-      //   started_at: 1712467524517149,
-      //   user_id: "root@example.com",
-      //   org_id: "default",
-      //   stream_type: "logs",
-      //   query: {
-      //     sql: "select * from 'default'",
-      //     start_time: 1712672758000000,
-      //     end_time: 1712676358000000,
-      //   },
-      //   scan_stats: {
-      //     files: 2,
-      //     records: 23376,
-      //     original_size: 50,
-      //     compressed_size: 0,
-      //   },
-      // },
-    ]);
-    console.log(queries.value, "queries.value");
+    const queries = ref([]);
 
     const deleteDialog = ref({
       show: false,
@@ -271,21 +185,10 @@ export default defineComponent({
     const showListSchemaDialog = ref(false);
 
     const listSchema = (props: any) => {
-      console.log("listSchema");
-
-      console.log(props, "props.row");
-
       //pass whole props.row to schemaData
       schemaData.value = props.row;
 
       showListSchemaDialog.value = true;
-      console.log(
-        schemaData.value,
-        "schemaData.value",
-        "showListSchemaDialog.value",
-        showListSchemaDialog.value
-      );
-      console.log("schemaData.value", schemaData.value);
     };
 
     const perPageOptions: any = [
@@ -295,7 +198,6 @@ export default defineComponent({
       { label: "50", value: 50 },
       { label: "100", value: 100 },
     ];
-    const maxRecordToReturn = ref(100);
     const selectedPerPage = ref(20);
     const pagination: any = ref({
       rowsPerPage: 20,
@@ -319,15 +221,10 @@ export default defineComponent({
       // Convert milliseconds to microseconds
       var timestampMicroseconds = timestampMilliseconds * 1000;
 
-      console.log(timestampMicroseconds, "------------");
       return timestampMicroseconds;
     };
-
-    // Test the function
-
     const getDuration = (createdAt: number) => {
       const currentTime = localTimeToMicroseconds();
-      console.log(currentTime, "currentTime", createdAt, "createdAt");
 
       const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
 
@@ -438,8 +335,6 @@ export default defineComponent({
       SearchService.get_running_queries()
         .then((response: any) => {
           resultTotal.value = response?.data?.status?.length;
-          console.log("response", response);
-          console.log("queries", queries.value);
           queries.value = response?.data?.status;
         })
         .catch((error: any) => {
@@ -458,10 +353,6 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      console.log("deleteQuery");
-      
-      console.log("deleteQuery", deleteDialog.value.data);
-      
       SearchService.delete_running_query(deleteDialog.value.data)
         .then(() => {
           getRunningQueries();
@@ -484,80 +375,37 @@ export default defineComponent({
         });
     };
 
-    const filterData = (rows: any, terms: any) => {
-      return queries.value;
-      // var filtered = [];
-      // terms = terms.toLowerCase();
-
-      // for (var i = 0; i < duplicateStreamList.value.length; i++) {
-      //   if (
-      //     (selectedStreamType.value ===
-      //       duplicateStreamList.value[i]["stream_type"] ||
-      //       selectedStreamType.value === "all") &&
-      //     (duplicateStreamList.value[i]["name"].toLowerCase().includes(terms) ||
-      //       duplicateStreamList.value[i]["stream_type"]
-      //         .toLowerCase()
-      //         .includes(terms))
-      //   ) {
-      //     filtered.push(duplicateStreamList.value[i]);
-      //   }
-      // }
-      // return filtered;
-    };
-
     const confirmDeleteAction = (props: any) => {
-      console.log(props);
       deleteDialog.value.data = props.row.trace_id;
       deleteDialog.value.show = true;
     };
 
-    // const dashboards = computed(function () {
-    //   const dashboardList = toRaw(
-    //     store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-    //       []
-    //   );
-    //   return dashboardList.map((board: any, index) => {
-    //     return {
-    //       "#": index < 9 ? `0${index + 1}` : index + 1,
-    //       id: board.dashboardId,
-    //       name: board.title,
-    //       identifier: board.dashboardId,
-    //       description: board.description,
-    //       owner: board.owner,
-    //       created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
-    //       actions: "true",
-    //     };
-    //   });
-    // });
     const rowsQuery = computed(function () {
       const rows = toRaw(queries.value) ?? [];
-      console.log("rows-----", rows);
-      
+
       return rows.map((row: any, index) => {
-        console.log("row inside map", row);
-        console.log("index", index);
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
-          "user_id": row?.user_id,
-          "org_id": row?.org_id,
-          "duration": getDuration(row?.created_at),
-          "queryRange": queryRange(row?.query?.start_time, row?.query?.end_time),
-          "status": row?.status,
-          "stream_type": row?.stream_type,
-          "actions": "true",
-          "trace_id": row?.trace_id,
-          "created_at": row?.created_at,
-          "started_at": row?.started_at,
-          "sql": row?.query?.sql,
-          "start_time": row?.query?.start_time,
-          "end_time": row?.query?.end_time,
-          "files": row?.scan_stats?.files,
-          "records": row?.scan_stats?.records,
-          "original_size": row?.scan_stats?.original_size,
-          "compressed_size": row?.scan_stats?.compressed_size
-        }
-      })
-    })
+          user_id: row?.user_id,
+          org_id: row?.org_id,
+          duration: getDuration(row?.created_at),
+          queryRange: queryRange(row?.query?.start_time, row?.query?.end_time),
+          status: row?.status,
+          stream_type: row?.stream_type,
+          actions: "true",
+          trace_id: row?.trace_id,
+          created_at: row?.created_at,
+          started_at: row?.started_at,
+          sql: row?.query?.sql,
+          start_time: row?.query?.start_time,
+          end_time: row?.query?.end_time,
+          files: row?.scan_stats?.files,
+          records: row?.scan_stats?.records,
+          original_size: row?.scan_stats?.original_size,
+          compressed_size: row?.scan_stats?.compressed_size,
+        };
+      });
+    });
     return {
       t,
       store,
@@ -565,7 +413,6 @@ export default defineComponent({
       columns,
       getRunningQueries,
       deleteQuery,
-      filterData,
       confirmDeleteAction,
       deleteDialog,
       perPageOptions,
@@ -582,7 +429,7 @@ export default defineComponent({
       resultTotal,
       selectedPerPage,
       qTable,
-      rowsQuery
+      rowsQuery,
     };
   },
 });

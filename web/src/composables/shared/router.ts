@@ -57,8 +57,6 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
-const RunningQueriesList = () =>
-  import("@/components/queries/RunningQueriesList.vue");
 
 import { routeGuard } from "@/utils/zincutils";
 import useIngestionRoutes from "./useIngestionRoutes";
