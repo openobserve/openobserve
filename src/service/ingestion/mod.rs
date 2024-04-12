@@ -44,7 +44,7 @@ use crate::{
         meta::{
             alerts::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            stream::{PartitioningDetails, Routing, SchemaRecords, StreamParams, StreamPartition},
+            stream::{Routing, SchemaRecords, StreamParams},
         },
         utils::functions::get_vrl_compiler_config,
     },

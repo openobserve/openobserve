@@ -35,7 +35,7 @@ use crate::{
     common::meta::{
         alerts::Alert,
         ingestion::RecordStatus,
-        stream::{Routing, SchemaRecords, StreamPartition},
+        stream::{Routing, SchemaRecords},
     },
     service::{
         ingestion::get_wal_time_key,

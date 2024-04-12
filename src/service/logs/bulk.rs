@@ -43,7 +43,7 @@ use crate::{
             BulkResponse, BulkResponseError, BulkResponseItem, BulkStreamData, RecordStatus,
             StreamSchemaChk,
         },
-        stream::{PartitioningDetails, Routing, StreamParams},
+        stream::{Routing, StreamParams},
     },
     service::{
         db,
@@ -113,13 +113,13 @@ pub async fn ingest(
 
     fields.insert(CONFIG.common.column_timestamp.clone());
 
-    let mut interesting = HashSet::new();
-    for i in 1..100 {
-        interesting.insert(format!("random_attr_{}", i));
-    }
-    for i in 1..10 {
-        interesting.insert(format!("attr{i}"));
-    }
+    // let mut interesting = HashSet::new();
+    // for i in 1..100 {
+    //     interesting.insert(format!("random_attr_{}", i));
+    // }
+    // for i in 1..10 {
+    //     interesting.insert(format!("attr{i}"));
+    // }
 
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -281,7 +281,7 @@ pub async fn ingest(
                 _ => unreachable!(),
             };
 
-            crate::service::logs::refactor_map(&mut local_val, &interesting);
+            // crate::service::logs::refactor_map(&mut local_val, &interesting);
 
             // set _id
             if !doc_id.is_empty() {
