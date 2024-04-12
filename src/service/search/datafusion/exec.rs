@@ -1070,8 +1070,8 @@ pub async fn merge_parquet_files(
         .with_listing_options(listing_options)
         .with_schema(schema.clone());
 
-    let table = ListingTable::try_new(config)?;
-    ctx.register_table("tbl", Arc::new(table))?;
+    let table = Arc::new(ListingTable::try_new(config)?);
+    ctx.register_table("tbl", table.clone())?;
 
     // get meta data
     let meta_sql = format!(
@@ -1139,6 +1139,7 @@ pub async fn merge_parquet_files(
         && schema.fields().len() > CONFIG.limit.query_optimization_num_fields
         && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
+    ctx.register_table("tbl", table.clone())?;
 
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
