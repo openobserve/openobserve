@@ -94,6 +94,7 @@ struct ConfigResponse<'a> {
     rum: Rum,
     custom_logo_img: Option<String>,
     custom_hide_menus: String,
+    meta_org: String,
 }
 
 #[derive(Serialize)]
@@ -234,6 +235,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
             api_version: CONFIG.rum.api_version.to_string(),
             insecure_http: CONFIG.rum.insecure_http,
         },
+        meta_org: CONFIG.common.usage_org.to_string(),
     }))
 }
 
