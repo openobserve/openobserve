@@ -29,7 +29,7 @@ use config::{
 };
 use infra::{errors, schema::STREAM_SCHEMAS};
 use opentelemetry::{global, trace::TraceContextExt};
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
@@ -383,11 +383,17 @@ pub async fn around(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let trace_id = if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+    let mut http_span = None;
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
+    } else if CONFIG.common.tracing_search_enabled {
+        let span = tracing::info_span!("/api/org/_search");
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        http_span = Some(span);
+        trace_id
     } else {
         ider::uuid()
     };
@@ -484,8 +490,7 @@ pub async fn around(
         .map(|v| v.to_string());
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
     let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_around");
-        search_fut.instrument(http_span.clone()).await
+        search_fut.instrument(http_span.clone().unwrap()).await
     } else {
         search_fut.await
     };
@@ -555,8 +560,7 @@ pub async fn around(
     };
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req);
     let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_around");
-        search_fut.instrument(http_span).await
+        search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
     };
@@ -724,11 +728,17 @@ pub async fn values(
         Some(v) => v.to_str().unwrap(),
         None => "",
     };
-    let trace_id = if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+    let mut http_span = None;
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
+    } else if CONFIG.common.tracing_search_enabled {
+        let span = tracing::info_span!("/api/org/_search");
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        http_span = Some(span);
+        trace_id
     } else {
         ider::uuid()
     };
@@ -750,6 +760,7 @@ pub async fn values(
                         &query,
                         user_id,
                         trace_id,
+                        http_span,
                     )
                     .await;
                 }
@@ -764,6 +775,7 @@ pub async fn values(
                     &query,
                     user_id,
                     trace_id,
+                    http_span,
                 )
                 .await;
             }
@@ -778,6 +790,7 @@ pub async fn values(
                 &query,
                 user_id,
                 trace_id,
+                http_span,
             )
             .await;
         }
@@ -790,6 +803,7 @@ pub async fn values(
         &query,
         user_id,
         trace_id,
+        http_span,
     )
     .await
 }
@@ -802,6 +816,7 @@ async fn values_v1(
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
     trace_id: String,
+    http_span: Option<Span>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
@@ -928,8 +943,7 @@ async fn values_v1(
         &req,
     );
     let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_values");
-        search_fut.instrument(http_span).await
+        search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
     };
@@ -1044,6 +1058,7 @@ async fn values_v2(
     query: &web::Query<HashMap<String, String>>,
     user_id: &str,
     trace_id: String,
+    http_span: Option<Span>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
@@ -1115,8 +1130,7 @@ async fn values_v2(
         &req,
     );
     let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/_values");
-        search_fut.instrument(http_span).await
+        search_fut.instrument(http_span.unwrap()).await
     } else {
         search_fut.await
     };
@@ -1258,11 +1272,17 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let trace_id = if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+    let mut http_span = None;
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
+    } else if CONFIG.common.tracing_search_enabled {
+        let span = tracing::info_span!("/api/org/_search");
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        http_span = Some(span);
+        trace_id
     } else {
         ider::uuid()
     };
@@ -1279,8 +1299,15 @@ pub async fn search_partition(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
+    let search_fut = SearchService::search_partition(&trace_id, &org_id, stream_type, &req);
+    let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
+        search_fut.instrument(http_span.unwrap()).await
+    } else {
+        search_fut.await
+    };
+
     // do search
-    match SearchService::search_partition(&trace_id, &org_id, stream_type, &req).await {
+    match search_res {
         Ok(res) => {
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME

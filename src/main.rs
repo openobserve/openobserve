@@ -226,10 +226,8 @@ async fn main() -> Result<(), anyhow::Error> {
         if let Err(e) = init_http_server_without_tracing().await {
             log::error!("HTTP server runs failed: {}", e);
         }
-    } else {
-        if let Err(e) = init_http_server().await {
-            log::error!("HTTP server runs failed: {}", e);
-        }
+    } else if let Err(e) = init_http_server().await {
+        log::error!("HTTP server runs failed: {}", e);
     }
     log::info!("HTTP server stopped");
 

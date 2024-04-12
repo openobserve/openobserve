@@ -21,6 +21,7 @@ use infra::errors;
 use opentelemetry::{global, trace::TraceContextExt};
 use serde::Serialize;
 use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
@@ -135,11 +136,17 @@ pub async fn get_latest_traces(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
 
-    let trace_id = if CONFIG.common.tracing_enabled || CONFIG.common.tracing_search_enabled {
+    let mut http_span = None;
+    let trace_id = if CONFIG.common.tracing_enabled {
         let ctx = global::get_text_map_propagator(|propagator| {
             propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
         });
         ctx.span().span_context().trace_id().to_string()
+    } else if CONFIG.common.tracing_search_enabled {
+        let span = tracing::info_span!("/api/{org_id}/{stream_name}/traces/latest");
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        http_span = Some(span);
+        trace_id
     } else {
         ider::uuid()
     };
@@ -256,8 +263,7 @@ pub async fn get_latest_traces(
 
     let search_fut = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
     let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-        let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/traces/latest");
-        search_fut.instrument(http_span).await
+        search_fut.instrument(http_span.clone().unwrap()).await
     } else {
         search_fut.await
     };
@@ -350,8 +356,7 @@ pub async fn get_latest_traces(
         let search_fut =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
         let search_res = if !CONFIG.common.tracing_enabled && CONFIG.common.tracing_search_enabled {
-            let http_span = tracing::info_span!("/api/{org_id}/{stream_name}/traces/latest");
-            search_fut.instrument(http_span).await
+            search_fut.instrument(http_span.clone().unwrap()).await
         } else {
             search_fut.await
         };
