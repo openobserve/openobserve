@@ -1058,10 +1058,7 @@ pub async fn merge_parquet_files(
     // query data
     let runtime_env = create_runtime_env(None)?;
     let session_config = create_session_config(&SearchType::Normal)?;
-    let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
-        .with_optimizer_rules(vec![])
-        .with_analyzer_rules(vec![]);
-    let ctx = SessionContext::new_with_state(state);
+    let ctx = SessionContext::new_with_config_rt(session_config, Arc::new(runtime_env));
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -1071,7 +1068,7 @@ pub async fn merge_parquet_files(
     let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
     let config = ListingTableConfig::new(prefix)
         .with_listing_options(listing_options)
-        .with_schema(schema);
+        .with_schema(schema.clone());
 
     let table = ListingTable::try_new(config)?;
     ctx.register_table("tbl", Arc::new(table))?;
@@ -1135,6 +1132,12 @@ pub async fn merge_parquet_files(
             CONFIG.common.column_timestamp
         )
     };
+
+    let select_wildcard = query_sql.to_lowercase().starts_with("select * ");
+    let without_optimizer = select_wildcard
+        && CONFIG.limit.query_optimization_num_fields > 0
+        && schema.fields().len() > CONFIG.limit.query_optimization_num_fields;
+    let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
 
     let df = ctx.sql(&query_sql).await?;
     let schema: Schema = df.schema().into();
