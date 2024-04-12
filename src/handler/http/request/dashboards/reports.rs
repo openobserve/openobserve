@@ -52,9 +52,7 @@ pub async fn create_report(
     report: web::Json<Report>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let report = report.into_inner();
-    let _name = report.name.to_string();
-    match reports::save(&org_id, "", report, true).await {
+    match reports::save(&org_id, "", report.into_inner(), true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

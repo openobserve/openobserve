@@ -46,7 +46,6 @@ pub async fn save_template(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let tmpl = tmpl.into_inner();
-    let _name = tmpl.name.to_string();
     match templates::save(&org_id, "", tmpl, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
