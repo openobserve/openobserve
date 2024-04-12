@@ -175,10 +175,11 @@ impl FileData {
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let root_dir = FILES.read().await.root_dir.clone();
-    let root_dir = Path::new(&root_dir).canonicalize().unwrap();
     std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
+        let root_dir = Path::new(&root_dir).canonicalize().unwrap();
         if let Err(e) = load(&root_dir, &root_dir).await {
             log::error!("load disk cache error: {}", e);
         }
