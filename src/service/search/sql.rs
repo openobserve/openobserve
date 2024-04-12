@@ -1001,6 +1001,7 @@ mod tests {
             query,
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            clusters: vec![],
             timeout: 0,
         };
 
@@ -1108,6 +1109,7 @@ mod tests {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
+                clusters: vec![],
                 timeout: 0,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -1228,6 +1230,7 @@ mod tests {
                 query: query.clone(),
                 aggs: HashMap::new(),
                 encoding: config::meta::search::RequestEncoding::Empty,
+                clusters: vec![],
                 timeout: 0,
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();

@@ -375,11 +375,11 @@ pub async fn search(
         let mut job = job.clone();
         job.partition = partition_no as i32;
         req.job = Some(job);
-        req.stype = cluster_rpc::SearchType::WalOnly as i32;
+        req.stype = cluster_rpc::SearchType::WalOnly as _;
         let is_querier = is_querier(&node.role);
         if is_querier {
             if offset_start < file_num {
-                req.stype = cluster_rpc::SearchType::Cluster as i32;
+                req.stype = cluster_rpc::SearchType::Cluster as _;
                 match partition_strategy {
                     QueryPartitionStrategy::FileNum => {
                         req.file_list = file_list
@@ -400,7 +400,7 @@ pub async fn search(
                         offset_start += offset;
                         if req.file_list.is_empty() {
                             if is_ingester(&node.role) {
-                                req.stype = cluster_rpc::SearchType::WalOnly as i32;
+                                req.stype = cluster_rpc::SearchType::WalOnly as _;
                             } else {
                                 continue; // no need more querier
                             }

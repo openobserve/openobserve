@@ -15,6 +15,11 @@
 
 use config::metrics;
 use infra::errors;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::infra::config::O2_CONFIG,
+    search::{QueryManager, TaskStatus},
+};
 use proto::cluster_rpc::{
     search_server::Search, CancelQueryRequest, CancelQueryResponse, QueryStatusRequest,
     QueryStatusResponse, SearchRequest, SearchResponse,
@@ -27,16 +32,14 @@ use crate::service::search as SearchService;
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
 pub struct Searcher {
-    pub query_manager: std::sync::Arc<o2_enterprise::enterprise::search::QueryManager>,
+    pub query_manager: std::sync::Arc<QueryManager>,
 }
 
 #[cfg(feature = "enterprise")]
 impl Searcher {
     pub fn new() -> Self {
         Self {
-            query_manager: std::sync::Arc::new(
-                o2_enterprise::enterprise::search::QueryManager::new(),
-            ),
+            query_manager: std::sync::Arc::new(QueryManager::new()),
         }
     }
 
@@ -46,19 +49,12 @@ impl Searcher {
     }
 
     // insert the trace_id and task_status into the query_manager
-    pub async fn insert(
-        &self,
-        trace_id: String,
-        task_status: o2_enterprise::enterprise::search::TaskStatus,
-    ) {
+    pub async fn insert(&self, trace_id: String, task_status: TaskStatus) {
         self.query_manager.insert(trace_id, task_status).await;
     }
 
     // remove the trace_id from the query_manager
-    pub async fn remove(
-        &self,
-        trace_id: &str,
-    ) -> Option<(String, o2_enterprise::enterprise::search::TaskStatus)> {
+    pub async fn remove(&self, trace_id: &str) -> Option<(String, TaskStatus)> {
         self.query_manager.remove(trace_id).await
     }
 
@@ -137,16 +133,7 @@ impl Search for Searcher {
         if !self.contain_key(&trace_id).await {
             self.insert(
                 trace_id.clone(),
-                o2_enterprise::enterprise::search::TaskStatus::new(
-                    vec![],
-                    false,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                TaskStatus::new(vec![], false, None, None, None, None, None, None),
             )
             .await;
         }
@@ -155,7 +142,7 @@ impl Search for Searcher {
 
         // remove task
         #[cfg(feature = "enterprise")]
-        if !self.is_leader(&trace_id).await {
+        if !O2_CONFIG.super_cluster.enabled && !self.is_leader(&trace_id).await {
             self.remove(&trace_id).await;
         }
 
@@ -211,16 +198,7 @@ impl Search for Searcher {
         if !self.contain_key(&trace_id).await {
             self.insert(
                 trace_id.clone(),
-                o2_enterprise::enterprise::search::TaskStatus::new(
-                    vec![],
-                    false,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
+                TaskStatus::new(vec![], false, None, None, None, None, None, None),
             )
             .await;
         }

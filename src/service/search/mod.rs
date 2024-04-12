@@ -102,7 +102,7 @@ pub async fn search(
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().trace_id = trace_id.clone();
     req.org_id = org_id.to_string();
-    req.stype = cluster_rpc::SearchType::User as i32;
+    req.stype = cluster_rpc::SearchType::Cluster as _;
     req.stream_type = stream_type.to_string();
 
     let res = {

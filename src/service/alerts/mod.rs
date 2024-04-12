@@ -460,6 +460,7 @@ impl QueryCondition {
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
+            clusters: vec![],
             timeout: 0,
         };
         let trace_id = ider::uuid();

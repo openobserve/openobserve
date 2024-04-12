@@ -425,6 +425,7 @@ async fn _get_stream_stats(
         query,
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout: 0,
     };
     match SearchService::search("", &CONFIG.common.usage_org, StreamType::Logs, None, &req).await {

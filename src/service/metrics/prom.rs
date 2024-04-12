@@ -609,6 +609,7 @@ pub(crate) async fn get_series(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout: 0,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
@@ -751,6 +752,7 @@ pub(crate) async fn get_label_values(
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
+        clusters: vec![],
         timeout: 0,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
