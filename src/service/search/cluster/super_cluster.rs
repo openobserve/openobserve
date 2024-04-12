@@ -53,7 +53,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         .map(|v| (Node::default(), v))
         .collect();
     let (merge_batches, scan_stats) =
-        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results).await?;
+        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

@@ -66,6 +66,9 @@ pub async fn search(
 )> {
     let start = std::time::Instant::now();
 
+    // if the request is a super cluster request, then forward it to the super cluster service
+    let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
+
     // handle request time range
     let stream_type = StreamType::from(req.stream_type.as_str());
 
@@ -560,23 +563,23 @@ pub async fn search(
         }
     }
 
-    let (merge_batches, scan_stats) = match merge_grpc_result(trace_id, meta.clone(), results).await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            // search done, release lock
-            #[cfg(not(feature = "enterprise"))]
-            dist_lock::unlock(&locker).await?;
-            #[cfg(feature = "enterprise")]
-            work_group
-                .as_ref()
-                .unwrap()
-                .done(trace_id)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
-            return Err(e);
-        }
-    };
+    let (merge_batches, scan_stats) =
+        match merge_grpc_result(trace_id, meta.clone(), results, is_final_phase).await {
+            Ok(v) => v,
+            Err(e) => {
+                // search done, release lock
+                #[cfg(not(feature = "enterprise"))]
+                dist_lock::unlock(&locker).await?;
+                #[cfg(feature = "enterprise")]
+                work_group
+                    .as_ref()
+                    .unwrap()
+                    .done(trace_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+                return Err(e);
+            }
+        };
     log::info!("[trace_id {trace_id}] final merge task finish");
 
     // search done, release lock
@@ -597,6 +600,7 @@ async fn merge_grpc_result(
     trace_id: &str,
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
+    is_final_phase: bool,
 ) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
@@ -693,7 +697,7 @@ async fn merge_grpc_result(
                 &merge_sql,
                 &batch,
                 &select_fields,
-                true,
+                is_final_phase,
             ) => {
                 match res {
                     Ok(res) => merge_batch = res,

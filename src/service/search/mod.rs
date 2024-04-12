@@ -37,6 +37,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     hashbrown::HashSet,
+    o2_enterprise::enterprise::common::infra::config::O2_CONFIG,
+    o2_enterprise::enterprise::search::TaskStatus,
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
     tracing::{info_span, Instrument},
 };
@@ -85,7 +87,7 @@ pub async fn search(
         SEARCH_SERVER
             .insert(
                 trace_id.clone(),
-                o2_enterprise::enterprise::search::TaskStatus::new(
+                TaskStatus::new(
                     vec![],
                     true,
                     user_id,
@@ -99,6 +101,8 @@ pub async fn search(
             .await;
     }
 
+    let local_cluster_search = !req.clusters.is_empty() && req.clusters == vec!["local"];
+
     let mut req: cluster_rpc::SearchRequest = req.to_owned().into();
     req.job.as_mut().unwrap().trace_id = trace_id.clone();
     req.org_id = org_id.to_string();
@@ -107,10 +111,7 @@ pub async fn search(
 
     let res = {
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .super_cluster
-            .enabled
-        {
+        if O2_CONFIG.super_cluster.enabled && !local_cluster_search {
             cluster::super_cluster::search(req).await
         } else {
             cluster::http::search(req).await
